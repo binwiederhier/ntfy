@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ntfy.sh</title>
+    <style>
+    </style>
+</head>
+<body>
+<h1>ntfy.sh</h1>
+
+Topics:
+<ul id="topics">
+</ul>
+
+<input type="text" id="topic" size="64" autofocus />
+<button id="topicButton">Add topic</button>
+<button onclick="notifyMe('test'); return false">Notify me!</button>
+
+<div id="error"></div>
+<script type="text/javascript">
+    window.onload = function() {
+        let topics = {};
+
+        const topicField = document.getElementById("topic");
+        const topicsList = document.getElementById("topics");
+        const topicButton = document.getElementById("topicButton");
+        const errorField = document.getElementById("error");
+
+        const subscribe = function (topic) {
+            let conn = new WebSocket(`ws://${document.location.host}/${topic}/ws`);
+            conn.onclose = function (evt) {
+                errorField.innerHTML = "Connection closed";
+            };
+            conn.onmessage = function (evt) {
+                notify(evt.data)
+            };
+            topics[topic] = conn;
+
+            let topicEntry = document.createElement('li');
+            topicEntry.innerHTML = `${topic} <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
+            topicsList.appendChild(topicEntry);
+        };
+
+        const notify = function (msg) {
+            if (!("Notification" in window)) {
+                alert("This browser does not support desktop notification");
+            } else if (Notification.permission === "granted") {
+                var notification = new Notification(msg);
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === "granted") {
+                        var notification = new Notification(msg);
+                    }
+                });
+            }
+        }
+
+        topicButton.onclick = function () {
+            if (!topicField.value) {
+                return false;
+            }
+            subscribe(topicField.value);
+            return false;
+        };
+
+        if (!window["Notification"]) {
+            errorField.innerHTML = "Your browser does not support desktop notifications";
+            topicField.disabled = true;
+            topicButton.disabled = true;
+        } else if (!window["Notification"]) {
+            errorField.innerHTML = "Your browser does not support WebSockets.";
+            topicField.disabled = true;
+            topicButton.disabled = true;
+        }
+    };
+</script>
+
+</body>
+</html>

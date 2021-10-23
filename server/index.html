@@ -8,71 +8,89 @@
 <body>
 <h1>ntfy.sh</h1>
 
-Topics:
-<ul id="topics">
-</ul>
+<p>
+    ntfy.sh is a super simple pub-sub notification service. It allows you to send desktop and (soon) phone notifications
+    via scripts, without signup or cost. It's entirely free and open source.
+</p>
 
-<input type="text" id="topic" size="64" autofocus />
-<button id="topicButton">Add topic</button>
-<button onclick="notifyMe('test'); return false">Notify me!</button>
+<p>
+    <b>Usage:</b> You can subscribe to a topic either in this web UI, or in your own app by subscribing to an SSE/EventSource
+    or JSON feed. Once subscribed, you can publish messages via PUT or POST.
+</p>
 
 <div id="error"></div>
+
+<form id="subscribeForm">
+    <input type="text" id="topicField" size="64" autofocus />
+    <input type="submit" id="subscribeButton" value="Subscribe topic" />
+</form>
+
+Topics:
+<ul id="topicsList">
+</ul>
+
 <script type="text/javascript">
-    window.onload = function() {
-        let topics = {};
+    let topics = {};
 
-        const topicField = document.getElementById("topic");
-        const topicsList = document.getElementById("topics");
-        const topicButton = document.getElementById("topicButton");
-        const errorField = document.getElementById("error");
+    const topicField = document.getElementById("topicField");
+    const topicsList = document.getElementById("topicsList");
+    const subscribeButton = document.getElementById("subscribeButton");
+    const subscribeForm = document.getElementById("subscribeForm");
+    const errorField = document.getElementById("error");
 
-        const subscribe = function (topic) {
-            let conn = new WebSocket(`ws://${document.location.host}/${topic}/ws`);
-            conn.onclose = function (evt) {
-                errorField.innerHTML = "Connection closed";
-            };
-            conn.onmessage = function (evt) {
-                notify(evt.data)
-            };
-            topics[topic] = conn;
-
-            let topicEntry = document.createElement('li');
-            topicEntry.innerHTML = `${topic} <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
-            topicsList.appendChild(topicEntry);
-        };
-
-        const notify = function (msg) {
-            if (!("Notification" in window)) {
-                alert("This browser does not support desktop notification");
-            } else if (Notification.permission === "granted") {
-                var notification = new Notification(msg);
-            } else if (Notification.permission !== "denied") {
-                Notification.requestPermission().then(function (permission) {
-                    if (permission === "granted") {
-                        var notification = new Notification(msg);
-                    }
-                });
-            }
-        }
-
-        topicButton.onclick = function () {
-            if (!topicField.value) {
-                return false;
-            }
-            subscribe(topicField.value);
-            return false;
-        };
-
-        if (!window["Notification"]) {
-            errorField.innerHTML = "Your browser does not support desktop notifications";
-            topicField.disabled = true;
-            topicButton.disabled = true;
-        } else if (!window["Notification"]) {
-            errorField.innerHTML = "Your browser does not support WebSockets.";
-            topicField.disabled = true;
-            topicButton.disabled = true;
+    const subscribe = function (topic) {
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission().then(function (permission) {
+                if (permission === "granted") {
+                    subscribeInternal(topic);
+                }
+            });
+        } else {
+            subscribeInternal(topic);
         }
     };
+
+    const subscribeInternal = function (topic) {
+        let eventSource = new EventSource(`${topic}/sse`);
+        eventSource.onerror = function (e) {
+            console.log(e);
+            errorField.innerHTML = "Error " + e;
+        };
+        eventSource.onmessage = function (e) {
+            const event = JSON.parse(e.data);
+            new Notification(event.message);
+        };
+        topics[topic] = eventSource;
+
+        let topicEntry = document.createElement('li');
+        topicEntry.id = `topic-${topic}`;
+        topicEntry.innerHTML = `${topic} <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
+        topicsList.appendChild(topicEntry);
+    };
+
+        const unsubscribe = function(topic) {
+        topics[topic].close();
+        document.getElementById(`topic-${topic}`).remove();
+    };
+
+    subscribeForm.onsubmit = function () {
+        alert("hi")
+        if (!topicField.value) {
+            return false;
+        }
+        subscribe(topicField.value);
+        return false;
+    };
+
+    if (!window["Notification"] || !window["EventSource"]) {
+        errorField.innerHTML = "Your browser is not compatible to use the web-based desktop notifications.";
+        topicField.disabled = true;
+        subscribeButton.disabled = true;
+    } else if (Notification.permission === "denied") {
+        errorField.innerHTML = "You have blocked desktop notifications for this website. Please unblock them and refresh to use the web-based desktop notifications.";
+        topicField.disabled = true;
+        subscribeButton.disabled = true;
+    }
 </script>
 
 </body>

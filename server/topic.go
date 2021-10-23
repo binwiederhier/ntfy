@@ -12,11 +12,11 @@ import (
 type topic struct {
 	id          string
 	subscribers map[int]subscriber
-	messages int
+	messages    int
 	last        time.Time
-	ctx context.Context
-	cancel context.CancelFunc
-	mu sync.Mutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	mu          sync.Mutex
 }
 
 type subscriber func(msg *message) error

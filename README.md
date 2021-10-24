@@ -43,6 +43,64 @@ curl -d "long process is done" ntfy.sh/mytopic
 Messages published to a non-existing topic or a topic without subscribers will not be delivered later. There is (currently)
 no buffering of any kind. If you're not listening, the message won't be delivered.
 
+## Installation
+Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
+deb/rpm packages.
+
+1. Install ntfy using one of the methods described below
+2. Then (optionally) edit `/etc/ntfy/config.yml`
+3. Then just run it with `ntfy` (or `systemctl start ntfy` when using the deb/rpm).
+
+### Binaries and packages
+**Debian/Ubuntu** (*from a repository*)**:**
+```bash
+curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+sudo apt install apt-transport-https
+sudo sh -c "echo 'deb [arch=amd64] https://archive.heckel.io/apt debian main' > /etc/apt/sources.list.d/archive.heckel.io.list"  
+sudo apt update
+sudo apt install ntfy
+```
+
+**Debian/Ubuntu** (*manual install*)**:**
+```bash
+sudo apt install tmux
+wget https://github.com/binwiederhier/ntfy/releases/download/v0.0.2/ntfy_0.0.2_amd64.deb
+dpkg -i ntfy_0.0.2_amd64.deb
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v0.0.2/ntfy_0.0.2_amd64.rpm
+```
+
+**Docker:**
+```bash
+docker run --rm -it binwiederhier/ntfy
+```
+
+**Go:**
+```bash
+go get -u heckel.io/ntfy
+```
+
+**Manual install** (*any x86_64-based Linux*)**:**
+```bash
+wget https://github.com/binwiederhier/ntfy/releases/download/v0.0.2/ntfy_0.0.2_linux_x86_64.tar.gz
+sudo tar -C /usr/bin -zxf ntfy_0.0.2_linux_x86_64.tar.gz ntfy
+./ntfy
+```
+
+## Building
+Building ntfy is simple. Here's how you do it:
+
+```
+make build-simple
+# Builds to dist/ntfy_linux_amd64/ntfy
+``` 
+
+To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that installed, you can run `make build` or
+`make build-snapshot`.
+
 ## FAQ
 
 ### Isn't this like ...?

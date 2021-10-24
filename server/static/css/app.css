@@ -1,0 +1,76 @@
+/* general styling */
+
+html, body {
+    font-family: 'Lato', sans-serif;
+    color: #333;
+    font-size: 1.1em;
+}
+
+a {
+    color: #39005a;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+h1 {
+    margin-top: 25px;
+    margin-bottom: 18px;
+    font-size: 2.5em;
+}
+
+h2 {
+    margin-top: 20px;
+    margin-bottom: 5px;
+    font-size: 1.8em;
+}
+
+h3 {
+    margin-top: 20px;
+    margin-bottom: 5px;
+    font-size: 1.3em;
+}
+
+p {
+    margin-top: 0;
+    font-size: 1.1em;
+}
+
+tt {
+    background: #eee;
+    padding: 2px 7px;
+    border-radius: 3px;
+}
+
+code {
+    display: block;
+    background: #eee;
+    font-family: monospace;
+    padding: 20px;
+    border-radius: 3px;
+}
+
+/* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
+   embedded with the help of https://google-webfonts-helper.herokuapp.com/fonts/lato?subsets=latin */
+
+@font-face {
+    font-family: 'Lato';
+    font-style: normal;
+    font-weight: 400;
+    src: local(''),
+    url('../font/lato-v17-latin-ext_latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../font/lato-v17-latin-ext_latin-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* Main page */
+
+#main {
+    max-width: 900px;
+    margin: 0 auto 50px auto;
+}
+
+#error {
+    color: darkred;
+    font-style: italic;
+}

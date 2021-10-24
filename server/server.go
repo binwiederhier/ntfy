@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"embed"
 	_ "embed" // required for go:embed
 	"encoding/json"
 	"fmt"
@@ -51,9 +52,13 @@ var (
 	jsonRegex  = regexp.MustCompile(`^/[^/]+/json$`)
 	sseRegex   = regexp.MustCompile(`^/[^/]+/sse$`)
 	rawRegex   = regexp.MustCompile(`^/[^/]+/raw$`)
+	staticRegex   = regexp.MustCompile(`^/static/.+`)
 
 	//go:embed "index.html"
 	indexSource string
+
+	//go:embed static
+	webStaticFs embed.FS
 
 	errHTTPNotFound        = &errHTTP{http.StatusNotFound, http.StatusText(http.StatusNotFound)}
 	errHTTPTooManyRequests = &errHTTP{http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)}
@@ -123,6 +128,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 	}
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
+	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+		return s.handleStatic(w, r)
 	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
 		return s.handleSubscribeJSON(w, r)
 	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
@@ -238,6 +245,11 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request) erro
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
+	return nil
+}
+
+func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
+	http.FileServer(http.FS(webStaticFs)).ServeHTTP(w, r)
 	return nil
 }
 

@@ -14,6 +14,7 @@ let topics = {};
 const topicsHeader = document.getElementById("topicsHeader");
 const topicsList = document.getElementById("topicsList");
 const topicField = document.getElementById("topicField");
+const notifySound = document.getElementById("notifySound");
 const subscribeButton = document.getElementById("subscribeButton");
 const subscribeForm = document.getElementById("subscribeForm");
 const errorField = document.getElementById("error");
@@ -59,6 +60,7 @@ const subscribeInternal = (topic, delaySec) => {
         eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
             new Notification(event.message);
+            notifySound.play();
         };
         topics[topic] = eventSource;
         localStorage.setItem('topics', JSON.stringify(Object.keys(topics)));

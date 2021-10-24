@@ -127,3 +127,9 @@ I welcome any and all contributions. Just create a PR or an issue.
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io), distributed under the [Apache License 2.0](LICENSE).
+
+Third party libraries and resources:
+* [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI
+* [Mixkit sound](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) used as notification sound
+* [Lato Font](https://www.latofonts.com/) (OFL) is used as a font in the Web UI
+* [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases 

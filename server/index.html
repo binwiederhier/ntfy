@@ -14,7 +14,7 @@
     <p>
         <b>ntfy</b> (pronounce: <i>notify</i>) is a simple <b>HTTP-based pub-sub notification service and tool</b>.
         It allows you to send <b>desktop notifications via scripts</b>, entirely <b>without signup or cost</b>.
-        It's entirely free and open source. You can find the source code <a href="https://github.com/binwiederhier/ntfy">on GitHub</a>.
+        It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
     <p id="error"></p>
 
@@ -31,12 +31,12 @@
     <h3>Subscribe via web</h3>
     <p>
         If you subscribe to a topic via this web UI in the field below, messages published to any subscribed topic
-        will show up as <b>desktop notification</b>. 
+        will show up as <b>desktop notification</b>.
     </p>
     <form id="subscribeForm">
         <p>
             <label for="topicField">Topic ID:</label>
-            <input type="text" id="topicField" size="64" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" autofocus />
+            <input type="text" id="topicField" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" autofocus />
             <input type="submit" id="subscribeButton" value="Subscribe topic" />
         </p>
     </form>

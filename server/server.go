@@ -131,6 +131,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleSubscribeRaw(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
 		return s.handlePublishHTTP(w, r)
+	} else if r.Method == http.MethodOptions {
+		return s.handleOptions(w, r)
 	}
 	return errHTTPNotFound
 }
@@ -154,7 +156,11 @@ func (s *Server) handlePublishHTTP(w http.ResponseWriter, r *http.Request) error
 		Time:    time.Now().UnixMilli(),
 		Message: string(b),
 	}
-	return t.Publish(msg)
+	if err := t.Publish(msg); err != nil {
+		return err
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	return nil
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) error {
@@ -169,6 +175,7 @@ func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) err
 		return nil
 	})
 	defer s.unsubscribe(t, subscriberID)
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	select {
 	case <-t.ctx.Done():
 	case <-r.Context().Done():
@@ -194,7 +201,7 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request) erro
 	})
 	defer s.unsubscribe(t, subscriberID)
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if _, err := io.WriteString(w, "event: open\n\n"); err != nil {
 		return err
 	}
@@ -225,6 +232,12 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request) erro
 	case <-t.ctx.Done():
 	case <-r.Context().Done():
 	}
+	return nil
+}
+
+func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
 	return nil
 }
 

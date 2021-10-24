@@ -1,0 +1,10 @@
+[Unit]
+Description=ntfy server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/ntfy
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

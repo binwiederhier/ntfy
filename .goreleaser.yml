@@ -1,0 +1,62 @@
+before:
+  hooks:
+    - go mod download
+builds:
+  - binary: ntfy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+nfpms:
+  -
+    package_name: ntfy
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+    homepage: https://heckel.io/ntfy
+    maintainer: Philipp C. Heckel <philipp.heckel@gmail.com>
+    description: Simple pub-sub notification service
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: config/config.yml
+        dst: /etc/ntfy/config.yml
+        type: config
+      - src: config/ntfy.service
+        dst: /lib/systemd/system/ntfy.service
+    scripts:
+      postremove: "scripts/postrm.sh"
+archives:
+  -
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+      - config/config.yml
+      - config/ntfy.service
+    replacements:
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+dockers:
+  - dockerfile: Dockerfile
+    ids:
+      - ntfy
+    image_templates:
+      - "binwiederhier/ntfy:latest"
+      - "binwiederhier/ntfy:{{ .Tag }}"
+      - "binwiederhier/ntfy:v{{ .Major }}.{{ .Minor }}"

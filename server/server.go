@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/config"
 	"io"
 	"log"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 )
 
 type Server struct {
+	config *config.Config
 	topics map[string]*topic
 	mu     sync.Mutex
 }
@@ -33,13 +35,17 @@ var (
 	topicRegex = regexp.MustCompile(`^/[^/]+$`)
 	jsonRegex  = regexp.MustCompile(`^/[^/]+/json$`)
 	sseRegex   = regexp.MustCompile(`^/[^/]+/sse$`)
+	rawRegex   = regexp.MustCompile(`^/[^/]+/raw$`)
 
 	//go:embed "index.html"
 	indexSource string
+
+	errTopicNotFound = errors.New("topic not found")
 )
 
-func New() *Server {
+func New(conf *config.Config) *Server {
 	return &Server{
+		config: conf,
 		topics: make(map[string]*topic),
 	}
 }
@@ -50,23 +56,22 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) listenAndServe() error {
-	log.Printf("Listening on :9997")
+	log.Printf("Listening on %s", s.config.ListenHTTP)
 	http.HandleFunc("/", s.handle)
-	return http.ListenAndServe(":9997", nil)
+	return http.ListenAndServe(s.config.ListenHTTP, nil)
 }
 
 func (s *Server) runMonitor() {
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(30 * time.Second)
 		s.mu.Lock()
-		log.Printf("topics: %d", len(s.topics))
+		var subscribers, messages int
 		for _, t := range s.topics {
-			t.mu.Lock()
-			log.Printf("- %s: %d subscriber(s), %d message(s) sent, last active = %s",
-				t.id, len(t.subscribers), t.messages, t.last.String())
-			t.mu.Unlock()
+			subs, msgs := t.Stats()
+			subscribers += subs
+			messages += msgs
 		}
-		// TODO kill dead topics
+		log.Printf("Stats: %d topic(s), %d subscriber(s), %d message(s) sent", len(s.topics), subscribers, messages)
 		s.mu.Unlock()
 	}
 }
@@ -74,7 +79,7 @@ func (s *Server) runMonitor() {
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	if err := s.handleInternal(w, r); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = io.WriteString(w, err.Error())
+		_, _ = io.WriteString(w, err.Error()+"\n")
 	}
 }
 
@@ -85,6 +90,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleSubscribeJSON(w, r)
 	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
 		return s.handleSubscribeSSE(w, r)
+	} else if r.Method == http.MethodGet && rawRegex.MatchString(r.URL.Path) {
+		return s.handleSubscribeRaw(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
 		return s.handlePublishHTTP(w, r)
 	}
@@ -125,7 +132,7 @@ func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) err
 		}
 		return nil
 	})
-	defer t.Unsubscribe(subscriberID)
+	defer s.unsubscribe(t, subscriberID)
 	select {
 	case <-t.ctx.Done():
 	case <-r.Context().Done():
@@ -149,7 +156,7 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request) erro
 		}
 		return nil
 	})
-	defer t.Unsubscribe(subscriberID)
+	defer s.unsubscribe(t, subscriberID)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.WriteString(w, "event: open\n\n"); err != nil {
@@ -158,6 +165,26 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request) erro
 	if fl, ok := w.(http.Flusher); ok {
 		fl.Flush()
 	}
+	select {
+	case <-t.ctx.Done():
+	case <-r.Context().Done():
+	}
+	return nil
+}
+
+func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request) error {
+	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/raw")) // Hack
+	subscriberID := t.Subscribe(func(msg *message) error {
+		m := strings.ReplaceAll(msg.Message, "\n", " ") + "\n"
+		if _, err := io.WriteString(w, m); err != nil {
+			return err
+		}
+		if fl, ok := w.(http.Flusher); ok {
+			fl.Flush()
+		}
+		return nil
+	})
+	defer s.unsubscribe(t, subscriberID)
 	select {
 	case <-t.ctx.Done():
 	case <-r.Context().Done():
@@ -179,7 +206,15 @@ func (s *Server) topic(topicID string) (*topic, error) {
 	defer s.mu.Unlock()
 	c, ok := s.topics[topicID]
 	if !ok {
-		return nil, errors.New("topic does not exist")
+		return nil, errTopicNotFound
 	}
 	return c, nil
+}
+
+func (s *Server) unsubscribe(t *topic, subscriberID int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if subscribers := t.Unsubscribe(subscriberID); subscribers == 0 {
+		delete(s.topics, t.id)
+	}
 }

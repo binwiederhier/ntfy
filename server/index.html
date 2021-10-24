@@ -3,37 +3,45 @@
 <head>
     <title>ntfy.sh</title>
     <style>
+        body { font-size: 1.3em; line-height: 140%; }
+        #error { color: darkred; font-style: italic; }
+        #main { max-width: 800px; margin: 0 auto; }
     </style>
 </head>
 <body>
-<h1>ntfy.sh</h1>
+<div id="main">
+    <h1>ntfy.sh</h1>
 
-<p>
-    ntfy.sh is a super simple pub-sub notification service. It allows you to send desktop and (soon) phone notifications
-    via scripts, without signup or cost. It's entirely free and open source. You can find the source code <a href="https://github.com/binwiederhier/ntfy">on GitHub</a>.
-</p>
+    <p>
+        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based pub-sub notification service. It allows you to send desktop and (soon) phone notifications
+        via scripts, without signup or cost. It's entirely free and open source. You can find the source code <a href="https://github.com/binwiederhier/ntfy">on GitHub</a>.
+    </p>
 
-<p>
-    You can subscribe to a topic either in this web UI, or in your own app by subscribing to an SSE/EventSource
-    or JSON feed. Once subscribed, you can publish messages via PUT or POST.
-</p>
+    <p>
+        You can subscribe to a topic either in this web UI, or in your own app by subscribing to an SSE/EventSource
+        or JSON feed. Once subscribed, you can publish messages via PUT or POST.
+    </p>
 
-<p id="error"></p>
+    <p id="error"></p>
 
-<form id="subscribeForm">
-    <input type="text" id="topicField" size="64" autofocus />
-    <input type="submit" id="subscribeButton" value="Subscribe topic" />
-</form>
+    <form id="subscribeForm">
+        <p>
+            <input type="text" id="topicField" size="64" placeholder="Topic ID (letters, numbers, _ and -)"  pattern="[-_A-Za-z]{1,64}" autofocus />
+            <input type="submit" id="subscribeButton" value="Subscribe topic" />
+        </p>
+    </form>
 
-<p>Topics:</p>
-<ul id="topicsList">
-</ul>
+    <p id="topicsHeader"><b>Subscribed topics:</b></p>
+    <ul id="topicsList"></ul>
+
+</div>
 
 <script type="text/javascript">
     let topics = {};
 
-    const topicField = document.getElementById("topicField");
+    const topicsHeader = document.getElementById("topicsHeader");
     const topicsList = document.getElementById("topicsList");
+    const topicField = document.getElementById("topicField");
     const subscribeButton = document.getElementById("subscribeButton");
     const subscribeForm = document.getElementById("subscribeForm");
     const errorField = document.getElementById("error");
@@ -43,6 +51,8 @@
             Notification.requestPermission().then((permission) => {
                 if (permission === "granted") {
                     subscribeInternal(topic, 0);
+                } else {
+                    showNotificationDeniedError();
                 }
             });
         } else {
@@ -60,6 +70,7 @@
                 topicEntry.innerHTML = `${topic} <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
                 topicsList.appendChild(topicEntry);
             }
+            topicsHeader.style.display = '';
 
             // Open event source
             let eventSource = new EventSource(`${topic}/sse`);
@@ -68,7 +79,6 @@
                 delaySec = 0; // Reset on successful connection
             };
             eventSource.onerror = (e) => {
-                console.log("onerror")
                 const newDelaySec = (delaySec + 5 <= 30) ? delaySec + 5 : 30;
                 topicEntry.innerHTML = `${topic} <i>(Reconnecting in ${newDelaySec}s ...)</i> <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
                 eventSource.close()
@@ -88,6 +98,23 @@
         delete topics[topic];
         localStorage.setItem('topics', JSON.stringify(Object.keys(topics)));
         document.getElementById(`topic-${topic}`).remove();
+        if (Object.keys(topics).length === 0) {
+            topicsHeader.style.display = 'none';
+        }
+    };
+
+    const showError = (msg) => {
+        errorField.innerHTML = msg;
+        topicField.disabled = true;
+        subscribeButton.disabled = true;
+    };
+
+    const showBrowserIncompatibleError = () => {
+        showError("Your browser is not compatible to use the web-based desktop notifications.");
+    };
+
+    const showNotificationDeniedError = () => {
+        showError("You have blocked desktop notifications for this website. Please unblock them and refresh to use the web-based desktop notifications.");
     };
 
     subscribeForm.onsubmit = function () {
@@ -101,13 +128,9 @@
 
     // Disable Web UI if notifications of EventSource are not available
     if (!window["Notification"] || !window["EventSource"]) {
-        errorField.innerHTML = "Your browser is not compatible to use the web-based desktop notifications.";
-        topicField.disabled = true;
-        subscribeButton.disabled = true;
+        showBrowserIncompatibleError();
     } else if (Notification.permission === "denied") {
-        errorField.innerHTML = "You have blocked desktop notifications for this website. Please unblock them and refresh to use the web-based desktop notifications.";
-        topicField.disabled = true;
-        subscribeButton.disabled = true;
+        showNotificationDeniedError();
     }
 
     // Reset UI
@@ -115,10 +138,14 @@
 
     // Restore topics
     const storedTopics = localStorage.getItem('topics');
-    if (storedTopics) {
-        JSON.parse(storedTopics).forEach((topic) => {
-            subscribeInternal(topic, 0);
-        });
+    if (storedTopics && Notification.permission === "granted") {
+        const storedTopicsArray = JSON.parse(storedTopics)
+        storedTopicsArray.forEach((topic) => { subscribeInternal(topic, 0); });
+        if (storedTopicsArray.length === 0) {
+            topicsHeader.style.display = 'none';
+        }
+    } else {
+        topicsHeader.style.display = 'none';
     }
 </script>
 

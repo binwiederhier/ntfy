@@ -1,0 +1,9 @@
+# ntfy config file
+
+# Listen address for the HTTP web server
+#
+# Format:    <hostname>:<port>
+# Default:   :80
+# Required:  No
+#
+# listen-http: ":80"

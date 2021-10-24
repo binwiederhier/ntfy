@@ -41,10 +41,11 @@ func (t *topic) Subscribe(s subscriber) int {
 	return subscriberID
 }
 
-func (t *topic) Unsubscribe(id int) {
+func (t *topic) Unsubscribe(id int) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.subscribers, id)
+	return len(t.subscribers)
 }
 
 func (t *topic) Publish(m *message) error {
@@ -57,10 +58,16 @@ func (t *topic) Publish(m *message) error {
 	t.messages++
 	for _, s := range t.subscribers {
 		if err := s(m); err != nil {
-			log.Printf("error publishing message to subscriber x")
+			log.Printf("error publishing message to subscriber")
 		}
 	}
 	return nil
+}
+
+func (t *topic) Stats() (subscribers int, messages int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.subscribers), t.messages
 }
 
 func (t *topic) Close() {

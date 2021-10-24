@@ -3,37 +3,64 @@
 <head>
     <title>ntfy.sh</title>
     <style>
-        body { font-size: 1.3em; line-height: 140%; }
+        body { font-size: 1.2em; line-height: 130%; }
         #error { color: darkred; font-style: italic; }
-        #main { max-width: 800px; margin: 0 auto; }
+        #main { max-width: 900px; margin: 0 auto 50px auto; }
     </style>
 </head>
 <body>
 <div id="main">
-    <h1>ntfy.sh</h1>
-
+    <h1>ntfy.sh - simple HTTP-based pub-sub</h1>
     <p>
-        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based pub-sub notification service. It allows you to send desktop and (soon) phone notifications
-        via scripts, without signup or cost. It's entirely free and open source. You can find the source code <a href="https://github.com/binwiederhier/ntfy">on GitHub</a>.
+        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple <b>HTTP-based pub-sub notification service and tool</b>.
+        It allows you to send <b>desktop notifications via scripts</b>, entirely <b>without signup or cost</b>.
+        It's entirely free and open source. You can find the source code <a href="https://github.com/binwiederhier/ntfy">on GitHub</a>.
     </p>
-
-    <p>
-        You can subscribe to a topic either in this web UI, or in your own app by subscribing to an SSE/EventSource
-        or JSON feed. Once subscribed, you can publish messages via PUT or POST.
-    </p>
-
     <p id="error"></p>
 
+    <h2>Subscribe to a topic</h2>
+    <p>
+        Topics are created on the fly by subscribing to them. You can create and subscribe to a topic either in this web UI, or in
+        your own app by subscribing to an <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>,
+        a JSON feed, or raw feed.
+    </p>
+    <p>
+        Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
+    </p>
+
+    <h3>Subscribe via web</h3>
+    <p>
+        If you subscribe to a topic via this web UI in the field below, messages published to any subscribed topic
+        will show up as <b>desktop notification</b>. 
+    </p>
     <form id="subscribeForm">
         <p>
-            <input type="text" id="topicField" size="64" placeholder="Topic ID (letters, numbers, _ and -)"  pattern="[-_A-Za-z]{1,64}" autofocus />
+            <label for="topicField">Topic ID:</label>
+            <input type="text" id="topicField" size="64" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" autofocus />
             <input type="submit" id="subscribeButton" value="Subscribe topic" />
         </p>
     </form>
-
-    <p id="topicsHeader"><b>Subscribed topics:</b></p>
+    <p id="topicsHeader">Subscribed topics:</p>
     <ul id="topicsList"></ul>
 
+    <h3>Subscribe via your app, or via the CLI</h3>
+    <tt>
+        curl -s ntfy.sh/mytopic/raw # one message per line (\n are replaced with a space)<br/>
+        curl -s ntfy.sh/mytopic/json # one JSON message per line<br/>
+        curl -s ntfy.sh/mytopic/sse # server-sent events (SSE) stream
+    </tt>
+
+    <h3>Publishing messages</h3>
+    <p>
+        Publishing messages can be done via PUT or POST using. Here's an example using <tt>curl</tt>:
+    </p>
+    <tt>
+        curl -d "long process is done" ntfy.sh/mytopic
+    </tt>
+    <p>
+        Messages published to a non-existing topic or a topic without subscribers will not be delivered later.
+        There is (currently) no buffering of any kind. If you're not listening, the message won't be delivered.
+    </p>
 </div>
 
 <script type="text/javascript">

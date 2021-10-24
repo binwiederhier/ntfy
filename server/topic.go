@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// topic represents a channel to which subscribers can subscribe, and publishers
+// can publish a message
 type topic struct {
 	id          string
 	subscribers map[int]subscriber
@@ -19,6 +21,13 @@ type topic struct {
 	mu          sync.Mutex
 }
 
+// message represents a message published to a topic
+type message struct {
+	Time    int64  `json:"time"`
+	Message string `json:"message"`
+}
+
+// subscriber is a function that is called for every new message on a topic
 type subscriber func(msg *message) error
 
 func newTopic(id string) *topic {

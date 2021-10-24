@@ -1,18 +1,38 @@
 // Package config provides the main configuration
 package config
 
+import (
+	"golang.org/x/time/rate"
+	"time"
+)
+
+// Defines default config settings
 const (
-	DefaultListenHTTP = ":80"
+	DefaultListenHTTP      = ":80"
+	defaultManagerInterval = time.Minute
+)
+
+// Defines the max number of requests, here:
+// 50 requests bucket, replenished at a rate of 1 per second
+var (
+	defaultLimit      = rate.Every(time.Second)
+	defaultLimitBurst = 50
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	ListenHTTP string
+	ListenHTTP      string
+	Limit           rate.Limit
+	LimitBurst      int
+	ManagerInterval time.Duration
 }
 
 // New instantiates a default new config
 func New(listenHTTP string) *Config {
 	return &Config{
-		ListenHTTP: listenHTTP,
+		ListenHTTP:      listenHTTP,
+		Limit:           defaultLimit,
+		LimitBurst:      defaultLimitBurst,
+		ManagerInterval: defaultManagerInterval,
 	}
 }

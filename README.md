@@ -6,11 +6,14 @@ via scripts. I run a free version of it on *[ntfy.sh](https://ntfy.sh)*. **No si
 ## Usage
 
 ### Subscribe to a topic
-You can subscribe to a topic either in a web UI, or in your own app by subscribing to an 
-[SSE](https://en.wikipedia.org/wiki/Server-sent_events)/[EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource),
+Topics are created on the fly by subscribing to them. You can create and subscribe to a topic either in a web UI, or in 
+your own app by subscribing to an [SSE](https://en.wikipedia.org/wiki/Server-sent_events)/[EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource),
 or a JSON or raw feed.  
 
-Here's how to see the raw/json/sse stream in `curl`. This will subscribe to the topic and wait for events.
+Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable.  
+
+Here's how you can create a topic `mytopic`, subscribe to it topic and wait for events. This is using `curl`, but you
+can use any library that can do HTTP GETs:
 
 ```
 # Subscribe to "mytopic" and output one message per line (\n are replaced with a space)
@@ -54,9 +57,11 @@ Best effort.
 ### Why is the web UI so ugly?
 I don't particularly like JS or dealing with CSS. I'll make it pretty after it's functional.
 
+## Will you know what topics exist, can you spy on me?
+If you don't trust me or your messages are sensitive, run your ntfy on your own server. That said, the logs do not 
+contain any topic names
+
 ## TODO
-- rate limiting / abuse protection
-- release/packaging
 - add HTTPS
 
 ## Contributing

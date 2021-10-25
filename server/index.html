@@ -12,9 +12,9 @@
     <meta name="HandheldFriendly" content="true">
 
     <!-- Mobile browsers, background color -->
-    <meta name="theme-color" content="#004c79">
-    <meta name="msapplication-navbutton-color" content="#004c79">
-    <meta name="apple-mobile-web-app-status-bar-style" content="#004c79">
+    <meta name="theme-color" content="#39005a">
+    <meta name="msapplication-navbutton-color" content="#39005a">
+    <meta name="apple-mobile-web-app-status-bar-style" content="#39005a">
 
     <!-- Favicon, see favicon.io -->
     <link rel="icon" type="image/png" href="static/img/favicon.png">
@@ -56,7 +56,7 @@
     <form id="subscribeForm">
         <p>
             <label for="topicField">Subscribe to topic:</label>
-            <input type="text" id="topicField" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" autofocus />
+            <input type="text" id="topicField" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" />
             <input type="submit" id="subscribeButton" value="Subscribe" />
         </p>
     </form>
@@ -83,7 +83,7 @@
         notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
     <code>
-        const eventSource = new EventSource(`https://ntfy.sh/mytopic/sse`);<br/>
+        const eventSource = new EventSource('https://ntfy.sh/mytopic/sse');<br/>
         eventSource.onmessage = (e) => {<br/>
         &nbsp;&nbsp;// Do something with e.data<br/>
         };
@@ -100,9 +100,9 @@
         Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
     <code>
-        fetch(`https://ntfy.sh/mytopic`, {<br/>
+        fetch('https://ntfy.sh/mytopic', {<br/>
         &nbsp;&nbsp;method: 'POST', // PUT works too<br/>
-        &nbsp;&nbsp;body: `Hello from the other side.`<br/>
+        &nbsp;&nbsp;body: 'Hello from the other side.'<br/>
         })
     </code>
     <p>

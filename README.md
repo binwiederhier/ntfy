@@ -103,6 +103,8 @@ To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that
 
 ## TODO
 - add HTTPS
+- make limits configurable
+- limit max number of subscriptions 
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue.

@@ -59,8 +59,11 @@ const subscribeInternal = (topic, delaySec) => {
         };
         eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
-            new Notification(event.message);
             notifySound.play();
+            new Notification(topic, {
+                body: event.message,
+                icon: '/static/img/favicon.png'
+            });
         };
         topics[topic] = eventSource;
         localStorage.setItem('topics', JSON.stringify(Object.keys(topics)));
@@ -80,7 +83,7 @@ const unsubscribe = (topic) => {
 const test = (topic) => {
     fetch(`/${topic}`, {
         method: 'PUT',
-        body: `This is a test notification for topic ${topic}!`
+        body: `This is a test notification`
     })
 };
 

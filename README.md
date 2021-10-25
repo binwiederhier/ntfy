@@ -101,24 +101,6 @@ make build-simple
 To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that installed, you can run `make build` or
 `make build-snapshot`.
 
-## FAQ
-
-### Isn't this like ...?
-Probably. I didn't do a whole lot of research before making this.
-
-### Can I use this in my app?
-Yes. As long as you don't abuse it, it'll be available and free of charge.
-
-### What are the uptime guarantees?
-Best effort.
-
-### Why is the web UI so ugly?
-I don't particularly like JS or dealing with CSS. I'll make it pretty after it's functional.
-
-### Will you know what topics exist, can you spy on me?
-If you don't trust me or your messages are sensitive, run your ntfy on your own server. That said, the logs do not 
-contain any topic names or other details about you.
-
 ## TODO
 - add HTTPS
 

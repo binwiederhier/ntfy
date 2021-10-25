@@ -25,14 +25,14 @@
     <meta property="og:site_name" content="ntfy.sh" />
     <meta property="og:title" content="ntfy.sh | simple HTTP-based pub-sub" />
     <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
-    <meta property="og:image" content="/static/img/ntfy.png" />
+    <meta property="og:image" content="/static/img/favicon.png" />
     <meta property="og:url" content="https://ntfy.sh" />
 </head>
 <body>
 <div id="main">
     <h1>ntfy.sh - simple HTTP-based pub-sub</h1>
     <p>
-        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based pub-sub notification service and tool.
+        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
         It allows you to send <b>desktop notifications via scripts from any computer</b>, entirely <b>without signup or cost</b>.
         It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
@@ -55,20 +55,38 @@
     </p>
     <form id="subscribeForm">
         <p>
-            <label for="topicField">Topic ID:</label>
+            <label for="topicField">Subscribe to topic:</label>
             <input type="text" id="topicField" placeholder="Letters, numbers, _ and -"  pattern="[-_A-Za-z]{1,64}" autofocus />
             <input type="submit" id="subscribeButton" value="Subscribe" />
         </p>
     </form>
-    <p id="topicsHeader">Subscribed topics:</p>
+    <p id="topicsHeader">Topics:</p>
     <ul id="topicsList"></ul>
-    <audio id="notifySound" src="static/sound/mixkit-long-pop-2358.wav"></audio>
+    <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
 
     <h3>Subscribe via your app, or via the CLI</h3>
+    <p>
+        Here are some examples using <tt>curl</tt>:
+    </p>
     <code>
-        curl -s ntfy.sh/mytopic/raw # one message per line (\n are replaced with a space)<br/>
-        curl -s ntfy.sh/mytopic/json # one JSON message per line<br/>
-        curl -s ntfy.sh/mytopic/sse # server-sent events (SSE) stream
+        # one message per line (\n are replaced with a space)<br/>
+        curl -s ntfy.sh/mytopic/raw<br/><br/>
+
+        # one JSON message per line<br/>
+        curl -s ntfy.sh/mytopic/json<br/><br/>
+
+        # server-sent events (SSE) stream, use with EventSource<br/>
+        curl -s ntfy.sh/mytopic/sse
+    </code>
+    <p>
+        Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, you can consume
+        notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
+    </p>
+    <code>
+        const eventSource = new EventSource(`https://ntfy.sh/mytopic/sse`);<br/>
+        eventSource.onmessage = (e) => {<br/>
+        &nbsp;&nbsp;// Do something with e.data<br/>
+        };
     </code>
 
     <h2>Publishing messages</h2>
@@ -79,9 +97,43 @@
         curl -d "long process is done" ntfy.sh/mytopic
     </code>
     <p>
+        Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
+    </p>
+    <code>
+        fetch(`https://ntfy.sh/mytopic`, {<br/>
+        &nbsp;&nbsp;method: 'POST', // PUT works too<br/>
+        &nbsp;&nbsp;body: `Hello from the other side.`<br/>
+        })
+    </code>
+    <p>
         Messages published to a non-existing topic or a topic without subscribers will not be delivered later.
         There is (currently) no buffering of any kind. If you're not listening, the message won't be delivered.
     </p>
+
+    <h2>FAQ</h2>
+    <p>
+        <b>Isn't this like ...?</b><br/>
+        Who knows. I didn't do a lot of research before making this. It was fun making it.
+    </p>
+
+    <p>
+        <b>Can I use this in my app? Will it stay free?</b><br/>
+        Yes. As long as you don't abuse it, it'll be available and free of charge. I do not plan on monetizing
+        the service.
+    </p>
+
+    <p>
+        <b>What are the uptime guarantees?</b><br/>
+        Best effort.
+    </p>
+
+    <p>
+        <b>Will you know what topics exist, can you spy on me?</b><br/>
+        If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
+        That said, the logs do not contain any topic names or other details about you. Check the code if you don't believe me.
+    </p>
+
+    <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>
 </div>
 <script src="static/js/app.js"></script>
 </body>

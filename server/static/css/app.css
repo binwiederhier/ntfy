@@ -20,6 +20,7 @@ h1 {
     font-size: 2.5em;
 }
 
+
 h2 {
     margin-top: 20px;
     margin-bottom: 5px;
@@ -33,8 +34,10 @@ h3 {
 }
 
 p {
-    margin-top: 0;
+    margin-top: 10px;
+    margin-bottom: 20px;
     font-size: 1.1em;
+    line-height: 140%;
 }
 
 tt {
@@ -49,6 +52,8 @@ code {
     font-family: monospace;
     padding: 20px;
     border-radius: 3px;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
@@ -73,4 +78,8 @@ code {
 #error {
     color: darkred;
     font-style: italic;
+}
+
+#ironicCenterTagDontFreakOut {
+    color: #666;
 }

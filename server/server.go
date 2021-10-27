@@ -48,11 +48,11 @@ const (
 )
 
 var (
-	topicRegex = regexp.MustCompile(`^/[^/]+$`)
-	jsonRegex  = regexp.MustCompile(`^/[^/]+/json$`)
-	sseRegex   = regexp.MustCompile(`^/[^/]+/sse$`)
-	rawRegex   = regexp.MustCompile(`^/[^/]+/raw$`)
-	staticRegex   = regexp.MustCompile(`^/static/.+`)
+	topicRegex  = regexp.MustCompile(`^/[^/]+$`)
+	jsonRegex   = regexp.MustCompile(`^/[^/]+/json$`)
+	sseRegex    = regexp.MustCompile(`^/[^/]+/sse$`)
+	rawRegex    = regexp.MustCompile(`^/[^/]+/raw$`)
+	staticRegex = regexp.MustCompile(`^/static/.+`)
 
 	//go:embed "index.html"
 	indexSource string
@@ -159,11 +159,7 @@ func (s *Server) handlePublishHTTP(w http.ResponseWriter, r *http.Request) error
 	if err != nil {
 		return err
 	}
-	msg := &message{
-		Time:    time.Now().UnixMilli(),
-		Message: string(b),
-	}
-	if err := t.Publish(msg); err != nil {
+	if err := t.Publish(newDefaultMessage(string(b))); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
@@ -171,75 +167,74 @@ func (s *Server) handlePublishHTTP(w http.ResponseWriter, r *http.Request) error
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) error {
-	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/json")) // Hack
-	subscriberID := t.Subscribe(func(msg *message) error {
-		if err := json.NewEncoder(w).Encode(&msg); err != nil {
-			return err
+	encoder := func(msg *message) (string, error) {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(&msg); err != nil {
+			return "", err
 		}
-		if fl, ok := w.(http.Flusher); ok {
-			fl.Flush()
-		}
-		return nil
-	})
-	defer s.unsubscribe(t, subscriberID)
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	select {
-	case <-t.ctx.Done():
-	case <-r.Context().Done():
+		return buf.String(), nil
 	}
-	return nil
+	return s.handleSubscribe(w, r, "json", "application/stream+json", encoder)
 }
 
 func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request) error {
-	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/sse")) // Hack
-	subscriberID := t.Subscribe(func(msg *message) error {
+	encoder := func(msg *message) (string, error) {
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(&msg); err != nil {
-			return err
+			return "", err
 		}
-		m := fmt.Sprintf("data: %s\n", buf.String())
-		if _, err := io.WriteString(w, m); err != nil {
-			return err
+		if msg.Event != "" {
+			return fmt.Sprintf("event: %s\ndata: %s\n", msg.Event, buf.String()), nil // Browser's .onmessage() does not fire on this!
 		}
-		if fl, ok := w.(http.Flusher); ok {
-			fl.Flush()
-		}
-		return nil
-	})
-	defer s.unsubscribe(t, subscriberID)
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	if _, err := io.WriteString(w, "event: open\n\n"); err != nil {
-		return err
+		return fmt.Sprintf("data: %s\n", buf.String()), nil
 	}
-	if fl, ok := w.(http.Flusher); ok {
-		fl.Flush()
-	}
-	select {
-	case <-t.ctx.Done():
-	case <-r.Context().Done():
-	}
-	return nil
+	return s.handleSubscribe(w, r, "sse", "text/event-stream", encoder)
 }
 
 func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request) error {
-	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/raw")) // Hack
-	subscriberID := t.Subscribe(func(msg *message) error {
-		m := strings.ReplaceAll(msg.Message, "\n", " ") + "\n"
-		if _, err := io.WriteString(w, m); err != nil {
+	encoder := func(msg *message) (string, error) {
+		if msg.Event == "" { // only handle default events
+			return strings.ReplaceAll(msg.Message, "\n", " ") + "\n", nil
+		}
+		return "\n", nil // "keepalive" and "open" events just send an empty line
+	}
+	return s.handleSubscribe(w, r, "raw", "text/plain", encoder)
+}
+
+func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, format string, contentType string, encoder messageEncoder) error {
+	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/"+format)) // Hack
+	sub := func(msg *message) error {
+		m, err := encoder(msg)
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte(m)); err != nil {
 			return err
 		}
 		if fl, ok := w.(http.Flusher); ok {
 			fl.Flush()
 		}
 		return nil
-	})
-	defer s.unsubscribe(t, subscriberID)
-	select {
-	case <-t.ctx.Done():
-	case <-r.Context().Done():
 	}
-	return nil
+	subscriberID := t.Subscribe(sub)
+	defer s.unsubscribe(t, subscriberID)
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	w.Header().Set("Content-Type", contentType)
+	if err := sub(newOpenMessage()); err != nil { // Send out open message
+		return err
+	}
+	for {
+		select {
+		case <-t.ctx.Done():
+			return nil
+		case <-r.Context().Done():
+			return nil
+		case <-time.After(s.config.KeepaliveInterval):
+			if err := sub(newKeepaliveMessage()); err != nil { // Send keepalive message
+				return err
+			}
+		}
+	}
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {

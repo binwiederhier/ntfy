@@ -16,6 +16,7 @@ func New() *cli.App {
 	flags := []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/config.yml", DefaultText: "/etc/ntfy/config.yml", Usage: "config file"},
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: config.DefaultListenHTTP, Usage: "ip:port used to as listen address"}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: config.DefaultKeepaliveInterval, Usage: "default interval of keepalive messages"}),
 	}
 	return &cli.App{
 		Name:                   "ntfy",
@@ -37,9 +38,11 @@ func New() *cli.App {
 func execRun(c *cli.Context) error {
 	// Read all the options
 	listenHTTP := c.String("listen-http")
+	keepaliveInterval := c.Duration("keepalive-interval")
 
 	// Run main bot, can be killed by signal
 	conf := config.New(listenHTTP)
+	conf.KeepaliveInterval = keepaliveInterval
 	s := server.New(conf)
 	if err := s.Run(); err != nil {
 		log.Fatalln(err)

@@ -21,15 +21,10 @@ type topic struct {
 	mu          sync.Mutex
 }
 
-// message represents a message published to a topic
-type message struct {
-	Time    int64  `json:"time"`
-	Message string `json:"message"`
-}
-
 // subscriber is a function that is called for every new message on a topic
 type subscriber func(msg *message) error
 
+// newTopic creates a new topic
 func newTopic(id string) *topic {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &topic{

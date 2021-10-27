@@ -40,6 +40,10 @@ p {
     line-height: 140%;
 }
 
+p.smallMarginBottom {
+    margin-bottom: 10px;
+}
+
 tt {
     background: #eee;
     padding: 2px 7px;
@@ -53,7 +57,7 @@ code {
     padding: 20px;
     border-radius: 3px;
     margin-top: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
 }
 
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,

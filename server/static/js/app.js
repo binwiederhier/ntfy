@@ -60,7 +60,7 @@ const subscribeInternal = (topic, delaySec) => {
         eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
             notifySound.play();
-            new Notification(topic, {
+            new Notification(`${location.host}/${topic}`, {
                 body: event.message,
                 icon: '/static/img/favicon.png'
             });

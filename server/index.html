@@ -65,20 +65,7 @@
     <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
 
     <h3>Subscribe via your app, or via the CLI</h3>
-    <p>
-        Here are some examples using <tt>curl</tt>:
-    </p>
-    <code>
-        # one message per line (\n are replaced with a space)<br/>
-        curl -s ntfy.sh/mytopic/raw<br/><br/>
-
-        # one JSON message per line<br/>
-        curl -s ntfy.sh/mytopic/json<br/><br/>
-
-        # server-sent events (SSE) stream, use with EventSource<br/>
-        curl -s ntfy.sh/mytopic/sse
-    </code>
-    <p>
+    <p class="smallMarginBottom">
         Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, you can consume
         notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
@@ -88,15 +75,46 @@
         &nbsp;&nbsp;// Do something with e.data<br/>
         };
     </code>
+    <p class="smallMarginBottom">
+        Or you can use <tt>curl</tt> or any other HTTP library. Here's an example for the <tt>/json</tt> endpoint,
+        which prints one JSON message per line (keepalive and open messages have an "event" field):
+    </p>
+    <code>
+        $ curl -s ntfy.sh/mytopic/json<br/>
+        {"time":1635359841,"event":"open"}<br/>
+        {"time":1635359844,"message":"This is a notification"}<br/>
+        {"time":1635359851,"event":"keepalive"}
+    </code>
+    <p class="smallMarginBottom">
+        Using the <tt>/sse</tt> endpoint (SSE, server-sent events stream):
+    </p>
+    <code>
+        $ curl -s ntfy.sh/mytopic/sse<br/>
+        event: open<br/>
+        data: {"time":1635359796,"event":"open"}<br/><br/>
+
+        data: {"time":1635359803,"message":"This is a notification"}<br/><br/>
+
+        event: keepalive<br/>
+        data: {"time":1635359806,"event":"keepalive"}
+    </code>
+    <p class="smallMarginBottom">
+        Using the <tt>/raw</tt> endpoint (empty lines are keepalive messages):
+    </p>
+    <code>
+        $ curl -s ntfy.sh/mytopic/raw<br/>
+        <br/>
+        This is a notification
+    </code>
 
     <h2>Publishing messages</h2>
-    <p>
+    <p class="smallMarginBottom">
         Publishing messages can be done via PUT or POST using. Here's an example using <tt>curl</tt>:
     </p>
     <code>
         curl -d "long process is done" ntfy.sh/mytopic
     </code>
-    <p>
+    <p class="smallMarginBottom">
         Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
     <code>

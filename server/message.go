@@ -6,6 +6,7 @@ import "time"
 const (
 	openEvent      = "open"
 	keepaliveEvent = "keepalive"
+	messageEvent = "message"
 )
 
 // message represents a message published to a topic
@@ -39,5 +40,5 @@ func newKeepaliveMessage() *message {
 
 // newDefaultMessage is a convenience method to create a notification message
 func newDefaultMessage(msg string) *message {
-	return newMessage("", msg)
+	return newMessage(messageEvent, msg)
 }

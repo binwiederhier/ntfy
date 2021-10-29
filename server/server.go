@@ -219,7 +219,7 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request) erro
 		if err := json.NewEncoder(&buf).Encode(&msg); err != nil {
 			return "", err
 		}
-		if msg.Event != "" {
+		if msg.Event != messageEvent {
 			return fmt.Sprintf("event: %s\ndata: %s\n", msg.Event, buf.String()), nil // Browser's .onmessage() does not fire on this!
 		}
 		return fmt.Sprintf("data: %s\n", buf.String()), nil

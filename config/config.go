@@ -8,9 +8,10 @@ import (
 
 // Defines default config settings
 const (
-	DefaultListenHTTP        = ":80"
-	DefaultKeepaliveInterval = 30 * time.Second
-	defaultManagerInterval   = time.Minute
+	DefaultListenHTTP            = ":80"
+	DefaultMessageBufferDuration = 12 * time.Hour
+	DefaultKeepaliveInterval     = 30 * time.Second
+	DefaultManagerInterval       = time.Minute
 )
 
 // Defines the max number of requests, here:
@@ -22,22 +23,24 @@ var (
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	ListenHTTP        string
-	Limit             rate.Limit
-	LimitBurst        int
-	FirebaseKeyFile   string
-	KeepaliveInterval time.Duration
-	ManagerInterval   time.Duration
+	ListenHTTP            string
+	FirebaseKeyFile       string
+	MessageBufferDuration time.Duration
+	KeepaliveInterval     time.Duration
+	ManagerInterval       time.Duration
+	Limit                 rate.Limit
+	LimitBurst            int
 }
 
 // New instantiates a default new config
 func New(listenHTTP string) *Config {
 	return &Config{
-		ListenHTTP:        listenHTTP,
-		Limit:             defaultLimit,
-		LimitBurst:        defaultLimitBurst,
-		FirebaseKeyFile:   "",
-		KeepaliveInterval: DefaultKeepaliveInterval,
-		ManagerInterval:   defaultManagerInterval,
+		ListenHTTP:            listenHTTP,
+		FirebaseKeyFile:       "",
+		MessageBufferDuration: DefaultMessageBufferDuration,
+		KeepaliveInterval:     DefaultKeepaliveInterval,
+		ManagerInterval:       DefaultManagerInterval,
+		Limit:                 defaultLimit,
+		LimitBurst:            defaultLimitBurst,
 	}
 }

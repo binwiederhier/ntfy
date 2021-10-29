@@ -38,14 +38,31 @@
     </p>
     <p id="error"></p>
 
+    <h2>Publishing messages</h2>
+    <p>
+        Publishing messages can be done via PUT or POST using. Topics are created on the fly by subscribing or publishing to them.
+        Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
+    </p>
+    <p class="smallMarginBottom">
+        Here's an example showing how to publish a message using <tt>curl</tt>:
+    </p>
+    <code>
+        curl -d "long process is done" ntfy.sh/mytopic
+    </code>
+    <p class="smallMarginBottom">
+        Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
+    </p>
+    <code>
+        fetch('https://ntfy.sh/mytopic', {<br/>
+        &nbsp;&nbsp;method: 'POST', // PUT works too<br/>
+        &nbsp;&nbsp;body: 'Hello from the other side.'<br/>
+        })
+    </code>
+
     <h2>Subscribe to a topic</h2>
     <p>
-        Topics are created on the fly by subscribing to them. You can create and subscribe to a topic either in this web UI, or in
-        your own app by subscribing to an <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>,
-        a JSON feed, or raw feed.
-    </p>
-    <p>
-        Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
+        You can create and subscribe to a topic either in this web UI, or in your own app by subscribing to an
+        <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, a JSON feed, or raw feed.
     </p>
 
     <h3>Subscribe via web</h3>
@@ -66,7 +83,7 @@
 
     <h3>Subscribe via your app, or via the CLI</h3>
     <p class="smallMarginBottom">
-        Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, you can consume
+        Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a> in JS, you can consume
         notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
     <code>
@@ -76,30 +93,29 @@
         };
     </code>
     <p class="smallMarginBottom">
-        Or you can use <tt>curl</tt> or any other HTTP library. Here's an example for the <tt>/json</tt> endpoint,
-        which prints one JSON message per line (keepalive and open messages have an "event" field):
-    </p>
-    <code>
-        $ curl -s ntfy.sh/mytopic/json<br/>
-        {"time":1635359841,"event":"open"}<br/>
-        {"time":1635359844,"message":"This is a notification"}<br/>
-        {"time":1635359851,"event":"keepalive"}
-    </code>
-    <p class="smallMarginBottom">
-        Using the <tt>/sse</tt> endpoint (SSE, server-sent events stream):
+        You can also use the same <tt>/sse</tt> endpoint via <tt>curl</tt> or any other HTTP library:
     </p>
     <code>
         $ curl -s ntfy.sh/mytopic/sse<br/>
         event: open<br/>
-        data: {"time":1635359796,"event":"open"}<br/><br/>
+        data: {"id":"weSj9RtNkj","time":1635528898,"event":"open","topic":"mytopic"}<br/><br/>
 
-        data: {"time":1635359803,"message":"This is a notification"}<br/><br/>
+        data: {"id":"p0M5y6gcCY","time":1635528909,"event":"message","topic":"mytopic","message":"Hi!"}<br/><br/>
 
         event: keepalive<br/>
-        data: {"time":1635359806,"event":"keepalive"}
+        data: {"id":"VNxNIg5fpt","time":1635528928,"event":"keepalive","topic":"test"}
     </code>
     <p class="smallMarginBottom">
-        Using the <tt>/raw</tt> endpoint (empty lines are keepalive messages):
+        To consume JSON instead, use the <tt>/json</tt> endpoint, which prints one message per line:
+    </p>
+    <code>
+        $ curl -s ntfy.sh/mytopic/json<br/>
+        {"id":"SLiKI64DOt","time":1635528757,"event":"open","topic":"mytopic"}<br/>
+        {"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Hi!"}<br/>
+        {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}
+    </code>
+    <p class="smallMarginBottom">
+        Or use the <tt>/raw</tt> endpoint if you need something super simple (empty lines are keepalive messages):
     </p>
     <code>
         $ curl -s ntfy.sh/mytopic/raw<br/>
@@ -107,27 +123,25 @@
         This is a notification
     </code>
 
-    <h2>Publishing messages</h2>
+    <h3>Message buffering and polling</h3>
     <p class="smallMarginBottom">
-        Publishing messages can be done via PUT or POST using. Here's an example using <tt>curl</tt>:
+        Messages are buffered in memory for a few hours to account for network interruptions of subscribers.
+        You can read back what you missed by using the <tt>since=...</tt> query parameter. It takes either a
+        duration (e.g. <tt>10m</tt> or <tt>30s</tt>) or a Unix timestamp (e.g. <tt>1635528757</tt>):
     </p>
     <code>
-        curl -d "long process is done" ntfy.sh/mytopic
+        $ curl -s "ntfy.sh/mytopic/json?since=10m"<br/>
+        # Same output as above, but includes messages from up to 10 minutes ago
     </code>
     <p class="smallMarginBottom">
-        Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
+        You can also just poll for messages if you don't like the long-standing connection using the <tt>poll=1</tt>
+        query parameter. The connection will end after all available messages have been read. This parameter has to be
+        combined with <tt>since=</tt>.
     </p>
     <code>
-        fetch('https://ntfy.sh/mytopic', {<br/>
-        &nbsp;&nbsp;method: 'POST', // PUT works too<br/>
-        &nbsp;&nbsp;body: 'Hello from the other side.'<br/>
-        })
+        $ curl -s "ntfy.sh/mytopic/json?poll=1&since=10m"<br/>
+        # Returns messages from up to 10 minutes ago and ends the connection
     </code>
-    <p>
-        Messages published to a non-existing topic or a topic without subscribers will not be delivered later.
-        There is (currently) no buffering of any kind. If you're not listening, the message won't be delivered.
-    </p>
-
     <h2>FAQ</h2>
     <p>
         <b>Isn't this like ...?</b><br/>

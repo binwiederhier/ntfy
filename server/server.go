@@ -17,17 +17,23 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+// TODO add "max connections open" limit
+// TODO add "max messages in a topic" limit
+// TODO add "max topics" limit
 
 // Server is the main server
 type Server struct {
 	config   *config.Config
 	topics   map[string]*topic
 	visitors map[string]*visitor
-	firebase *messaging.Client
+	firebase subscriber
+	messages int64
 	mu       sync.Mutex
 }
 
@@ -53,10 +59,11 @@ const (
 )
 
 var (
-	topicRegex  = regexp.MustCompile(`^/[^/]+$`)
-	jsonRegex   = regexp.MustCompile(`^/[^/]+/json$`)
-	sseRegex    = regexp.MustCompile(`^/[^/]+/sse$`)
-	rawRegex    = regexp.MustCompile(`^/[^/]+/raw$`)
+	topicRegex = regexp.MustCompile(`^/[^/]+$`)
+	jsonRegex  = regexp.MustCompile(`^/[^/]+/json$`)
+	sseRegex   = regexp.MustCompile(`^/[^/]+/sse$`)
+	rawRegex   = regexp.MustCompile(`^/[^/]+/raw$`)
+
 	staticRegex = regexp.MustCompile(`^/static/.+`)
 
 	//go:embed "index.html"
@@ -65,27 +72,54 @@ var (
 	//go:embed static
 	webStaticFs embed.FS
 
+	errHTTPBadRequest      = &errHTTP{http.StatusBadRequest, http.StatusText(http.StatusBadRequest)}
 	errHTTPNotFound        = &errHTTP{http.StatusNotFound, http.StatusText(http.StatusNotFound)}
 	errHTTPTooManyRequests = &errHTTP{http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)}
 )
 
 func New(conf *config.Config) (*Server, error) {
-	var fcm *messaging.Client
+	var firebaseSubscriber subscriber
 	if conf.FirebaseKeyFile != "" {
-		fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(conf.FirebaseKeyFile))
-		if err != nil {
-			return nil, err
-		}
-		fcm, err = fb.Messaging(context.Background())
+		var err error
+		firebaseSubscriber, err = createFirebaseSubscriber(conf)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return &Server{
 		config:   conf,
-		firebase: fcm,
+		firebase: firebaseSubscriber,
 		topics:   make(map[string]*topic),
 		visitors: make(map[string]*visitor),
+	}, nil
+}
+
+func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
+	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(conf.FirebaseKeyFile))
+	if err != nil {
+		return nil, err
+	}
+	msg, err := fb.Messaging(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return func(m *message) error {
+		_, err := msg.Send(context.Background(), &messaging.Message{
+			Data: map[string]string{
+				"id":      m.ID,
+				"time":    fmt.Sprintf("%d", m.Time),
+				"event": m.Event,
+				"topic":   m.Topic,
+				"message": m.Message,
+			},
+			Notification: &messaging.Notification{
+				Title:    m.Topic, // FIXME convert to ntfy.sh/$topic instead
+				Body:     m.Message,
+				ImageURL: "",
+			},
+			Topic: m.Topic,
+		})
+		return err
 	}, nil
 }
 
@@ -104,28 +138,6 @@ func (s *Server) listenAndServe() error {
 	log.Printf("Listening on %s", s.config.ListenHTTP)
 	http.HandleFunc("/", s.handle)
 	return http.ListenAndServe(s.config.ListenHTTP, nil)
-}
-
-func (s *Server) updateStatsAndExpire() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Expire visitors from rate visitors map
-	for ip, v := range s.visitors {
-		if time.Since(v.seen) > visitorExpungeAfter {
-			delete(s.visitors, ip)
-		}
-	}
-
-	// Print stats
-	var subscribers, messages int
-	for _, t := range s.topics {
-		subs, msgs := t.Stats()
-		subscribers += subs
-		messages += msgs
-	}
-	log.Printf("Stats: %d topic(s), %d subscriber(s), %d message(s) sent, %d visitor(s)",
-		len(s.topics), subscribers, messages, len(s.visitors))
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
@@ -147,14 +159,14 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleHome(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.handleStatic(w, r)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
+		return s.handlePublish(w, r)
 	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
 		return s.handleSubscribeJSON(w, r)
 	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
 		return s.handleSubscribeSSE(w, r)
 	} else if r.Method == http.MethodGet && rawRegex.MatchString(r.URL.Path) {
 		return s.handleSubscribeRaw(w, r)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
-		return s.handlePublishHTTP(w, r)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
 	}
@@ -166,40 +178,26 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 	return err
 }
 
-func (s *Server) handlePublishHTTP(w http.ResponseWriter, r *http.Request) error {
-	t, err := s.topic(r.URL.Path[1:])
-	if err != nil {
-		return err
-	}
+func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
+	http.FileServer(http.FS(webStaticFs)).ServeHTTP(w, r)
+	return nil
+}
+
+func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) error {
+	t := s.createTopic(r.URL.Path[1:])
 	reader := io.LimitReader(r.Body, messageLimit)
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
-	if err := t.Publish(newDefaultMessage(string(b))); err != nil {
-		return err
-	}
-	if err := s.maybePublishFirebase(t.id, string(b)); err != nil {
+	if err := t.Publish(newDefaultMessage(t.id, string(b))); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	s.mu.Lock()
+	s.messages++
+	s.mu.Unlock()
 	return nil
-}
-
-func (s *Server) maybePublishFirebase(topic, message string) error {
-	_, err := s.firebase.Send(context.Background(), &messaging.Message{
-		Data: map[string]string{
-			"topic":   topic,
-			"message": message,
-		},
-		Notification: &messaging.Notification{
-			Title:    "ntfy.sh/" + topic,
-			Body:     message,
-			ImageURL: "",
-		},
-		Topic: topic,
-	})
-	return err
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) error {
@@ -239,6 +237,11 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request) erro
 
 func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, format string, contentType string, encoder messageEncoder) error {
 	t := s.createTopic(strings.TrimSuffix(r.URL.Path[1:], "/"+format)) // Hack
+	since, err := parseSince(r)
+	if err != nil {
+		return err
+	}
+	poll := r.URL.Query().Has("poll")
 	sub := func(msg *message) error {
 		m, err := encoder(msg)
 		if err != nil {
@@ -252,11 +255,17 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, format 
 		}
 		return nil
 	}
-	subscriberID := t.Subscribe(sub)
-	defer s.unsubscribe(t, subscriberID)
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType)
-	if err := sub(newOpenMessage()); err != nil { // Send out open message
+	if poll {
+		return sendOldMessages(t, since, sub)
+	}
+	subscriberID := t.Subscribe(sub)
+	defer t.Unsubscribe(subscriberID)
+	if err := sub(newOpenMessage(t.id)); err != nil { // Send out open message
+		return err
+	}
+	if err := sendOldMessages(t, since, sub); err != nil {
 		return err
 	}
 	for {
@@ -266,11 +275,36 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, format 
 		case <-r.Context().Done():
 			return nil
 		case <-time.After(s.config.KeepaliveInterval):
-			if err := sub(newKeepaliveMessage()); err != nil { // Send keepalive message
+			if err := sub(newKeepaliveMessage(t.id)); err != nil { // Send keepalive message
 				return err
 			}
 		}
 	}
+}
+
+func sendOldMessages(t *topic, since time.Time, sub subscriber) error {
+	if since.IsZero() {
+		return nil
+	}
+	for _, m := range t.Messages(since) {
+		if err := sub(m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func parseSince(r *http.Request) (time.Time, error) {
+	if !r.URL.Query().Has("since") {
+		return time.Time{}, nil
+	}
+	if since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
+		return time.Unix(since, 0), nil
+	}
+	if d, err := time.ParseDuration(r.URL.Query().Get("since")); err == nil {
+		return time.Now().Add(-1 * d), nil
+	}
+	return time.Time{}, errHTTPBadRequest
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {
@@ -279,36 +313,47 @@ func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
-	http.FileServer(http.FS(webStaticFs)).ServeHTTP(w, r)
-	return nil
-}
-
 func (s *Server) createTopic(id string) *topic {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.topics[id]; !ok {
 		s.topics[id] = newTopic(id)
+		if s.firebase != nil {
+			s.topics[id].Subscribe(s.firebase)
+		}
 	}
 	return s.topics[id]
 }
 
-func (s *Server) topic(topicID string) (*topic, error) {
+func (s *Server) updateStatsAndExpire() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c, ok := s.topics[topicID]
-	if !ok {
-		return nil, errHTTPNotFound
-	}
-	return c, nil
-}
 
-func (s *Server) unsubscribe(t *topic, subscriberID int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if subscribers := t.Unsubscribe(subscriberID); subscribers == 0 {
-		delete(s.topics, t.id)
+	// Expire visitors from rate visitors map
+	for ip, v := range s.visitors {
+		if time.Since(v.seen) > visitorExpungeAfter {
+			delete(s.visitors, ip)
+		}
 	}
+
+	// Prune old messages, remove topics without subscribers
+	for _, t := range s.topics {
+		t.Prune(s.config.MessageBufferDuration)
+		subs, msgs := t.Stats()
+		if msgs == 0 && (subs == 0 || (s.firebase != nil && subs == 1)) {
+			delete(s.topics, t.id)
+		}
+	}
+
+	// Print stats
+	var subscribers, messages int
+	for _, t := range s.topics {
+		subs, msgs := t.Stats()
+		subscribers += subs
+		messages += msgs
+	}
+	log.Printf("Stats: %d message(s) published, %d topic(s) active, %d subscriber(s), %d message(s) buffered, %d visitor(s)",
+		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
 }
 
 // visitor creates or retrieves a rate.Limiter for the given visitor.

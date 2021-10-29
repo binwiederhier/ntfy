@@ -1,9 +1,25 @@
 # ntfy config file
 
 # Listen address for the HTTP web server
-#
-# Format:    <hostname>:<port>
-# Default:   :80
-# Required:  No
+# Format: <hostname>:<port>
 #
 # listen-http: ":80"
+
+# If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app.
+# This is optional and only required to support Android apps (which don't allow background services anymore).
+#
+# firebase-key-file: <filename>
+
+# Duration for which messages will be buffered before they are deleted.
+# This is required to support the "since=..." and "poll=1" parameter.
+#
+# message-buffer-duration: 12h
+
+# Interval in which keepalive messages are sent to the client. This is to prevent
+# intermediaries closing the connection for inactivity.
+#
+# keepalive-interval: 30s
+
+# Interval in which the manager prunes old messages, deletes topics and prints the stats.
+#
+# manager-interval: 1m

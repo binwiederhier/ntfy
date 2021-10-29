@@ -105,19 +105,14 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 	}
 	return func(m *message) error {
 		_, err := msg.Send(context.Background(), &messaging.Message{
+			Topic: m.Topic,
 			Data: map[string]string{
 				"id":      m.ID,
 				"time":    fmt.Sprintf("%d", m.Time),
-				"event": m.Event,
+				"event":   m.Event,
 				"topic":   m.Topic,
 				"message": m.Message,
 			},
-			Notification: &messaging.Notification{
-				Title:    m.Topic, // FIXME convert to ntfy.sh/$topic instead
-				Body:     m.Message,
-				ImageURL: "",
-			},
-			Topic: m.Topic,
 		})
 		return err
 	}, nil

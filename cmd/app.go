@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -16,6 +17,7 @@ func New() *cli.App {
 	flags := []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/config.yml", DefaultText: "/etc/ntfy/config.yml", Usage: "config file"},
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: config.DefaultListenHTTP, Usage: "ip:port used to as listen address"}),
+		altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: config.DefaultKeepaliveInterval, Usage: "default interval of keepalive messages"}),
 	}
 	return &cli.App{
@@ -38,16 +40,25 @@ func New() *cli.App {
 func execRun(c *cli.Context) error {
 	// Read all the options
 	listenHTTP := c.String("listen-http")
+	firebaseKeyFile := c.String("firebase-key-file")
 	keepaliveInterval := c.Duration("keepalive-interval")
+
+	// Check values
+	if firebaseKeyFile != "" && !fileExists(firebaseKeyFile) {
+		return errors.New("if set, FCM key file must exist")
+	}
 
 	// Run main bot, can be killed by signal
 	conf := config.New(listenHTTP)
+	conf.FirebaseKeyFile = firebaseKeyFile
 	conf.KeepaliveInterval = keepaliveInterval
-	s := server.New(conf)
+	s, err := server.New(conf)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	if err := s.Run(); err != nil {
 		log.Fatalln(err)
 	}
-
 	log.Printf("Exiting.")
 	return nil
 }

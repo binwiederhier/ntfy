@@ -25,6 +25,7 @@ type Config struct {
 	ListenHTTP        string
 	Limit             rate.Limit
 	LimitBurst        int
+	FirebaseKeyFile   string
 	KeepaliveInterval time.Duration
 	ManagerInterval   time.Duration
 }
@@ -35,6 +36,7 @@ func New(listenHTTP string) *Config {
 		ListenHTTP:        listenHTTP,
 		Limit:             defaultLimit,
 		LimitBurst:        defaultLimitBurst,
+		FirebaseKeyFile:   "",
 		KeepaliveInterval: DefaultKeepaliveInterval,
 		ManagerInterval:   defaultManagerInterval,
 	}

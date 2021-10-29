@@ -2,11 +2,15 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	_ "embed" // required for go:embed
 	"encoding/json"
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
 	"fmt"
 	"golang.org/x/time/rate"
+	"google.golang.org/api/option"
 	"heckel.io/ntfy/config"
 	"io"
 	"log"
@@ -23,6 +27,7 @@ type Server struct {
 	config   *config.Config
 	topics   map[string]*topic
 	visitors map[string]*visitor
+	firebase *messaging.Client
 	mu       sync.Mutex
 }
 
@@ -64,12 +69,24 @@ var (
 	errHTTPTooManyRequests = &errHTTP{http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)}
 )
 
-func New(conf *config.Config) *Server {
+func New(conf *config.Config) (*Server, error) {
+	var fcm *messaging.Client
+	if conf.FirebaseKeyFile != "" {
+		fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(conf.FirebaseKeyFile))
+		if err != nil {
+			return nil, err
+		}
+		fcm, err = fb.Messaging(context.Background())
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &Server{
 		config:   conf,
+		firebase: fcm,
 		topics:   make(map[string]*topic),
 		visitors: make(map[string]*visitor),
-	}
+	}, nil
 }
 
 func (s *Server) Run() error {
@@ -162,8 +179,27 @@ func (s *Server) handlePublishHTTP(w http.ResponseWriter, r *http.Request) error
 	if err := t.Publish(newDefaultMessage(string(b))); err != nil {
 		return err
 	}
+	if err := s.maybePublishFirebase(t.id, string(b)); err != nil {
+		return err
+	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	return nil
+}
+
+func (s *Server) maybePublishFirebase(topic, message string) error {
+	_, err := s.firebase.Send(context.Background(), &messaging.Message{
+		Data: map[string]string{
+			"topic":   topic,
+			"message": message,
+		},
+		Notification: &messaging.Notification{
+			Title:    "ntfy.sh/" + topic,
+			Body:     message,
+			ImageURL: "",
+		},
+		Topic: topic,
+	})
+	return err
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request) error {

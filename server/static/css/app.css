@@ -6,12 +6,13 @@ html, body {
     font-size: 1.1em;
 }
 
-a {
-    color: #39005a;
+a, a:visited {
+    color: #3a9784;
 }
 
 a:hover {
     text-decoration: none;
+    color: #317f6f;
 }
 
 h1 {
@@ -19,7 +20,6 @@ h1 {
     margin-bottom: 18px;
     font-size: 2.5em;
 }
-
 
 h2 {
     margin-top: 20px;

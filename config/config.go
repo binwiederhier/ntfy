@@ -14,36 +14,41 @@ const (
 	DefaultManagerInterval       = time.Minute
 )
 
-// Defines the max number of requests, here:
-// 50 requests bucket, replenished at a rate of 1 per second
+// Defines all the limits
+// - request limit: max number of PUT/GET/.. requests (here: 50 requests bucket, replenished at a rate of 1 per second)
+// - global topic limit: max number of topics overall
+// - subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
 var (
-	defaultRequestLimit      = rate.Every(time.Second)
-	defaultRequestLimitBurst = 50
-	defaultSubscriptionLimit = 30 // per visitor
+	defaultGlobalTopicLimit         = 5000
+	defaultVisitorRequestLimit      = rate.Every(time.Second)
+	defaultVisitorRequestLimitBurst = 50
+	defaultVisitorSubscriptionLimit = 30
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	ListenHTTP            string
-	FirebaseKeyFile       string
-	MessageBufferDuration time.Duration
-	KeepaliveInterval     time.Duration
-	ManagerInterval       time.Duration
-	RequestLimit          rate.Limit
-	RequestLimitBurst     int
-	SubscriptionLimit     int
+	ListenHTTP               string
+	FirebaseKeyFile          string
+	MessageBufferDuration    time.Duration
+	KeepaliveInterval        time.Duration
+	ManagerInterval          time.Duration
+	GlobalTopicLimit         int
+	VisitorRequestLimit      rate.Limit
+	VisitorRequestLimitBurst int
+	VisitorSubscriptionLimit int
 }
 
 // New instantiates a default new config
 func New(listenHTTP string) *Config {
 	return &Config{
-		ListenHTTP:            listenHTTP,
-		FirebaseKeyFile:       "",
-		MessageBufferDuration: DefaultMessageBufferDuration,
-		KeepaliveInterval:     DefaultKeepaliveInterval,
-		ManagerInterval:       DefaultManagerInterval,
-		RequestLimit:          defaultRequestLimit,
-		RequestLimitBurst:     defaultRequestLimitBurst,
-		SubscriptionLimit:     defaultSubscriptionLimit,
+		ListenHTTP:               listenHTTP,
+		FirebaseKeyFile:          "",
+		MessageBufferDuration:    DefaultMessageBufferDuration,
+		KeepaliveInterval:        DefaultKeepaliveInterval,
+		ManagerInterval:          DefaultManagerInterval,
+		GlobalTopicLimit:         defaultGlobalTopicLimit,
+		VisitorRequestLimit:      defaultVisitorRequestLimit,
+		VisitorRequestLimitBurst: defaultVisitorRequestLimitBurst,
+		VisitorSubscriptionLimit: defaultVisitorSubscriptionLimit,
 	}
 }

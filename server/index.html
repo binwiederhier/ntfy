@@ -81,6 +81,12 @@
     <ul id="topicsList"></ul>
     <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
 
+    <h3>Subscribe via phone</h3>
+    <p>
+        Once it's approved, you can use the <b>Ntfy Android App</b> to receive notifications directly on your phone. Just like
+        the server, this app is also <a href="https://github.com/binwiederhier/ntfy-android">open source</a>.
+    </p>
+
     <h3>Subscribe via your app, or via the CLI</h3>
     <p class="smallMarginBottom">
         Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a> in JS, you can consume
@@ -142,6 +148,7 @@
         $ curl -s "ntfy.sh/mytopic/json?poll=1&since=10m"<br/>
         # Returns messages from up to 10 minutes ago and ends the connection
     </code>
+
     <h2>FAQ</h2>
     <p>
         <b>Isn't this like ...?</b><br/>
@@ -163,6 +170,28 @@
         <b>Will you know what topics exist, can you spy on me?</b><br/>
         If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
         That said, the logs do not contain any topic names or other details about you. Check the code if you don't believe me.
+    </p>
+
+    <p>
+        <b>Why is Firebase used?</b><br/>
+        In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
+        published to Firebase Cloud Messaging (FCM) (if <tt>FirebaseKeyFile</tt> is set, which it is on ntfy.sh). This
+        is to facilitate instant notifications on Android. I tried really, really hard to avoid using FCM, but newer
+        versions of Android made it impossible to implement <a href="https://developer.android.com/guide/background">background services</a>>.
+        I'm sorry.
+    </p>
+
+    <h2>Privacy policy</h2>
+    <p>
+        Neither the server nor the app record any personal information, or share any of the messages and topics with
+        any outside service. All data is exclusively used to make the service function properly. The notable exception
+        is the Firebase Cloud Messaging (FCM) service, which is required to provide instant Android notifications (see
+        FAQ for details).
+    </p>
+
+    <p>
+        The web server does not log or otherwise store request paths, remote IP addresses or even topics or messages,
+        aside from a short on-disk cache (up to a day) to support the <tt>since=</tt> feature and service restarts.
     </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>

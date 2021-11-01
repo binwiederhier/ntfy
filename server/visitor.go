@@ -3,6 +3,7 @@ package server
 import (
 	"golang.org/x/time/rate"
 	"heckel.io/ntfy/config"
+	"heckel.io/ntfy/util"
 	"sync"
 	"time"
 )
@@ -15,16 +16,17 @@ const (
 type visitor struct {
 	config        *config.Config
 	limiter       *rate.Limiter
-	subscriptions int
+	subscriptions *util.Limiter
 	seen          time.Time
 	mu            sync.Mutex
 }
 
 func newVisitor(conf *config.Config) *visitor {
 	return &visitor{
-		config:  conf,
-		limiter: rate.NewLimiter(conf.RequestLimit, conf.RequestLimitBurst),
-		seen:    time.Now(),
+		config:        conf,
+		limiter:       rate.NewLimiter(conf.VisitorRequestLimit, conf.VisitorRequestLimitBurst),
+		subscriptions: util.NewLimiter(int64(conf.VisitorSubscriptionLimit)),
+		seen:          time.Now(),
 	}
 }
 
@@ -38,17 +40,16 @@ func (v *visitor) RequestAllowed() error {
 func (v *visitor) AddSubscription() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if v.subscriptions >= v.config.SubscriptionLimit {
+	if err := v.subscriptions.Add(1); err != nil {
 		return errHTTPTooManyRequests
 	}
-	v.subscriptions++
 	return nil
 }
 
 func (v *visitor) RemoveSubscription() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.subscriptions--
+	v.subscriptions.Sub(1)
 }
 
 func (v *visitor) Keepalive() {
@@ -60,6 +61,5 @@ func (v *visitor) Keepalive() {
 func (v *visitor) Stale() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.seen = time.Now()
 	return time.Since(v.seen) > visitorExpungeAfter
 }

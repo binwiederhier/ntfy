@@ -17,8 +17,9 @@ const (
 // Defines the max number of requests, here:
 // 50 requests bucket, replenished at a rate of 1 per second
 var (
-	defaultLimit      = rate.Every(time.Second)
-	defaultLimitBurst = 50
+	defaultRequestLimit      = rate.Every(time.Second)
+	defaultRequestLimitBurst = 50
+	defaultSubscriptionLimit = 30 // per visitor
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
@@ -28,8 +29,9 @@ type Config struct {
 	MessageBufferDuration time.Duration
 	KeepaliveInterval     time.Duration
 	ManagerInterval       time.Duration
-	Limit                 rate.Limit
-	LimitBurst            int
+	RequestLimit          rate.Limit
+	RequestLimitBurst     int
+	SubscriptionLimit     int
 }
 
 // New instantiates a default new config
@@ -40,7 +42,8 @@ func New(listenHTTP string) *Config {
 		MessageBufferDuration: DefaultMessageBufferDuration,
 		KeepaliveInterval:     DefaultKeepaliveInterval,
 		ManagerInterval:       DefaultManagerInterval,
-		Limit:                 defaultLimit,
-		LimitBurst:            defaultLimitBurst,
+		RequestLimit:          defaultRequestLimit,
+		RequestLimitBurst:     defaultRequestLimitBurst,
+		SubscriptionLimit:     defaultSubscriptionLimit,
 	}
 }

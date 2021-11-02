@@ -23,7 +23,6 @@ import (
 )
 
 // TODO add "max messages in a topic" limit
-// TODO implement persistence
 // TODO implement "since=<ID>"
 
 // Server is the main server
@@ -33,6 +32,7 @@ type Server struct {
 	visitors map[string]*visitor
 	firebase subscriber
 	messages int64
+	cache *cache
 	mu       sync.Mutex
 }
 
@@ -78,12 +78,30 @@ func New(conf *config.Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	cache, err := maybeCreateCache(conf)
+	if err != nil {
+		return nil, err
+	}
+	topics := make(map[string]*topic)
+	if cache != nil {
+		if topics, err = cache.Load(); err != nil {
+			return nil, err
+		}
+	}
 	return &Server{
 		config:   conf,
+		cache: cache,
 		firebase: firebaseSubscriber,
-		topics:   make(map[string]*topic),
+		topics:   topics,
 		visitors: make(map[string]*visitor),
 	}, nil
+}
+
+func maybeCreateCache(conf *config.Config) (*cache, error) {
+	if conf.CacheFile == "" {
+		return nil, nil
+	}
+	return newCache(conf.CacheFile)
 }
 
 func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
@@ -180,8 +198,12 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
-	if err := t.Publish(newDefaultMessage(t.id, string(b))); err != nil {
+	m := newDefaultMessage(t.id, string(b))
+	if err := t.Publish(m); err != nil {
 		return err
+	}
+	if s.cache != nil {
+		s.cache.Add(m)
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	s.mu.Lock()
@@ -334,6 +356,13 @@ func (s *Server) updateStatsAndExpire() {
 	for ip, v := range s.visitors {
 		if v.Stale() {
 			delete(s.visitors, ip)
+		}
+	}
+
+	// Prune cache
+	if s.cache != nil {
+		if err := s.cache.Prune(s.config.MessageBufferDuration); err != nil {
+			log.Printf("error pruning cache: %s", err.Error())
 		}
 	}
 

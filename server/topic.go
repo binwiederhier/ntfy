@@ -29,6 +29,7 @@ func newTopic(id string) *topic {
 	return &topic{
 		id:          id,
 		subscribers: make(map[int]subscriber),
+		messages: make([]*message, 0),
 		last:        time.Now(),
 		ctx:         ctx,
 		cancel:      cancel,

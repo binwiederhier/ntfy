@@ -28,6 +28,7 @@ var (
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
 	ListenHTTP               string
+	CacheFile          string
 	FirebaseKeyFile          string
 	MessageBufferDuration    time.Duration
 	KeepaliveInterval        time.Duration
@@ -42,6 +43,7 @@ type Config struct {
 func New(listenHTTP string) *Config {
 	return &Config{
 		ListenHTTP:               listenHTTP,
+		CacheFile: "",
 		FirebaseKeyFile:          "",
 		MessageBufferDuration:    DefaultMessageBufferDuration,
 		KeepaliveInterval:        DefaultKeepaliveInterval,

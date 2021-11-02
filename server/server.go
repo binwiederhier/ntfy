@@ -217,7 +217,7 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request, v *v
 
 func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	encoder := func(msg *message) (string, error) {
-		if msg.Event == "" { // only handle default events
+		if msg.Event == messageEvent { // only handle default events
 			return strings.ReplaceAll(msg.Message, "\n", " ") + "\n", nil
 		}
 		return "\n", nil // "keepalive" and "open" events just send an empty line

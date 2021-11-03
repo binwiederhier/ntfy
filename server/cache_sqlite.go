@@ -19,8 +19,8 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
-	insertMessageQuery = `INSERT INTO messages (id, time, topic, message) VALUES (?, ?, ?, ?)`
-	pruneMessagesQuery = `DELETE FROM messages WHERE time < ?`
+	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message) VALUES (?, ?, ?, ?)`
+	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ?`
 	selectMessagesSinceTimeQuery = `
 		SELECT id, time, message 
 		FROM messages 
@@ -46,7 +46,7 @@ func newSqliteCache(filename string) (*sqliteCache, error) {
 		return nil, err
 	}
 	return &sqliteCache{
-		db:     db,
+		db: db,
 	}, nil
 }
 
@@ -122,6 +122,6 @@ func (s *sqliteCache) Topics() (map[string]*topic, error) {
 }
 
 func (c *sqliteCache) Prune(keep time.Duration) error {
-	_, err := c.db.Exec(pruneMessagesQuery, time.Now().Add(-1 * keep).Unix())
+	_, err := c.db.Exec(pruneMessagesQuery, time.Now().Add(-1*keep).Unix())
 	return err
 }

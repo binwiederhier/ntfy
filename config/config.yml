@@ -10,10 +10,15 @@
 #
 # firebase-key-file: <filename>
 
+# If set, messages are cached in a local SQLite database instead of only in-memory. This
+# allows for service restarts without losing messages in support of the since= parameter.
+#
+# cache-file: <filename>
+
 # Duration for which messages will be buffered before they are deleted.
 # This is required to support the "since=..." and "poll=1" parameter.
 #
-# message-buffer-duration: 12h
+# cache-duration: 12h
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.

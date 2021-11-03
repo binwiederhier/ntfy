@@ -7,8 +7,8 @@ import (
 )
 
 type memCache struct {
-	messages    map[string][]*message
-	mu sync.Mutex
+	messages map[string][]*message
+	mu       sync.Mutex
 }
 
 var _ cache = (*memCache)(nil)

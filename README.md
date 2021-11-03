@@ -1,47 +1,110 @@
 # ntfy
 
-ntfy (pronounce: *notify*) is a super simple pub-sub notification service. It allows you to send desktop and (soon) phone notifications
-via scripts. I run a free version of it on *[ntfy.sh](https://ntfy.sh)*. **No signups or cost.**
+**ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub]https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
+It allows you to send notifications to your phone or desktop via scripts from any computer, entirely without signup or cost.
+It's also open source (as you can plainly see) if you want to run your own.
+
+I run a free version of it at **[ntfy.sh](https://ntfy.sh)**, and there's an [Android app](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
+too.
 
 ## Usage
 
-### Subscribe to a topic
-Topics are created on the fly by subscribing to them. You can create and subscribe to a topic either in a web UI, or in 
-your own app by subscribing to an [SSE](https://en.wikipedia.org/wiki/Server-sent_events)/[EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource),
-or a JSON or raw feed.  
+### Publishing messages
 
-Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable.  
+Publishing messages can be done via PUT or POST using. Topics are created on the fly by subscribing or publishing to them.
+Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable.
 
-Here's how you can create a topic `mytopic`, subscribe to it topic and wait for events. This is using `curl`, but you
-can use any library that can do HTTP GETs:
+Here's an example showing how to publish a message using `curl`:
 
-```
-# Subscribe to "mytopic" and output one message per line (\n are replaced with a space)
-curl -s ntfy.sh/mytopic/raw
-
-# Subscribe to "mytopic" and output one JSON message per line
-curl -s ntfy.sh/mytopic/json
-
-# Subscribe to "mytopic" and output an SSE stream (supported via JS/EventSource)
-curl -s ntfy.sh/mytopic/sse
-```
-
-You can easily script it to execute any command when a message arrives. This sends desktop notifications (just like 
-the web UI, but without it):
-```
-while read msg; do
-  [ -n "$msg" ] && notify-send "$msg"
-done < <(stdbuf -i0 -o0 curl -s ntfy.sh/mytopic/raw)
-```
-
-### Publish messages
-Publishing messages can be done via PUT or POST using. Here's an example using `curl`:
 ```
 curl -d "long process is done" ntfy.sh/mytopic
 ```
 
-Messages published to a non-existing topic or a topic without subscribers will not be delivered later. There is (currently)
-no buffering of any kind. If you're not listening, the message won't be delivered.
+Here's an example in JS with `fetch()` (see [full example](examples)):
+
+```
+fetch('https://ntfy.sh/mytopic', {
+  method: 'POST', // PUT works too
+  body: 'Hello from the other side.'
+})
+```
+
+### Subscribe to a topic
+You can create and subscribe to a topic either in this web UI, or in your own app by subscribing to an
+[EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource), a JSON feed, or raw feed.
+
+#### Subscribe via web
+If you subscribe to a topic via this web UI in the field below, messages published to any subscribed topic
+will show up as **desktop notification**.
+
+You can try this easily on **[ntfy.sh](https://ntfy.sh)**.
+
+#### Subscribe via phone
+You can use the [Ntfy Android App](https://play.google.com/store/apps/details?id=io.heckel.ntfy) to receive 
+notifications directly on your phone. Just like the server, this app is also [open source](https://github.com/binwiederhier/ntfy-android).
+
+#### Subscribe via your app, or via the CLI
+Using [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) in JS, you can consume
+notifications like this (see [full example](examples)):
+
+```javascript
+const eventSource = new EventSource('https://ntfy.sh/mytopic/sse');<br/>
+eventSource.onmessage = (e) => {<br/>
+  // Do something with e.data<br/>
+};
+```
+
+You can also use the same `/sse` endpoint via `curl` or any other HTTP library:
+
+```
+$ curl -s ntfy.sh/mytopic/sse
+event: open
+data: {"id":"weSj9RtNkj","time":1635528898,"event":"open","topic":"mytopic"}
+
+data: {"id":"p0M5y6gcCY","time":1635528909,"event":"message","topic":"mytopic","message":"Hi!"}
+
+event: keepalive
+data: {"id":"VNxNIg5fpt","time":1635528928,"event":"keepalive","topic":"test"}
+```
+
+To consume JSON instead, use the `/json` endpoint, which prints one message per line:
+
+```
+$ curl -s ntfy.sh/mytopic/json
+{"id":"SLiKI64DOt","time":1635528757,"event":"open","topic":"mytopic"}
+{"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Hi!"}
+{"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}
+```
+
+Or use the `/raw` endpoint if you need something super simple (empty lines are keepalive messages):
+
+```
+$ curl -s ntfy.sh/mytopic/raw
+
+This is a notification
+```
+
+#### Message buffering and polling
+Messages are buffered in memory for a few hours to account for network interruptions of subscribers.
+You can read back what you missed by using the `since=...` query parameter. It takes either a
+duration (e.g. `10m` or `30s`) or a Unix timestamp (e.g. `1635528757`):
+
+```
+$ curl -s "ntfy.sh/mytopic/json?since=10m"
+# Same output as above, but includes messages from up to 10 minutes ago
+```
+
+You can also just poll for messages if you don't like the long-standing connection using the `poll=1`
+query parameter. The connection will end after all available messages have been read. This parameter has to be
+combined with `since=`.
+
+```
+$ curl -s "ntfy.sh/mytopic/json?poll=1&since=10m"
+# Returns messages from up to 10 minutes ago and ends the connection
+```
+
+## Examples
+There are a few usage examples in the [examples](examples) directory. I'm sure there are tons of other ways to use it.
 
 ## Installation
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
@@ -104,7 +167,6 @@ To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that
 ## TODO
 - add HTTPS
 - make limits configurable
-- limit max number of subscriptions 
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue.
@@ -116,4 +178,6 @@ Third party libraries and resources:
 * [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI
 * [Mixkit sound](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) used as notification sound
 * [Lato Font](https://www.latofonts.com/) (OFL) is used as a font in the Web UI
-* [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases 
+* [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases
+* [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
+* [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages

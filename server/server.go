@@ -204,6 +204,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	if err := json.NewEncoder(w).Encode(m); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
@@ -360,7 +363,7 @@ func (s *Server) updateStatsAndExpire() {
 	}
 
 	// Prune cache
-	if err := s.cache.Prune(s.config.MessageBufferDuration); err != nil {
+	if err := s.cache.Prune(s.config.CacheDuration); err != nil {
 		log.Printf("error pruning cache: %s", err.Error())
 	}
 

@@ -8,10 +8,10 @@ import (
 
 // Defines default config settings
 const (
-	DefaultListenHTTP            = ":80"
-	DefaultMessageBufferDuration = 12 * time.Hour
-	DefaultKeepaliveInterval     = 30 * time.Second
-	DefaultManagerInterval       = time.Minute
+	DefaultListenHTTP        = ":80"
+	DefaultCacheDuration     = 12 * time.Hour
+	DefaultKeepaliveInterval = 30 * time.Second
+	DefaultManagerInterval   = time.Minute
 )
 
 // Defines all the limits
@@ -28,9 +28,9 @@ var (
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
 	ListenHTTP               string
-	CacheFile          string
 	FirebaseKeyFile          string
-	MessageBufferDuration    time.Duration
+	CacheFile                string
+	CacheDuration            time.Duration
 	KeepaliveInterval        time.Duration
 	ManagerInterval          time.Duration
 	GlobalTopicLimit         int
@@ -43,9 +43,9 @@ type Config struct {
 func New(listenHTTP string) *Config {
 	return &Config{
 		ListenHTTP:               listenHTTP,
-		CacheFile: "",
 		FirebaseKeyFile:          "",
-		MessageBufferDuration:    DefaultMessageBufferDuration,
+		CacheFile:                "",
+		CacheDuration:            DefaultCacheDuration,
 		KeepaliveInterval:        DefaultKeepaliveInterval,
 		ManagerInterval:          DefaultManagerInterval,
 		GlobalTopicLimit:         defaultGlobalTopicLimit,

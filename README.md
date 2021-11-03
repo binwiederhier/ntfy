@@ -1,4 +1,6 @@
-# ntfy
+![ntfy](server/static/img/ntfy.png)
+
+# ntfy - simple HTTP-based pub-sub
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.

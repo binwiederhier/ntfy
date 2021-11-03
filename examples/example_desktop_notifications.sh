@@ -3,5 +3,5 @@
 # a simple script. The notify-send command sends any arriving message as a desktop notification.
 
 while read msg; do
-  notify-send "$msg"
+  [ -n "$msg" ] && notify-send "$msg"
 done < <(stdbuf -i0 -o0 curl -s ntfy.sh/mytopic/raw)

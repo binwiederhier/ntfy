@@ -32,7 +32,7 @@ type Server struct {
 	visitors map[string]*visitor
 	firebase subscriber
 	messages int64
-	cache *cache
+	cache    cache
 	mu       sync.Mutex
 }
 
@@ -78,30 +78,28 @@ func New(conf *config.Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	cache, err := maybeCreateCache(conf)
+	cache, err := createCache(conf)
 	if err != nil {
 		return nil, err
 	}
-	topics := make(map[string]*topic)
-	if cache != nil {
-		if topics, err = cache.Load(); err != nil {
-			return nil, err
-		}
+	topics, err := cache.Topics()
+	if err != nil {
+		return nil, err
 	}
 	return &Server{
 		config:   conf,
-		cache: cache,
+		cache:    cache,
 		firebase: firebaseSubscriber,
 		topics:   topics,
 		visitors: make(map[string]*visitor),
 	}, nil
 }
 
-func maybeCreateCache(conf *config.Config) (*cache, error) {
-	if conf.CacheFile == "" {
-		return nil, nil
+func createCache(conf *config.Config) (cache, error) {
+	if conf.CacheFile != "" {
+		return newSqliteCache(conf.CacheFile)
 	}
-	return newCache(conf.CacheFile)
+	return newMemCache(), nil
 }
 
 func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
@@ -202,8 +200,8 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err := t.Publish(m); err != nil {
 		return err
 	}
-	if s.cache != nil {
-		s.cache.Add(m)
+	if err := s.cache.AddMessage(m); err != nil {
+		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	s.mu.Lock()
@@ -277,20 +275,18 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType)
 	if poll {
-		return sendOldMessages(t, since, sub)
+		return s.sendOldMessages(t, since, sub)
 	}
 	subscriberID := t.Subscribe(sub)
 	defer t.Unsubscribe(subscriberID)
 	if err := sub(newOpenMessage(t.id)); err != nil { // Send out open message
 		return err
 	}
-	if err := sendOldMessages(t, since, sub); err != nil {
+	if err := s.sendOldMessages(t, since, sub); err != nil {
 		return err
 	}
 	for {
 		select {
-		case <-t.ctx.Done():
-			return nil
 		case <-r.Context().Done():
 			return nil
 		case <-time.After(s.config.KeepaliveInterval):
@@ -302,11 +298,15 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 }
 
-func sendOldMessages(t *topic, since time.Time, sub subscriber) error {
+func (s *Server) sendOldMessages(t *topic, since time.Time, sub subscriber) error {
 	if since.IsZero() {
 		return nil
 	}
-	for _, m := range t.Messages(since) {
+	messages, err := s.cache.Messages(t.id, since)
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
 		if err := sub(m); err != nil {
 			return err
 		}
@@ -340,7 +340,7 @@ func (s *Server) topic(id string) (*topic, error) {
 		if len(s.topics) >= s.config.GlobalTopicLimit {
 			return nil, errHTTPTooManyRequests
 		}
-		s.topics[id] = newTopic(id)
+		s.topics[id] = newTopic(id, time.Now())
 		if s.firebase != nil {
 			s.topics[id].Subscribe(s.firebase)
 		}
@@ -360,28 +360,28 @@ func (s *Server) updateStatsAndExpire() {
 	}
 
 	// Prune cache
-	if s.cache != nil {
-		if err := s.cache.Prune(s.config.MessageBufferDuration); err != nil {
-			log.Printf("error pruning cache: %s", err.Error())
-		}
+	if err := s.cache.Prune(s.config.MessageBufferDuration); err != nil {
+		log.Printf("error pruning cache: %s", err.Error())
 	}
 
 	// Prune old messages, remove subscriptions without subscribers
-	for _, t := range s.topics {
-		t.Prune(s.config.MessageBufferDuration)
-		subs, msgs := t.Stats()
-		if msgs == 0 && (subs == 0 || (s.firebase != nil && subs == 1)) { // Firebase is a subscriber!
-			delete(s.topics, t.id)
-		}
-	}
-
-	// Print stats
 	var subscribers, messages int
 	for _, t := range s.topics {
-		subs, msgs := t.Stats()
+		subs := t.Subscribers()
+		msgs, err := s.cache.MessageCount(t.id)
+		if err != nil {
+			log.Printf("cannot get stats for topic %s: %s", t.id, err.Error())
+			continue
+		}
+		if msgs == 0 && (subs == 0 || (s.firebase != nil && subs == 1)) { // Firebase is a subscriber!
+			delete(s.topics, t.id)
+			continue
+		}
 		subscribers += subs
 		messages += msgs
 	}
+
+	// Print stats
 	log.Printf("Stats: %d message(s) published, %d topic(s) active, %d subscriber(s), %d message(s) buffered, %d visitor(s)",
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
 }

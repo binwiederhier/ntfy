@@ -4,11 +4,9 @@ before:
 builds:
   - binary: ntfy
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1 # required for go-sqlite3
     goos:
       - linux
-      - windows
-      - darwin
     goarch:
       - amd64
 nfpms:

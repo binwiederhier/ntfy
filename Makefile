@@ -94,6 +94,7 @@ build-snapshot:
 
 build-simple: clean
 	mkdir -p dist/ntfy_linux_amd64
+	export CGO_ENABLED=1
 	$(GO) build \
 		-o dist/ntfy_linux_amd64/ntfy \
 		-ldflags \

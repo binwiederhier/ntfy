@@ -15,12 +15,12 @@ const (
 )
 
 // Defines all the limits
-// - request limit: max number of PUT/GET/.. requests (here: 50 requests bucket, replenished at a rate of 1 per second)
+// - request limit: max number of PUT/GET/.. requests (here: 50 requests bucket, replenished at a rate of one per 10 seconds)
 // - global topic limit: max number of topics overall
 // - subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
 var (
 	defaultGlobalTopicLimit         = 5000
-	defaultVisitorRequestLimit      = rate.Every(time.Second)
+	defaultVisitorRequestLimit      = rate.Every(10 * time.Second)
 	defaultVisitorRequestLimitBurst = 50
 	defaultVisitorSubscriptionLimit = 30
 )

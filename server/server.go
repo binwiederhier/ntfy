@@ -47,7 +47,7 @@ func (e errHTTP) Error() string {
 }
 
 const (
-	messageLimit = 1024
+	messageLimit = 512
 )
 
 var (
@@ -85,6 +85,11 @@ func New(conf *config.Config) (*Server, error) {
 	topics, err := cache.Topics()
 	if err != nil {
 		return nil, err
+	}
+	for _, t := range topics {
+		if firebaseSubscriber != nil {
+			t.Subscribe(firebaseSubscriber)
+		}
 	}
 	return &Server{
 		config:   conf,

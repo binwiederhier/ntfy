@@ -60,6 +60,7 @@ code {
     margin-bottom: 20px;
 }
 
+
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
    embedded with the help of https://google-webfonts-helper.herokuapp.com/fonts/lato?subsets=latin */
 
@@ -87,3 +88,104 @@ code {
 #ironicCenterTagDontFreakOut {
     color: #666;
 }
+
+/* Subscribe box */
+
+button {
+    background: #3a9784;
+    border: none;
+    border-radius: 3px;
+    padding: 3px 5px;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #317f6f;
+    padding: 5px;
+}
+
+ul {
+    padding-left: 1em;
+    list-style-type: none;
+    padding-bottom: 0;
+    margin: 0;
+}
+
+li {
+    padding: 4px 0;
+    margin: 4px 0;
+    font-size: 0.9em;
+}
+
+@media only screen and (min-width: 1600px) {
+    #subscribeBox {
+        position: fixed;
+        top: 180px;
+        right: 10px;
+        width: 300px;
+        border-left: 4px solid #3a9784;
+        padding: 10px;
+    }
+
+    #subscribeBox h3 {
+        margin-top: 0;
+        margin-bottom: 5px;
+        font-size: 1.1em;
+    }
+
+    #subscribeBox #topicsHeader {
+        margin-bottom: 0;
+    }
+
+    #subscribeBox p {
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+
+    #subscribeBox ul {
+        margin: 0;
+        padding: 0;
+    }
+
+    #subscribeBox input {
+        height: 18px;
+        border-radius: 3px;
+        border: none;
+        border-bottom: 1px solid #aaa;
+    }
+
+    #subscribeBox input:focus {
+        border-bottom: 2px solid #3a9784;
+        outline: none;
+    }
+
+    #subscribeBox li {
+        margin: 3px 0;
+        padding: 0;
+    }
+
+    #subscribeBox li img {
+        width: 15px;
+        height: 15px;
+        vertical-align: bottom;
+    }
+
+    #subscribeBox button {
+        font-size: 0.7em;
+        background: #3a9784;
+        border-radius: 3px;
+        padding: 3px 5px;
+        color: white;
+        cursor: pointer;
+        border-top: solid transparent 2px;
+        border-bottom: solid transparent 2px;
+    }
+
+    #subscribeBox button:hover {
+        background: #317f6f;
+    }
+
+}
+
+

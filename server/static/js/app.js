@@ -40,7 +40,7 @@ const subscribeInternal = (topic, delaySec) => {
         if (!topicEntry) {
             topicEntry = document.createElement('li');
             topicEntry.id = `topic-${topic}`;
-            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')">Test</button> <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
+            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}')"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
             topicsList.appendChild(topicEntry);
         }
         topicsHeader.style.display = '';
@@ -48,7 +48,7 @@ const subscribeInternal = (topic, delaySec) => {
         // Open event source
         let eventSource = new EventSource(`${topic}/sse`);
         eventSource.onopen = () => {
-            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')">Test</button> <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
+            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}')"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
             delaySec = 0; // Reset on successful connection
         };
         eventSource.onerror = (e) => {
@@ -83,7 +83,7 @@ const unsubscribe = (topic) => {
 const test = (topic) => {
     fetch(`/${topic}`, {
         method: 'PUT',
-        body: `This is a test notification`
+        body: `This is a test notification sent from the Ntfy Web UI. It was sent at ${new Date().toString()}.`
     })
 };
 
@@ -101,7 +101,7 @@ const showNotificationDeniedError = () => {
     showError("You have blocked desktop notifications for this website. Please unblock them and refresh to use the web-based desktop notifications.");
 };
 
-subscribeForm.onsubmit = function () {
+subscribeButton.onclick = function () {
     if (!topicField.value) {
         return false;
     }

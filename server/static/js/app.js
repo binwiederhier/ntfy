@@ -16,7 +16,6 @@ const topicsList = document.getElementById("topicsList");
 const topicField = document.getElementById("topicField");
 const notifySound = document.getElementById("notifySound");
 const subscribeButton = document.getElementById("subscribeButton");
-const subscribeForm = document.getElementById("subscribeForm");
 const errorField = document.getElementById("error");
 
 const subscribe = (topic) => {
@@ -40,7 +39,7 @@ const subscribeInternal = (topic, delaySec) => {
         if (!topicEntry) {
             topicEntry = document.createElement('li');
             topicEntry.id = `topic-${topic}`;
-            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}')"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
+            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}'); return false;"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
             topicsList.appendChild(topicEntry);
         }
         topicsHeader.style.display = '';
@@ -48,13 +47,13 @@ const subscribeInternal = (topic, delaySec) => {
         // Open event source
         let eventSource = new EventSource(`${topic}/sse`);
         eventSource.onopen = () => {
-            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}')"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}')"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
+            topicEntry.innerHTML = `${topic} <button onclick="test('${topic}'); return false;"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
             delaySec = 0; // Reset on successful connection
         };
         eventSource.onerror = (e) => {
+            topicEntry.innerHTML = `${topic} <i>(Reconnecting)</i> <button disabled="disabled">Test</button> <button onclick="unsubscribe('${topic}'); return false;">Unsubscribe</button>`;
+            eventSource.close();
             const newDelaySec = (delaySec + 5 <= 15) ? delaySec + 5 : 15;
-            topicEntry.innerHTML = `${topic} <i>(Reconnecting in ${newDelaySec}s ...)</i> <button disabled="disabled">Test</button> <button onclick="unsubscribe('${topic}')">Unsubscribe</button>`;
-            eventSource.close()
             subscribeInternal(topic, newDelaySec);
         };
         eventSource.onmessage = (e) => {
@@ -83,7 +82,7 @@ const unsubscribe = (topic) => {
 const test = (topic) => {
     fetch(`/${topic}`, {
         method: 'PUT',
-        body: `This is a test notification sent from the Ntfy Web UI. It was sent at ${new Date().toString()}.`
+        body: `This is a test notification sent by the ntfy.sh Web UI at ${new Date().toString()}.`
     })
 };
 

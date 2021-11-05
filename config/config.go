@@ -21,7 +21,7 @@ const (
 var (
 	defaultGlobalTopicLimit         = 5000
 	defaultVisitorRequestLimit      = rate.Every(10 * time.Second)
-	defaultVisitorRequestLimitBurst = 50
+	defaultVisitorRequestLimitBurst = 60
 	defaultVisitorSubscriptionLimit = 30
 )
 

@@ -58,8 +58,8 @@ code {
     border-radius: 3px;
     margin-top: 10px;
     margin-bottom: 20px;
+    overflow-x: scroll;
 }
-
 
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
    embedded with the help of https://google-webfonts-helper.herokuapp.com/fonts/lato?subsets=latin */
@@ -118,6 +118,69 @@ li {
     font-size: 0.9em;
 }
 
+/* Subscribe box SMALL SCREEN */
+@media only screen and (max-width: 1599px) {
+    #subscribeBox #subscribeForm {
+        border-left: 4px solid #3a9784;
+        padding: 10px;
+    }
+
+    #subscribeBox h3 {
+        margin-top: 0;
+        margin-bottom: 0;
+        font-size: 1.1em;
+    }
+
+    #subscribeBox #topicsHeader {
+        margin-bottom: 0;
+    }
+
+    #subscribeBox input {
+        height: 24px;
+        min-width: 200px;
+        max-width: 300px;
+        border-radius: 3px;
+        border: none;
+        border-bottom: 1px solid #aaa;
+        font-size: 0.8em;
+    }
+
+    #subscribeBox input:focus {
+        border-bottom: 2px solid #3a9784;
+        outline: none;
+    }
+
+    #subscribeBox ul {
+        margin: 0;
+        padding: 0;
+    }
+
+    #subscribeBox li {
+        margin: 3px 0;
+        padding: 0;
+    }
+
+    #subscribeBox li img {
+        width: 15px;
+        height: 15px;
+        vertical-align: bottom;
+    }
+
+    #subscribeBox button {
+        font-size: 0.8em;
+        background: #3a9784;
+        border-radius: 3px;
+        padding: 5px;
+        color: white;
+        cursor: pointer;
+    }
+
+    #subscribeBox button:hover {
+        background: #317f6f;
+    }
+}
+
+/* Subscribe box BIG SCREEN */
 @media only screen and (min-width: 1600px) {
     #subscribeBox {
         position: fixed;
@@ -175,11 +238,9 @@ li {
         font-size: 0.7em;
         background: #3a9784;
         border-radius: 3px;
-        padding: 3px 5px;
+        padding: 5px;
         color: white;
         cursor: pointer;
-        border-top: solid transparent 2px;
-        border-bottom: solid transparent 2px;
     }
 
     #subscribeBox button:hover {

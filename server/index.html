@@ -65,25 +65,25 @@
     </p>
 
     <div id="subscribeBox">
+        <h3>Subscribe in this Web UI</h3>
+        <p id="error"></p>
+        <p>
+            Subscribe to topics here and receive messages as <b>desktop notification</b>. Topics are not password-protected,
+            so choose a name that's not easy to guess. Once subscribed, you can publish messages via PUT/POST.
+        </p>
         <form id="subscribeForm">
-            <h3>Subscribe via web</h3>
-            <p id="error"></p>
             <p>
-                Messages published to topics subscribed here will show up as <b>desktop notification</b>.
-                Topics are not password-protected, so choose a name that's not easy to guess. Once subscribed, you can
-                publish messages via PUT/POST.
-            </p>
-            <p>
+                <b>Topic:</b><br/>
                 <input type="text" id="topicField" autocomplete="off" placeholder="Topic name, e.g. phil_alerts"  pattern="[-_A-Za-z]{1,64}" />
                 <button id="subscribeButton">Subscribe</button>
             </p>
+            <p id="topicsHeader"><b>Subscribed topics:</b></p>
+            <ul id="topicsList"></ul>
         </form>
-        <p id="topicsHeader"><b>Subscribed topics:</b></p>
-        <ul id="topicsList"></ul>
         <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
     </div>
 
-    <h3>Subscribe via phone</h3>
+    <h3>Subscribe via Android App</h3>
     <p>
         You can use the <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">Ntfy Android App</a>
         to receive notifications directly on your phone. Just like the server, this app is also <a href="https://github.com/binwiederhier/ntfy-android">open source</a>.
@@ -190,7 +190,6 @@
         is the Firebase Cloud Messaging (FCM) service, which is required to provide instant Android notifications (see
         FAQ for details).
     </p>
-
     <p>
         The web server does not log or otherwise store request paths, remote IP addresses or even topics or messages,
         aside from a short on-disk cache (up to a day) to support service restarts.

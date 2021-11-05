@@ -58,7 +58,7 @@ code {
     border-radius: 3px;
     margin-top: 10px;
     margin-bottom: 20px;
-    overflow-x: scroll;
+    overflow-x: auto;
 }
 
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
@@ -125,12 +125,6 @@ li {
         padding: 10px;
     }
 
-    #subscribeBox h3 {
-        margin-top: 0;
-        margin-bottom: 0;
-        font-size: 1.1em;
-    }
-
     #subscribeBox #topicsHeader {
         margin-bottom: 0;
     }
@@ -184,7 +178,7 @@ li {
 @media only screen and (min-width: 1600px) {
     #subscribeBox {
         position: fixed;
-        top: 180px;
+        top: 170px;
         right: 10px;
         width: 300px;
         border-left: 4px solid #3a9784;

@@ -36,6 +36,11 @@
         It allows you to send notifications <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">to your phone</a> or desktop via scripts from any computer,
         entirely <b>without signup or cost</b>. It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
+    <p>
+        There are many ways to use ntfy. You can send yourself messages for all sorts of things: When a long process finishes or fails (a backup, a long rsync job, ...),
+        or to notify yourself when somebody logs into your server(s). Or you may want to use it in your own app to distribute messages to subscribed clients.
+        Endless possibilities 😀.
+    </p>
 
     <h2>Publishing messages</h2>
     <p>
@@ -130,6 +135,14 @@
         <br/>
         This is a notification
     </code>
+    <p class="smallMarginBottom">
+        Here's an example of how to use this endpoint to send desktop notifications for every incoming message:
+    </p>
+    <code>
+        while read msg; do<br/>
+        &nbsp;&nbsp;[ -n "$msg" ] && notify-send "$msg"<br/>
+        done < <(stdbuf -i0 -o0 curl -s ntfy.sh/mytopic/raw)
+    </code>
 
     <h3>Message buffering and polling</h3>
     <p class="smallMarginBottom">
@@ -179,8 +192,7 @@
         In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
         published to Firebase Cloud Messaging (FCM) (if <tt>FirebaseKeyFile</tt> is set, which it is on ntfy.sh). This
         is to facilitate instant notifications on Android. I tried really, really hard to avoid using FCM, but newer
-        versions of Android made it impossible to implement <a href="https://developer.android.com/guide/background">background services</a>>.
-        I'm sorry.
+        versions of Android made it impossible to implement <a href="https://developer.android.com/guide/background">background services</a>.
     </p>
 
     <h2>Privacy policy</h2>

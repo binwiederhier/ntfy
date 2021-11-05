@@ -22,8 +22,13 @@ func New() *cli.App {
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: config.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: config.DefaultKeepaliveInterval, Usage: "default interval of keepalive messages"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: config.DefaultManagerInterval, Usage: "default interval of for message pruning and stats printing"}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: config.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: config.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
+		altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: config.DefaultGlobalTopicLimit, Usage: "total number of topics allowed"}),
+		altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"V"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: config.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
+		altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", Aliases: []string{"B"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: config.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
+		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", Aliases: []string{"R"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: config.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
+		altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
 	}
 	return &cli.App{
 		Name:                   "ntfy",
@@ -50,6 +55,11 @@ func execRun(c *cli.Context) error {
 	cacheDuration := c.Duration("cache-duration")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
+	globalTopicLimit := c.Int("global-topic-limit")
+	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
+	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
+	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
+	behindProxy := c.Bool("behind-proxy")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -69,6 +79,11 @@ func execRun(c *cli.Context) error {
 	conf.CacheDuration = cacheDuration
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
+	conf.GlobalTopicLimit = globalTopicLimit
+	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
+	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
+	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
+	conf.BehindProxy = behindProxy
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatalln(err)

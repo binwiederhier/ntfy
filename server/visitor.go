@@ -24,7 +24,7 @@ type visitor struct {
 func newVisitor(conf *config.Config) *visitor {
 	return &visitor{
 		config:        conf,
-		limiter:       rate.NewLimiter(conf.VisitorRequestLimit, conf.VisitorRequestLimitBurst),
+		limiter:       rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
 		subscriptions: util.NewLimiter(int64(conf.VisitorSubscriptionLimit)),
 		seen:          time.Now(),
 	}

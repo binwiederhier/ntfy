@@ -2,7 +2,6 @@
 package config
 
 import (
-	"golang.org/x/time/rate"
 	"time"
 )
 
@@ -15,42 +14,44 @@ const (
 )
 
 // Defines all the limits
-// - request limit: max number of PUT/GET/.. requests (here: 50 requests bucket, replenished at a rate of one per 10 seconds)
 // - global topic limit: max number of topics overall
-// - subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
-var (
-	defaultGlobalTopicLimit         = 5000
-	defaultVisitorRequestLimit      = rate.Every(10 * time.Second)
-	defaultVisitorRequestLimitBurst = 60
-	defaultVisitorSubscriptionLimit = 30
+// - per visistor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
+// - per visistor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
+const (
+	DefaultGlobalTopicLimit             = 5000
+	DefaultVisitorRequestLimitBurst     = 60
+	DefaultVisitorRequestLimitReplenish = 10 * time.Second
+	DefaultVisitorSubscriptionLimit     = 30
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	ListenHTTP               string
-	FirebaseKeyFile          string
-	CacheFile                string
-	CacheDuration            time.Duration
-	KeepaliveInterval        time.Duration
-	ManagerInterval          time.Duration
-	GlobalTopicLimit         int
-	VisitorRequestLimit      rate.Limit
-	VisitorRequestLimitBurst int
-	VisitorSubscriptionLimit int
+	ListenHTTP                   string
+	FirebaseKeyFile              string
+	CacheFile                    string
+	CacheDuration                time.Duration
+	KeepaliveInterval            time.Duration
+	ManagerInterval              time.Duration
+	GlobalTopicLimit             int
+	VisitorRequestLimitBurst     int
+	VisitorRequestLimitReplenish time.Duration
+	VisitorSubscriptionLimit     int
+	BehindProxy                  bool
 }
 
 // New instantiates a default new config
 func New(listenHTTP string) *Config {
 	return &Config{
-		ListenHTTP:               listenHTTP,
-		FirebaseKeyFile:          "",
-		CacheFile:                "",
-		CacheDuration:            DefaultCacheDuration,
-		KeepaliveInterval:        DefaultKeepaliveInterval,
-		ManagerInterval:          DefaultManagerInterval,
-		GlobalTopicLimit:         defaultGlobalTopicLimit,
-		VisitorRequestLimit:      defaultVisitorRequestLimit,
-		VisitorRequestLimitBurst: defaultVisitorRequestLimitBurst,
-		VisitorSubscriptionLimit: defaultVisitorSubscriptionLimit,
+		ListenHTTP:                   listenHTTP,
+		FirebaseKeyFile:              "",
+		CacheFile:                    "",
+		CacheDuration:                DefaultCacheDuration,
+		KeepaliveInterval:            DefaultKeepaliveInterval,
+		ManagerInterval:              DefaultManagerInterval,
+		GlobalTopicLimit:             DefaultGlobalTopicLimit,
+		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
+		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,
+		VisitorSubscriptionLimit:     DefaultVisitorSubscriptionLimit,
+		BehindProxy:                  false,
 	}
 }

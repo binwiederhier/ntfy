@@ -25,6 +25,30 @@
 #
 # keepalive-interval: 30s
 
-# Interval in which the manager prunes old messages, deletes topics and prints the stats.
+# Interval in which the manager prunes old messages, deletes topics
+# and prints the stats.
 #
 # manager-interval: 1m
+
+# Rate limiting: Total number of topics before the server rejects new topics.
+#
+# global-topic-limit: 5000
+
+# Rate limiting: Number of subscriptions per visitor (IP address)
+#
+# visitor-subscription-limit: 30
+
+# Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
+# - visitor-request-limit-burst is the initial bucket of requests each visitor has
+# - visitor-request-limit-replenish is the rate at which the bucket is refilled
+#
+# visitor-request-limit-burst: 60
+# visitor-request-limit-replenish: 10s
+
+# If set, the X-Forwarded-For header is used to determine the visitor IP address
+# instead of the remote address of the connection.
+#
+# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
+#          as if they are one.
+#
+# behind-proxy: false

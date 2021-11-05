@@ -159,24 +159,22 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
-	v := s.visitor(r.RemoteAddr)
-	if err := v.RequestAllowed(); err != nil {
-		return err
-	}
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
+	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
+		return s.handleEmpty(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.handleStatic(w, r)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
-		return s.handlePublish(w, r, v)
-	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
-		return s.handleSubscribeJSON(w, r, v)
-	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
-		return s.handleSubscribeSSE(w, r, v)
-	} else if r.Method == http.MethodGet && rawRegex.MatchString(r.URL.Path) {
-		return s.handleSubscribeRaw(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
+		return s.withRateLimit(w, r, s.handlePublish)
+	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
+		return s.withRateLimit(w, r, s.handleSubscribeJSON)
+	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
+		return s.withRateLimit(w, r, s.handleSubscribeSSE)
+	} else if r.Method == http.MethodGet && rawRegex.MatchString(r.URL.Path) {
+		return s.withRateLimit(w, r, s.handleSubscribeRaw)
 	}
 	return errHTTPNotFound
 }
@@ -184,6 +182,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 	_, err := io.WriteString(w, indexSource)
 	return err
+}
+
+func (s *Server) handleEmpty(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
@@ -394,14 +396,26 @@ func (s *Server) updateStatsAndExpire() {
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
 }
 
+func (s *Server) withRateLimit(w http.ResponseWriter, r *http.Request, handler func(w http.ResponseWriter, r *http.Request, v *visitor) error) error {
+	v := s.visitor(r)
+	if err := v.RequestAllowed(); err != nil {
+		return err
+	}
+	return handler(w, r, v)
+}
+
 // visitor creates or retrieves a rate.Limiter for the given visitor.
 // This function was taken from https://www.alexedwards.net/blog/how-to-rate-limit-http-requests (MIT).
-func (s *Server) visitor(remoteAddr string) *visitor {
+func (s *Server) visitor(r *http.Request) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	remoteAddr := r.RemoteAddr
 	ip, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		ip = remoteAddr // This should not happen in real life; only in tests.
+	}
+	if s.config.BehindProxy && r.Header.Get("X-Forwarded-For") != "" {
+		ip = r.Header.Get("X-Forwarded-For")
 	}
 	v, exists := s.visitors[ip]
 	if !exists {

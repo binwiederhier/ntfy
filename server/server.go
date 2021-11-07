@@ -228,7 +228,7 @@ func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request, v *
 		}
 		return buf.String(), nil
 	}
-	return s.handleSubscribe(w, r, v, "json", "application/stream+json", encoder)
+	return s.handleSubscribe(w, r, v, "json", "application/x-ndjson", encoder)
 }
 
 func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -282,8 +282,8 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 		}
 		return nil
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Access-Control-Allow-Origin", "*")            // CORS, allow cross-origin requests
+	w.Header().Set("Content-Type", contentType+"; charset=utf-8") // Android/Volley client needs charset!
 	if poll {
 		return s.sendOldMessages(t, since, sub)
 	}

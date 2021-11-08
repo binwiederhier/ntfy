@@ -118,7 +118,7 @@ const test = (topic) => {
 };
 
 const fetchCachedMessages = async (topic) => {
-    const topicJsonUrl = `/${topic}/json?poll=1&since=12h`; // Poll!
+    const topicJsonUrl = `/${topic}/json?poll=1`; // Poll!
     for await (let line of makeTextFileLineIterator(topicJsonUrl)) {
         const message = JSON.parse(line);
         topics[topic]['messages'].push(message);

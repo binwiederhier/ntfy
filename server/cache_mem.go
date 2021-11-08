@@ -29,7 +29,7 @@ func (s *memCache) AddMessage(m *message) error {
 	return nil
 }
 
-func (s *memCache) Messages(topic string, since time.Time) ([]*message, error) {
+func (s *memCache) Messages(topic string, since sinceTime) ([]*message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.messages[topic]; !ok {
@@ -38,7 +38,7 @@ func (s *memCache) Messages(topic string, since time.Time) ([]*message, error) {
 	messages := make([]*message, 0) // copy!
 	for _, m := range s.messages[topic] {
 		msgTime := time.Unix(m.Time, 0)
-		if msgTime == since || msgTime.After(since) {
+		if msgTime == since.Time() || msgTime.After(since.Time()) {
 			messages = append(messages, m)
 		}
 	}

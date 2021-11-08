@@ -53,6 +53,25 @@ type indexPage struct {
 	CacheDuration string
 }
 
+type sinceTime time.Time
+
+func (t sinceTime) IsAll() bool {
+	return t == sinceAllMessages
+}
+
+func (t sinceTime) IsNone() bool {
+	return t == sinceNoMessages
+}
+
+func (t sinceTime) Time() time.Time {
+	return time.Time(t)
+}
+
+var (
+	sinceAllMessages = sinceTime(time.Unix(0, 0))
+	sinceNoMessages  = sinceTime(time.Unix(1, 0))
+)
+
 const (
 	messageLimit = 512
 )
@@ -318,8 +337,8 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 }
 
-func (s *Server) sendOldMessages(t *topic, since time.Time, sub subscriber) error {
-	if since.IsZero() {
+func (s *Server) sendOldMessages(t *topic, since sinceTime, sub subscriber) error {
+	if since.IsNone() {
 		return nil
 	}
 	messages, err := s.cache.Messages(t.id, since)
@@ -334,17 +353,27 @@ func (s *Server) sendOldMessages(t *topic, since time.Time, sub subscriber) erro
 	return nil
 }
 
-func parseSince(r *http.Request) (time.Time, error) {
+// parseSince returns a timestamp identifying the time span from which cached messages should be received.
+//
+// Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h), or
+// "all" for all messages.
+func parseSince(r *http.Request) (sinceTime, error) {
 	if !r.URL.Query().Has("since") {
-		return time.Time{}, nil
+		if r.URL.Query().Has("poll") {
+			return sinceAllMessages, nil
+		}
+		return sinceNoMessages, nil
 	}
-	if since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
-		return time.Unix(since, 0), nil
+	if r.URL.Query().Get("since") == "all" {
+		return sinceAllMessages, nil
+	}
+	if s, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
+		return sinceTime(time.Unix(s, 0)), nil
 	}
 	if d, err := time.ParseDuration(r.URL.Query().Get("since")); err == nil {
-		return time.Now().Add(-1 * d), nil
+		return sinceTime(time.Now().Add(-1 * d)), nil
 	}
-	return time.Time{}, errHTTPBadRequest
+	return sinceNoMessages, errHTTPBadRequest
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {

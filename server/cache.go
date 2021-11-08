@@ -7,7 +7,7 @@ import (
 
 type cache interface {
 	AddMessage(m *message) error
-	Messages(topic string, since time.Time) ([]*message, error)
+	Messages(topic string, since sinceTime) ([]*message, error)
 	MessageCount(topic string) (int, error)
 	Topics() (map[string]*topic, error)
 	Prune(keep time.Duration) error

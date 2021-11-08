@@ -55,8 +55,8 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	return err
 }
 
-func (c *sqliteCache) Messages(topic string, since time.Time) ([]*message, error) {
-	rows, err := c.db.Query(selectMessagesSinceTimeQuery, topic, since.Unix())
+func (c *sqliteCache) Messages(topic string, since sinceTime) ([]*message, error) {
+	rows, err := c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
 	if err != nil {
 		return nil, err
 	}

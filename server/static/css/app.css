@@ -278,8 +278,9 @@ li {
 
 #detail #detailMain {
     max-width: 900px;
-    margin: 0 auto 50px auto;
+    margin: 0 auto;
     position: relative; /* required for close button's "position: absolute" */
+    padding-bottom: 50px; /* Chrome and Firefox behave differently regarding bottom margin */
 }
 
 #detail #detailCloseButton {

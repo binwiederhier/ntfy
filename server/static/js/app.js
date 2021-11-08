@@ -73,7 +73,7 @@ const subscribeInternal = (topic, persist, delaySec) => {
         eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
             topics[topic]['messages'].push(event);
-            topics[topic]['messages'].sort((a, b) => { return a.time < b.time; }) // Newest first
+            topics[topic]['messages'].sort((a, b) => { return a.time < b.time ? 1 : -1; }); // Newest first
             if (currentTopic === topic) {
                 rerenderDetailView();
             }
@@ -123,7 +123,7 @@ const fetchCachedMessages = async (topic) => {
         const message = JSON.parse(line);
         topics[topic]['messages'].push(message);
     }
-    topics[topic]['messages'].sort((a, b) => { return a.time < b.time; }) // Newest first
+    topics[topic]['messages'].sort((a, b) => { return a.time < b.time ? 1 : -1; }); // Newest first
 };
 
 const showDetail = (topic) => {
@@ -258,27 +258,23 @@ if (!window["Notification"] || !window["EventSource"]) {
 // Reset UI
 topicField.value = "";
 
+// Restore topics
+const storedTopics = JSON.parse(localStorage.getItem('topics') || "[]");
+if (storedTopics) {
+    storedTopics.forEach((topic) => { subscribeInternal(topic, true, 0); });
+    if (storedTopics.length === 0) {
+        topicsHeader.style.display = 'none';
+    }
+} else {
+    topicsHeader.style.display = 'none';
+}
+
 // (Temporarily) subscribe topic if we navigated to /sometopic URL
 const match = location.pathname.match(/^\/([-_a-zA-Z0-9]{1,64})$/) // Regex must match Go & Android app!
 if (match) {
     currentTopic = match[1];
-    subscribeInternal(currentTopic, false,0);
-}
-
-// Restore topics
-const storedTopics = localStorage.getItem('topics');
-if (storedTopics) {
-    const storedTopicsArray = JSON.parse(storedTopics);
-    storedTopicsArray.forEach((topic) => { subscribeInternal(topic, true, 0); });
-    if (storedTopicsArray.length === 0) {
-        topicsHeader.style.display = 'none';
-    }
-    if (currentTopic) {
-        currentTopicUnsubscribeOnClose = !storedTopicsArray.includes(currentTopic);
-    }
-} else {
-    topicsHeader.style.display = 'none';
-    if (currentTopic) {
+    if (!storedTopics.includes(currentTopic)) {
+        subscribeInternal(currentTopic, false,0);
         currentTopicUnsubscribeOnClose = true;
     }
 }

@@ -1,3 +1,4 @@
+{{- /*gotype: heckel.io/ntfy/server.indexPage*/ -}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,12 +28,16 @@
     <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
     <meta property="og:image" content="/static/img/ntfy.png" />
     <meta property="og:url" content="https://ntfy.sh" />
+{{if .Topic}}
+    <!-- Never index topic page -->
+    <meta name="robots" content="noindex, nofollow" />
+{{end}}
 </head>
 <body>
-<div id="main">
-    <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/>ntfy.sh - simple HTTP-based pub-sub</h1>
+<div id="main"{{if .Topic}} style="display: none"{{end}}>
+    <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/>ntfy.sh | simple HTTP-based pub-sub</h1>
     <p>
-        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
+        <b>Ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
         It allows you to send notifications <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">to your phone</a> or desktop via scripts from any computer,
         entirely <b>without signup or cost</b>. It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
@@ -79,7 +84,7 @@
         <form id="subscribeForm">
             <p>
                 <b>Topic:</b><br/>
-                <input type="text" id="topicField" autocomplete="off" placeholder="Topic name, e.g. phil_alerts"  pattern="[-_A-Za-z]{1,64}" />
+                <input type="text" id="topicField" autocomplete="off" placeholder="Topic name, e.g. phil_alerts" maxlength="64" pattern="[-_A-Za-z0-9]{1,64}" />
                 <button id="subscribeButton">Subscribe</button>
             </p>
             <p id="topicsHeader"><b>Subscribed topics:</b></p>
@@ -208,6 +213,31 @@
     </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>
+</div>
+<div id="detail"{{if not .Topic}} style="display: none"{{end}}>
+    <div id="detailMain">
+        <button id="detailCloseButton"><img src="static/img/close_black_24dp.svg"/></button>
+        <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/><span id="detailTitle"></span></h1>
+        <p class="smallMarginBottom">
+            <b>Ntfy</b> is a simple HTTP-based pub-sub notification service. This is a Ntfy topic.
+            To send notifications to it, simply PUT or POST to the topic URL. Here's an example using <tt>curl</tt>:
+        </p>
+        <code>
+            curl -d "Backup failed" <span id="detailTopicUrl"></span>
+        </code>
+        <p id="detailNotificationsDisallowed">
+            If you'd like to receive desktop notifications when new messages arrive on this topic, you have
+            <a href="#" onclick="return requestPermission()">grant the browser permission</a> to show notifications.
+            Click the link to do so.
+        </p>
+        <p class="smallMarginBottom">
+            <b>Recent notifications</b> (cached for {{.CacheDuration}}):
+        </p>
+        <p id="detailNoNotifications">
+            <i>You haven't received any notifications for this topic yet.</i>
+        </p>
+        <div id="detailEventsList"></div>
+    </div>
 </div>
 <script src="static/js/app.js"></script>
 </body>

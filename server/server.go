@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/config"
+	"heckel.io/ntfy/util"
+	"html/template"
 	"io"
 	"log"
 	"net"
@@ -46,20 +48,26 @@ func (e errHTTP) Error() string {
 	return fmt.Sprintf("http: %s", e.Status)
 }
 
+type indexPage struct {
+	Topic         string
+	CacheDuration string
+}
+
 const (
 	messageLimit = 512
 )
 
 var (
-	topicRegex = regexp.MustCompile(`^/[^/]+$`)
-	jsonRegex  = regexp.MustCompile(`^/[^/]+/json$`)
-	sseRegex   = regexp.MustCompile(`^/[^/]+/sse$`)
-	rawRegex   = regexp.MustCompile(`^/[^/]+/raw$`)
+	topicRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
+	jsonRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/json$`)
+	sseRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/sse$`)
+	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/raw$`)
 
 	staticRegex = regexp.MustCompile(`^/static/.+`)
 
-	//go:embed "index.html"
-	indexSource string
+	//go:embed "index.gohtml"
+	indexSource   string
+	indexTemplate = template.Must(template.New("index").Parse(indexSource))
 
 	//go:embed static
 	webStaticFs embed.FS
@@ -159,7 +167,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
-	if r.Method == http.MethodGet && r.URL.Path == "/" {
+	if r.Method == http.MethodGet && (r.URL.Path == "/" || topicRegex.MatchString(r.URL.Path)) {
 		return s.handleHome(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.handleEmpty(w, r)
@@ -180,8 +188,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
-	_, err := io.WriteString(w, indexSource)
-	return err
+	return indexTemplate.Execute(w, &indexPage{
+		Topic:         r.URL.Path[1:],
+		CacheDuration: util.DurationToHuman(s.config.CacheDuration),
+	})
 }
 
 func (s *Server) handleEmpty(w http.ResponseWriter, r *http.Request) error {

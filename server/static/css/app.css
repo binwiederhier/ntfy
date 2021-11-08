@@ -6,6 +6,12 @@ html, body {
     font-size: 1.1em;
 }
 
+html {
+    /* prevent scrollbar from repositioning website:
+     * https://www.w3docs.com/snippets/css/how-to-prevent-scrollbar-from-repositioning-web-page.html */
+    overflow-y: scroll;
+}
+
 a, a:visited {
     color: #3a9784;
 }
@@ -107,7 +113,7 @@ button:hover {
 
 ul {
     padding-left: 1em;
-    list-style-type: none;
+    list-style-type: circle;
     padding-bottom: 0;
     margin: 0;
 }
@@ -146,7 +152,6 @@ li {
 
     #subscribeBox ul {
         margin: 0;
-        padding: 0;
     }
 
     #subscribeBox li {
@@ -158,6 +163,10 @@ li {
         width: 15px;
         height: 15px;
         vertical-align: bottom;
+    }
+
+    #subscribeBox li a {
+        padding: 0 5px 0 0;
     }
 
     #subscribeBox button {
@@ -202,7 +211,6 @@ li {
 
     #subscribeBox ul {
         margin: 0;
-        padding: 0;
     }
 
     #subscribeBox input {
@@ -228,6 +236,10 @@ li {
         vertical-align: bottom;
     }
 
+    #subscribeBox li a {
+        padding: 0 5px 0 0;
+    }
+
     #subscribeBox button {
         font-size: 0.7em;
         background: #3a9784;
@@ -240,7 +252,62 @@ li {
     #subscribeBox button:hover {
         background: #317f6f;
     }
-
 }
 
+/** Detail view */
+#detail {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    left: 8px;
+    right: 8px;
+    top: 0;
+    bottom: 0;
+    background: white;
+}
 
+#detail .detailDate {
+    color: #888;
+    font-size: 0.9em;
+}
+
+#detail .detailMessage {
+    margin-bottom: 20px;
+    font-size: 1.1em;
+}
+
+#detail #detailMain {
+    max-width: 900px;
+    margin: 0 auto 50px auto;
+    position: relative; /* required for close button's "position: absolute" */
+}
+
+#detail #detailCloseButton {
+    background: #eee;
+    border-radius: 5px;
+    border: none;
+    padding: 5px;
+    position: absolute;
+    right: 0;
+    top: 10px;
+    display: block;
+}
+
+#detail #detailCloseButton:hover {
+    padding: 5px;
+    background: #ccc;
+}
+
+#detail #detailCloseButton img {
+    display: block; /* get rid of the weird bottom border */
+}
+
+#detail #detailNotificationsDisallowed {
+    display: none;
+    color: darkred;
+}
+
+#detail #events {
+    max-width: 900px;
+    margin: 0 auto 50px auto;
+}

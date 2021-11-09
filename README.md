@@ -1,13 +1,21 @@
 ![ntfy](server/static/img/ntfy.png)
 
-# ntfy - simple HTTP-based pub-sub
+# ntfy.sh | simple HTTP-based pub-sub
 
-**ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
+**Ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
 It's also open source (as you can plainly see) if you want to run your own.
 
 I run a free version of it at **[ntfy.sh](https://ntfy.sh)**, and there's an [Android app](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
 too.
+
+<p>
+  <img src="server/static/img/screenshot-curl.png" height="180">
+  <img src="server/static/img/screenshot-web-detail.png" height="180">
+  <img src="server/static/img/screenshot-phone-main.jpg" height="180">
+  <img src="server/static/img/screenshot-phone-detail.jpg" height="180">
+  <img src="server/static/img/screenshot-phone-notification.jpg" height="180">
+</p>
 
 ## Usage
 

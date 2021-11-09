@@ -183,3 +183,4 @@ Third party libraries and resources:
 * [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
+* [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) 

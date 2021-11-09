@@ -95,6 +95,83 @@ code {
     color: #666;
 }
 
+/* Screenshots */
+
+#screenshots {
+    text-align: center;
+}
+
+#screenshots img {
+    height: 190px;
+    margin: 3px;
+    border-radius: 5px;
+    filter: drop-shadow(2px 2px 2px #ddd);
+}
+
+#screenshots .nowrap {
+    white-space: nowrap;
+}
+
+/* Lightbox; thanks to https://yossiabramov.com/blog/vanilla-js-lightbox */
+
+.lightbox {
+    opacity: 0;
+    visibility: hidden;
+    position: fixed;
+    left:0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease-in;
+}
+
+.lightbox.show {
+    background-color: rgba(0,0,0, 0.75);
+    opacity: 1;
+    visibility: visible;
+    z-index: 1000;
+}
+
+.lightbox img {
+    max-width: 90%;
+    max-height: 90%;
+    filter: drop-shadow(5px 5px 10px #222);
+    border-radius: 5px;
+}
+
+.lightbox .close-lightbox {
+    cursor: pointer;
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    width: 20px;
+    height: 20px;
+}
+
+.lightbox .close-lightbox::after,
+.lightbox .close-lightbox::before {
+    content: '';
+    width: 3px;
+    height: 20px;
+    background-color: #ddd;
+    position: absolute;
+    border-radius: 5px;
+    transform: rotate(45deg);
+}
+
+.lightbox .close-lightbox::before {
+    transform: rotate(-45deg);
+}
+
+.lightbox .close-lightbox:hover::after,
+.lightbox .close-lightbox:hover::before {
+    background-color: #fff;
+}
+
 /* Subscribe box */
 
 button {

@@ -32,6 +32,9 @@ const detailNoNotifications = document.getElementById("detailNoNotifications");
 const detailCloseButton = document.getElementById("detailCloseButton");
 const detailNotificationsDisallowed = document.getElementById("detailNotificationsDisallowed");
 
+/* Screenshots */
+const lightbox = document.getElementById("lightbox");
+
 const subscribe = (topic) => {
     if (Notification.permission !== "granted") {
         Notification.requestPermission().then((permission) => {
@@ -203,6 +206,54 @@ const showNotificationDeniedError = () => {
     showError("You have blocked desktop notifications for this website. Please unblock them and refresh to use the web-based desktop notifications.");
 };
 
+const showScreenshotOverlay = (e, el, index) => {
+    lightbox.classList.add('show');
+    document.addEventListener('keydown', nextScreenshotKeyboardListener);
+    return showScreenshot(e, index);
+};
+
+const showScreenshot = (e, index) => {
+    const actualIndex = resolveScreenshotIndex(index);
+    lightbox.innerHTML = '<div class="close-lightbox"></div>' + screenshots[actualIndex].innerHTML;
+    lightbox.querySelector('img').onclick = (e) => { return showScreenshot(e,actualIndex+1); };
+    currentScreenshotIndex = actualIndex;
+    e.stopPropagation();
+    return false;
+};
+
+const nextScreenshot = (e) => {
+    return showScreenshot(e, currentScreenshotIndex+1);
+};
+
+const previousScreenshot = (e) => {
+    return showScreenshot(e, currentScreenshotIndex-1);
+};
+
+const resolveScreenshotIndex = (index) => {
+    if (index < 0) {
+        return screenshots.length - 1;
+    } else if (index > screenshots.length - 1) {
+        return 0;
+    }
+    return index;
+};
+
+const hideScreenshotOverlay = (e) => {
+    lightbox.classList.remove('show');
+    document.removeEventListener('keydown', nextScreenshotKeyboardListener);
+};
+
+const nextScreenshotKeyboardListener = (e) => {
+    switch (e.keyCode) {
+        case 37:
+            previousScreenshot(e);
+            break;
+        case 39:
+            nextScreenshot(e);
+            break;
+    }
+};
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 async function* makeTextFileLineIterator(fileURL) {
     const utf8Decoder = new TextDecoder('utf-8');
@@ -247,6 +298,14 @@ subscribeButton.onclick = () => {
 detailCloseButton.onclick = () => {
     hideDetailView();
 };
+
+let currentScreenshotIndex = 0;
+const screenshots = [...document.querySelectorAll("#screenshots a")];
+screenshots.forEach((el, index) => {
+    el.onclick = (e) => { return showScreenshotOverlay(e, el, index); };
+});
+
+lightbox.onclick = hideScreenshotOverlay;
 
 // Disable Web UI if notifications of EventSource are not available
 if (!window["Notification"] || !window["EventSource"]) {

@@ -1,0 +1,8 @@
+# PAM config file snippet
+#
+# Put this snippet AT THE END of the file /etc/pam.d/sshd
+# See https://geekthis.net/post/run-scripts-after-ssh-authentication/ for details.
+
+# (lots of stuff here ...)
+
+session optional pam_exec.so /usr/local/bin/ntfy-ssh-login.sh

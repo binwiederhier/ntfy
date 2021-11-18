@@ -243,6 +243,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	m := newDefaultMessage(t.id, string(b))
+	if m.Message == "" {
+		return errHTTPBadRequest
+	}
 	if err := t.Publish(m); err != nil {
 		return err
 	}

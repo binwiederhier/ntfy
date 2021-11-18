@@ -68,6 +68,9 @@ func (c *sqliteCache) Messages(topic string, since sinceTime) ([]*message, error
 		if err := rows.Scan(&id, &timestamp, &msg); err != nil {
 			return nil, err
 		}
+		if msg == "" {
+			msg = " " // Hack: never return empty messages; this should not happen
+		}
 		messages = append(messages, &message{
 			ID:      id,
 			Time:    timestamp,

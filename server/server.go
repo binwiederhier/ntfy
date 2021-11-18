@@ -88,6 +88,9 @@ var (
 	indexSource   string
 	indexTemplate = template.Must(template.New("index").Parse(indexSource))
 
+	//go:embed "example.html"
+	exampleSource   string
+
 	//go:embed static
 	webStaticFs embed.FS
 
@@ -188,6 +191,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == http.MethodGet && (r.URL.Path == "/" || topicRegex.MatchString(r.URL.Path)) {
 		return s.handleHome(w, r)
+	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
+		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.handleEmpty(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -215,6 +220,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 
 func (s *Server) handleEmpty(w http.ResponseWriter, r *http.Request) error {
 	return nil
+}
+
+func (s *Server) handleExample(w http.ResponseWriter, r *http.Request) error {
+	_, err := io.WriteString(w, exampleSource)
+	return err
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {

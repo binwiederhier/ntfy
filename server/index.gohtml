@@ -38,7 +38,7 @@
     <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/>ntfy.sh | simple HTTP-based pub-sub</h1>
     <p>
         <b>Ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
-        It allows you to send notifications <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">to your phone</a> or desktop via scripts from any computer,
+        It allows you to send notifications <a href="#subscribe-phone">to your phone</a> or desktop via scripts from any computer,
         entirely <b>without signup or cost</b>. It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
 
@@ -53,9 +53,9 @@
     </div>
 
     <p>
-        There are many ways to use Ntfy. You can send yourself messages for all sorts of things: When a long process finishes or fails (a backup, a long rsync job, ...),
+        There are many ways to use Ntfy. You can send yourself messages for all sorts of things: When a long process finishes or fails,
         or to notify yourself when somebody logs into your server(s). Or you may want to use it in your own app to distribute messages to subscribed clients.
-        Endless possibilities 😀. Be sure to check out the  <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">example on GitHub</a>!
+        Endless possibilities 😀. Be sure to check out the <a href="#examples">examples below</a>.
     </p>
 
     <h2 id="publish" class="anchor">Publishing messages</h2>
@@ -104,16 +104,21 @@
         <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
     </div>
 
-    <h3 id="android-app" class="anchor">Subscribe via Android App</h3>
+    <h3 id="subscribe-phone" class="anchor">Subscribe from your phone</h3>
     <p>
         You can use the <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">Ntfy Android App</a>
         to receive notifications directly on your phone. Just like the server, this app is also <a href="https://github.com/binwiederhier/ntfy-android">open source</a>.
+        Since I don't have an iPhone or a Mac, I didn't make an iOS app yet. I'd be awesome if <a href="https://github.com/binwiederhier/ntfy/issues/4">someone else could help out</a>.
+    </p>
+    <p>
+        <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="static/img/badge-googleplay.png"></a>
+        <a href="https://github.com/binwiederhier/ntfy/issues/4"><img src="static/img/badge-appstore.png"></a>
     </p>
 
     <h3 id="subscribe-api" class="anchor">Subscribe via your app, or via the CLI</h3>
     <p class="smallMarginBottom">
         Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a> in JS, you can consume
-        notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
+        notifications like this (see <a href="example.html">live example</a>):
     </p>
     <code>
         const eventSource = new EventSource('https://ntfy.sh/mytopic/sse');<br/>
@@ -149,19 +154,12 @@
     <code>
         $ curl -s ntfy.sh/mytopic/raw<br/>
         <br/>
-        This is a notification
-    </code>
-    <p class="smallMarginBottom">
-        Here's an example of how to use this endpoint to send desktop notifications for every incoming message:
-    </p>
-    <code>
-        while read msg; do<br/>
-        &nbsp;&nbsp;[ -n "$msg" ] && notify-send "$msg"<br/>
-        done < <(stdbuf -i0 -o0 curl -s ntfy.sh/mytopic/raw)
+        This is a notification<br/>
+        And another one with a smiley face 😀
     </code>
 
     <h2 id="other-features" class="anchor">Other features</h2>
-    <h3 id="fetching-cached-messages" class="anchor">Fetching cached messages</h3>
+    <h3 id="fetching-cached-messages" class="anchor">Fetching cached messages (<tt>since=</tt>)</h3>
     <p class="smallMarginBottom">
         Messages are cached on disk for {{.CacheDuration}} to account for network interruptions of subscribers.
         You can read back what you missed by using the <tt>since=</tt> query parameter. It takes either a
@@ -172,7 +170,7 @@
         curl -s "ntfy.sh/mytopic/json?since=10m"
     </code>
 
-    <h3 id="polling" class="anchor">Fetching cached messages</h3>
+    <h3 id="polling" class="anchor">Polling (<tt>poll=1</tt>)</h3>
     <p class="smallMarginBottom">
         You can also just poll for messages if you don't like the long-standing connection using the <tt>poll=1</tt>
         query parameter. The connection will end after all available messages have been read. This parameter can be
@@ -182,7 +180,7 @@
         curl -s "ntfy.sh/mytopic/json?poll=1"
     </code>
 
-    <h3 id="multiple-topics" class="anchor">Subscribing to multiple topics</h3>
+    <h3 id="multiple-topics" class="anchor">Subscribing to multiple topics (<tt>topic1,topic2,...</tt>)</h3>
     <p class="smallMarginBottom">
         It's possible to subscribe to multiple topics in one HTTP call by providing a
         comma-separated list of topics in the URL. This allows you to reduce the number of connections you have to maintain:
@@ -192,6 +190,65 @@
         {"id":"0OkXIryH3H","time":1637182619,"event":"open","topic":"mytopic1,mytopic2,mytopic3"}<br/>
         {"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}<br/>
         {"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
+    </code>
+
+    <h2 id="examples" class="anchor">Examples</h2>
+    <p>
+        There are a million ways to use Ntfy, but here are some inspirations. I try to collect
+        <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">examples on GitHub</a>, so be sure to check
+        those out, too.
+    </p>
+
+    <h3 id="example-alerts" class="anchor">Example: A long process is done: backups, copying data, pipelines, ...</h3>
+    <p class="smallMarginBottom">
+        I started adding notifications pretty much all of my scripts. Typically, I just chain the <tt>curl</tt> call
+        directly to the command I'm running. The following example will either send <i>Laptop backup succeeded</i>
+        or ⚠️ <i>Laptop backup failed</i> directly to my phone:
+    </p>
+    <code>
+        rsync -a root@laptop /backups/laptop \<br/>
+        &nbsp;&nbsp;&& zfs snapshot ... \<br/>
+        &nbsp;&nbsp;&& curl -d "Laptop backup succeeded" ntfy.sh/backups \<br/>
+        &nbsp;&nbsp;|| echo -en "\u26A0\uFE0F Laptop backup failed" | curl -sT- ntfy.sh/backups
+    </code>
+
+    <h3 id="example-web" class="anchor">Example: Server-sent messages in your web app</h3>
+    <p>
+        Just as you can <a href="#subscribe-web">subscribe to topics in this Web UI</a>, you can use Ntfy in your own
+        web application. Check out the <a href="example.html">live example</a> or just look the source of this page.
+    </p>
+
+    <h3 id="example-notify-ssh" class="anchor">Example: Notify on SSH login</h3>
+    <p>
+        Years ago my home server was broken into. That shook me hard, so every time someone logs into any machine that I
+        own, I now message myself. Here's an example of how to use <a href="https://en.wikipedia.org/wiki/Linux_PAM">PAM</a>
+        to notify yourself on SSH login.
+    </p>
+    <p class="smallMarginBottom">
+        <b>/etc/pam.d/sshd</b> (at the end of the file):
+    </p>
+    <code>
+        session optional pam_exec.so /usr/local/bin/ntfy-ssh-login.sh
+    </code>
+    <p class="smallMarginBottom">
+        <b>/usr/local/bin/ntfy-ssh-login.sh</b>:
+    </p>
+    <code>
+        #!/bin/bash<br/>
+        if [ "${PAM_TYPE}" = "open_session" ]; then<br/>
+        &nbsp;&nbsp;echo -en "\u26A0\uFE0F SSH login: ${PAM_USER} from ${PAM_RHOST}" | curl -T- ntfy.sh/alerts<br/>
+        fi
+    </code>
+
+    <h3 id="example-collect-data" class="anchor">Example: Collect data from multiple machines</h3>
+    <p>
+        The other day I was running tasks on 20 servers and I wanted to collect the interim results
+        as a CSV in one place. Here's the script I wrote:
+    </p>
+    <code>
+        while read result; do<br/>
+        &nbsp;&nbsp;[ -n "$result" ] && echo "result" >> results.csv<br/>
+        done < <(stdbuf -i0 -o0 curl -s ntfy.sh/results/raw)
     </code>
 
     <h2 id="faq" class="anchor">FAQ</h2>
@@ -226,13 +283,26 @@
     </p>
 
     <p>
+        <b id="selfhosted" class="anchor">Can I self-host it?</b><br/>
+        Yes. The server (including this Web UI) can be self-hosted, and the Android app supports adding topics from
+        your own server as well. There are <a href="https://github.com/binwiederhier/ntfy#installation">install instructions</a>
+        on GitHub.
+    </p>
+
+    <p>
         <b id="why-firebase" class="anchor">Why is Firebase used?</b><br/>
         In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
         published to Firebase Cloud Messaging (FCM) (if <tt>FirebaseKeyFile</tt> is set, which it is on ntfy.sh). This
         is to facilitate instant notifications on Android.
     </p>
 
-    <h2 id="#privacy" class="anchor">Privacy policy</h2>
+    <p>
+        <b id="why-no-ios" class="anchor">Why is there no iOS app (yet)?</b><br/>
+        I don't have an iPhone or a Mac, so I didn't make an iOS app yet. I'd be awesome if
+        <a href="https://github.com/binwiederhier/ntfy/issues/4">someone else could help out</a>.
+    </p>
+
+    <h2 id="privacy" class="anchor">Privacy policy</h2>
     <p>
         Neither the server nor the app record any personal information, or share any of the messages and topics with
         any outside service. All data is exclusively used to make the service function properly. The one exception

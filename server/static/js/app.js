@@ -338,6 +338,7 @@ if (match) {
     }
 }
 
+// Add anchor links
 document.querySelectorAll('.anchor').forEach((el) => {
     if (el.hasAttribute('id')) {
         const id = el.getAttribute('id');

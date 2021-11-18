@@ -95,6 +95,24 @@ code {
     color: #666;
 }
 
+/* Anchors */
+
+.anchor .anchorLink {
+    color: #ccc;
+    text-decoration: none;
+    padding: 0 5px;
+    visibility: hidden;
+}
+
+.anchor:hover .anchorLink {
+    visibility: visible;
+}
+
+.anchor .anchorLink:hover {
+    color: #3a9784;
+    visibility: visible;
+}
+
 /* Screenshots */
 
 #screenshots {

@@ -337,3 +337,12 @@ if (match) {
         currentTopicUnsubscribeOnClose = true;
     }
 }
+
+document.querySelectorAll('.anchor').forEach((el) => {
+    if (el.hasAttribute('id')) {
+        const id = el.getAttribute('id');
+        const anchor = document.createElement('a');
+        anchor.innerHTML = `<a href="#${id}" class="anchorLink">#</a>`;
+        el.appendChild(anchor);
+    }
+});

@@ -58,7 +58,7 @@
         Endless possibilities 😀. Be sure to check out the  <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">example on GitHub</a>!
     </p>
 
-    <h2>Publishing messages</h2>
+    <h2 id="publish" class="anchor">Publishing messages</h2>
     <p>
         Publishing messages can be done via PUT or POST using. Topics are created on the fly by subscribing or publishing to them.
         Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
@@ -79,14 +79,14 @@
         })
     </code>
 
-    <h2>Subscribe to a topic</h2>
+    <h2 id="subscribe" class="anchor">Subscribe to a topic</h2>
     <p>
         You can create and subscribe to a topic either in this web UI, or in your own app by subscribing to an
         <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, a JSON feed, or raw feed.
     </p>
 
     <div id="subscribeBox">
-        <h3>Subscribe in this Web UI</h3>
+        <h3 id="subscribe-web" class="anchor">Subscribe in this Web UI</h3>
         <p id="error"></p>
         <p>
             Subscribe to topics here and receive messages as <b>desktop notification</b>. Topics are not password-protected,
@@ -104,13 +104,13 @@
         <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
     </div>
 
-    <h3>Subscribe via Android App</h3>
+    <h3 id="android-app" class="anchor">Subscribe via Android App</h3>
     <p>
         You can use the <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">Ntfy Android App</a>
         to receive notifications directly on your phone. Just like the server, this app is also <a href="https://github.com/binwiederhier/ntfy-android">open source</a>.
     </p>
 
-    <h3>Subscribe via your app, or via the CLI</h3>
+    <h3 id="subscribe-api" class="anchor">Subscribe via your app, or via the CLI</h3>
     <p class="smallMarginBottom">
         Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a> in JS, you can consume
         notifications like this (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
@@ -160,58 +160,79 @@
         done < <(stdbuf -i0 -o0 curl -s ntfy.sh/mytopic/raw)
     </code>
 
-    <h3>Message buffering and polling</h3>
+    <h2 id="other-features" class="anchor">Other features</h2>
+    <h3 id="fetching-cached-messages" class="anchor">Fetching cached messages</h3>
     <p class="smallMarginBottom">
-        Messages are buffered in memory for a few hours to account for network interruptions of subscribers.
-        You can read back what you missed by using the <tt>since=...</tt> query parameter. It takes either a
-        duration (e.g. <tt>10m</tt> or <tt>30s</tt>) or a Unix timestamp (e.g. <tt>1635528757</tt>):
+        Messages are cached on disk for {{.CacheDuration}} to account for network interruptions of subscribers.
+        You can read back what you missed by using the <tt>since=</tt> query parameter. It takes either a
+        duration (e.g. <tt>10m</tt> or <tt>30s</tt>), a Unix timestamp (e.g. <tt>1635528757</tt>) or <tt>all</tt> (all
+        cached messages).
     </p>
     <code>
-        $ curl -s "ntfy.sh/mytopic/json?since=10m"<br/>
-        # Same output as above, but includes messages from up to 10 minutes ago
-    </code>
-    <p class="smallMarginBottom">
-        You can also just poll for messages if you don't like the long-standing connection using the <tt>poll=1</tt>
-        query parameter. The connection will end after all available messages have been read. This parameter has to be
-        combined with <tt>since=</tt>.
-    </p>
-    <code>
-        $ curl -s "ntfy.sh/mytopic/json?poll=1&since=10m"<br/>
-        # Returns messages from up to 10 minutes ago and ends the connection
+        curl -s "ntfy.sh/mytopic/json?since=10m"
     </code>
 
-    <h2>FAQ</h2>
+    <h3 id="polling" class="anchor">Fetching cached messages</h3>
+    <p class="smallMarginBottom">
+        You can also just poll for messages if you don't like the long-standing connection using the <tt>poll=1</tt>
+        query parameter. The connection will end after all available messages have been read. This parameter can be
+        combined with <tt>since=</tt> (defaults to <tt>since=all</tt>).
+    </p>
+    <code>
+        curl -s "ntfy.sh/mytopic/json?poll=1"
+    </code>
+
+    <h3 id="multiple-topics" class="anchor">Subscribing to multiple topics</h3>
+    <p class="smallMarginBottom">
+        It's possible to subscribe to multiple topics in one HTTP call by providing a
+        comma-separated list of topics in the URL. This allows you to reduce the number of connections you have to maintain:
+    </p>
+    <code>
+        $ curl -s ntfy.sh/mytopic1,mytopic2/json<br/>
+        {"id":"0OkXIryH3H","time":1637182619,"event":"open","topic":"mytopic1,mytopic2,mytopic3"}<br/>
+        {"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}<br/>
+        {"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
+    </code>
+
+    <h2 id="faq" class="anchor">FAQ</h2>
     <p>
-        <b>Isn't this like ...?</b><br/>
+        <b id="isnt-this-like" class="anchor">Isn't this like ...?</b><br/>
         Who knows. I didn't do a lot of research before making this. It was fun making it.
     </p>
 
     <p>
-        <b>Can I use this in my app? Will it stay free?</b><br/>
+        <b id="is-it-free" class="anchor">Can I use this in my app? Will it stay free?</b><br/>
         Yes. As long as you don't abuse it, it'll be available and free of charge. I do not plan on monetizing
         the service.
     </p>
 
     <p>
-        <b>What are the uptime guarantees?</b><br/>
+        <b id="uptime-guarantees" class="anchor">What are the uptime guarantees?</b><br/>
         Best effort.
     </p>
 
     <p>
-        <b>Will you know what topics exist, can you spy on me?</b><br/>
-        If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
-        That said, the logs do not contain any topic names or other details about you. Check the code if you don't believe me.
+        <b id="multiple-subscribers" class="anchor">What happens if there are multiple subscribers to the same topic?</b><br/>
+        As per usual with pub-sub, all subscribers receive notifications if they are
+        subscribed to a topic.
     </p>
 
     <p>
-        <b>Why is Firebase used?</b><br/>
-        In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
-        published to Firebase Cloud Messaging (FCM) (if <tt>FirebaseKeyFile</tt> is set, which it is on ntfy.sh). This
-        is to facilitate instant notifications on Android. I tried really, really hard to avoid using FCM, but newer
-        versions of Android made it impossible to implement <a href="https://developer.android.com/guide/background">background services</a>.
+        <b id="can-you-spy-on-me" class="anchor">Will you know what topics exist, can you spy on me?</b><br/>
+        If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
+        That said, the logs do not contain any topic names or other details about you.
+        Messages are cached for {{.CacheDuration}} to facilitate service restarts, message polling and to overcome
+        client network disruptions.
     </p>
 
-    <h2>Privacy policy</h2>
+    <p>
+        <b id="why-firebase" class="anchor">Why is Firebase used?</b><br/>
+        In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
+        published to Firebase Cloud Messaging (FCM) (if <tt>FirebaseKeyFile</tt> is set, which it is on ntfy.sh). This
+        is to facilitate instant notifications on Android.
+    </p>
+
+    <h2 id="#privacy" class="anchor">Privacy policy</h2>
     <p>
         Neither the server nor the app record any personal information, or share any of the messages and topics with
         any outside service. All data is exclusively used to make the service function properly. The one exception
@@ -220,7 +241,7 @@
     </p>
     <p>
         The web server does not log or otherwise store request paths, remote IP addresses or even topics or messages,
-        aside from a short on-disk cache (up to a day) to support service restarts.
+        aside from a short on-disk cache (for {{.CacheDuration}}) to support service restarts.
     </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>

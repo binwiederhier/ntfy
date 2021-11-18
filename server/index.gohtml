@@ -60,14 +60,20 @@
 
     <h2 id="publish" class="anchor">Publishing messages</h2>
     <p>
-        Publishing messages can be done via PUT or POST using. Topics are created on the fly by subscribing or publishing to them.
+        Publishing messages can be done via PUT or POST. Topics are created on the fly by subscribing or publishing to them.
         Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
     </p>
     <p class="smallMarginBottom">
-        Here's an example showing how to publish a message using <tt>curl</tt>:
+        Here's an example showing how to publish a message using <tt>curl</tt> (via POST):
     </p>
     <code>
-        curl -d "long process is done" ntfy.sh/mytopic
+        curl -d "Backup successful 😀" ntfy.sh/mytopic
+    </code>
+    <p class="smallMarginBottom">
+        And another one using PUT:
+    </p>
+    <code>
+        echo -en "\u26A0\uFE0F Unauthorized login" | curl -sT- ntfy.sh/mytopic
     </code>
     <p class="smallMarginBottom">
         Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):

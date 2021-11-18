@@ -253,7 +253,7 @@
     </p>
     <code>
         while read result; do<br/>
-        &nbsp;&nbsp;[ -n "$result" ] && echo "result" >> results.csv<br/>
+        &nbsp;&nbsp;[ -n "$result" ] && echo "$result" >> results.csv<br/>
         done < <(stdbuf -i0 -o0 curl -s ntfy.sh/results/raw)
     </code>
 

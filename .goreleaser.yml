@@ -31,7 +31,6 @@ builds:
 nfpms:
   -
     package_name: ntfy
-    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
     homepage: https://heckel.io/ntfy
     maintainer: Philipp C. Heckel <philipp.heckel@gmail.com>
     description: Simple pub-sub notification service

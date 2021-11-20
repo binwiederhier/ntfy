@@ -2,7 +2,7 @@
 
 # ntfy.sh | simple HTTP-based pub-sub
 
-**Ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
+**ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
 It's also open source (as you can plainly see) if you want to run your own.
 
@@ -155,15 +155,27 @@ docker run --rm -it binwiederhier/ntfy
 go get -u heckel.io/ntfy
 ```
 
-**Manual install** (*any x86_64-based Linux*)**:**
+**Manual install:**
 ```bash
+# x86_64/amd64
 wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.5/ntfy_1.4.5_linux_x86_64.tar.gz
+
+# ARMv6
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.5/ntfy_1.4.5_linux_armv6.tar.gz
+
+# ARMv7
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.5/ntfy_1.4.5_linux_armv7.tar.gz
+
+# arm64
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.5/ntfy_1.4.5_linux_arm64.tar.gz
+
+# Extract and run
 sudo tar -C /usr/bin -zxf ntfy_1.4.5_linux_x86_64.tar.gz ntfy
 ./ntfy
 ```
 
 ## Building
-Building ntfy is simple. Here's how you do it:
+Building `ntfy` is simple. Here's how you do it:
 
 ```
 make build-simple
@@ -172,9 +184,6 @@ make build-simple
 
 To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that installed, you can run `make build` or
 `make build-snapshot`.
-
-## TODO
-- add HTTPS
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue.

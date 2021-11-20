@@ -175,13 +175,13 @@ To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that
 
 ## TODO
 - add HTTPS
-- make limits configurable
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue.
 
 ## License
-Made with ❤️ by [Philipp C. Heckel](https://heckel.io), distributed under the [Apache License 2.0](LICENSE).
+Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   
+The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
 Third party libraries and resources:
 * [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI

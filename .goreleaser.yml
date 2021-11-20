@@ -2,13 +2,32 @@ before:
   hooks:
     - go mod download
 builds:
-  - binary: ntfy
+  -
+    id: ntfy
+    binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
-    goos:
-      - linux
-    goarch:
-      - amd64
+    goos: [linux]
+    goarch: [amd64]
+  -
+    id: ntfy_arm67
+    binary: ntfy
+    env:
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
+    goos: [linux]
+    goarch: [arm]
+    goarm:
+      - 6
+      - 7
+  -
+    id: ntfy_arm64
+    binary: ntfy
+    env:
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=aarch64-linux-gnu-gcc # apt install gcc-aarch64-linux-gnu
+    goos: [linux]
+    goarch: [arm64]
 nfpms:
   -
     package_name: ntfy
@@ -54,6 +73,8 @@ dockers:
   - dockerfile: Dockerfile
     ids:
       - ntfy
+    goos: linux
+    goarch: amd64
     image_templates:
       - "binwiederhier/ntfy:latest"
       - "binwiederhier/ntfy:{{ .Tag }}"

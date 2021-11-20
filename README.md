@@ -136,14 +136,13 @@ sudo apt install ntfy
 
 **Debian/Ubuntu** (*manual install*)**:**
 ```bash
-sudo apt install tmux
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.3/ntfy_1.3.0_amd64.deb
-dpkg -i ntfy_1.4.3_amd64.deb
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.4/ntfy_1.4.4_amd64.deb
+dpkg -i ntfy_1.4.4_amd64.deb
 ```
 
 **Fedora/RHEL/CentOS:**
 ```bash
-rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.4.3/ntfy_1.3.0_amd64.rpm
+rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.4.4/ntfy_1.4.4_amd64.rpm
 ```
 
 **Docker:**
@@ -158,8 +157,8 @@ go get -u heckel.io/ntfy
 
 **Manual install** (*any x86_64-based Linux*)**:**
 ```bash
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.3/ntfy_1.3.0_linux_x86_64.tar.gz
-sudo tar -C /usr/bin -zxf ntfy_1.4.3_linux_x86_64.tar.gz ntfy
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.4/ntfy_1.4.4_linux_x86_64.tar.gz
+sudo tar -C /usr/bin -zxf ntfy_1.4.4_linux_x86_64.tar.gz ntfy
 ./ntfy
 ```
 

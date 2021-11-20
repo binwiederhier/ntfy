@@ -61,6 +61,7 @@ coverage-html:
 coverage-upload:
 	cd build/coverage && (curl -s https://codecov.io/bash | bash)
 
+
 # Lint/formatting targets
 
 fmt:
@@ -84,13 +85,18 @@ staticcheck: .PHONY
 	PATH="$(PWD)/build/staticcheck:$(PATH)" staticcheck ./...
 	rm -rf build/staticcheck
 
+
 # Building targets
 
-build: .PHONY
-	goreleaser build --rm-dist
+build-deps: .PHONY
+	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/v7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
+	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
-build-snapshot:
-	goreleaser build --snapshot --rm-dist
+build: build-deps
+	goreleaser build --rm-dist --debug
+
+build-snapshot: build-deps
+	goreleaser build --snapshot --rm-dist --debug
 
 build-simple: clean
 	mkdir -p dist/ntfy_linux_amd64
@@ -106,11 +112,11 @@ clean: .PHONY
 
 # Releasing targets
 
-release:
-	goreleaser release --rm-dist
+release: build-deps
+	goreleaser release --rm-dist --debug
 
-release-snapshot:
-	goreleaser release --snapshot --skip-publish --rm-dist
+release-snapshot: build-deps
+	goreleaser release --snapshot --skip-publish --rm-dist --debug
 
 
 # Installing targets

@@ -146,8 +146,19 @@ rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.4.5/ntfy_1.4
 ```
 
 **Docker:**
+Without cache:
+```
+docker run -p 80:80 -it binwiederhier/ntfy
+```
+
+With cache:
 ```bash
-docker run --rm -it binwiederhier/ntfy
+docker run \
+  -v /var/cache/ntfy:/var/cache/ntfy \
+  -p 80:80 \
+  -it \
+  binwiederhier/ntfy \
+    --cache-file /var/cache/ntfy/cache.db
 ```
 
 **Go:**
@@ -200,3 +211,4 @@ Third party libraries and resources:
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
 * [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) 
+* [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)

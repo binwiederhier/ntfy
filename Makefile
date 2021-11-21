@@ -103,8 +103,9 @@ build-simple: clean
 	export CGO_ENABLED=1
 	$(GO) build \
 		-o dist/ntfy_linux_amd64/ntfy \
+		-tags sqlite_omit_load_extension \
 		-ldflags \
-		"-s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
 
 clean: .PHONY
 	rm -rf dist build

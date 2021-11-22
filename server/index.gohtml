@@ -67,19 +67,19 @@
         Here's an example showing how to publish a message using <tt>curl</tt> (via POST):
     </p>
     <code>
-        curl -d "Backup successful 😀" ntfy.sh/mytopic
+        curl -d "Backup successful 😀" <span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
     <p class="smallMarginBottom">
         And another one using PUT:
     </p>
     <code>
-        echo -en "\u26A0\uFE0F Unauthorized login" | curl -sT- ntfy.sh/mytopic
+        echo -en "\u26A0\uFE0F Unauthorized login" | curl -sT- <span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
     <p class="smallMarginBottom">
         Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
     </p>
     <code>
-        fetch('https://ntfy.sh/mytopic', {<br/>
+        fetch('https://<span class="ntfyUrl">ntfy.sh</span>/mytopic', {<br/>
         &nbsp;&nbsp;method: 'POST', // PUT works too<br/>
         &nbsp;&nbsp;body: 'Hello from the other side.'<br/>
         })
@@ -127,7 +127,7 @@
         notifications like this (see <a href="example.html">live example</a>):
     </p>
     <code>
-        const eventSource = new EventSource('https://ntfy.sh/mytopic/sse');<br/>
+        const eventSource = new EventSource('<span class="ntfyProtocol">https://</span><span class="ntfyUrl">ntfy.sh</span>/mytopic/sse');<br/>
         eventSource.onmessage = (e) => {<br/>
         &nbsp;&nbsp;// Do something with e.data<br/>
         };
@@ -136,7 +136,7 @@
         You can also use the same <tt>/sse</tt> endpoint via <tt>curl</tt> or any other HTTP library:
     </p>
     <code>
-        $ curl -s ntfy.sh/mytopic/sse<br/>
+        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/sse<br/>
         event: open<br/>
         data: {"id":"weSj9RtNkj","time":1635528898,"event":"open","topic":"mytopic"}<br/><br/>
 
@@ -149,7 +149,7 @@
         To consume JSON instead, use the <tt>/json</tt> endpoint, which prints one message per line:
     </p>
     <code>
-        $ curl -s ntfy.sh/mytopic/json<br/>
+        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/json<br/>
         {"id":"SLiKI64DOt","time":1635528757,"event":"open","topic":"mytopic"}<br/>
         {"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Hi!"}<br/>
         {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}
@@ -158,7 +158,7 @@
         Or use the <tt>/raw</tt> endpoint if you need something super simple (empty lines are keepalive messages):
     </p>
     <code>
-        $ curl -s ntfy.sh/mytopic/raw<br/>
+        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/raw<br/>
         <br/>
         This is a notification<br/>
         And another one with a smiley face 😀
@@ -173,7 +173,7 @@
         cached messages).
     </p>
     <code>
-        curl -s "ntfy.sh/mytopic/json?since=10m"
+        curl -s "<span class="ntfyUrl">ntfy.sh</span>/mytopic/json?since=10m"
     </code>
 
     <h3 id="polling" class="anchor">Polling (<tt>poll=1</tt>)</h3>
@@ -183,7 +183,7 @@
         combined with <tt>since=</tt> (defaults to <tt>since=all</tt>).
     </p>
     <code>
-        curl -s "ntfy.sh/mytopic/json?poll=1"
+        curl -s "<span class="ntfyUrl">ntfy.sh</span>/mytopic/json?poll=1"
     </code>
 
     <h3 id="multiple-topics" class="anchor">Subscribing to multiple topics (<tt>topic1,topic2,...</tt>)</h3>
@@ -192,7 +192,7 @@
         comma-separated list of topics in the URL. This allows you to reduce the number of connections you have to maintain:
     </p>
     <code>
-        $ curl -s ntfy.sh/mytopic1,mytopic2/json<br/>
+        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic1,mytopic2/json<br/>
         {"id":"0OkXIryH3H","time":1637182619,"event":"open","topic":"mytopic1,mytopic2,mytopic3"}<br/>
         {"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}<br/>
         {"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
@@ -214,8 +214,8 @@
     <code>
         rsync -a root@laptop /backups/laptop \<br/>
         &nbsp;&nbsp;&& zfs snapshot ... \<br/>
-        &nbsp;&nbsp;&& curl -d "Laptop backup succeeded" ntfy.sh/backups \<br/>
-        &nbsp;&nbsp;|| echo -en "\u26A0\uFE0F Laptop backup failed" | curl -sT- ntfy.sh/backups
+        &nbsp;&nbsp;&& curl -d "Laptop backup succeeded" <span class="ntfyUrl">ntfy.sh</span>/backups \<br/>
+        &nbsp;&nbsp;|| echo -en "\u26A0\uFE0F Laptop backup failed" | curl -sT- <span class="ntfyUrl">ntfy.sh</span>/backups
     </code>
 
     <h3 id="example-web" class="anchor">Example: Server-sent messages in your web app</h3>
@@ -242,7 +242,7 @@
     <code>
         #!/bin/bash<br/>
         if [ "${PAM_TYPE}" = "open_session" ]; then<br/>
-        &nbsp;&nbsp;echo -en "\u26A0\uFE0F SSH login: ${PAM_USER} from ${PAM_RHOST}" | curl -T- ntfy.sh/alerts<br/>
+        &nbsp;&nbsp;echo -en "\u26A0\uFE0F SSH login: ${PAM_USER} from ${PAM_RHOST}" | curl -T- <span class="ntfyUrl">ntfy.sh</span>/alerts<br/>
         fi
     </code>
 
@@ -254,7 +254,7 @@
     <code>
         while read result; do<br/>
         &nbsp;&nbsp;[ -n "$result" ] && echo "$result" >> results.csv<br/>
-        done < <(stdbuf -i0 -o0 curl -s ntfy.sh/results/raw)
+        done < <(stdbuf -i0 -o0 curl -s <span class="ntfyUrl">ntfy.sh</span>/results/raw)
     </code>
 
     <h2 id="faq" class="anchor">FAQ</h2>
@@ -331,7 +331,7 @@
             To send notifications to it, simply PUT or POST to the topic URL. Here's an example using <tt>curl</tt>:
         </p>
         <code>
-            curl -d "Backup failed" <span id="detailTopicUrl"></span>
+            curl -d "Backup failed" <span id="detailTopicUrl">ntfy.sh/topic</span>
         </code>
         <p id="detailNotificationsDisallowed">
             If you'd like to receive desktop notifications when new messages arrive on this topic, you have

@@ -12,6 +12,10 @@
 let topics = {};
 let currentTopic = "";
 let currentTopicUnsubscribeOnClose = false;
+let currentUrl = window.location.hostname;
+if (window.location.port) {
+    currentUrl += ':' + window.location.port
+}
 
 /* Main view */
 const main = document.getElementById("main");
@@ -131,15 +135,15 @@ const fetchCachedMessages = async (topic) => {
 
 const showDetail = (topic) => {
     currentTopic = topic;
-    history.replaceState(topic, `ntfy.sh/${topic}`, `/${topic}`);
+    history.replaceState(topic, `${currentUrl}/${topic}`, `/${topic}`);
     window.scrollTo(0, 0);
     rerenderDetailView();
     return false;
 };
 
 const rerenderDetailView = () => {
-    detailTitle.innerHTML = `ntfy.sh/${currentTopic}`; // document.location.replaceAll(..)
-    detailTopicUrl.innerHTML = `ntfy.sh/${currentTopic}`;
+    detailTitle.innerHTML = `${currentUrl}/${currentTopic}`; // document.location.replaceAll(..)
+    detailTopicUrl.innerHTML = `${currentUrl}/${currentTopic}`;
     while (detailEventsList.firstChild) {
         detailEventsList.removeChild(detailEventsList.firstChild);
     }
@@ -346,4 +350,12 @@ document.querySelectorAll('.anchor').forEach((el) => {
         anchor.innerHTML = `<a href="#${id}" class="anchorLink">#</a>`;
         el.appendChild(anchor);
     }
+});
+
+// Change ntfy.sh url and protocol to match self-hosted one
+document.querySelectorAll('.ntfyUrl').forEach((el) => {
+    el.innerHTML = currentUrl;
+});
+document.querySelectorAll('.ntfyProtocol').forEach((el) => {
+    el.innerHTML = window.location.protocol + "//";
 });

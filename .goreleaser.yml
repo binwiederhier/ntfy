@@ -78,12 +78,26 @@ changelog:
       - '^docs:'
       - '^test:'
 dockers:
-  - dockerfile: Dockerfile
-    ids:
-      - ntfy
-    goos: linux
+  - image_templates:
+      - &amd64_image "binwiederhier/ntfy:{{ .Tag }}-amd64"
+    use: buildx
+    dockerfile: Dockerfile
     goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
+    use: buildx
+    dockerfile: Dockerfile
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64/v8"
+docker_manifests:
+  - name_template: "binwiederhier/ntfy:latest"
     image_templates:
-      - "binwiederhier/ntfy:latest"
-      - "binwiederhier/ntfy:{{ .Tag }}"
-      - "binwiederhier/ntfy:v{{ .Major }}.{{ .Minor }}"
+      - *amd64_image
+      - *arm64v8_image
+  - name_template: "binwiederhier/ntfy:{{ .Tag }}"
+    image_templates:
+      - *amd64_image
+      - *arm64v8_image

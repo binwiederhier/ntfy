@@ -4,6 +4,8 @@ html, body {
     font-family: 'Lato', sans-serif;
     color: #333;
     font-size: 1.1em;
+    margin: 0;
+    padding: 0;
 }
 
 html {
@@ -25,6 +27,8 @@ h1 {
     margin-top: 25px;
     margin-bottom: 18px;
     font-size: 2.5em;
+    word-wrap: break-word; /* For very long topics */
+    padding-right: 40px; /* For the X on the detail page */
 }
 
 h2 {
@@ -84,6 +88,7 @@ code {
 #main {
     max-width: 900px;
     margin: 0 auto 50px auto;
+    padding: 0 10px;
 }
 
 #error {
@@ -188,6 +193,23 @@ code {
 .lightbox .close-lightbox:hover::after,
 .lightbox .close-lightbox:hover::before {
     background-color: #fff;
+}
+
+/* Header */
+
+#header {
+    background: #3a9784;
+    height: 130px;
+}
+
+#header #headerBox {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 10px;
+}
+
+#header img {
+    margin-top: 23px;
 }
 
 /* Subscribe box */
@@ -352,13 +374,6 @@ li {
 /** Detail view */
 #detail {
     display: none;
-    position: absolute;
-    z-index: 1;
-    left: 8px;
-    right: 8px;
-    top: 0;
-    bottom: 0;
-    background: white;
 }
 
 #detail .detailDate {
@@ -375,7 +390,7 @@ li {
     max-width: 900px;
     margin: 0 auto;
     position: relative; /* required for close button's "position: absolute" */
-    padding-bottom: 50px; /* Chrome and Firefox behave differently regarding bottom margin */
+    padding: 0 10px 50px 10px; /* Chrome and Firefox behave differently regarding bottom margin */
 }
 
 #detail #detailCloseButton {
@@ -384,7 +399,7 @@ li {
     border: none;
     padding: 5px;
     position: absolute;
-    right: 0;
+    right: 10px;
     top: 10px;
     display: block;
 }

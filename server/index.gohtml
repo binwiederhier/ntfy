@@ -34,14 +34,14 @@
 {{end}}
 </head>
 <body>
+<div id="header"><div id="headerBox"><img src="static/img/ntfy.png" alt="ntfy"/></div></div>
 <div id="main"{{if .Topic}} style="display: none"{{end}}>
-    <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/>ntfy.sh | simple HTTP-based pub-sub</h1>
+    <h1>ntfy.sh | simple HTTP-based pub-sub</h1>
     <p>
-        <b>Ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
-        It allows you to send notifications <a href="#subscribe-phone">to your phone</a> or desktop via scripts from any computer,
-        entirely <b>without signup or cost</b>. It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
+        <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
+        It allows you to send notifications to your phone or desktop via scripts from any computer,
+        entirely <b>without signup, cost or setup</b>. It's also <a href="https://github.com/binwiederhier/ntfy">open source</a> if you want to run your own.
     </p>
-
     <div id="screenshots">
         <a href="static/img/screenshot-curl.png"><img src="static/img/screenshot-curl.png"/></a>
         <a href="static/img/screenshot-web-detail.png"><img src="static/img/screenshot-web-detail.png"/></a>
@@ -51,11 +51,9 @@
             <a href="static/img/screenshot-phone-notification.jpg"><img src="static/img/screenshot-phone-notification.jpg"/></a>
         </span>
     </div>
-
     <p>
-        There are many ways to use Ntfy. You can send yourself messages for all sorts of things: When a long process finishes or fails,
-        or to notify yourself when somebody logs into your server(s). Or you may want to use it in your own app to distribute messages to subscribed clients.
-        Endless possibilities 😀. Be sure to check out the <a href="#examples">examples below</a>.
+        There are many ways to use it: Notify yourself when a build finishes, when an rsync is done or a backup fails,
+        or know when somebody logs into your server. There are <a href="#examples">many more examples</a>, endless possibilities 😀.
     </p>
 
     <h2 id="publish" class="anchor">Publishing messages</h2>
@@ -64,16 +62,16 @@
         Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
     </p>
     <p class="smallMarginBottom">
-        Here's an example showing how to publish a message using <tt>curl</tt> (via POST):
+        Here's an example showing how to publish a message using a POST request (via <tt>curl -d</tt>):
     </p>
     <code>
         curl -d "Backup successful 😀" <span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
     <p class="smallMarginBottom">
-        And another one using PUT:
+        And another one using PUT (via <tt>curl -T</tt>):
     </p>
     <code>
-        echo -en "\u26A0\uFE0F Unauthorized login" | curl -sT- <span class="ntfyUrl">ntfy.sh</span>/mytopic
+        echo -en "\u26A0\uFE0F Unauthorized login" | curl -T- <span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
     <p class="smallMarginBottom">
         Here's an example in JS with <tt>fetch()</tt> (see <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">full example</a>):
@@ -200,7 +198,7 @@
 
     <h2 id="examples" class="anchor">Examples</h2>
     <p>
-        There are a million ways to use Ntfy, but here are some inspirations. I try to collect
+        There are a million ways to use ntfy, but here are some inspirations. I try to collect
         <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">examples on GitHub</a>, so be sure to check
         those out, too.
     </p>
@@ -220,7 +218,7 @@
 
     <h3 id="example-web" class="anchor">Example: Server-sent messages in your web app</h3>
     <p>
-        Just as you can <a href="#subscribe-web">subscribe to topics in this Web UI</a>, you can use Ntfy in your own
+        Just as you can <a href="#subscribe-web">subscribe to topics in this Web UI</a>, you can use ntfy in your own
         web application. Check out the <a href="example.html">live example</a> or just look the source of this page.
     </p>
 
@@ -303,8 +301,23 @@
     </p>
 
     <p>
+        <b id="battery-usage" class="anchor">How much battery does the Android app use?</b><br/>
+        If you use the ntfy.sh server and you don't use the <i>instant delivery</i> feature, the Android app uses no
+        additional battery, since Firebase Cloud Messaging (FCM) is used. If you use your own server, or you use
+        <i>instant delivery</i>, the app has to maintain a constant connection to the server, which consumes about 4% of
+        battery in 17h of use (on my phone). I use it and it makes no difference to me.
+    </p>
+
+    <p>
+        <b id="instant-delivery" class="anchor">What is instant delivery?</b><br/>
+        Instant delivery is a feature in the Android app. If turned on, the app maintains a constant connection to the
+        server and listens for incoming notifications. This consumes <a href="#battery-usage">additional battery</a>,
+        but delivers notifications instantly.
+    </p>
+
+    <p>
         <b id="why-no-ios" class="anchor">Why is there no iOS app (yet)?</b><br/>
-        I don't have an iPhone or a Mac, so I didn't make an iOS app yet. I'd be awesome if
+        I don't have an iPhone or a Mac, so I didn't make an iOS app yet. It'd be awesome if
         <a href="https://github.com/binwiederhier/ntfy/issues/4">someone else could help out</a>.
     </p>
 
@@ -325,9 +338,9 @@
 <div id="detail"{{if not .Topic}} style="display: none"{{end}}>
     <div id="detailMain">
         <button id="detailCloseButton"><img src="static/img/close_black_24dp.svg"/></button>
-        <h1><img src="static/img/ntfy.png" alt="ntfy"/><br/><span id="detailTitle"></span></h1>
+        <h1><span id="detailTitle"></span></h1>
         <p class="smallMarginBottom">
-            <b>Ntfy</b> is a simple HTTP-based pub-sub notification service. This is a Ntfy topic.
+            <b>ntfy</b> is a simple HTTP-based pub-sub notification service. This is a ntfy topic.
             To send notifications to it, simply PUT or POST to the topic URL. Here's an example using <tt>curl</tt>:
         </p>
         <code>

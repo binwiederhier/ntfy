@@ -181,7 +181,7 @@ const hideDetailView = () => {
     currentTopic = "";
     history.replaceState('', originalTitle, '/');
     detailView.style.display = 'none';
-    main.style.display = '';
+    main.style.display = 'block';
     return false;
 };
 

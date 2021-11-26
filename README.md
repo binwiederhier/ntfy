@@ -1,6 +1,8 @@
 ![ntfy](server/static/img/ntfy.png)
 
 # ntfy.sh | simple HTTP-based pub-sub
+[![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
+[![Slack channel](https://img.shields.io/badge/slack-@gophers/binwiederhier-success.svg?logo=slack)](https://gophers.slack.com/archives/C01JMTPGF2Q)
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
@@ -195,6 +197,10 @@ To build releases, I use [GoReleaser](https://goreleaser.com/). If you have that
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue.
+
+## Contact me
+You can directly contact me [on Slack](https://gophers.slack.com/archives/C01JMTPGF2Q), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues),
+or find more contact information [on my website](https://heckel.io/about).
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

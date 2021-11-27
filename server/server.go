@@ -89,7 +89,7 @@ var (
 	indexTemplate = template.Must(template.New("index").Parse(indexSource))
 
 	//go:embed "example.html"
-	exampleSource   string
+	exampleSource string
 
 	//go:embed static
 	webStaticFs embed.FS
@@ -150,11 +150,14 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 		_, err := msg.Send(context.Background(), &messaging.Message{
 			Topic: m.Topic,
 			Data: map[string]string{
-				"id":      m.ID,
-				"time":    fmt.Sprintf("%d", m.Time),
-				"event":   m.Event,
-				"topic":   m.Topic,
-				"message": m.Message,
+				"id":       m.ID,
+				"time":     fmt.Sprintf("%d", m.Time),
+				"event":    m.Event,
+				"topic":    m.Topic,
+				"priority": fmt.Sprintf("%d", m.Priority),
+				"tags":     strings.Join(m.Tags, ","),
+				"title":    m.Title,
+				"message":  m.Message,
 			},
 		})
 		return err
@@ -246,6 +249,10 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
+	title, priority, tags := parseHeaders(r.Header)
+	m.Title = title
+	m.Priority = priority
+	m.Tags = tags
 	if err := t.Publish(m); err != nil {
 		return err
 	}
@@ -260,6 +267,40 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	s.messages++
 	s.mu.Unlock()
 	return nil
+}
+
+func parseHeaders(header http.Header) (title string, priority int, tags []string) {
+	title = readHeader(header, "x-title", "title", "ti", "t")
+	priorityStr := readHeader(header, "x-priority", "priority", "prio", "p")
+	if priorityStr != "" {
+		switch strings.ToLower(priorityStr) {
+		case "1", "min":
+			priority = 1
+		case "2", "low":
+			priority = 2
+		case "4", "high":
+			priority = 4
+		case "5", "max", "urgent":
+			priority = 5
+		default:
+			priority = 3
+		}
+	}
+	tagsStr := readHeader(header, "x-tags", "tags", "ta")
+	if tagsStr != "" {
+		tags = strings.Split(tagsStr, ",")
+	}
+	return title, priority, tags
+}
+
+func readHeader(header http.Header, names ...string) string {
+	for _, name := range names {
+		value := header.Get(name)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -414,11 +455,11 @@ func (s *Server) topicFromID(id string) (*topic, error) {
 	return topics[0], nil
 }
 
-func (s *Server) topicsFromIDs(ids... string) ([]*topic, error) {
+func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
-	for  _, id := range ids {
+	for _, id := range ids {
 		if _, ok := s.topics[id]; !ok {
 			if len(s.topics) >= s.config.GlobalTopicLimit {
 				return nil, errHTTPTooManyRequests

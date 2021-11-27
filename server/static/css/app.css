@@ -69,6 +69,7 @@ code {
     margin-top: 10px;
     margin-bottom: 20px;
     overflow-x: auto;
+    white-space: nowrap;
 }
 
 /* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,

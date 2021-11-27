@@ -18,11 +18,14 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID      string `json:"id"`    // Random message ID
-	Time    int64  `json:"time"`  // Unix time in seconds
-	Event   string `json:"event"` // One of the above
-	Topic   string `json:"topic"`
-	Message string `json:"message,omitempty"`
+	ID       string   `json:"id"`    // Random message ID
+	Time     int64    `json:"time"`  // Unix time in seconds
+	Event    string   `json:"event"` // One of the above
+	Topic    string   `json:"topic"`
+	Priority int      `json:"priority,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Title    string   `json:"title,omitempty"`
+	Message  string   `json:"message,omitempty"`
 }
 
 // messageEncoder is a function that knows how to encode a message
@@ -31,11 +34,14 @@ type messageEncoder func(msg *message) (string, error)
 // newMessage creates a new message with the current timestamp
 func newMessage(event, topic, msg string) *message {
 	return &message{
-		ID:      util.RandomString(messageIDLength),
-		Time:    time.Now().Unix(),
-		Event:   event,
-		Topic:   topic,
-		Message: msg,
+		ID:       util.RandomString(messageIDLength),
+		Time:     time.Now().Unix(),
+		Event:    event,
+		Topic:    topic,
+		Priority: 0,
+		Tags:     nil,
+		Title:    "",
+		Message:  msg,
 	}
 }
 

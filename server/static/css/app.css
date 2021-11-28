@@ -382,6 +382,11 @@ li {
     font-size: 0.9em;
 }
 
+#detail .detailTitle {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
 #detail .detailMessage {
     margin-bottom: 20px;
     font-size: 1.1em;

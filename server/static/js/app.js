@@ -86,10 +86,14 @@ const subscribeInternal = (topic, persist, delaySec) => {
             }
             if (Notification.permission === "granted") {
                 notifySound.play();
-                new Notification(`${location.host}/${topic}`, {
+                const title = (event.title) ? event.title : `${location.host}/${topic}`;
+                const notification = new Notification(title, {
                     body: event.message,
                     icon: '/static/img/favicon.png'
                 });
+                notification.onclick = (e) => {
+                    showDetail(event.topic);
+                };
             }
         };
         topics[topic] = {
@@ -149,6 +153,7 @@ const rerenderDetailView = () => {
     }
     topics[currentTopic]['messages'].forEach(m => {
         let dateDiv = document.createElement('div');
+        let titleDiv = document.createElement('div');
         let messageDiv = document.createElement('div');
         let eventDiv = document.createElement('div');
         dateDiv.classList.add('detailDate');
@@ -156,6 +161,11 @@ const rerenderDetailView = () => {
         messageDiv.classList.add('detailMessage');
         messageDiv.innerText = m.message;
         eventDiv.appendChild(dateDiv);
+        if (m.title) {
+            titleDiv.classList.add('detailTitle');
+            titleDiv.innerText = m.title;
+            eventDiv.appendChild(titleDiv)
+        }
         eventDiv.appendChild(messageDiv);
         detailEventsList.appendChild(eventDiv);
     })

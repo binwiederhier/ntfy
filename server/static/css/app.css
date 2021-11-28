@@ -373,10 +373,6 @@ li {
 }
 
 /** Detail view */
-#detail {
-    display: none;
-}
-
 #detail .detailDate {
     color: #888;
     font-size: 0.9em;

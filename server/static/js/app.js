@@ -60,7 +60,7 @@ const subscribeInternal = (topic, persist, delaySec) => {
         if (!topicEntry) {
             topicEntry = document.createElement('li');
             topicEntry.id = `topic-${topic}`;
-            topicEntry.innerHTML = `<a href="/${topic}" onclick="return showDetail('${topic}')">${topic}</a> <button onclick="test('${topic}'); return false;"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
+            topicEntry.innerHTML = `<a href="/${topic}" onclick="return showDetail('${topic}')">${topic}</a> <button onclick="test('${topic}'); return false;"> <img src="static/img/send.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/unsubscribe.svg"> Unsubscribe</button>`;
             topicsList.appendChild(topicEntry);
         }
         topicsHeader.style.display = '';
@@ -68,7 +68,7 @@ const subscribeInternal = (topic, persist, delaySec) => {
         // Open event source
         let eventSource = new EventSource(`${topic}/sse`);
         eventSource.onopen = () => {
-            topicEntry.innerHTML = `<a href="/${topic}" onclick="return showDetail('${topic}')">${topic}</a> <button onclick="test('${topic}'); return false;"> <img src="static/img/send_black_24dp.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/clear_black_24dp.svg"> Unsubscribe</button>`;
+            topicEntry.innerHTML = `<a href="/${topic}" onclick="return showDetail('${topic}')">${topic}</a> <button onclick="test('${topic}'); return false;"> <img src="static/img/send.svg"> Test</button> <button onclick="unsubscribe('${topic}'); return false;"> <img src="static/img/unsubscribe.svg"> Unsubscribe</button>`;
             delaySec = 0; // Reset on successful connection
         };
         eventSource.onerror = (e) => {
@@ -152,22 +152,35 @@ const rerenderDetailView = () => {
         detailEventsList.removeChild(detailEventsList.firstChild);
     }
     topics[currentTopic]['messages'].forEach(m => {
-        let dateDiv = document.createElement('div');
-        let titleDiv = document.createElement('div');
-        let messageDiv = document.createElement('div');
-        let eventDiv = document.createElement('div');
+        const entryDiv = document.createElement('div');
+        const dateDiv = document.createElement('div');
+        const titleDiv = document.createElement('div');
+        const messageDiv = document.createElement('div');
+        const tagsDiv = document.createElement('div');
+
+        entryDiv.classList.add('detailEntry');
         dateDiv.classList.add('detailDate');
-        dateDiv.innerHTML = new Date(m.time * 1000).toLocaleString();
+        const dateStr = new Date(m.time * 1000).toLocaleString();
+        if (m.priority && [1,2,4,5].includes(m.priority)) {
+            dateDiv.innerHTML = `${dateStr} <img src="static/img/priority-${m.priority}.svg"/>`;
+        } else {
+            dateDiv.innerHTML = `${dateStr}`;
+        }
         messageDiv.classList.add('detailMessage');
         messageDiv.innerText = m.message;
-        eventDiv.appendChild(dateDiv);
+        entryDiv.appendChild(dateDiv);
         if (m.title) {
             titleDiv.classList.add('detailTitle');
             titleDiv.innerText = m.title;
-            eventDiv.appendChild(titleDiv)
+            entryDiv.appendChild(titleDiv);
         }
-        eventDiv.appendChild(messageDiv);
-        detailEventsList.appendChild(eventDiv);
+        entryDiv.appendChild(messageDiv);
+        if (m.tags) {
+            tagsDiv.classList.add('detailTags');
+            tagsDiv.innerText = "Tags: " + m.tags.join(", ");
+            entryDiv.appendChild(tagsDiv);
+        }
+        detailEventsList.appendChild(entryDiv);
     })
     if (topics[currentTopic]['messages'].length === 0) {
         detailNoNotifications.style.display = '';

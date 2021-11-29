@@ -377,9 +377,19 @@ li {
     display: none;
 }
 
-#detail .detailDate {
+#detail .detailEntry {
+    margin-bottom: 20px;
+}
+
+#detail .detailDate, #detail .detailTags {
     color: #888;
     font-size: 0.9em;
+}
+
+#detail .detailDate img {
+    width: 20px;
+    height: 20px;
+    vertical-align: bottom;
 }
 
 #detail .detailTitle {
@@ -388,7 +398,6 @@ li {
 }
 
 #detail .detailMessage {
-    margin-bottom: 20px;
     font-size: 1.1em;
 }
 

@@ -1,4 +1,7 @@
-[
+// Original data source: https://github.com/github/gemoji/blob/master/db/emoji.json
+// Manually prepended "const rawEmojis = " to make it play nice with JS/HTML.
+
+const rawEmojis = [
   {
     "emoji": "😀"
   , "description": "grinning face"

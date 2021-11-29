@@ -92,7 +92,8 @@ var (
 	exampleSource string
 
 	//go:embed static
-	webStaticFs embed.FS
+	webStaticFs       embed.FS
+	webStaticFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webStaticFs}
 
 	errHTTPBadRequest      = &errHTTP{http.StatusBadRequest, http.StatusText(http.StatusBadRequest)}
 	errHTTPNotFound        = &errHTTP{http.StatusNotFound, http.StatusText(http.StatusNotFound)}
@@ -231,7 +232,7 @@ func (s *Server) handleExample(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
-	http.FileServer(http.FS(webStaticFs)).ServeHTTP(w, r)
+	http.FileServer(http.FS(webStaticFsCached)).ServeHTTP(w, r)
 	return nil
 }
 

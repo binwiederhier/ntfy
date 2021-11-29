@@ -86,9 +86,10 @@ const subscribeInternal = (topic, persist, delaySec) => {
             }
             if (Notification.permission === "granted") {
                 notifySound.play();
-                const title = (event.title) ? event.title : `${location.host}/${topic}`;
+                const title = formatTitle(event);
+                const message = formatMessage(event);
                 const notification = new Notification(title, {
-                    body: event.message,
+                    body: message,
                     icon: '/static/img/favicon.png'
                 });
                 notification.onclick = (e) => {
@@ -158,56 +159,28 @@ const rerenderDetailView = () => {
         const messageDiv = document.createElement('div');
         const tagsDiv = document.createElement('div');
 
-        // Figure out mapped emojis (and unmapped tags)
-        let mappedEmojiTags = '';
-        let unmappedTags = '';
-        if (m.tags) {
-            mappedEmojiTags = m.tags
-                .filter(tag => tag in emojis)
-                .map(tag => emojis[tag])
-                .join("");
-            unmappedTags = m.tags
-                .filter(tag => !(tag in emojis))
-                .join(", ");
-        }
-
-        // Figure out title and message
-        let title = '';
-        let message = m.message;
-        if (m.title) {
-            if (mappedEmojiTags) {
-                title = `${mappedEmojiTags} ${m.title}`;
-            } else {
-                title = m.title;
-            }
-        } else {
-            if (mappedEmojiTags) {
-                message = `${mappedEmojiTags} ${m.message}`;
-            } else {
-                message = m.message;
-            }
-        }
-
         entryDiv.classList.add('detailEntry');
         dateDiv.classList.add('detailDate');
+        titleDiv.classList.add('detailTitle');
+        messageDiv.classList.add('detailMessage');
+        tagsDiv.classList.add('detailTags');
+
         const dateStr = new Date(m.time * 1000).toLocaleString();
         if (m.priority && [1,2,4,5].includes(m.priority)) {
             dateDiv.innerHTML = `${dateStr} <img src="static/img/priority-${m.priority}.svg"/>`;
         } else {
             dateDiv.innerHTML = `${dateStr}`;
         }
-        messageDiv.classList.add('detailMessage');
-        messageDiv.innerText = message;
+        messageDiv.innerText = formatMessage(m);
         entryDiv.appendChild(dateDiv);
         if (m.title) {
-            titleDiv.classList.add('detailTitle');
-            titleDiv.innerText = title;
+            titleDiv.innerText = formatTitleA(m);
             entryDiv.appendChild(titleDiv);
         }
         entryDiv.appendChild(messageDiv);
-        if (unmappedTags) {
-            tagsDiv.classList.add('detailTags');
-            tagsDiv.innerText = `Tags: ${unmappedTags}`;
+        const otherTags = unmatchedTags(m.tags);
+        if (otherTags.length > 0) {
+            tagsDiv.innerText = `Tags: ${otherTags.join(", ")}`;
             entryDiv.appendChild(tagsDiv);
         }
         detailEventsList.appendChild(entryDiv);
@@ -311,9 +284,45 @@ const nextScreenshotKeyboardListener = (e) => {
     }
 };
 
-const toEmoji = (tag) => {
-    emojis
+const formatTitle = (m) => {
+    if (m.title) {
+        return formatTitleA(m);
+    } else {
+        return `${location.host}/${m.topic}`;
+    }
 };
+
+const formatTitleA = (m) => {
+    const emojiList = toEmojis(m.tags);
+    if (emojiList) {
+        return `${emojiList.join(" ")} ${m.title}`;
+    } else {
+        return m.title;
+    }
+};
+
+const formatMessage = (m) => {
+    if (m.title) {
+        return m.message;
+    } else {
+        const emojiList = toEmojis(m.tags);
+        if (emojiList) {
+            return `${emojiList.join(" ")} ${m.message}`;
+        } else {
+            return m.message;
+        }
+    }
+};
+
+const toEmojis = (tags) => {
+    if (!tags) return [];
+    else return tags.filter(tag => tag in emojis).map(tag => emojis[tag]);
+}
+
+const unmatchedTags = (tags) => {
+    if (!tags) return [];
+    else return tags.filter(tag => !(tag in emojis));
+}
 
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 async function* makeTextFileLineIterator(fileURL) {
@@ -417,14 +426,10 @@ document.querySelectorAll('.ntfyProtocol').forEach((el) => {
     el.innerHTML = window.location.protocol + "//";
 });
 
-// Fetch emojis
+// Format emojis (see emoji.js)
 const emojis = {};
-fetch('static/js/emoji.json')
-    .then(response => response.json())
-    .then(data => {
-        data.forEach(emoji => {
-            emoji.aliases.forEach(alias => {
-                emojis[alias] = emoji.emoji;
-            });
-        });
+rawEmojis.forEach(emoji => {
+    emoji.aliases.forEach(alias => {
+        emojis[alias] = emoji.emoji;
     });
+});

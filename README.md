@@ -213,6 +213,6 @@ Third party libraries and resources:
 * [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
-* [emoji-java](https://github.com/vdurmont/emoji-java) (MIT) is used for emoji support (the emoji.json file only) 
+* [github/gemoji](https://github.com/github/gemoji) (MIT) is used for emoji support (specifically the [emoji.json](https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json) file)
 * [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) 
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)

@@ -85,7 +85,7 @@
         curl \<br/>
         &nbsp;&nbsp;-H "Title: Unauthorized access detected" \<br/>
         &nbsp;&nbsp;-H "Priority: urgent" \<br/>
-        &nbsp;&nbsp;-H "Tags: warn,skull" \<br/>
+        &nbsp;&nbsp;-H "Tags: warning,skull" \<br/>
         &nbsp;&nbsp;-d "Remote access to $(hostname) detected. Act right away." \<br/>
         &nbsp;&nbsp;<span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
@@ -228,16 +228,22 @@
         curl -H "Title: Dogs are better than cats" -d "Oh my ..." <span class="ntfyUrl">ntfy.sh</span>/mytopic<br/>
     </code>
 
-    <h3 id="tags" class="anchor">Tagging messages (<tt>X-Tags</tt>, <tt>Tags</tt>, or <tt>ta</tt>)</h3>
+    <h3 id="tags" class="anchor">Tags &amp; emojis 🥳 🎉 (<tt>X-Tags</tt>, <tt>Tags</tt>, or <tt>ta</tt>)</h3>
+    <p>
+        You can tag messages with emojis (or other relevant strings). If a tag matches a <a href="https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json">known emoji short code</a>,
+        it will be converted to an emoji. If it doesn't match, it will be listed below the notification. This is useful
+        for things like warnings and such (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. which script the
+        message came from, ...).
+    </p>
     <p class="smallMarginBottom">
-        You can tag notifications with emojis (or other relevant strings). In the phone app, the tags will be converted
-        to emojis and prepended to the message or title in the notification. You can set tags with the <tt>X-Tags</tt> header
-        (or any of its aliases: <tt>Tags</tt>, or <tt>ta</tt>). Use <a href="https://github.com/vdurmont/emoji-java/blob/master/EMOJIS.md">this reference</a>
-        to figure out what tags you can use to send emojis.
+        You can set tags with the <tt>X-Tags</tt> header (or any of its aliases: <tt>Tags</tt>, or <tt>ta</tt>).
+        Use <a href="https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json">this reference</a>
+        to figure out what tags can be converted to emojis. In the example below, the tag "warning" matches the emoji ⚠️,
+        the tag "ssh-login" doesn't match and will be displayed below the message.
     </p>
     <code>
-        curl -H "Tags: warn,skull" -d "Unauthorized SSH access" <span class="ntfyUrl">ntfy.sh</span>/mytopic<br/>
-        curl -H tags:thumbsup -d "Backup successful" <span class="ntfyUrl">ntfy.sh</span>/mytopic<br/>
+        $ curl -H "Tags: warning,ssh-login" -d "Unauthorized SSH access" <span class="ntfyUrl">ntfy.sh</span>/mytopic<br/>
+        {"id":"ZEIwjfHlSS",...,"tags":["warning","ssh-login"],"message":"Unauthorized SSH access"}
     </code>
 
     <h2 id="examples" class="anchor">Examples</h2>
@@ -257,7 +263,7 @@
         rsync -a root@laptop /backups/laptop \<br/>
         &nbsp;&nbsp;&& zfs snapshot ... \<br/>
         &nbsp;&nbsp;&& curl -d "Laptop backup succeeded" <span class="ntfyUrl">ntfy.sh</span>/backups \<br/>
-        &nbsp;&nbsp;|| curl -H tags:warn -H prio:high -d "Laptop backup failed" <span class="ntfyUrl">ntfy.sh</span>/backups
+        &nbsp;&nbsp;|| curl -H tags:warning -H prio:high -d "Laptop backup failed" <span class="ntfyUrl">ntfy.sh</span>/backups
     </code>
 
     <h3 id="example-web" class="anchor">Example: Server-sent messages in your web app</h3>
@@ -284,7 +290,7 @@
     <code>
         #!/bin/bash<br/>
         if [ "${PAM_TYPE}" = "open_session" ]; then<br/>
-        &nbsp;&nbsp;curl -H tags:warn -d "SSH login: ${PAM_USER} from ${PAM_RHOST}" <span class="ntfyUrl">ntfy.sh</span>/alerts<br/>
+        &nbsp;&nbsp;curl -H tags:warning -d "SSH login: ${PAM_USER} from ${PAM_RHOST}" <span class="ntfyUrl">ntfy.sh</span>/alerts<br/>
         fi
     </code>
 
@@ -405,6 +411,7 @@
     </div>
 </div>
 <div id="lightbox" class="lightbox"></div>
+<script src="static/js/emoji.js"></script>
 <script src="static/js/app.js"></script>
 </body>
 </html>

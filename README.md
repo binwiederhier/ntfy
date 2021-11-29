@@ -138,13 +138,13 @@ sudo apt install ntfy
 
 **Debian/Ubuntu** (*manual install*)**:**
 ```bash
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.8/ntfy_1.4.8_amd64.deb
-dpkg -i ntfy_1.4.8_amd64.deb
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_amd64.deb
+dpkg -i ntfy_1.5.0_amd64.deb
 ```
 
 **Fedora/RHEL/CentOS:**
 ```bash
-rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.4.8/ntfy_1.4.8_amd64.rpm
+rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_amd64.rpm
 ```
 
 **Docker:**
@@ -171,13 +171,13 @@ go get -u heckel.io/ntfy
 **Manual install:**
 ```bash
 # x86_64/amd64
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.8/ntfy_1.4.8_linux_x86_64.tar.gz
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_x86_64.tar.gz
 
 # armv7
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.8/ntfy_1.4.8_linux_armv7.tar.gz
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.tar.gz
 
 # arm64/v8
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.4.8/ntfy_1.4.8_linux_arm64.tar.gz
+wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.tar.gz
 
 # Extract and run
 sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy

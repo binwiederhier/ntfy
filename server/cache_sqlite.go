@@ -34,7 +34,7 @@ const (
 		ORDER BY time ASC
 	`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
-	selectMessageCountForTopicQuery = `SELECT count(*) FROM messages WHERE topic = ?`
+	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
 	selectTopicsQuery               = `SELECT topic, MAX(time) FROM messages GROUP BY topic`
 )
 

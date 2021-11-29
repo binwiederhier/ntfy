@@ -373,9 +373,6 @@ li {
 }
 
 /** Detail view */
-#detail {
-    display: none;
-}
 
 #detail .detailEntry {
     margin-bottom: 20px;

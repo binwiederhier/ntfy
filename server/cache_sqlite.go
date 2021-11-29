@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"log"
 	"strings"
 	"time"
 )
@@ -210,6 +211,7 @@ func setupNewDB(db *sql.DB) error {
 }
 
 func migrateFrom0To1(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 0 to 1")
 	if _, err := db.Exec(migrate0To1AlterMessagesTableQuery); err != nil {
 		return err
 	}

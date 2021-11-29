@@ -158,6 +158,36 @@ const rerenderDetailView = () => {
         const messageDiv = document.createElement('div');
         const tagsDiv = document.createElement('div');
 
+        // Figure out mapped emojis (and unmapped tags)
+        let mappedEmojiTags = '';
+        let unmappedTags = '';
+        if (m.tags) {
+            mappedEmojiTags = m.tags
+                .filter(tag => tag in emojis)
+                .map(tag => emojis[tag])
+                .join("");
+            unmappedTags = m.tags
+                .filter(tag => !(tag in emojis))
+                .join(", ");
+        }
+
+        // Figure out title and message
+        let title = '';
+        let message = m.message;
+        if (m.title) {
+            if (mappedEmojiTags) {
+                title = `${mappedEmojiTags} ${m.title}`;
+            } else {
+                title = m.title;
+            }
+        } else {
+            if (mappedEmojiTags) {
+                message = `${mappedEmojiTags} ${m.message}`;
+            } else {
+                message = m.message;
+            }
+        }
+
         entryDiv.classList.add('detailEntry');
         dateDiv.classList.add('detailDate');
         const dateStr = new Date(m.time * 1000).toLocaleString();
@@ -167,17 +197,17 @@ const rerenderDetailView = () => {
             dateDiv.innerHTML = `${dateStr}`;
         }
         messageDiv.classList.add('detailMessage');
-        messageDiv.innerText = m.message;
+        messageDiv.innerText = message;
         entryDiv.appendChild(dateDiv);
         if (m.title) {
             titleDiv.classList.add('detailTitle');
-            titleDiv.innerText = m.title;
+            titleDiv.innerText = title;
             entryDiv.appendChild(titleDiv);
         }
         entryDiv.appendChild(messageDiv);
-        if (m.tags) {
+        if (unmappedTags) {
             tagsDiv.classList.add('detailTags');
-            tagsDiv.innerText = "Tags: " + m.tags.join(", ");
+            tagsDiv.innerText = `Tags: ${unmappedTags}`;
             entryDiv.appendChild(tagsDiv);
         }
         detailEventsList.appendChild(entryDiv);
@@ -281,6 +311,10 @@ const nextScreenshotKeyboardListener = (e) => {
     }
 };
 
+const toEmoji = (tag) => {
+    emojis
+};
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 async function* makeTextFileLineIterator(fileURL) {
     const utf8Decoder = new TextDecoder('utf-8');
@@ -382,3 +416,15 @@ document.querySelectorAll('.ntfyUrl').forEach((el) => {
 document.querySelectorAll('.ntfyProtocol').forEach((el) => {
     el.innerHTML = window.location.protocol + "//";
 });
+
+// Fetch emojis
+const emojis = {};
+fetch('static/js/emoji.json')
+    .then(response => response.json())
+    .then(data => {
+        data.forEach(emoji => {
+            emoji.aliases.forEach(alias => {
+                emojis[alias] = emoji.emoji;
+            });
+        });
+    });

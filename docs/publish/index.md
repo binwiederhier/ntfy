@@ -115,6 +115,60 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
+## Message title
+The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`). To override the title, 
+you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
+
+=== "Command line (curl)"
+    ```
+    curl -H "X-Title: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
+    curl -H "Title: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
+    curl -H "t: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /controversial HTTP/1.1
+    Host: ntfy.sh
+    Title: Dogs are better than cats
+    
+    Oh my ...
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/controversial', {
+        method: 'POST',
+        body: 'Oh my ...',
+        headers: { 'Title': 'Dogs are better than cats' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/controversial", strings.NewReader("Oh my ..."))
+    req.Header.Set("Title", "Dogs are better than cats")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PHP"
+    ``` php
+    file_get_contents('https://ntfy.sh/controversial', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Title: Dogs are better than cats",
+            'content' => 'Oh my ...'
+        ]
+    ]));
+    ```
+
+<figure markdown>
+  ![notification with title](../static/img/notification-with-title.png){ width=500 }
+  <figcaption>Detail view of notification with title</figcaption>
+</figure>
+
 ## Message priority
 All messages have a priority, which defines how urgently your phone notifies you. You can set custom
 notification sounds and vibration patterns on your phone to map to these priorities (see [Android config](../subscribe/phone.md)).
@@ -182,26 +236,99 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 </figure>
 
 ## Tags & emojis 🥳 🎉
-You can tag messages with emojis (or other relevant strings). If a tag matches a <a href="https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json">known emoji short code</a>,
-it will be converted to an emoji. If it doesn't match, it will be listed below the notification. This is useful
-for things like warnings and such (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. which script the
-message came from, ...).
+You can tag messages with emojis and other relevant strings:
 
-You can set tags with the `X-Tags` header (or any of its aliases: `Tags`, or `ta`).
-Use <a href="https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json">this reference</a>
-to figure out what tags can be converted to emojis. In the example below, the tag "warning" matches the emoji ⚠️,
-the tag "ssh-login" doesn't match and will be displayed below the message.
+* **Emojis**: If a tag matches an [emoji short code](../emojis.md), it'll be converted to an emoji and prepended 
+  to title or message.
+* **Other tags:** If a tag doesn't match, it will be listed below the notification. 
 
-```
-$ curl -H "Tags: warning,ssh-login" -d "Unauthorized SSH access" ntfy.sh/mytopic
-{"id":"ZEIwjfHlSS",...,"tags":["warning","ssh-login"],"message":"Unauthorized SSH access"}
-```
+This feature is useful for things like warnings (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. script 
+names, hostnames, etc.). Use [the emoji short code list](../emojis.md) to figure out what tags can be converted to emojis. 
+Here's an **excerpt of emojis** I've found very useful in alert messages:
 
-## Message title
-The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`.
-To override it, you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
+<table class="remove-md-box"><tr>
+<td>
+    <table><thead><tr><th>Tag</th><th>Emoji</th></tr></thead><tbody>
+    <tr><td><code>+1</code></td><td>👍️</td></tr>
+    <tr><td><code>partying_face</code></td><td>🥳</td></tr>
+    <tr><td><code>tada</code></td><td>🎉</td></tr>
+    <tr><td><code>heavy_check_mark</code></td><td>✔️</td></tr>
+    <tr><td><code>loudspeaker</code></td><td>📢</td></tr>
+    <tr><td>...</td><td>...</td></tr>
+    </tbody></table>
+</td>
+<td>
+    <table><thead><tr><th>Tag</th><th>Emoji</th></tr></thead><tbody> 
+    <tr><td><code>-1</code></td><td>👎️</td></tr>
+    <tr><td><code>warning</code></td><td>⚠️</td></tr>
+    <tr><td><code>rotating_light</code></td><td>️🚨</td></tr>
+    <tr><td><code>triangular_flag_on_post</code></td><td>🚩</td></tr>
+    <tr><td><code>skull</code></td><td>💀</td></tr>
+    <tr><td>...</td><td>...</td></tr>
+    </tbody></table>
+</td>
+<td>
+    <table><thead><tr><th>Tag</th><th>Emoji</th></tr></thead><tbody>
+    <tr><td><code>facepalm</code></td><td>🤦</td></tr>
+    <tr><td><code>no_entry</code></td><td>⛔</td></tr>
+    <tr><td><code>no_entry_sign</code></td><td>🚫</td></tr>
+    <tr><td><code>cd</code></td><td>💿</td></tr> 
+    <tr><td><code>computer</code></td><td>💻</td></tr>
+    <tr><td>...</td><td>...</td></tr>
+    </tbody></table>
+</td>
+</tr></table>
 
-```
-curl -H "Title: Dogs are better than cats" -d "Oh my ..." ntfy.sh/mytopic<
-```
-        
+You can set tags with the `X-Tags` header (or any of its aliases: `Tags`, or `ta`). Specify multiple tags by separating
+them with a comma, e.g. `tag1,tag2,tag3`.
+
+=== "Command line (curl)"
+    ```
+    curl -H "X-Tags: warning,mailsrv13,daily-backup" -d "Backup of mailsrv13 failed" ntfy.sh/backups
+    curl -H "Tags: horse,unicorn" -d "Unicorns are just horses with unique horns" ntfy.sh/backups
+    curl -H ta:dog -d "Dogs are awesome" ntfy.sh/backups
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /backups HTTP/1.1
+    Host: ntfy.sh
+    Tags: warning,mailsrv13,daily-backup
+    
+    Backup of mailsrv13 failed
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/backups', {
+        method: 'POST',
+        body: 'Backup of mailsrv13 failed',
+        headers: { 'Tags': 'warning,mailsrv13,daily-backup' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/backups", strings.NewReader("Backup of mailsrv13 failed"))
+    req.Header.Set("Tags", "warning,mailsrv13,daily-backup")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PHP"
+    ``` php
+    file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Tags: warning,mailsrv13,daily-backup",
+            'content' => 'Backup of mailsrv13 failed'
+        ]
+    ]));
+    ```
+
+<figure markdown>
+  ![priority notification](../static/img/notification-with-tags.png){ width=500 }
+  <figcaption>Detail view of notifications with tags</figcaption>
+</figure>
+

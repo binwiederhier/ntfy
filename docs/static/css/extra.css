@@ -2,3 +2,13 @@ figure img {
     border-radius: 7px;
     filter: drop-shadow(3px 3px 5px #ccc);
 }
+
+.remove-md-box {
+    background: none;
+    border: none;
+    margin: 0 auto;
+}
+
+.remove-md-box td {
+    padding: 0 10px
+}

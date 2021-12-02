@@ -24,6 +24,9 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | Config option | Env variable | Format | Default | Description |
 |---|---|---|---|---|
 | `listen-http` | `NTFY_LISTEN_HTTP` | `[host]:port` | `:80` | Listen address for the HTTP web server |
+| `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
+| `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
+| `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
 | `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. |
 | `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. |
 | `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. |
@@ -67,20 +70,43 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ## Behind a proxy (TLS, etc.)
 
 !!! warning
-    If you are behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
+    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
     as if they are one.
 
-**TLS/SSL*: ntfy does not support TLS at this time. 
+**Rate limiting:** If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
+flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
+identifier for a visitor, as opposed to the remote IP address. If the `behing-proxy` flag is not set, all visitors will
+be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
-If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` flag. This will
-instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier 
-
+**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` config option. However, if you are behind a proxy, it is
+recommended that TLS/SSL termination is done by the proxy itself.
 
 ## Rate limiting
-Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
-- visitor-request-limit-burst is the initial bucket of requests each visitor has
-- visitor-request-limit-replenish is the rate at which the bucket is refilled
+!!! info
+    Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 
+    Otherwise all visitors are rate limited as if they are one.
 
+By default, ntfy runs without authentication, so it is vitally important that we protect the server from abuse or overload.
+There are various limits and rate limits in place that you can use to configure the server. Let's do the easy ones first:
+
+* `global-topic-limit` defines the total number of topics before the server rejects new topics. It defaults to 5000.
+* `visitor-subscription-limit` is the number of subscriptions (open connections) per visitor. This value defaults to 30.
+
+A **visitor** is identified by its IP address (or the `X-Forwarded-For` header if `behind-proxy` is set). All config 
+options that start with the word `visitor` apply only on a per-visitor basis.   
+
+In addition to the limits above, there is a requests/second limit per visitor for all sensitive GET/PUT/POST requests.
+This limit uses a [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (using Go's [rate package](https://pkg.go.dev/golang.org/x/time/rate)):
+
+Each visitor has a bucket of 60 requests they can fire against the server (defined by `visitor-request-limit-burst`). 
+After the 60, new requests will encounter a `429 Too Many Requests` response. The visitor request bucket is refilled at a rate of one
+request every 10s (defined by `visitor-request-limit-replenish`)
+
+* `visitor-request-limit-burst` is the initial bucket of requests each visitor has. This defaults to 60.
+* `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 10s.
+
+During normal usage, you shouldn't encounter this limit at all, and even if you burst a few requests shortly (e.g. when you 
+reconnect after a connection drop), it shouldn't have any effect.
 
 ## Command line options
 ```

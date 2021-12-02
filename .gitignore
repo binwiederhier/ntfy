@@ -1,4 +1,5 @@
 dist/
 .idea/
 site/
+server/docs/
 *.iml

@@ -88,7 +88,10 @@ staticcheck: .PHONY
 
 # Building targets
 
-build-deps: .PHONY
+docs: .PHONY
+	mkdocs build
+
+build-deps: docs
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/v7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 

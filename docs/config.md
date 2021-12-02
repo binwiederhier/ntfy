@@ -11,34 +11,39 @@ $ ntfy
 2021/11/30 19:59:08 Listening on :80
 ```
 
-You can immediately start [publishing messages](publish/index.md), or subscribe via the [Android app](subscribe/phone.md),
+You can immediately start [publishing messages](publish.md), or subscribe via the [Android app](subscribe/phone.md),
 [the web UI](subscribe/web.md), or simply via [curl or your favorite HTTP client](subscribe/api.md). To configure 
 the server further, check out the [config options table](#config-options) or simply type `ntfy --help` to
 get a list of [command line options](#command-line-options).
 
-## Config options
-Each config options can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a 
-CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
-variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
+## Message cache
+If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period
+of time is important to allow [phones](subscribe/phone.md) and other devices with brittle Internet connections to be able to retrieve
+notifications that they may have missed. 
 
-| Config option | Env variable | Format | Default | Description |
-|---|---|---|---|---|
-| `listen-http` | `NTFY_LISTEN_HTTP` | `[host]:port` | `:80` | Listen address for the HTTP web server |
-| `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
-| `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
-| `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
-| `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. |
-| `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. |
-| `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. |
-| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
-| `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
-| `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
-| `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
-| `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
-| `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
-| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+By default, ntfy keeps messages in memory for 12 hours, which means that **cached messages do not survive an application
+restart**. You can override this behavior using the following config settings:
 
-The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
+* `cache-file`: if set, ntfy will store messages in a SQLite based cache (default is empty, which means in-memory cache).
+  **This is required if you'd like messages to be retained across restarts**.
+* `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`)
+
+Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#polling), as well as the
+[`since=` parameter](subscribe/api.md#since).
+
+## Behind a proxy (TLS, etc.)
+
+!!! warning
+    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
+    as if they are one.
+
+**Rate limiting:** If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
+flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
+identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
+be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
+
+**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` config option. However, if you are behind a proxy, it is
+recommended that TLS/SSL termination is done by the proxy itself.
 
 ## Firebase (FCM)
 !!! info
@@ -47,7 +52,7 @@ The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 
 [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) is the Google approved way to send
 push messages to Android devices. FCM is the only method that an Android app can receive messages without having to run a
-[foreground service](https://developer.android.com/guide/components/foreground-services). 
+[foreground service](https://developer.android.com/guide/components/foreground-services).
 
 For the main host [ntfy.sh](https://ntfy.sh), the [ntfy Android App](subscribe/phone.md) uses Firebase to send messages
 to the device. For other hosts, instant delivery is used and FCM is not involved.
@@ -66,20 +71,6 @@ Example:
 #
 firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ```
-
-## Behind a proxy (TLS, etc.)
-
-!!! warning
-    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
-    as if they are one.
-
-**Rate limiting:** If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
-flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
-identifier for a visitor, as opposed to the remote IP address. If the `behing-proxy` flag is not set, all visitors will
-be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
-
-**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` config option. However, if you are behind a proxy, it is
-recommended that TLS/SSL termination is done by the proxy itself.
 
 ## Rate limiting
 !!! info
@@ -107,6 +98,30 @@ request every 10s (defined by `visitor-request-limit-replenish`)
 
 During normal usage, you shouldn't encounter this limit at all, and even if you burst a few requests shortly (e.g. when you 
 reconnect after a connection drop), it shouldn't have any effect.
+
+## Config options
+Each config options can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a
+CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
+variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
+
+| Config option | Env variable | Format | Default | Description |
+|---|---|---|---|---|
+| `listen-http` | `NTFY_LISTEN_HTTP` | `[host]:port` | `:80` | Listen address for the HTTP web server |
+| `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
+| `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
+| `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
+| `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. |
+| `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. |
+| `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. |
+| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
+| `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
+| `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
+| `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
+| `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
+| `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
+| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+
+The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 
 ## Command line options
 ```

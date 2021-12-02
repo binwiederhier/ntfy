@@ -1,6 +1,6 @@
 # Install your own ntfy server
 The following steps are only required if you want to **self-host your own ntfy server**. If you just want to 
-[send messages using ntfy.sh](publish/index.md), you don't need to install anything. Just use `curl`
+[send messages using ntfy.sh](publish.md), you don't need to install anything. Just use `curl`
 or your favorite HTTP client.
 
 ## General steps
@@ -11,24 +11,23 @@ We support amd64, armv7 and arm64.
 2. Then (optionally) edit `/etc/ntfy/config.yml` (see [configuration](config.md))
 3. Then just run it with `ntfy` (or `systemctl start ntfy` when using the deb/rpm).
 
-
 ## Binaries and packages
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
 deb/rpm packages.
 
-x86_64/amd64:
+**x86_64/amd64:**
 ```
 wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_x86_64.tar.gz
 sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
 ```
 
-armv7:
+**armv7:**
 ```
 wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.tar.gz
 sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
 ```
 
-arm64/v8:
+**arm64/v8:**
 ```
 wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.tar.gz
 sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy

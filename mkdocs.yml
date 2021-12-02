@@ -1,4 +1,5 @@
-site_name: ntfy.sh
+site_dir: server/docs
+site_name: ntfy
 site_url: https://ntfy.sh
 site_description: simple HTTP-based pub-sub
 copyright: Made with ❤️ by Philipp C. Heckel
@@ -8,7 +9,6 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-#  custom_dir: docs/overrides
   language: en
   logo: static/img/ntfy.png
   favicon: static/img/favicon.png
@@ -69,14 +69,11 @@ nav:
 - "Installation": install.md
 - "Configuration": config.md
 - "Publishing":
-  - "Sending messages": publish/index.md
+  - "Sending messages": publish.md
 - "Subscribing":
     - "From the Android/iOS app": subscribe/phone.md
     - "From the Web UI": subscribe/web.md
-    - "Using the API":
-        - "Basic API usage": subscribe/api.md
-        - "Fetching cached messages": subscribe/since.md
-        - "Polling": subscribe/poll.md
+    - "Using the API": subscribe/api.md
 - "Other things":
   - "Examples": examples.md
   - "Emojis 🥳 🎉": emojis.md

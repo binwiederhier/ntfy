@@ -41,10 +41,10 @@ Here's an example showing how to publish a simple message using a POST request:
     ]));
     ```
 
-If you have the [Android app](../subscribe/phone.md) installed on your phone, this will create a notification that looks like this:
+If you have the [Android app](subscribe/phone.md) installed on your phone, this will create a notification that looks like this:
 
 <figure markdown>
-  ![basic notification](../static/img/basic-notification.png){ width=500 }
+  ![basic notification](static/img/basic-notification.png){ width=500 }
   <figcaption>Android notification</figcaption>
 </figure>
 
@@ -111,7 +111,7 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 <figure markdown>
-  ![priority notification](../static/img/priority-notification.png){ width=500 }
+  ![priority notification](static/img/priority-notification.png){ width=500 }
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
@@ -165,23 +165,23 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 <figure markdown>
-  ![notification with title](../static/img/notification-with-title.png){ width=500 }
+  ![notification with title](static/img/notification-with-title.png){ width=500 }
   <figcaption>Detail view of notification with title</figcaption>
 </figure>
 
 ## Message priority
 All messages have a priority, which defines how urgently your phone notifies you. You can set custom
-notification sounds and vibration patterns on your phone to map to these priorities (see [Android config](../subscribe/phone.md)).
+notification sounds and vibration patterns on your phone to map to these priorities (see [Android config](subscribe/phone.md)).
 
 The following priorities exist:
 
 | Priority | Icon | ID | Name | Description |
 |---|---|---|---|---|
-| Max priority | ![min priority](../static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. |
-| High priority | ![min priority](../static/img/priority-4.svg) | `4` | `high` | Long vibration burst, default notification sound with a pop-over notification. |
+| Max priority | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. |
+| High priority | ![min priority](static/img/priority-4.svg) | `4` | `high` | Long vibration burst, default notification sound with a pop-over notification. |
 | **Default priority** | *(none)* | `3` | `default` | Short default vibration and sound. Default notification behavior. |
-| Low priority | ![min priority](../static/img/priority-2.svg) |`2` | `low` | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
-| Min priority | ![min priority](../static/img/priority-1.svg) | `1` | `min` | No vibration or sound. The notification will be under the fold in "Other notifications". |
+| Low priority | ![min priority](static/img/priority-2.svg) |`2` | `low` | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
+| Min priority | ![min priority](static/img/priority-1.svg) | `1` | `min` | No vibration or sound. The notification will be under the fold in "Other notifications". |
 
 You can set the priority with the header `X-Priority` (or any of its aliases: `Priority`, `prio`, or `p`).
 
@@ -231,19 +231,19 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     ```
 
 <figure markdown>
-  ![priority notification](../static/img/priority-detail-overview.png){ width=500 }
+  ![priority notification](static/img/priority-detail-overview.png){ width=500 }
   <figcaption>Detail view of priority notifications</figcaption>
 </figure>
 
 ## Tags & emojis 🥳 🎉
 You can tag messages with emojis and other relevant strings:
 
-* **Emojis**: If a tag matches an [emoji short code](../emojis.md), it'll be converted to an emoji and prepended 
+* **Emojis**: If a tag matches an [emoji short code](emojis.md), it'll be converted to an emoji and prepended 
   to title or message.
 * **Other tags:** If a tag doesn't match, it will be listed below the notification. 
 
 This feature is useful for things like warnings (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. script 
-names, hostnames, etc.). Use [the emoji short code list](../emojis.md) to figure out what tags can be converted to emojis. 
+names, hostnames, etc.). Use [the emoji short code list](emojis.md) to figure out what tags can be converted to emojis. 
 Here's an **excerpt of emojis** I've found very useful in alert messages:
 
 <table class="remove-md-box"><tr>
@@ -328,7 +328,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 <figure markdown>
-  ![priority notification](../static/img/notification-with-tags.png){ width=500 }
+  ![priority notification](static/img/notification-with-tags.png){ width=500 }
   <figcaption>Detail view of notifications with tags</figcaption>
 </figure>
 

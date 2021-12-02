@@ -83,6 +83,7 @@ var (
 	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
 
 	staticRegex = regexp.MustCompile(`^/static/.+`)
+	docsRegex = regexp.MustCompile(`^/docs(|/.*)$`)
 
 	//go:embed "index.gohtml"
 	indexSource   string
@@ -94,6 +95,10 @@ var (
 	//go:embed static
 	webStaticFs       embed.FS
 	webStaticFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webStaticFs}
+
+	//go:embed docs
+	docsStaticFs       embed.FS
+	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
 	errHTTPBadRequest      = &errHTTP{http.StatusBadRequest, http.StatusText(http.StatusBadRequest)}
 	errHTTPNotFound        = &errHTTP{http.StatusNotFound, http.StatusText(http.StatusNotFound)}
@@ -203,7 +208,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
-	if r.Method == http.MethodGet && (r.URL.Path == "/" || topicRegex.MatchString(r.URL.Path)) {
+	log.Printf(r.URL.Path)
+	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
 		return s.handleExample(w, r)
@@ -211,8 +217,12 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleEmpty(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.handleStatic(w, r)
+	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
+		return s.handleDocs(w, r)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
+	} else if r.Method == http.MethodGet && topicRegex.MatchString(r.URL.Path) {
+		return s.handleHome(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handlePublish)
 	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
@@ -243,6 +253,11 @@ func (s *Server) handleExample(w http.ResponseWriter, r *http.Request) error {
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
 	http.FileServer(http.FS(webStaticFsCached)).ServeHTTP(w, r)
+	return nil
+}
+
+func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
+	http.FileServer(http.FS(docsStaticCached)).ServeHTTP(w, r)
 	return nil
 }
 

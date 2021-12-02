@@ -5,6 +5,21 @@
 #
 # listen-http: ":80"
 
+# Listen address for the HTTPS web server. If set, you must also set "key-file" and "cert-file".
+# Format: <hostname>:<port>
+#
+# listen-https:
+
+# Path to the private key file for the HTTPS web server. Not used if "listen-https" is not set.
+# Format: <filename>
+#
+# key-file:
+
+# Path to the cert file for the HTTPS web server. Not used if "listen-https" is not set.
+# Format: <filename>
+#
+# cert-file:
+
 # If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app.
 # This is optional and only required to save battery when using the Android app.
 #

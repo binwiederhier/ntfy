@@ -1,0 +1,85 @@
+site_name: ntfy.sh
+site_url: https://ntfy.sh
+site_description: simple HTTP-based pub-sub
+copyright: Made with ❤️ by Philipp C. Heckel
+repo_name: binwiederhier/ntfy
+repo_url: https://github.com/binwiederhier/ntfy
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+#  custom_dir: docs/overrides
+  language: en
+  logo: static/img/ntfy.png
+  favicon: static/img/favicon.png
+  include_search_page: false
+  search_index_only: true
+  palette:
+    - media: "(prefers-color-scheme: light)"  # Light mode
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: dark)"  # Dark mode
+      scheme: slate
+      primary: teal
+      accent: indigo
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+  features:
+    - search.suggest
+    - search.highlight
+    - search.share
+    - navigation.sections
+    - toc.integrate
+    - content.tabs.link
+extra_javascript:
+  - static/js/extra.js
+extra_css:
+  - static/css/extra.css
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - footnotes
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/binwiederhier
+
+nav:
+- "Getting started": index.md
+- "Installation": install.md
+- "Configuration": config.md
+- "Publishing":
+  - "Sending messages": publish/index.md
+- "Subscribing":
+    - "From the Android/iOS app": subscribe/phone.md
+    - "From the Web UI": subscribe/web.md
+    - "Using the API":
+        - "Basic API usage": subscribe/api.md
+        - "Fetching cached messages": subscribe/since.md
+        - "Polling": subscribe/poll.md
+- "Other things":
+  - "Examples": examples.md
+  - "FAQs": faq.md
+  - "Development": develop.md
+
+

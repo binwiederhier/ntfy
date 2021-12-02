@@ -6,7 +6,7 @@
 # listen-http: ":80"
 
 # If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app.
-# This is optional and only required to support Android apps (which don't allow background services anymore).
+# This is optional and only required to save battery when using the Android app.
 #
 # firebase-key-file: <filename>
 
@@ -22,6 +22,8 @@
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
+#
+# Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.
 #
 # keepalive-interval: 30s
 

@@ -173,13 +173,23 @@ func (s *Server) Run() error {
 			s.updateStatsAndExpire()
 		}
 	}()
-	return s.listenAndServe()
-}
+	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
+	if s.config.ListenHTTPS != "" {
+		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
+	}
+	log.Printf("Listening on %s", listenStr)
 
-func (s *Server) listenAndServe() error {
-	log.Printf("Listening on %s", s.config.ListenHTTP)
 	http.HandleFunc("/", s.handle)
-	return http.ListenAndServe(s.config.ListenHTTP, nil)
+	errChan := make(chan error)
+	go func() {
+		errChan <- http.ListenAndServe(s.config.ListenHTTP, nil)
+	}()
+	if s.config.ListenHTTPS != "" {
+		go func() {
+			errChan <- http.ListenAndServeTLS(s.config.ListenHTTPS, s.config.CertFile, s.config.KeyFile, nil)
+		}()
+	}
+	return <-errChan
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {

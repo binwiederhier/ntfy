@@ -66,9 +66,14 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 
 ## Behind a proxy (TLS, etc.)
 
-!! warn
-If you are behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
-as if they are one.
+!!! warning
+    If you are behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
+    as if they are one.
+
+**TLS/SSL*: ntfy does not support TLS at this time. 
+
+If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` flag. This will
+instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier 
 
 
 ## Rate limiting

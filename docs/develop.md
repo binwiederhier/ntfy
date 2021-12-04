@@ -1,6 +1,7 @@
 # Building
 
 ## ntfy server
+The ntfy server source code is available [on GitHub](https://github.com/binwiederhier/ntfy). 
 To quickly build on amd64, you can use `make build-simple`:
 
 ```
@@ -29,6 +30,7 @@ Releasing (requires goreleaser):
 There are currently no platform-specific make targets, so they will build for all platforms (which may take a while).
 
 ## Android app
+The ntfy Android app source code is available [on GitHub](https://github.com/binwiederhier/ntfy-android).
 The Android app has two flavors:
 
 * **Google Play:** The `play` flavor includes Firebase (FCM) and requires a Firebase account

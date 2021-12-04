@@ -33,6 +33,7 @@ theme:
     - search.highlight
     - search.share
     - navigation.sections
+    - navigation.instant
     - toc.integrate
     - content.tabs.link
 extra_javascript:
@@ -42,17 +43,20 @@ extra_css:
 
 markdown_extensions:
   - admonition
-  - codehilite
   - meta
   - toc:
       permalink: true
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.superfences
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      extend_pygments_lang:
+        - name: php-inline
+          lang: php
+          options:
+            startinline: true
   - pymdownx.tasklist:
       custom_checkbox: true
-  - footnotes
   - attr_list
   - md_in_html
 
@@ -71,7 +75,7 @@ nav:
 - "Publishing":
   - "Sending messages": publish.md
 - "Subscribing":
-    - "From the Android/iOS app": subscribe/phone.md
+    - "From your phone": subscribe/phone.md
     - "From the Web UI": subscribe/web.md
     - "Using the API": subscribe/api.md
 - "Other things":

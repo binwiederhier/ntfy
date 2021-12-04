@@ -15,47 +15,120 @@ We support amd64, armv7 and arm64.
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
 deb/rpm packages.
 
-**x86_64/amd64:**
-```
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_x86_64.tar.gz
-sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-```
+=== "x86_64/amd64"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_x86_64.tar.gz
+    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
+    sudo ./ntfy
+    ```
 
-**armv7:**
-```
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.tar.gz
-sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-```
+=== "armv7/armhf"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.tar.gz
+    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
+    sudo ./ntfy
+    ```
 
-**arm64/v8:**
-```
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.tar.gz
-sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-```
+=== "arm64"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.tar.gz
+    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
+    sudo ./ntfy
+    ```
 
 ## Debian/Ubuntu repository
 Installation via Debian repository:
-```bash
-curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
-sudo apt install apt-transport-https
-sudo sh -c "echo 'deb [arch=amd64] https://archive.heckel.io/apt debian main' > /etc/apt/sources.list.d/archive.heckel.io.list"  
-sudo apt update
-sudo apt install ntfy
-```
+
+=== "x86_64/amd64"
+    ```bash
+    curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+    sudo apt install apt-transport-https
+    sudo sh -c "echo 'deb [arch=amd64] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+    sudo apt update
+    sudo apt install ntfy
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
+
+=== "armv7/armhf"
+    ```bash
+    curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+    sudo apt install apt-transport-https
+    sudo sh -c "echo 'deb [arch=armhf] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+    sudo apt update
+    sudo apt install ntfy
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
+
+=== "arm64"
+    ```bash
+    curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+    sudo apt install apt-transport-https
+    sudo sh -c "echo 'deb [arch=arm64] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+    sudo apt update
+    sudo apt install ntfy
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
 
 Manually installing the .deb file:
-```bash
-wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_amd64.deb
-dpkg -i ntfy_1.5.0_amd64.deb
-```
+
+=== "x86_64/amd64"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_amd64.deb
+    sudo dpkg -i ntfy_*.deb
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
+
+=== "armv7/armhf"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.deb
+    sudo dpkg -i ntfy_*.deb
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
+
+=== "arm64"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.deb
+    sudo dpkg -i ntfy_*.deb
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
 
 ## Fedora/RHEL/CentOS
-```bash
-rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_amd64.rpm
-```
+
+=== "x86_64/amd64"
+    ```bash
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_amd64.rpm
+    sudo systemctl enable ntfy 
+    sudo systemctl start ntfy
+    ```
+
+=== "armv7/armhf"
+    ```bash
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_armv7.rpm
+    sudo systemctl enable ntfy 
+    sudo systemctl start ntfy
+    ```
+
+=== "arm64"
+    ```bash
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.5.0/ntfy_1.5.0_linux_arm64.rpm
+    sudo systemctl enable ntfy 
+    sudo systemctl start ntfy
+    ```
 
 ## Docker
-The ntfy server exposes its web UI and the API on port 80, so you need to expose that in Docker. To use the persistent 
+The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for amd64, armv7 and arm64. It should be pretty
+straight forward to use.
+
+The server exposes its web UI and the API on port 80, so you need to expose that in Docker. To use the persistent 
 message cache, you also need to map a volume to `/var/cache/ntfy`. To change other settings, you should map `/etc/ntfy`,
 so you can edit `/etc/ntfy/config.yml`.
 
@@ -88,6 +161,7 @@ To install via Go, simply run:
 ```bash
 go install heckel.io/ntfy@latest
 ```
+
 !!! info
     Please [let me know](https://github.com/binwiederhier/ntfy/issues) if there are any issues with this installation
     method. The SQLite bindings require CGO and it works for me, but I have the feeling it may not work for everyone.

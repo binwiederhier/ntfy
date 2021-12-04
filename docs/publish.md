@@ -1,9 +1,9 @@
 # Publishing
-
-Publishing messages can be done via PUT or POST. Topics are created on the fly by subscribing or publishing to them.
-Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
+Publishing messages can be done via HTTP PUT or POST. Topics are created on the fly by subscribing or publishing to them.
+Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable.
 
 Here's an example showing how to publish a simple message using a POST request:
+
 === "Command line (curl)"
     ```
     curl -d "Backup successful 😀" ntfy.sh/mytopic
@@ -31,7 +31,7 @@ Here's an example showing how to publish a simple message using a POST request:
     ```
 
 === "PHP"
-    ``` php
+    ``` php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -96,7 +96,7 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 === "PHP"
-    ``` php
+    ``` php-inline
     file_get_contents('https://ntfy.sh/phil_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -152,7 +152,7 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 === "PHP"
-    ``` php
+    ``` php-inline
     file_get_contents('https://ntfy.sh/controversial', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -218,7 +218,7 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     ```
 
 === "PHP"
-    ``` php
+    ``` php-inline
     file_get_contents('https://ntfy.sh/phil_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -315,7 +315,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 === "PHP"
-    ``` php
+    ``` php-inline
     file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
         'http' => [
             'method' => 'POST',

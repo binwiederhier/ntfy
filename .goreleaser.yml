@@ -53,6 +53,8 @@ nfpms:
       - src: config/ntfy.service
         dst: /lib/systemd/system/ntfy.service
     scripts:
+      postinstall: "scripts/postinst.sh"
+      preremove: "scripts/prerm.sh"
       postremove: "scripts/postrm.sh"
 archives:
   -

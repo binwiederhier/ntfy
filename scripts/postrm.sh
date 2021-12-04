@@ -1,6 +1,8 @@
 #!/bin/sh
-set -eu
-systemctl stop ntfy >/dev/null 2>&1 || true
+set -e
+
+# Delete the config if package is purged
 if [ "$1" = "purge" ]; then
-  rm -rf /etc/ntfy
+  echo "Deleting /etc/ntfy ..."
+  rm -rf /etc/ntfy || true
 fi

@@ -1,3 +1,7 @@
+article {
+    padding-bottom: 50px;
+}
+
 figure img {
     border-radius: 7px;
     filter: drop-shadow(3px 3px 5px #ccc);

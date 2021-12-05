@@ -1,7 +1,10 @@
 # Install your own ntfy server
-The following steps are only required if you want to **self-host your own ntfy server**. If you just want to 
-[send messages using ntfy.sh](publish.md), you don't need to install anything. Just use `curl`
-or your favorite HTTP client.
+**Self-hosting your own ntfy server** is pretty straight forward. Just install the binary, package or Docker image, then 
+configure it and run it. Just like any other software. No fuzz. 
+
+!!! info
+    The following steps are only required if you want to **self-host your own ntfy server**. If you just want to 
+    [send messages using ntfy.sh](publish.md), you don't need to install anything.
 
 ## General steps
 The ntfy server comes as a statically linked binary and is shipped as tarball, deb/rpm packages and as a Docker image.
@@ -129,7 +132,7 @@ The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for a
 straight forward to use.
 
 The server exposes its web UI and the API on port 80, so you need to expose that in Docker. To use the persistent 
-message cache, you also need to map a volume to `/var/cache/ntfy`. To change other settings, you should map `/etc/ntfy`,
+[message cache](config.md#message-cache), you also need to map a volume to `/var/cache/ntfy`. To change other settings, you should map `/etc/ntfy`,
 so you can edit `/etc/ntfy/config.yml`.
 
 Basic usage (no cache or additional config):

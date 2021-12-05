@@ -51,7 +51,7 @@ the settings (and custom sounds or vibration) for each of the priorities:
 </figure>
 
 ### Instant delivery
-Instant delivery is allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e. 
+Instant delivery allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e. 
 when the screen turns off, and you leave it on the desk for a while. This is achieved with a foreground service, which 
 you'll see as a permanent notification that looks like this:
 

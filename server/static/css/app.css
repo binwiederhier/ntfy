@@ -1,9 +1,10 @@
 /* general styling */
 
 html, body {
-    font-family: 'Lato', sans-serif;
-    color: #333;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
     font-size: 1.1em;
+    color: #444;
     margin: 0;
     padding: 0;
 }
@@ -29,29 +30,39 @@ h1 {
     font-size: 2.5em;
     word-wrap: break-word; /* For very long topics */
     padding-right: 40px; /* For the X on the detail page */
+    font-weight: 300;
+    color: #666;
 }
 
 h2 {
     margin-top: 30px;
     margin-bottom: 5px;
     font-size: 1.8em;
+    font-weight: 300;
+    color: #333;
 }
 
 h3 {
     margin-top: 25px;
     margin-bottom: 5px;
     font-size: 1.3em;
+    font-weight: 300;
+    color: #333;
 }
 
 p {
     margin-top: 10px;
     margin-bottom: 20px;
-    font-size: 1.1em;
-    line-height: 140%;
+    line-height: 160%;
+    font-weight: 400;
 }
 
 p.smallMarginBottom {
     margin-bottom: 10px;
+}
+
+b {
+    font-weight: 500;
 }
 
 tt {
@@ -72,16 +83,36 @@ code {
     white-space: nowrap;
 }
 
-/* Lato font (OFL), https://fonts.google.com/specimen/Lato#about,
-   embedded with the help of https://google-webfonts-helper.herokuapp.com/fonts/lato?subsets=latin */
+/* Roboto font, embedded with the help of https://google-webfonts-helper.herokuapp.com/fonts/roboto?subsets=latin */
 
+/* roboto-300 - latin */
 @font-face {
-    font-family: 'Lato';
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 300;
+    src: local(''),
+    url('../font/roboto-v29-latin-300.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../font/roboto-v29-latin-300.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* roboto-regular - latin */
+@font-face {
+    font-family: 'Roboto';
     font-style: normal;
     font-weight: 400;
     src: local(''),
-    url('../font/lato-v17-latin-ext_latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
-    url('../font/lato-v17-latin-ext_latin-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+    url('../font/roboto-v29-latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../font/roboto-v29-latin-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
+/* roboto-500 - latin */
+@font-face {
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 500;
+    src: local(''),
+    url('../font/roboto-v29-latin-500.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+    url('../font/roboto-v29-latin-500.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
 }
 
 /* Main page */
@@ -117,6 +148,29 @@ code {
 .anchor .anchorLink:hover {
     color: #3a9784;
     visibility: visible;
+}
+
+/* Figures */
+
+figure {
+    text-align: center;
+}
+
+figure img, figure video {
+    filter: drop-shadow(3px 3px 3px #ccc);
+    border-radius: 7px;
+    max-width: 100%;
+}
+
+figure video {
+    width: 100%;
+    max-height: 450px;
+}
+
+figcaption {
+    text-align: center;
+    font-style: italic;
+    padding-top: 10px;
 }
 
 /* Screenshots */
@@ -218,21 +272,20 @@ code {
     float: left;
     color: white;
     font-size: 2.6em;
-    font-weight: bold;
+    font-weight: 300;
     margin: 35px 0 0 20px;
 }
 
 #header ol {
     list-style-type: none;
-    float:right;
+    float: right;
     margin-top: 80px;
 }
 
 #header ol li {
     display: inline-block;
     margin: 0 10px;
-    font-weight: bold;
-
+    font-weight: 400;
 }
 
 #header ol li a, nav ol li a:visited {
@@ -271,6 +324,14 @@ li {
     padding: 4px 0;
     margin: 4px 0;
     font-size: 0.9em;
+}
+
+
+/* Hide top menu SMALL SCREEN */
+@media only screen and (max-width: 780px) {
+    #header ol {
+        display: none;
+    }
 }
 
 /* Subscribe box SMALL SCREEN */

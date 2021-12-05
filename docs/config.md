@@ -21,7 +21,7 @@ If desired, ntfy can temporarily keep notifications in an in-memory or an on-dis
 of time is important to allow [phones](subscribe/phone.md) and other devices with brittle Internet connections to be able to retrieve
 notifications that they may have missed. 
 
-By default, ntfy keeps messages in memory for 12 hours, which means that **cached messages do not survive an application
+By default, ntfy keeps messages **in-memory for 12 hours**, which means that **cached messages do not survive an application
 restart**. You can override this behavior using the following config settings:
 
 * `cache-file`: if set, ntfy will store messages in a SQLite based cache (default is empty, which means in-memory cache).
@@ -29,7 +29,7 @@ restart**. You can override this behavior using the following config settings:
 * `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`)
 
 Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#polling), as well as the
-[`since=` parameter](subscribe/api.md#since).
+[`since=` parameter](subscribe/api.md#fetching-cached-messages).
 
 ## Behind a proxy (TLS, etc.)
 
@@ -42,27 +42,27 @@ flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X
 identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
-**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` config option. However, if you are behind a proxy, it is
-recommended that TLS/SSL termination is done by the proxy itself.
+**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
+are behind a proxy, it is recommended that TLS/SSL termination is done by the proxy itself.
 
 ## Firebase (FCM)
 !!! info
-    Using Firebase is **optional** and only works if you modify and build your own Android .apk.
+    Using Firebase is **optional** and only works if you modify and [build your own Android .apk](develop.md#android-app).
     For a self-hosted instance, it's easier to just not bother with FCM.
 
 [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) is the Google approved way to send
 push messages to Android devices. FCM is the only method that an Android app can receive messages without having to run a
 [foreground service](https://developer.android.com/guide/components/foreground-services).
 
-For the main host [ntfy.sh](https://ntfy.sh), the [ntfy Android App](subscribe/phone.md) uses Firebase to send messages
+For the main host [ntfy.sh](https://ntfy.sh), the [ntfy Android app](subscribe/phone.md) uses Firebase to send messages
 to the device. For other hosts, instant delivery is used and FCM is not involved.
 
 To configure FCM for your self-hosted instance of the ntfy server, follow these steps:
 
 1. Sign up for a [Firebase account](https://console.firebase.google.com/)
-2. Create an app and download the key file (e.g. `myapp-firebase-adminsdk-ahnce-....json`)
+2. Create a Firebase app and download the key file (e.g. `myapp-firebase-adminsdk-...json`)
 3. Place the key file in `/etc/ntfy`, set the `firebase-key-file` in `config.yml` accordingly and restart the ntfy server
-4. Build your own Android .apk following [these instructions]()
+4. Build your own Android .apk following [these instructions](develop.md#android-app)
 
 Example:
 ```
@@ -100,7 +100,7 @@ During normal usage, you shouldn't encounter this limit at all, and even if you 
 reconnect after a connection drop), it shouldn't have any effect.
 
 ## Config options
-Each config options can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a
+Each config option can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a
 CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
 variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
@@ -110,8 +110,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
 | `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
 | `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
-| `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. |
-| `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. |
+| `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm). |
+| `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
 | `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. |
 | `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |

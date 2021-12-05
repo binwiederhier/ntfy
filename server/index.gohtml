@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>ntfy.sh | PUT/POST push notifications to your phone</title>
+    <title>ntfy.sh | Send push notifications to your phone via PUT/POST</title>
     <link rel="stylesheet" href="static/css/app.css" type="text/css">
 
     <!-- Mobile view -->
@@ -24,7 +24,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="ntfy.sh" />
-    <meta property="og:title" content="ntfy.sh | send push notifications to your phone or desktop via PUT/POST" />
+    <meta property="og:title" content="ntfy.sh | Send push notifications to your phone or desktop via PUT/POST" />
     <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
     <meta property="og:image" content="/static/img/ntfy.png" />
     <meta property="og:url" content="https://ntfy.sh" />
@@ -38,12 +38,13 @@
 <nav id="header">
     <div id="headerBox">
         <img id="logo" src="static/img/ntfy.png" alt="logo"/>
-        <div id="name">ntfy.sh</div>
+        <div id="name">ntfy</div>
         <ol>
             <li><a href="docs/">Getting started</a></li>
             <li><a href="docs/subscribe/phone/">Android/iOS</a></li>
             <li><a href="docs/publish/">API</a></li>
             <li><a href="docs/install/">Self-hosting</a></li>
+            <li><a href="https://github.com/binwiederhier/ntfy">GitHub</a></li>
         </ol>
     </div>
 </nav>
@@ -63,14 +64,10 @@
             <a href="static/img/screenshot-phone-notification.jpg"><img src="static/img/screenshot-phone-notification.jpg"/></a>
         </span>
     </div>
-    <p>
-        There are many ways to use it: Notify yourself when a build finishes, when an rsync is done or a backup fails,
-        or know when somebody logs into your server. There are <a href="#examples">many more examples</a>, endless possibilities 😀.
-    </p>
 
     <h2 id="publish" class="anchor">Publishing messages</h2>
     <p>
-        Publishing messages can be done via PUT or POST. Topics are created on the fly by subscribing or publishing to them.
+        <a href="docs/publish/">Publishing messages</a> can be done via PUT or POST. Topics are created on the fly by subscribing or publishing to them.
         Because there is no sign-up, <b>the topic is essentially a password</b>, so pick something that's not easily guessable.
     </p>
     <p class="smallMarginBottom">
@@ -81,8 +78,8 @@
     </code>
     <p class="smallMarginBottom">
         There are <a href="docs/publish/">more features</a> related to publishing messages: You can set a
-        <a href="#docs/publish/#message-priority">notification priority</a>, a <a href="docs/publish/#message-title">title</a>,
-        and <a href="docs/publish/#tags--emojis--">tag messages</a>.
+        <a href="docs/publish/#message-priority">notification priority</a>, a <a href="docs/publish/#message-title">title</a>,
+        and <a href="docs/publish/#tags-emojis">tag messages</a>.
         Here's an example using all of them:
     </p>
     <code>
@@ -93,6 +90,13 @@
         &nbsp;&nbsp;-d "Remote access to $(hostname) detected. Act right away." \<br/>
         &nbsp;&nbsp;<span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
+    <p>
+        Here's what that looks like in the <a href="docs/subscribe/phone/">Android app</a>:
+    </p>
+    <figure>
+        <img src="static/img/priority-notification.png" style="max-height: 200px"/>
+        <figcaption>Urgent notification with pop-over</figcaption>
+    </figure>
 
     <h2 id="subscribe" class="anchor">Subscribe to a topic</h2>
     <p>
@@ -110,9 +114,11 @@
         <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="static/img/badge-fdroid.png"></a>
         <a href="https://github.com/binwiederhier/ntfy/issues/4"><img src="static/img/badge-appstore.png"></a>
     </p>
-
+    <p>
+        Here's a video showing the app in action:
+    </p>
     <figure>
-        <video controls muted autoplay loop width="650" src="static/img/android-video-overview.mp4"></video>
+        <video controls muted autoplay loop src="static/img/android-video-overview.mp4" style="max-width: 650px"></video>
         <figcaption>Sending push notifications to your Android phone</figcaption>
     </figure>
 
@@ -143,7 +149,7 @@
         as well as a <a href="docs/subscribe/api/#subscribe-as-raw-stream">plain text stream</a>.
     </p>
     <p class="smallMarginBottom">
-        Here's an example for JSON. Note that <b>the connection stays open</b>, so you can retrieve messages as they come in:
+        Here's an example for JSON. The <b>connection stays open</b>, so you can retrieve messages as they come in:
     </p>
     <code>
         $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/json<br/>
@@ -152,24 +158,30 @@
         {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}<br/>
         ...
     </code>
-
     <p>
-        <script id="asciicast-453771" src="https://asciinema.org/a/453771.js" async></script>
+        Here's a short video demonstrating it in action:
     </p>
+    <figure>
+        <video controls muted autoplay loop src="static/img/android-video-subscribe-api.mp4" style="max-width: 650px"></video>
+        <figcaption>Subscribing to the JSON stream with <tt>curl</tt></figcaption>
+    </figure>
 
-    <h3 id="more" class="anchor">More, more, more!</h3>
+    <h3 id="docs" class="anchor">Check out the docs!</h3>
     <p>
-        ntfy has so <a href="docs/">many more features</a> and you can learn about all of them <a href="docs/">in the documentation</a>
+        ntfy has so many more features and you can learn about all of them <a href="docs/">in the documentation</a>
         (I tried my very best to make it the best docs ever 😉, not sure if I succeeded, hehe).
     </p>
+    <figure>
+        <a href="docs/"><img width="100%" src="static/img/screenshot-docs.png"/></a>
+        <figcaption>Check out the documentation</figcaption>
+    </figure>
 
-    <a href="docs/"><img width="100%" src="static/img/screenshot-docs.png"/></a>
-
-    <h3 id="free-software" class="anchor">Forever free, forever 100% free software</h3>
+    <h3 id="free-software" class="anchor">100% open source &amp; forever free</h3>
     <p>
         I love free software, and I'm doing this because it's fun. I have no bad intentions, and I will
-        never monetize or sell your information. This service will always stay free and open. You can
-        read more in the <a href="docs/faq/">FAQs</a> and in the <a href="docs/privacy/">privacy policy</a>.
+        never monetize or sell your information. This service will always stay
+        <a href="https://github.com/binwiederhier/ntfy">free and open</a>.
+        You can read more in the <a href="docs/faq/">FAQs</a> and in the <a href="docs/privacy/">privacy policy</a>.
     </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>

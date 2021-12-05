@@ -22,23 +22,24 @@ client network disruptions.
 
 ## Can I self-host it?
 Yes. The server (including this Web UI) can be self-hosted, and the Android app supports adding topics from
-your own server as well. There are <a href="https://github.com/binwiederhier/ntfy#installation">install instructions</a>
-on GitHub.
+your own server as well. Check out the [install instructions](install.md).
 
 ## Why is Firebase used?
 In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
 published to Firebase Cloud Messaging (FCM) (if `FirebaseKeyFile` is set, which it is on ntfy.sh). This
-is to facilitate instant notifications on Android.
-    </p>
+is to facilitate notifications on Android. 
+
+If you do not care for Firebase, I suggest you install the [F-Droid version](https://f-droid.org/en/packages/io.heckel.ntfy/)
+of the app and [self-host your own ntfy server](install.md).
 
 ## How much battery does the Android app use?
-If you use the ntfy.sh server and you don't use the <i>instant delivery</i> feature, the Android app uses no
-additional battery, since Firebase Cloud Messaging (FCM) is used. If you use your own server, or you use
-<i>instant delivery</i>, the app has to maintain a constant connection to the server, which consumes about 4% of
-battery in 17h of use (on my phone). I use it and it makes no difference to me.
+If you use the ntfy.sh server and you don't use the [instant delivery](subscribe/phone.md#instant-delivery) feature, 
+the Android app uses no additional battery, since Firebase Cloud Messaging (FCM) is used. If you use your own server, 
+or you use *instant delivery*, the app has to maintain a constant connection to the server, which consumes about 4% of
+battery in 17h of use (on my phone). I use it, and it makes no difference to me.
 
 ## What is instant delivery?
-Instant delivery is a feature in the Android app. If turned on, the app maintains a constant connection to the
+[Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the
 server and listens for incoming notifications. This consumes <a href="#battery-usage">additional battery</a>,
 but delivers notifications instantly.
 

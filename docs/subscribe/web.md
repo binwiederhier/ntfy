@@ -11,4 +11,10 @@ To learn how to send messages, check out the [publishing page](../publish.md).
     <a href="../../static/img/web-detail.png"><img src="../../static/img/web-detail.png"/></a> 
 </div>
 
+To keep receiving desktop notifications from ntfy, you need to keep the website open. What I do, and what I highly recommend,
+is to pin the tab so that it's always open, but sort of out of the way:
 
+<figure markdown>
+  ![pinned](../static/img/web-pin.png){ width=500 }
+  <figcaption>Pin web app to move it out of the way</figcaption>
+</figure>

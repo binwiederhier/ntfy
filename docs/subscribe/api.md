@@ -168,12 +168,12 @@ format of the message. It's very straight forward:
 | Field | Required | Type | Example | Description |
 |---|---|---|---|---|
 | `id` | ✔️ | *string* | `hwQ2YpKdmg` | Randomly chosen message identifier |
-| `time` | ✔️ | *int* | 1635528741 | Message date time, as Unix time stamp |  
+| `time` | ✔️ | *int* | `1635528741` | Message date time, as Unix time stamp |  
 | `event` | ✔️ | `open`, `keepalive` or `message` | `message` | Message type, typically you'd be only interested in `message` |
 | `topic` | ✔️ | *string* | `topic1,topic2` | Comma-separated list of topics the message is associated with; only one for all `message` events, but may be a list in `open` events |
 | `message` | - | *string* | `Some message` | Message body; always present in `message` events |
 | `title` | - | *string* | `Some title` | Message [title](../publish.md#message-title); if not set defaults to `ntfy.sh/<topic>` |
-| `tags` | - | *string array* | `["tag1","tag2"]` | List of [tags](../publish.md#tags--emojis--) that may or not map to emojis |
+| `tags` | - | *string array* | `["tag1","tag2"]` | List of [tags](../publish.md#tags-emojis) that may or not map to emojis |
 | `priority` | - | *1, 2, 3, 4, or 5* | `4` | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
 
 Here's an example for each message type:

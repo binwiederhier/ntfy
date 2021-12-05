@@ -36,6 +36,11 @@ theme:
     - navigation.instant
     - toc.integrate
     - content.tabs.link
+extra:
+  homepage: /
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/binwiederhier
 extra_javascript:
   - static/js/extra.js
 extra_css:
@@ -63,25 +68,22 @@ markdown_extensions:
 plugins:
   - search
 
-extra:
-  social:
-    - icon: fontawesome/brands/github-alt
-      link: https://github.com/binwiederhier
-
 nav:
 - "Getting started": index.md
-- "Installation": install.md
-- "Configuration": config.md
 - "Publishing":
   - "Sending messages": publish.md
 - "Subscribing":
-    - "From your phone": subscribe/phone.md
-    - "From the Web UI": subscribe/web.md
-    - "Using the API": subscribe/api.md
+  - "From your phone": subscribe/phone.md
+  - "From the Web UI": subscribe/web.md
+  - "Using the API": subscribe/api.md
+- "Self-hosting":
+  - "Installation": install.md
+  - "Configuration": config.md
 - "Other things":
+  - "FAQs": faq.md
   - "Examples": examples.md
   - "Emojis 🥳 🎉": emojis.md
   - "Development": develop.md
-  - "FAQs": faq.md
+  - "Privacy policy": privacy.md
 
 

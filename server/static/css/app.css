@@ -24,8 +24,8 @@ a:hover {
 }
 
 h1 {
-    margin-top: 25px;
-    margin-bottom: 18px;
+    margin-top: 35px;
+    margin-bottom: 30px;
     font-size: 2.5em;
     word-wrap: break-word; /* For very long topics */
     padding-right: 40px; /* For the X on the detail page */
@@ -209,8 +209,39 @@ code {
     padding: 0 10px;
 }
 
-#header img {
+#header #logo {
     margin-top: 23px;
+    float: left;
+}
+
+#header #name {
+    float: left;
+    color: white;
+    font-size: 2.6em;
+    font-weight: bold;
+    margin: 35px 0 0 20px;
+}
+
+#header ol {
+    list-style-type: none;
+    float:right;
+    margin-top: 80px;
+}
+
+#header ol li {
+    display: inline-block;
+    margin: 0 10px;
+    font-weight: bold;
+
+}
+
+#header ol li a, nav ol li a:visited {
+    color: white;
+    text-decoration: none;
+}
+
+#header ol li a:hover {
+    text-decoration: underline;
 }
 
 /* Subscribe box */

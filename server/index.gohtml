@@ -34,9 +34,21 @@
 {{end}}
 </head>
 <body>
-<div id="header"><div id="headerBox"><img src="static/img/ntfy.png" alt="ntfy"/></div></div>
+
+<nav id="header">
+    <div id="headerBox">
+        <img id="logo" src="static/img/ntfy.png" alt="logo"/>
+        <div id="name">ntfy.sh</div>
+        <ol>
+            <li><a href="docs/">Getting started</a></li>
+            <li><a href="docs/subscribe/phone/">Android/iOS</a></li>
+            <li><a href="docs/publish/">API</a></li>
+            <li><a href="docs/install/">Self-hosting</a></li>
+        </ol>
+    </div>
+</nav>
 <div id="main"{{if .Topic}} style="display: none"{{end}}>
-    <h1>ntfy.sh | PUT/POST push notifications to your phone</h1>
+    <h1>Send push notifications to your phone or desktop via PUT/POST</h1>
     <p>
         <b>ntfy</b> (pronounce: <i>notify</i>) is a simple HTTP-based <a href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">pub-sub</a> notification service.
         It allows you to send notifications to your phone or desktop via scripts from any computer,
@@ -83,8 +95,8 @@
 
     <h2 id="subscribe" class="anchor">Subscribe to a topic</h2>
     <p>
-        You can create and subscribe to a topic either in this web UI, or in your own app by subscribing to an
-        <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a>, a JSON feed, or raw feed.
+        You can create and subscribe to a topic either <a href="docs/subscribe/phone/">using your phone</a>,
+        in <a href="docs/subscribe/web/">this web UI</a>, or in your own app by <a href="docs/subscribe/api/">subscribing via the API</a>.
     </p>
 
     <div id="subscribeBox">
@@ -159,18 +171,6 @@
         This is a notification<br/>
         And another one with a smiley face 😀
     </code>
-
-    <h2 id="privacy" class="anchor">Privacy policy</h2>
-    <p>
-        Neither the server nor the app record any personal information, or share any of the messages and topics with
-        any outside service. All data is exclusively used to make the service function properly. The one exception
-        is the Firebase Cloud Messaging (FCM) service, which is required to provide instant Android notifications (see
-        FAQ for details).
-    </p>
-    <p>
-        The web server does not log or otherwise store request paths, remote IP addresses or even topics or messages,
-        aside from a short on-disk cache (for {{.CacheDuration}}) to support service restarts.
-    </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>
 </div>

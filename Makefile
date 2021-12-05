@@ -123,7 +123,7 @@ release-check-tags:
 	 	exit 1;\
 	fi
 
-release: build-deps release-check-tags
+release: build-deps
 	goreleaser release --rm-dist --debug
 
 release-snapshot: build-deps

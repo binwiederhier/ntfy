@@ -3,9 +3,12 @@ You can use the Web UI to subscribe to topics as well. If you do, and you keep t
 pop up as desktop notifications**. Simply type in the topic name and click the *Subscribe* button. The browser will 
 keep a connection open and listen for incoming notifications.
 
-<figure markdown>
-  ![web subscribe](../static/img/screenshot-web.png){ width=300 }
-  <figcaption>Subscribe via Web UI</figcaption>
-</figure>
+To learn how to send messages, check out the [publishing page](../publish.md).
 
-Once subscribed, you can [publish messages](../publish.md) via `curl` or from without any of your scripts.
+<div id="web-screenshots" class="screenshots">
+    <a href="../../static/img/web-subscribe.png"><img src="../../static/img/web-subscribe.png"/></a>
+    <a href="../../static/img/web-notification.png"><img src="../../static/img/web-notification.png"/></a>
+    <a href="../../static/img/web-detail.png"><img src="../../static/img/web-detail.png"/></a> 
+</div>
+
+

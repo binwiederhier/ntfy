@@ -4,12 +4,51 @@ notifications directly on your phone. Just like the server, this app is also [op
 Since I don't have an iPhone or a Mac, I didn't make an iOS app yet. I'd be awesome if [someone else could help out](https://github.com/binwiederhier/ntfy/issues/4).
 
 ## Android
+<a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="../../static/img/badge-googleplay.png"></a>
+<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="../../static/img/badge-fdroid.png"></a>
+
 You can get the Android app from both [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) and 
 from [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/). Both are largely identical, with the one exception that
 the F-Droid flavor does not use Firebase.
 
-<a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="../../static/img/badge-googleplay.png"></a>
-<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="../../static/img/badge-fdroid.png"></a>
+### Overview
+A picture is worth a thousand words. Here are a few screenshots showing what the app looks like. It's all pretty
+straight forward. You can add topics and as soon as you add them, you can [publish messages](../publish.md) to them.
+
+<div id="android-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-main.jpg"><img src="../../static/img/android-screenshot-main.jpg"/></a>
+    <a href="../../static/img/android-screenshot-detail.jpg"><img src="../../static/img/android-screenshot-detail.jpg"/></a>
+    <a href="../../static/img/android-screenshot-add.jpg"><img src="../../static/img/android-screenshot-add.jpg"/></a>
+    <a href="../../static/img/android-screenshot-add-instant.jpg"><img src="../../static/img/android-screenshot-add-instant.jpg"/></a>
+    <a href="../../static/img/android-screenshot-add-other.jpg"><img src="../../static/img/android-screenshot-add-other.jpg"/></a>
+</div>
+
+If those screenshots are still not enough, here's a video:
+
+<figure>
+  <video controls muted autoplay loop width="650" src="../../static/img/overview.mp4"></video>
+  <figcaption>Sending push notifications to your Android phone</figcaption>
+</figure>
+
+### Message priority
+When you [publish messages](../publish.md#message-priority) to a topic, you can define a priority. This priority defines
+how urgently Android will notify you about the notification, and whether they make a sound and/or vibrate.
+
+By default, messages with default priority or higher (>= 3) will vibrate and make a sound. Messages with high or urgent
+priority (>= 4) will also show as pop-over, like so:
+
+<figure markdown>
+  ![priority notification](../static/img/priority-notification.png){ width=500 }
+  <figcaption>High and urgent notifications show as pop-over</figcaption>
+</figure>
+
+You can change these settings in Android by long-pressing on the app, and tapping "Notifications". You can then configure
+the settings (and custom sounds or vibration) for each of the priorities:
+
+<figure markdown>
+  ![notification settings](../static/img/android-notification-settings.png){ width=500 }
+  <figcaption>Per-priority sound/vibration settings</figcaption>
+</figure>
 
 ### Instant delivery
 Instant delivery is allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e. 

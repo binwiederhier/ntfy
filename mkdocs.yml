@@ -33,7 +33,7 @@ theme:
     - search.highlight
     - search.share
     - navigation.sections
-    - navigation.instant
+    # - navigation.instant
     - toc.integrate
     - content.tabs.link
 extra:
@@ -67,6 +67,8 @@ markdown_extensions:
 
 plugins:
   - search
+  - minify:
+      minify_html: true
 
 nav:
 - "Getting started": index.md

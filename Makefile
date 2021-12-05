@@ -116,7 +116,14 @@ clean: .PHONY
 
 # Releasing targets
 
-release: build-deps
+release-check-tags:
+	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))
+	if grep -q $(LATEST_TAG) docs/install.md; then\
+	 	echo "ERROR: Must update docs/install.md with latest tag first.";\
+	 	exit 1;\
+	fi
+
+release: build-deps release-check-tags
 	goreleaser release --rm-dist --debug
 
 release-snapshot: build-deps

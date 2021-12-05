@@ -1,6 +1,6 @@
 # Privacy policy
 
-I love free software and I'm doing this because it's fun and to give back. I have no bad intentions and I will
+I love free software, and I'm doing this because it's fun. I have no bad intentions, and I will
 never monetize or sell your information. This service will always stay free and open.
 
 Neither the server nor the app record any personal information, or share any of the messages and topics with

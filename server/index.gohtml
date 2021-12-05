@@ -80,8 +80,9 @@
         curl -d "Backup successful 😀" <span class="ntfyUrl">ntfy.sh</span>/mytopic
     </code>
     <p class="smallMarginBottom">
-        There are <a href="#other-features">more features</a> related to publishing messages: You can set a
-        <a href="#priority">notification priority</a>, a <a href="#title">title</a>, and <a href="#tags">tag messages</a>.
+        There are <a href="docs/publish/">more features</a> related to publishing messages: You can set a
+        <a href="#docs/publish/#message-priority">notification priority</a>, a <a href="docs/publish/#message-title">title</a>,
+        and <a href="docs/publish/#tags--emojis--">tag messages</a>.
         Here's an example using all of them:
     </p>
     <code>
@@ -98,6 +99,22 @@
         You can create and subscribe to a topic either <a href="docs/subscribe/phone/">using your phone</a>,
         in <a href="docs/subscribe/web/">this web UI</a>, or in your own app by <a href="docs/subscribe/api/">subscribing via the API</a>.
     </p>
+
+    <h3 id="subscribe-phone" class="anchor">Subscribe from your phone</h3>
+    <p>
+        Simply get the app and start <a href="docs/publish/">publishing messages</a>. To learn more about the app,
+        <a href="docs/subscribe/phone/">check out the documentation</a>.
+    </p>
+    <p>
+        <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="static/img/badge-googleplay.png"></a>
+        <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="static/img/badge-fdroid.png"></a>
+        <a href="https://github.com/binwiederhier/ntfy/issues/4"><img src="static/img/badge-appstore.png"></a>
+    </p>
+
+    <figure>
+        <video controls muted autoplay loop width="650" src="static/img/android-video-overview.mp4"></video>
+        <figcaption>Sending push notifications to your Android phone</figcaption>
+    </figure>
 
     <div id="subscribeBox">
         <h3 id="subscribe-web" class="anchor">Subscribe in this Web UI</h3>
@@ -118,59 +135,42 @@
         <audio id="notifySound" src="static/sound/mixkit-message-pop-alert-2354.mp3"></audio>
     </div>
 
-    <h3 id="subscribe-phone" class="anchor">Subscribe from your phone</h3>
+    <h3 id="subscribe-api" class="anchor">Subscribe using the API</h3>
     <p>
-        You can use the <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy">Ntfy Android App</a>
-        to receive notifications directly on your phone. Just like the server, this app is also <a href="https://github.com/binwiederhier/ntfy-android">open source</a>.
-        Since I don't have an iPhone or a Mac, I didn't make an iOS app yet. I'd be awesome if <a href="https://github.com/binwiederhier/ntfy/issues/4">someone else could help out</a>.
+        There's a super simple API that you can use to integrate your own app. You can consume
+        a <a href="docs/subscribe/api/#subscribe-as-json-stream">JSON stream</a>,
+        an <a href="docs/subscribe/api/#subscribe-as-sse-stream">SSE/EventSource stream</a> (useful for web apps),
+        as well as a <a href="docs/subscribe/api/#subscribe-as-raw-stream">plain text stream</a>.
     </p>
-    <p>
-        <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="static/img/badge-googleplay.png"></a>
-        <a href="https://github.com/binwiederhier/ntfy/issues/4"><img src="static/img/badge-appstore.png"></a>
-    </p>
-
-    <h3 id="subscribe-api" class="anchor">Subscribe via your app, or via the CLI</h3>
     <p class="smallMarginBottom">
-        Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventSource">EventSource</a> in JS, you can consume
-        notifications like this (see <a href="example.html">live example</a>):
-    </p>
-    <code>
-        const eventSource = new EventSource('<span class="ntfyProtocol">https://</span><span class="ntfyUrl">ntfy.sh</span>/mytopic/sse');<br/>
-        eventSource.onmessage = (e) => {<br/>
-        &nbsp;&nbsp;// Do something with e.data<br/>
-        };
-    </code>
-    <p class="smallMarginBottom">
-        You can also use the same <tt>/sse</tt> endpoint via <tt>curl</tt> or any other HTTP library:
-    </p>
-    <code>
-        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/sse<br/>
-        event: open<br/>
-        data: {"id":"weSj9RtNkj","time":1635528898,"event":"open","topic":"mytopic"}<br/><br/>
-
-        data: {"id":"p0M5y6gcCY","time":1635528909,"event":"message","topic":"mytopic","message":"Hi!"}<br/><br/>
-
-        event: keepalive<br/>
-        data: {"id":"VNxNIg5fpt","time":1635528928,"event":"keepalive","topic":"test"}
-    </code>
-    <p class="smallMarginBottom">
-        To consume JSON instead, use the <tt>/json</tt> endpoint, which prints one message per line:
+        Here's an example for JSON. Note that <b>the connection stays open</b>, so you can retrieve messages as they come in:
     </p>
     <code>
         $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/json<br/>
         {"id":"SLiKI64DOt","time":1635528757,"event":"open","topic":"mytopic"}<br/>
         {"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Hi!"}<br/>
-        {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}
+        {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}<br/>
+        ...
     </code>
-    <p class="smallMarginBottom">
-        Or use the <tt>/raw</tt> endpoint if you need something super simple (empty lines are keepalive messages):
+
+    <p>
+        <script id="asciicast-453771" src="https://asciinema.org/a/453771.js" async></script>
     </p>
-    <code>
-        $ curl -s <span class="ntfyUrl">ntfy.sh</span>/mytopic/raw<br/>
-        <br/>
-        This is a notification<br/>
-        And another one with a smiley face 😀
-    </code>
+
+    <h3 id="more" class="anchor">More, more, more!</h3>
+    <p>
+        ntfy has so <a href="docs/">many more features</a> and you can learn about all of them <a href="docs/">in the documentation</a>
+        (I tried my very best to make it the best docs ever 😉, not sure if I succeeded, hehe).
+    </p>
+
+    <a href="docs/"><img width="100%" src="static/img/screenshot-docs.png"/></a>
+
+    <h3 id="free-software" class="anchor">Forever free, forever 100% free software</h3>
+    <p>
+        I love free software, and I'm doing this because it's fun. I have no bad intentions, and I will
+        never monetize or sell your information. This service will always stay free and open. You can
+        read more in the <a href="docs/faq/">FAQs</a> and in the <a href="docs/privacy/">privacy policy</a>.
+    </p>
 
     <center id="ironicCenterTagDontFreakOut"><i>Made with ❤️ by <a href="https://heckel.io">Philipp C. Heckel</a></i></center>
 </div>

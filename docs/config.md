@@ -34,16 +34,124 @@ Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscri
 ## Behind a proxy (TLS, etc.)
 
 !!! warning
-    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise all visitors are rate limited
-    as if they are one.
+    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are 
+    [rate limited](#rate-limiting) as if they are one.
 
-**Rate limiting:** If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
+### Rate limiting
+If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
 flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
 identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
-**TLS/SSL:** ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
-are behind a proxy, it is recommended that TLS/SSL termination is done by the proxy itself.
+### TLS/SSL
+ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
+are behind a proxy, it is recommended that TLS/SSL termination is done by the proxy itself (see below).
+
+### nginx/Apache2 configs
+For your convenience, here's a working config that'll help configure things behind a proxy. In this 
+example, ntfy runs on `:13222` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
+or the root domain:
+
+=== "nginx (/etc/nginx/sites-*/ntfy)"
+    ```
+    server {
+      listen 80;
+      server_name ntfy.sh;
+    
+      location / {
+        proxy_pass http://127.0.0.1:13222;
+        proxy_http_version 1.1;
+    
+        proxy_buffering off;
+        proxy_redirect off;
+     
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    
+        proxy_connect_timeout 1m;
+        proxy_send_timeout 1m;
+        proxy_read_timeout 1m;
+      }
+    }
+    
+    server {
+      listen 443 ssl;
+      server_name ntfy.sh;
+    
+      ssl_session_cache builtin:1000 shared:SSL:10m;
+      ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
+      ssl_prefer_server_ciphers on;
+    
+      ssl_certificate /etc/letsencrypt/live/nopaste.net/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/nopaste.net/privkey.pem;
+    
+      location / {
+        proxy_pass http://127.0.0.1:13222;
+        proxy_http_version 1.1;
+    
+        proxy_buffering off;
+        proxy_redirect off;
+     
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    
+        proxy_connect_timeout 1m;
+        proxy_send_timeout 1m;
+        proxy_read_timeout 1m;
+      }
+    }
+    ```
+
+=== "Apache2 (/etc/apache2/sites-*/ntfy.conf"
+    ```
+    <VirtualHost *:80>
+        ServerName ntfy.sh
+        
+        SetEnv proxy-nokeepalive 1
+        SetEnv proxy-sendchunked 1
+        
+        ProxyPass / http://127.0.0.1:13222/
+        ProxyPassReverse / http://127.0.0.1:13222/
+        
+        # Higher than the max message size of 512k 
+        LimitRequestBody 102400
+        
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+        # it to work with curl without the annoying https:// prefix 
+        RewriteEngine on
+        RewriteCond %{REQUEST_METHOD} GET
+        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+    </VirtualHost>
+    
+    <VirtualHost *:443>
+        ServerName ntfy.sh
+        
+        SSLEngine on
+        SSLCertificateFile /etc/letsencrypt/live/ntfy.sh/fullchain.pem
+        SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
+        Include /etc/letsencrypt/options-ssl-apache.conf
+        
+        SetEnv proxy-nokeepalive 1
+        SetEnv proxy-sendchunked 1
+        
+        ProxyPass / http://127.0.0.1:13222/
+        ProxyPassReverse / http://127.0.0.1:13222/
+        
+        # Higher than the max message size of 512k 
+        LimitRequestBody 102400
+        
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+        # it to work with curl without the annoying https:// prefix 
+        RewriteEngine on
+        RewriteCond %{REQUEST_METHOD} GET
+        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+    </VirtualHost>
+    ```
 
 ## Firebase (FCM)
 !!! info
@@ -98,6 +206,61 @@ request every 10s (defined by `visitor-request-limit-replenish`)
 
 During normal usage, you shouldn't encounter this limit at all, and even if you burst a few requests shortly (e.g. when you 
 reconnect after a connection drop), it shouldn't have any effect.
+
+
+## Tuning for scale
+If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,
+if it's not behind a proxy, the ntfy server can keep about **as many connections as the open file limit allows**.
+This limit is typically called `nofile`. Other than that, RAM and CPU are obviously relevant. You may also want to check
+out [this discussion on Reddit](https://www.reddit.com/r/golang/comments/r9u4ee/how_many_actively_connected_http_clients_can_a_go/).
+
+Depending on *how you run it*, here are a few limits that are relevant:
+
+### For systemd services
+If you're running ntfy in a systemd service (e.g. for .deb/.rpm packages), the main limiting factor is the
+`LimitNOFILE` setting in the systemd unit. The default open files limit for `ntfy.service` is 10000. You can override it
+by creating a `/etc/systemd/system/ntfy.service.d/override.conf` file. As far as I can tell, `/etc/security/limits.conf`
+is not relevant.
+
+=== "/etc/systemd/system/ntfy.service.d/override.conf"
+    ```
+    # Allow 20,000 ntfy connections (and give room for other file handles)
+    [Service]
+    LimitNOFILE=20500
+    ```
+
+### Outside of systemd
+If you're running outside systemd, you may want to adjust your `/etc/security/limits.conf` file to
+increase the `nofile` setting. Here's an example that increases the limit to 5000. You can find out the current setting
+by running `ulimit -n`, or manually override it temporarily by running `ulimit -n 50000`.
+
+=== "/etc/security/limits.conf"
+    ```
+    # Increase open files limit globally
+    * hard nofile 20500
+    ```
+
+### Proxy limits (nginx, Apache2)
+If you are running [behind a proxy](#behind-a-proxy-tls-etc) (e.g. nginx, Apache), the open files limit of the proxy is also
+relevant. So if your proxy runs inside of systemd, increase the limits in systemd for the proxy. Typically, the proxy
+open files limit has to be **double the number of how many connections you'd like to support**, because the proxy has
+to maintain the client connection and the connection to ntfy.
+
+=== "/etc/nginx/nginx.conf"
+    ```
+    events {
+      # Allow 20,000 proxy connections (2x of the desired ntfy connection count;
+      # and give room for other file handles)
+      worker_connections 40500;
+    }
+    ```
+=== "/etc/systemd/system/nginx.service.d/override.conf"
+    ```
+    # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
+    # and give room for other file handles)
+    [Service]
+    LimitNOFILE=40500
+    ```
 
 ## Config options
 Each config option can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a

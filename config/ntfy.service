@@ -5,6 +5,7 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/ntfy
 Restart=on-failure
+LimitNOFILE=10000
 
 [Install]
 WantedBy=multi-user.target

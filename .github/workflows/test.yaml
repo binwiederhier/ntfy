@@ -12,8 +12,10 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y python3-pip
+      - name: x
+        run: pip3 list
       - name: Install mkdocs
-        run: sudo pip3 install mkdocs mkdocs-material mkdocs-minify-plugin
+        run: pip3 install mkdocs mkdocs-material mkdocs-minify-plugin
       - name: Build docs
         run: make docs
       - name: Run tests, formatting, vetting and linting

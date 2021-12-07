@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -12,7 +13,8 @@ const (
 )
 
 var (
-	random = rand.New(rand.NewSource(time.Now().UnixNano()))
+	random      = rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMutex = sync.Mutex{}
 )
 
 // FileExists checks if a file exists, and returns true if it does
@@ -23,6 +25,8 @@ func FileExists(filename string) bool {
 
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
+	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!
+	defer randomMutex.Unlock()
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = randomStringCharset[random.Intn(len(randomStringCharset))]

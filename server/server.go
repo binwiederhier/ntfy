@@ -386,8 +386,11 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	if err != nil {
 		return err
 	}
+	var wlock sync.Mutex
 	poll := r.URL.Query().Has("poll")
 	sub := func(msg *message) error {
+		wlock.Lock()
+		defer wlock.Unlock()
 		m, err := encoder(msg)
 		if err != nil {
 			return err

@@ -129,10 +129,8 @@ func request(t *testing.T, s *Server, method, url, body string, headers map[stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	if headers != nil {
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	s.handle(rr, req)
 	return rr

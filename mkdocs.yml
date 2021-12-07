@@ -17,13 +17,11 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"  # Light mode
       scheme: default
-      primary: teal
       toggle:
         icon: material/lightbulb-outline
         name: Switch to light mode
     - media: "(prefers-color-scheme: dark)"  # Dark mode
       scheme: slate
-      primary: teal
       accent: indigo
       toggle:
         icon: material/lightbulb

@@ -1,3 +1,9 @@
+:root {
+    --md-primary-fg-color:        #3a9784;
+    --md-primary-fg-color--light: #3a9784;
+    --md-primary-fg-color--dark:  #3a9784;
+}
+
 .md-header__button.md-logo :is(img, svg) {
     width: unset !important;
 }
@@ -6,9 +12,16 @@ article {
     padding-bottom: 50px;
 }
 
-figure iframe, figure img, figure video {
-    filter: drop-shadow(3px 3px 3px #ccc);
+figure img, figure video {
     border-radius: 7px;
+}
+
+body[data-md-color-scheme="default"] figure img, body[data-md-color-scheme="default"] figure video {
+    filter: drop-shadow(3px 3px 3px #ccc);
+}
+
+body[data-md-color-scheme="slate"] figure img, body[data-md-color-scheme="slate"] figure video {
+    filter: drop-shadow(3px 3px 3px #1a1313);
 }
 
 figure video {

@@ -1,0 +1,18 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.x'
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install test dependencies
+        run: sudo apt-get install netcat-openbsd
+      - name: Run tests, formatting, vetting and linting
+        run: make check
+      - name: Run and upload coverage to codecov.io
+        run: make coverage coverage-upload

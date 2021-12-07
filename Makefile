@@ -39,7 +39,10 @@ help:
 
 
 # Documentation
-docs: .PHONY
+docs-deps: .PHONY
+	pip3 install -r requirements.txt
+
+docs: docs-deps
 	mkdocs build
 
 # Test/check targets

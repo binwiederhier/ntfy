@@ -12,11 +12,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y python3-pip
-      - name: Install latest jinja2 version
-        run: pip3 install jinja2
-      - name: Install mkdocs
-        run: pip3 install mkdocs mkdocs-material mkdocs-minify-plugin
-      - name: Build docs
+      - name: Build docs (required for tests)
         run: make docs
       - name: Run tests, formatting, vetting and linting
         run: make check

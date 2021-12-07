@@ -306,17 +306,22 @@ func parseHeaders(header http.Header) (title string, priority int, tags []string
 			priority = 1
 		case "2", "low":
 			priority = 2
+		case "3", "default":
+			priority = 3
 		case "4", "high":
 			priority = 4
 		case "5", "max", "urgent":
 			priority = 5
 		default:
-			priority = 3
+			priority = 0
 		}
 	}
-	tagsStr := readHeader(header, "x-tags", "tags", "ta")
+	tagsStr := readHeader(header, "x-tags", "tag", "tags", "ta")
 	if tagsStr != "" {
-		tags = strings.Split(tagsStr, ",")
+		tags = make([]string, 0)
+		for _, s := range strings.Split(tagsStr, ",") {
+			tags = append(tags, strings.TrimSpace(s))
+		}
 	}
 	return title, priority, tags
 }
@@ -325,7 +330,7 @@ func readHeader(header http.Header, names ...string) string {
 	for _, name := range names {
 		value := header.Get(name)
 		if value != "" {
-			return value
+			return strings.TrimSpace(value)
 		}
 	}
 	return ""

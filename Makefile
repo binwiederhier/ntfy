@@ -72,7 +72,7 @@ coverage-upload:
 # Lint/formatting targets
 
 fmt:
-	$(GO) fmt ./...
+	gofmt -s -w .
 
 fmt-check:
 	test -z $(shell gofmt -l .)

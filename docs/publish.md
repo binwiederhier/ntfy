@@ -279,7 +279,7 @@ Here's an **excerpt of emojis** I've found very useful in alert messages:
 </td>
 </tr></table>
 
-You can set tags with the `X-Tags` header (or any of its aliases: `Tags`, or `ta`). Specify multiple tags by separating
+You can set tags with the `X-Tags` header (or any of its aliases: `Tags`, `tag`, or `ta`). Specify multiple tags by separating
 them with a comma, e.g. `tag1,tag2,tag3`.
 
 === "Command line (curl)"

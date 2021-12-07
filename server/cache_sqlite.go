@@ -81,11 +81,17 @@ func newSqliteCache(filename string) (*sqliteCache, error) {
 }
 
 func (c *sqliteCache) AddMessage(m *message) error {
+	if m.Event != messageEvent {
+		return errUnexpectedMessageType
+	}
 	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","))
 	return err
 }
 
 func (c *sqliteCache) Messages(topic string, since sinceTime) ([]*message, error) {
+	if since.IsNone() {
+		return make([]*message, 0), nil
+	}
 	rows, err := c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
 	if err != nil {
 		return nil, err
@@ -98,9 +104,6 @@ func (c *sqliteCache) Messages(topic string, since sinceTime) ([]*message, error
 		var id, msg, title, tagsStr string
 		if err := rows.Scan(&id, &timestamp, &msg, &title, &priority, &tagsStr); err != nil {
 			return nil, err
-		}
-		if msg == "" {
-			msg = " " // Hack: never return empty messages; this should not happen
 		}
 		var tags []string
 		if tagsStr != "" {
@@ -141,13 +144,13 @@ func (c *sqliteCache) MessageCount(topic string) (int, error) {
 	return count, nil
 }
 
-func (s *sqliteCache) Topics() (map[string]*topic, error) {
-	rows, err := s.db.Query(selectTopicsQuery)
+func (c *sqliteCache) Topics() (map[string]*topic, error) {
+	rows, err := c.db.Query(selectTopicsQuery)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	topics := make(map[string]*topic, 0)
+	topics := make(map[string]*topic)
 	for rows.Next() {
 		var id string
 		var last int64
@@ -162,8 +165,8 @@ func (s *sqliteCache) Topics() (map[string]*topic, error) {
 	return topics, nil
 }
 
-func (s *sqliteCache) Prune(keep time.Duration) error {
-	_, err := s.db.Exec(pruneMessagesQuery, time.Now().Add(-1*keep).Unix())
+func (c *sqliteCache) Prune(keep time.Duration) error {
+	_, err := c.db.Exec(pruneMessagesQuery, time.Now().Add(-1*keep).Unix())
 	return err
 }
 

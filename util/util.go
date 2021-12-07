@@ -15,6 +15,7 @@ var (
 	random = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
+// FileExists checks if a file exists, and returns true if it does
 func FileExists(filename string) bool {
 	stat, _ := os.Stat(filename)
 	return stat != nil

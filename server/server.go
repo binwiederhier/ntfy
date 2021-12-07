@@ -3,8 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
-	"embed"
-	_ "embed" // required for go:embed
+	"embed" // required for go:embed
 	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
@@ -27,7 +26,7 @@ import (
 // TODO add "max messages in a topic" limit
 // TODO implement "since=<ID>"
 
-// Server is the main server
+// Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config   *config.Config
 	topics   map[string]*topic
@@ -105,6 +104,8 @@ var (
 	errHTTPTooManyRequests = &errHTTP{http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)}
 )
 
+// New instantiates a new Server. It creates the cache and adds a Firebase
+// subscriber (if configured).
 func New(conf *config.Config) (*Server, error) {
 	var firebaseSubscriber subscriber
 	if conf.FirebaseKeyFile != "" {
@@ -170,6 +171,8 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 	}, nil
 }
 
+// Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
+// a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
 	go func() {
 		ticker := time.NewTicker(s.config.ManagerInterval)
@@ -241,11 +244,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-func (s *Server) handleEmpty(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (s *Server) handleExample(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {
 	_, err := io.WriteString(w, exampleSource)
 	return err
 }
@@ -260,7 +263,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	t, err := s.topicFromID(r.URL.Path[1:])
 	if err != nil {
 		return err
@@ -466,7 +469,7 @@ func parseSince(r *http.Request) (sinceTime, error) {
 	return sinceNoMessages, errHTTPBadRequest
 }
 
-func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
 	return nil
@@ -570,5 +573,5 @@ func (s *Server) visitor(r *http.Request) *visitor {
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, err error) {
 	log.Printf("[%s] %s - %d - %s", r.RemoteAddr, r.Method, code, err.Error())
 	w.WriteHeader(code)
-	io.WriteString(w, fmt.Sprintf("%s\n", http.StatusText(code)))
+	_, _ = io.WriteString(w, fmt.Sprintf("%s\n", http.StatusText(code)))
 }

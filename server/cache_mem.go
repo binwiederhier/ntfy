@@ -1,7 +1,6 @@
 package server
 
 import (
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"sync"
 	"time"
 )
@@ -22,6 +21,9 @@ func newMemCache() *memCache {
 func (s *memCache) AddMessage(m *message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if m.Event != messageEvent {
+		return errUnexpectedMessageType
+	}
 	if _, ok := s.messages[m.Topic]; !ok {
 		s.messages[m.Topic] = make([]*message, 0)
 	}
@@ -32,7 +34,7 @@ func (s *memCache) AddMessage(m *message) error {
 func (s *memCache) Messages(topic string, since sinceTime) ([]*message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.messages[topic]; !ok {
+	if _, ok := s.messages[topic]; !ok || since.IsNone() {
 		return make([]*message, 0), nil
 	}
 	messages := make([]*message, 0) // copy!
@@ -62,7 +64,7 @@ func (s *memCache) Topics() (map[string]*topic, error) {
 func (s *memCache) Prune(keep time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for topic, _ := range s.messages {
+	for topic := range s.messages {
 		s.pruneTopic(topic, keep)
 	}
 	return nil

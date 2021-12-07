@@ -83,7 +83,7 @@ var (
 	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
 
 	staticRegex = regexp.MustCompile(`^/static/.+`)
-	docsRegex = regexp.MustCompile(`^/docs(|/.*)$`)
+	docsRegex   = regexp.MustCompile(`^/docs(|/.*)$`)
 
 	//go:embed "index.gohtml"
 	indexSource   string
@@ -97,7 +97,7 @@ var (
 	webStaticFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webStaticFs}
 
 	//go:embed docs
-	docsStaticFs       embed.FS
+	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
 	errHTTPBadRequest      = &errHTTP{http.StatusBadRequest, http.StatusText(http.StatusBadRequest)}

@@ -27,9 +27,9 @@ const (
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
 	ListenHTTP                   string
-	ListenHTTPS                   string
-	KeyFile                   string
-	CertFile                   string
+	ListenHTTPS                  string
+	KeyFile                      string
+	CertFile                     string
 	FirebaseKeyFile              string
 	CacheFile                    string
 	CacheDuration                time.Duration
@@ -46,9 +46,9 @@ type Config struct {
 func New(listenHTTP string) *Config {
 	return &Config{
 		ListenHTTP:                   listenHTTP,
-		ListenHTTPS: "",
-		KeyFile: "",
-		CertFile: "",
+		ListenHTTPS:                  "",
+		KeyFile:                      "",
+		CertFile:                     "",
 		FirebaseKeyFile:              "",
 		CacheFile:                    "",
 		CacheDuration:                DefaultCacheDuration,

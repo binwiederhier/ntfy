@@ -86,7 +86,7 @@ lint:
 
 staticcheck: .PHONY
 	rm -rf build/staticcheck
-	which staticcheck || go get honnef.co/go/tools/cmd/staticcheck
+	which staticcheck || go install honnef.co/go/tools/cmd/staticcheck@latest
 	mkdir -p build/staticcheck
 	ln -s "$(GO)" build/staticcheck/go
 	PATH="$(PWD)/build/staticcheck:$(PATH)" staticcheck ./...

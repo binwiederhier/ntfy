@@ -32,16 +32,25 @@ Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscri
 [`since=` parameter](subscribe/api.md#fetching-cached-messages).
 
 ## Behind a proxy (TLS, etc.)
-
 !!! warning
-    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are 
+    If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are
     [rate limited](#rate-limiting) as if they are one.
+
+It may be desirable to run ntfy behind a proxy, e.g. so you can provide TLS certificates using Let's Encrypt using certbot,
+or simply because you'd like to share the ports (80/443) with other services. Whatever your reasons may be, there are a 
+few things to consider. 
 
 ### Rate limiting
 If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
 flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
 identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
+
+=== "/etc/ntfy/config.yml"
+    ```
+    # Tell ntfy to use "X-Forwarded-For" to identify visitors
+    behind-proxy: true
+    ```
 
 ### TLS/SSL
 ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
@@ -107,7 +116,7 @@ or the root domain:
     }
     ```
 
-=== "Apache2 (/etc/apache2/sites-*/ntfy.conf"
+=== "Apache2 (/etc/apache2/sites-*/ntfy.conf)"
     ```
     <VirtualHost *:80>
         ServerName ntfy.sh

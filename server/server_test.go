@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"heckel.io/ntfy/config"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestServer_PublishAndPoll(t *testing.T) {
@@ -29,25 +31,46 @@ func TestServer_PublishAndPoll(t *testing.T) {
 	response := request(t, s, "GET", "/mytopic/json?poll=1", "")
 	messages := toMessages(t, response.Body.String())
 	assert.Equal(t, 2, len(messages))
+	assert.Equal(t, "my first message", messages[0].Message)
+	assert.Equal(t, "my second message", messages[1].Message)
 }
 
-func TestServer_PublishAndSubscribe(t *testing.T) {
-	s := newTestServer(t, newTestConfig(t))
+func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
+	c := newTestConfig(t)
+	c.KeepaliveInterval = time.Second
+	s := newTestServer(t, c)
 
-	response1 := request(t, s, "PUT", "/mytopic", "my first message")
-	msg1 := toMessage(t, response1.Body.String())
-	assert.NotEmpty(t, msg1.ID)
-	assert.Equal(t, "my first message", msg1.Message)
+	rr := httptest.NewRecorder()
+	ctx, cancel := context.WithCancel(context.Background())
+	req, err := http.NewRequestWithContext(ctx, "GET", "/mytopic/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doneChan := make(chan bool)
+	go func() {
+		s.handle(rr, req)
+		doneChan <- true
+	}()
+	time.Sleep(1300 * time.Millisecond)
+	cancel()
+	<-doneChan
 
-	response2 := request(t, s, "PUT", "/mytopic", "my second message")
-	msg2 := toMessage(t, response2.Body.String())
-	assert.NotEqual(t, msg1.ID, msg2.ID)
-	assert.NotEmpty(t, msg2.ID)
-	assert.Equal(t, "my second message", msg2.Message)
-
-	response := request(t, s, "GET", "/mytopic/json?poll=1", "")
-	messages := toMessages(t, response.Body.String())
+	messages := toMessages(t, rr.Body.String())
 	assert.Equal(t, 2, len(messages))
+
+	assert.Equal(t, openEvent, messages[0].Event)
+	assert.Equal(t, "mytopic", messages[0].Topic)
+	assert.Equal(t, "", messages[0].Message)
+	assert.Equal(t, "", messages[0].Title)
+	assert.Equal(t, 0, messages[0].Priority)
+	assert.Nil(t, messages[0].Tags)
+
+	assert.Equal(t, keepaliveEvent, messages[1].Event)
+	assert.Equal(t, "mytopic", messages[1].Topic)
+	assert.Equal(t, "", messages[1].Message)
+	assert.Equal(t, "", messages[1].Title)
+	assert.Equal(t, 0, messages[1].Priority)
+	assert.Nil(t, messages[1].Tags)
 }
 
 func newTestConfig(t *testing.T) *config.Config {

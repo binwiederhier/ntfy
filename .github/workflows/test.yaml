@@ -7,12 +7,18 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.16.x'
+          go-version: '1.17.x'
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Install test dependencies
-        run: sudo apt-get install netcat-openbsd
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y python3-pip
+      - name: Install mkdocs
+        run: sudo pip3 install mkdocs mkdocs-material mkdocs-minify-plugin
+      - name: Build docs
+        run: make docs
       - name: Run tests, formatting, vetting and linting
         run: make check
-      - name: Run and upload coverage to codecov.io
-        run: make coverage coverage-upload
+      - name: Run coverage
+        run: make coverage
+      # - name: Upload coverage to codecov.io
+      #  run: make coverage-upload

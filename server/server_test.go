@@ -22,17 +22,30 @@ func TestServer_PublishAndPoll(t *testing.T) {
 	assert.NotEmpty(t, msg1.ID)
 	assert.Equal(t, "my first message", msg1.Message)
 
-	response2 := request(t, s, "PUT", "/mytopic", "my second message", nil)
+	response2 := request(t, s, "PUT", "/mytopic", "my second\n\nmessage", nil)
 	msg2 := toMessage(t, response2.Body.String())
 	assert.NotEqual(t, msg1.ID, msg2.ID)
 	assert.NotEmpty(t, msg2.ID)
-	assert.Equal(t, "my second message", msg2.Message)
+	assert.Equal(t, "my second\n\nmessage", msg2.Message)
 
 	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages := toMessages(t, response.Body.String())
 	assert.Equal(t, 2, len(messages))
 	assert.Equal(t, "my first message", messages[0].Message)
-	assert.Equal(t, "my second message", messages[1].Message)
+	assert.Equal(t, "my second\n\nmessage", messages[1].Message)
+
+	response = request(t, s, "GET", "/mytopic/sse?poll=1", "", nil)
+	lines := strings.Split(strings.TrimSpace(response.Body.String()), "\n")
+	assert.Equal(t, 3, len(lines))
+	assert.Equal(t, "my first message", toMessage(t, strings.TrimPrefix(lines[0], "data: ")).Message)
+	assert.Equal(t, "", lines[1])
+	assert.Equal(t, "my second\n\nmessage", toMessage(t, strings.TrimPrefix(lines[2], "data: ")).Message)
+
+	response = request(t, s, "GET", "/mytopic/raw?poll=1", "", nil)
+	lines = strings.Split(strings.TrimSpace(response.Body.String()), "\n")
+	assert.Equal(t, 2, len(lines))
+	assert.Equal(t, "my first message", lines[0])
+	assert.Equal(t, "my second  message", lines[1]) // \n -> " "
 }
 
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
@@ -107,6 +120,37 @@ func TestServer_PublishAndSubscribe(t *testing.T) {
 	assert.Equal(t, "This is a title", messages[2].Title)
 	assert.Equal(t, 1, messages[2].Priority)
 	assert.Equal(t, []string{"tag1", "tag 2", "tag3"}, messages[2].Tags)
+}
+
+func TestServer_StaticSites(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	rr := request(t, s, "GET", "/", "", nil)
+	assert.Equal(t, 200, rr.Code)
+	assert.Contains(t, rr.Body.String(), "</html>")
+
+	rr = request(t, s, "HEAD", "/", "", nil)
+	assert.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/does-not-exist.txt", "", nil)
+	assert.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/mytopic", "", nil)
+	assert.Equal(t, 200, rr.Code)
+	assert.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow" />`)
+
+	rr = request(t, s, "GET", "/static/css/app.css", "", nil)
+	assert.Equal(t, 200, rr.Code)
+	assert.Contains(t, rr.Body.String(), `html, body {`)
+
+	rr = request(t, s, "GET", "/docs", "", nil)
+	assert.Equal(t, 301, rr.Code)
+
+	rr = request(t, s, "GET", "/docs/", "", nil)
+	assert.Equal(t, 200, rr.Code)
+	assert.Contains(t, rr.Body.String(), `Made with ❤️ by Philipp C. Heckel`)
+	assert.Contains(t, rr.Body.String(), `<script src=static/js/extra.js></script>`)
+
 }
 
 func newTestConfig(t *testing.T) *config.Config {

@@ -56,9 +56,14 @@ be counted as one, because from the perspective of the ntfy server, they all sha
 ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
 are behind a proxy, it is recommended that TLS/SSL termination is done by the proxy itself (see below).
 
-### nginx/Apache2 configs
+I highly recommend using [certbot](https://certbot.eff.org/). I use it with the [dns-route53 plugin](https://certbot-dns-route53.readthedocs.io/en/stable/), 
+which lets you use [AWS Route 53](https://aws.amazon.com/route53/) as the challenge. That's much easier than using the
+HTTP challenge. I've found [this guide](https://nandovieira.com/using-lets-encrypt-in-development-with-nginx-and-aws-route53) to
+be incredibly helpful.
+
+### nginx/Apache2
 For your convenience, here's a working config that'll help configure things behind a proxy. In this 
-example, ntfy runs on `:13222` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
+example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
 
 === "nginx (/etc/nginx/sites-*/ntfy)"
@@ -66,9 +71,22 @@ or the root domain:
     server {
       listen 80;
       server_name ntfy.sh;
-    
+
       location / {
-        proxy_pass http://127.0.0.1:13222;
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+        # it to work with curl without the annoying https:// prefix
+        set $redirect_https "";
+        if ($request_method = GET) {
+          set $redirect_https "yes";
+        }
+        if ($request_uri ~* "^/[-_a-z0-9]{0,64}$") {
+          set $redirect_https "${redirect_https}yes";
+        }
+        if ($redirect_https = "yesyes") {
+          return 302 https://$http_host$request_uri$is_args$query_string;
+        }
+
+        proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
     
         proxy_buffering off;
@@ -94,11 +112,11 @@ or the root domain:
       ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
       ssl_prefer_server_ciphers on;
     
-      ssl_certificate /etc/letsencrypt/live/nopaste.net/fullchain.pem;
-      ssl_certificate_key /etc/letsencrypt/live/nopaste.net/privkey.pem;
+      ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
     
       location / {
-        proxy_pass http://127.0.0.1:13222;
+        proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
     
         proxy_buffering off;
@@ -124,8 +142,8 @@ or the root domain:
         SetEnv proxy-nokeepalive 1
         SetEnv proxy-sendchunked 1
         
-        ProxyPass / http://127.0.0.1:13222/
-        ProxyPassReverse / http://127.0.0.1:13222/
+        ProxyPass / http://127.0.0.1:2586/
+        ProxyPassReverse / http://127.0.0.1:2586/
         
         # Higher than the max message size of 512k 
         LimitRequestBody 102400
@@ -148,8 +166,8 @@ or the root domain:
         SetEnv proxy-nokeepalive 1
         SetEnv proxy-sendchunked 1
         
-        ProxyPass / http://127.0.0.1:13222/
-        ProxyPassReverse / http://127.0.0.1:13222/
+        ProxyPass / http://127.0.0.1:2586/
+        ProxyPassReverse / http://127.0.0.1:2586/
         
         # Higher than the max message size of 512k 
         LimitRequestBody 102400
@@ -258,7 +276,7 @@ to maintain the client connection and the connection to ntfy.
 === "/etc/nginx/nginx.conf"
     ```
     events {
-      # Allow 20,000 proxy connections (2x of the desired ntfy connection count;
+      # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
       # and give room for other file handles)
       worker_connections 40500;
     }

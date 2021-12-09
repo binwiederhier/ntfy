@@ -74,7 +74,7 @@ func execRun(c *cli.Context) error {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {
 		return errors.New("manager interval cannot be lower than five seconds")
-	} else if cacheDuration < managerInterval {
+	} else if cacheDuration > 0 && cacheDuration < managerInterval {
 		return errors.New("cache duration cannot be lower than manager interval")
 	} else if keyFile != "" && !util.FileExists(keyFile) {
 		return errors.New("if set, key file must exist")

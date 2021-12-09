@@ -294,7 +294,7 @@ const formatTitle = (m) => {
 
 const formatTitleA = (m) => {
     const emojiList = toEmojis(m.tags);
-    if (emojiList) {
+    if (emojiList.length > 0) {
         return `${emojiList.join(" ")} ${m.title}`;
     } else {
         return m.title;
@@ -306,7 +306,7 @@ const formatMessage = (m) => {
         return m.message;
     } else {
         const emojiList = toEmojis(m.tags);
-        if (emojiList) {
+        if (emojiList.length > 0) {
             return `${emojiList.join(" ")} ${m.message}`;
         } else {
             return m.message;

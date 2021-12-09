@@ -28,6 +28,8 @@
 # If set, messages are cached in a local SQLite database instead of only in-memory. This
 # allows for service restarts without losing messages in support of the since= parameter.
 #
+# To disable the cache entirely (on-disk/in-memory), set "cache-duration" to 0.
+#
 # Note: If you are running ntfy with systemd, make sure this cache file is owned by the
 #       ntfy user and group by running: chown ntfy.ntfy <filename>.
 #
@@ -35,6 +37,8 @@
 
 # Duration for which messages will be buffered before they are deleted.
 # This is required to support the "since=..." and "poll=1" parameter.
+#
+# You can disable the cache entirely by setting this to 0.
 #
 # cache-duration: 12h
 

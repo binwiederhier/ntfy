@@ -150,7 +150,74 @@ func TestServer_StaticSites(t *testing.T) {
 	assert.Equal(t, 200, rr.Code)
 	assert.Contains(t, rr.Body.String(), `Made with ❤️ by Philipp C. Heckel`)
 	assert.Contains(t, rr.Body.String(), `<script src=static/js/extra.js></script>`)
+}
 
+func TestServer_PublishNoCache(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic", "this message is not cached", map[string]string{
+		"Cache": "no",
+	})
+	msg := toMessage(t, response.Body.String())
+	assert.NotEmpty(t, msg.ID)
+	assert.Equal(t, "this message is not cached", msg.Message)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	assert.Empty(t, messages)
+}
+
+func TestServer_PublishAndMultiPoll(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic1", "message 1", nil)
+	msg := toMessage(t, response.Body.String())
+	assert.NotEmpty(t, msg.ID)
+	assert.Equal(t, "mytopic1", msg.Topic)
+	assert.Equal(t, "message 1", msg.Message)
+
+	response = request(t, s, "PUT", "/mytopic2", "message 2", nil)
+	msg = toMessage(t, response.Body.String())
+	assert.NotEmpty(t, msg.ID)
+	assert.Equal(t, "mytopic2", msg.Topic)
+	assert.Equal(t, "message 2", msg.Message)
+
+	response = request(t, s, "GET", "/mytopic1/json?poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	assert.Equal(t, 1, len(messages))
+	assert.Equal(t, "mytopic1", messages[0].Topic)
+	assert.Equal(t, "message 1", messages[0].Message)
+
+	response = request(t, s, "GET", "/mytopic1,mytopic2/json?poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	assert.Equal(t, 2, len(messages))
+	assert.Equal(t, "mytopic1", messages[0].Topic)
+	assert.Equal(t, "message 1", messages[0].Message)
+	assert.Equal(t, "mytopic2", messages[1].Topic)
+	assert.Equal(t, "message 2", messages[1].Message)
+}
+
+func TestServer_PublishWithNopCache(t *testing.T) {
+	c := newTestConfig(t)
+	c.CacheDuration = 0
+	s := newTestServer(t, c)
+
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, s, "/mytopic/json", subscribeRR)
+
+	publishRR := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	assert.Equal(t, 200, publishRR.Code)
+
+	subscribeCancel()
+	messages := toMessages(t, subscribeRR.Body.String())
+	assert.Equal(t, 2, len(messages))
+	assert.Equal(t, openEvent, messages[0].Event)
+	assert.Equal(t, messageEvent, messages[1].Event)
+	assert.Equal(t, "my first message", messages[1].Message)
+
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	assert.Empty(t, messages)
 }
 
 func newTestConfig(t *testing.T) *config.Config {

@@ -80,7 +80,7 @@
         There are <a href="docs/publish/">more features</a> related to publishing messages: You can set a
         <a href="docs/publish/#message-priority">notification priority</a>, a <a href="docs/publish/#message-title">title</a>,
         and <a href="docs/publish/#tags-emojis">tag messages</a>.
-        Here's an example using all of them:
+        Here's an example using some of them together:
     </p>
     <code>
         curl \<br/>
@@ -203,7 +203,7 @@
             Click the link to do so.
         </p>
         <p class="smallMarginBottom">
-            <b>Recent notifications</b> (cached for {{.CacheDuration}}):
+            <b>Recent notifications</b> ({{if .CacheDuration}}cached for {{.CacheDuration | durationToHuman}}{{else}}caching is disabled{{end}}):
         </p>
         <p id="detailNoNotifications">
             <i>You haven't received any notifications for this topic yet.</i>

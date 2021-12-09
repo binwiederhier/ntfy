@@ -7,20 +7,35 @@ import (
 
 type memCache struct {
 	messages map[string][]*message
+	nop      bool
 	mu       sync.Mutex
 }
 
 var _ cache = (*memCache)(nil)
 
+// newMemCache creates an in-memory cache
 func newMemCache() *memCache {
 	return &memCache{
 		messages: make(map[string][]*message),
+		nop:      false,
+	}
+}
+
+// newNopCache creates an in-memory cache that discards all messages;
+// it is always empty and can be used if caching is entirely disabled
+func newNopCache() *memCache {
+	return &memCache{
+		messages: make(map[string][]*message),
+		nop:      true,
 	}
 }
 
 func (s *memCache) AddMessage(m *message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.nop {
+		return nil
+	}
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
 	}

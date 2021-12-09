@@ -49,7 +49,7 @@ If you have the [Android app](subscribe/phone.md) installed on your phone, this 
 </figure>
 
 There are more features related to publishing messages: You can set a [notification priority](#message-priority), 
-a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an example that uses all of them at once:
+a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an example that uses some of them at together:
 
 === "Command line (curl)"
     ```
@@ -332,3 +332,56 @@ them with a comma, e.g. `tag1,tag2,tag3`.
   <figcaption>Detail view of notifications with tags</figcaption>
 </figure>
 
+## Message caching
+By default, the ntfy server caches messages on disk for 12 hours (see [message caching](config.md#message-cache)), so
+all messages you publish are stored server-side for a little while. The reason for this is to overcome temporary 
+client-side network disruptions, but arguably this feature also may raise privacy concerns.
+
+To avoid messages being cached server-side entirely, you can set `X-Cache` header (or its alias: `Cache`) to `no`. 
+This will make sure that your message is not cached on the server, even if server-side caching is enabled. Messages
+are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetching-cached-messages) and 
+[`poll=1`](subscribe/api.md#polling) won't return the message anymore.
+
+=== "Command line (curl)"
+    ```
+    curl -H "X-Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
+    curl -H "Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    Cache: no
+
+    This message won't be stored server-side
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic', {
+        method: 'POST',
+        body: 'This message won't be stored server-side',
+        headers: { 'Cache': 'no' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be stored server-side"))
+    req.Header.Set("Cache", "no")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Cache: no",
+            'content' => 'This message won't be stored server-side'
+        ]
+    ]));
+    ```

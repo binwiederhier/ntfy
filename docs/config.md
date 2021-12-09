@@ -26,7 +26,11 @@ restart**. You can override this behavior using the following config settings:
 
 * `cache-file`: if set, ntfy will store messages in a SQLite based cache (default is empty, which means in-memory cache).
   **This is required if you'd like messages to be retained across restarts**.
-* `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`)
+* `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`). 
+
+You can also entirely disable the cache by setting `cache-duration` to `0`. When the cache is disabled, messages are only
+passed on to the connected subscribers, but never stored on disk or even kept in memory longer than is needed to forward
+the message to the subscribers.
 
 Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#polling), as well as the
 [`since=` parameter](subscribe/api.md#fetching-cached-messages).
@@ -302,7 +306,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
 | `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm). |
 | `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
-| `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. |
+| `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely. |
 | `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |

@@ -49,7 +49,7 @@ func (e errHTTP) Error() string {
 
 type indexPage struct {
 	Topic         string
-	CacheDuration string
+	CacheDuration time.Duration
 }
 
 type sinceTime time.Time
@@ -85,9 +85,13 @@ var (
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	disallowedTopics = []string{"docs", "static"}
 
+	templateFnMap = template.FuncMap{
+		"durationToHuman": util.DurationToHuman,
+	}
+
 	//go:embed "index.gohtml"
 	indexSource   string
-	indexTemplate = template.Must(template.New("index").Parse(indexSource))
+	indexTemplate = template.Must(template.New("index").Funcs(templateFnMap).Parse(indexSource))
 
 	//go:embed "example.html"
 	exampleSource string
@@ -139,7 +143,9 @@ func New(conf *config.Config) (*Server, error) {
 }
 
 func createCache(conf *config.Config) (cache, error) {
-	if conf.CacheFile != "" {
+	if conf.CacheDuration == 0 {
+		return newNopCache(), nil
+	} else if conf.CacheFile != "" {
 		return newSqliteCache(conf.CacheFile)
 	}
 	return newMemCache(), nil
@@ -241,7 +247,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 	return indexTemplate.Execute(w, &indexPage{
 		Topic:         r.URL.Path[1:],
-		CacheDuration: util.DurationToHuman(s.config.CacheDuration),
+		CacheDuration: s.config.CacheDuration,
 	})
 }
 
@@ -278,15 +284,17 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
-	title, priority, tags := parseHeaders(r.Header)
+	title, priority, tags, cache := parseHeaders(r.Header)
 	m.Title = title
 	m.Priority = priority
 	m.Tags = tags
 	if err := t.Publish(m); err != nil {
 		return err
 	}
-	if err := s.cache.AddMessage(m); err != nil {
-		return err
+	if cache {
+		if err := s.cache.AddMessage(m); err != nil {
+			return err
+		}
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(m); err != nil {
@@ -298,7 +306,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func parseHeaders(header http.Header) (title string, priority int, tags []string) {
+func parseHeaders(header http.Header) (title string, priority int, tags []string, cache bool) {
 	title = readHeader(header, "x-title", "title", "ti", "t")
 	priorityStr := readHeader(header, "x-priority", "priority", "prio", "p")
 	if priorityStr != "" {
@@ -324,7 +332,8 @@ func parseHeaders(header http.Header) (title string, priority int, tags []string
 			tags = append(tags, strings.TrimSpace(s))
 		}
 	}
-	return title, priority, tags
+	cache = readHeader(header, "x-cache", "cache") != "no"
+	return title, priority, tags, cache
 }
 
 func readHeader(header http.Header, names ...string) string {

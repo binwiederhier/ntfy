@@ -470,9 +470,17 @@ li {
     margin-bottom: 20px;
 }
 
+#detail .detailDate {
+    margin-bottom: 2px;
+}
+
 #detail .detailDate, #detail .detailTags {
     color: #888;
     font-size: 0.9em;
+}
+
+#detail .detailTags {
+    margin-top: 2px;
 }
 
 #detail .detailDate img {
@@ -483,11 +491,6 @@ li {
 
 #detail .detailTitle {
     font-weight: bold;
-    font-size: 1.1em;
-}
-
-#detail .detailMessage {
-    font-size: 1.1em;
 }
 
 #detail #detailMain {

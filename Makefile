@@ -143,4 +143,4 @@ install:
 install-deb:
 	sudo systemctl stop ntfy || true
 	sudo apt-get purge ntfy || true
-	sudo dpkg -i dist/*.deb
+	sudo dpkg -i dist/ntfy_*_linux_amd64.deb

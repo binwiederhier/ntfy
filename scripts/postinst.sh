@@ -7,6 +7,21 @@ set -e
 # TODO: This is only tested on Debian.
 #
 if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
+  # Create ntfy user/group
+  id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy
+  chown ntfy.ntfy /var/cache/ntfy
+  chmod 700 /var/cache/ntfy
+
+  # Hack to change permissions on cache file
+  configfile="/etc/ntfy/config.yml"
+  if [ -f "$configfile" ]; then
+    cachefile="$(cat "$configfile" | perl -n -e'/^\s*cache-file: (.+)/ && print $1')"
+    if [ -n "$cachefile" ]; then
+      chown ntfy.ntfy "$cachefile" || true
+    fi
+  fi
+
+  # Restart service
   systemctl --system daemon-reload >/dev/null || true
   if systemctl is-active -q ntfy.service; then
     echo "Restarting ntfy.service ..."

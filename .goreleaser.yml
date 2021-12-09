@@ -52,6 +52,8 @@ nfpms:
         type: config
       - src: config/ntfy.service
         dst: /lib/systemd/system/ntfy.service
+      - dst: /var/cache/ntfy
+        type: dir
     scripts:
       postinstall: "scripts/postinst.sh"
       preremove: "scripts/prerm.sh"

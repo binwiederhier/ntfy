@@ -65,6 +65,50 @@ func testCacheMessages(t *testing.T, c cache) {
 	assert.Empty(t, messages)
 }
 
+func testCacheTopics(t *testing.T, c cache) {
+	assert.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
+	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
+	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
+	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 3")))
+
+	topics, err := c.Topics()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, len(topics))
+	assert.Equal(t, "topic1", topics["topic1"].ID)
+	assert.Equal(t, "topic2", topics["topic2"].ID)
+}
+
+func testCachePrune(t *testing.T, c cache) {
+	m1 := newDefaultMessage("mytopic", "my message")
+	m1.Time = 1
+
+	m2 := newDefaultMessage("mytopic", "my other message")
+	m2.Time = 2
+
+	m3 := newDefaultMessage("another_topic", "and another one")
+	m3.Time = 1
+
+	assert.Nil(t, c.AddMessage(m1))
+	assert.Nil(t, c.AddMessage(m2))
+	assert.Nil(t, c.AddMessage(m3))
+	assert.Nil(t, c.Prune(time.Unix(2, 0)))
+
+	count, err := c.MessageCount("mytopic")
+	assert.Nil(t, err)
+	assert.Equal(t, 1, count)
+
+	count, err = c.MessageCount("another_topic")
+	assert.Nil(t, err)
+	assert.Equal(t, 0, count)
+
+	messages, err := c.Messages("mytopic", sinceAllMessages)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(messages))
+	assert.Equal(t, "my other message", messages[0].Message)
+}
+
 func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
 	m := newDefaultMessage("mytopic", "some message")
 	m.Tags = []string{"tag1", "tag2"}

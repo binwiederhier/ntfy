@@ -36,7 +36,7 @@ const (
 	`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
-	selectTopicsQuery               = `SELECT topic, MAX(time) FROM messages GROUP BY topic`
+	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
 )
 
 // Schema management queries
@@ -153,11 +153,10 @@ func (c *sqliteCache) Topics() (map[string]*topic, error) {
 	topics := make(map[string]*topic)
 	for rows.Next() {
 		var id string
-		var last int64
-		if err := rows.Scan(&id, &last); err != nil {
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		topics[id] = newTopic(id, time.Unix(last, 0))
+		topics[id] = newTopic(id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -165,8 +164,8 @@ func (c *sqliteCache) Topics() (map[string]*topic, error) {
 	return topics, nil
 }
 
-func (c *sqliteCache) Prune(keep time.Duration) error {
-	_, err := c.db.Exec(pruneMessagesQuery, time.Now().Add(-1*keep).Unix())
+func (c *sqliteCache) Prune(olderThan time.Time) error {
+	_, err := c.db.Exec(pruneMessagesQuery, olderThan.Unix())
 	return err
 }
 

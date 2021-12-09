@@ -4,14 +4,12 @@ import (
 	"log"
 	"math/rand"
 	"sync"
-	"time"
 )
 
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	id          string
-	last        time.Time
+	ID          string
 	subscribers map[int]subscriber
 	mu          sync.Mutex
 }
@@ -20,10 +18,9 @@ type topic struct {
 type subscriber func(msg *message) error
 
 // newTopic creates a new topic
-func newTopic(id string, last time.Time) *topic {
+func newTopic(id string) *topic {
 	return &topic{
-		id:          id,
-		last:        last,
+		ID:          id,
 		subscribers: make(map[int]subscriber),
 	}
 }
@@ -34,7 +31,6 @@ func (t *topic) Subscribe(s subscriber) int {
 	defer t.mu.Unlock()
 	subscriberID := rand.Int()
 	t.subscribers[subscriberID] = s
-	t.last = time.Now()
 	return subscriberID
 }
 
@@ -50,7 +46,6 @@ func (t *topic) Publish(m *message) error {
 	go func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		t.last = time.Now()
 		for _, s := range t.subscribers {
 			if err := s(m); err != nil {
 				log.Printf("error publishing message to subscriber")

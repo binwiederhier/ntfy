@@ -17,5 +17,5 @@ type cache interface {
 	Messages(topic string, since sinceTime) ([]*message, error)
 	MessageCount(topic string) (int, error)
 	Topics() (map[string]*topic, error)
-	Prune(keep time.Duration) error
+	Prune(olderThan time.Time) error
 }

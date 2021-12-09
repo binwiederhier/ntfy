@@ -57,26 +57,30 @@ func (s *memCache) MessageCount(topic string) (int, error) {
 }
 
 func (s *memCache) Topics() (map[string]*topic, error) {
-	// Hack since we know when this is called there are no messages!
-	return make(map[string]*topic), nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	topics := make(map[string]*topic)
+	for topic := range s.messages {
+		topics[topic] = newTopic(topic)
+	}
+	return topics, nil
 }
 
-func (s *memCache) Prune(keep time.Duration) error {
+func (s *memCache) Prune(olderThan time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for topic := range s.messages {
-		s.pruneTopic(topic, keep)
+		s.pruneTopic(topic, olderThan)
 	}
 	return nil
 }
 
-func (s *memCache) pruneTopic(topic string, keep time.Duration) {
-	for i, m := range s.messages[topic] {
-		msgTime := time.Unix(m.Time, 0)
-		if time.Since(msgTime) < keep {
-			s.messages[topic] = s.messages[topic][i:]
-			return
+func (s *memCache) pruneTopic(topic string, olderThan time.Time) {
+	messages := make([]*message, 0)
+	for _, m := range s.messages[topic] {
+		if m.Time >= olderThan.Unix() {
+			messages = append(messages, m)
 		}
 	}
-	s.messages[topic] = make([]*message, 0) // all messages expired
+	s.messages[topic] = messages
 }

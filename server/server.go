@@ -274,7 +274,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if err != nil {
 		return err
 	}
-	m := newDefaultMessage(t.id, string(b))
+	m := newDefaultMessage(t.ID, string(b))
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
@@ -442,7 +442,7 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceTime, sub subscribe
 		return nil
 	}
 	for _, t := range topics {
-		messages, err := s.cache.Messages(t.id, since)
+		messages, err := s.cache.Messages(t.ID, since)
 		if err != nil {
 			return err
 		}
@@ -468,11 +468,9 @@ func parseSince(r *http.Request) (sinceTime, error) {
 	}
 	if r.URL.Query().Get("since") == "all" {
 		return sinceAllMessages, nil
-	}
-	if s, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
+	} else if s, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
 		return sinceTime(time.Unix(s, 0)), nil
-	}
-	if d, err := time.ParseDuration(r.URL.Query().Get("since")); err == nil {
+	} else if d, err := time.ParseDuration(r.URL.Query().Get("since")); err == nil {
 		return sinceTime(time.Now().Add(-1 * d)), nil
 	}
 	return sinceNoMessages, errHTTPBadRequest
@@ -504,7 +502,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 			if len(s.topics) >= s.config.GlobalTopicLimit {
 				return nil, errHTTPTooManyRequests
 			}
-			s.topics[id] = newTopic(id, time.Now())
+			s.topics[id] = newTopic(id)
 			if s.firebase != nil {
 				s.topics[id].Subscribe(s.firebase)
 			}
@@ -526,7 +524,8 @@ func (s *Server) updateStatsAndExpire() {
 	}
 
 	// Prune cache
-	if err := s.cache.Prune(s.config.CacheDuration); err != nil {
+	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
+	if err := s.cache.Prune(olderThan); err != nil {
 		log.Printf("error pruning cache: %s", err.Error())
 	}
 
@@ -534,13 +533,13 @@ func (s *Server) updateStatsAndExpire() {
 	var subscribers, messages int
 	for _, t := range s.topics {
 		subs := t.Subscribers()
-		msgs, err := s.cache.MessageCount(t.id)
+		msgs, err := s.cache.MessageCount(t.ID)
 		if err != nil {
-			log.Printf("cannot get stats for topic %s: %s", t.id, err.Error())
+			log.Printf("cannot get stats for topic %s: %s", t.ID, err.Error())
 			continue
 		}
 		if msgs == 0 && (subs == 0 || (s.firebase != nil && subs == 1)) { // Firebase is a subscriber!
-			delete(s.topics, t.id)
+			delete(s.topics, t.ID)
 			continue
 		}
 		subscribers += subs

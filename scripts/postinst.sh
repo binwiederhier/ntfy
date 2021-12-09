@@ -18,6 +18,7 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
     cachefile="$(cat "$configfile" | perl -n -e'/^\s*cache-file: ["'"'"']?([^"'"'"']+)["'"'"']?/ && print $1')" # Oh my, see #47
     if [ -n "$cachefile" ]; then
       chown ntfy.ntfy "$cachefile" || true
+      chmod 600 "$cachefile" || true
     fi
   fi
 

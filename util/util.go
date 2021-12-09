@@ -23,6 +23,16 @@ func FileExists(filename string) bool {
 	return stat != nil
 }
 
+// InStringList returns true if needle is contained in haystack
+func InStringList(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
+}
+
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!

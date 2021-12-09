@@ -81,8 +81,9 @@ var (
 	sseRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
 	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
 
-	staticRegex = regexp.MustCompile(`^/static/.+`)
-	docsRegex   = regexp.MustCompile(`^/docs(|/.*)$`)
+	staticRegex      = regexp.MustCompile(`^/static/.+`)
+	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
+	disallowedTopics = []string{"docs", "static"}
 
 	//go:embed "index.gohtml"
 	indexSource   string
@@ -496,6 +497,9 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
 	for _, id := range ids {
+		if util.InStringList(disallowedTopics, id) {
+			return nil, errHTTPBadRequest
+		}
 		if _, ok := s.topics[id]; !ok {
 			if len(s.topics) >= s.config.GlobalTopicLimit {
 				return nil, errHTTPTooManyRequests

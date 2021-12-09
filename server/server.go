@@ -128,11 +128,6 @@ func New(conf *config.Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, t := range topics {
-		if firebaseSubscriber != nil {
-			t.Subscribe(firebaseSubscriber)
-		}
-	}
 	return &Server{
 		config:   conf,
 		cache:    cache,
@@ -284,12 +279,19 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
-	title, priority, tags, cache := parseHeaders(r.Header)
+	title, priority, tags, cache, firebase := parseHeaders(r.Header)
 	m.Title = title
 	m.Priority = priority
 	m.Tags = tags
 	if err := t.Publish(m); err != nil {
 		return err
+	}
+	if s.firebase != nil && firebase {
+		go func() {
+			if err := s.firebase(m); err != nil {
+				log.Printf("Unable to publish to Firebase: %v", err.Error())
+			}
+		}()
 	}
 	if cache {
 		if err := s.cache.AddMessage(m); err != nil {
@@ -306,7 +308,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func parseHeaders(header http.Header) (title string, priority int, tags []string, cache bool) {
+func parseHeaders(header http.Header) (title string, priority int, tags []string, cache bool, firebase bool) {
 	title = readHeader(header, "x-title", "title", "ti", "t")
 	priorityStr := readHeader(header, "x-priority", "priority", "prio", "p")
 	if priorityStr != "" {
@@ -333,7 +335,8 @@ func parseHeaders(header http.Header) (title string, priority int, tags []string
 		}
 	}
 	cache = readHeader(header, "x-cache", "cache") != "no"
-	return title, priority, tags, cache
+	firebase = readHeader(header, "x-firebase", "firebase") != "no"
+	return title, priority, tags, cache, firebase
 }
 
 func readHeader(header http.Header, names ...string) string {
@@ -512,9 +515,6 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 				return nil, errHTTPTooManyRequests
 			}
 			s.topics[id] = newTopic(id)
-			if s.firebase != nil {
-				s.topics[id].Subscribe(s.firebase)
-			}
 		}
 		topics = append(topics, s.topics[id])
 	}
@@ -547,7 +547,7 @@ func (s *Server) updateStatsAndExpire() {
 			log.Printf("cannot get stats for topic %s: %s", t.ID, err.Error())
 			continue
 		}
-		if msgs == 0 && (subs == 0 || (s.firebase != nil && subs == 1)) { // Firebase is a subscriber!
+		if msgs == 0 && subs == 0 {
 			delete(s.topics, t.ID)
 			continue
 		}

@@ -332,7 +332,14 @@ them with a comma, e.g. `tag1,tag2,tag3`.
   <figcaption>Detail view of notifications with tags</figcaption>
 </figure>
 
-## Message caching
+## Advanced features
+
+### Message caching
+!!! info
+    If `Cache: no` is used, messages will only be delivered to connected subscribers, and won't be re-delivered if a 
+    client re-connects. If a subscriber has (temporary) network issues or is reconnecting momentarily, 
+    **messages might be missed**.
+
 By default, the ntfy server caches messages on disk for 12 hours (see [message caching](config.md#message-cache)), so
 all messages you publish are stored server-side for a little while. The reason for this is to overcome temporary 
 client-side network disruptions, but arguably this feature also may raise privacy concerns.
@@ -381,6 +388,64 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
             'header' =>
                 "Content-Type: text/plain\r\n" .
                 "Cache: no",
+            'content' => 'This message won't be stored server-side'
+        ]
+    ]));
+    ```
+
+### Firebase
+!!! info
+    If `Firebase: no` is used and [instant delivery](subscribe/phone.md#instant-delivery) isn't enabled in the Android 
+    app (Google Play variant only), **message delivery will be significantly delayed (up to 15 minutes)**. To overcome 
+    this delay, simply enable instant delivery.
+
+The ntfy server can be configured to use [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging)
+(see [Firebase config](config.md#firebase-fcm)) for message delivery on Android (to minimize the app's battery footprint). 
+The ntfy.sh server is configured this way, meaning that all messages published to ntfy.sh are also published to corresponding
+FCM topics.
+
+If you'd like to avoid forwarding messages to Firebase, you can set the `X-Firebase` header (or its alias: `Firebase`)
+to `no`. This will instruct the server not to forward messages to Firebase.
+
+=== "Command line (curl)"
+    ```
+    curl -H "X-Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
+    curl -H "Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    Firebase: no
+
+    This message won't be forwarded to FCM
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic', {
+        method: 'POST',
+        body: 'This message won't be forwarded to FCM',
+        headers: { 'Firebase': 'no' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be forwarded to FCM"))
+    req.Header.Set("Firebase", "no")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Firebase: no",
             'content' => 'This message won't be stored server-side'
         ]
     ]));

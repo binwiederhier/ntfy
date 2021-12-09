@@ -64,5 +64,14 @@ It looked something like this:
     curl -d "$(hostname),$count,$time" ntfy.sh/results
     ```
 
+## Ansible, Salt and Puppet
+You can easily integrate ntfy into Ansible, Salt, or Puppet to notify you when runs are done or are highstated.
+One of my co-workers uses the following Ansible task to let him know when things are done:
 
-
+```yml
+- name: Send ntfy.sh update
+  uri:
+    url: "https://ntfy.sh/{{ ntfy_channel }}"
+    method: POST
+    body: "{{ inventory_hostname }} reseeding complete"
+```

@@ -14,8 +14,10 @@ var (
 // i.e. message structs with the Event messageEvent.
 type cache interface {
 	AddMessage(m *message) error
-	Messages(topic string, since sinceTime) ([]*message, error)
+	Messages(topic string, since sinceTime, scheduled bool) ([]*message, error)
+	MessagesDue() ([]*message, error)
 	MessageCount(topic string) (int, error)
 	Topics() (map[string]*topic, error)
 	Prune(olderThan time.Time) error
+	MarkPublished(m *message) error
 }

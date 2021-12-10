@@ -9,8 +9,12 @@ import (
 	"time"
 )
 
-func TestSqliteCache_AddMessage(t *testing.T) {
+func TestSqliteCache_Messages(t *testing.T) {
 	testCacheMessages(t, newSqliteTestCache(t))
+}
+
+func TestSqliteCache_MessagesScheduled(t *testing.T) {
+	testCacheMessagesScheduled(t, newSqliteTestCache(t))
 }
 
 func TestSqliteCache_Topics(t *testing.T) {
@@ -25,7 +29,7 @@ func TestSqliteCache_Prune(t *testing.T) {
 	testCachePrune(t, newSqliteTestCache(t))
 }
 
-func TestSqliteCache_Migration_0to1(t *testing.T) {
+func TestSqliteCache_Migration_From0(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
 	db, err := sql.Open("sqlite3", filename)
 	assert.Nil(t, err)
@@ -53,7 +57,7 @@ func TestSqliteCache_Migration_0to1(t *testing.T) {
 
 	// Create cache to trigger migration
 	c := newSqliteTestCacheFromFile(t, filename)
-	messages, err := c.Messages("mytopic", sinceAllMessages)
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 10, len(messages))
 	assert.Equal(t, "some message 5", messages[5].Message)
@@ -67,7 +71,7 @@ func TestSqliteCache_Migration_0to1(t *testing.T) {
 
 	var schemaVersion int
 	assert.Nil(t, rows.Scan(&schemaVersion))
-	assert.Equal(t, 1, schemaVersion)
+	assert.Equal(t, 2, schemaVersion)
 }
 
 func newSqliteTestCache(t *testing.T) *sqliteCache {

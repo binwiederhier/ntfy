@@ -11,6 +11,7 @@ const (
 	DefaultCacheDuration     = 12 * time.Hour
 	DefaultKeepaliveInterval = 30 * time.Second
 	DefaultManagerInterval   = time.Minute
+	DefaultAtSenderInterval  = 10 * time.Second
 )
 
 // Defines all the limits
@@ -35,6 +36,7 @@ type Config struct {
 	CacheDuration                time.Duration
 	KeepaliveInterval            time.Duration
 	ManagerInterval              time.Duration
+	AtSenderInterval             time.Duration
 	GlobalTopicLimit             int
 	VisitorRequestLimitBurst     int
 	VisitorRequestLimitReplenish time.Duration
@@ -54,6 +56,7 @@ func New(listenHTTP string) *Config {
 		CacheDuration:                DefaultCacheDuration,
 		KeepaliveInterval:            DefaultKeepaliveInterval,
 		ManagerInterval:              DefaultManagerInterval,
+		AtSenderInterval:             DefaultAtSenderInterval,
 		GlobalTopicLimit:             DefaultGlobalTopicLimit,
 		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,

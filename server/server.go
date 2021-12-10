@@ -73,6 +73,7 @@ var (
 
 const (
 	messageLimit = 512
+	minDelay     = 10 * time.Second
 )
 
 var (
@@ -183,6 +184,15 @@ func (s *Server) Run() error {
 			s.updateStatsAndExpire()
 		}
 	}()
+	go func() {
+		ticker := time.NewTicker(s.config.AtSenderInterval)
+		for {
+			<-ticker.C
+			if err := s.sendDelayedMessages(); err != nil {
+				log.Printf("error sending scheduled messages: %s", err.Error())
+			}
+		}
+	}()
 	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
@@ -279,14 +289,17 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
-	title, priority, tags, cache, firebase := parseHeaders(r.Header)
-	m.Title = title
-	m.Priority = priority
-	m.Tags = tags
-	if err := t.Publish(m); err != nil {
+	cache, firebase, err := parseHeaders(r.Header, m)
+	if err != nil {
 		return err
 	}
-	if s.firebase != nil && firebase {
+	delayed := m.Time > time.Now().Unix()
+	if !delayed {
+		if err := t.Publish(m); err != nil {
+			return err
+		}
+	}
+	if s.firebase != nil && firebase && !delayed {
 		go func() {
 			if err := s.firebase(m); err != nil {
 				log.Printf("Unable to publish to Firebase: %v", err.Error())
@@ -308,35 +321,62 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func parseHeaders(header http.Header) (title string, priority int, tags []string, cache bool, firebase bool) {
-	title = readHeader(header, "x-title", "title", "ti", "t")
+func parseHeaders(header http.Header, m *message) (cache bool, firebase bool, err error) {
+	cache = readHeader(header, "x-cache", "cache") != "no"
+	firebase = readHeader(header, "x-firebase", "firebase") != "no"
+	m.Title = readHeader(header, "x-title", "title", "ti", "t")
 	priorityStr := readHeader(header, "x-priority", "priority", "prio", "p")
 	if priorityStr != "" {
 		switch strings.ToLower(priorityStr) {
 		case "1", "min":
-			priority = 1
+			m.Priority = 1
 		case "2", "low":
-			priority = 2
+			m.Priority = 2
 		case "3", "default":
-			priority = 3
+			m.Priority = 3
 		case "4", "high":
-			priority = 4
+			m.Priority = 4
 		case "5", "max", "urgent":
-			priority = 5
+			m.Priority = 5
 		default:
-			priority = 0
+			return false, false, errHTTPBadRequest
 		}
 	}
 	tagsStr := readHeader(header, "x-tags", "tag", "tags", "ta")
 	if tagsStr != "" {
-		tags = make([]string, 0)
+		m.Tags = make([]string, 0)
 		for _, s := range strings.Split(tagsStr, ",") {
-			tags = append(tags, strings.TrimSpace(s))
+			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	cache = readHeader(header, "x-cache", "cache") != "no"
-	firebase = readHeader(header, "x-firebase", "firebase") != "no"
-	return title, priority, tags, cache, firebase
+	atStr := readHeader(header, "x-at", "at", "x-schedule", "schedule", "sched")
+	if atStr != "" {
+		if !cache {
+			return false, false, errHTTPBadRequest
+		}
+		at, err := strconv.Atoi(atStr)
+		if err != nil {
+			return false, false, errHTTPBadRequest
+		} else if int64(at) < time.Now().Add(minDelay).Unix() {
+			return false, false, errHTTPBadRequest
+		}
+		m.Time = int64(at)
+	} else {
+		delayStr := readHeader(header, "x-delay", "delay", "x-in", "in")
+		if delayStr != "" {
+			if !cache {
+				return false, false, errHTTPBadRequest
+			}
+			delay, err := time.ParseDuration(delayStr)
+			if err != nil {
+				return false, false, errHTTPBadRequest
+			} else if delay < minDelay {
+				return false, false, errHTTPBadRequest
+			}
+			m.Time = time.Now().Add(delay).Unix()
+		}
+	}
+	return cache, firebase, nil
 }
 
 func readHeader(header http.Header, names ...string) string {
@@ -401,6 +441,7 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 	var wlock sync.Mutex
 	poll := r.URL.Query().Has("poll")
+	scheduled := r.URL.Query().Has("scheduled") || r.URL.Query().Has("sched")
 	sub := func(msg *message) error {
 		wlock.Lock()
 		defer wlock.Unlock()
@@ -419,7 +460,7 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	w.Header().Set("Access-Control-Allow-Origin", "*")            // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8") // Android/Volley client needs charset!
 	if poll {
-		return s.sendOldMessages(topics, since, sub)
+		return s.sendOldMessages(topics, since, scheduled, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
@@ -433,7 +474,7 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	if err := sub(newOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, sub); err != nil {
+	if err := s.sendOldMessages(topics, since, scheduled, sub); err != nil {
 		return err
 	}
 	for {
@@ -449,12 +490,12 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 }
 
-func (s *Server) sendOldMessages(topics []*topic, since sinceTime, sub subscriber) error {
+func (s *Server) sendOldMessages(topics []*topic, since sinceTime, scheduled bool, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
 	for _, t := range topics {
-		messages, err := s.cache.Messages(t.ID, since)
+		messages, err := s.cache.Messages(t.ID, since, scheduled)
 		if err != nil {
 			return err
 		}
@@ -558,6 +599,32 @@ func (s *Server) updateStatsAndExpire() {
 	// Print stats
 	log.Printf("Stats: %d message(s) published, %d topic(s) active, %d subscriber(s), %d message(s) buffered, %d visitor(s)",
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
+}
+
+func (s *Server) sendDelayedMessages() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	messages, err := s.cache.MessagesDue()
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
+		t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
+		if ok {
+			if err := t.Publish(m); err != nil {
+				log.Printf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
+			}
+			if s.firebase != nil {
+				if err := s.firebase(m); err != nil {
+					log.Printf("unable to publish to Firebase: %v", err.Error())
+				}
+			}
+		}
+		if err := s.cache.MarkPublished(m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) withRateLimit(w http.ResponseWriter, r *http.Request, handler func(w http.ResponseWriter, r *http.Request, v *visitor) error) error {

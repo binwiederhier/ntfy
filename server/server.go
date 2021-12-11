@@ -344,20 +344,20 @@ func (s *Server) parseHeaders(header http.Header, m *message) (cache bool, fireb
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	whenStr := readHeader(header, "x-at", "at", "x-in", "in", "x-delay", "delay")
-	if whenStr != "" {
+	delayStr := readHeader(header, "x-delay", "delay", "x-at", "at", "x-in", "in")
+	if delayStr != "" {
 		if !cache {
 			return false, false, errHTTPBadRequest
 		}
-		at, err := util.ParseFutureTime(whenStr, time.Now())
+		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
 			return false, false, errHTTPBadRequest
-		} else if at.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
 			return false, false, errHTTPBadRequest
-		} else if at.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
+		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
 			return false, false, errHTTPBadRequest
 		}
-		m.Time = at.Unix()
+		m.Time = delay.Unix()
 	}
 	return cache, firebase, nil
 }

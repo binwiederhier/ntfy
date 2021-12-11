@@ -14,6 +14,8 @@ var (
 	durationStrRegex  = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
 )
 
+// ParseFutureTime parses a date/time string to a time.Time. It supports unix timestamps, durations
+// and natural language dates
 func ParseFutureTime(s string, now time.Time) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	t, err := parseUnixTime(s, now)

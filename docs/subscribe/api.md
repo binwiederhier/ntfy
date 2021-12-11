@@ -239,13 +239,23 @@ or `all` (all cached messages).
 curl -s "ntfy.sh/mytopic/json?since=10m"
 ```
 
-### Polling
+### Polling for messages
 You can also just poll for messages if you don't like the long-standing connection using the `poll=1`
 query parameter. The connection will end after all available messages have been read. This parameter can be
 combined with `since=` (defaults to `since=all`).
 
 ```
 curl -s "ntfy.sh/mytopic/json?poll=1"
+```
+
+### Fetching scheduled messages
+Messages that are [scheduled to be delivered](../publish.md#scheduled-delivery) at a later date are not typically 
+returned when subscribing via the API, which makes sense, because after all, the messages have technically not been 
+delivered yet. To also return scheduled messages from the API, you can use the `scheduled=1` (alias: `sched=1`) 
+parameter (makes most sense with the `poll=1` parameter):
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1&sched=1"
 ```
 
 ### Subscribing to multiple topics

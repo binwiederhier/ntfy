@@ -76,9 +76,7 @@ const (
 
 	// 1 -> 2
 	migrate1To2AlterMessagesTableQuery = `
-		BEGIN;
 		ALTER TABLE messages ADD COLUMN published INT NOT NULL DEFAULT(1);
-		COMMIT;
 	`
 )
 
@@ -220,7 +218,7 @@ func setupDB(db *sql.DB) error {
 	if err != nil {
 		return setupNewDB(db)
 	}
-	defer rowsMC.Close()
+	rowsMC.Close()
 
 	// If 'messages' table exists, check 'schemaVersion' table
 	schemaVersion := 0
@@ -233,6 +231,7 @@ func setupDB(db *sql.DB) error {
 		if err := rowsSV.Scan(&schemaVersion); err != nil {
 			return err
 		}
+		rowsSV.Close()
 	}
 
 	// Do migrations

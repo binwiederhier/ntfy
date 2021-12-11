@@ -332,6 +332,85 @@ them with a comma, e.g. `tag1,tag2,tag3`.
   <figcaption>Detail view of notifications with tags</figcaption>
 </figure>
 
+## Scheduled delivery
+You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself 
+reminders or even to execute commands at a later date (if your subscriber acts on messages).
+
+Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`, 
+`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`, 
+`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
+[and more](https://github.com/olebedev/when)). 
+
+As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can currently
+not be configured otherwise ([let me know](https://github.com/binwiederhier/ntfy/issues) if you'd like to change 
+these limits).
+
+For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours 
+after they were delivered (or whatever the server-side cache duration is set to). For instance, if a message is scheduled
+to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Also note that naturally, 
+[turning off server-side caching](#message-caching) is not possible in combination with this feature.  
+
+=== "Command line (curl)"
+    ```
+    curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
+    curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
+    curl -H "Delay: 1639194738" -d "Unix timestamps are awesome" ntfy.sh/itsaunixsystem
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /hello HTTP/1.1
+    Host: ntfy.sh
+    At: tomorrow, 10am
+
+    Good morning
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/hello', {
+        method: 'POST',
+        body: 'Good morning',
+        headers: { 'At': 'tomorrow, 10am' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/hello", strings.NewReader("Good morning"))
+    req.Header.Set("At", "tomorrow, 10am")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "At: tomorrow, 10am",
+            'content' => 'Good morning'
+        ]
+    ]));
+    ```
+
+Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Time Zone**):
+
+
+<table class="remove-md-box"><tr>
+<td>
+    <table><thead><tr><th><code>Delay/At/In</code> header</th><th>Message will be delivered at</th><th>Explanation</th></tr></thead><tbody>
+    <tr><td><code>30m</code></td><td>12/10/2021, 9:<b>30</b>am</td><td>30 minutes from now</td></tr>
+    <tr><td><code>2 hours</code></td><td>12/10/2021, <b>11:30</b>am</td><td>2 hours from now</td></tr>
+    <tr><td><code>1 day</code></td><td>12/<b>11</b>/2021, 9am</td><td>24 hours from now</td></tr>
+    <tr><td><code>10am</code></td><td>12/10/2021, <b>10am</b></td><td>Today at 10am (same day, because it's only 9am)</td></tr>
+    <tr><td><code>8am</code></td><td>12/<b>11</b>/2021, <b>8am</b></td><td>Tomorrow at 8am (because it's 9am already)</td></tr>
+    <tr><td><code>1639152000</code></td><td>12/10/2021, 11am (EST)</td><td> Today at 11am (EST)</td></tr>
+    </tbody></table>
+</td>
+</tr></table>
+
 ## Advanced features
 
 ### Message caching
@@ -347,7 +426,7 @@ client-side network disruptions, but arguably this feature also may raise privac
 To avoid messages being cached server-side entirely, you can set `X-Cache` header (or its alias: `Cache`) to `no`. 
 This will make sure that your message is not cached on the server, even if server-side caching is enabled. Messages
 are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetching-cached-messages) and 
-[`poll=1`](subscribe/api.md#polling) won't return the message anymore.
+[`poll=1`](subscribe/api.md#polling-for-messages) won't return the message anymore.
 
 === "Command line (curl)"
     ```
@@ -393,7 +472,7 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ]));
     ```
 
-### Firebase
+### Disable Firebase
 !!! info
     If `Firebase: no` is used and [instant delivery](subscribe/phone.md#instant-delivery) isn't enabled in the Android 
     app (Google Play variant only), **message delivery will be significantly delayed (up to 15 minutes)**. To overcome 

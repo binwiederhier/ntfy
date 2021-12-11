@@ -27,7 +27,7 @@ func testCacheMessages(t *testing.T, c cache) {
 	assert.Equal(t, 2, count)
 
 	// mytopic: since all
-	messages, _ := c.Messages("mytopic", sinceAllMessages)
+	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
 	assert.Equal(t, 2, len(messages))
 	assert.Equal(t, "my message", messages[0].Message)
 	assert.Equal(t, "mytopic", messages[0].Topic)
@@ -38,11 +38,11 @@ func testCacheMessages(t *testing.T, c cache) {
 	assert.Equal(t, "my other message", messages[1].Message)
 
 	// mytopic: since none
-	messages, _ = c.Messages("mytopic", sinceNoMessages)
+	messages, _ = c.Messages("mytopic", sinceNoMessages, false)
 	assert.Empty(t, messages)
 
 	// mytopic: since 2
-	messages, _ = c.Messages("mytopic", sinceTime(time.Unix(2, 0)))
+	messages, _ = c.Messages("mytopic", sinceTime(time.Unix(2, 0)), false)
 	assert.Equal(t, 1, len(messages))
 	assert.Equal(t, "my other message", messages[0].Message)
 
@@ -52,7 +52,7 @@ func testCacheMessages(t *testing.T, c cache) {
 	assert.Equal(t, 1, count)
 
 	// example: since all
-	messages, _ = c.Messages("example", sinceAllMessages)
+	messages, _ = c.Messages("example", sinceAllMessages, false)
 	assert.Equal(t, "my example message", messages[0].Message)
 
 	// non-existing: count
@@ -61,7 +61,7 @@ func testCacheMessages(t *testing.T, c cache) {
 	assert.Equal(t, 0, count)
 
 	// non-existing: since all
-	messages, _ = c.Messages("doesnotexist", sinceAllMessages)
+	messages, _ = c.Messages("doesnotexist", sinceAllMessages, false)
 	assert.Empty(t, messages)
 }
 
@@ -103,7 +103,7 @@ func testCachePrune(t *testing.T, c cache) {
 	assert.Nil(t, err)
 	assert.Equal(t, 0, count)
 
-	messages, err := c.Messages("mytopic", sinceAllMessages)
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(messages))
 	assert.Equal(t, "my other message", messages[0].Message)
@@ -116,8 +116,34 @@ func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
 	m.Title = "some title"
 	assert.Nil(t, c.AddMessage(m))
 
-	messages, _ := c.Messages("mytopic", sinceAllMessages)
+	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
 	assert.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
 	assert.Equal(t, 5, messages[0].Priority)
 	assert.Equal(t, "some title", messages[0].Title)
+}
+
+func testCacheMessagesScheduled(t *testing.T, c cache) {
+	m1 := newDefaultMessage("mytopic", "message 1")
+	m2 := newDefaultMessage("mytopic", "message 2")
+	m2.Time = time.Now().Add(time.Hour).Unix()
+	m3 := newDefaultMessage("mytopic", "message 3")
+	m3.Time = time.Now().Add(time.Minute).Unix() // earlier than m2!
+	m4 := newDefaultMessage("mytopic2", "message 4")
+	m4.Time = time.Now().Add(time.Minute).Unix()
+	assert.Nil(t, c.AddMessage(m1))
+	assert.Nil(t, c.AddMessage(m2))
+	assert.Nil(t, c.AddMessage(m3))
+
+	messages, _ := c.Messages("mytopic", sinceAllMessages, false) // exclude scheduled
+	assert.Equal(t, 1, len(messages))
+	assert.Equal(t, "message 1", messages[0].Message)
+
+	messages, _ = c.Messages("mytopic", sinceAllMessages, true) // include scheduled
+	assert.Equal(t, 3, len(messages))
+	assert.Equal(t, "message 1", messages[0].Message)
+	assert.Equal(t, "message 3", messages[1].Message) // Order!
+	assert.Equal(t, "message 2", messages[2].Message)
+
+	messages, _ = c.MessagesDue()
+	assert.Empty(t, messages)
 }

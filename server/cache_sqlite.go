@@ -21,19 +21,32 @@ const (
 			message VARCHAR(512) NOT NULL,
 			title VARCHAR(256) NOT NULL,
 			priority INT NOT NULL,
-			tags VARCHAR(256) NOT NULL
+			tags VARCHAR(256) NOT NULL,
+			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
-	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ?`
+	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, message, title, priority, tags
+		SELECT id, time, topic, message, title, priority, tags
+		FROM messages 
+		WHERE topic = ? AND time >= ? AND published = 1
+		ORDER BY time ASC
+	`
+	selectMessagesSinceTimeIncludeScheduledQuery = `
+		SELECT id, time, topic, message, title, priority, tags
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
+	selectMessagesDueQuery = `
+		SELECT id, time, topic, message, title, priority, tags
+		FROM messages 
+		WHERE time <= ? AND published = 0
+	`
+	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE id = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
@@ -41,7 +54,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 1
+	currentSchemaVersion          = 2
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -49,6 +62,7 @@ const (
 		);
 	`
 	insertSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
+	updateSchemaVersion      = `UPDATE schemaVersion SET version = ? WHERE id = 1`
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
 
 	// 0 -> 1
@@ -58,6 +72,11 @@ const (
 		ALTER TABLE messages ADD COLUMN priority INT NOT NULL DEFAULT(0);
 		ALTER TABLE messages ADD COLUMN tags VARCHAR(256) NOT NULL DEFAULT('');
 		COMMIT;
+	`
+
+	// 1 -> 2
+	migrate1To2AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN published INT NOT NULL DEFAULT(1);
 	`
 )
 
@@ -84,46 +103,39 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
 	}
-	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","))
+	published := m.Time <= time.Now().Unix()
+	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","), published)
 	return err
 }
 
-func (c *sqliteCache) Messages(topic string, since sinceTime) ([]*message, error) {
+func (c *sqliteCache) Messages(topic string, since sinceTime, scheduled bool) ([]*message, error) {
 	if since.IsNone() {
 		return make([]*message, 0), nil
 	}
-	rows, err := c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
+	var rows *sql.Rows
+	var err error
+	if scheduled {
+		rows, err = c.db.Query(selectMessagesSinceTimeIncludeScheduledQuery, topic, since.Time().Unix())
+	} else {
+		rows, err = c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	messages := make([]*message, 0)
-	for rows.Next() {
-		var timestamp int64
-		var priority int
-		var id, msg, title, tagsStr string
-		if err := rows.Scan(&id, &timestamp, &msg, &title, &priority, &tagsStr); err != nil {
-			return nil, err
-		}
-		var tags []string
-		if tagsStr != "" {
-			tags = strings.Split(tagsStr, ",")
-		}
-		messages = append(messages, &message{
-			ID:       id,
-			Time:     timestamp,
-			Event:    messageEvent,
-			Topic:    topic,
-			Message:  msg,
-			Title:    title,
-			Priority: priority,
-			Tags:     tags,
-		})
-	}
-	if err := rows.Err(); err != nil {
+	return readMessages(rows)
+}
+
+func (c *sqliteCache) MessagesDue() ([]*message, error) {
+	rows, err := c.db.Query(selectMessagesDueQuery, time.Now().Unix())
+	if err != nil {
 		return nil, err
 	}
-	return messages, nil
+	return readMessages(rows)
+}
+
+func (c *sqliteCache) MarkPublished(m *message) error {
+	_, err := c.db.Exec(updateMessagePublishedQuery, m.ID)
+	return err
 }
 
 func (c *sqliteCache) MessageCount(topic string) (int, error) {
@@ -169,13 +181,44 @@ func (c *sqliteCache) Prune(olderThan time.Time) error {
 	return err
 }
 
+func readMessages(rows *sql.Rows) ([]*message, error) {
+	defer rows.Close()
+	messages := make([]*message, 0)
+	for rows.Next() {
+		var timestamp int64
+		var priority int
+		var id, topic, msg, title, tagsStr string
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr); err != nil {
+			return nil, err
+		}
+		var tags []string
+		if tagsStr != "" {
+			tags = strings.Split(tagsStr, ",")
+		}
+		messages = append(messages, &message{
+			ID:       id,
+			Time:     timestamp,
+			Event:    messageEvent,
+			Topic:    topic,
+			Message:  msg,
+			Title:    title,
+			Priority: priority,
+			Tags:     tags,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return messages, nil
+}
+
 func setupDB(db *sql.DB) error {
 	// If 'messages' table does not exist, this must be a new database
 	rowsMC, err := db.Query(selectMessagesCountQuery)
 	if err != nil {
 		return setupNewDB(db)
 	}
-	defer rowsMC.Close()
+	rowsMC.Close()
 
 	// If 'messages' table exists, check 'schemaVersion' table
 	schemaVersion := 0
@@ -188,13 +231,16 @@ func setupDB(db *sql.DB) error {
 		if err := rowsSV.Scan(&schemaVersion); err != nil {
 			return err
 		}
+		rowsSV.Close()
 	}
 
 	// Do migrations
 	if schemaVersion == currentSchemaVersion {
 		return nil
 	} else if schemaVersion == 0 {
-		return migrateFrom0To1(db)
+		return migrateFrom0(db)
+	} else if schemaVersion == 1 {
+		return migrateFrom1(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -212,7 +258,7 @@ func setupNewDB(db *sql.DB) error {
 	return nil
 }
 
-func migrateFrom0To1(db *sql.DB) error {
+func migrateFrom0(db *sql.DB) error {
 	log.Print("Migrating cache database schema: from 0 to 1")
 	if _, err := db.Exec(migrate0To1AlterMessagesTableQuery); err != nil {
 		return err
@@ -223,5 +269,16 @@ func migrateFrom0To1(db *sql.DB) error {
 	if _, err := db.Exec(insertSchemaVersion, 1); err != nil {
 		return err
 	}
-	return nil
+	return migrateFrom1(db)
+}
+
+func migrateFrom1(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 1 to 2")
+	if _, err := db.Exec(migrate1To2AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 2); err != nil {
+		return err
+	}
+	return nil // Update this when a new version is added
 }

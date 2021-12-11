@@ -1,14 +1,16 @@
 package server
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
 
 type memCache struct {
-	messages map[string][]*message
-	nop      bool
-	mu       sync.Mutex
+	messages  map[string][]*message
+	scheduled map[string]*message // Message ID -> message
+	nop       bool
+	mu        sync.Mutex
 }
 
 var _ cache = (*memCache)(nil)
@@ -16,8 +18,9 @@ var _ cache = (*memCache)(nil)
 // newMemCache creates an in-memory cache
 func newMemCache() *memCache {
 	return &memCache{
-		messages: make(map[string][]*message),
-		nop:      false,
+		messages:  make(map[string][]*message),
+		scheduled: make(map[string]*message),
+		nop:       false,
 	}
 }
 
@@ -25,77 +28,109 @@ func newMemCache() *memCache {
 // it is always empty and can be used if caching is entirely disabled
 func newNopCache() *memCache {
 	return &memCache{
-		messages: make(map[string][]*message),
-		nop:      true,
+		messages:  make(map[string][]*message),
+		scheduled: make(map[string]*message),
+		nop:       true,
 	}
 }
 
-func (s *memCache) AddMessage(m *message) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.nop {
+func (c *memCache) AddMessage(m *message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.nop {
 		return nil
 	}
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
 	}
-	if _, ok := s.messages[m.Topic]; !ok {
-		s.messages[m.Topic] = make([]*message, 0)
+	if _, ok := c.messages[m.Topic]; !ok {
+		c.messages[m.Topic] = make([]*message, 0)
 	}
-	s.messages[m.Topic] = append(s.messages[m.Topic], m)
+	delayed := m.Time > time.Now().Unix()
+	if delayed {
+		c.scheduled[m.ID] = m
+	}
+	c.messages[m.Topic] = append(c.messages[m.Topic], m)
 	return nil
 }
 
-func (s *memCache) Messages(topic string, since sinceTime) ([]*message, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.messages[topic]; !ok || since.IsNone() {
+func (c *memCache) Messages(topic string, since sinceTime, scheduled bool) ([]*message, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.messages[topic]; !ok || since.IsNone() {
 		return make([]*message, 0), nil
 	}
-	messages := make([]*message, 0) // copy!
-	for _, m := range s.messages[topic] {
-		msgTime := time.Unix(m.Time, 0)
-		if msgTime == since.Time() || msgTime.After(since.Time()) {
+	messages := make([]*message, 0)
+	for _, m := range c.messages[topic] {
+		_, messageScheduled := c.scheduled[m.ID]
+		include := m.Time >= since.Time().Unix() && (!messageScheduled || scheduled)
+		if include {
 			messages = append(messages, m)
 		}
 	}
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].Time < messages[j].Time
+	})
 	return messages, nil
 }
 
-func (s *memCache) MessageCount(topic string) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.messages[topic]; !ok {
-		return 0, nil
+func (c *memCache) MessagesDue() ([]*message, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	messages := make([]*message, 0)
+	for _, m := range c.scheduled {
+		due := time.Now().Unix() >= m.Time
+		if due {
+			messages = append(messages, m)
+		}
 	}
-	return len(s.messages[topic]), nil
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].Time < messages[j].Time
+	})
+	return messages, nil
 }
 
-func (s *memCache) Topics() (map[string]*topic, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (c *memCache) MarkPublished(m *message) error {
+	c.mu.Lock()
+	delete(c.scheduled, m.ID)
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *memCache) MessageCount(topic string) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.messages[topic]; !ok {
+		return 0, nil
+	}
+	return len(c.messages[topic]), nil
+}
+
+func (c *memCache) Topics() (map[string]*topic, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	topics := make(map[string]*topic)
-	for topic := range s.messages {
+	for topic := range c.messages {
 		topics[topic] = newTopic(topic)
 	}
 	return topics, nil
 }
 
-func (s *memCache) Prune(olderThan time.Time) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for topic := range s.messages {
-		s.pruneTopic(topic, olderThan)
+func (c *memCache) Prune(olderThan time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for topic := range c.messages {
+		c.pruneTopic(topic, olderThan)
 	}
 	return nil
 }
 
-func (s *memCache) pruneTopic(topic string, olderThan time.Time) {
+func (c *memCache) pruneTopic(topic string, olderThan time.Time) {
 	messages := make([]*message, 0)
-	for _, m := range s.messages[topic] {
+	for _, m := range c.messages[topic] {
 		if m.Time >= olderThan.Unix() {
 			messages = append(messages, m)
 		}
 	}
-	s.messages[topic] = messages
+	c.messages[topic] = messages
 }

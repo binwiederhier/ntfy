@@ -9,6 +9,10 @@ func TestMemCache_Messages(t *testing.T) {
 	testCacheMessages(t, newMemCache())
 }
 
+func TestMemCache_MessagesScheduled(t *testing.T) {
+	testCacheMessagesScheduled(t, newMemCache())
+}
+
 func TestMemCache_Topics(t *testing.T) {
 	testCacheTopics(t, newMemCache())
 }
@@ -25,7 +29,7 @@ func TestMemCache_NopCache(t *testing.T) {
 	c := newNopCache()
 	assert.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))
 
-	messages, err := c.Messages("mytopic", sinceAllMessages)
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
 	assert.Nil(t, err)
 	assert.Empty(t, messages)
 

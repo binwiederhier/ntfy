@@ -71,11 +71,6 @@ var (
 	sinceNoMessages  = sinceTime(time.Unix(1, 0))
 )
 
-const (
-	messageLimit = 512
-	minDelay     = 10 * time.Second
-)
-
 var (
 	topicRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
 	jsonRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
@@ -181,7 +176,7 @@ func (s *Server) Run() error {
 		ticker := time.NewTicker(s.config.ManagerInterval)
 		for {
 			<-ticker.C
-			s.updateStatsAndExpire()
+			s.updateStatsAndPrune()
 		}
 	}()
 	go func() {
@@ -280,7 +275,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if err != nil {
 		return err
 	}
-	reader := io.LimitReader(r.Body, messageLimit)
+	reader := io.LimitReader(r.Body, int64(s.config.MessageLimit))
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return err
@@ -289,7 +284,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if m.Message == "" {
 		return errHTTPBadRequest
 	}
-	cache, firebase, err := parseHeaders(r.Header, m)
+	cache, firebase, err := s.parseHeaders(r.Header, m)
 	if err != nil {
 		return err
 	}
@@ -321,7 +316,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func parseHeaders(header http.Header, m *message) (cache bool, firebase bool, err error) {
+func (s *Server) parseHeaders(header http.Header, m *message) (cache bool, firebase bool, err error) {
 	cache = readHeader(header, "x-cache", "cache") != "no"
 	firebase = readHeader(header, "x-firebase", "firebase") != "no"
 	m.Title = readHeader(header, "x-title", "title", "ti", "t")
@@ -349,7 +344,7 @@ func parseHeaders(header http.Header, m *message) (cache bool, firebase bool, er
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	whenStr := readHeader(header, "x-at", "at", "x-in", "in")
+	whenStr := readHeader(header, "x-at", "at", "x-in", "in", "x-delay", "delay")
 	if whenStr != "" {
 		if !cache {
 			return false, false, errHTTPBadRequest
@@ -357,7 +352,9 @@ func parseHeaders(header http.Header, m *message) (cache bool, firebase bool, er
 		at, err := util.ParseFutureTime(whenStr, time.Now())
 		if err != nil {
 			return false, false, errHTTPBadRequest
-		} else if at.Unix() < time.Now().Add(minDelay).Unix() {
+		} else if at.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+			return false, false, errHTTPBadRequest
+		} else if at.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
 			return false, false, errHTTPBadRequest
 		}
 		m.Time = at.Unix()
@@ -548,7 +545,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	return topics, nil
 }
 
-func (s *Server) updateStatsAndExpire() {
+func (s *Server) updateStatsAndPrune() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -559,13 +556,13 @@ func (s *Server) updateStatsAndExpire() {
 		}
 	}
 
-	// Prune cache
+	// Prune message cache
 	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
 	if err := s.cache.Prune(olderThan); err != nil {
 		log.Printf("error pruning cache: %s", err.Error())
 	}
 
-	// Prune old messages, remove subscriptions without subscribers
+	// Prune old topics, remove subscriptions without subscribers
 	var subscribers, messages int
 	for _, t := range s.topics {
 		subs := t.Subscribers()

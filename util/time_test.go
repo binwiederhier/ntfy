@@ -56,5 +56,5 @@ func TestParseFutureTime_1day(t *testing.T) {
 func TestParseFutureTime_UnixTime(t *testing.T) {
 	d, err := ParseFutureTime("1639183911", base)
 	require.Nil(t, err)
-	require.Equal(t, time.Date(2021, 12, 10, 19, 51, 51, 0, time.Local), d)
+	require.Equal(t, time.Date(2021, 12, 11, 0, 51, 51, 0, time.UTC), d)
 }

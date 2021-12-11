@@ -73,7 +73,7 @@ func parseUnixTime(s string, now time.Time) (time.Time, error) {
 	} else if int64(t) < now.Unix() {
 		return time.Time{}, errUnparsableTime
 	}
-	return time.Unix(int64(t), 0), nil
+	return time.Unix(int64(t), 0).UTC(), nil
 }
 
 func parseNaturalTime(s string, now time.Time) (time.Time, error) {

@@ -28,7 +28,7 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ?`
+	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
 		SELECT id, time, topic, message, title, priority, tags
 		FROM messages 

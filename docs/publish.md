@@ -44,7 +44,7 @@ Here's an example showing how to publish a simple message using a POST request:
 If you have the [Android app](subscribe/phone.md) installed on your phone, this will create a notification that looks like this:
 
 <figure markdown>
-  ![basic notification](static/img/basic-notification.png){ width=500 }
+  ![basic notification](static/img/android-screenshot-basic-notification.png){ width=500 }
   <figcaption>Android notification</figcaption>
 </figure>
 

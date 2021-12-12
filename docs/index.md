@@ -66,7 +66,7 @@ is in the request body. Here's an example showing how to publish a simple messag
 This will create a notification that looks like this:
 
 <figure markdown>
-  ![basic notification](static/img/basic-notification.png){ width=500 }
+  ![basic notification](static/img/android-screenshot-basic-notification.png){ width=500 }
   <figcaption>Android notification</figcaption>
 </figure>
 
@@ -76,7 +76,7 @@ That's it. You're all set. Go play and read the rest of the docs. I highly recom
 Here's another video showing the entire process:
 
 <figure>
-  <video controls muted autoplay loop width="650" src="static/img/overview.mp4"></video>
+  <video controls muted autoplay loop width="650" src="static/img/android-video-overview.mp4"></video>
   <figcaption>Sending push notifications to your Android phone</figcaption>
 </figure>
 

@@ -15,17 +15,18 @@ A picture is worth a thousand words. Here are a few screenshots showing what the
 straight forward. You can add topics and as soon as you add them, you can [publish messages](../publish.md) to them.
 
 <div id="android-screenshots" class="screenshots">
-    <a href="../../static/img/android-screenshot-main.jpg"><img src="../../static/img/android-screenshot-main.jpg"/></a>
-    <a href="../../static/img/android-screenshot-detail.jpg"><img src="../../static/img/android-screenshot-detail.jpg"/></a>
-    <a href="../../static/img/android-screenshot-add.jpg"><img src="../../static/img/android-screenshot-add.jpg"/></a>
-    <a href="../../static/img/android-screenshot-add-instant.jpg"><img src="../../static/img/android-screenshot-add-instant.jpg"/></a>
-    <a href="../../static/img/android-screenshot-add-other.jpg"><img src="../../static/img/android-screenshot-add-other.jpg"/></a>
+    <a href="../../static/img/android-screenshot-main.png"><img src="../../static/img/android-screenshot-main.png"/></a>
+    <a href="../../static/img/android-screenshot-detail.png"><img src="../../static/img/android-screenshot-detail.png"/></a>
+    <a href="../../static/img/android-screenshot-pause.png"><img src="../../static/img/android-screenshot-pause.png"/></a>
+    <a href="../../static/img/android-screenshot-add.png"><img src="../../static/img/android-screenshot-add.png"/></a>
+    <a href="../../static/img/android-screenshot-add-instant.png"><img src="../../static/img/android-screenshot-add-instant.png"/></a>
+    <a href="../../static/img/android-screenshot-add-other.png"><img src="../../static/img/android-screenshot-add-other.png"/></a>
 </div>
 
 If those screenshots are still not enough, here's a video:
 
 <figure>
-  <video controls muted autoplay loop width="650" src="../../static/img/overview.mp4"></video>
+  <video controls muted autoplay loop width="650" src="../../static/img/android-video-overview.mp4"></video>
   <figcaption>Sending push notifications to your Android phone</figcaption>
 </figure>
 
@@ -129,14 +130,19 @@ Here's a list of extras you can access. Most likely, you'll want to filter for `
 ### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm)), you can 
-broadcast an intent with the `io.heckel.ntfy.SEND_MESSAGE` action. In Tasker, you can alternatively use the "HTTP Request"
-action, which may be a little easier and also works if ntfy is not installed.
+broadcast an intent with the `io.heckel.ntfy.SEND_MESSAGE` action. The ntfy Android app will forward the intent as a HTTP
+POST request to [publish a message](../publish.md). This is primarily useful for apps that do not support HTTP POST/PUT
+(like MacroDroid). In Tasker, you can simply use the "HTTP Request" action, which is a little easier and also works if 
+ntfy is not installed.
 
 Here's what that looks like:
 
 <div id="integration-screenshots-send" class="screenshots">
-    <a href="../../static/img/android-screenshot-macrodroid-overview.jpg"><img src="../../static/img/android-screenshot-macrodroid-overview.jpg"/></a>
-    <a href="../../static/img/android-screenshot-macrodroid-trigger.jpg"><img src="../../static/img/android-screenshot-macrodroid-trigger.jpg"/></a> 
+    <a href="../../static/img/android-screenshot-macrodroid-send-macro.jpg"><img src="../../static/img/android-screenshot-macrodroid-send-macro.jpg"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-send-action.jpg"><img src="../../static/img/android-screenshot-macrodroid-send-action.jpg"/></a>
+    <a href="../../static/img/android-screenshot-tasker-profile-send.jpg"><img src="../../static/img/android-screenshot-tasker-profile-send.jpg"/></a>
+    <a href="../../static/img/android-screenshot-tasker-task-edit-post.jpg"><img src="../../static/img/android-screenshot-tasker-task-edit-post.jpg"/></a>
+    <a href="../../static/img/android-screenshot-tasker-action-http-post.jpg"><img src="../../static/img/android-screenshot-tasker-action-http-post.jpg"/></a>
 </div>
 
 The following intent extras are supported when for the intent with the `io.heckel.ntfy.SEND_MESSAGE` action:

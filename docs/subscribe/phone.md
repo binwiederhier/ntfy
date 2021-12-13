@@ -93,13 +93,13 @@ and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android
 broadcasts is supported:
 
 <div id="integration-screenshots-receive" class="screenshots">
-    <a href="../../static/img/android-screenshot-macrodroid-overview.jpg"><img src="../../static/img/android-screenshot-macrodroid-overview.jpg"/></a>
-    <a href="../../static/img/android-screenshot-macrodroid-trigger.jpg"><img src="../../static/img/android-screenshot-macrodroid-trigger.jpg"/></a>
-    <a href="../../static/img/android-screenshot-macrodroid-action.jpg"><img src="../../static/img/android-screenshot-macrodroid-action.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-profiles.jpg"><img src="../../static/img/android-screenshot-tasker-profiles.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-event-edit.jpg"><img src="../../static/img/android-screenshot-tasker-event-edit.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-task-edit.jpg"><img src="../../static/img/android-screenshot-tasker-task-edit.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-action-edit.jpg"><img src="../../static/img/android-screenshot-tasker-action-edit.jpg"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-overview.png"><img src="../../static/img/android-screenshot-macrodroid-overview.png"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-trigger.png"><img src="../../static/img/android-screenshot-macrodroid-trigger.png"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-action.png"><img src="../../static/img/android-screenshot-macrodroid-action.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-profiles.png"><img src="../../static/img/android-screenshot-tasker-profiles.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-event-edit.png"><img src="../../static/img/android-screenshot-tasker-event-edit.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-task-edit.png"><img src="../../static/img/android-screenshot-tasker-task-edit.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-action-edit.png"><img src="../../static/img/android-screenshot-tasker-action-edit.png"/></a>
 </div>
 
 For MacroDroid, be sure to type in the package name `io.heckel.ntfy`, otherwise intents may be silently swallowed.
@@ -138,11 +138,11 @@ ntfy is not installed.
 Here's what that looks like:
 
 <div id="integration-screenshots-send" class="screenshots">
-    <a href="../../static/img/android-screenshot-macrodroid-send-macro.jpg"><img src="../../static/img/android-screenshot-macrodroid-send-macro.jpg"/></a>
-    <a href="../../static/img/android-screenshot-macrodroid-send-action.jpg"><img src="../../static/img/android-screenshot-macrodroid-send-action.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-profile-send.jpg"><img src="../../static/img/android-screenshot-tasker-profile-send.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-task-edit-post.jpg"><img src="../../static/img/android-screenshot-tasker-task-edit-post.jpg"/></a>
-    <a href="../../static/img/android-screenshot-tasker-action-http-post.jpg"><img src="../../static/img/android-screenshot-tasker-action-http-post.jpg"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-send-macro.png"><img src="../../static/img/android-screenshot-macrodroid-send-macro.png"/></a>
+    <a href="../../static/img/android-screenshot-macrodroid-send-action.png"><img src="../../static/img/android-screenshot-macrodroid-send-action.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-profile-send.png"><img src="../../static/img/android-screenshot-tasker-profile-send.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-task-edit-post.png"><img src="../../static/img/android-screenshot-tasker-task-edit-post.png"/></a>
+    <a href="../../static/img/android-screenshot-tasker-action-http-post.png"><img src="../../static/img/android-screenshot-tasker-action-http-post.png"/></a>
 </div>
 
 The following intent extras are supported when for the intent with the `io.heckel.ntfy.SEND_MESSAGE` action:

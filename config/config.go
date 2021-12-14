@@ -7,14 +7,15 @@ import (
 
 // Defines default config settings
 const (
-	DefaultListenHTTP        = ":80"
-	DefaultCacheDuration     = 12 * time.Hour
-	DefaultKeepaliveInterval = 30 * time.Second
-	DefaultManagerInterval   = time.Minute
-	DefaultAtSenderInterval  = 10 * time.Second
-	DefaultMinDelay          = 10 * time.Second
-	DefaultMaxDelay          = 3 * 24 * time.Hour
-	DefaultMessageLimit      = 512
+	DefaultListenHTTP                = ":80"
+	DefaultCacheDuration             = 12 * time.Hour
+	DefaultKeepaliveInterval         = 30 * time.Second
+	DefaultManagerInterval           = time.Minute
+	DefaultAtSenderInterval          = 10 * time.Second
+	DefaultMinDelay                  = 10 * time.Second
+	DefaultMaxDelay                  = 3 * 24 * time.Hour
+	DefaultMessageLimit              = 512
+	DefaultFirebaseKeepaliveInterval = time.Hour
 )
 
 // Defines all the limits
@@ -40,6 +41,7 @@ type Config struct {
 	KeepaliveInterval            time.Duration
 	ManagerInterval              time.Duration
 	AtSenderInterval             time.Duration
+	FirebaseKeepaliveInterval    time.Duration
 	MessageLimit                 int
 	MinDelay                     time.Duration
 	MaxDelay                     time.Duration
@@ -66,6 +68,7 @@ func New(listenHTTP string) *Config {
 		MinDelay:                     DefaultMinDelay,
 		MaxDelay:                     DefaultMaxDelay,
 		AtSenderInterval:             DefaultAtSenderInterval,
+		FirebaseKeepaliveInterval:    DefaultFirebaseKeepaliveInterval,
 		GlobalTopicLimit:             DefaultGlobalTopicLimit,
 		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,

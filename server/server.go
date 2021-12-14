@@ -105,6 +105,10 @@ var (
 	errHTTPTooManyRequests = &errHTTP{http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)}
 )
 
+const (
+	firebaseControlTopic = "~control" // See Android if changed
+)
+
 // New instantiates a new Server. It creates the cache and adds a Firebase
 // subscriber (if configured).
 func New(conf *config.Config) (*Server, error) {
@@ -152,9 +156,17 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 		return nil, err
 	}
 	return func(m *message) error {
-		_, err := msg.Send(context.Background(), &messaging.Message{
-			Topic: m.Topic,
-			Data: map[string]string{
+		var data map[string]string // Matches https://ntfy.sh/docs/subscribe/api/#json-message-format
+		switch m.Event {
+		case keepaliveEvent, openEvent:
+			data = map[string]string{
+				"id":    m.ID,
+				"time":  fmt.Sprintf("%d", m.Time),
+				"event": m.Event,
+				"topic": m.Topic,
+			}
+		case messageEvent:
+			data = map[string]string{
 				"id":       m.ID,
 				"time":     fmt.Sprintf("%d", m.Time),
 				"event":    m.Event,
@@ -163,7 +175,11 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 				"tags":     strings.Join(m.Tags, ","),
 				"title":    m.Title,
 				"message":  m.Message,
-			},
+			}
+		}
+		_, err := msg.Send(context.Background(), &messaging.Message{
+			Topic: m.Topic,
+			Data:  data,
 		})
 		return err
 	}, nil
@@ -188,6 +204,17 @@ func (s *Server) Run() error {
 			}
 		}
 	}()
+	if s.firebase != nil {
+		go func() {
+			ticker := time.NewTicker(s.config.FirebaseKeepaliveInterval)
+			for {
+				<-ticker.C
+				if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
+					log.Printf("error sending Firebase keepalive message: %s", err.Error())
+				}
+			}
+		}()
+	}
 	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)

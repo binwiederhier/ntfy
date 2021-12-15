@@ -188,39 +188,14 @@ func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
-	go func() {
-		ticker := time.NewTicker(s.config.ManagerInterval)
-		for {
-			<-ticker.C
-			s.updateStatsAndPrune()
-		}
-	}()
-	go func() {
-		ticker := time.NewTicker(s.config.AtSenderInterval)
-		for {
-			<-ticker.C
-			if err := s.sendDelayedMessages(); err != nil {
-				log.Printf("error sending scheduled messages: %s", err.Error())
-			}
-		}
-	}()
-	if s.firebase != nil {
-		go func() {
-			ticker := time.NewTicker(s.config.FirebaseKeepaliveInterval)
-			for {
-				<-ticker.C
-				if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
-					log.Printf("error sending Firebase keepalive message: %s", err.Error())
-				}
-			}
-		}()
-	}
+	go s.runManager()
+	go s.runAtSender()
+	go s.runFirebaseKeepliver()
 	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
 	}
 	log.Printf("Listening on %s", listenStr)
-
 	http.HandleFunc("/", s.handle)
 	errChan := make(chan error)
 	go func() {
@@ -611,6 +586,38 @@ func (s *Server) updateStatsAndPrune() {
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
 }
 
+func (s *Server) runManager() {
+	func() {
+		ticker := time.NewTicker(s.config.ManagerInterval)
+		for {
+			<-ticker.C
+			s.updateStatsAndPrune()
+		}
+	}()
+}
+
+func (s *Server) runAtSender() {
+	ticker := time.NewTicker(s.config.AtSenderInterval)
+	for {
+		<-ticker.C
+		if err := s.sendDelayedMessages(); err != nil {
+			log.Printf("error sending scheduled messages: %s", err.Error())
+		}
+	}
+}
+
+func (s *Server) runFirebaseKeepliver() {
+	if s.firebase == nil {
+		return
+	}
+	ticker := time.NewTicker(s.config.FirebaseKeepaliveInterval)
+	for {
+		<-ticker.C
+		if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
+			log.Printf("error sending Firebase keepalive message: %s", err.Error())
+		}
+	}
+}
 func (s *Server) sendDelayedMessages() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/config"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,7 +36,7 @@ func TestServer_PublishAndPoll(t *testing.T) {
 	require.Equal(t, "my first message", messages[0].Message)
 	require.Equal(t, "my second\n\nmessage", messages[1].Message)
 
-	response = request(t, s, "GET", "/mytopic/sse?poll=1", "", nil)
+	response = request(t, s, "GET", "/mytopic/sse?poll=1&since=all", "", nil)
 	lines := strings.Split(strings.TrimSpace(response.Body.String()), "\n")
 	require.Equal(t, 3, len(lines))
 	require.Equal(t, "my first message", toMessage(t, strings.TrimPrefix(lines[0], "data: ")).Message)
@@ -132,6 +134,9 @@ func TestServer_StaticSites(t *testing.T) {
 	rr = request(t, s, "HEAD", "/", "", nil)
 	require.Equal(t, 200, rr.Code)
 
+	rr = request(t, s, "OPTIONS", "/", "", nil)
+	require.Equal(t, 200, rr.Code)
+
 	rr = request(t, s, "GET", "/does-not-exist.txt", "", nil)
 	require.Equal(t, 404, rr.Code)
 
@@ -150,6 +155,10 @@ func TestServer_StaticSites(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Contains(t, rr.Body.String(), `Made with ❤️ by Philipp C. Heckel`)
 	require.Contains(t, rr.Body.String(), `<script src=static/js/extra.js></script>`)
+
+	rr = request(t, s, "GET", "/example.html", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.Contains(t, rr.Body.String(), "</html>")
 }
 
 func TestServer_PublishLargeMessage(t *testing.T) {
@@ -168,6 +177,34 @@ func TestServer_PublishLargeMessage(t *testing.T) {
 	require.Equal(t, truncated, messages[0].Message)
 }
 
+func TestServer_PublishPriority(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	for prio := 1; prio <= 5; prio++ {
+		response := request(t, s, "GET", fmt.Sprintf("/mytopic/publish?priority=%d", prio), fmt.Sprintf("priority %d", prio), nil)
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, prio, msg.Priority)
+	}
+
+	response := request(t, s, "GET", "/mytopic/publish?priority=min", "test", nil)
+	require.Equal(t, 1, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/send?priority=low", "test", nil)
+	require.Equal(t, 2, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/send?priority=default", "test", nil)
+	require.Equal(t, 3, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/send?priority=high", "test", nil)
+	require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/send?priority=max", "test", nil)
+	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/trigger?priority=urgent", "test", nil)
+	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+}
+
 func TestServer_PublishNoCache(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
@@ -182,6 +219,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Empty(t, messages)
 }
+
 func TestServer_PublishAt(t *testing.T) {
 	c := newTestConfig(t)
 	c.MinDelay = time.Second
@@ -302,6 +340,59 @@ func TestServer_PublishWithNopCache(t *testing.T) {
 	require.Empty(t, messages)
 }
 
+func TestServer_PublishAndPollSince(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	request(t, s, "PUT", "/mytopic", "test 1", nil)
+	time.Sleep(1100 * time.Millisecond)
+
+	since := time.Now().Unix()
+	request(t, s, "PUT", "/mytopic", "test 2", nil)
+
+	response := request(t, s, "GET", fmt.Sprintf("/mytopic/json?poll=1&since=%d", since), "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "test 2", messages[0].Message)
+}
+
+func TestServer_PublishViaGET(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "GET", "/mytopic/trigger", "", nil)
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+	require.Equal(t, "triggered", msg.Message)
+
+	response = request(t, s, "GET", "/mytopic/send?message=This+is+a+test&t=This+is+a+title&tags=skull&x-priority=5&delay=24h", "", nil)
+	msg = toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+	require.Equal(t, "This is a test", msg.Message)
+	require.Equal(t, "This is a title", msg.Title)
+	require.Equal(t, []string{"skull"}, msg.Tags)
+	require.Equal(t, 5, msg.Priority)
+	require.Greater(t, msg.Time, time.Now().Add(23*time.Hour).Unix())
+}
+
+func TestServer_PublishFirebase(t *testing.T) {
+	// This is unfortunately not much of a test, since it merely fires the messages towards Firebase,
+	// but cannot re-read them. There is no way from Go to read the messages back, or even get an error back.
+	// I tried everything. I already had written the test, and it increases the code coverage, so I'll leave it ... :shrug: ...
+
+	c := newTestConfig(t)
+	c.FirebaseKeyFile = firebaseServiceAccountFile(t) // May skip the test!
+	s := newTestServer(t, c)
+
+	// Normal message
+	response := request(t, s, "PUT", "/mytopic", "This is a message for firebase", nil)
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+
+	// Keepalive message
+	require.Nil(t, s.firebase(newKeepaliveMessage(firebaseControlTopic)))
+
+	time.Sleep(500 * time.Millisecond) // Time for sends
+}
+
 func newTestConfig(t *testing.T) *config.Config {
 	conf := config.New(":80")
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
@@ -362,4 +453,16 @@ func toMessage(t *testing.T, s string) *message {
 	var m message
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&m))
 	return &m
+}
+
+func firebaseServiceAccountFile(t *testing.T) string {
+	if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE") != "" {
+		return os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE")
+	} else if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT") != "" {
+		filename := filepath.Join(t.TempDir(), "firebase.json")
+		require.NotNil(t, os.WriteFile(filename, []byte(os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT")), 0600))
+		return filename
+	}
+	t.SkipNow()
+	return ""
 }

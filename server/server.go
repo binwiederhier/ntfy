@@ -76,7 +76,7 @@ var (
 	jsonRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
 	sseRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
 	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
-	sendRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(send|trigger)$`)
+	sendRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
 
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
@@ -311,13 +311,12 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 			return err
 		}
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(m); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	s.messages++
-	s.mu.Unlock()
+	s.inc(&s.messages)
 	return nil
 }
 
@@ -689,6 +688,12 @@ func (s *Server) visitor(r *http.Request) *visitor {
 	}
 	v.seen = time.Now()
 	return v
+}
+
+func (s *Server) inc(counter *int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	*counter++
 }
 
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, err error) {

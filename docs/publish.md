@@ -30,6 +30,12 @@ Here's an example showing how to publish a simple message using a POST request:
         strings.NewReader("Backup successful 😀"))
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic", 
+        data="Backup successful 😀".encode(encoding='utf-8'))
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
@@ -95,6 +101,17 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 	http.DefaultClient.Do(req)
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/phil_alerts",
+        data="Remote access to phils-laptop detected. Act right away.",
+        headers={
+            "Title": "Unauthorized access detected",
+            "Priority": "urgent",
+            "Tags": "warning,skull"
+        })
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/phil_alerts', false, stream_context_create([
@@ -149,6 +166,13 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     req, _ := http.NewRequest("POST", "https://ntfy.sh/controversial", strings.NewReader("Oh my ..."))
     req.Header.Set("Title", "Dogs are better than cats")
     http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/controversial",
+        data="Oh my ...",
+        headers={ "Title": "Dogs are better than cats" })
     ```
 
 === "PHP"
@@ -215,6 +239,13 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     req, _ := http.NewRequest("POST", "https://ntfy.sh/phil_alerts", strings.NewReader("An urgent message"))
     req.Header.Set("Priority", "5")
     http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/phil_alerts",
+        data="An urgent message",
+        headers={ "Priority": "5" })
     ```
 
 === "PHP"
@@ -314,6 +345,13 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     http.DefaultClient.Do(req)
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/backups",
+        data="Backup of mailsrv13 failed",
+        headers={ "Tags": "warning,mailsrv13,daily-backup" })
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
@@ -382,6 +420,13 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     http.DefaultClient.Do(req)
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/hello",
+        data="Good morning",
+        headers={ "At": "tomorrow, 10am" })
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
@@ -397,7 +442,6 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
 
 Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Time Zone**):
 
-
 <table class="remove-md-box"><tr>
 <td>
     <table><thead><tr><th><code>Delay/At/In</code> header</th><th>Message will be delivered at</th><th>Explanation</th></tr></thead><tbody>
@@ -410,6 +454,87 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
     </tbody></table>
 </td>
 </tr></table>
+
+## Webhooks (Send via GET) 
+In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
+a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
+like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
+
+To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
+any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 
+also supported as HTTP headers as URL-encoded arguments. Be sure to check the list of all 
+[supported parameters and headers](#list-of-all-parameters) for details.
+
+For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhook/trigger` to send a message 
+(aka trigger the webhook):
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh/mywebhook/trigger
+    ```
+
+=== "HTTP"
+    ``` http
+    GET /mywebhook/trigger HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mywebhook/trigger')
+    ```
+
+=== "Go"
+    ``` go
+    http.Get("https://ntfy.sh/mywebhook/trigger")
+    ```
+
+=== "Python"
+    ``` python
+    requests.get("https://ntfy.sh/mywebhook/trigger")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mywebhook/trigger');
+    ```
+
+To add a custom message, simply append the `message=` URL parameter. And of course you can set the 
+[message priority](#message-priority), the [message title](#message-title), and [tags](#tags-emojis) as well. 
+For a full list of possible parameters, check the list of [supported parameters and headers](#list-of-all-parameters).
+
+Here's an example with a custom message, tags and a priority:
+
+=== "Command line (curl)"
+    ```
+    curl "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    ```
+
+=== "HTTP"
+    ``` http
+    GET /mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull')
+    ```
+
+=== "Go"
+    ``` go
+    http.Get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    ```
+
+=== "Python"
+    ``` python
+    requests.get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
+    ```
 
 ## Advanced features
 
@@ -457,6 +582,13 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be stored server-side"))
     req.Header.Set("Cache", "no")
     http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic",
+        data="This message won't be stored server-side",
+        headers={ "Cache": "no" })
     ```
 
 === "PHP"
@@ -517,6 +649,13 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     http.DefaultClient.Do(req)
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic",
+        data="This message won't be forwarded to FCM",
+        headers={ "Firebase": "no" })
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
@@ -529,3 +668,17 @@ to `no`. This will instruct the server not to forward messages to Firebase.
         ]
     ]));
     ```
+
+## List of all parameters
+The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
+and can be passed as **HTTP headers** or **query parameters in the URL**.
+
+| Parameter | Aliases (case-insensitive) | Description |
+|---|---|---|
+| `X-Message` | `Message`, `m` | Main body of the message as shown in the notification |
+| `X-Title` | `Title`, `t` | [Message title](#message-title) |
+| `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
+| `X-Tags` | `Tags`, `ta` | [Tags and emojis](#tags-emojis) |
+| `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
+| `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
+| `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |

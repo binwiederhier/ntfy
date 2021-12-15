@@ -58,8 +58,3 @@ func (l *Limiter) Value() int64 {
 	defer l.mu.Unlock()
 	return l.value
 }
-
-// Limit returns the defined limit
-func (l *Limiter) Limit() int64 {
-	return l.limit
-}

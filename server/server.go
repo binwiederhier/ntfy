@@ -76,6 +76,7 @@ var (
 	jsonRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
 	sseRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
 	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
+	sendRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(send|trigger)$`)
 
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
@@ -236,6 +237,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleHome(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handlePublish)
+	} else if r.Method == http.MethodGet && sendRegex.MatchString(r.URL.Path) {
+		return s.withRateLimit(w, r, s.handlePublish)
 	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handleSubscribeJSON)
 	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
@@ -273,7 +276,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	t, err := s.topicFromID(r.URL.Path[1:])
+	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
 		return err
 	}
@@ -282,13 +285,13 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if err != nil {
 		return err
 	}
-	m := newDefaultMessage(t.ID, string(b))
-	if m.Message == "" {
-		return errHTTPBadRequest
-	}
-	cache, firebase, err := s.parseHeaders(r.Header, m)
+	m := newDefaultMessage(t.ID, strings.TrimSpace(string(b)))
+	cache, firebase, err := s.parseParams(r, m)
 	if err != nil {
 		return err
+	}
+	if m.Message == "" {
+		m.Message = "triggered"
 	}
 	delayed := m.Time > time.Now().Unix()
 	if !delayed {
@@ -318,11 +321,15 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func (s *Server) parseHeaders(header http.Header, m *message) (cache bool, firebase bool, err error) {
-	cache = readHeader(header, "x-cache", "cache") != "no"
-	firebase = readHeader(header, "x-firebase", "firebase") != "no"
-	m.Title = readHeader(header, "x-title", "title", "ti", "t")
-	priorityStr := readHeader(header, "x-priority", "priority", "prio", "p")
+func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, err error) {
+	cache = readParam(r, "x-cache", "cache") != "no"
+	firebase = readParam(r, "x-firebase", "firebase") != "no"
+	m.Title = readParam(r, "x-title", "title", "ti", "t")
+	messageStr := readParam(r, "x-message", "message", "m")
+	if messageStr != "" {
+		m.Message = messageStr
+	}
+	priorityStr := readParam(r, "x-priority", "priority", "prio", "p")
 	if priorityStr != "" {
 		switch strings.ToLower(priorityStr) {
 		case "1", "min":
@@ -339,14 +346,14 @@ func (s *Server) parseHeaders(header http.Header, m *message) (cache bool, fireb
 			return false, false, errHTTPBadRequest
 		}
 	}
-	tagsStr := readHeader(header, "x-tags", "tag", "tags", "ta")
+	tagsStr := readParam(r, "x-tags", "tag", "tags", "ta")
 	if tagsStr != "" {
 		m.Tags = make([]string, 0)
 		for _, s := range strings.Split(tagsStr, ",") {
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	delayStr := readHeader(header, "x-delay", "delay", "x-at", "at", "x-in", "in")
+	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
 			return false, false, errHTTPBadRequest
@@ -364,9 +371,15 @@ func (s *Server) parseHeaders(header http.Header, m *message) (cache bool, fireb
 	return cache, firebase, nil
 }
 
-func readHeader(header http.Header, names ...string) string {
+func readParam(r *http.Request, names ...string) string {
 	for _, name := range names {
-		value := header.Get(name)
+		value := r.Header.Get(name)
+		if value != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	for _, name := range names {
+		value := r.URL.Query().Get(strings.ToLower(name))
 		if value != "" {
 			return strings.TrimSpace(value)
 		}
@@ -520,8 +533,12 @@ func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (s *Server) topicFromID(id string) (*topic, error) {
-	topics, err := s.topicsFromIDs(id)
+func (s *Server) topicFromPath(path string) (*topic, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		return nil, errHTTPBadRequest
+	}
+	topics, err := s.topicsFromIDs(parts[1])
 	if err != nil {
 		return nil, err
 	}

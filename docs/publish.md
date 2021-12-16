@@ -669,6 +669,17 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ]));
     ```
 
+## Limitations
+There are a few limitations to the API to prevent abuse and to keep the server healthy. Most of them you won't run into,
+but just in case, let's list them all:
+
+| Limit | Description |
+|---|---|
+| **Message length** | Each message can be up to 512 bytes long. Longer messages are truncated. |
+| **Requests per second** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
+| **Subscription limits** | By default, the server allows each visitor to keep 30 connections to the server open. |
+| **Total number of topics** | By default, the server is configured to allow 5,000 topics. The ntfy.sh server has higher limits though. |
+
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
 and can be passed as **HTTP headers** or **query parameters in the URL**.

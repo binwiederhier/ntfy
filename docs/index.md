@@ -52,6 +52,12 @@ is in the request body. Here's an example showing how to publish a simple messag
        strings.NewReader("Backup successful 😀"))
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic",
+        data="Backup successful 😀".encode(encoding='utf-8'))
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([

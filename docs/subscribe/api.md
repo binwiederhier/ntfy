@@ -54,6 +54,14 @@ recommended way to subscribe to a topic**. The notable exception is JavaScript, 
     }
     ```
 
+=== "Python"
+    ``` python
+    resp = requests.get("https://ntfy.sh/disk-alerts/json", stream=True)
+    for line in resp.iter_lines():
+      if line:
+        print(line)
+    ```
+
 === "PHP"
     ``` php-inline
     $fp = fopen('https://ntfy.sh/disk-alerts/json', 'r');
@@ -148,6 +156,14 @@ format. Keepalive messages are sent as empty lines.
     for scanner.Scan() {
         println(scanner.Text())
     }
+    ```
+
+=== "Python"
+    ``` python 
+    resp = requests.get("https://ntfy.sh/disk-alerts/raw", stream=True)
+    for line in resp.iter_lines():
+      if line:
+        print(line)
     ```
 
 === "PHP"

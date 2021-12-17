@@ -1,9 +1,11 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -15,6 +17,8 @@ const (
 var (
 	random      = rand.New(rand.NewSource(time.Now().UnixNano()))
 	randomMutex = sync.Mutex{}
+
+	errInvalidPriority = errors.New("unknown priority")
 )
 
 // FileExists checks if a file exists, and returns true if it does
@@ -74,4 +78,23 @@ func DurationToHuman(d time.Duration) (str string) {
 		str += fmt.Sprintf("%ds", seconds)
 	}
 	return
+}
+
+func ParsePriority(priority string) (int, error) {
+	switch strings.ToLower(priority) {
+	case "":
+		return 0, nil
+	case "1", "min":
+		return 1, nil
+	case "2", "low":
+		return 2, nil
+	case "3", "default":
+		return 3, nil
+	case "4", "high":
+		return 4, nil
+	case "5", "max", "urgent":
+		return 5, nil
+	default:
+		return 0, errInvalidPriority
+	}
 }

@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=ntfy
 Group=ntfy
-ExecStart=/usr/bin/ntfy
+ExecStart=/usr/bin/ntfy serve
 Restart=on-failure
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 LimitNOFILE=10000

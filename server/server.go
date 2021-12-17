@@ -328,22 +328,9 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	if messageStr != "" {
 		m.Message = messageStr
 	}
-	priorityStr := readParam(r, "x-priority", "priority", "prio", "p")
-	if priorityStr != "" {
-		switch strings.ToLower(priorityStr) {
-		case "1", "min":
-			m.Priority = 1
-		case "2", "low":
-			m.Priority = 2
-		case "3", "default":
-			m.Priority = 3
-		case "4", "high":
-			m.Priority = 4
-		case "5", "max", "urgent":
-			m.Priority = 5
-		default:
-			return false, false, errHTTPBadRequest
-		}
+	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
+	if err != nil {
+		return false, false, errHTTPBadRequest
 	}
 	tagsStr := readParam(r, "x-tags", "tag", "tags", "ta")
 	if tagsStr != "" {

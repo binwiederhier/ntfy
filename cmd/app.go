@@ -2,112 +2,42 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/config"
-	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
 	"log"
 	"os"
-	"time"
+	"strings"
 )
 
 // New creates a new CLI application
 func New() *cli.App {
-	flags := []cli.Flag{
-		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/config.yml", DefaultText: "/etc/ntfy/config.yml", Usage: "config file"},
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: config.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used to as HTTPS listen address"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: config.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: config.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: config.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
-		altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: config.DefaultGlobalTopicLimit, Usage: "total number of topics allowed"}),
-		altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"V"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: config.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
-		altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", Aliases: []string{"B"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: config.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
-		altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", Aliases: []string{"R"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: config.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
-		altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
-	}
 	return &cli.App{
 		Name:                   "ntfy",
 		Usage:                  "Simple pub-sub notification service",
 		UsageText:              "ntfy [OPTION..]",
-		HideHelp:               true,
 		HideVersion:            true,
-		EnableBashCompletion:   true,
 		UseShortOptionHandling: true,
 		Reader:                 os.Stdin,
 		Writer:                 os.Stdout,
 		ErrWriter:              os.Stderr,
-		Action:                 execRun,
-		Before:                 initConfigFileInputSource("config", flags),
-		Flags:                  flags,
+		Action:                 execMainApp,
+		Before:                 initConfigFileInputSource("config", flagsServe), // DEPRECATED, see deprecation notice
+		Flags:                  flagsServe,                                      // DEPRECATED, see deprecation notice
+		Commands: []*cli.Command{
+			cmdServe,
+			cmdPublish,
+			cmdSubscribe,
+		},
 	}
 }
 
-func execRun(c *cli.Context) error {
-	// Read all the options
-	listenHTTP := c.String("listen-http")
-	listenHTTPS := c.String("listen-https")
-	keyFile := c.String("key-file")
-	certFile := c.String("cert-file")
-	firebaseKeyFile := c.String("firebase-key-file")
-	cacheFile := c.String("cache-file")
-	cacheDuration := c.Duration("cache-duration")
-	keepaliveInterval := c.Duration("keepalive-interval")
-	managerInterval := c.Duration("manager-interval")
-	globalTopicLimit := c.Int("global-topic-limit")
-	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
-	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
-	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
-	behindProxy := c.Bool("behind-proxy")
-
-	// Check values
-	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
-		return errors.New("if set, FCM key file must exist")
-	} else if keepaliveInterval < 5*time.Second {
-		return errors.New("keepalive interval cannot be lower than five seconds")
-	} else if managerInterval < 5*time.Second {
-		return errors.New("manager interval cannot be lower than five seconds")
-	} else if cacheDuration > 0 && cacheDuration < managerInterval {
-		return errors.New("cache duration cannot be lower than manager interval")
-	} else if keyFile != "" && !util.FileExists(keyFile) {
-		return errors.New("if set, key file must exist")
-	} else if certFile != "" && !util.FileExists(certFile) {
-		return errors.New("if set, certificate file must exist")
-	} else if listenHTTPS != "" && (keyFile == "" || certFile == "") {
-		return errors.New("if listen-https is set, both key-file and cert-file must be set")
-	}
-
-	// Run server
-	conf := config.New(listenHTTP)
-	conf.ListenHTTPS = listenHTTPS
-	conf.KeyFile = keyFile
-	conf.CertFile = certFile
-	conf.FirebaseKeyFile = firebaseKeyFile
-	conf.CacheFile = cacheFile
-	conf.CacheDuration = cacheDuration
-	conf.KeepaliveInterval = keepaliveInterval
-	conf.ManagerInterval = managerInterval
-	conf.GlobalTopicLimit = globalTopicLimit
-	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
-	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
-	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
-	conf.BehindProxy = behindProxy
-	s, err := server.New(conf)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if err := s.Run(); err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("Exiting.")
-	return nil
+func execMainApp(c *cli.Context) error {
+	log.Printf("\x1b[1;33mDeprecation notice: Please run the server using 'ntfy serve'; see 'ntfy -h' for help.\x1b[0m")
+	log.Printf("\x1b[1;33mThis way of running the server will be removed Feb 2022.\x1b[0m")
+	return execServe(c)
 }
 
 // initConfigFileInputSource is like altsrc.InitInputSourceWithContext and altsrc.NewYamlSourceFromFlagFunc, but checks
@@ -126,4 +56,17 @@ func initConfigFileInputSource(configFlag string, flags []cli.Flag) cli.BeforeFu
 		}
 		return altsrc.ApplyInputSourceValues(context, inputSource, flags)
 	}
+}
+
+func expandTopicURL(s string) string {
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		return s
+	} else if strings.Contains(s, "/") {
+		return fmt.Sprintf("https://%s", s)
+	}
+	return fmt.Sprintf("%s/%s", client.DefaultBaseURL, s)
+}
+
+func collapseTopicURL(s string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
 }

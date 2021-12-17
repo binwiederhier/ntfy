@@ -19,7 +19,7 @@ func main() {
 Try 'ntfy COMMAND --help' for more information.
 
 ntfy %s (%s), runtime %s, built at %s
-Copyright (C) 2021 Philipp C. Heckel, distributed under the Apache License 2.0
+Copyright (C) 2021 Philipp C. Heckel, licensed under Apache License 2.0 & GPLv2
 `, version, commit[:7], runtime.Version(), date)
 
 	app := cmd.New()

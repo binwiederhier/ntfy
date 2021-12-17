@@ -12,7 +12,7 @@ We support amd64, armv7 and arm64.
 
 1. Install ntfy using one of the methods described below
 2. Then (optionally) edit `/etc/ntfy/config.yml` (see [configuration](config.md))
-3. Then just run it with `ntfy` (or `systemctl start ntfy` when using the deb/rpm).
+3. Then just run it with `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
 
 ## Binaries and packages
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
@@ -22,21 +22,21 @@ deb/rpm packages.
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.7.0/ntfy_1.7.0_linux_x86_64.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy
+    sudo ./ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.7.0/ntfy_1.7.0_linux_armv7.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy
+    sudo ./ntfy serve
     ```
 
 === "arm64"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.7.0/ntfy_1.7.0_linux_arm64.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy
+    sudo ./ntfy serve
     ```
 
 ## Debian/Ubuntu repository
@@ -132,12 +132,12 @@ The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for a
 straight forward to use.
 
 The server exposes its web UI and the API on port 80, so you need to expose that in Docker. To use the persistent 
-[message cache](config.md#message-cache), you also need to map a volume to `/var/cache/ntfy`. To change other settings, you should map `/etc/ntfy`,
-so you can edit `/etc/ntfy/config.yml`.
+[message cache](config.md#message-cache), you also need to map a volume to `/var/cache/ntfy`. To change other settings, 
+you should map `/etc/ntfy`, so you can edit `/etc/ntfy/config.yml`.
 
 Basic usage (no cache or additional config):
 ```
-docker run -p 80:80 -it binwiederhier/ntfy
+docker run -p 80:80 -it binwiederhier/ntfy serve
 ```
 
 With persistent cache (configured as command line arguments):
@@ -147,7 +147,8 @@ docker run \
   -p 80:80 \
   -it \
   binwiederhier/ntfy \
-    --cache-file /var/cache/ntfy/cache.db
+    --cache-file /var/cache/ntfy/cache.db \
+    serve
 ```
 
 With other config options (configured via `/etc/ntfy/config.yml`, see [configuration](config.md) for details):
@@ -156,7 +157,8 @@ docker run \
   -v /etc/ntfy:/etc/ntfy \
   -p 80:80 \
   -it \
-  binwiederhier/ntfy
+  binwiederhier/ntfy \
+  serve
 ```
 
 ## Go

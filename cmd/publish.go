@@ -9,7 +9,7 @@ import (
 
 var cmdPublish = &cli.Command{
 	Name:      "publish",
-	Aliases:   []string{"pub", "send"},
+	Aliases:   []string{"pub", "send", "push"},
 	Usage:     "Send message via a ntfy server",
 	UsageText: "ntfy send [OPTIONS..] TOPIC MESSAGE",
 	Action:    execPublish,

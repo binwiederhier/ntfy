@@ -34,12 +34,12 @@ type Message struct {
 	Event    string
 	Time     int64
 	Topic    string
+	BaseURL  string
+	TopicURL string
 	Message  string
 	Title    string
 	Priority int
 	Tags     []string
-	BaseURL  string
-	TopicURL string
 	Raw      string
 }
 
@@ -73,7 +73,23 @@ func (c *Client) Publish(topicURL, message string, options ...PublishOption) err
 	return err
 }
 
-func (c *Client) Subscribe(topicURL string) {
+func (c *Client) Poll(topicURL string, options ...SubscribeOption) ([]*Message, error) {
+	ctx := context.Background()
+	messages := make([]*Message, 0)
+	msgChan := make(chan *Message)
+	errChan := make(chan error)
+	go func() {
+		err := performSubscribeRequest(ctx, msgChan, topicURL, options...)
+		close(msgChan)
+		errChan <- err
+	}()
+	for m := range msgChan {
+		messages = append(messages, m)
+	}
+	return messages, <-errChan
+}
+
+func (c *Client) Subscribe(topicURL string, options ...SubscribeOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.subscriptions[topicURL]; ok {
@@ -81,7 +97,7 @@ func (c *Client) Subscribe(topicURL string) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c.subscriptions[topicURL] = &subscription{cancel}
-	go handleConnectionLoop(ctx, c.Messages, topicURL)
+	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, options...)
 }
 
 func (c *Client) Unsubscribe(topicURL string) {
@@ -95,24 +111,29 @@ func (c *Client) Unsubscribe(topicURL string) {
 	return
 }
 
-func handleConnectionLoop(ctx context.Context, msgChan chan *Message, topicURL string) {
+func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL string, options ...SubscribeOption) {
 	for {
-		if err := handleConnection(ctx, msgChan, topicURL); err != nil {
-			log.Printf("connection to %s failed: %s", topicURL, err.Error())
+		if err := performSubscribeRequest(ctx, msgChan, topicURL, options...); err != nil {
+			log.Printf("Connection to %s failed: %s", topicURL, err.Error())
 		}
 		select {
 		case <-ctx.Done():
-			log.Printf("connection to %s exited", topicURL)
+			log.Printf("Connection to %s exited", topicURL)
 			return
 		case <-time.After(5 * time.Second):
 		}
 	}
 }
 
-func handleConnection(ctx context.Context, msgChan chan *Message, topicURL string) error {
+func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, options ...SubscribeOption) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/json", topicURL), nil)
 	if err != nil {
 		return err
+	}
+	for _, option := range options {
+		if err := option(req); err != nil {
+			return err
+		}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

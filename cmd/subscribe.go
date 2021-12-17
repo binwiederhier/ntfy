@@ -21,6 +21,8 @@ var cmdSubscribe = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "exec", Aliases: []string{"e"}, Usage: "execute command for each message event"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since (Unix timestamp, or all)"},
+		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
+		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
 	},
 	Description: `(THIS COMMAND IS INCUBATING. IT MAY CHANGE WITHOUT NOTICE.)
 
@@ -45,7 +47,8 @@ are passed to the command as environment variables:
 Examples:
   ntfy subscribe mytopic                       # Prints JSON for incoming messages to stdout
   ntfy sub home.lan/backups alerts             # Subscribe to two different topics
-  ntfy sub --exec='notify-send "$m"' mytopic   # Execute command for incoming messages'  
+  ntfy sub --exec='notify-send "$m"' mytopic   # Execute command for incoming messages
+  ntfy sub --exec=/my/script topic1 topic2     # Subscribe to two topics and execute command for each message
 `,
 }
 
@@ -56,11 +59,37 @@ func execSubscribe(c *cli.Context) error {
 	log.Printf("\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
 	cl := client.DefaultClient
 	command := c.String("exec")
-	for _, topic := range c.Args().Slice() {
-		cl.Subscribe(expandTopicURL(topic))
+	since := c.String("since")
+	poll := c.Bool("poll")
+	scheduled := c.Bool("scheduled")
+	topics := c.Args().Slice()
+	var options []client.SubscribeOption
+	if since != "" {
+		options = append(options, client.WithSince(since))
 	}
-	for m := range cl.Messages {
-		_ = dispatchMessage(c, command, m)
+	if poll {
+		options = append(options, client.WithPoll())
+	}
+	if scheduled {
+		options = append(options, client.WithScheduled())
+	}
+	if poll {
+		for _, topic := range topics {
+			messages, err := cl.Poll(expandTopicURL(topic), options...)
+			if err != nil {
+				return err
+			}
+			for _, m := range messages {
+				_ = dispatchMessage(c, command, m)
+			}
+		}
+	} else {
+		for _, topic := range topics {
+			cl.Subscribe(expandTopicURL(topic), options...)
+		}
+		for m := range cl.Messages {
+			_ = dispatchMessage(c, command, m)
+		}
 	}
 	return nil
 }
@@ -77,11 +106,9 @@ func execCommand(c *cli.Context, command string, m *client.Message) error {
 	if m.Event == client.OpenEvent {
 		log.Printf("[%s] Connection opened, subscribed to topic", collapseTopicURL(m.TopicURL))
 	} else if m.Event == client.MessageEvent {
-		go func() {
-			if err := runCommandInternal(c, command, m); err != nil {
-				log.Printf("[%s] Command failed: %s", collapseTopicURL(m.TopicURL), err.Error())
-			}
-		}()
+		if err := runCommandInternal(c, command, m); err != nil {
+			log.Printf("[%s] Command failed: %s", collapseTopicURL(m.TopicURL), err.Error())
+		}
 	}
 	return nil
 }

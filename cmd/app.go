@@ -36,7 +36,7 @@ func New() *cli.App {
 
 func execMainApp(c *cli.Context) error {
 	log.Printf("\x1b[1;33mDeprecation notice: Please run the server using 'ntfy serve'; see 'ntfy -h' for help.\x1b[0m")
-	log.Printf("\x1b[1;33mThis way of running the server will be removed Feb 2022.\x1b[0m")
+	log.Printf("\x1b[1;33mThis way of running the server will be removed March 2022. See https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
 	return execServe(c)
 }
 

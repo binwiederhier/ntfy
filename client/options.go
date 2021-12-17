@@ -4,42 +4,24 @@ import (
 	"net/http"
 )
 
-type PublishOption func(r *http.Request) error
+type RequestOption func(r *http.Request) error
+type PublishOption = RequestOption
+type SubscribeOption = RequestOption
 
 func WithTitle(title string) PublishOption {
-	return func(r *http.Request) error {
-		if title != "" {
-			r.Header.Set("X-Title", title)
-		}
-		return nil
-	}
+	return WithHeader("X-Title", title)
 }
 
 func WithPriority(priority string) PublishOption {
-	return func(r *http.Request) error {
-		if priority != "" {
-			r.Header.Set("X-Priority", priority)
-		}
-		return nil
-	}
+	return WithHeader("X-Priority", priority)
 }
 
 func WithTags(tags string) PublishOption {
-	return func(r *http.Request) error {
-		if tags != "" {
-			r.Header.Set("X-Tags", tags)
-		}
-		return nil
-	}
+	return WithHeader("X-Tags", tags)
 }
 
 func WithDelay(delay string) PublishOption {
-	return func(r *http.Request) error {
-		if delay != "" {
-			r.Header.Set("X-Delay", delay)
-		}
-		return nil
-	}
+	return WithHeader("X-Delay", delay)
 }
 
 func WithNoCache() PublishOption {
@@ -50,20 +32,32 @@ func WithNoFirebase() PublishOption {
 	return WithHeader("X-Firebase", "no")
 }
 
-func WithHeader(header, value string) PublishOption {
+func WithSince(since string) SubscribeOption {
+	return WithQueryParam("since", since)
+}
+
+func WithPoll() SubscribeOption {
+	return WithQueryParam("poll", "1")
+}
+
+func WithScheduled() SubscribeOption {
+	return WithQueryParam("scheduled", "1")
+}
+
+func WithHeader(header, value string) RequestOption {
 	return func(r *http.Request) error {
-		r.Header.Set(header, value)
+		if value != "" {
+			r.Header.Set(header, value)
+		}
 		return nil
 	}
 }
 
-type SubscribeOption func(r *http.Request) error
-
-func WithSince(since string) PublishOption {
+func WithQueryParam(param, value string) RequestOption {
 	return func(r *http.Request) error {
-		if since != "" {
+		if value != "" {
 			q := r.URL.Query()
-			q.Add("since", since)
+			q.Add(param, value)
 			r.URL.RawQuery = q.Encode()
 		}
 		return nil

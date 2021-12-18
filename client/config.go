@@ -7,8 +7,8 @@ const (
 type Config struct {
 	DefaultHost string
 	Subscribe   []struct {
-		Topic string
-		Exec  string
+		Topic   string
+		Command string
 	}
 }
 

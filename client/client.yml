@@ -11,8 +11,8 @@
 # Here's a (hopefully self-explanatory) example:
 #   subscribe:
 #     - topic: mytopic
-#       exec: /usr/local/bin/mytopic-triggered.sh
+#       command: /usr/local/bin/mytopic-triggered.sh
 #     - topic: myserver.com/anothertopic
-#       exec: 'echo "$message"'
+#       command: 'echo "$message"'
 #
 # subscribe:

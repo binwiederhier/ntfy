@@ -27,6 +27,7 @@ var cmdSubscribe = &cli.Command{
 		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
+		&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "print verbose output"},
 	},
 	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
 every arriving message. There are 3 modes in which the command can be run:
@@ -71,39 +72,9 @@ ntfy subscribe --from-config
 }
 
 func execSubscribe(c *cli.Context) error {
-	fromConfig := c.Bool("from-config")
-	if fromConfig {
-		return execSubscribeFromConfig(c)
-	}
-	return execSubscribeWithoutConfig(c)
-}
-
-func execSubscribeFromConfig(c *cli.Context) error {
-	conf, err := loadConfig(c)
-	if err != nil {
-		return err
-	}
-	cl := client.New(conf)
-	commands := make(map[string]string)
-	for _, s := range conf.Subscribe {
-		topicURL := cl.Subscribe(s.Topic)
-		commands[topicURL] = s.Exec
-	}
-	for m := range cl.Messages {
-		command, ok := commands[m.TopicURL]
-		if !ok {
-			continue
-		}
-		_ = dispatchMessage(c, command, m)
-	}
-	return nil
-}
-
-func execSubscribeWithoutConfig(c *cli.Context) error {
-	if c.NArg() < 1 {
-		return errors.New("topic missing")
-	}
 	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
+
+	// Read config and options
 	conf, err := loadConfig(c)
 	if err != nil {
 		return err
@@ -112,8 +83,12 @@ func execSubscribeWithoutConfig(c *cli.Context) error {
 	since := c.String("since")
 	poll := c.Bool("poll")
 	scheduled := c.Bool("scheduled")
+	fromConfig := c.Bool("from-config")
 	topic := c.Args().Get(0)
 	command := c.Args().Get(1)
+	if !fromConfig {
+		conf.Subscribe = nil // wipe if --from-config not passed
+	}
 	var options []client.SubscribeOption
 	if since != "" {
 		options = append(options, client.WithSince(since))
@@ -124,40 +99,77 @@ func execSubscribeWithoutConfig(c *cli.Context) error {
 	if scheduled {
 		options = append(options, client.WithScheduled())
 	}
+	if topic == "" && len(conf.Subscribe) == 0 {
+		return errors.New("must specify topic, or have at least one topic defined in config")
+	}
+
+	// Execute poll or subscribe
 	if poll {
-		messages, err := cl.Poll(topic, options...)
-		if err != nil {
+		return execPoll(c, cl, conf, topic, command, options...)
+	}
+	return execSubscribeInternal(c, cl, conf, topic, command, options...)
+}
+
+func execPoll(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
+	for _, s := range conf.Subscribe { // may be nil
+		if err := execPollSingle(c, cl, s.Topic, s.Command, options...); err != nil {
 			return err
 		}
-		for _, m := range messages {
-			_ = dispatchMessage(c, command, m)
-		}
-	} else {
-		cl.Subscribe(topic, options...)
-		for m := range cl.Messages {
-			_ = dispatchMessage(c, command, m)
+	}
+	if topic != "" {
+		if err := execPollSingle(c, cl, topic, command, options...); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func dispatchMessage(c *cli.Context, command string, m *client.Message) error {
+func execPollSingle(c *cli.Context, cl *client.Client, topic, command string, options ...client.SubscribeOption) error {
+	messages, err := cl.Poll(topic, options...)
+	if err != nil {
+		return err
+	}
+	for _, m := range messages {
+		printMessageOrRunCommand(c, m, command)
+	}
+	return nil
+}
+
+func execSubscribeInternal(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
+	commands := make(map[string]string)
+	for _, s := range conf.Subscribe { // May be nil
+		topicURL := cl.Subscribe(s.Topic, options...)
+		commands[topicURL] = s.Command
+	}
+	if topic != "" {
+		topicURL := cl.Subscribe(topic, options...)
+		commands[topicURL] = command
+	}
+	for m := range cl.Messages {
+		command, ok := commands[m.TopicURL]
+		if !ok {
+			continue
+		}
+		printMessageOrRunCommand(c, m, command)
+	}
+	return nil
+}
+
+func printMessageOrRunCommand(c *cli.Context, m *client.Message, command string) {
+	if m.Event != client.MessageEvent {
+		return
+	}
 	if command != "" {
-		return execCommand(c, command, m)
+		runCommand(c, command, m)
+	} else {
+		fmt.Fprintln(c.App.Writer, m.Raw)
 	}
-	fmt.Println(m.Raw)
-	return nil
 }
 
-func execCommand(c *cli.Context, command string, m *client.Message) error {
-	if m.Event == client.OpenEvent {
-		log.Printf("[%s] Connection opened, subscribed to topic", collapseTopicURL(m.TopicURL))
-	} else if m.Event == client.MessageEvent {
-		if err := runCommandInternal(c, command, m); err != nil {
-			log.Printf("[%s] Command failed: %s", collapseTopicURL(m.TopicURL), err.Error())
-		}
+func runCommand(c *cli.Context, command string, m *client.Message) {
+	if err := runCommandInternal(c, command, m); err != nil {
+		fmt.Fprintf(c.App.ErrWriter, "Command failed: %s\n", err.Error())
 	}
-	return nil
 }
 
 func runCommandInternal(c *cli.Context, command string, m *client.Message) error {
@@ -166,7 +178,10 @@ func runCommandInternal(c *cli.Context, command string, m *client.Message) error
 		return err
 	}
 	defer os.Remove(scriptFile)
-	log.Printf("[%s] Executing: %s (for message: %s)", collapseTopicURL(m.TopicURL), command, m.Raw)
+	verbose := c.Bool("verbose")
+	if verbose {
+		log.Printf("[%s] Executing: %s (for message: %s)", collapseTopicURL(m.TopicURL), command, m.Raw)
+	}
 	cmd := exec.Command("sh", "-c", scriptFile)
 	cmd.Stdin = c.App.Reader
 	cmd.Stdout = c.App.Writer

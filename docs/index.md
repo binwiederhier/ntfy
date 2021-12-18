@@ -22,12 +22,18 @@ For this guide, we'll just use `mytopic` as our topic name:
 That's it. After you tap "Subscribe", the app is listening for new messages on that topic.
 
 ## Step 2: Send a message
-Now let's [send a message](publish.md) to our topic. It's easy in every language, since we're just using HTTP PUT or POST. The message
-is in the request body. Here's an example showing how to publish a simple message using a POST request:
+Now let's [send a message](publish.md) to our topic. It's easy in every language, since we're just using HTTP PUT/POST,
+or with the [ntfy CLI](install.md). The message is in the request body. Here's an example showing how to publish a 
+simple message using a POST request:
 
 === "Command line (curl)"
     ```
     curl -d "Backup successful 😀" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish mytopic "Backup successful 😀"
     ```
 
 === "HTTP"

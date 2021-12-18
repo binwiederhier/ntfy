@@ -4,10 +4,10 @@ see [config.yml](https://github.com/binwiederhier/ntfy/blob/main/config/config.y
 or using environment variables.
 
 ## Quick start
-By default, simply running `ntfy` will start the server at port 80. No configuration needed. Batteries included 😀. 
+By default, simply running `ntfy serve` will start the server at port 80. No configuration needed. Batteries included 😀. 
 If everything works as it should, you'll see something like this:
 ```
-$ ntfy                
+$ ntfy serve
 2021/11/30 19:59:08 Listening on :80
 ```
 

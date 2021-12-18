@@ -56,7 +56,7 @@ func execSubscribe(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return errors.New("topic missing")
 	}
-	log.Printf("\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
+	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
 	cl := client.DefaultClient
 	command := c.String("exec")
 	since := c.String("since")

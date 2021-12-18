@@ -1,12 +1,18 @@
 # Publishing
-Publishing messages can be done via HTTP PUT or POST. Topics are created on the fly by subscribing or publishing to them.
-Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable.
+Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](install.md). Topics are created on the fly by 
+subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
+something that's not easily guessable.
 
 Here's an example showing how to publish a simple message using a POST request:
 
 === "Command line (curl)"
     ```
     curl -d "Backup successful 😀" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish mytopic "Backup successful 😀"
     ```
 
 === "HTTP"
@@ -65,6 +71,16 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
       -H "Tags: warning,skull" \
       -d "Remote access to phils-laptop detected. Act right away." \
       ntfy.sh/phil_alerts
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --title "Unauthorized access detected" \
+        --tags warning,skull \
+        --priority urgent \
+        mytopic \
+        "Remote access to phils-laptop detected. Act right away."
     ```
 
 === "HTTP"
@@ -143,6 +159,13 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     curl -H "t: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
     ```
 
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        -t "Dogs are better than cats" \
+        controversial "Oh my ..."
+    ```
+
 === "HTTP"
     ``` http
     POST /controversial HTTP/1.1
@@ -214,6 +237,13 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     curl -H "X-Priority: 5" -d "An urgent message" ntfy.sh/phil_alerts
     curl -H "Priority: low" -d "Low priority message" ntfy.sh/phil_alerts
     curl -H p:4 -d "A high priority message" ntfy.sh/phil_alerts
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \ 
+        -p 5 \
+        phil_alerts An urgent message
     ```
 
 === "HTTP"
@@ -320,6 +350,13 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     curl -H ta:dog -d "Dogs are awesome" ntfy.sh/backups
     ```
 
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --tags=warning,mailsrv13,daily-backup \
+        backups "Backup of mailsrv13 failed"
+    ```
+
 === "HTTP"
     ``` http
     POST /backups HTTP/1.1
@@ -393,6 +430,13 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
     curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
     curl -H "Delay: 1639194738" -d "Unix timestamps are awesome" ntfy.sh/itsaunixsystem
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --at="tomorrow, 10am" \
+        hello "Good morning"
     ```
 
 === "HTTP"
@@ -473,6 +517,11 @@ For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhoo
     curl ntfy.sh/mywebhook/trigger
     ```
 
+=== "ntfy CLI"
+    ```
+    ntfy trigger mywebhook
+    ```
+
 === "HTTP"
     ``` http
     GET /mywebhook/trigger HTTP/1.1
@@ -508,6 +557,13 @@ Here's an example with a custom message, tags and a priority:
 === "Command line (curl)"
     ```
     curl "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        -p 5 --tags=warning,skull \
+        mywebhook "Webhook triggered"
     ```
 
 === "HTTP"
@@ -557,6 +613,13 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
     curl -H "X-Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
     curl -H "Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --no-cache \
+        mytopic "This message won't be stored server-side"
     ```
 
 === "HTTP"
@@ -622,6 +685,13 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
     curl -H "X-Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
     curl -H "Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --no-firebase \
+        mytopic "This message won't be forwarded to FCM"
     ```
 
 === "HTTP"

@@ -1,10 +1,12 @@
-# Install your own ntfy server
-**Self-hosting your own ntfy server** is pretty straight forward. Just install the binary, package or Docker image, then 
+# Installing ntfy
+The `ntfy` CLI allows you to [publish messages](publish.md), [subscribe to topics](subscribe/cli.md) as well as to   
+**self-host your own ntfy server**. It's all pretty straight forward. Just install the binary, package or Docker image, 
 configure it and run it. Just like any other software. No fuzz. 
 
 !!! info
-    The following steps are only required if you want to **self-host your own ntfy server**. If you just want to 
-    [send messages using ntfy.sh](publish.md), you don't need to install anything.
+    The following steps are only required if you want to **self-host your own ntfy server** or you want to use the ntfy CLI.
+    If you just want to [send messages using ntfy.sh](publish.md), you don't need to install anything. You can just use
+    `curl`.
 
 ## General steps
 The ntfy server comes as a statically linked binary and is shipped as tarball, deb/rpm packages and as a Docker image.
@@ -12,7 +14,10 @@ We support amd64, armv7 and arm64.
 
 1. Install ntfy using one of the methods described below
 2. Then (optionally) edit `/etc/ntfy/config.yml` (see [configuration](config.md))
-3. Then just run it with `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
+
+To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
+To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI][subscribe/cli.md]
+for details). 
 
 ## Binaries and packages
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and

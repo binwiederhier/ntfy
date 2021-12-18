@@ -9,7 +9,7 @@ import (
 
 var cmdPublish = &cli.Command{
 	Name:      "publish",
-	Aliases:   []string{"pub", "send", "push"},
+	Aliases:   []string{"pub", "send", "push", "trigger"},
 	Usage:     "Send message via a ntfy server",
 	UsageText: "ntfy send [OPTIONS..] TOPIC MESSAGE",
 	Action:    execPublish,
@@ -30,14 +30,15 @@ Examples:
   ntfy pub --tags=warning,skull backups "Backups failed"  # Add tags/emojis to message
   ntfy pub --delay=10s delayed_topic Laterzz              # Delay message by 10s
   ntfy pub --at=8:30am delayed_topic Laterzz              # Send message at 8:30am
+  ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
 
 Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
 it has incredibly useful information: https://ntfy.sh/docs/publish/.`,
 }
 
 func execPublish(c *cli.Context) error {
-	if c.NArg() < 2 {
-		return errors.New("topic/message missing")
+	if c.NArg() < 1 {
+		return errors.New("topic missing")
 	}
 	title := c.String("title")
 	priority := c.String("priority")
@@ -46,7 +47,10 @@ func execPublish(c *cli.Context) error {
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
 	topicURL := expandTopicURL(c.Args().Get(0))
-	message := strings.Join(c.Args().Slice()[1:], " ")
+	message := ""
+	if c.NArg() > 1 {
+		message = strings.Join(c.Args().Slice()[1:], " ")
+	}
 	var options []client.PublishOption
 	if title != "" {
 		options = append(options, client.WithTitle(title))

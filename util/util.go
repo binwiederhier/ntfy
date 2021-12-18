@@ -98,3 +98,8 @@ func ParsePriority(priority string) (int, error) {
 		return 0, errInvalidPriority
 	}
 }
+
+// ExpandHome replaces "~" with the user's home directory
+func ExpandHome(path string) string {
+	return os.ExpandEnv(strings.ReplaceAll(path, "~", "$HOME"))
+}

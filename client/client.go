@@ -13,18 +13,14 @@ import (
 )
 
 const (
-	DefaultBaseURL = "https://ntfy.sh"
-)
-
-const (
 	MessageEvent   = "message"
 	KeepaliveEvent = "keepalive"
 	OpenEvent      = "open"
 )
 
 type Client struct {
-	BaseURL       string
 	Messages      chan *Message
+	config        *Config
 	subscriptions map[string]*subscription
 	mu            sync.Mutex
 }
@@ -34,7 +30,6 @@ type Message struct {
 	Event    string
 	Time     int64
 	Topic    string
-	BaseURL  string
 	TopicURL string
 	Message  string
 	Title    string
@@ -47,11 +42,10 @@ type subscription struct {
 	cancel context.CancelFunc
 }
 
-var DefaultClient = New()
-
-func New() *Client {
+func New(config *Config) *Client {
 	return &Client{
 		Messages:      make(chan *Message),
+		config:        config,
 		subscriptions: make(map[string]*subscription),
 	}
 }
@@ -73,11 +67,12 @@ func (c *Client) Publish(topicURL, message string, options ...PublishOption) err
 	return err
 }
 
-func (c *Client) Poll(topicURL string, options ...SubscribeOption) ([]*Message, error) {
+func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, error) {
 	ctx := context.Background()
 	messages := make([]*Message, 0)
 	msgChan := make(chan *Message)
 	errChan := make(chan error)
+	topicURL := c.expandTopicURL(topic)
 	go func() {
 		err := performSubscribeRequest(ctx, msgChan, topicURL, options...)
 		close(msgChan)
@@ -89,26 +84,38 @@ func (c *Client) Poll(topicURL string, options ...SubscribeOption) ([]*Message, 
 	return messages, <-errChan
 }
 
-func (c *Client) Subscribe(topicURL string, options ...SubscribeOption) {
+func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	topicURL := c.expandTopicURL(topic)
 	if _, ok := c.subscriptions[topicURL]; ok {
-		return
+		return topicURL
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c.subscriptions[topicURL] = &subscription{cancel}
 	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, options...)
+	return topicURL
 }
 
-func (c *Client) Unsubscribe(topicURL string) {
+func (c *Client) Unsubscribe(topic string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	topicURL := c.expandTopicURL(topic)
 	sub, ok := c.subscriptions[topicURL]
 	if !ok {
 		return
 	}
 	sub.cancel()
 	return
+}
+
+func (c *Client) expandTopicURL(topic string) string {
+	if strings.HasPrefix(topic, "http://") || strings.HasPrefix(topic, "https://") {
+		return topic
+	} else if strings.Contains(topic, "/") {
+		return fmt.Sprintf("https://%s", topic)
+	}
+	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic)
 }
 
 func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL string, options ...SubscribeOption) {
@@ -147,7 +154,6 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 		if err := json.NewDecoder(strings.NewReader(line)).Decode(&m); err != nil {
 			return err
 		}
-		m.BaseURL = strings.TrimSuffix(topicURL, "/"+m.Topic) // FIXME hack!
 		m.TopicURL = topicURL
 		m.Raw = line
 		msgChan <- m

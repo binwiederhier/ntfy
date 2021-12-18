@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
-	"log"
 	"os"
 	"strings"
+)
+
+var (
+	defaultClientRootConfigFile = "/etc/ntfy/client.yml"
+	defaultClientUserConfigFile = "~/.config/ntfy/client.yml"
 )
 
 // New creates a new CLI application
@@ -35,8 +38,8 @@ func New() *cli.App {
 }
 
 func execMainApp(c *cli.Context) error {
-	log.Printf("\x1b[1;33mDeprecation notice: Please run the server using 'ntfy serve'; see 'ntfy -h' for help.\x1b[0m")
-	log.Printf("\x1b[1;33mThis way of running the server will be removed March 2022. See https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
+	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mDeprecation notice: Please run the server using 'ntfy serve'; see 'ntfy -h' for help.\x1b[0m")
+	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis way of running the server will be removed March 2022. See https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
 	return execServe(c)
 }
 
@@ -56,15 +59,6 @@ func initConfigFileInputSource(configFlag string, flags []cli.Flag) cli.BeforeFu
 		}
 		return altsrc.ApplyInputSourceValues(context, inputSource, flags)
 	}
-}
-
-func expandTopicURL(s string) string {
-	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
-		return s
-	} else if strings.Contains(s, "/") {
-		return fmt.Sprintf("https://%s", s)
-	}
-	return fmt.Sprintf("%s/%s", client.DefaultBaseURL, s)
 }
 
 func collapseTopicURL(s string) string {

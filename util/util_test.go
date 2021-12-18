@@ -3,6 +3,7 @@ package util
 import (
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -53,4 +54,12 @@ func TestInStringList(t *testing.T) {
 	s := []string{"one", "two"}
 	require.True(t, InStringList(s, "two"))
 	require.False(t, InStringList(s, "three"))
+}
+
+func TestExpandHome_WithTilde(t *testing.T) {
+	require.Equal(t, os.Getenv("HOME")+"/this/is/a/path", ExpandHome("~/this/is/a/path"))
+}
+
+func TestExpandHome_NoTilde(t *testing.T) {
+	require.Equal(t, "/this/is/an/absolute/path", ExpandHome("/this/is/an/absolute/path"))
 }

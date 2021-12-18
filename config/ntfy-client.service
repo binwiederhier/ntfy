@@ -1,0 +1,12 @@
+[Unit]
+Description=ntfy client
+After=network.target
+
+[Service]
+User=ntfy
+Group=ntfy
+ExecStart=/usr/bin/ntfy subscribe --config /etc/ntfy/client.yml --from-config
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

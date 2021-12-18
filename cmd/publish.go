@@ -46,7 +46,7 @@ func execPublish(c *cli.Context) error {
 	delay := c.String("delay")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
-	topicURL := expandTopicURL(c.Args().Get(0))
+	topic := c.Args().Get(0)
 	message := ""
 	if c.NArg() > 1 {
 		message = strings.Join(c.Args().Slice()[1:], " ")
@@ -70,5 +70,10 @@ func execPublish(c *cli.Context) error {
 	if noFirebase {
 		options = append(options, client.WithNoFirebase())
 	}
-	return client.DefaultClient.Publish(topicURL, message, options...)
+	conf, err := loadConfig(c)
+	if err != nil {
+		return err
+	}
+	cl := client.New(conf)
+	return cl.Publish(topic, message, options...)
 }

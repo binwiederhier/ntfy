@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 )
 
@@ -16,53 +18,102 @@ var cmdSubscribe = &cli.Command{
 	Name:      "subscribe",
 	Aliases:   []string{"sub"},
 	Usage:     "Subscribe to one or more topics on a ntfy server",
-	UsageText: "ntfy subscribe [OPTIONS..] TOPIC",
+	UsageText: "ntfy subscribe [OPTIONS..] [TOPIC]",
 	Action:    execSubscribe,
 	Flags: []cli.Flag{
+		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "config file"},
 		&cli.StringFlag{Name: "exec", Aliases: []string{"e"}, Usage: "execute command for each message event"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since (Unix timestamp, or all)"},
+		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
 	},
-	Description: `(THIS COMMAND IS INCUBATING. IT MAY CHANGE WITHOUT NOTICE.)
+	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
+every arriving message. There are 3 modes in which the command can be run:
 
-Subscribe to one or more topics on a ntfy server, and either print 
-or execute commands for every arriving message. 
+ntfy subscribe TOPIC
+  This prints the JSON representation of every incoming message. It is useful when you
+  have a command that wants to stream-read incoming JSON messages. Unless --poll is passed,
+  this command stays open forever. 
 
-By default, the subscribe command just prints the JSON representation of a message. 
-When --exec is passed, each incoming message will execute a command. The message fields 
-are passed to the command as environment variables:
+  Examples:
+    ntfy subscribe mytopic            # Prints JSON for incoming messages for ntfy.sh/mytopic
+    ntfy sub home.lan/backups         # Subscribe to topic on different server
+    ntfy sub --poll home.lan/backups  # Just query for latest messages and exit
+  
+ntfy subscribe TOPIC COMMAND
+  This executes COMMAND for every incoming messages. The message fields are passed to the
+  command as environment variables:
 
     Variable        Aliases         Description
     --------------- --------------- -----------------------------------
+    $NTFY_ID        $id             Unique message ID
+    $NTFY_TIME      $time           Unix timestamp of the message delivery
+    $NTFY_TOPIC     $topic          Topic name
     $NTFY_MESSAGE   $message, $m    Message body
     $NTFY_TITLE     $title, $t      Message title
     $NTFY_PRIORITY  $priority, $p   Message priority (1=min, 5=max)
     $NTFY_TAGS      $tags, $ta      Message tags (comma separated list)
-    $NTFY_ID        $id             Unique message ID
-    $NTFY_TIME      $time           Unix timestamp of the message delivery
-    $NTFY_TOPIC     $topic          Topic name
-    $NTFY_EVENT     $event, $ev     Event identifier (always "message")
 
-Examples:
-  ntfy subscribe mytopic                       # Prints JSON for incoming messages to stdout
-  ntfy sub home.lan/backups alerts             # Subscribe to two different topics
-  ntfy sub --exec='notify-send "$m"' mytopic   # Execute command for incoming messages
-  ntfy sub --exec=/my/script topic1 topic2     # Subscribe to two topics and execute command for each message
+  Examples:
+    ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
+    ntfy sub topic1 /my/script.sh          # Execute script for incoming messages
+
+ntfy subscribe --from-config
+  Service mode (used in ntfy-client.service). This reads the config file (/etc/ntfy/client.yml 
+  or ~/.config/ntfy/client.yml) and sets up subscriptions for every topic in the "subscribe:" 
+  block (see config file).
+
+  Examples: 
+    ntfy sub --from-config                           # Read topics from config file
+    ntfy sub --config=/my/client.yml --from-config   # Read topics from alternate config file
 `,
 }
 
 func execSubscribe(c *cli.Context) error {
+	fromConfig := c.Bool("from-config")
+	if fromConfig {
+		return execSubscribeFromConfig(c)
+	}
+	return execSubscribeWithoutConfig(c)
+}
+
+func execSubscribeFromConfig(c *cli.Context) error {
+	conf, err := loadConfig(c)
+	if err != nil {
+		return err
+	}
+	cl := client.New(conf)
+	commands := make(map[string]string)
+	for _, s := range conf.Subscribe {
+		topicURL := cl.Subscribe(s.Topic)
+		commands[topicURL] = s.Exec
+	}
+	for m := range cl.Messages {
+		command, ok := commands[m.TopicURL]
+		if !ok {
+			continue
+		}
+		_ = dispatchMessage(c, command, m)
+	}
+	return nil
+}
+
+func execSubscribeWithoutConfig(c *cli.Context) error {
 	if c.NArg() < 1 {
 		return errors.New("topic missing")
 	}
 	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
-	cl := client.DefaultClient
-	command := c.String("exec")
+	conf, err := loadConfig(c)
+	if err != nil {
+		return err
+	}
+	cl := client.New(conf)
 	since := c.String("since")
 	poll := c.Bool("poll")
 	scheduled := c.Bool("scheduled")
-	topics := c.Args().Slice()
+	topic := c.Args().Get(0)
+	command := c.Args().Get(1)
 	var options []client.SubscribeOption
 	if since != "" {
 		options = append(options, client.WithSince(since))
@@ -74,19 +125,15 @@ func execSubscribe(c *cli.Context) error {
 		options = append(options, client.WithScheduled())
 	}
 	if poll {
-		for _, topic := range topics {
-			messages, err := cl.Poll(expandTopicURL(topic), options...)
-			if err != nil {
-				return err
-			}
-			for _, m := range messages {
-				_ = dispatchMessage(c, command, m)
-			}
+		messages, err := cl.Poll(topic, options...)
+		if err != nil {
+			return err
+		}
+		for _, m := range messages {
+			_ = dispatchMessage(c, command, m)
 		}
 	} else {
-		for _, topic := range topics {
-			cl.Subscribe(expandTopicURL(topic), options...)
-		}
+		cl.Subscribe(topic, options...)
 		for m := range cl.Messages {
 			_ = dispatchMessage(c, command, m)
 		}
@@ -140,7 +187,6 @@ func createTmpScript(command string) (string, error) {
 func envVars(m *client.Message) []string {
 	env := os.Environ()
 	env = append(env, envVar(m.ID, "NTFY_ID", "id")...)
-	env = append(env, envVar(m.Event, "NTFY_EVENT", "event", "ev")...)
 	env = append(env, envVar(m.Topic, "NTFY_TOPIC", "topic")...)
 	env = append(env, envVar(fmt.Sprintf("%d", m.Time), "NTFY_TIME", "time")...)
 	env = append(env, envVar(m.Message, "NTFY_MESSAGE", "message", "m")...)
@@ -156,4 +202,32 @@ func envVar(value string, vars ...string) []string {
 		env = append(env, fmt.Sprintf("%s=%s", v, value))
 	}
 	return env
+}
+
+func loadConfig(c *cli.Context) (*client.Config, error) {
+	filename := c.String("config")
+	if filename != "" {
+		return loadConfigFromFile(filename)
+	}
+	u, _ := user.Current()
+	configFile := defaultClientRootConfigFile
+	if u.Uid != "0" {
+		configFile = util.ExpandHome(defaultClientUserConfigFile)
+	}
+	if s, _ := os.Stat(configFile); s != nil {
+		return loadConfigFromFile(configFile)
+	}
+	return client.NewConfig(), nil
+}
+
+func loadConfigFromFile(filename string) (*client.Config, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	c := client.NewConfig()
+	if err := yaml.Unmarshal(b, c); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

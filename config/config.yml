@@ -1,23 +1,15 @@
 # ntfy config file
 
-# Listen address for the HTTP web server
+# Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
+# set "key-file" and "cert-file".
 # Format: <hostname>:<port>
 #
 # listen-http: ":80"
-
-# Listen address for the HTTPS web server. If set, you must also set "key-file" and "cert-file".
-# Format: <hostname>:<port>
-#
 # listen-https:
 
-# Path to the private key file for the HTTPS web server. Not used if "listen-https" is not set.
-# Format: <filename>
+# Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #
 # key-file:
-
-# Path to the cert file for the HTTPS web server. Not used if "listen-https" is not set.
-# Format: <filename>
-#
 # cert-file:
 
 # If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app.

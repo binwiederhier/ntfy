@@ -20,8 +20,8 @@ const (
 
 // Defines all the limits
 // - global topic limit: max number of topics overall
-// - per visistor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
-// - per visistor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
+// - per visitor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
+// - per visitor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
 const (
 	DefaultGlobalTopicLimit             = 5000
 	DefaultVisitorRequestLimitBurst     = 60

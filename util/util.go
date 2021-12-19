@@ -80,8 +80,9 @@ func DurationToHuman(d time.Duration) (str string) {
 	return
 }
 
+// ParsePriority parses a priority string into its equivalent integer value
 func ParsePriority(priority string) (int, error) {
-	switch strings.ToLower(priority) {
+	switch strings.TrimSpace(strings.ToLower(priority)) {
 	case "":
 		return 0, nil
 	case "1", "min":

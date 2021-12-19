@@ -1,3 +1,4 @@
+// Package client provides a ntfy client to publish and subscribe to topics
 package client
 
 import (
@@ -12,12 +13,14 @@ import (
 	"time"
 )
 
+// Event type constants
 const (
 	MessageEvent   = "message"
 	KeepaliveEvent = "keepalive"
 	OpenEvent      = "open"
 )
 
+// Client is the ntfy client that can be used to publish and subscribe to ntfy topics
 type Client struct {
 	Messages      chan *Message
 	config        *Config
@@ -25,6 +28,7 @@ type Client struct {
 	mu            sync.Mutex
 }
 
+// Message is a struct that represents a ntfy message
 type Message struct {
 	ID       string
 	Event    string
@@ -42,6 +46,7 @@ type subscription struct {
 	cancel context.CancelFunc
 }
 
+// New creates a new Client using a given Config
 func New(config *Config) *Client {
 	return &Client{
 		Messages:      make(chan *Message),
@@ -50,6 +55,14 @@ func New(config *Config) *Client {
 	}
 }
 
+// Publish sends a message to a specific topic, optionally using options.
+//
+// A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
+// (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
+// config (e.g. mytopic -> https://ntfy.sh/mytopic).
+//
+// To pass title, priority and tags, check out WithTitle, WithPriority, WithTagsList, WithDelay, WithNoCache,
+// WithNoFirebase, and the generic WithHeader.
 func (c *Client) Publish(topic, message string, options ...PublishOption) error {
 	topicURL := c.expandTopicURL(topic)
 	req, _ := http.NewRequest("POST", topicURL, strings.NewReader(message))
@@ -68,6 +81,15 @@ func (c *Client) Publish(topic, message string, options ...PublishOption) error 
 	return err
 }
 
+// Poll queries a topic for all (or a limited set) of messages. Unlike Subscribe, this method only polls for
+// messages and does not subscribe to messages that arrive after this call.
+//
+// A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
+// (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
+// config (e.g. mytopic -> https://ntfy.sh/mytopic).
+//
+// By default, all messages will be returned, but you can change this behavior using a SubscribeOption.
+// See WithSince, WithSinceAll, WithSinceUnixTime, WithScheduled, and the generic WithQueryParam.
 func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, error) {
 	ctx := context.Background()
 	messages := make([]*Message, 0)
@@ -85,6 +107,22 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 	return messages, <-errChan
 }
 
+// Subscribe subscribes to a topic to listen for newly incoming messages. The method starts a connection in the
+// background and returns new messages via the Messages channel.
+//
+// A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
+// (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
+// config (e.g. mytopic -> https://ntfy.sh/mytopic).
+//
+// By default, only new messages will be returned, but you can change this behavior using a SubscribeOption.
+// See WithSince, WithSinceAll, WithSinceUnixTime, WithScheduled, and the generic WithQueryParam.
+//
+// Example:
+//   c := client.New(client.NewConfig())
+//   c.Subscribe("mytopic")
+//   for m := range c.Messages {
+//     fmt.Printf("New message: %s", m.Message)
+//   }
 func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -98,6 +136,11 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	return topicURL
 }
 
+// Unsubscribe unsubscribes from a topic that has been previously subscribed with Subscribe.
+//
+// A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
+// (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
+// config (e.g. mytopic -> https://ntfy.sh/mytopic).
 func (c *Client) Unsubscribe(topic string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -107,7 +150,6 @@ func (c *Client) Unsubscribe(topic string) {
 		return
 	}
 	sub.cancel()
-	return
 }
 
 func (c *Client) expandTopicURL(topic string) string {
@@ -128,7 +170,7 @@ func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicUR
 		case <-ctx.Done():
 			log.Printf("Connection to %s exited", topicURL)
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(10 * time.Second): // TODO Add incremental backoff
 		}
 	}
 }

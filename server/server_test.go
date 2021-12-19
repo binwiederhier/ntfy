@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/config"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -393,13 +392,13 @@ func TestServer_PublishFirebase(t *testing.T) {
 	time.Sleep(500 * time.Millisecond) // Time for sends
 }
 
-func newTestConfig(t *testing.T) *config.Config {
-	conf := config.New(":80")
+func newTestConfig(t *testing.T) *Config {
+	conf := NewConfig(":80")
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 	return conf
 }
 
-func newTestServer(t *testing.T, config *config.Config) *Server {
+func newTestServer(t *testing.T, config *Config) *Server {
 	server, err := New(config)
 	if err != nil {
 		t.Fatal(err)

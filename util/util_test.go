@@ -63,3 +63,21 @@ func TestExpandHome_WithTilde(t *testing.T) {
 func TestExpandHome_NoTilde(t *testing.T) {
 	require.Equal(t, "/this/is/an/absolute/path", ExpandHome("/this/is/an/absolute/path"))
 }
+
+func TestParsePriority(t *testing.T) {
+	priorities := []string{"", "1", "2", "3", "4", "5", "min", "LOW", "   default ", "HIgh", "max", "urgent"}
+	expected := []int{0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 5}
+	for i, priority := range priorities {
+		actual, err := ParsePriority(priority)
+		require.Nil(t, err)
+		require.Equal(t, expected[i], actual)
+	}
+}
+
+func TestParsePriority_Invalid(t *testing.T) {
+	priorities := []string{"-1", "6", "aa", "-"}
+	for _, priority := range priorities {
+		_, err := ParsePriority(priority)
+		require.Equal(t, errInvalidPriority, err)
+	}
+}

@@ -51,7 +51,7 @@ type Config struct {
 	BehindProxy                  bool
 }
 
-// New instantiates a default new config
+// NewConfig instantiates a default new server config
 func NewConfig(listenHTTP string) *Config {
 	return &Config{
 		ListenHTTP:                   listenHTTP,

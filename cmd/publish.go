@@ -59,7 +59,7 @@ func execPublish(c *cli.Context) error {
 		options = append(options, client.WithPriority(priority))
 	}
 	if tags != "" {
-		options = append(options, client.WithTags(tags))
+		options = append(options, client.WithTagsList(tags))
 	}
 	if delay != "" {
 		options = append(options, client.WithDelay(delay))

@@ -13,7 +13,7 @@ The ntfy server comes as a statically linked binary and is shipped as tarball, d
 We support amd64, armv7 and arm64.
 
 1. Install ntfy using one of the methods described below
-2. Then (optionally) edit `/etc/ntfy/config.yml` (see [configuration](config.md))
+2. Then (optionally) edit `/etc/ntfy/server.yml` (see [configuration](config.md))
 
 To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
 To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI][subscribe/cli.md]
@@ -138,7 +138,7 @@ straight forward to use.
 
 The server exposes its web UI and the API on port 80, so you need to expose that in Docker. To use the persistent 
 [message cache](config.md#message-cache), you also need to map a volume to `/var/cache/ntfy`. To change other settings, 
-you should map `/etc/ntfy`, so you can edit `/etc/ntfy/config.yml`.
+you should map `/etc/ntfy`, so you can edit `/etc/ntfy/server.yml`.
 
 Basic usage (no cache or additional config):
 ```
@@ -156,7 +156,7 @@ docker run \
     serve
 ```
 
-With other config options (configured via `/etc/ntfy/config.yml`, see [configuration](config.md) for details):
+With other config options (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):
 ```bash
 docker run \
   -v /etc/ntfy:/etc/ntfy \

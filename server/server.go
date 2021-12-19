@@ -9,7 +9,6 @@ import (
 	"firebase.google.com/go/messaging"
 	"fmt"
 	"google.golang.org/api/option"
-	"heckel.io/ntfy/config"
 	"heckel.io/ntfy/util"
 	"html/template"
 	"io"
@@ -28,7 +27,7 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config   *config.Config
+	config   *Config
 	topics   map[string]*topic
 	visitors map[string]*visitor
 	firebase subscriber
@@ -112,7 +111,7 @@ const (
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
 // subscriber (if configured).
-func New(conf *config.Config) (*Server, error) {
+func New(conf *Config) (*Server, error) {
 	var firebaseSubscriber subscriber
 	if conf.FirebaseKeyFile != "" {
 		var err error
@@ -138,7 +137,7 @@ func New(conf *config.Config) (*Server, error) {
 	}, nil
 }
 
-func createCache(conf *config.Config) (cache, error) {
+func createCache(conf *Config) (cache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache(), nil
 	} else if conf.CacheFile != "" {
@@ -147,7 +146,7 @@ func createCache(conf *config.Config) (cache, error) {
 	return newMemCache(), nil
 }
 
-func createFirebaseSubscriber(conf *config.Config) (subscriber, error) {
+func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(conf.FirebaseKeyFile))
 	if err != nil {
 		return nil, err

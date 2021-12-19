@@ -50,7 +50,8 @@ func New(config *Config) *Client {
 	}
 }
 
-func (c *Client) Publish(topicURL, message string, options ...PublishOption) error {
+func (c *Client) Publish(topic, message string, options ...PublishOption) error {
+	topicURL := c.expandTopicURL(topic)
 	req, _ := http.NewRequest("POST", topicURL, strings.NewReader(message))
 	for _, option := range options {
 		if err := option(req); err != nil {

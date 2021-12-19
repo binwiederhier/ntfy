@@ -1,5 +1,4 @@
-// Package config provides the main configuration
-package config
+package server
 
 import (
 	"time"
@@ -53,7 +52,7 @@ type Config struct {
 }
 
 // New instantiates a default new config
-func New(listenHTTP string) *Config {
+func NewConfig(listenHTTP string) *Config {
 	return &Config{
 		ListenHTTP:                   listenHTTP,
 		ListenHTTPS:                  "",

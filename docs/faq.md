@@ -17,7 +17,7 @@ subscribed to a topic.
 ## Will you know what topics exist, can you spy on me?
 If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
 That said, the logs do not contain any topic names or other details about you.
-Messages are cached for the duration configured in `config.yml` (12h by default) to facilitate service restarts, message polling and to overcome
+Messages are cached for the duration configured in `server.yml` (12h by default) to facilitate service restarts, message polling and to overcome
 client network disruptions.
 
 ## Can I self-host it?

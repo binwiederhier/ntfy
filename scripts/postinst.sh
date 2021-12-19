@@ -13,7 +13,7 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   chmod 700 /var/cache/ntfy
 
   # Hack to change permissions on cache file
-  configfile="/etc/ntfy/config.yml"
+  configfile="/etc/ntfy/server.yml"
   if [ -f "$configfile" ]; then
     cachefile="$(cat "$configfile" | perl -n -e'/^\s*cache-file: ["'"'"']?([^"'"'"']+)["'"'"']?/ && print $1')" # Oh my, see #47
     if [ -n "$cachefile" ]; then

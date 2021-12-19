@@ -47,14 +47,20 @@ nfpms:
       - rpm
     bindir: /usr/bin
     contents:
-      - src: config/config.yml
-        dst: /etc/ntfy/config.yml
+      - src: server/server.yml
+        dst: /etc/ntfy/server.yml
         type: config
-      - src: config/ntfy.service
+      - src: server/ntfy.service
         dst: /lib/systemd/system/ntfy.service
+      - src: client/client.yml
+        dst: /etc/ntfy/client.yml
+        type: config
+      - src: client/ntfy-client.service
+        dst: /lib/systemd/system/ntfy-client.service
       - dst: /var/cache/ntfy
         type: dir
     scripts:
+      preinstall: "scripts/preinst.sh"
       postinstall: "scripts/postinst.sh"
       preremove: "scripts/prerm.sh"
       postremove: "scripts/postrm.sh"
@@ -64,8 +70,10 @@ archives:
     files:
       - LICENSE
       - README.md
-      - config/config.yml
-      - config/ntfy.service
+      - server/server.yml
+      - server/ntfy.service
+      - client/client.yml
+      - client/ntfy-client.service
     replacements:
       386: i386
       amd64: x86_64

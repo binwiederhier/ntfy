@@ -1,4 +1,4 @@
-# ntfy config file
+# ntfy server config file
 
 # Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
 # set "key-file" and "cert-file".

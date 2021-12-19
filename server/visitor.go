@@ -2,7 +2,6 @@ package server
 
 import (
 	"golang.org/x/time/rate"
-	"heckel.io/ntfy/config"
 	"heckel.io/ntfy/util"
 	"sync"
 	"time"
@@ -14,14 +13,14 @@ const (
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
-	config        *config.Config
+	config        *Config
 	limiter       *rate.Limiter
 	subscriptions *util.Limiter
 	seen          time.Time
 	mu            sync.Mutex
 }
 
-func newVisitor(conf *config.Config) *visitor {
+func newVisitor(conf *Config) *visitor {
 	return &visitor{
 		config:        conf,
 		limiter:       rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),

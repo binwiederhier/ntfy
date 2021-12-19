@@ -1,6 +1,6 @@
 # Configuring the ntfy server
-The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/config.yml`, 
-see [config.yml](https://github.com/binwiederhier/ntfy/blob/main/config/config.yml)), via command line arguments 
+The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/server.yml`, 
+see [server.yml](https://github.com/binwiederhier/ntfy/blob/main/config/server.yml)), via command line arguments 
 or using environment variables.
 
 ## Quick start
@@ -50,7 +50,7 @@ flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X
 identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
-=== "/etc/ntfy/config.yml"
+=== "/etc/ntfy/server.yml"
     ```
     # Tell ntfy to use "X-Forwarded-For" to identify visitors
     behind-proxy: true
@@ -200,7 +200,7 @@ To configure FCM for your self-hosted instance of the ntfy server, follow these 
 
 1. Sign up for a [Firebase account](https://console.firebase.google.com/)
 2. Create a Firebase app and download the key file (e.g. `myapp-firebase-adminsdk-...json`)
-3. Place the key file in `/etc/ntfy`, set the `firebase-key-file` in `config.yml` accordingly and restart the ntfy server
+3. Place the key file in `/etc/ntfy`, set the `firebase-key-file` in `server.yml` accordingly and restart the ntfy server
 4. Build your own Android .apk following [these instructions](develop.md#android-app)
 
 Example:
@@ -294,7 +294,7 @@ to maintain the client connection and the connection to ntfy.
     ```
 
 ## Config options
-Each config option can be set in the config file `/etc/ntfy/config.yml` (e.g. `listen-http: :80`) or as a
+Each config option can be set in the config file `/etc/ntfy/server.yml` (e.g. `listen-http: :80`) or as a
 CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
 variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
@@ -327,7 +327,7 @@ USAGE:
    ntfy [OPTION..]
 
 GLOBAL OPTIONS:
-   --config value, -c value                           config file (default: /etc/ntfy/config.yml) [$NTFY_CONFIG_FILE]
+   --config value, -c value                           config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
    --listen-http value, -l value                      ip:port used to as listen address (default: ":80") [$NTFY_LISTEN_HTTP]
    --firebase-key-file value, -F value                Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
    --cache-file value, -C value                       cache file used for message caching [$NTFY_CACHE_FILE]

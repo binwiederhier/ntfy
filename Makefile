@@ -115,7 +115,7 @@ build-simple: clean
 		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
 
 clean: .PHONY
-	rm -rf dist build
+	rm -rf dist build server/docs
 
 
 # Releasing targets

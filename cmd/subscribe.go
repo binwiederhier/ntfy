@@ -20,10 +20,14 @@ var cmdSubscribe = &cli.Command{
 	Usage:     "Subscribe to one or more topics on a ntfy server",
 	UsageText: "ntfy subscribe [OPTIONS..] [TOPIC]",
 	Action:    execSubscribe,
+	OnUsageError: func(context *cli.Context, err error, isSubcommand bool) error {
+		println("ee")
+		return nil
+	},
+
 	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "config file"},
-		&cli.StringFlag{Name: "exec", Aliases: []string{"e"}, Usage: "execute command for each message event"},
-		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since (Unix timestamp, or all)"},
+		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "config file `FILE`"},
+		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
 		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
@@ -72,8 +76,6 @@ ntfy subscribe --from-config
 }
 
 func execSubscribe(c *cli.Context) error {
-	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis command is incubating. The interface may change without notice.\x1b[0m")
-
 	// Read config and options
 	conf, err := loadConfig(c)
 	if err != nil {
@@ -100,7 +102,7 @@ func execSubscribe(c *cli.Context) error {
 		options = append(options, client.WithScheduled())
 	}
 	if topic == "" && len(conf.Subscribe) == 0 {
-		return errors.New("must specify topic, or have at least one topic defined in config")
+		return errors.New("must specify topic, type 'ntfy subscribe --help' for help")
 	}
 
 	// Execute poll or subscribe

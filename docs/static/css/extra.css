@@ -8,6 +8,10 @@
     width: unset !important;
 }
 
+.admonition {
+    font-size: .74rem !important;
+}
+
 article {
     padding-bottom: 50px;
 }

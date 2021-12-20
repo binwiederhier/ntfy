@@ -74,7 +74,7 @@ nav:
 - "Subscribing":
   - "From your phone": subscribe/phone.md
   - "From the Web UI": subscribe/web.md
-  - "Using the CLI": subscribe/cli.md
+  - "From the CLI": subscribe/cli.md
   - "Using the API": subscribe/api.md
 - "Self-hosting":
   - "Installation": install.md

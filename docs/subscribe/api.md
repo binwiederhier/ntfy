@@ -1,7 +1,7 @@
 # Subscribe via API
-You can create and subscribe to a topic either in the [web UI](web.md), via the [phone app](phone.md), or in your own 
-app or script by subscribing the API. This page describes how to subscribe via API. You may also want to check out the 
-page that describes how to [publish messages](../publish.md).
+You can create and subscribe to a topic in the [web UI](web.md), via the [phone app](phone.md), via the [ntfy CLI](cli.md),
+or in your own app or script by subscribing the API. This page describes how to subscribe via API. You may also want to 
+check out the page that describes how to [publish messages](../publish.md).
 
 The subscription API relies on a simple HTTP GET request with a streaming HTTP response, i.e **you open a GET request and
 the connection stays open forever**, sending messages back as they come in. There are three different API endpoints, which 
@@ -23,6 +23,13 @@ recommended way to subscribe to a topic**. The notable exception is JavaScript, 
     {"id":"SLiKI64DOt","time":1635528757,"event":"open","topic":"mytopic"}
     {"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Disk full"}
     {"id":"DGUDShMCsc","time":1635528787,"event":"keepalive","topic":"mytopic"}
+    ...
+    ```
+
+=== "ntfy CLI"
+    ```
+    $ ntfy subcribe disk-alerts
+    {"id":"hwQ2YpKdmg","time":1635528741,"event":"message","topic":"mytopic","message":"Disk full"}
     ...
     ```
 

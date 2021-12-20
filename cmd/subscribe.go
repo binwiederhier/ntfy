@@ -26,7 +26,7 @@ var cmdSubscribe = &cli.Command{
 	},
 
 	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "config file `FILE`"},
+		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
 		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
@@ -72,7 +72,9 @@ ntfy subscribe --from-config
   Examples: 
     ntfy sub --from-config                           # Read topics from config file
     ntfy sub --config=/my/client.yml --from-config   # Read topics from alternate config file
-`,
+
+The default config file for all client commands is /etc/ntfy/client.yml (if root user),
+or ~/.config/ntfy/client.yml for all other users.`,
 }
 
 func execSubscribe(c *cli.Context) error {

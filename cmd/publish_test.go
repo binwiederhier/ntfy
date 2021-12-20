@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCLI_Publish_Real_Server(t *testing.T) {
+func TestCLI_Publish_Subscribe_Poll_Real_Server(t *testing.T) {
 	testMessage := util.RandomString(10)
 
 	app, _, _, _ := newTestApp()

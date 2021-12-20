@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -18,6 +19,10 @@ const (
 	MessageEvent   = "message"
 	KeepaliveEvent = "keepalive"
 	OpenEvent      = "open"
+)
+
+const (
+	maxResponseBytes = 4096
 )
 
 // Client is the ntfy client that can be used to publish and subscribe to ntfy topics
@@ -63,22 +68,31 @@ func New(config *Config) *Client {
 //
 // To pass title, priority and tags, check out WithTitle, WithPriority, WithTagsList, WithDelay, WithNoCache,
 // WithNoFirebase, and the generic WithHeader.
-func (c *Client) Publish(topic, message string, options ...PublishOption) error {
+func (c *Client) Publish(topic, message string, options ...PublishOption) (*Message, error) {
 	topicURL := c.expandTopicURL(topic)
 	req, _ := http.NewRequest("POST", topicURL, strings.NewReader(message))
 	for _, option := range options {
 		if err := option(req); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected response %d from server", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected response %d from server", resp.StatusCode)
 	}
-	return err
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return nil, err
+	}
+	m, err := toMessage(string(b), topicURL)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // Poll queries a topic for all (or a limited set) of messages. Unlike Subscribe, this method only polls for
@@ -192,14 +206,21 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 	defer resp.Body.Close()
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
-		var m *Message
-		line := scanner.Text()
-		if err := json.NewDecoder(strings.NewReader(line)).Decode(&m); err != nil {
+		m, err := toMessage(scanner.Text(), topicURL)
+		if err != nil {
 			return err
 		}
-		m.TopicURL = topicURL
-		m.Raw = line
 		msgChan <- m
 	}
 	return nil
+}
+
+func toMessage(s, topicURL string) (*Message, error) {
+	var m *Message
+	if err := json.NewDecoder(strings.NewReader(s)).Decode(&m); err != nil {
+		return nil, err
+	}
+	m.TopicURL = topicURL
+	m.Raw = s
+	return m, nil
 }

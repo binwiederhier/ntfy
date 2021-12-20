@@ -47,6 +47,10 @@ Examples:
 }
 
 func execServe(c *cli.Context) error {
+	if c.NArg() > 0 {
+		return errors.New("no arguments expected, see 'ntfy serve --help' for help")
+	}
+
 	// Read all the options
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")

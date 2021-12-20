@@ -1,10 +1,10 @@
 # Installing ntfy
-The `ntfy` CLI allows you to [publish messages](publish.md), [subscribe to topics](subscribe/cli.md) as well as to   
-**self-host your own ntfy server**. It's all pretty straight forward. Just install the binary, package or Docker image, 
+The `ntfy` CLI allows you to [publish messages](publish.md), [subscribe to topics](subscribe/cli.md) as well as to
+self-host your own ntfy server. It's all pretty straight forward. Just install the binary, package or Docker image, 
 configure it and run it. Just like any other software. No fuzz. 
 
 !!! info
-    The following steps are only required if you want to **self-host your own ntfy server** or you want to use the ntfy CLI.
+    The following steps are only required if you want to **self-host your own ntfy server or you want to use the ntfy CLI**.
     If you just want to [send messages using ntfy.sh](publish.md), you don't need to install anything. You can just use
     `curl`.
 

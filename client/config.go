@@ -11,6 +11,7 @@ type Config struct {
 	Subscribe   []struct {
 		Topic   string
 		Command string
+		// If []map[string]string TODO This would be cool
 	}
 }
 

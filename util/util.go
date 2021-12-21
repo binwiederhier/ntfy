@@ -37,6 +37,30 @@ func InStringList(haystack []string, needle string) bool {
 	return false
 }
 
+// InStringListAll returns true if all needles are contained in haystack
+func InStringListAll(haystack []string, needles []string) bool {
+	matches := 0
+	for _, s := range haystack {
+		for _, needle := range needles {
+			if s == needle {
+				matches++
+			}
+		}
+	}
+	return matches == len(needles)
+}
+
+// SplitNoEmpty splits a string using strings.Split, but filters out empty strings
+func SplitNoEmpty(s string, sep string) []string {
+	res := make([]string, 0)
+	for _, r := range strings.Split(s, sep) {
+		if r != "" {
+			res = append(res, r)
+		}
+	}
+	return res
+}
+
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!

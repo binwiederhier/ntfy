@@ -56,6 +56,19 @@ func TestInStringList(t *testing.T) {
 	require.False(t, InStringList(s, "three"))
 }
 
+func TestInStringListAll(t *testing.T) {
+	s := []string{"one", "two", "three", "four"}
+	require.True(t, InStringListAll(s, []string{"two", "four"}))
+	require.False(t, InStringListAll(s, []string{"three", "five"}))
+}
+
+func TestSplitNoEmpty(t *testing.T) {
+	require.Equal(t, []string{}, SplitNoEmpty("", ","))
+	require.Equal(t, []string{}, SplitNoEmpty(",,,", ","))
+	require.Equal(t, []string{"tag1", "tag2"}, SplitNoEmpty("tag1,tag2", ","))
+	require.Equal(t, []string{"tag1", "tag2"}, SplitNoEmpty("tag1,tag2,", ","))
+}
+
 func TestExpandHome_WithTilde(t *testing.T) {
 	require.Equal(t, os.Getenv("HOME")+"/this/is/a/path", ExpandHome("~/this/is/a/path"))
 }

@@ -9,9 +9,9 @@ const (
 type Config struct {
 	DefaultHost string `yaml:"default-host"`
 	Subscribe   []struct {
-		Topic   string `yaml:"topic"`
-		Command string `yaml:"command"`
-		// If []map[string]string TODO This would be cool
+		Topic   string            `yaml:"topic"`
+		Command string            `yaml:"command"`
+		If      map[string]string `yaml:"if"`
 	} `yaml:"subscribe"`
 }
 

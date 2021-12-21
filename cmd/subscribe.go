@@ -135,17 +135,21 @@ func doPollSingle(c *cli.Context, cl *client.Client, topic, command string, opti
 }
 
 func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
-	commands := make(map[string]string)
-	for _, s := range conf.Subscribe { // May be nil
-		topicURL := cl.Subscribe(s.Topic, options...)
-		commands[topicURL] = s.Command
+	commands := make(map[string]string) // Subscription ID -> command
+	for _, s := range conf.Subscribe {  // May be nil
+		topicOptions := append(make([]client.SubscribeOption, 0), options...)
+		for filter, value := range s.If {
+			topicOptions = append(topicOptions, client.WithFilter(filter, value))
+		}
+		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
+		commands[subscriptionID] = s.Command
 	}
 	if topic != "" {
-		topicURL := cl.Subscribe(topic, options...)
-		commands[topicURL] = command
+		subscriptionID := cl.Subscribe(topic, options...)
+		commands[subscriptionID] = command
 	}
 	for m := range cl.Messages {
-		command, ok := commands[m.TopicURL]
+		command, ok := commands[m.SubscriptionID]
 		if !ok {
 			continue
 		}

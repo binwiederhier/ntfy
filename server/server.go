@@ -334,7 +334,7 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	tagsStr := readParam(r, "x-tags", "tag", "tags", "ta")
 	if tagsStr != "" {
 		m.Tags = make([]string, 0)
-		for _, s := range strings.Split(tagsStr, ",") {
+		for _, s := range util.SplitNoEmpty(tagsStr, ",") {
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
@@ -413,7 +413,7 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 	defer v.RemoveSubscription()
 	topicsStr := strings.TrimSuffix(r.URL.Path[1:], "/"+format) // Hack
-	topicIDs := strings.Split(topicsStr, ",")
+	topicIDs := util.SplitNoEmpty(topicsStr, ",")
 	topics, err := s.topicsFromIDs(topicIDs...)
 	if err != nil {
 		return err
@@ -425,13 +425,20 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	var wlock sync.Mutex
 	poll := r.URL.Query().Has("poll")
 	scheduled := r.URL.Query().Has("scheduled") || r.URL.Query().Has("sched")
+	messageFilter, titleFilter, priorityFilter, tagsFilter, err := parseQueryFilters(r)
+	if err != nil {
+		return err
+	}
 	sub := func(msg *message) error {
-		wlock.Lock()
-		defer wlock.Unlock()
+		if !passesQueryFilter(msg, messageFilter, titleFilter, priorityFilter, tagsFilter) {
+			return nil
+		}
 		m, err := encoder(msg)
 		if err != nil {
 			return err
 		}
+		wlock.Lock()
+		defer wlock.Unlock()
 		if _, err := w.Write([]byte(m)); err != nil {
 			return err
 		}
@@ -471,6 +478,34 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 			}
 		}
 	}
+}
+
+func parseQueryFilters(r *http.Request) (messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string, err error) {
+	messageFilter = r.URL.Query().Get("message")
+	titleFilter = r.URL.Query().Get("title")
+	tagsFilter = util.SplitNoEmpty(r.URL.Query().Get("tags"), ",")
+	priorityFilter, err = util.ParsePriority(r.URL.Query().Get("priority"))
+	return
+}
+
+func passesQueryFilter(msg *message, messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string) bool {
+	if messageFilter != "" && msg.Message != messageFilter {
+		log.Printf("1")
+		return false
+	}
+	if titleFilter != "" && msg.Title != titleFilter {
+		log.Printf("2")
+		return false
+	}
+	if priorityFilter > 0 && (msg.Priority != priorityFilter || (msg.Priority == 0 && priorityFilter != 3)) {
+		log.Printf("3")
+		return false
+	}
+	if len(tagsFilter) > 0 && !util.InStringListAll(msg.Tags, tagsFilter) {
+		log.Printf("4")
+		return false
+	}
+	return true
 }
 
 func (s *Server) sendOldMessages(topics []*topic, since sinceTime, scheduled bool, sub subscriber) error {

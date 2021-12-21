@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/util"
 	"io"
 	"log"
 	"net/http"
@@ -39,16 +40,21 @@ type Message struct {
 	Event    string
 	Time     int64
 	Topic    string
-	TopicURL string
 	Message  string
 	Title    string
 	Priority int
 	Tags     []string
-	Raw      string
+
+	// Additional fields
+	TopicURL       string
+	SubscriptionID string
+	Raw            string
 }
 
 type subscription struct {
-	cancel context.CancelFunc
+	ID       string
+	topicURL string
+	cancel   context.CancelFunc
 }
 
 // New creates a new Client using a given Config
@@ -88,7 +94,7 @@ func (c *Client) Publish(topic, message string, options ...PublishOption) (*Mess
 	if err != nil {
 		return nil, err
 	}
-	m, err := toMessage(string(b), topicURL)
+	m, err := toMessage(string(b), topicURL, "")
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +117,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 	errChan := make(chan error)
 	topicURL := c.expandTopicURL(topic)
 	go func() {
-		err := performSubscribeRequest(ctx, msgChan, topicURL, options...)
+		err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
 		close(msgChan)
 		errChan <- err
 	}()
@@ -131,39 +137,58 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 // By default, only new messages will be returned, but you can change this behavior using a SubscribeOption.
 // See WithSince, WithSinceAll, WithSinceUnixTime, WithScheduled, and the generic WithQueryParam.
 //
+// The method returns a unique subscriptionID that can be used in Unsubscribe.
+//
 // Example:
 //   c := client.New(client.NewConfig())
-//   c.Subscribe("mytopic")
+//   subscriptionID := c.Subscribe("mytopic")
 //   for m := range c.Messages {
 //     fmt.Printf("New message: %s", m.Message)
 //   }
 func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	subscriptionID := util.RandomString(10)
 	topicURL := c.expandTopicURL(topic)
-	if _, ok := c.subscriptions[topicURL]; ok {
-		return topicURL
-	}
 	ctx, cancel := context.WithCancel(context.Background())
-	c.subscriptions[topicURL] = &subscription{cancel}
-	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, options...)
-	return topicURL
+	c.subscriptions[subscriptionID] = &subscription{
+		ID:       subscriptionID,
+		topicURL: topicURL,
+		cancel:   cancel,
+	}
+	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, subscriptionID, options...)
+	return subscriptionID
 }
 
-// Unsubscribe unsubscribes from a topic that has been previously subscribed with Subscribe.
+// Unsubscribe unsubscribes from a topic that has been previously subscribed to using the unique
+// subscriptionID returned in Subscribe.
+func (c *Client) Unsubscribe(subscriptionID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	sub, ok := c.subscriptions[subscriptionID]
+	if !ok {
+		return
+	}
+	delete(c.subscriptions, subscriptionID)
+	sub.cancel()
+}
+
+// UnsubscribeAll unsubscribes from a topic that has been previously subscribed with Subscribe.
+// If there are multiple subscriptions matching the topic, all of them are unsubscribed from.
 //
 // A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
 // (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
 // config (e.g. mytopic -> https://ntfy.sh/mytopic).
-func (c *Client) Unsubscribe(topic string) {
+func (c *Client) UnsubscribeAll(topic string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	topicURL := c.expandTopicURL(topic)
-	sub, ok := c.subscriptions[topicURL]
-	if !ok {
-		return
+	for _, sub := range c.subscriptions {
+		if sub.topicURL == topicURL {
+			delete(c.subscriptions, sub.ID)
+			sub.cancel()
+		}
 	}
-	sub.cancel()
 }
 
 func (c *Client) expandTopicURL(topic string) string {
@@ -175,9 +200,11 @@ func (c *Client) expandTopicURL(topic string) string {
 	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic)
 }
 
-func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL string, options ...SubscribeOption) {
+func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL, subcriptionID string, options ...SubscribeOption) {
 	for {
-		if err := performSubscribeRequest(ctx, msgChan, topicURL, options...); err != nil {
+		// TODO The retry logic is crude and may lose messages. It should record the last message like the
+		//      Android client, use since=, and do incremental backoff too
+		if err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, options...); err != nil {
 			log.Printf("Connection to %s failed: %s", topicURL, err.Error())
 		}
 		select {
@@ -189,7 +216,7 @@ func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicUR
 	}
 }
 
-func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, options ...SubscribeOption) error {
+func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, options ...SubscribeOption) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/json", topicURL), nil)
 	if err != nil {
 		return err
@@ -206,7 +233,7 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 	defer resp.Body.Close()
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
-		m, err := toMessage(scanner.Text(), topicURL)
+		m, err := toMessage(scanner.Text(), topicURL, subscriptionID)
 		if err != nil {
 			return err
 		}
@@ -215,12 +242,13 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 	return nil
 }
 
-func toMessage(s, topicURL string) (*Message, error) {
+func toMessage(s, topicURL, subscriptionID string) (*Message, error) {
 	var m *Message
 	if err := json.NewDecoder(strings.NewReader(s)).Decode(&m); err != nil {
 		return nil, err
 	}
 	m.TopicURL = topicURL
+	m.SubscriptionID = subscriptionID
 	m.Raw = s
 	return m, nil
 }

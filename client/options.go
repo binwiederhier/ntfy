@@ -88,6 +88,32 @@ func WithScheduled() SubscribeOption {
 	return WithQueryParam("scheduled", "1")
 }
 
+// WithFilter is a generic subscribe option meant to be used to filter for certain messages only
+func WithFilter(param, value string) SubscribeOption {
+	return WithQueryParam(param, value)
+}
+
+// WithMessageFilter instructs the server to only return messages that match the exact message
+func WithMessageFilter(message string) SubscribeOption {
+	return WithQueryParam("message", message)
+}
+
+// WithTitleFilter instructs the server to only return messages with a title that match the exact string
+func WithTitleFilter(title string) SubscribeOption {
+	return WithQueryParam("title", title)
+}
+
+// WithPriorityFilter instructs the server to only return messages with the matching priority. Not that messages
+// without priority also implicitly match priority 3.
+func WithPriorityFilter(priority int) SubscribeOption {
+	return WithQueryParam("priority", fmt.Sprintf("%d", priority))
+}
+
+// WithTagsFilter instructs the server to only return messages that contain all of the given tags
+func WithTagsFilter(tags []string) SubscribeOption {
+	return WithQueryParam("tags", strings.Join(tags, ","))
+}
+
 // WithHeader is a generic option to add headers to a request
 func WithHeader(header, value string) RequestOption {
 	return func(r *http.Request) error {

@@ -7,12 +7,12 @@ const (
 
 // Config is the config struct for a Client
 type Config struct {
-	DefaultHost string
+	DefaultHost string `yaml:"default-host"`
 	Subscribe   []struct {
-		Topic   string
-		Command string
+		Topic   string `yaml:"topic"`
+		Command string `yaml:"command"`
 		// If []map[string]string TODO This would be cool
-	}
+	} `yaml:"subscribe"`
 }
 
 // NewConfig creates a new Config struct for a Client

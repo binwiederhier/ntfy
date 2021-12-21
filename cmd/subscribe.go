@@ -20,11 +20,6 @@ var cmdSubscribe = &cli.Command{
 	Usage:     "Subscribe to one or more topics on a ntfy server",
 	UsageText: "ntfy subscribe [OPTIONS..] [TOPIC]",
 	Action:    execSubscribe,
-	OnUsageError: func(context *cli.Context, err error, isSubcommand bool) error {
-		println("ee")
-		return nil
-	},
-
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
@@ -109,26 +104,26 @@ func execSubscribe(c *cli.Context) error {
 
 	// Execute poll or subscribe
 	if poll {
-		return execPoll(c, cl, conf, topic, command, options...)
+		return doPoll(c, cl, conf, topic, command, options...)
 	}
-	return execSubscribeInternal(c, cl, conf, topic, command, options...)
+	return doSubscribe(c, cl, conf, topic, command, options...)
 }
 
-func execPoll(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
+func doPoll(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
 	for _, s := range conf.Subscribe { // may be nil
-		if err := execPollSingle(c, cl, s.Topic, s.Command, options...); err != nil {
+		if err := doPollSingle(c, cl, s.Topic, s.Command, options...); err != nil {
 			return err
 		}
 	}
 	if topic != "" {
-		if err := execPollSingle(c, cl, topic, command, options...); err != nil {
+		if err := doPollSingle(c, cl, topic, command, options...); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func execPollSingle(c *cli.Context, cl *client.Client, topic, command string, options ...client.SubscribeOption) error {
+func doPollSingle(c *cli.Context, cl *client.Client, topic, command string, options ...client.SubscribeOption) error {
 	messages, err := cl.Poll(topic, options...)
 	if err != nil {
 		return err
@@ -139,7 +134,7 @@ func execPollSingle(c *cli.Context, cl *client.Client, topic, command string, op
 	return nil
 }
 
-func execSubscribeInternal(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
+func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
 	commands := make(map[string]string)
 	for _, s := range conf.Subscribe { // May be nil
 		topicURL := cl.Subscribe(s.Topic, options...)

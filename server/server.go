@@ -489,20 +489,19 @@ func parseQueryFilters(r *http.Request) (messageFilter string, titleFilter strin
 }
 
 func passesQueryFilter(msg *message, messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string) bool {
+	if msg.Event != messageEvent {
+		return true // filters only apply to messages
+	}
 	if messageFilter != "" && msg.Message != messageFilter {
-		log.Printf("1")
 		return false
 	}
 	if titleFilter != "" && msg.Title != titleFilter {
-		log.Printf("2")
 		return false
 	}
 	if priorityFilter > 0 && (msg.Priority != priorityFilter || (msg.Priority == 0 && priorityFilter != 3)) {
-		log.Printf("3")
 		return false
 	}
 	if len(tagsFilter) > 0 && !util.InStringListAll(msg.Tags, tagsFilter) {
-		log.Printf("4")
 		return false
 	}
 	return true

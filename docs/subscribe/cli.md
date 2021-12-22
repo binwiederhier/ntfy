@@ -112,6 +112,7 @@ in double-quotes, you should be fine:
 | `$NTFY_TITLE` | `$title`, `$t` | Message title |
 | `$NTFY_PRIORITY` | `$priority`, `$prio`, `$p` | Message priority (1=min, 5=max) |
 | `$NTFY_TAGS` | `$tags`, `$tag`, `$ta` | Message tags (comma separated list) |
+| `$NTFY_RAW` | `$raw` | Raw JSON message |
    
 ### Subscribe to multiple topics
 ```
@@ -127,14 +128,14 @@ Here's an example config file that subscribes to three different topics, executi
     subscribe:
     - topic: echo-this
       command: 'echo "Message received: $message"'
-      - topic: alerts
-        command: notify-send -i /usr/share/ntfy/logo.png "Important" "$m"
-        if:
-          priority: high,urgent
-      - topic: calc
-        command: 'gnome-calculator 2>/dev/null &'
-      - topic: print-temp
-        command: |
+    - topic: alerts
+      command: notify-send -i /usr/share/ntfy/logo.png "Important" "$m"
+      if:
+        priority: high,urgent
+    - topic: calc
+      command: 'gnome-calculator 2>/dev/null &'
+    - topic: print-temp
+      command: |
             echo "You can easily run inline scripts, too."
             temp="$(sensors | awk '/Pack/ { print substr($4,2,2) }')"
             if [ $temp -gt 80 ]; then
@@ -142,12 +143,12 @@ Here's an example config file that subscribes to three different topics, executi
             else
               echo "CPU temperature is $temp. That's alright."
             fi
-      ```
+    ```
 
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out
-* Messages to `alerts` display as desktop notification for high priority messages using `notify-send`
+* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html)
 * Messages to `calc` open the gnome calculator 😀 (*because, why not*)
 * Messages to `print-temp` execute an inline script and print the CPU temperature
 

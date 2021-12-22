@@ -44,15 +44,16 @@ ntfy subscribe TOPIC COMMAND
   This executes COMMAND for every incoming messages. The message fields are passed to the
   command as environment variables:
 
-    Variable        Aliases         Description
-    --------------- --------------- -----------------------------------
-    $NTFY_ID        $id             Unique message ID
-    $NTFY_TIME      $time           Unix timestamp of the message delivery
-    $NTFY_TOPIC     $topic          Topic name
-    $NTFY_MESSAGE   $message, $m    Message body
-    $NTFY_TITLE     $title, $t      Message title
-    $NTFY_PRIORITY  $priority, $p   Message priority (1=min, 5=max)
-    $NTFY_TAGS      $tags, $ta      Message tags (comma separated list)
+    Variable        Aliases               Description
+    --------------- --------------------- -----------------------------------
+    $NTFY_ID        $id                   Unique message ID
+    $NTFY_TIME      $time                 Unix timestamp of the message delivery
+    $NTFY_TOPIC     $topic                Topic name
+    $NTFY_MESSAGE   $message, $m          Message body
+    $NTFY_TITLE     $title, $t            Message title
+    $NTFY_PRIORITY  $priority, $prio, $p  Message priority (1=min, 5=max)
+    $NTFY_TAGS      $tags, $tag, $ta      Message tags (comma separated list)
+	$NTFY_RAW       $raw                  Raw JSON message
 
   Examples:
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
@@ -207,6 +208,7 @@ func envVars(m *client.Message) []string {
 	env = append(env, envVar(m.Title, "NTFY_TITLE", "title", "t")...)
 	env = append(env, envVar(fmt.Sprintf("%d", m.Priority), "NTFY_PRIORITY", "priority", "prio", "p")...)
 	env = append(env, envVar(strings.Join(m.Tags, ","), "NTFY_TAGS", "tags", "tag", "ta")...)
+	env = append(env, envVar(m.Raw, "NTFY_RAW", "raw")...)
 	return env
 }
 

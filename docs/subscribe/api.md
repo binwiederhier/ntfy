@@ -231,7 +231,7 @@ Available filters (all case-insensitive):
 
 | Filter variable | Alias | Example | Description |
 |---|---|---|---|
-| `message` | `X-Message`, `m` | `ntfy.sh/mytopic?some_message` | Only return messages that match this exact message string |
+| `message` | `X-Message`, `m` | `ntfy.sh/mytopic?message=lalala` | Only return messages that match this exact message string |
 | `title` | `X-Title`, `t` | `ntfy.sh/mytopic?title=some+title` | Only return messages that match this exact title string |
 | `priority` | `X-Priority`, `prio`, `p` | `ntfy.sh/mytopic?p=high,urgent` | Only return messages that match *any priority listed* (comma-separated) |
 | `tags` | `X-Tags`, `tag`, `ta` | `ntfy.sh/mytopic?tags=error,alert` | Only return messages that match *all listed tags* (comma-separated) |

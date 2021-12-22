@@ -158,9 +158,6 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 }
 
 func printMessageOrRunCommand(c *cli.Context, m *client.Message, command string) {
-	if m.Event != client.MessageEvent {
-		return
-	}
 	if command != "" {
 		runCommand(c, command, m)
 	} else {

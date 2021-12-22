@@ -1,4 +1,3 @@
-GO=$(shell which go)
 VERSION := $(shell git describe --tag)
 
 .PHONY:
@@ -50,20 +49,20 @@ docs: docs-deps
 check: test fmt-check vet lint staticcheck
 
 test: .PHONY
-	$(GO) test -v ./...
+	go test -v $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 race: .PHONY
-	$(GO) test -race ./...
+	go test -race $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	$(GO) test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -func build/coverage/coverage.txt
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:
 	mkdir -p build/coverage
-	$(GO) test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -html build/coverage/coverage.txt
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go tool cover -html build/coverage/coverage.txt
 
 coverage-upload:
 	cd build/coverage && (curl -s https://codecov.io/bash | bash)
@@ -78,17 +77,17 @@ fmt-check:
 	test -z $(shell gofmt -l .)
 
 vet:
-	$(GO) vet ./...
+	go vet ./...
 
 lint:
-	which golint || $(GO) get -u golang.org/x/lint/golint
-	$(GO) list ./... | grep -v /vendor/ | xargs -L1 golint -set_exit_status
+	which golint || go get -u golang.org/x/lint/golint
+	go list ./... | grep -v /vendor/ | xargs -L1 golint -set_exit_status
 
 staticcheck: .PHONY
 	rm -rf build/staticcheck
 	which staticcheck || go install honnef.co/go/tools/cmd/staticcheck@latest
 	mkdir -p build/staticcheck
-	ln -s "$(GO)" build/staticcheck/go
+	ln -s "go" build/staticcheck/go
 	PATH="$(PWD)/build/staticcheck:$(PATH)" staticcheck ./...
 	rm -rf build/staticcheck
 
@@ -108,7 +107,7 @@ build-snapshot: build-deps
 build-simple: clean
 	mkdir -p dist/ntfy_linux_amd64
 	export CGO_ENABLED=1
-	$(GO) build \
+	go build \
 		-o dist/ntfy_linux_amd64/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \

@@ -35,7 +35,7 @@ type Client struct {
 }
 
 // Message is a struct that represents a ntfy message
-type Message struct {
+type Message struct { // TODO combine with server.message
 	ID       string
 	Event    string
 	Time     int64
@@ -60,7 +60,7 @@ type subscription struct {
 // New creates a new Client using a given Config
 func New(config *Config) *Client {
 	return &Client{
-		Messages:      make(chan *Message),
+		Messages:      make(chan *Message, 50), // Allow reading a few messages
 		config:        config,
 		subscriptions: make(map[string]*subscription),
 	}
@@ -237,7 +237,9 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 		if err != nil {
 			return err
 		}
-		msgChan <- m
+		if m.Event == MessageEvent {
+			msgChan <- m
+		}
 	}
 	return nil
 }

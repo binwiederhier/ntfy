@@ -191,9 +191,6 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
-	go s.runManager()
-	go s.runAtSender()
-	go s.runFirebaseKeepliver()
 	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
@@ -214,6 +211,9 @@ func (s *Server) Run() error {
 		}()
 	}
 	s.mu.Unlock()
+	go s.runManager()
+	go s.runAtSender()
+	go s.runFirebaseKeepliver()
 	return <-errChan
 }
 

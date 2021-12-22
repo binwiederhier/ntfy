@@ -1,5 +1,10 @@
 package client
 
+import (
+	"gopkg.in/yaml.v2"
+	"os"
+)
+
 const (
 	// DefaultBaseURL is the base URL used to expand short topic names
 	DefaultBaseURL = "https://ntfy.sh"
@@ -21,4 +26,17 @@ func NewConfig() *Config {
 		DefaultHost: DefaultBaseURL,
 		Subscribe:   nil,
 	}
+}
+
+// LoadConfig loads the Client config from a yaml file
+func LoadConfig(filename string) (*Config, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	c := NewConfig()
+	if err := yaml.Unmarshal(b, c); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

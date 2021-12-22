@@ -125,25 +125,31 @@ Here's an example config file that subscribes to three different topics, executi
 === "~/.config/ntfy/client.yml"
     ```yaml
     subscribe:
-      - topic: echo-this
-        command: 'echo "Message received: $message"'
-      - topic: get-temp
-        command: |
-          temp="$(sensors | awk '/Package/ { print $4 }')"
-          ntfy publish --quiet temp "$temp";
-          echo "CPU temp is $temp; published to topic 'temp'"
+    - topic: echo-this
+      command: 'echo "Message received: $message"'
       - topic: alerts
-        command: notify-send "$m"
+        command: notify-send -i /usr/share/ntfy/logo.png "Important" "$m"
+        if:
+          priority: high,urgent
       - topic: calc
         command: 'gnome-calculator 2>/dev/null &'
-    ```
+      - topic: print-temp
+        command: |
+            echo "You can easily run inline scripts, too."
+            temp="$(sensors | awk '/Pack/ { print substr($4,2,2) }')"
+            if [ $temp -gt 80 ]; then
+              echo "Warning: CPU temperature is $temp. Too high."
+            else
+              echo "CPU temperature is $temp. That's alright."
+            fi
+      ```
 
 In this example, when `ntfy subscribe --from-config` is executed:
 
-* Messages to topic `echo-this` will be simply echoed to standard out
-* Messages to topic `get-temp` will publish the CPU core temperature to topic `temp`
-* Messages to topic `alerts` will be displayed as desktop notification using `notify-send`
-* And messages to topic `calc` will open the gnome calculator 😀 (*because, why not*)
+* Messages to `echo-this` simply echos to standard out
+* Messages to `alerts` display as desktop notification for high priority messages using `notify-send`
+* Messages to `calc` open the gnome calculator 😀 (*because, why not*)
+* Messages to `print-temp` execute an inline script and print the CPU temperature
 
 I hope this shows how powerful this command is. Here's a short video that demonstrates the above example:
 

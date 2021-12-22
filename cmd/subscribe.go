@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
 	"log"
@@ -225,7 +224,7 @@ func envVar(value string, vars ...string) []string {
 func loadConfig(c *cli.Context) (*client.Config, error) {
 	filename := c.String("config")
 	if filename != "" {
-		return loadConfigFromFile(filename)
+		return client.LoadConfig(filename)
 	}
 	u, _ := user.Current()
 	configFile := defaultClientRootConfigFile
@@ -233,19 +232,7 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 		configFile = util.ExpandHome(defaultClientUserConfigFile)
 	}
 	if s, _ := os.Stat(configFile); s != nil {
-		return loadConfigFromFile(configFile)
+		return client.LoadConfig(configFile)
 	}
 	return client.NewConfig(), nil
-}
-
-func loadConfigFromFile(filename string) (*client.Config, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	c := client.NewConfig()
-	if err := yaml.Unmarshal(b, c); err != nil {
-		return nil, err
-	}
-	return c, nil
 }

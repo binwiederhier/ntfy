@@ -480,15 +480,22 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	}
 }
 
-func parseQueryFilters(r *http.Request) (messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string, err error) {
+func parseQueryFilters(r *http.Request) (messageFilter string, titleFilter string, priorityFilter []int, tagsFilter []string, err error) {
 	messageFilter = readParam(r, "x-message", "message", "m")
 	titleFilter = readParam(r, "x-title", "title", "t")
 	tagsFilter = util.SplitNoEmpty(readParam(r, "x-tags", "tags", "tag", "ta"), ",")
-	priorityFilter, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
-	return // may be err!
+	priorityFilter = make([]int, 0)
+	for _, p := range util.SplitNoEmpty(readParam(r, "x-priority", "priority", "prio", "p"), ",") {
+		priority, err := util.ParsePriority(p)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		priorityFilter = append(priorityFilter, priority)
+	}
+	return
 }
 
-func passesQueryFilter(msg *message, messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string) bool {
+func passesQueryFilter(msg *message, messageFilter string, titleFilter string, priorityFilter []int, tagsFilter []string) bool {
 	if msg.Event != messageEvent {
 		return true // filters only apply to messages
 	}
@@ -502,7 +509,7 @@ func passesQueryFilter(msg *message, messageFilter string, titleFilter string, p
 	if messagePriority == 0 {
 		messagePriority = 3 // For query filters, default priority (3) is the same as "not set" (0)
 	}
-	if priorityFilter > 0 && messagePriority != priorityFilter {
+	if len(priorityFilter) > 0 && !util.InIntList(priorityFilter, messagePriority) {
 		return false
 	}
 	if len(tagsFilter) > 0 && !util.InStringListAll(msg.Tags, tagsFilter) {

@@ -217,15 +217,24 @@ curl -s "ntfy.sh/mytopic/json?poll=1&sched=1"
 
 ### Filter messages
 You can filter which messages are returned based on the well-known message fields `message`, `title`, `priority` and
-`tags`. Currently, only exact matches are supported. Here's an example that only returns messages of high priority
-with the tag "zfs-error":
+`tags`. Here's an example that only returns messages of high or urgent priority that contains the both tags 
+"zfs-error" and "error". Note that the `priority` filter is a logical OR and the `tags` filter is a logical AND. 
 
 ```
 $ curl "ntfy.sh/alerts/json?priority=high&tags=zfs-error"
 {"id":"0TIkJpBcxR","time":1640122627,"event":"open","topic":"alerts"}
-{"id":"X3Uzz9O1sM","time":1640122674,"event":"message","topic":"alerts","priority":4,"tags":["zfs-error"],
-  "message":"ZFS pool corruption detected"}
+{"id":"X3Uzz9O1sM","time":1640122674,"event":"message","topic":"alerts","priority":4,
+  "tags":["error", "zfs-error"], "message":"ZFS pool corruption detected"}
 ```
+
+Available filters (all case-insensitive):
+
+| Filter variable | Alias | Example | Description |
+|---|---|---|---|
+| `message` | `X-Message`, `m` | `ntfy.sh/mytopic?some_message` | Only return messages that match this exact message string |
+| `title` | `X-Title`, `t` | `ntfy.sh/mytopic?title=some+title` | Only return messages that match this exact title string |
+| `priority` | `X-Priority`, `prio`, `p` | `ntfy.sh/mytopic?p=high,urgent` | Only return messages that match *any priority listed* (comma-separated) |
+| `tags` | `X-Tags`, `tag`, `ta` | `ntfy.sh/mytopic?tags=error,alert` | Only return messages that match *all listed tags* (comma-separated) |
 
 ### Subscribe to multiple topics
 It's possible to subscribe to multiple topics in one HTTP call by providing a comma-separated list of topics 
@@ -314,5 +323,5 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `scheduled` | `X-Scheduled`, `sched` | Include scheduled/delayed messages in message list |
 | `message` | `X-Message`, `m` | Filter: Only return messages that match this exact message string |
 | `title` | `X-Title`, `t` | Filter: Only return messages that match this exact title string |
-| `priority` | `X-Priority`, `prio`, `p` | Filter: Only return messages that match this priority |
-| `tags` | `X-Tags`, `tag`, `ta` | Filter: Only return messages that all listed tags (comma-separated) |
+| `priority` | `X-Priority`, `prio`, `p` | Filter: Only return messages that match *any priority listed* (comma-separated) |
+| `tags` | `X-Tags`, `tag`, `ta` | Filter: Only return messages that match *all listed tags* (comma-separated) |

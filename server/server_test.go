@@ -408,6 +408,9 @@ func TestServer_PollWithQueryFilters(t *testing.T) {
 	queriesThatShouldReturnMessageOne := []string{
 		"/mytopic/json?poll=1&priority=1",
 		"/mytopic/json?poll=1&priority=min",
+		"/mytopic/json?poll=1&priority=min,low",
+		"/mytopic/json?poll=1&priority=1,2",
+		"/mytopic/json?poll=1&p=2,min",
 		"/mytopic/json?poll=1&tags=tag1",
 		"/mytopic/json?poll=1&tags=tag1,tag2",
 		"/mytopic/json?poll=1&message=my+first+message",

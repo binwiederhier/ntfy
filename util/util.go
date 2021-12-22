@@ -18,7 +18,7 @@ var (
 	random      = rand.New(rand.NewSource(time.Now().UnixNano()))
 	randomMutex = sync.Mutex{}
 
-	errInvalidPriority = errors.New("unknown priority")
+	errInvalidPriority = errors.New("invalid priority")
 )
 
 // FileExists checks if a file exists, and returns true if it does
@@ -48,6 +48,16 @@ func InStringListAll(haystack []string, needles []string) bool {
 		}
 	}
 	return matches == len(needles)
+}
+
+// InIntList returns true if needle is contained in haystack
+func InIntList(haystack []int, needle int) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }
 
 // SplitNoEmpty splits a string using strings.Split, but filters out empty strings

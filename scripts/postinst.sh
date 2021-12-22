@@ -22,7 +22,7 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
     fi
   fi
 
-  # Restart service
+  # Restart services
   systemctl --system daemon-reload >/dev/null || true
   if systemctl is-active -q ntfy.service; then
     echo "Restarting ntfy.service ..."
@@ -32,4 +32,12 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
       systemctl restart ntfy.service >/dev/null || true
     fi
   fi
+  if systemctl is-active -q ntfy-client.service; then
+      echo "Restarting ntfy-client.service ..."
+      if [ -x /usr/bin/deb-systemd-invoke ]; then
+        deb-systemd-invoke try-restart ntfy-client.service >/dev/null || true
+      else
+        systemctl restart ntfy-client.service >/dev/null || true
+      fi
+    fi
 fi

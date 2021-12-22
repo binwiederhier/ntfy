@@ -14,6 +14,8 @@
 #         command: /usr/local/bin/mytopic-triggered.sh
 #       - topic: myserver.com/anothertopic
 #         command: 'echo "$message"'
+#         if:
+#             priority: high,urgent
 #
 # Variables:
 #     Variable        Aliases         Description
@@ -25,5 +27,9 @@
 #     $NTFY_TITLE     $title, $t      Message title
 #     $NTFY_PRIORITY  $priority, $p   Message priority (1=min, 5=max)
 #     $NTFY_TAGS      $tags, $ta      Message tags (comma separated list)
+#
+# Filters ('if:'):
+#     You can filter 'message', 'title', 'priority' (comma-separated list, logical OR)
+#     and 'tags' (comma-separated list, logical AND). See https://ntfy.sh/docs/subscribe/api/#filter-messages.
 #
 # subscribe:

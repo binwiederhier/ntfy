@@ -52,9 +52,9 @@ type Config struct {
 }
 
 // NewConfig instantiates a default new server config
-func NewConfig(listenHTTP string) *Config {
+func NewConfig() *Config {
 	return &Config{
-		ListenHTTP:                   listenHTTP,
+		ListenHTTP:                   DefaultListenHTTP,
 		ListenHTTPS:                  "",
 		KeyFile:                      "",
 		CertFile:                     "",

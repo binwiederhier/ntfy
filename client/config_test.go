@@ -1,7 +1,8 @@
-package client
+package client_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/client"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +22,7 @@ subscribe:
             priority: high,urgent
 `), 0600))
 
-	conf, err := LoadConfig(filename)
+	conf, err := client.LoadConfig(filename)
 	require.Nil(t, err)
 	require.Equal(t, "http://localhost", conf.DefaultHost)
 	require.Equal(t, 3, len(conf.Subscribe))

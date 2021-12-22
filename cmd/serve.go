@@ -85,7 +85,8 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Run server
-	conf := server.NewConfig(listenHTTP)
+	conf := server.NewConfig()
+	conf.ListenHTTP = listenHTTP
 	conf.ListenHTTPS = listenHTTPS
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile

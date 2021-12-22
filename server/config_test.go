@@ -7,6 +7,7 @@ import (
 )
 
 func TestConfig_New(t *testing.T) {
-	c := server.NewConfig(":1234")
-	assert.Equal(t, ":1234", c.ListenHTTP)
+	c := server.NewConfig()
+	assert.Equal(t, ":80", c.ListenHTTP)
+	assert.Equal(t, server.DefaultKeepaliveInterval, c.KeepaliveInterval)
 }

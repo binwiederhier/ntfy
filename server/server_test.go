@@ -488,7 +488,7 @@ func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 }
 
 func newTestConfig(t *testing.T) *Config {
-	conf := NewConfig(":80")
+	conf := NewConfig()
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 	return conf
 }

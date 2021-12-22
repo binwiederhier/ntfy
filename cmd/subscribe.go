@@ -210,7 +210,7 @@ func envVars(m *client.Message) []string {
 	env = append(env, envVar(m.Message, "NTFY_MESSAGE", "message", "m")...)
 	env = append(env, envVar(m.Title, "NTFY_TITLE", "title", "t")...)
 	env = append(env, envVar(fmt.Sprintf("%d", m.Priority), "NTFY_PRIORITY", "priority", "prio", "p")...)
-	env = append(env, envVar(strings.Join(m.Tags, ","), "NTFY_TAGS", "tags", "ta")...)
+	env = append(env, envVar(strings.Join(m.Tags, ","), "NTFY_TAGS", "tags", "tag", "ta")...)
 	return env
 }
 

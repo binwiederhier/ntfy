@@ -73,6 +73,7 @@ stays open forever.
 $ ntfy sub mytopic
 {"id":"nZ8PjH5oox","time":1639971913,"event":"message","topic":"mytopic","message":"hi there"}
 {"id":"sekSLWTujn","time":1639972063,"event":"message","topic":"mytopic",priority:5,"message":"Oh no!"}
+...
 ```
 
 <figure>
@@ -84,8 +85,8 @@ $ ntfy sub mytopic
 ```
 ntfy subscribe TOPIC COMMAND
 ```
-If you run it like this, a COMMAND is executed for every incoming messages. Here are a few 
-examples:
+If you run it like this, a COMMAND is executed for every incoming messages. Scroll down to see a list of available
+environment variables. Here are a few examples:
  
 ```
 ntfy sub mytopic 'notify-send "$m"'
@@ -109,10 +110,10 @@ in double-quotes, you should be fine:
 | `$NTFY_TOPIC` | `$topic` | Topic name |
 | `$NTFY_MESSAGE` | `$message`, `$m` | Message body |
 | `$NTFY_TITLE` | `$title`, `$t` | Message title |
-| `$NTFY_PRIORITY` | `$priority`, `$p` | Message priority (1=min, 5=max) |
-| `$NTFY_TAGS` | `$tags`, `$ta` | Message tags (comma separated list) |
+| `$NTFY_PRIORITY` | `$priority`, `$prio`, `$p` | Message priority (1=min, 5=max) |
+| `$NTFY_TAGS` | `$tags`, `$tag`, `$ta` | Message tags (comma separated list) |
    
-### Subscribing to multiple topics
+### Subscribe to multiple topics
 ```
 ntfy subscribe --from-config
 ```
@@ -160,18 +161,19 @@ if you install the deb/rpm package. To configure it, simply edit `/etc/ntfy/clie
     The `ntfy-client.service` runs as user `ntfy`, meaning that typical Linux permission restrictions apply. See below
     for how to fix this.
 
-If it runs on your personal desktop machine, you may want to override the service user/group (`User=` and `Group=`), and 
-adjust the `DISPLAY` and DBUS environment variables. This will allow you to run commands in your X session as the primary
-machine user.
+If the service runs on your personal desktop machine, you may want to override the service user/group (`User=` and `Group=`), and 
+adjust the `DISPLAY` and `DBUS_SESSION_BUS_ADDRESS` environment variables. This will allow you to run commands in your X session 
+as the primary machine user.
 
 You can either manually override these systemd service entries with `sudo systemctl edit ntfy-client`, and add this
-(assuming your user is `pheckel`):
+(assuming your user is `phil`). Don't forget to run `sudo systemctl daemon-reload` and `sudo systemctl restart ntfy-client`
+after editing the service file:
 
 === "/etc/systemd/system/ntfy-client.service.d/override.conf"
     ```
     [Service]
-    User=pheckel
-    Group=pheckel
+    User=phil
+    Group=phil
     Environment="DISPLAY=:0" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
     ```
 Or you can run the following script that creates this override config for you:

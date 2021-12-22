@@ -59,6 +59,8 @@ nfpms:
         dst: /lib/systemd/system/ntfy-client.service
       - dst: /var/cache/ntfy
         type: dir
+      - dst: /usr/share/ntfy/logo.png
+        src: server/static/img/ntfy.png
     scripts:
       preinstall: "scripts/preinst.sh"
       postinstall: "scripts/postinst.sh"

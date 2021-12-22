@@ -116,6 +116,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 	msgChan := make(chan *Message)
 	errChan := make(chan error)
 	topicURL := c.expandTopicURL(topic)
+	options = append(options, WithPoll())
 	go func() {
 		err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
 		close(msgChan)

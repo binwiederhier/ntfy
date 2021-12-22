@@ -196,16 +196,17 @@ func (s *Server) Run() error {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
 	}
 	log.Printf("Listening on %s", listenStr)
-	http.HandleFunc("/", s.handle)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
 	s.mu.Lock()
 	s.closeChan = make(chan bool)
-	s.httpServer = &http.Server{Addr: s.config.ListenHTTP}
+	s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
 	go func() {
 		errChan <- s.httpServer.ListenAndServe()
 	}()
 	if s.config.ListenHTTPS != "" {
-		s.httpsServer = &http.Server{Addr: s.config.ListenHTTP}
+		s.httpsServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
 		go func() {
 			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
 		}()

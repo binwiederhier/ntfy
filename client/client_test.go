@@ -62,6 +62,36 @@ func TestClient_Publish_Subscribe(t *testing.T) {
 	require.Nil(t, msg)
 }
 
+func TestClient_Publish_Poll(t *testing.T) {
+	s, port := test.StartServer(t)
+	defer test.StopServer(t, s, port)
+	c := client.New(newTestConfig(port))
+
+	msg, err := c.Publish("mytopic", "some message", client.WithNoFirebase(), client.WithTagsList("tag1,tag2"))
+	require.Nil(t, err)
+	require.Equal(t, "some message", msg.Message)
+	require.Equal(t, []string{"tag1", "tag2"}, msg.Tags)
+
+	msg, err = c.Publish("mytopic", "this won't be cached", client.WithNoCache())
+	require.Nil(t, err)
+	require.Equal(t, "this won't be cached", msg.Message)
+
+	msg, err = c.Publish("mytopic", "some delayed message", client.WithDelay("20 min"))
+	require.Nil(t, err)
+	require.Equal(t, "some delayed message", msg.Message)
+
+	messages, err := c.Poll("mytopic")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "some message", messages[0].Message)
+
+	messages, err = c.Poll("mytopic", client.WithScheduled())
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+	require.Equal(t, "some message", messages[0].Message)
+	require.Equal(t, "some delayed message", messages[1].Message)
+}
+
 func newTestConfig(port int) *client.Config {
 	c := client.NewConfig()
 	c.DefaultHost = fmt.Sprintf("http://127.0.0.1:%d", port)

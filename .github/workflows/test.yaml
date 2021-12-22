@@ -11,7 +11,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y python3-pip
+        run: sudo apt update && sudo apt install -y python3-pip curl
       - name: Build docs (required for tests)
         run: make docs
       - name: Run tests, formatting, vetting and linting

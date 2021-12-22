@@ -62,6 +62,12 @@ func TestInStringListAll(t *testing.T) {
 	require.False(t, InStringListAll(s, []string{"three", "five"}))
 }
 
+func TestInIntList(t *testing.T) {
+	s := []int{1, 2}
+	require.True(t, InIntList(s, 2))
+	require.False(t, InIntList(s, 3))
+}
+
 func TestSplitNoEmpty(t *testing.T) {
 	require.Equal(t, []string{}, SplitNoEmpty("", ","))
 	require.Equal(t, []string{}, SplitNoEmpty(",,,", ","))

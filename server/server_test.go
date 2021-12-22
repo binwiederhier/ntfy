@@ -487,6 +487,27 @@ func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 	require.Equal(t, keepaliveEvent, messages[2].Event)
 }
 
+/*
+func TestServer_Curl_Publish_Poll(t *testing.T) {
+	s, port := test.StartServer(t)
+	defer test.StopServer(t, s, port)
+
+	cmd := exec.Command("sh", "-c", fmt.Sprintf(`curl -sd "This is a test" localhost:%d/mytopic`, port))
+	require.Nil(t, cmd.Run())
+	b, err := cmd.CombinedOutput()
+	require.Nil(t, err)
+	msg := toMessage(t, string(b))
+	require.Equal(t, "This is a test", msg.Message)
+
+	cmd = exec.Command("sh", "-c", fmt.Sprintf(`curl "localhost:%d/mytopic?poll=1"`, port))
+	require.Nil(t, cmd.Run())
+	b, err = cmd.CombinedOutput()
+	require.Nil(t, err)
+	msg = toMessage(t, string(b))
+	require.Equal(t, "This is a test", msg.Message)
+}
+*/
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")

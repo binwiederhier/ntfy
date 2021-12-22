@@ -711,7 +711,7 @@ func (s *Server) visitor(r *http.Request) *visitor {
 		s.visitors[ip] = newVisitor(s.config)
 		return s.visitors[ip]
 	}
-	v.seen = time.Now()
+	v.Keepalive()
 	return v
 }
 

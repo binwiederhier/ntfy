@@ -184,6 +184,60 @@ format. Keepalive messages are sent as empty lines.
     fclose($fp);
     ```
 
+## Advanced features
+
+### Poll for messages
+You can also just poll for messages if you don't like the long-standing connection using the `poll=1`
+query parameter. The connection will end after all available messages have been read. This parameter can be
+combined with `since=` (defaults to `since=all`).
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1"
+```
+
+### Fetch cached messages
+Messages may be cached for a couple of hours (see [message caching](../config.md#message-cache)) to account for network
+interruptions of subscribers. If the server has configured message caching, you can read back what you missed by using 
+the `since=` query parameter. It takes either a duration (e.g. `10m` or `30s`), a Unix timestamp (e.g. `1635528757`) 
+or `all` (all cached messages).
+
+```
+curl -s "ntfy.sh/mytopic/json?since=10m"
+```
+
+### Fetch scheduled messages
+Messages that are [scheduled to be delivered](../publish.md#scheduled-delivery) at a later date are not typically 
+returned when subscribing via the API, which makes sense, because after all, the messages have technically not been 
+delivered yet. To also return scheduled messages from the API, you can use the `scheduled=1` (alias: `sched=1`) 
+parameter (makes most sense with the `poll=1` parameter):
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1&sched=1"
+```
+
+### Filter messages
+You can filter which messages are returned based on the well-known message fields `message`, `title`, `priority` and
+`tags`. Currently, only exact matches are supported. Here's an example that only returns messages of high priority
+with the tag "zfs-error":
+
+```
+$ curl "ntfy.sh/alerts/json?priority=high&tags=zfs-error"
+{"id":"0TIkJpBcxR","time":1640122627,"event":"open","topic":"alerts"}
+{"id":"X3Uzz9O1sM","time":1640122674,"event":"message","topic":"alerts","priority":4,"tags":["zfs-error"],
+  "message":"ZFS pool corruption detected"}
+```
+
+### Subscribe to multiple topics
+It's possible to subscribe to multiple topics in one HTTP call by providing a comma-separated list of topics 
+in the URL. This allows you to reduce the number of connections you have to maintain:
+
+```
+$ curl -s ntfy.sh/mytopic1,mytopic2/json
+{"id":"0OkXIryH3H","time":1637182619,"event":"open","topic":"mytopic1,mytopic2,mytopic3"}
+{"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}
+{"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
+```
+
 ## JSON message format
 Both the [`/json` endpoint](#subscribe-as-json-stream) and the [`/sse` endpoint](#subscribe-as-sse-stream) return a JSON
 format of the message. It's very straight forward:
@@ -204,17 +258,17 @@ Here's an example for each message type:
 === "Notification message"
     ``` json
     {
-      "id": "wze9zgqK41",
-      "time": 1638542110,
-      "event": "message",
-      "topic": "phil_alerts",
-      "priority": 5,
-      "tags": [
-        "warning",
-        "skull"
-      ],
-      "title": "Unauthorized access detected",
-      "message": "Remote access to phils-laptop detected. Act right away."
+        "id": "wze9zgqK41",
+        "time": 1638542110,
+        "event": "message",
+        "topic": "phil_alerts",
+        "priority": 5,
+        "tags": [
+            "warning",
+            "skull"
+        ],
+        "title": "Unauthorized access detected",
+        "message": "Remote access to phils-laptop detected. Act right away."
     }
     ```
 
@@ -222,72 +276,43 @@ Here's an example for each message type:
 === "Notification message (minimal)"
     ``` json
     {
-      "id": "wze9zgqK41",
-      "time": 1638542110,
-      "event": "message",
-      "topic": "phil_alerts",
-      "message": "Remote access to phils-laptop detected. Act right away."
+        "id": "wze9zgqK41",
+        "time": 1638542110,
+        "event": "message",
+        "topic": "phil_alerts",
+        "message": "Remote access to phils-laptop detected. Act right away."
     }
     ```
 
 === "Open message"
     ``` json
     {
-      "id": "2pgIAaGrQ8",
-      "time": 1638542215,
-      "event": "open",
-      "topic": "phil_alerts"
+        "id": "2pgIAaGrQ8",
+        "time": 1638542215,
+        "event": "open",
+        "topic": "phil_alerts"
     }
     ```
 
-=== "Keepalive message" 
+=== "Keepalive message"
     ``` json
     {
-      "id": "371sevb0pD",
-      "time": 1638542275,
-      "event": "keepalive",
-      "topic": "phil_alerts"
+        "id": "371sevb0pD",
+        "time": 1638542275,
+        "event": "keepalive",
+        "topic": "phil_alerts"
     }
     ```    
 
-## Advanced features
+## List of all parameters
+The following is a list of all parameters that can be passed when subscribing to a message. Parameter names are **case-insensitive**,
+and can be passed as **HTTP headers** or **query parameters in the URL**. They are listed in the table in their canonical form.
 
-### Fetching cached messages
-Messages may be cached for a couple of hours (see [message caching](../config.md#message-cache)) to account for network
-interruptions of subscribers. If the server has configured message caching, you can read back what you missed by using 
-the `since=` query parameter. It takes either a duration (e.g. `10m` or `30s`), a Unix timestamp (e.g. `1635528757`) 
-or `all` (all cached messages).
-
-```
-curl -s "ntfy.sh/mytopic/json?since=10m"
-```
-
-### Polling for messages
-You can also just poll for messages if you don't like the long-standing connection using the `poll=1`
-query parameter. The connection will end after all available messages have been read. This parameter can be
-combined with `since=` (defaults to `since=all`).
-
-```
-curl -s "ntfy.sh/mytopic/json?poll=1"
-```
-
-### Fetching scheduled messages
-Messages that are [scheduled to be delivered](../publish.md#scheduled-delivery) at a later date are not typically 
-returned when subscribing via the API, which makes sense, because after all, the messages have technically not been 
-delivered yet. To also return scheduled messages from the API, you can use the `scheduled=1` (alias: `sched=1`) 
-parameter (makes most sense with the `poll=1` parameter):
-
-```
-curl -s "ntfy.sh/mytopic/json?poll=1&sched=1"
-```
-
-### Subscribing to multiple topics
-It's possible to subscribe to multiple topics in one HTTP call by providing a
-comma-separated list of topics in the URL. This allows you to reduce the number of connections you have to maintain:
-
-```
-$ curl -s ntfy.sh/mytopic1,mytopic2/json
-{"id":"0OkXIryH3H","time":1637182619,"event":"open","topic":"mytopic1,mytopic2,mytopic3"}
-{"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}
-{"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
-```
+| Parameter | Aliases (case-insensitive) | Description |
+|---|---|---|
+| `poll` | `X-Poll`, `po` | Return cached messages and close connection |
+| `scheduled` | `X-Scheduled`, `sched` | Include scheduled/delayed messages in message list |
+| `message` | `X-Message`, `m` | Filter: Only return messages that match this exact message string |
+| `title` | `X-Title`, `t` | Filter: Only return messages that match this exact title string |
+| `priority` | `X-Priority`, `prio`, `p` | Filter: Only return messages that match this priority |
+| `tags` | `X-Tags`, `tag`, `ta` | Filter: Only return messages that all listed tags (comma-separated) |

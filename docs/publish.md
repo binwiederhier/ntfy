@@ -606,8 +606,8 @@ client-side network disruptions, but arguably this feature also may raise privac
 
 To avoid messages being cached server-side entirely, you can set `X-Cache` header (or its alias: `Cache`) to `no`. 
 This will make sure that your message is not cached on the server, even if server-side caching is enabled. Messages
-are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetching-cached-messages) and 
-[`poll=1`](subscribe/api.md#polling-for-messages) won't return the message anymore.
+are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetch-cached-messages) and 
+[`poll=1`](subscribe/api.md#poll-for-messages) won't return the message anymore.
 
 === "Command line (curl)"
     ```
@@ -752,14 +752,14 @@ but just in case, let's list them all:
 
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
-and can be passed as **HTTP headers** or **query parameters in the URL**.
+and can be passed as **HTTP headers** or **query parameters in the URL**. They are listed in the table in their canonical form.
 
 | Parameter | Aliases (case-insensitive) | Description |
 |---|---|---|
 | `X-Message` | `Message`, `m` | Main body of the message as shown in the notification |
 | `X-Title` | `Title`, `t` | [Message title](#message-title) |
 | `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
-| `X-Tags` | `Tags`, `ta` | [Tags and emojis](#tags-emojis) |
+| `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
 | `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |

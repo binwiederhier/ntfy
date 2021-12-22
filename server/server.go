@@ -322,7 +322,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, err error) {
 	cache = readParam(r, "x-cache", "cache") != "no"
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
-	m.Title = readParam(r, "x-title", "title", "ti", "t")
+	m.Title = readParam(r, "x-title", "title", "t")
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
 		m.Message = messageStr
@@ -331,7 +331,7 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	if err != nil {
 		return false, false, errHTTPBadRequest
 	}
-	tagsStr := readParam(r, "x-tags", "tag", "tags", "ta")
+	tagsStr := readParam(r, "x-tags", "tags", "tag", "ta")
 	if tagsStr != "" {
 		m.Tags = make([]string, 0)
 		for _, s := range util.SplitNoEmpty(tagsStr, ",") {
@@ -418,17 +418,17 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 	if err != nil {
 		return err
 	}
-	since, err := parseSince(r)
+	poll := readParam(r, "x-poll", "poll", "po") == "1"
+	scheduled := readParam(r, "x-scheduled", "scheduled", "sched") == "1"
+	since, err := parseSince(r, poll)
 	if err != nil {
 		return err
 	}
-	var wlock sync.Mutex
-	poll := r.URL.Query().Has("poll")
-	scheduled := r.URL.Query().Has("scheduled") || r.URL.Query().Has("sched")
 	messageFilter, titleFilter, priorityFilter, tagsFilter, err := parseQueryFilters(r)
 	if err != nil {
 		return err
 	}
+	var wlock sync.Mutex
 	sub := func(msg *message) error {
 		if !passesQueryFilter(msg, messageFilter, titleFilter, priorityFilter, tagsFilter) {
 			return nil
@@ -481,11 +481,11 @@ func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request, v *visi
 }
 
 func parseQueryFilters(r *http.Request) (messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string, err error) {
-	messageFilter = r.URL.Query().Get("message")
-	titleFilter = r.URL.Query().Get("title")
-	tagsFilter = util.SplitNoEmpty(r.URL.Query().Get("tags"), ",")
-	priorityFilter, err = util.ParsePriority(r.URL.Query().Get("priority"))
-	return
+	messageFilter = readParam(r, "x-message", "message", "m")
+	titleFilter = readParam(r, "x-title", "title", "t")
+	tagsFilter = util.SplitNoEmpty(readParam(r, "x-tags", "tags", "tag", "ta"), ",")
+	priorityFilter, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
+	return // may be err!
 }
 
 func passesQueryFilter(msg *message, messageFilter string, titleFilter string, priorityFilter int, tagsFilter []string) bool {
@@ -498,7 +498,11 @@ func passesQueryFilter(msg *message, messageFilter string, titleFilter string, p
 	if titleFilter != "" && msg.Title != titleFilter {
 		return false
 	}
-	if priorityFilter > 0 && (msg.Priority != priorityFilter || (msg.Priority == 0 && priorityFilter != 3)) {
+	messagePriority := msg.Priority
+	if messagePriority == 0 {
+		messagePriority = 3 // For query filters, default priority (3) is the same as "not set" (0)
+	}
+	if priorityFilter > 0 && messagePriority != priorityFilter {
 		return false
 	}
 	if len(tagsFilter) > 0 && !util.InStringListAll(msg.Tags, tagsFilter) {
@@ -529,18 +533,19 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceTime, scheduled boo
 //
 // Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h), or
 // "all" for all messages.
-func parseSince(r *http.Request) (sinceTime, error) {
-	if !r.URL.Query().Has("since") {
-		if r.URL.Query().Has("poll") {
+func parseSince(r *http.Request, poll bool) (sinceTime, error) {
+	since := readParam(r, "x-since", "since", "si")
+	if since == "" {
+		if poll {
 			return sinceAllMessages, nil
 		}
 		return sinceNoMessages, nil
 	}
-	if r.URL.Query().Get("since") == "all" {
+	if since == "all" {
 		return sinceAllMessages, nil
-	} else if s, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64); err == nil {
+	} else if s, err := strconv.ParseInt(since, 10, 64); err == nil {
 		return sinceTime(time.Unix(s, 0)), nil
-	} else if d, err := time.ParseDuration(r.URL.Query().Get("since")); err == nil {
+	} else if d, err := time.ParseDuration(since); err == nil {
 		return sinceTime(time.Now().Add(-1 * d)), nil
 	}
 	return sinceNoMessages, errHTTPBadRequest

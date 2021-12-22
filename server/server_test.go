@@ -392,6 +392,98 @@ func TestServer_PublishFirebase(t *testing.T) {
 	time.Sleep(500 * time.Millisecond) // Time for sends
 }
 
+func TestServer_PollWithQueryFilters(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic?priority=1&tags=tag1,tag2", "my first message", nil)
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+
+	response = request(t, s, "PUT", "/mytopic?title=a+title", "my second message", map[string]string{
+		"Tags": "tag2,tag3",
+	})
+	msg = toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+
+	queriesThatShouldReturnMessageOne := []string{
+		"/mytopic/json?poll=1&priority=1",
+		"/mytopic/json?poll=1&priority=min",
+		"/mytopic/json?poll=1&tags=tag1",
+		"/mytopic/json?poll=1&tags=tag1,tag2",
+		"/mytopic/json?poll=1&message=my+first+message",
+	}
+	for _, query := range queriesThatShouldReturnMessageOne {
+		response = request(t, s, "GET", query, "", nil)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages), "Query failed: "+query)
+		require.Equal(t, "my first message", messages[0].Message, "Query failed: "+query)
+	}
+
+	queriesThatShouldReturnMessageTwo := []string{
+		"/mytopic/json?poll=1&x-priority=3", // !
+		"/mytopic/json?poll=1&priority=3",
+		"/mytopic/json?poll=1&priority=default",
+		"/mytopic/json?poll=1&p=3",
+		"/mytopic/json?poll=1&x-tags=tag2,tag3",
+		"/mytopic/json?poll=1&tags=tag2,tag3",
+		"/mytopic/json?poll=1&tag=tag2,tag3",
+		"/mytopic/json?poll=1&ta=tag2,tag3",
+		"/mytopic/json?poll=1&x-title=a+title",
+		"/mytopic/json?poll=1&title=a+title",
+		"/mytopic/json?poll=1&t=a+title",
+		"/mytopic/json?poll=1&x-message=my+second+message",
+		"/mytopic/json?poll=1&message=my+second+message",
+		"/mytopic/json?poll=1&m=my+second+message",
+		"/mytopic/json?x-poll=1&m=my+second+message",
+		"/mytopic/json?po=1&m=my+second+message",
+	}
+	for _, query := range queriesThatShouldReturnMessageTwo {
+		response = request(t, s, "GET", query, "", nil)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages), "Query failed: "+query)
+		require.Equal(t, "my second message", messages[0].Message, "Query failed: "+query)
+	}
+
+	queriesThatShouldReturnNoMessages := []string{
+		"/mytopic/json?poll=1&priority=4",
+		"/mytopic/json?poll=1&tags=tag1,tag2,tag3",
+		"/mytopic/json?poll=1&title=another+title",
+		"/mytopic/json?poll=1&message=my+third+message",
+		"/mytopic/json?poll=1&message=my+third+message",
+	}
+	for _, query := range queriesThatShouldReturnNoMessages {
+		response = request(t, s, "GET", query, "", nil)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 0, len(messages), "Query failed: "+query)
+	}
+}
+
+func TestServer_SubscribeWithQueryFilters(t *testing.T) {
+	c := newTestConfig(t)
+	c.KeepaliveInterval = 800 * time.Millisecond
+	s := newTestServer(t, c)
+
+	subscribeResponse := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, s, "/mytopic/json?tags=zfs-issue", subscribeResponse)
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	require.Equal(t, 200, response.Code)
+	response = request(t, s, "PUT", "/mytopic", "ZFS scrub failed", map[string]string{
+		"Tags": "zfs-issue,zfs-scrub",
+	})
+	require.Equal(t, 200, response.Code)
+
+	time.Sleep(850 * time.Millisecond)
+	subscribeCancel()
+
+	messages := toMessages(t, subscribeResponse.Body.String())
+	require.Equal(t, 3, len(messages))
+	require.Equal(t, openEvent, messages[0].Event)
+	require.Equal(t, messageEvent, messages[1].Event)
+	require.Equal(t, "ZFS scrub failed", messages[1].Message)
+	require.Equal(t, keepaliveEvent, messages[2].Event)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig(":80")
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")

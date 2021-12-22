@@ -32,8 +32,8 @@ You can also entirely disable the cache by setting `cache-duration` to `0`. When
 passed on to the connected subscribers, but never stored on disk or even kept in memory longer than is needed to forward
 the message to the subscribers.
 
-Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#polling-for-messages), as well as the
-[`since=` parameter](subscribe/api.md#fetching-cached-messages).
+Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#poll-for-messages), as well as the
+[`since=` parameter](subscribe/api.md#fetch-cached-messages).
 
 ## Behind a proxy (TLS, etc.)
 !!! warning

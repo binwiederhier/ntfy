@@ -8,13 +8,17 @@ import (
 )
 
 const (
-	visitorExpungeAfter = 30 * time.Minute
+	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory. This number
+	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
+	// they are replenished faster (typically).
+	visitorExpungeAfter = 24 * time.Hour
 )
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
 	config        *Config
-	limiter       *rate.Limiter
+	requests      *rate.Limiter
+	emails        *rate.Limiter
 	subscriptions *util.Limiter
 	seen          time.Time
 	mu            sync.Mutex
@@ -23,14 +27,22 @@ type visitor struct {
 func newVisitor(conf *Config) *visitor {
 	return &visitor{
 		config:        conf,
-		limiter:       rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
+		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
+		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewLimiter(int64(conf.VisitorSubscriptionLimit)),
 		seen:          time.Now(),
 	}
 }
 
 func (v *visitor) RequestAllowed() error {
-	if !v.limiter.Allow() {
+	if !v.requests.Allow() {
+		return errHTTPTooManyRequests
+	}
+	return nil
+}
+
+func (v *visitor) EmailAllowed() error {
+	if !v.emails.Allow() {
 		return errHTTPTooManyRequests
 	}
 	return nil

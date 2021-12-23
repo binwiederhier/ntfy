@@ -508,6 +508,76 @@ func TestServer_Curl_Publish_Poll(t *testing.T) {
 }
 */
 
+type testMailer struct {
+	count int
+}
+
+func (t *testMailer) Send(to string, m *message) error {
+	t.count++
+	return nil
+}
+
+func TestServer_PublishTooManyEmails_Defaults(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	s.mailer = &testMailer{}
+	for i := 0; i < 16; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), map[string]string{
+			"E-Mail": "test@example.com",
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "one too many", map[string]string{
+		"E-Mail": "test@example.com",
+	})
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishTooManyEmails_Replenish(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorEmailLimitReplenish = 500 * time.Millisecond
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	for i := 0; i < 16; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), map[string]string{
+			"E-Mail": "test@example.com",
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "one too many", map[string]string{
+		"E-Mail": "test@example.com",
+	})
+	require.Equal(t, 429, response.Code)
+
+	time.Sleep(510 * time.Millisecond)
+	response = request(t, s, "PUT", "/mytopic", "this should be okay again too many", map[string]string{
+		"E-Mail": "test@example.com",
+	})
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "PUT", "/mytopic", "and bad again", map[string]string{
+		"E-Mail": "test@example.com",
+	})
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishDelayedEmail_Fail(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	s.mailer = &testMailer{}
+	response := request(t, s, "PUT", "/mytopic", "fail", map[string]string{
+		"E-Mail": "test@example.com",
+		"Delay":  "20 min",
+	})
+	require.Equal(t, 400, response.Code)
+}
+
+func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "fail", map[string]string{
+		"E-Mail": "test@example.com",
+	})
+	require.Equal(t, 400, response.Code)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")

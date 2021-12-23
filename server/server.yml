@@ -61,6 +61,13 @@
 # visitor-request-limit-burst: 60
 # visitor-request-limit-replenish: 10s
 
+# Rate limiting: Allowed emails per visitor:
+# - visitor-email-limit-burst is the initial bucket of emails each visitor has
+# - visitor-email-limit-replenish is the rate at which the bucket is refilled
+#
+# visitor-email-limit-burst: 16
+# visitor-email-limit-replenish: 1h
+
 # If set, the X-Forwarded-For header is used to determine the visitor IP address
 # instead of the remote address of the connection.
 #

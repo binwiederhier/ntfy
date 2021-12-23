@@ -3,7 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
-	"embed" // required for go:embed
+	"embed"
 	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
@@ -15,7 +15,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/smtp"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,6 +33,7 @@ type Server struct {
 	topics      map[string]*topic
 	visitors    map[string]*visitor
 	firebase    subscriber
+	mailer      mailer
 	messages    int64
 	cache       cache
 	closeChan   chan bool
@@ -111,6 +111,7 @@ var (
 
 const (
 	firebaseControlTopic = "~control" // See Android if changed
+	emptyMessageBody     = "triggered"
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -124,6 +125,10 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	var mailer mailer
+	if conf.SMTPAddr != "" {
+		mailer = &smtpMailer{config: conf}
+	}
 	cache, err := createCache(conf)
 	if err != nil {
 		return nil, err
@@ -136,6 +141,7 @@ func New(conf *Config) (*Server, error) {
 		config:   conf,
 		cache:    cache,
 		firebase: firebaseSubscriber,
+		mailer:   mailer,
 		topics:   topics,
 		visitors: make(map[string]*visitor),
 	}, nil
@@ -187,23 +193,6 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 		})
 		return err
 	}, nil
-}
-
-func (s *Server) sendMail(to string, m *message) error {
-	host, _, err := net.SplitHostPort(s.config.SMTPAddr)
-	if err != nil {
-		return err
-	}
-	subject := m.Title
-	if subject == "" {
-		subject = m.Message
-	}
-	msg := []byte(fmt.Sprintf("From: %s\r\n"+
-		"To: %s\r\n"+
-		"Subject: %s\r\n\r\n"+
-		"%s\r\n", s.config.SMTPFrom, to, subject, m.Message))
-	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
-	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.SMTPFrom, []string{to}, msg)
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
@@ -314,7 +303,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
 		return err
@@ -329,8 +318,16 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	if err != nil {
 		return err
 	}
+	if email != "" {
+		if err := v.EmailAllowed(); err != nil {
+			return err
+		}
+	}
+	if s.mailer == nil && email != "" {
+		return errHTTPBadRequest
+	}
 	if m.Message == "" {
-		m.Message = "triggered"
+		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
 	if !delayed {
@@ -345,9 +342,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 			}
 		}()
 	}
-	if s.config.SMTPAddr != "" && email != "" && !delayed {
+	if s.mailer != nil && email != "" && !delayed {
 		go func() {
-			if err := s.sendMail(email, m); err != nil {
+			if err := s.mailer.Send(email, m); err != nil {
 				log.Printf("Unable to send email: %v", err.Error())
 			}
 		}()
@@ -369,7 +366,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, email string, err error) {
 	cache = readParam(r, "x-cache", "cache") != "no"
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
-	email = readParam(r, "x-email", "email", "mail", "e")
+	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	m.Title = readParam(r, "x-title", "title", "t")
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
@@ -390,6 +387,9 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	if delayStr != "" {
 		if !cache {
 			return false, false, "", errHTTPBadRequest
+		}
+		if email != "" {
+			return false, false, "", errHTTPBadRequest // we cannot store the email address (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
@@ -740,7 +740,7 @@ func (s *Server) sendDelayedMessages() error {
 					log.Printf("unable to publish to Firebase: %v", err.Error())
 				}
 			}
-			// FIXME delayed email
+			// TODO delayed email sending
 		}
 		if err := s.cache.MarkPublished(m); err != nil {
 			return err

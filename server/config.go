@@ -20,11 +20,14 @@ const (
 // Defines all the limits
 // - global topic limit: max number of topics overall
 // - per visitor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
+// - per visitor email limit: max number of emails (here: 16 email bucket, replenished at a rate of one per hour)
 // - per visitor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
 const (
 	DefaultGlobalTopicLimit             = 5000
 	DefaultVisitorRequestLimitBurst     = 60
 	DefaultVisitorRequestLimitReplenish = 10 * time.Second
+	DefaultVisitorEmailLimitBurst       = 16
+	DefaultVisitorEmailLimitReplenish   = time.Hour
 	DefaultVisitorSubscriptionLimit     = 30
 )
 
@@ -51,6 +54,8 @@ type Config struct {
 	GlobalTopicLimit             int
 	VisitorRequestLimitBurst     int
 	VisitorRequestLimitReplenish time.Duration
+	VisitorEmailLimitBurst       int
+	VisitorEmailLimitReplenish   time.Duration
 	VisitorSubscriptionLimit     int
 	BehindProxy                  bool
 }
@@ -75,6 +80,8 @@ func NewConfig() *Config {
 		GlobalTopicLimit:             DefaultGlobalTopicLimit,
 		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,
+		VisitorEmailLimitBurst:       DefaultVisitorEmailLimitBurst,
+		VisitorEmailLimitReplenish:   DefaultVisitorEmailLimitReplenish,
 		VisitorSubscriptionLimit:     DefaultVisitorSubscriptionLimit,
 		BehindProxy:                  false,
 	}

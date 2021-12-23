@@ -138,3 +138,8 @@ func ParsePriority(priority string) (int, error) {
 func ExpandHome(path string) string {
 	return os.ExpandEnv(strings.ReplaceAll(path, "~", "$HOME"))
 }
+
+// ShortTopicURL shortens the topic URL to be human-friendly, removing the http:// or https://
+func ShortTopicURL(s string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+}

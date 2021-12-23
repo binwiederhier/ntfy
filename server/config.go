@@ -41,6 +41,10 @@ type Config struct {
 	ManagerInterval              time.Duration
 	AtSenderInterval             time.Duration
 	FirebaseKeepaliveInterval    time.Duration
+	SMTPAddr                     string
+	SMTPUser                     string
+	SMTPPass                     string
+	SMTPFrom                     string
 	MessageLimit                 int
 	MinDelay                     time.Duration
 	MaxDelay                     time.Duration

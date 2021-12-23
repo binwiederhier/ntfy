@@ -15,6 +15,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/smtp"
 	"regexp"
 	"strconv"
 	"strings"
@@ -188,6 +189,23 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 	}, nil
 }
 
+func (s *Server) sendMail(to string, m *message) error {
+	host, _, err := net.SplitHostPort(s.config.SMTPAddr)
+	if err != nil {
+		return err
+	}
+	subject := m.Title
+	if subject == "" {
+		subject = m.Message
+	}
+	msg := []byte(fmt.Sprintf("From: %s\r\n"+
+		"To: %s\r\n"+
+		"Subject: %s\r\n\r\n"+
+		"%s\r\n", s.config.SMTPFrom, to, subject, m.Message))
+	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
+	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.SMTPFrom, []string{to}, msg)
+}
+
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
@@ -307,7 +325,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 		return err
 	}
 	m := newDefaultMessage(t.ID, strings.TrimSpace(string(b)))
-	cache, firebase, err := s.parseParams(r, m)
+	cache, firebase, email, err := s.parseParams(r, m)
 	if err != nil {
 		return err
 	}
@@ -327,6 +345,13 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 			}
 		}()
 	}
+	if s.config.SMTPAddr != "" && email != "" && !delayed {
+		go func() {
+			if err := s.sendMail(email, m); err != nil {
+				log.Printf("Unable to send email: %v", err.Error())
+			}
+		}()
+	}
 	if cache {
 		if err := s.cache.AddMessage(m); err != nil {
 			return err
@@ -341,9 +366,10 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
-func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, err error) {
+func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, email string, err error) {
 	cache = readParam(r, "x-cache", "cache") != "no"
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
+	email = readParam(r, "x-email", "email", "mail", "e")
 	m.Title = readParam(r, "x-title", "title", "t")
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
@@ -351,7 +377,7 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	}
 	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if err != nil {
-		return false, false, errHTTPBadRequest
+		return false, false, "", errHTTPBadRequest
 	}
 	tagsStr := readParam(r, "x-tags", "tags", "tag", "ta")
 	if tagsStr != "" {
@@ -363,19 +389,19 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, errHTTPBadRequest
+			return false, false, "", errHTTPBadRequest
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, errHTTPBadRequest
+			return false, false, "", errHTTPBadRequest
 		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, errHTTPBadRequest
+			return false, false, "", errHTTPBadRequest
 		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, errHTTPBadRequest
+			return false, false, "", errHTTPBadRequest
 		}
 		m.Time = delay.Unix()
 	}
-	return cache, firebase, nil
+	return cache, firebase, email, nil
 }
 
 func readParam(r *http.Request, names ...string) string {
@@ -714,6 +740,7 @@ func (s *Server) sendDelayedMessages() error {
 					log.Printf("unable to publish to Firebase: %v", err.Error())
 				}
 			}
+			// FIXME delayed email
 		}
 		if err := s.cache.MarkPublished(m); err != nil {
 			return err

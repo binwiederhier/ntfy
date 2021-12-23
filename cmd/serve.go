@@ -95,6 +95,7 @@ func execServe(c *cli.Context) error {
 	conf.CacheDuration = cacheDuration
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
+	//XXXXXXXXX
 	conf.GlobalTopicLimit = globalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst

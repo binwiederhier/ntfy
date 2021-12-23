@@ -180,7 +180,7 @@ func runCommandInternal(c *cli.Context, command string, m *client.Message) error
 	defer os.Remove(scriptFile)
 	verbose := c.Bool("verbose")
 	if verbose {
-		log.Printf("[%s] Executing: %s (for message: %s)", collapseTopicURL(m.TopicURL), command, m.Raw)
+		log.Printf("[%s] Executing: %s (for message: %s)", util.ShortTopicURL(m.TopicURL), command, m.Raw)
 	}
 	cmd := exec.Command("sh", "-c", scriptFile)
 	cmd.Stdin = c.App.Reader

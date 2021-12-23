@@ -7,7 +7,6 @@ import (
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/util"
 	"os"
-	"strings"
 )
 
 var (
@@ -59,8 +58,4 @@ func initConfigFileInputSource(configFlag string, flags []cli.Flag) cli.BeforeFu
 		}
 		return altsrc.ApplyInputSourceValues(context, inputSource, flags)
 	}
-}
-
-func collapseTopicURL(s string) string {
-	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
 }

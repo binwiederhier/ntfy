@@ -37,6 +37,8 @@ func TestClient_Publish_Subscribe(t *testing.T) {
 	require.Equal(t, "some delayed message", msg.Message)
 	require.True(t, time.Now().Add(24*time.Hour).Unix() < msg.Time)
 
+	time.Sleep(200 * time.Millisecond)
+
 	msg = nextMessage(c)
 	require.NotNil(t, msg)
 	require.Equal(t, "some message", msg.Message)

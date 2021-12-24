@@ -592,16 +592,26 @@ Here's an example with a custom message, tags and a priority:
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
-## Publish as e-mail
+## E-mail notifications
 You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
-you'd like to persist longer, or to blast-notify yourself on all possible channels. Since ntfy does not provide auth,
-the [rate limiting](#limitations) is pretty strict (see below). In the default configuration, you get 16 e-mails per 
-visitor (IP address) and then after that one per hour. On top of that, your IP address appears in the e-mail body. This 
-is to prevent abuse. 
+you'd like to persist longer, or to blast-notify yourself on all possible channels. 
+
+Usage is easy: Simply pass the `X-Email` header (or any of its aliases: `X-E-mail`, `Email`, `E-mail`, `Mail`, or `e`).
+Only one e-mail address is supported.
+
+Since ntfy does not provide auth (yet), the rate limiting is pretty strict (see [limitations](#limitations)). In the 
+default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of 
+that, your IP address appears in the e-mail body. This is to prevent abuse.
 
 === "Command line (curl)"
     ```
-    curl -H "Email: phil@example.com" -d "You've Got Mail" ntfy.sh/alerts
+    curl \
+        -H "Email: phil@example.com" \
+        -H "Tags: warning,skull,backup-host,ssh-login" \
+        -H "Priority: high" \
+        -d "Unknown login from 5.31.23.83 to backups.example.com" \
+        ntfy.sh/alerts
+    curl -H "Email: phil@example.com" -d "You've Got Mail" 
     curl -d "You've Got Mail" "ntfy.sh/alerts?email=phil@example.com"
     ```
 
@@ -609,7 +619,9 @@ is to prevent abuse.
     ```
     ntfy publish \
         --email=phil@example.com \
-        alerts "You've Got Mail"
+        --tags=warning,skull,backup-host,ssh-login \
+        --priority=high \
+        alerts "Unknown login from 5.31.23.83 to backups.example.com"
     ```
 
 === "HTTP"
@@ -617,31 +629,44 @@ is to prevent abuse.
     POST /alerts HTTP/1.1
     Host: ntfy.sh
     Email: phil@example.com
+    Tags: warning,skull,backup-host,ssh-login
+    Priority: high
 
-    You've Got Mail
+    Unknown login from 5.31.23.83 to backups.example.com
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/alerts', {
         method: 'POST',
-        body: "You've Got Mail",
-        headers: { 'Email': 'phil@example.com' }
+        body: "Unknown login from 5.31.23.83 to backups.example.com",
+        headers: { 
+            'Email': 'phil@example.com',
+            'Tags': 'warning,skull,backup-host,ssh-login',
+            'Priority': 'high'
+        }
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", strings.NewReader("You've Got Mail"))
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
+        strings.NewReader("Unknown login from 5.31.23.83 to backups.example.com"))
     req.Header.Set("Email", "phil@example.com")
+    req.Header.Set("Tags", "warning,skull,backup-host,ssh-login")
+    req.Header.Set("Priority", "high")
     http.DefaultClient.Do(req)
     ```
 
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/alerts",
-        data="You've Got Mail",
-        headers={ "Email": "phil@example.com" })
+        data="Unknown login from 5.31.23.83 to backups.example.com",
+        headers={ 
+            "Email": "phil@example.com",
+            "Tags": "warning,skull,backup-host,ssh-login",
+            "Priority": "high"
+        })
     ```
 
 === "PHP"
@@ -651,11 +676,20 @@ is to prevent abuse.
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Email: phil@example.com",
-            'content' => 'You've Got Mail'
+                "Email: phil@example.com\r\n" .
+                "Tags: warning,skull,backup-host,ssh-login\r\n" .
+                "Priority: high",
+            'content' => 'Unknown login from 5.31.23.83 to backups.example.com'
         ]
     ]));
     ```
+
+Here's what that looks like in Google Mail:
+
+<figure markdown>
+  ![e-mail notification](static/img/screenshot-email.png){ width=600 }
+  <figcaption>E-mail notification</figcaption>
+</figure>
 
 ## Advanced features
 
@@ -827,6 +861,6 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
 | `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
-| `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail delivery](#publish-as-e-mail) |
+| `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
 | `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |

@@ -100,3 +100,24 @@ func TestParsePriority_Invalid(t *testing.T) {
 		require.Equal(t, errInvalidPriority, err)
 	}
 }
+
+func TestPriorityString(t *testing.T) {
+	priorities := []int{0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 5}
+	expected := []string{"default", "min", "low", "default", "high", "max"}
+	for i, priority := range priorities {
+		actual, err := PriorityString(priority)
+		require.Nil(t, err)
+		require.Equal(t, expected[i], actual)
+	}
+}
+
+func TestPriorityString_Invalid(t *testing.T) {
+	_, err := PriorityString(99)
+	require.Equal(t, err, errInvalidPriority)
+}
+
+func TestShortTopicURL(t *testing.T) {
+	require.Equal(t, "ntfy.sh/mytopic", ShortTopicURL("https://ntfy.sh/mytopic"))
+	require.Equal(t, "ntfy.sh/mytopic", ShortTopicURL("http://ntfy.sh/mytopic"))
+	require.Equal(t, "lalala", ShortTopicURL("lalala"))
+}

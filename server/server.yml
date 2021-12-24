@@ -1,8 +1,12 @@
 # ntfy server config file
 
+# Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
+# This setting is currently only used by the e-mail feature.
+#
+# base-url:
+
 # Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
-# set "key-file" and "cert-file".
-# Format: <hostname>:<port>
+# set "key-file" and "cert-file". Format: <hostname>:<port>
 #
 # listen-http: ":80"
 # listen-https:
@@ -33,6 +37,27 @@
 # You can disable the cache entirely by setting this to 0.
 #
 # cache-duration: 12h
+
+# If set, the X-Forwarded-For header is used to determine the visitor IP address
+# instead of the remote address of the connection.
+#
+# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
+#          as if they are one.
+#
+# behind-proxy: false
+
+# If enabled, allow e-mail notifications via the 'X-Email' header. As of today, only SMTP servers
+# with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
+# below (visitor-email-limit-burst & visitor-email-limit-burst).
+#
+# - smtp-addr is the hostname:port of the SMTP server
+# - smtp-user/smtp-pass are the username and password of the SMTP user
+# - smtp-from is the e-mail address of the sender
+#
+# smtp-addr:
+# smtp-user:
+# smtp-pass:
+# smtp-from:
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
@@ -67,11 +92,3 @@
 #
 # visitor-email-limit-burst: 16
 # visitor-email-limit-replenish: 1h
-
-# If set, the X-Forwarded-For header is used to determine the visitor IP address
-# instead of the remote address of the connection.
-#
-# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
-#          as if they are one.
-#
-# behind-proxy: false

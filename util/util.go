@@ -148,7 +148,7 @@ func PriorityString(priority int) (string, error) {
 	case 4:
 		return "high", nil
 	case 5:
-		return "urgent", nil
+		return "max", nil
 	default:
 		return "", errInvalidPriority
 	}

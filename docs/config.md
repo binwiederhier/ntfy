@@ -300,6 +300,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
 | Config option | Env variable | Format | Default | Description |
 |---|---|---|---|---|
+| `base-url` | `NTFY_BASE_URL` | *URL* | - | Public facing base URL of the service (e.g. `https://ntfy.sh`) |
 | `listen-http` | `NTFY_LISTEN_HTTP` | `[host]:port` | `:80` | Listen address for the HTTP web server |
 | `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
 | `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
@@ -307,42 +308,64 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm). |
 | `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
 | `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely. |
+| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+| `smtp-addr` | `NTFY_SMTP_ADDR` | `host:port` | - | SMTP server address to allow email sending |
+| `smtp-user` | `NTFY_SMTP_USER` | *string* | - | SMTP user; only used if e-mail sending is enabled |
+| `smtp-pass` | `NTFY_SMTP_PASS` | *string* | - | SMTP password; only used if e-mail sending is enabled |
+| `smtp-from` | `NTFY_SMTP_FROM` | *e-mail address* | - | SMTP sender e-mail address; only used if e-mail sending is enabled |
 | `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
 | `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
 | `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
 | `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
-| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+| `visitor-email-limit-burst` | `NTFY_VISITOR_EMAIL_LIMIT_BURST` | *number* | 16 |Initial limit of e-mails per visitor |
+| `visitor-email-limit-replenish` | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH` | *duration* | 1h | Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 
 ## Command line options
 ```
-$ ntfy --help
+$ ntfy serve --help
 NAME:
-   ntfy - Simple pub-sub notification service
+   main serve - Run the ntfy server
 
 USAGE:
-   ntfy [OPTION..]
+   ntfy serve [OPTIONS..]
 
-GLOBAL OPTIONS:
-   --config value, -c value                           config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
-   --listen-http value, -l value                      ip:port used to as listen address (default: ":80") [$NTFY_LISTEN_HTTP]
-   --firebase-key-file value, -F value                Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
-   --cache-file value, -C value                       cache file used for message caching [$NTFY_CACHE_FILE]
-   --cache-duration since, -b since                   buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
-   --keepalive-interval value, -k value               interval of keepalive messages (default: 30s) [$NTFY_KEEPALIVE_INTERVAL]
-   --manager-interval value, -m value                 interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
-   --global-topic-limit value, -T value               total number of topics allowed (default: 5000) [$NTFY_GLOBAL_TOPIC_LIMIT]
-   --visitor-subscription-limit value, -V value       number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
-   --visitor-request-limit-burst value, -B value      initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
-   --visitor-request-limit-replenish value, -R value  interval at which burst limit is replenished (one per x) (default: 10s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
-   --behind-proxy, -P                                 if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+DESCRIPTION:
+   Run the ntfy server and listen for incoming requests
+   
+   The command will load the configuration from /etc/ntfy/server.yml. Config options can 
+   be overridden using the command line options.
+   
+   Examples:
+     ntfy serve                      # Starts server in the foreground (on port 80)
+     ntfy serve --listen-http :8080  # Starts server with alternate port
 
-Try 'ntfy COMMAND --help' for more information.
-
-ntfy v1.4.8 (7b8185c), runtime go1.17, built at 1637872539
-Copyright (C) 2021 Philipp C. Heckel, distributed under the Apache License 2.0
+OPTIONS:
+   --config value, -c value                 config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
+   --base-url value, -B value               externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
+   --listen-http value, -l value            ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-https value, -L value           ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
+   --key-file value, -K value               private key file, if listen-https is set [$NTFY_KEY_FILE]
+   --cert-file value, -E value              certificate file, if listen-https is set [$NTFY_CERT_FILE]
+   --firebase-key-file value, -F value      Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
+   --cache-file value, -C value             cache file used for message caching [$NTFY_CACHE_FILE]
+   --cache-duration since, -b since         buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
+   --keepalive-interval value, -k value     interval of keepalive messages (default: 30s) [$NTFY_KEEPALIVE_INTERVAL]
+   --manager-interval value, -m value       interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
+   --smtp-addr value                        SMTP server address (host:port) to allow email sending [$NTFY_SMTP_ADDR]
+   --smtp-user value                        SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_USER]
+   --smtp-pass value                        SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_PASS]
+   --smtp-from value                        SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_FROM]
+   --global-topic-limit value, -T value     total number of topics allowed (default: 5000) [$NTFY_GLOBAL_TOPIC_LIMIT]
+   --visitor-subscription-limit value       number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
+   --visitor-request-limit-burst value      initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
+   --visitor-request-limit-replenish value  interval at which burst limit is replenished (one per x) (default: 10s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
+   --visitor-email-limit-burst value        initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
+   --visitor-email-limit-replenish value    interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
+   --behind-proxy, -P                       if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+   --help, -h                               show help (default: false)
 ```
 

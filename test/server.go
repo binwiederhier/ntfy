@@ -15,8 +15,12 @@ func init() {
 
 // StartServer starts a server.Server with a random port and waits for the server to be up
 func StartServer(t *testing.T) (*server.Server, int) {
+	return StartServerWithConfig(t, server.NewConfig())
+}
+
+// StartServerWithConfig starts a server.Server with a random port and waits for the server to be up
+func StartServerWithConfig(t *testing.T, conf *server.Config) (*server.Server, int) {
 	port := 10000 + rand.Intn(20000)
-	conf := server.NewConfig()
 	conf.ListenHTTP = fmt.Sprintf(":%d", port)
 	s, err := server.New(conf)
 	if err != nil {

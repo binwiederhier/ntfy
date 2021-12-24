@@ -344,7 +344,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	}
 	if s.mailer != nil && email != "" && !delayed {
 		go func() {
-			if err := s.mailer.Send(email, m); err != nil {
+			if err := s.mailer.Send(v.ip, email, m); err != nil {
 				log.Printf("Unable to send email: %v", err.Error())
 			}
 		}()
@@ -772,7 +772,7 @@ func (s *Server) visitor(r *http.Request) *visitor {
 	}
 	v, exists := s.visitors[ip]
 	if !exists {
-		s.visitors[ip] = newVisitor(s.config)
+		s.visitors[ip] = newVisitor(s.config, ip)
 		return s.visitors[ip]
 	}
 	v.Keepalive()

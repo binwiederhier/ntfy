@@ -592,6 +592,69 @@ Here's an example with a custom message, tags and a priority:
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
+## Publish as e-mail
+You can forward messages to e-mail by specifying an e-mail address in the header. This can be useful for messages that 
+you'd like to persist longer, or to blast-notify yourself on all possible channels. Since ntfy does not provide auth,
+the [rate limiting](#limitations) is pretty strict (see below).
+
+=== "Command line (curl)"
+    ```
+    curl -H "Email: phil@example.com" -d "You've Got Mail" ntfy.sh/alerts
+    curl -d "You've Got Mail" "ntfy.sh/alerts?email=phil@example.com"
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --email=phil@example.com \
+        alerts "You've Got Mail"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /alerts HTTP/1.1
+    Host: ntfy.sh
+    Email: phil@example.com
+
+    You've Got Mail
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/alerts', {
+        method: 'POST',
+        body: "You've Got Mail",
+        headers: { 'Email': 'phil@example.com' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", strings.NewReader("You've Got Mail"))
+    req.Header.Set("Email", "phil@example.com")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/alerts",
+        data="You've Got Mail",
+        headers={ "Email": "phil@example.com" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Email: phil@example.com",
+            'content' => 'You've Got Mail'
+        ]
+    ]));
+    ```
+
 ## Advanced features
 
 ### Message caching
@@ -746,7 +809,8 @@ but just in case, let's list them all:
 | Limit | Description |
 |---|---|
 | **Message length** | Each message can be up to 512 bytes long. Longer messages are truncated. |
-| **Requests per second** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
+| **Requests** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
+| **E-mails** | By default, the server is configured to allow 16 e-mails at once, and then refills the your allowed e-mail bucket at a rate of one per hour. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **Subscription limits** | By default, the server allows each visitor to keep 30 connections to the server open. |
 | **Total number of topics** | By default, the server is configured to allow 5,000 topics. The ntfy.sh server has higher limits though. |
 

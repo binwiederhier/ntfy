@@ -45,6 +45,11 @@ func WithDelay(delay string) PublishOption {
 	return WithHeader("X-Delay", delay)
 }
 
+// WithEmail instructs the server to also send the message to the given e-mail address
+func WithEmail(email string) PublishOption {
+	return WithHeader("X-Email", email)
+}
+
 // WithNoCache instructs the server not to cache the message server-side
 func WithNoCache() PublishOption {
 	return WithHeader("X-Cache", "no")

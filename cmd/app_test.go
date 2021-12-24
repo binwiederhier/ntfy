@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/client"
 	"io"
 	"log"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -23,4 +26,12 @@ func newTestApp() (*cli.App, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	app.Writer = &stdout
 	app.ErrWriter = &stderr
 	return app, &stdin, &stdout, &stderr
+}
+
+func toMessage(t *testing.T, s string) *client.Message {
+	var m *client.Message
+	if err := json.NewDecoder(strings.NewReader(s)).Decode(&m); err != nil {
+		t.Fatal(err)
+	}
+	return m
 }

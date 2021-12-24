@@ -511,10 +511,10 @@ func TestServer_Curl_Publish_Poll(t *testing.T) {
 
 type testMailer struct {
 	count int
-	mu sync.Mutex
+	mu    sync.Mutex
 }
 
-func (t *testMailer) Send(to string, m *message) error {
+func (t *testMailer) Send(from, to string, m *message) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.count++

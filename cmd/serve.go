@@ -12,6 +12,7 @@ import (
 
 var flagsServe = []cli.Flag{
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used to as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
@@ -57,6 +58,7 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Read all the options
+	baseURL := c.String("base-url")
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	keyFile := c.String("key-file")
@@ -93,12 +95,13 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, certificate file must exist")
 	} else if listenHTTPS != "" && (keyFile == "" || certFile == "") {
 		return errors.New("if listen-https is set, both key-file and cert-file must be set")
-	} else if smtpAddr != "" && (smtpUser == "" || smtpPass == "" || smtpFrom == "") {
-		return errors.New("if smtp-addr is set, smtp-user, smtp-pass and smtp-from must also be set")
+	} else if smtpAddr != "" && (baseURL == "" || smtpUser == "" || smtpPass == "" || smtpFrom == "") {
+		return errors.New("if smtp-addr is set, base-url, smtp-user, smtp-pass and smtp-from must also be set")
 	}
 
 	// Run server
 	conf := server.NewConfig()
+	conf.BaseURL = baseURL
 	conf.ListenHTTP = listenHTTP
 	conf.ListenHTTPS = listenHTTPS
 	conf.KeyFile = keyFile

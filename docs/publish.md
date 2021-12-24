@@ -593,9 +593,11 @@ Here's an example with a custom message, tags and a priority:
     ```
 
 ## Publish as e-mail
-You can forward messages to e-mail by specifying an e-mail address in the header. This can be useful for messages that 
+You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
 you'd like to persist longer, or to blast-notify yourself on all possible channels. Since ntfy does not provide auth,
-the [rate limiting](#limitations) is pretty strict (see below).
+the [rate limiting](#limitations) is pretty strict (see below). In the default configuration, you get 16 e-mails per 
+visitor (IP address) and then after that one per hour. On top of that, your IP address appears in the e-mail body. This 
+is to prevent abuse. 
 
 === "Command line (curl)"
     ```
@@ -825,5 +827,6 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
 | `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
+| `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail delivery](#publish-as-e-mail) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
 | `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |

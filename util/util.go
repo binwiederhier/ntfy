@@ -134,6 +134,26 @@ func ParsePriority(priority string) (int, error) {
 	}
 }
 
+// PriorityString converts a priority number to a string
+func PriorityString(priority int) (string, error) {
+	switch priority {
+	case 0:
+		return "default", nil
+	case 1:
+		return "min", nil
+	case 2:
+		return "low", nil
+	case 3:
+		return "default", nil
+	case 4:
+		return "high", nil
+	case 5:
+		return "urgent", nil
+	default:
+		return "", errInvalidPriority
+	}
+}
+
 // ExpandHome replaces "~" with the user's home directory
 func ExpandHome(path string) string {
 	return os.ExpandEnv(strings.ReplaceAll(path, "~", "$HOME"))

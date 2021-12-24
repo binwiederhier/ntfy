@@ -33,6 +33,7 @@ const (
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
+	BaseURL                      string
 	ListenHTTP                   string
 	ListenHTTPS                  string
 	KeyFile                      string
@@ -63,6 +64,7 @@ type Config struct {
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
+		BaseURL:                      "",
 		ListenHTTP:                   DefaultListenHTTP,
 		ListenHTTPS:                  "",
 		KeyFile:                      "",

@@ -5,7 +5,11 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/messaging"
 	"fmt"
+	"google.golang.org/api/option"
+	"heckel.io/ntfy/util"
 	"html/template"
 	"io"
 	"log"
@@ -16,11 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/messaging"
-	"google.golang.org/api/option"
-	"heckel.io/ntfy/util"
 )
 
 // TODO add "max messages in a topic" limit
@@ -288,7 +287,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
 	} else if r.Method == http.MethodGet && topicRegex.MatchString(r.URL.Path) {
-		return s.handleHome(w, r)
+		return s.handleTopic(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handlePublish)
 	} else if r.Method == http.MethodGet && sendRegex.MatchString(r.URL.Path) {
@@ -308,6 +307,17 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
 		Topic:         r.URL.Path[1:],
 		CacheDuration: s.config.CacheDuration,
 	})
+}
+
+func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
+	unifiedpush := readParam(r, "x-unifiedpush", "unifiedpush", "up") == "1" // see PUT/POST too!
+	if unifiedpush {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+		_, err := io.WriteString(w, `{"unifiedpush":{"version":1}}`+"\n")
+		return err
+	}
+	return s.handleHome(w, r)
 }
 
 func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request) error {
@@ -340,25 +350,15 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	m := newDefaultMessage(t.ID, strings.TrimSpace(string(b)))
-	cache, firebase, email, err := s.parseParams(r, m)
+	cache, firebase, email, err := s.parsePublishParams(r, m)
 	if err != nil {
 		return err
 	}
-
-	if r.Method == http.MethodGet && unifiedpush {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-		_, err := io.WriteString(w, `{"unifiedpush":{"version":1}}`)
-		return err
-	}
-
 	if email != "" {
 		if err := v.EmailAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitEmails
 		}
 	}
-
-	m.UnifiedPush = unifiedpush
 	if s.mailer == nil && email != "" {
 		return errHTTPBadRequestEmailDisabled
 	}
@@ -371,21 +371,20 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 			return err
 		}
 	}
-	if s.firebase != nil && firebase && !delayed && !unifiedpush {
+	if s.firebase != nil && firebase && !delayed {
 		go func() {
 			if err := s.firebase(m); err != nil {
 				log.Printf("Unable to publish to Firebase: %v", err.Error())
 			}
 		}()
 	}
-	if s.mailer != nil && email != "" && !delayed && !unifiedpush {
+	if s.mailer != nil && email != "" && !delayed {
 		go func() {
 			if err := s.mailer.Send(v.ip, email, m); err != nil {
 				log.Printf("Unable to send email: %v", err.Error())
 			}
 		}()
 	}
-
 	if cache {
 		if err := s.cache.AddMessage(m); err != nil {
 			return err
@@ -393,7 +392,6 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-
 	if err := json.NewEncoder(w).Encode(m); err != nil {
 		return err
 	}
@@ -401,7 +399,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	return nil
 }
 
-func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase bool, email string, err error) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, err error) {
 	cache = readParam(r, "x-cache", "cache") != "no"
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
@@ -438,6 +436,10 @@ func (s *Server) parseParams(r *http.Request, m *message) (cache bool, firebase 
 			return false, false, "", errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
+	}
+	unifiedpush := readParam(r, "x-unifiedpush", "unifiedpush", "up") == "1" // see GET too!
+	if unifiedpush {
+		firebase = false
 	}
 	return cache, firebase, email, nil
 }

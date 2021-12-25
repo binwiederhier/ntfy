@@ -1,9 +1,8 @@
 package server
 
 import (
-	"time"
-
 	"heckel.io/ntfy/util"
+	"time"
 )
 
 // List of possible events
@@ -19,15 +18,14 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID          string   `json:"id"`    // Random message ID
-	Time        int64    `json:"time"`  // Unix time in seconds
-	Event       string   `json:"event"` // One of the above
-	Topic       string   `json:"topic"`
-	Priority    int      `json:"priority,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	Title       string   `json:"title,omitempty"`
-	Message     string   `json:"message,omitempty"`
-	UnifiedPush bool     `json:"unifiedpush,omitempty"` //this could be 'up'
+	ID       string   `json:"id"`    // Random message ID
+	Time     int64    `json:"time"`  // Unix time in seconds
+	Event    string   `json:"event"` // One of the above
+	Topic    string   `json:"topic"`
+	Priority int      `json:"priority,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Title    string   `json:"title,omitempty"`
+	Message  string   `json:"message,omitempty"`
 }
 
 // messageEncoder is a function that knows how to encode a message

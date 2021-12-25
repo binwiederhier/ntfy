@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"golang.org/x/time/rate"
 	"heckel.io/ntfy/util"
 	"sync"
@@ -12,6 +13,10 @@ const (
 	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
 	// they are replenished faster (typically).
 	visitorExpungeAfter = 24 * time.Hour
+)
+
+var (
+	errVisitorLimitReached = errors.New("limit reached")
 )
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
@@ -42,23 +47,23 @@ func (v *visitor) IP() string {
 
 func (v *visitor) RequestAllowed() error {
 	if !v.requests.Allow() {
-		return errHTTPTooManyRequests
+		return errVisitorLimitReached
 	}
 	return nil
 }
 
 func (v *visitor) EmailAllowed() error {
 	if !v.emails.Allow() {
-		return errHTTPTooManyRequests
+		return errVisitorLimitReached
 	}
 	return nil
 }
 
-func (v *visitor) AddSubscription() error {
+func (v *visitor) SubscriptionAllowed() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.subscriptions.Add(1); err != nil {
-		return errHTTPTooManyRequests
+		return errVisitorLimitReached
 	}
 	return nil
 }

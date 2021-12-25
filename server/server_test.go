@@ -252,6 +252,7 @@ func TestServer_PublishAtWithCacheError(t *testing.T) {
 		"In":    "30 min",
 	})
 	require.Equal(t, 400, response.Code)
+	require.Equal(t, errHTTPBadRequestDelayNoCache, toHTTPError(t, response.Body.String()))
 }
 
 func TestServer_PublishAtTooShortDelay(t *testing.T) {
@@ -642,6 +643,12 @@ func toMessage(t *testing.T, s string) *message {
 	var m message
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&m))
 	return &m
+}
+
+func toHTTPError(t *testing.T, s string) *errHTTP {
+	var e errHTTP
+	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&e))
+	return &e
 }
 
 func firebaseServiceAccountFile(t *testing.T) string {

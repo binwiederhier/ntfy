@@ -348,7 +348,7 @@ The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 ```
 $ ntfy serve --help
 NAME:
-   main serve - Run the ntfy server
+   ntfy serve - Run the ntfy server
 
 USAGE:
    ntfy serve [OPTIONS..]

@@ -102,7 +102,7 @@ func TestParsePriority_Invalid(t *testing.T) {
 }
 
 func TestPriorityString(t *testing.T) {
-	priorities := []int{0, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 5}
+	priorities := []int{0, 1, 2, 3, 4, 5}
 	expected := []string{"default", "min", "low", "default", "high", "max"}
 	for i, priority := range priorities {
 		actual, err := PriorityString(priority)

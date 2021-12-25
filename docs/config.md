@@ -35,19 +35,34 @@ the message to the subscribers.
 Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#poll-for-messages), as well as the
 [`since=` parameter](subscribe/api.md#fetch-cached-messages).
 
+## E-mail notifications
+To allow forwarding messages via e-mail, you can configure an SMTP server for outgoing messages. Once configured, 
+you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g. 
+`curl -d "hi there" -H "X-Email: phil@example.com" ntfy.sh/mytopic`).
+
+As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
+following settings:
+
+* `base-url` is the root URL for the ntfy server; this is needed for e-mail footer
+* `smtp-addr` is the hostname:port of the SMTP server
+* `smtp-user` and `smtp-pass` are the username and password of the SMTP user
+* `smtp-from` is the e-mail address of the sender
+
+Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-email-limit-burst` 
+and `visitor-email-limit-burst`. Setting these conservatively is necessary to avoid abuse.
+
 ## Behind a proxy (TLS, etc.)
 !!! warning
     If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are
     [rate limited](#rate-limiting) as if they are one.
 
-It may be desirable to run ntfy behind a proxy, e.g. so you can provide TLS certificates using Let's Encrypt using certbot,
-or simply because you'd like to share the ports (80/443) with other services. Whatever your reasons may be, there are a 
-few things to consider. 
+It may be desirable to run ntfy behind a proxy (e.g. nginx, HAproxy or Apache), so you can provide TLS certificates 
+using Let's Encrypt using certbot, or simply because you'd like to share the ports (80/443) with other services. 
+Whatever your reasons may be, there are a few things to consider. 
 
-### Rate limiting
-If you are running ntfy behind a proxy (e.g. nginx, HAproxy or Apache), you should set the `behind-proxy` 
-flag. This will instruct the [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary 
-identifier for a visitor, as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
+If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the 
+[rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier for a visitor, 
+as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
 === "/etc/ntfy/server.yml"
@@ -214,7 +229,7 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ## Rate limiting
 !!! info
     Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 
-    Otherwise all visitors are rate limited as if they are one.
+    Otherwise, all visitors are rate limited as if they are one.
 
 By default, ntfy runs without authentication, so it is vitally important that we protect the server from abuse or overload.
 There are various limits and rate limits in place that you can use to configure the server. Let's do the easy ones first:
@@ -235,9 +250,14 @@ request every 10s (defined by `visitor-request-limit-replenish`)
 * `visitor-request-limit-burst` is the initial bucket of requests each visitor has. This defaults to 60.
 * `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 10s.
 
-During normal usage, you shouldn't encounter this limit at all, and even if you burst a few requests shortly (e.g. when you 
-reconnect after a connection drop), it shouldn't have any effect.
+Similarly to the request limit, there is also an e-mail limit (only relevant if [e-mail notifications](#e-mail-notifications) 
+are enabled):
 
+* `visitor-email-limit-burst` is the initial bucket of emails each visitor has. This defaults to 16.
+* `visitor-email-limit-replenish` is the rate at which the bucket is refilled (one email per x). Defaults to 1h.
+
+During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
+(e.g. when you reconnect after a connection drop), it shouldn't have any effect.
 
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,

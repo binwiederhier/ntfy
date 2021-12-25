@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixMilli())
 }
 
 // StartServer starts a server.Server with a random port and waits for the server to be up

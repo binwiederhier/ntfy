@@ -133,7 +133,7 @@ A message that contains monkeys 🙉
 No really, though. Monkeys!
 
 Tags: tag123, other
-Priority: urgent
+Priority: max
 
 --
 This message was sent by 1.2.3.4 at Fri, 24 Dec 2021 21:43:24 UTC via https://ntfy.sh/alerts`

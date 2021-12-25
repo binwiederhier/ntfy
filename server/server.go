@@ -253,6 +253,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleHome(w, r)
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
 		return s.handleExample(w, r)
+	} else if r.Method == http.MethodGet && r.URL.Path == "/up" {
+		return s.handleUnifiedPush(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.handleEmpty(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -290,6 +292,13 @@ func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request) error {
 
 func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {
 	_, err := io.WriteString(w, exampleSource)
+	return err
+}
+
+func (s *Server) handleUnifiedPush(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	_, err := io.WriteString(w, `{"unifiedpush":{"version":1}}`)
 	return err
 }
 

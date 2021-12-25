@@ -43,7 +43,7 @@ type Server struct {
 // errHTTP is a generic HTTP error for any non-200 HTTP error
 type errHTTP struct {
 	Code     int    `json:"code,omitempty"`
-	HTTPCode int    `json:"http_code"`
+	HTTPCode int    `json:"http"`
 	Message  string `json:"error"`
 	Link     string `json:"link,omitempty"`
 }
@@ -111,7 +111,7 @@ var (
 	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
-	errHTTPNotFound                          = &errHTTP{40401, http.StatusNotFound, http.StatusText(http.StatusNotFound), ""}
+	errHTTPNotFound                          = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
 	errHTTPTooManyRequestsLimitRequests      = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitEmails        = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitSubscriptions = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}

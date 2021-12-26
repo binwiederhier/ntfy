@@ -29,7 +29,6 @@ func (s *smtpMailer) Send(senderIP, to string, m *message) error {
 	if err != nil {
 		return err
 	}
-	println(message)
 	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
 	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.SMTPFrom, []string{to}, []byte(message))
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"heckel.io/ntfy/util"
+	"mime"
 	"net"
 	"net/smtp"
 	"strings"
@@ -28,6 +29,7 @@ func (s *smtpMailer) Send(senderIP, to string, m *message) error {
 	if err != nil {
 		return err
 	}
+	println(message)
 	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
 	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.SMTPFrom, []string{to}, []byte(message))
 }
@@ -66,10 +68,11 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if trailer != "" {
 		message += "\n\n" + trailer
 	}
-	body := `Content-Type: text/plain; charset="utf-8"
-From: "{shortTopicURL}" <{from}>
+	subject = mime.BEncoding.Encode("utf-8", subject)
+	body := `From: "{shortTopicURL}" <{from}>
 To: {to}
 Subject: {subject}
+Content-Type: text/plain; charset="utf-8"
 
 {message}
 

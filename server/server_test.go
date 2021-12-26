@@ -583,6 +583,13 @@ func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {
 	require.Equal(t, 400, response.Code)
 }
 
+func TestServer_UnifiedPushDiscovery(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "GET", "/mytopic?up=1", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"unifiedpush":{"version":1}}`+"\n", response.Body.String())
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")

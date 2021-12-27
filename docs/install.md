@@ -133,6 +133,20 @@ Manually installing the .deb file:
     sudo systemctl start ntfy
     ```
 
+## Arch Linux
+ntfy can be installed using an [AUR package](https://aur.archlinux.org/packages/ntfysh-bin/). You can use an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers) like `paru`, `yay` or others to download, build and install ntfy and keep it up to date.
+```
+paru -S ntfysh-bin
+```
+
+Alternatively, run the following commands to install ntfy manually:
+```
+curl https://aur.archlinux.org/cgit/aur.git/snapshot/ntfysh-bin.tar.gz | tar xzv
+cd ntfysh-bin
+makepkg -si
+```
+
+
 ## Docker
 The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for amd64, armv7 and arm64. It should be pretty
 straight forward to use.

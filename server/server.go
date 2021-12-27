@@ -8,6 +8,7 @@ import (
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"fmt"
+	"github.com/emersion/go-smtp"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/util"
 	"html/template"
@@ -238,10 +239,16 @@ func (s *Server) Run() error {
 			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
 		}()
 	}
+	if true {
+		go func() {
+			errChan <- s.mailserver()
+		}()
+	}
 	s.mu.Unlock()
 	go s.runManager()
 	go s.runAtSender()
 	go s.runFirebaseKeepliver()
+
 	return <-errChan
 }
 
@@ -720,6 +727,21 @@ func (s *Server) updateStatsAndPrune() {
 	// Print stats
 	log.Printf("Stats: %d message(s) published, %d topic(s) active, %d subscriber(s), %d message(s) buffered, %d visitor(s)",
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
+}
+
+func (s *Server) mailserver() error {
+	ms := smtp.NewServer(&mailBackend{s})
+
+	ms.Addr = ":1025"
+	ms.Domain = "localhost"
+	ms.ReadTimeout = 10 * time.Second
+	ms.WriteTimeout = 10 * time.Second
+	ms.MaxMessageBytes = 1024 * 1024
+	ms.MaxRecipients = 50
+	ms.AllowInsecureAuth = true
+
+	log.Println("Starting server at", ms.Addr)
+	return ms.ListenAndServe()
 }
 
 func (s *Server) runManager() {

@@ -1,7 +1,7 @@
 # ntfy server config file
 
 # Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
-# This setting is currently only used by the e-mail feature.
+# This setting is currently only used by the e-mail sending feature (outgoing mail only).
 #
 # base-url:
 
@@ -46,21 +46,24 @@
 #
 # behind-proxy: false
 
-# If enabled, allow e-mail notifications via the 'X-Email' header. As of today, only SMTP servers
-# with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
+# If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
+# messages will additionally be sent out as e-mail using an external SMTP server. As of today, only
+# SMTP servers with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
 # below (visitor-email-limit-burst & visitor-email-limit-burst).
 #
-# - smtp-addr is the hostname:port of the SMTP server
-# - smtp-user/smtp-pass are the username and password of the SMTP user
-# - smtp-from is the e-mail address of the sender
+# - smtp-sender-addr is the hostname:port of the SMTP server
+# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user
+# - smtp-sender-from is the e-mail address of the sender
 #
-# smtp-addr:
-# smtp-user:
-# smtp-pass:
-# smtp-from:
+# smtp-sender-addr:
+# smtp-sender-user:
+# smtp-sender-pass:
+# smtp-sender-from:
 
+# XXXXXXXXXXXXXXXXXXXXxx
 # smtp-server-listen:
-# smtp-server-addr:
+# smtp-server-domain:
+# smtp-server-addr-prefix:
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.

@@ -735,8 +735,11 @@ func (s *Server) updateStatsAndPrune() {
 		messages += msgs
 	}
 
-	// Mail
-	mailSuccess, mailFailure := s.smtpBackend.Counts()
+	// Mail stats
+	var mailSuccess, mailFailure int64
+	if s.smtpBackend != nil {
+		mailSuccess, mailFailure = s.smtpBackend.Counts()
+	}
 
 	// Print stats
 	log.Printf("Stats: %d message(s) published, %d in cache, %d successful mails, %d failed, %d topic(s) active, %d subscriber(s), %d visitor(s)",

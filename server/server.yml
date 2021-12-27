@@ -59,6 +59,9 @@
 # smtp-pass:
 # smtp-from:
 
+# smtp-server-listen:
+# smtp-server-addr:
+
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
 #

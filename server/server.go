@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strconv"
 	"strings"
@@ -147,8 +149,8 @@ func New(conf *Config) (*Server, error) {
 		}
 	}
 	var mailer mailer
-	if conf.SMTPAddr != "" {
-		mailer = &smtpMailer{config: conf}
+	if conf.SMTPSenderAddr != "" {
+		mailer = &smtpSender{config: conf}
 	}
 	cache, err := createCache(conf)
 	if err != nil {
@@ -239,9 +241,9 @@ func (s *Server) Run() error {
 			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
 		}()
 	}
-	if true {
+	if s.config.SMTPServerListen != "" {
 		go func() {
-			errChan <- s.mailserver()
+			errChan <- s.runMailserver()
 		}()
 	}
 	s.mu.Unlock()
@@ -729,15 +731,31 @@ func (s *Server) updateStatsAndPrune() {
 		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
 }
 
-func (s *Server) mailserver() error {
-	ms := smtp.NewServer(&mailBackend{s})
+func (s *Server) runMailserver() error {
+	sub := func(m *message) error {
+		url := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
+		req, err := http.NewRequest("PUT", url, strings.NewReader(m.Message))
+		if err != nil {
+			return err
+		}
+		if m.Title != "" {
+			req.Header.Set("Title", m.Title)
+		}
+		rr := httptest.NewRecorder()
+		s.handle(rr, req)
+		if rr.Code != http.StatusOK {
+			return errors.New("error: " + rr.Body.String())
+		}
+		return nil
+	}
+	ms := smtp.NewServer(newMailBackend(s.config, sub))
 
-	ms.Addr = ":1025"
-	ms.Domain = "localhost"
+	ms.Addr = s.config.SMTPServerListen
+	ms.Domain = s.config.SMTPServerDomain
 	ms.ReadTimeout = 10 * time.Second
 	ms.WriteTimeout = 10 * time.Second
-	ms.MaxMessageBytes = 1024 * 1024
-	ms.MaxRecipients = 50
+	ms.MaxMessageBytes = 2 * s.config.MessageLimit
+	ms.MaxRecipients = 1
 	ms.AllowInsecureAuth = true
 
 	log.Println("Starting server at", ms.Addr)

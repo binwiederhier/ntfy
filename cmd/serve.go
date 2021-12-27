@@ -26,6 +26,9 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-user", EnvVars: []string{"NTFY_SMTP_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-pass", EnvVars: []string{"NTFY_SMTP_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-from", EnvVars: []string{"NTFY_SMTP_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "xxxxxxxxxx"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "xxxxxxxxxxx"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "xxxxxxxxxxx"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultGlobalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
@@ -68,10 +71,13 @@ func execServe(c *cli.Context) error {
 	cacheDuration := c.Duration("cache-duration")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
-	smtpAddr := c.String("smtp-addr")
-	smtpUser := c.String("smtp-user")
-	smtpPass := c.String("smtp-pass")
-	smtpFrom := c.String("smtp-from")
+	smtpSenderAddr := c.String("smtp-addr")
+	smtpSenderUser := c.String("smtp-user")
+	smtpSenderPass := c.String("smtp-pass")
+	smtpSenderFrom := c.String("smtp-from")
+	smtpServerListen := c.String("smtp-server-listen")
+	smtpServerDomain := c.String("smtp-server-domain")
+	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
 	globalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
@@ -95,7 +101,7 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, certificate file must exist")
 	} else if listenHTTPS != "" && (keyFile == "" || certFile == "") {
 		return errors.New("if listen-https is set, both key-file and cert-file must be set")
-	} else if smtpAddr != "" && (baseURL == "" || smtpUser == "" || smtpPass == "" || smtpFrom == "") {
+	} else if smtpSenderAddr != "" && (baseURL == "" || smtpSenderUser == "" || smtpSenderPass == "" || smtpSenderFrom == "") {
 		return errors.New("if smtp-addr is set, base-url, smtp-user, smtp-pass and smtp-from must also be set")
 	}
 
@@ -111,10 +117,13 @@ func execServe(c *cli.Context) error {
 	conf.CacheDuration = cacheDuration
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
-	conf.SMTPAddr = smtpAddr
-	conf.SMTPUser = smtpUser
-	conf.SMTPPass = smtpPass
-	conf.SMTPFrom = smtpFrom
+	conf.SMTPSenderAddr = smtpSenderAddr
+	conf.SMTPSenderUser = smtpSenderUser
+	conf.SMTPSenderPass = smtpSenderPass
+	conf.SMTPSenderFrom = smtpSenderFrom
+	conf.SMTPServerListen = smtpServerListen
+	conf.SMTPServerDomain = smtpServerDomain
+	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
 	conf.GlobalTopicLimit = globalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst

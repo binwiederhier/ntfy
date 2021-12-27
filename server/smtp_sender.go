@@ -16,21 +16,21 @@ type mailer interface {
 	Send(from, to string, m *message) error
 }
 
-type smtpMailer struct {
+type smtpSender struct {
 	config *Config
 }
 
-func (s *smtpMailer) Send(senderIP, to string, m *message) error {
-	host, _, err := net.SplitHostPort(s.config.SMTPAddr)
+func (s *smtpSender) Send(senderIP, to string, m *message) error {
+	host, _, err := net.SplitHostPort(s.config.SMTPSenderAddr)
 	if err != nil {
 		return err
 	}
-	message, err := formatMail(s.config.BaseURL, senderIP, s.config.SMTPFrom, to, m)
+	message, err := formatMail(s.config.BaseURL, senderIP, s.config.SMTPSenderFrom, to, m)
 	if err != nil {
 		return err
 	}
-	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
-	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.SMTPFrom, []string{to}, []byte(message))
+	auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+	return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
 }
 
 func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) {

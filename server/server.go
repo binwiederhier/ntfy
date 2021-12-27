@@ -33,6 +33,8 @@ type Server struct {
 	config      *Config
 	httpServer  *http.Server
 	httpsServer *http.Server
+	smtpServer  *smtp.Server
+	smtpBackend *smtpBackend
 	topics      map[string]*topic
 	visitors    map[string]*visitor
 	firebase    subscriber
@@ -85,11 +87,12 @@ var (
 )
 
 var (
-	topicRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
-	jsonRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
-	sseRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
-	rawRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
-	sendRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
+	topicRegex       = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No /!
+	topicPathRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
+	jsonPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
+	ssePathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
+	rawPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
+	publishPathRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
 
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
@@ -225,6 +228,9 @@ func (s *Server) Run() error {
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
 	}
+	if s.config.SMTPServerListen != "" {
+		listenStr += fmt.Sprintf(" %s/smtp", s.config.SMTPServerListen)
+	}
 	log.Printf("Listening on %s", listenStr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
@@ -243,7 +249,7 @@ func (s *Server) Run() error {
 	}
 	if s.config.SMTPServerListen != "" {
 		go func() {
-			errChan <- s.runMailserver()
+			errChan <- s.runSMTPServer()
 		}()
 	}
 	s.mu.Unlock()
@@ -263,6 +269,9 @@ func (s *Server) Stop() {
 	}
 	if s.httpsServer != nil {
 		s.httpsServer.Close()
+	}
+	if s.smtpServer != nil {
+		s.smtpServer.Close()
 	}
 	close(s.closeChan)
 }
@@ -295,17 +304,17 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleDocs(w, r)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
-	} else if r.Method == http.MethodGet && topicRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && topicPathRegex.MatchString(r.URL.Path) {
 		return s.handleTopic(w, r)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicRegex.MatchString(r.URL.Path) {
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handlePublish)
-	} else if r.Method == http.MethodGet && sendRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handlePublish)
-	} else if r.Method == http.MethodGet && jsonRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && jsonPathRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handleSubscribeJSON)
-	} else if r.Method == http.MethodGet && sseRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && ssePathRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handleSubscribeSSE)
-	} else if r.Method == http.MethodGet && rawRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && rawPathRegex.MatchString(r.URL.Path) {
 		return s.withRateLimit(w, r, s.handleSubscribeRaw)
 	}
 	return errHTTPNotFound
@@ -726,12 +735,15 @@ func (s *Server) updateStatsAndPrune() {
 		messages += msgs
 	}
 
+	// Mail
+	mailSuccess, mailFailure := s.smtpBackend.Counts()
+
 	// Print stats
-	log.Printf("Stats: %d message(s) published, %d topic(s) active, %d subscriber(s), %d message(s) buffered, %d visitor(s)",
-		s.messages, len(s.topics), subscribers, messages, len(s.visitors))
+	log.Printf("Stats: %d message(s) published, %d in cache, %d successful mails, %d failed, %d topic(s) active, %d subscriber(s), %d visitor(s)",
+		s.messages, messages, mailSuccess, mailFailure, len(s.topics), subscribers, len(s.visitors))
 }
 
-func (s *Server) runMailserver() error {
+func (s *Server) runSMTPServer() error {
 	sub := func(m *message) error {
 		url := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
 		req, err := http.NewRequest("PUT", url, strings.NewReader(m.Message))
@@ -748,18 +760,16 @@ func (s *Server) runMailserver() error {
 		}
 		return nil
 	}
-	ms := smtp.NewServer(newMailBackend(s.config, sub))
-
-	ms.Addr = s.config.SMTPServerListen
-	ms.Domain = s.config.SMTPServerDomain
-	ms.ReadTimeout = 10 * time.Second
-	ms.WriteTimeout = 10 * time.Second
-	ms.MaxMessageBytes = 2 * s.config.MessageLimit
-	ms.MaxRecipients = 1
-	ms.AllowInsecureAuth = true
-
-	log.Println("Starting server at", ms.Addr)
-	return ms.ListenAndServe()
+	s.smtpBackend = newMailBackend(s.config, sub)
+	s.smtpServer = smtp.NewServer(s.smtpBackend)
+	s.smtpServer.Addr = s.config.SMTPServerListen
+	s.smtpServer.Domain = s.config.SMTPServerDomain
+	s.smtpServer.ReadTimeout = 10 * time.Second
+	s.smtpServer.WriteTimeout = 10 * time.Second
+	s.smtpServer.MaxMessageBytes = 2 * s.config.MessageLimit
+	s.smtpServer.MaxRecipients = 1
+	s.smtpServer.AllowInsecureAuth = true
+	return s.smtpServer.ListenAndServe()
 }
 
 func (s *Server) runManager() {

@@ -30,7 +30,7 @@ Content-Type: text/html; charset="UTF-8"
 	_, backend := newTestBackend(t, func(m *message) error {
 		require.Equal(t, "mytopic", m.Topic)
 		require.Equal(t, "and one more", m.Title)
-		require.Equal(t, "what's up\n", m.Message)
+		require.Equal(t, "what's up", m.Message)
 		return nil
 	})
 	session, _ := backend.AnonymousLogin(nil)
@@ -84,7 +84,7 @@ what's up
 	conf, backend := newTestBackend(t, func(m *message) error {
 		require.Equal(t, "mytopic", m.Topic)
 		require.Equal(t, "and one more", m.Title)
-		require.Equal(t, "what's up\n", m.Message)
+		require.Equal(t, "what's up", m.Message)
 		return nil
 	})
 	conf.SMTPServerAddrPrefix = ""

@@ -769,7 +769,7 @@ func (s *Server) runSMTPServer() error {
 	s.smtpServer.Domain = s.config.SMTPServerDomain
 	s.smtpServer.ReadTimeout = 10 * time.Second
 	s.smtpServer.WriteTimeout = 10 * time.Second
-	s.smtpServer.MaxMessageBytes = 2 * s.config.MessageLimit
+	s.smtpServer.MaxMessageBytes = 1024 * 1024 // Must be much larger than message size (headers, multipart, etc.)
 	s.smtpServer.MaxRecipients = 1
 	s.smtpServer.AllowInsecureAuth = true
 	return s.smtpServer.ListenAndServe()

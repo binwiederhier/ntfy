@@ -5,16 +5,19 @@ import (
 	"errors"
 	"github.com/emersion/go-smtp"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/mail"
 	"strings"
 	"sync"
 )
 
 var (
-	errInvalidDomain     = errors.New("invalid domain")
-	errInvalidAddress    = errors.New("invalid address")
-	errInvalidTopic      = errors.New("invalid topic")
-	errTooManyRecipients = errors.New("too many recipients")
+	errInvalidDomain          = errors.New("invalid domain")
+	errInvalidAddress         = errors.New("invalid address")
+	errInvalidTopic           = errors.New("invalid topic")
+	errTooManyRecipients      = errors.New("too many recipients")
+	errUnsupportedContentType = errors.New("unsupported content type")
 )
 
 // smtpBackend implements SMTP server methods.
@@ -94,6 +97,7 @@ func (s *smtpSession) Rcpt(to string) error {
 
 func (s *smtpSession) Data(r io.Reader) error {
 	return s.withFailCount(func() error {
+		conf := s.backend.config
 		b, err := io.ReadAll(r) // Protected by MaxMessageBytes
 		if err != nil {
 			return err
@@ -102,13 +106,21 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		body, err := io.ReadAll(io.LimitReader(msg.Body, int64(s.backend.config.MessageLimit)))
+		body, err := readMailBody(msg)
 		if err != nil {
 			return err
 		}
-		m := newDefaultMessage(s.topic, string(body))
+		if len(body) > conf.MessageLimit {
+			body = body[:conf.MessageLimit]
+		}
+		m := newDefaultMessage(s.topic, body)
 		subject := msg.Header.Get("Subject")
 		if subject != "" {
+			dec := mime.WordDecoder{}
+			subject, err := dec.DecodeHeader(subject)
+			if err != nil {
+				return err
+			}
 			m.Title = subject
 		}
 		if err := s.backend.sub(m); err != nil {
@@ -139,4 +151,40 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 		s.backend.failure++
 	}
 	return err
+}
+
+func readMailBody(msg *mail.Message) (string, error) {
+	contentType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if err != nil {
+		return "", err
+	}
+	if contentType == "text/plain" {
+		body, err := io.ReadAll(msg.Body)
+		if err != nil {
+			return "", err
+		}
+		return string(body), nil
+	}
+	if strings.HasPrefix(contentType, "multipart/") {
+		mr := multipart.NewReader(msg.Body, params["boundary"])
+		for {
+			part, err := mr.NextPart()
+			if err != nil { // may be io.EOF
+				return "", err
+			}
+			partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
+			if err != nil {
+				return "", err
+			}
+			if partContentType != "text/plain" {
+				continue
+			}
+			body, err := io.ReadAll(part)
+			if err != nil {
+				return "", err
+			}
+			return string(body), nil
+		}
+	}
+	return "", errUnsupportedContentType
 }

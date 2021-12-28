@@ -36,7 +36,7 @@ Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscri
 [`since=` parameter](subscribe/api.md#fetch-cached-messages).
 
 ## E-mail notifications
-To allow forwarding messages via e-mail, you can configure an SMTP server for outgoing messages. Once configured, 
+To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 
 you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g. 
 `curl -d "hi there" -H "X-Email: phil@example.com" ntfy.sh/mytopic`).
 
@@ -44,12 +44,56 @@ As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To ena
 following settings:
 
 * `base-url` is the root URL for the ntfy server; this is needed for e-mail footer
-* `smtp-addr` is the hostname:port of the SMTP server
-* `smtp-user` and `smtp-pass` are the username and password of the SMTP user
-* `smtp-from` is the e-mail address of the sender
+* `smtp-sender-addr` is the hostname:port of the SMTP server
+* `smtp-sender-user` and `smtp-sender-pass` are the username and password of the SMTP user
+* `smtp-sender-from` is the e-mail address of the sender
+
+Here's an example config using [Amazon SES](https://aws.amazon.com/ses/) for outgoing mail (this is how it is 
+configured for `ntfy.sh`):
+
+=== "/etc/ntfy/server.yml"
+    ``` yaml
+    base-url: "https://ntfy.sh"
+    smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
+    smtp-sender-user: "AKIDEADBEEFAFFE12345"
+    smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
+    smtp-sender-from: "ntfy@ntfy.sh"
+    ```
 
 Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-email-limit-burst` 
 and `visitor-email-limit-burst`. Setting these conservatively is necessary to avoid abuse.
+
+## E-mail publishing
+To allow publishing messages via e-mail, ntfy can run a lightweight **SMTP server for incoming messages**. Once configured, 
+users can [send emails to a topic e-mail address](publish.md#e-mail-publishing) (e.g. `mytopic@ntfy.sh` or 
+`myprefix-mytopic@ntfy.sh`) to publish messages to a topic. This is useful for e-mail based integrations such as for 
+statuspage.io (though these days most services also support webhooks and HTTP calls).
+
+To configure the SMTP server, you must at least set `smtp-server-listen` and `smtp-server-domain`:
+
+* `smtp-server-listen` defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`
+* `smtp-server-domain` is the e-mail domain, e.g. `ntfy.sh`
+* `smtp-server-addr-prefix` is an optional prefix for the e-mail addresses to prevent spam. If set to `ntfy-`, for instance,
+  only e-mails to `ntfy-$topic@ntfy.sh` will be accepted. If this is not set, all emails to `$topic@ntfy.sh` will be
+  accepted (which may obviously be a spam problem).
+
+Here's an example config (this is how it is configured for `ntfy.sh`):
+
+=== "/etc/ntfy/server.yml"
+    ``` yaml
+    smtp-server-listen: ":25"
+    smtp-server-domain: "ntfy.sh"
+    smtp-server-addr-prefix: "ntfy-"
+    ```
+
+In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record) 
+and a corresponding A record), so incoming mail will find its way to your server. Here's an example of how `ntfy.sh` is 
+configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
+
+<figure markdown>
+  ![DNS records for incoming mail](static/img/screenshot-email-publishing-dns.png){ width=600 }
+  <figcaption>DNS records for incoming mail</figcaption>
+</figure>
 
 ## Behind a proxy (TLS, etc.)
 !!! warning
@@ -66,7 +110,7 @@ as opposed to the remote IP address. If the `behind-proxy` flag is not set, all 
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
 === "/etc/ntfy/server.yml"
-    ```
+    ``` yaml
     # Tell ntfy to use "X-Forwarded-For" to identify visitors
     behind-proxy: true
     ```

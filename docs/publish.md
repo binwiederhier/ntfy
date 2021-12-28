@@ -691,6 +691,28 @@ Here's what that looks like in Google Mail:
   <figcaption>E-mail notification</figcaption>
 </figure>
 
+## E-mail publishing
+You can publish messages to a topic via e-mail, i.e. by sending an email to a specific address. For instance, you can
+publish a message to the topic `sometopic` by sending an e-mail to `ntfy-sometopic@ntfy.sh`. This is useful for e-mail 
+based integrations such as for statuspage.io (though these days most services also support webhooks and HTTP calls).
+
+Depending on the [server configuration](config.md#e-mail-publishing), the e-mail address format can have a prefix to 
+prevent spam on topics. For ntfy.sh, the prefix is configured to `ntfy-`, meaning that the general e-mail address 
+format is:
+
+```
+ntfy-$topic@ntfy.sh
+```
+
+As of today, e-mail publishing only supports adding a [message title](#message-title) (the e-mail subject). Tags, priority,
+delay and other features are not supported (yet). Here's an example that will publish a message with the 
+title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://ntfy.sh/sometopic)):
+
+<figure markdown>
+  ![e-mail publishing](static/img/screenshot-email-publishing-gmail.png){ width=500 }
+  <figcaption>Publishing a message via e-mail</figcaption>
+</figure>
+
 ## Advanced features
 
 ### Message caching
@@ -846,7 +868,7 @@ but just in case, let's list them all:
 |---|---|
 | **Message length** | Each message can be up to 512 bytes long. Longer messages are truncated. |
 | **Requests** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
-| **E-mails** | By default, the server is configured to allow 16 e-mails at once, and then refills the your allowed e-mail bucket at a rate of one per hour. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
+| **E-mails** | By default, the server is configured to allow sending 16 e-mails at once, and then refills the your allowed e-mail bucket at a rate of one per hour. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **Subscription limits** | By default, the server allows each visitor to keep 30 connections to the server open. |
 | **Total number of topics** | By default, the server is configured to allow 5,000 topics. The ntfy.sh server has higher limits though. |
 

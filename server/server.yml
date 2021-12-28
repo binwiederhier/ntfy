@@ -60,7 +60,15 @@
 # smtp-sender-pass:
 # smtp-sender-from:
 
-# XXXXXXXXXXXXXXXXXXXXxx
+# If enabled, ntfy will launch a lightweight SMTP server for incoming messages. Once configured, users can send
+# emails to a topic e-mail address to publish messages to a topic.
+#
+# - smtp-server-listen defines the IP address and port the SMTP server will listen on, e.g. :25 or 1.2.3.4:25
+# - smtp-server-domain is the e-mail domain, e.g. ntfy.sh
+# - smtp-server-addr-prefix is an optional prefix for the e-mail addresses to prevent spam. If set to "ntfy-",
+#   for instance, only e-mails to ntfy-$topic@ntfy.sh will be accepted. If this is not set, all emails to
+#   $topic@ntfy.sh will be accepted (which may obviously be a spam problem).
+#
 # smtp-server-listen:
 # smtp-server-domain:
 # smtp-server-addr-prefix:

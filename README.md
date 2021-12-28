@@ -48,6 +48,8 @@ Third party libraries and resources:
 * [Mixkit sound](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) used as notification sound
 * [Lato Font](https://www.latofonts.com/) (OFL) is used as a font in the Web UI
 * [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases
+* [go-smtp](https://github.com/emersion/go-smtp) (MIT) is used to receive e-mails
+* [stretchr/testify](https://github.com/stretchr/testify) (MIT) is used for unit and integration tests
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
 * [github/gemoji](https://github.com/github/gemoji) (MIT) is used for emoji support (specifically the [emoji.json](https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json) file)

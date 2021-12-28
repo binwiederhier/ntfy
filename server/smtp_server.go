@@ -110,11 +110,12 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+		body = strings.TrimSpace(body)
 		if len(body) > conf.MessageLimit {
 			body = body[:conf.MessageLimit]
 		}
 		m := newDefaultMessage(s.topic, body)
-		subject := msg.Header.Get("Subject")
+		subject := strings.TrimSpace(msg.Header.Get("Subject"))
 		if subject != "" {
 			dec := mime.WordDecoder{}
 			subject, err := dec.DecodeHeader(subject)
@@ -122,6 +123,10 @@ func (s *smtpSession) Data(r io.Reader) error {
 				return err
 			}
 			m.Title = subject
+		}
+		if m.Title != "" && m.Message == "" {
+			m.Message = m.Title // Flip them, this makes more sense
+			m.Title = ""
 		}
 		if err := s.backend.sub(m); err != nil {
 			return err

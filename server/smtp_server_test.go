@@ -39,6 +39,38 @@ Content-Type: text/html; charset="UTF-8"
 	require.Nil(t, session.Data(strings.NewReader(email)))
 }
 
+func TestSmtpBackend_MultipartNoBody(t *testing.T) {
+	email := `MIME-Version: 1.0
+Date: Tue, 28 Dec 2021 01:33:34 +0100
+Message-ID: <CAAvm7ABCDsi9vsuu0WTRXzZQBC8dXrDOLT8iCWdqrsmg@mail.gmail.com>
+Subject: This email has a subject but no body
+From: Phil <phil@example.com>
+To: ntfy-emailtest@ntfy.sh
+Content-Type: multipart/alternative; boundary="000000000000bcf4a405d429f8d4"
+
+--000000000000bcf4a405d429f8d4
+Content-Type: text/plain; charset="UTF-8"
+
+
+
+--000000000000bcf4a405d429f8d4
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr"><br></div>
+
+--000000000000bcf4a405d429f8d4--`
+	_, backend := newTestBackend(t, func(m *message) error {
+		require.Equal(t, "emailtest", m.Topic)
+		require.Equal(t, "", m.Title) // We flipped message and body
+		require.Equal(t, "This email has a subject but no body", m.Message)
+		return nil
+	})
+	session, _ := backend.AnonymousLogin(nil)
+	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
+	require.Nil(t, session.Rcpt("ntfy-emailtest@ntfy.sh"))
+	require.Nil(t, session.Data(strings.NewReader(email)))
+}
+
 func TestSmtpBackend_Plaintext(t *testing.T) {
 	email := `Date: Tue, 28 Dec 2021 00:30:10 +0100
 Message-ID: <CAAvm79YP0C=Rt1N=KWmSUBB87KK2rRChmdzKqF1vCwMEUiVzLQ@mail.gmail.com>

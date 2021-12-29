@@ -13,7 +13,7 @@ $ ntfy serve
 
 You can immediately start [publishing messages](publish.md), or subscribe via the [Android app](subscribe/phone.md),
 [the web UI](subscribe/web.md), or simply via [curl or your favorite HTTP client](subscribe/api.md). To configure 
-the server further, check out the [config options table](#config-options) or simply type `ntfy --help` to
+the server further, check out the [config options table](#config-options) or simply type `ntfy serve --help` to
 get a list of [command line options](#command-line-options).
 
 ## Message cache
@@ -373,10 +373,13 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
 | `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely. |
 | `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
-| `smtp-addr` | `NTFY_SMTP_ADDR` | `host:port` | - | SMTP server address to allow email sending |
-| `smtp-user` | `NTFY_SMTP_USER` | *string* | - | SMTP user; only used if e-mail sending is enabled |
-| `smtp-pass` | `NTFY_SMTP_PASS` | *string* | - | SMTP password; only used if e-mail sending is enabled |
-| `smtp-from` | `NTFY_SMTP_FROM` | *e-mail address* | - | SMTP sender e-mail address; only used if e-mail sending is enabled |
+| `smtp-sender-addr` | `NTFY_SMTP_SENDER_ADDR` | `host:port` | - | SMTP server address to allow email sending |
+| `smtp-sender-user` | `NTFY_SMTP_SENDER_USER` | *string* | - | SMTP user; only used if e-mail sending is enabled |
+| `smtp-sender-pass` | `NTFY_SMTP_SENDER_PASS` | *string* | - | SMTP password; only used if e-mail sending is enabled |
+| `smtp-sender-from` | `NTFY_SMTP_SENDER_FROM` | *e-mail address* | - | SMTP sender e-mail address; only used if e-mail sending is enabled |
+| `smtp-server-listen` | `NTFY_SMTP_SERVER_LISTEN` | `[ip]:port` | - | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25` |
+| `smtp-server-domain` | `NTFY_SMTP_SERVER_DOMAIN` | *domain name* | - | SMTP server e-mail domain, e.g. `ntfy.sh` |
+| `smtp-server-addr-prefix` | `NTFY_SMTP_SERVER_ADDR_PREFIX` | `[ip]:port` | - |  Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-` |
 | `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 30s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
@@ -419,10 +422,13 @@ OPTIONS:
    --cache-duration since, -b since         buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
    --keepalive-interval value, -k value     interval of keepalive messages (default: 30s) [$NTFY_KEEPALIVE_INTERVAL]
    --manager-interval value, -m value       interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
-   --smtp-addr value                        SMTP server address (host:port) to allow email sending [$NTFY_SMTP_ADDR]
-   --smtp-user value                        SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_USER]
-   --smtp-pass value                        SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_PASS]
-   --smtp-from value                        SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_FROM]
+   --smtp-sender-addr value                 SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
+   --smtp-sender-user value                 SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
+   --smtp-sender-pass value                 SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
+   --smtp-sender-from value                 SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_FROM]
+   --smtp-server-listen value               SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
+   --smtp-server-domain value               SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
+   --smtp-server-addr-prefix value          SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
    --global-topic-limit value, -T value     total number of topics allowed (default: 5000) [$NTFY_GLOBAL_TOPIC_LIMIT]
    --visitor-subscription-limit value       number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
    --visitor-request-limit-burst value      initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]

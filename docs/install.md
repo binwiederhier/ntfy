@@ -181,6 +181,14 @@ docker run \
   serve
 ```
 
+Alternatively, you may wish to build a customized Docker image that can be run with fewer command-line arguments and without delivering the configuration file separately.
+```
+FROM binwiederhier/ntfy
+COPY server.yml /etc/ntfy/server.yml
+ENTRYPOINT ["ntfy", "serve"]
+```
+This image can be pushed to a container registry and shipped independently. All that's needed when running it is mapping ntfy's port to a host port.
+
 ## Go
 To install via Go, simply run:
 ```bash

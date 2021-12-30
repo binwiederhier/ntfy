@@ -1,8 +1,9 @@
 package client
 
 import (
-	"gopkg.in/yaml.v2"
 	"os"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -18,13 +19,16 @@ type Config struct {
 		Command string            `yaml:"command"`
 		If      map[string]string `yaml:"if"`
 	} `yaml:"subscribe"`
+
+	EnableUnifiedPush bool `yaml:"enable_unifiedpush"`
 }
 
 // NewConfig creates a new Config struct for a Client
 func NewConfig() *Config {
 	return &Config{
-		DefaultHost: DefaultBaseURL,
-		Subscribe:   nil,
+		DefaultHost:       DefaultBaseURL,
+		Subscribe:         nil,
+		EnableUnifiedPush: true,
 	}
 }
 

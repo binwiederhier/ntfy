@@ -3,14 +3,15 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/util"
 	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/util"
 )
 
 var cmdSubscribe = &cli.Command{
@@ -26,6 +27,7 @@ var cmdSubscribe = &cli.Command{
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
 		&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "print verbose output"},
+		&cli.BoolFlag{Name: "unifiedpush", Aliases: []string{"up"}, Usage: "enable or disable unifiedpush", DefaultText: "true"},
 	},
 	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
 every arriving message. There are 3 modes in which the command can be run:
@@ -83,10 +85,12 @@ func execSubscribe(c *cli.Context) error {
 	poll := c.Bool("poll")
 	scheduled := c.Bool("scheduled")
 	fromConfig := c.Bool("from-config")
+	unifiedpush := c.Bool("unifiedpush")
 	topic := c.Args().Get(0)
 	command := c.Args().Get(1)
 	if !fromConfig {
 		conf.Subscribe = nil // wipe if --from-config not passed
+		conf.EnableUnifiedPush = unifiedpush
 	}
 	var options []client.SubscribeOption
 	if since != "" {
@@ -98,15 +102,47 @@ func execSubscribe(c *cli.Context) error {
 	if scheduled {
 		options = append(options, client.WithScheduled())
 	}
-	if topic == "" && len(conf.Subscribe) == 0 {
+	if topic == "" && len(conf.Subscribe) == 0 && !conf.EnableUnifiedPush {
 		return errors.New("must specify topic, type 'ntfy subscribe --help' for help")
+	}
+
+	var d *distributor
+	if conf.EnableUnifiedPush {
+		d = newDistributor(conf)
+
+		go d.handleEndpointSettingsChanges()
 	}
 
 	// Execute poll or subscribe
 	if poll {
 		return doPoll(c, cl, conf, topic, command, options...)
 	}
-	return doSubscribe(c, cl, conf, topic, command, options...)
+	return doSubscribe(c, cl, conf, d, topic, command, options...)
+}
+
+func unifiedPushUpdatedSubscribe(commands map[string]string, cl *client.Client, d distributor) {
+	var sub string
+	// everytime resubscribe is triggered, this loop will unsubscribe from the old subscription
+	// and resubscribe to one with the new list of topics/applications
+	for {
+		fmt.Println("Subscribing...")
+		subscribeTopics := d.st.GetAllPubTokens()
+		if subscribeTopics != "" {
+			//								TODO needs better deduplication mechanism (or maybe this is good enough?)
+			// currently if there's a message at time 100.1, the client disconnects at 100.5, there's a message at 100.9, the client won't get the message from 100.9
+			// though I don't know if this impact is serious enough to justify adding a whole bunch of code with more maintainance, bugs, etc.
+			sub = cl.Subscribe(subscribeTopics, client.WithSinceUnixTime(d.st.GetLastMessage()+1))
+			commands[sub] = "unifiedpush"
+		}
+
+		if _, open := <-d.resub; !open {
+			return
+		}
+
+		// both operations are no-ops when the key doesn't exist so can be run even if subscribeTopics == ""
+		cl.Unsubscribe(sub)
+		delete(commands, sub)
+	}
 }
 
 func doPoll(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
@@ -129,14 +165,18 @@ func doPollSingle(c *cli.Context, cl *client.Client, topic, command string, opti
 		return err
 	}
 	for _, m := range messages {
-		printMessageOrRunCommand(c, m, command)
+		printMessageOrRunCommand(c, m, nil, command)
 	}
 	return nil
 }
 
-func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
+func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, d *distributor, topic, command string, options ...client.SubscribeOption) error {
 	commands := make(map[string]string) // Subscription ID -> command
-	for _, s := range conf.Subscribe {  // May be nil
+
+	if d != nil {
+		go unifiedPushUpdatedSubscribe(commands, cl, *d)
+	}
+	for _, s := range conf.Subscribe { // May be nil
 		topicOptions := append(make([]client.SubscribeOption, 0), options...)
 		for filter, value := range s.If {
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
@@ -150,16 +190,24 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 	}
 	for m := range cl.Messages {
 		command, ok := commands[m.SubscriptionID]
+		fmt.Println(command, ok, m, m.SubscriptionID)
 		if !ok {
 			continue
 		}
-		printMessageOrRunCommand(c, m, command)
+		printMessageOrRunCommand(c, m, d, command)
 	}
 	return nil
 }
 
-func printMessageOrRunCommand(c *cli.Context, m *client.Message, command string) {
-	if command != "" {
+func printMessageOrRunCommand(c *cli.Context, m *client.Message, d *distributor, command string) {
+	if command == "unifiedpush" && d != nil {
+		// this shouldn't ever be run if d is nil since there won't be a "unifiedpush" subscription
+		if conn := d.st.GetConnectionbyPublic(m.Topic); conn != nil {
+			fmt.Println("NEWMSG")
+			_ = d.dbus.NewConnector(conn.AppID).Message(conn.AppToken, m.Message, "")
+			d.st.SetLastMessage(m.Time)
+		}
+	} else if command != "" {
 		runCommand(c, command, m)
 	} else {
 		fmt.Fprintln(c.App.Writer, m.Raw)

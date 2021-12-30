@@ -3,10 +3,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/util"
-	"os"
 )
 
 var (
@@ -32,7 +33,6 @@ func New() *cli.App {
 			cmdServe,
 			cmdPublish,
 			cmdSubscribe,
-			cmdDistribute,
 		},
 	}
 }

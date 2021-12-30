@@ -105,7 +105,8 @@ build-snapshot: build-deps
 	goreleaser build --snapshot --rm-dist --debug
 
 build-simple: clean
-	mkdir -p dist/ntfy_linux_amd64
+	mkdir -p dist/ntfy_linux_amd64 server/docs
+	touch server/docs/dummy
 	export CGO_ENABLED=1
 	go build \
 		-o dist/ntfy_linux_amd64/ntfy \

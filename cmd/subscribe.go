@@ -201,7 +201,6 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, d *dist
 
 func printMessageOrRunCommand(c *cli.Context, m *client.Message, d *distributor, command string) {
 	if command == "unifiedpush" && d != nil {
-		// this shouldn't ever be run if d is nil since there won't be a "unifiedpush" subscription
 		if conn := d.st.GetConnectionbyPublic(m.Topic); conn != nil {
 			fmt.Println("NEWMSG")
 			_ = d.dbus.NewConnector(conn.AppID).Message(conn.AppToken, m.Message, "")

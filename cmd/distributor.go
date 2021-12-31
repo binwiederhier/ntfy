@@ -16,11 +16,11 @@ import (
 	"unifiedpush.org/go/np2p_dbus/utils"
 )
 
-type Store struct {
+type store struct {
 	*storage.Storage
 }
 
-func (s Store) GetAllPubTokens() string {
+func (s store) GetAllPubTokens() string {
 	var conns []storage.Connection
 	result := s.DB().Find(&conns)
 	if result.Error != nil {
@@ -34,26 +34,26 @@ func (s Store) GetAllPubTokens() string {
 	return strings.Join(pubtokens, ",")
 }
 
-type KVStore struct {
+type kvStore struct {
 	Key   string `gorm:"primaryKey"`
 	Value string
 }
 
-func (kv *KVStore) Get(db *gorm.DB) error {
+func (kv *kvStore) get(db *gorm.DB) error {
 	return db.First(kv).Error
 }
 
-func (kv KVStore) Set(db *gorm.DB) error {
+func (kv kvStore) set(db *gorm.DB) error {
 	return db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&kv).Error
 }
 
-func (s Store) SetLastMessage(id int64) error {
-	return KVStore{"device-id", fmt.Sprintf("%d", id)}.Set(s.DB())
+func (s store) SetLastMessage(id int64) error {
+	return kvStore{"device-id", fmt.Sprintf("%d", id)}.set(s.DB())
 }
 
-func (s Store) GetLastMessage() int64 {
-	answer := KVStore{Key: "device-id"}
-	if err := answer.Get(s.DB()); err != nil {
+func (s store) GetLastMessage() int64 {
+	answer := kvStore{Key: "device-id"}
+	if err := answer.get(s.DB()); err != nil {
 		//log or fatal??
 		return 100
 	}
@@ -64,13 +64,13 @@ func (s Store) GetLastMessage() int64 {
 // creates a new distributor object with an initialized storage and dbus
 func newDistributor(conf *client.Config) (d *distributor) {
 	st, err := storage.InitStorage(utils.StoragePath("ntfy.db"))
-	st.DB().AutoMigrate(KVStore{}) //todo move to proper function
+	st.DB().AutoMigrate(kvStore{}) //todo move to proper function
 	if err != nil {
 		log.Fatalln("failed to connect database")
 	}
 
 	dbus := distributor_tools.NewDBus("org.unifiedpush.Distributor.ntfy")
-	d = &distributor{dbus, Store{st}, conf, make(chan struct{})}
+	d = &distributor{dbus, store{st}, conf, make(chan struct{})}
 	err = dbus.StartHandling(d)
 	fmt.Println("DBUS HANDLING")
 	if err != nil {
@@ -82,7 +82,7 @@ func newDistributor(conf *client.Config) (d *distributor) {
 
 type distributor struct {
 	dbus  *distributor_tools.DBus
-	st    Store
+	st    store
 	conf  *client.Config
 	resub chan struct{}
 }

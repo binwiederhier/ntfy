@@ -164,12 +164,13 @@ func TestServer_StaticSites(t *testing.T) {
 func TestServer_PublishLargeMessage(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
-	body := strings.Repeat("this is a large message", 1000)
-	truncated := body[0:512]
+	body := strings.Repeat("this is a large message", 5000)
+	truncated := body[0:4096]
 	response := request(t, s, "PUT", "/mytopic", body, nil)
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, truncated, msg.Message)
+	require.Equal(t, 4096, len(msg.Message))
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages := toMessages(t, response.Body.String())

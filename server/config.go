@@ -13,7 +13,7 @@ const (
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
-	DefaultMessageLimit              = 512
+	DefaultMessageLimit              = 4096
 	DefaultFirebaseKeepaliveInterval = time.Hour
 )
 

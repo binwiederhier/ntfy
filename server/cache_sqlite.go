@@ -15,13 +15,13 @@ const (
 	createMessagesTableQuery = `
 		BEGIN;
 		CREATE TABLE IF NOT EXISTS messages (
-			id VARCHAR(20) PRIMARY KEY,
+			id TEXT PRIMARY KEY,
 			time INT NOT NULL,
-			topic VARCHAR(64) NOT NULL,
-			message VARCHAR(512) NOT NULL,
-			title VARCHAR(256) NOT NULL,
+			topic TEXT NOT NULL,
+			message TEXT NOT NULL,
+			title TEXT NOT NULL,
 			priority INT NOT NULL,
-			tags VARCHAR(256) NOT NULL,
+			tags TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
@@ -68,9 +68,9 @@ const (
 	// 0 -> 1
 	migrate0To1AlterMessagesTableQuery = `
 		BEGIN;
-		ALTER TABLE messages ADD COLUMN title VARCHAR(256) NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN title TEXT NOT NULL DEFAULT('');
 		ALTER TABLE messages ADD COLUMN priority INT NOT NULL DEFAULT(0);
-		ALTER TABLE messages ADD COLUMN tags VARCHAR(256) NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN tags TEXT NOT NULL DEFAULT('');
 		COMMIT;
 	`
 

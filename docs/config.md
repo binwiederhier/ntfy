@@ -380,7 +380,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `smtp-server-listen` | `NTFY_SMTP_SERVER_LISTEN` | `[ip]:port` | - | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25` |
 | `smtp-server-domain` | `NTFY_SMTP_SERVER_DOMAIN` | *domain name* | - | SMTP server e-mail domain, e.g. `ntfy.sh` |
 | `smtp-server-addr-prefix` | `NTFY_SMTP_SERVER_ADDR_PREFIX` | `[ip]:port` | - |  Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-` |
-| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 65s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
+| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 55s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
 | `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
@@ -420,7 +420,7 @@ OPTIONS:
    --firebase-key-file value, -F value      Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
    --cache-file value, -C value             cache file used for message caching [$NTFY_CACHE_FILE]
    --cache-duration since, -b since         buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
-   --keepalive-interval value, -k value     interval of keepalive messages (default: 65s) [$NTFY_KEEPALIVE_INTERVAL]
+   --keepalive-interval value, -k value     interval of keepalive messages (default: 55s) [$NTFY_KEEPALIVE_INTERVAL]
    --manager-interval value, -m value       interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
    --smtp-sender-addr value                 SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
    --smtp-sender-user value                 SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]

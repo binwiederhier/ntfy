@@ -8,7 +8,7 @@ import (
 const (
 	DefaultListenHTTP                = ":80"
 	DefaultCacheDuration             = 12 * time.Hour
-	DefaultKeepaliveInterval         = 30 * time.Second
+	DefaultKeepaliveInterval         = 55 * time.Second // Not too frequently to save battery
 	DefaultManagerInterval           = time.Minute
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second

@@ -142,7 +142,7 @@ or the root domain:
         if ($request_method = GET) {
           set $redirect_https "yes";
         }
-        if ($request_uri ~* "^/[-_a-z0-9]{0,64}$") {
+        if ($request_uri ~* "^/([-_a-z0-9]{0,64}$|docs/|static/)") {
           set $redirect_https "${redirect_https}yes";
         }
         if ($redirect_https = "yesyes") {
@@ -156,13 +156,11 @@ or the root domain:
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     
-        proxy_connect_timeout 1m;
-        proxy_send_timeout 1m;
-        proxy_read_timeout 1m;
+        proxy_connect_timeout 3m;
+        proxy_send_timeout 3m;
+        proxy_read_timeout 3m;
       }
     }
     
@@ -186,13 +184,11 @@ or the root domain:
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     
-        proxy_connect_timeout 1m;
-        proxy_send_timeout 1m;
-        proxy_read_timeout 1m;
+        proxy_connect_timeout 3m;
+        proxy_send_timeout 3m;
+        proxy_read_timeout 3m;
       }
     }
     ```

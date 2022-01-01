@@ -8,6 +8,12 @@
     width: unset !important;
 }
 
+.md-typeset h4 {
+    font-weight: 500 !important;
+    margin: 0 !important;
+    font-size: 1.1em !important;
+}
+
 .admonition {
     font-size: .74rem !important;
 }

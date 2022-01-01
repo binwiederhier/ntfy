@@ -81,11 +81,28 @@ The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in
 It won't use Firebase for any self-hosted servers, and not at all in the the F-Droid flavor.
 
 ## Integrations
+
+### UnifiedPush
+[UnifiedPush](https://unifiedpush.org) is a standard for receiving push notifications without using the Google-owned
+[Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications 
+in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwarding messages to apps that support it. 
+
+To use ntfy as a distributor, simply select it in one of the [supported apps](https://unifiedpush.org/users/apps/). 
+That's it. It's a one-step installation 😀. If desired, you can select your own [selfhosted ntfy server](../install.md)
+to handle messages. Here's an example with [FluffyChat](https://fluffychat.im/):
+
+<div id="unifiedpush-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-unifiedpush-fluffychat.jpg"><img src="../../static/img/android-screenshot-unifiedpush-fluffychat.jpg"/></a>
+    <a href="../../static/img/android-screenshot-unifiedpush-subscription.jpg"><img src="../../static/img/android-screenshot-unifiedpush-subscription.jpg"/></a>
+    <a href="../../static/img/android-screenshot-unifiedpush-settings.jpg"><img src="../../static/img/android-screenshot-unifiedpush-settings.jpg"/></a>
+</div>
+
+### Automation apps
 The ntfy Android app integrates nicely with automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm). Using Android intents, you can
 **react to incoming messages**, as well as **send messages**.
 
-### React to incoming messages
+#### React to incoming messages
 To react on incoming notifications, you have to register to intents with the `io.heckel.ntfy.MESSAGE_RECEIVED` action (see
 [code for details](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/java/io/heckel/ntfy/msg/BroadcastService.kt)).
 Here's an example using [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
@@ -127,7 +144,7 @@ Here's a list of extras you can access. Most likely, you'll want to filter for `
 | `tags_map` | *string* | `0=tag1,1=tag2,..` | Map of tags to make it easier to map first, second, ... tag |
 | `priority` | *int (between 1-5)* | `4` | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
 
-### Send messages using intents
+#### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm)), you can 
 broadcast an intent with the `io.heckel.ntfy.SEND_MESSAGE` action. The ntfy Android app will forward the intent as a HTTP

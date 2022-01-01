@@ -208,7 +208,7 @@ or the root domain:
         ProxyPass / http://127.0.0.1:2586/
         ProxyPassReverse / http://127.0.0.1:2586/
         
-        # Higher than the max message size of 512k 
+        # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
@@ -232,7 +232,7 @@ or the root domain:
         ProxyPass / http://127.0.0.1:2586/
         ProxyPassReverse / http://127.0.0.1:2586/
         
-        # Higher than the max message size of 512k 
+        # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 

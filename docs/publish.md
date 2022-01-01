@@ -866,7 +866,7 @@ but just in case, let's list them all:
 
 | Limit | Description |
 |---|---|
-| **Message length** | Each message can be up to 512 bytes long. Longer messages are truncated. |
+| **Message length** | Each message can be up to 4096 bytes long. Longer messages are truncated. |
 | **Requests** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **E-mails** | By default, the server is configured to allow sending 16 e-mails at once, and then refills the your allowed e-mail bucket at a rate of one per hour. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **Subscription limits** | By default, the server allows each visitor to keep 30 connections to the server open. |

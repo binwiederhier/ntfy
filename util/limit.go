@@ -2,6 +2,7 @@ package util
 
 import (
 	"errors"
+	"io"
 	"sync"
 )
 
@@ -57,4 +58,44 @@ func (l *Limiter) Value() int64 {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.value
+}
+
+// Limit returns the defined limit
+func (l *Limiter) Limit() int64 {
+	return l.limit
+}
+
+// LimitWriter implements an io.Writer that will pass through all Write calls to the underlying
+// writer w until any of the limiter's limit is reached, at which point a Write will return ErrLimitReached.
+// Each limiter's value is increased with every write.
+type LimitWriter struct {
+	w        io.Writer
+	written  int64
+	limiters []*Limiter
+	mu       sync.Mutex
+}
+
+// NewLimitWriter creates a new LimitWriter
+func NewLimitWriter(w io.Writer, limiters ...*Limiter) *LimitWriter {
+	return &LimitWriter{
+		w:        w,
+		limiters: limiters,
+	}
+}
+
+// Write passes through all writes to the underlying writer until any of the given limiter's limit is reached
+func (w *LimitWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for i := 0; i < len(w.limiters); i++ {
+		if err := w.limiters[i].Add(int64(len(p))); err != nil {
+			for j := i - 1; j >= 0; j-- {
+				w.limiters[j].Sub(int64(len(p)))
+			}
+			return 0, ErrLimitReached
+		}
+	}
+	n, err = w.w.Write(p)
+	w.written += int64(n)
+	return
 }

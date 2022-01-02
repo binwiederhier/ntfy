@@ -18,14 +18,21 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID       string   `json:"id"`    // Random message ID
-	Time     int64    `json:"time"`  // Unix time in seconds
-	Event    string   `json:"event"` // One of the above
-	Topic    string   `json:"topic"`
-	Priority int      `json:"priority,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	Title    string   `json:"title,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	ID         string      `json:"id"`    // Random message ID
+	Time       int64       `json:"time"`  // Unix time in seconds
+	Event      string      `json:"event"` // One of the above
+	Topic      string      `json:"topic"`
+	Priority   int         `json:"priority,omitempty"`
+	Tags       []string    `json:"tags,omitempty"`
+	Title      string      `json:"title,omitempty"`
+	Message    string      `json:"message,omitempty"`
+	Attachment *attachment `json:"attachment,omitempty"`
+}
+
+type attachment struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+	URL  string `json:"url"`
 }
 
 // messageEncoder is a function that knows how to encode a message

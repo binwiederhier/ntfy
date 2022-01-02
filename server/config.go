@@ -14,6 +14,7 @@ const (
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
 	DefaultMessageLimit              = 4096
+	DefaultAttachmentSizeLimit       = 5 * 1024 * 1024
 	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery
 )
 
@@ -41,6 +42,8 @@ type Config struct {
 	FirebaseKeyFile              string
 	CacheFile                    string
 	CacheDuration                time.Duration
+	AttachmentCacheDir           string
+	AttachmentSizeLimit          int64
 	KeepaliveInterval            time.Duration
 	ManagerInterval              time.Duration
 	AtSenderInterval             time.Duration
@@ -55,7 +58,8 @@ type Config struct {
 	MessageLimit                 int
 	MinDelay                     time.Duration
 	MaxDelay                     time.Duration
-	GlobalTopicLimit             int
+	TotalTopicLimit              int
+	TotalAttachmentSizeLimit     int64
 	VisitorRequestLimitBurst     int
 	VisitorRequestLimitReplenish time.Duration
 	VisitorEmailLimitBurst       int
@@ -75,6 +79,8 @@ func NewConfig() *Config {
 		FirebaseKeyFile:              "",
 		CacheFile:                    "",
 		CacheDuration:                DefaultCacheDuration,
+		AttachmentCacheDir:           "",
+		AttachmentSizeLimit:          DefaultAttachmentSizeLimit,
 		KeepaliveInterval:            DefaultKeepaliveInterval,
 		ManagerInterval:              DefaultManagerInterval,
 		MessageLimit:                 DefaultMessageLimit,
@@ -82,7 +88,7 @@ func NewConfig() *Config {
 		MaxDelay:                     DefaultMaxDelay,
 		AtSenderInterval:             DefaultAtSenderInterval,
 		FirebaseKeepaliveInterval:    DefaultFirebaseKeepaliveInterval,
-		GlobalTopicLimit:             DefaultGlobalTopicLimit,
+		TotalTopicLimit:              DefaultGlobalTopicLimit,
 		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,
 		VisitorEmailLimitBurst:       DefaultVisitorEmailLimitBurst,

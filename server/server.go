@@ -9,6 +9,7 @@ import (
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"fmt"
+	"github.com/disintegration/imaging"
 	"github.com/emersion/go-smtp"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/util"
@@ -101,7 +102,8 @@ var (
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics = []string{"docs", "static", "file"}
+	previewRegex     = regexp.MustCompile(`^/preview/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
+	disallowedTopics = []string{"docs", "static", "file", "preview"}
 
 	templateFnMap = template.FuncMap{
 		"durationToHuman": util.DurationToHuman,
@@ -122,26 +124,26 @@ var (
 	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
-	errHTTPNotFound                               = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
-	errHTTPTooManyRequestsLimitRequests           = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitEmails             = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitSubscriptions      = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitGlobalTopics       = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPBadRequestEmailDisabled                = &errHTTP{40001, http.StatusBadRequest, "e-mail notifications are not enabled", "https://ntfy.sh/docs/config/#e-mail-notifications"}
-	errHTTPBadRequestDelayNoCache                 = &errHTTP{40002, http.StatusBadRequest, "cannot disable cache for delayed message", ""}
-	errHTTPBadRequestDelayNoEmail                 = &errHTTP{40003, http.StatusBadRequest, "delayed e-mail notifications are not supported", ""}
-	errHTTPBadRequestDelayCannotParse             = &errHTTP{40004, http.StatusBadRequest, "invalid delay parameter: unable to parse delay", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
-	errHTTPBadRequestDelayTooSmall                = &errHTTP{40005, http.StatusBadRequest, "invalid delay parameter: too small, please refer to the docs", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
-	errHTTPBadRequestDelayTooLarge                = &errHTTP{40006, http.StatusBadRequest, "invalid delay parameter: too large, please refer to the docs", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
-	errHTTPBadRequestPriorityInvalid              = &errHTTP{40007, http.StatusBadRequest, "invalid priority parameter", "https://ntfy.sh/docs/publish/#message-priority"}
-	errHTTPBadRequestSinceInvalid                 = &errHTTP{40008, http.StatusBadRequest, "invalid since parameter", "https://ntfy.sh/docs/subscribe/api/#fetch-cached-messages"}
-	errHTTPBadRequestTopicInvalid                 = &errHTTP{40009, http.StatusBadRequest, "invalid topic: path invalid", ""}
-	errHTTPBadRequestTopicDisallowed              = &errHTTP{40010, http.StatusBadRequest, "invalid topic: topic name is disallowed", ""}
-	errHTTPBadRequestAttachmentsDisallowed        = &errHTTP{40011, http.StatusBadRequest, "attachments disallowed", ""}
-	errHTTPBadRequestAttachmentsPublishDisallowed = &errHTTP{40011, http.StatusBadRequest, "invalid message: invalid encoding or too large, and attachments are not allowed", ""}
-	errHTTPBadRequestMessageTooLarge              = &errHTTP{40013, http.StatusBadRequest, "invalid message: too large", ""}
-	errHTTPInternalError                          = &errHTTP{50001, http.StatusInternalServerError, "internal server error", ""}
-	errHTTPInternalErrorInvalidFilePath           = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid file path", ""}
+	errHTTPNotFound                          = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
+	errHTTPNotFoundTooLarge                  = &errHTTP{40402, http.StatusNotFound, "page not found: preview not available, file too large", ""}
+	errHTTPTooManyRequestsLimitRequests      = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitEmails        = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitSubscriptions = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitGlobalTopics  = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPBadRequestEmailDisabled           = &errHTTP{40001, http.StatusBadRequest, "e-mail notifications are not enabled", "https://ntfy.sh/docs/config/#e-mail-notifications"}
+	errHTTPBadRequestDelayNoCache            = &errHTTP{40002, http.StatusBadRequest, "cannot disable cache for delayed message", ""}
+	errHTTPBadRequestDelayNoEmail            = &errHTTP{40003, http.StatusBadRequest, "delayed e-mail notifications are not supported", ""}
+	errHTTPBadRequestDelayCannotParse        = &errHTTP{40004, http.StatusBadRequest, "invalid delay parameter: unable to parse delay", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
+	errHTTPBadRequestDelayTooSmall           = &errHTTP{40005, http.StatusBadRequest, "invalid delay parameter: too small, please refer to the docs", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
+	errHTTPBadRequestDelayTooLarge           = &errHTTP{40006, http.StatusBadRequest, "invalid delay parameter: too large, please refer to the docs", "https://ntfy.sh/docs/publish/#scheduled-delivery"}
+	errHTTPBadRequestPriorityInvalid         = &errHTTP{40007, http.StatusBadRequest, "invalid priority parameter", "https://ntfy.sh/docs/publish/#message-priority"}
+	errHTTPBadRequestSinceInvalid            = &errHTTP{40008, http.StatusBadRequest, "invalid since parameter", "https://ntfy.sh/docs/subscribe/api/#fetch-cached-messages"}
+	errHTTPBadRequestTopicInvalid            = &errHTTP{40009, http.StatusBadRequest, "invalid topic: path invalid", ""}
+	errHTTPBadRequestTopicDisallowed         = &errHTTP{40010, http.StatusBadRequest, "invalid topic: topic name is disallowed", ""}
+	errHTTPBadRequestInvalidMessage          = &errHTTP{40011, http.StatusBadRequest, "invalid message: invalid encoding or too large, and attachments are not allowed", ""}
+	errHTTPBadRequestMessageTooLarge         = &errHTTP{40012, http.StatusBadRequest, "invalid message: too large", ""}
+	errHTTPInternalError                     = &errHTTP{50001, http.StatusInternalServerError, "internal server error", ""}
+	errHTTPInternalErrorInvalidFilePath      = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid file path", ""}
 )
 
 const (
@@ -225,6 +227,13 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"tags":     strings.Join(m.Tags, ","),
 				"title":    m.Title,
 				"message":  m.Message,
+			}
+			if m.Attachment != nil {
+				data["attachment_name"] = m.Attachment.Name
+				data["attachment_type"] = m.Attachment.Type
+				data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
+				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
+				data["attachment_url"] = m.Attachment.URL
 			}
 		}
 		_, err := msg.Send(context.Background(), &messaging.Message{
@@ -316,8 +325,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleStatic(w, r)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.handleDocs(w, r)
-	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
 		return s.handleFile(w, r)
+	} else if r.Method == http.MethodGet && previewRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
+		return s.handlePreview(w, r)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
 	} else if r.Method == http.MethodGet && topicPathRegex.MatchString(r.URL.Path) {
@@ -375,7 +386,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) error {
 	if s.config.AttachmentCacheDir == "" {
-		return errHTTPBadRequestAttachmentsDisallowed
+		return errHTTPInternalError
 	}
 	matches := fileRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
@@ -397,6 +408,39 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) error {
 	return err
 }
 
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) error {
+	if s.config.AttachmentCacheDir == "" {
+		return errHTTPInternalError
+	}
+	matches := previewRegex.FindStringSubmatch(r.URL.Path)
+	if len(matches) != 2 {
+		return errHTTPInternalErrorInvalidFilePath
+	}
+	messageID := matches[1]
+	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
+	stat, err := os.Stat(file)
+	if err != nil {
+		return errHTTPNotFound
+	}
+	if stat.Size() > 20*1024*1024 {
+		return errHTTPInternalError
+	}
+	img, err := imaging.Open(file)
+	if err != nil {
+		return errHTTPNotFoundTooLarge
+	}
+	var width, height int
+	if width >= height {
+		width = 200
+		height = int(float32(img.Bounds().Dy()) / float32(img.Bounds().Dx()) * float32(width))
+	} else {
+		height = 200
+		width = int(float32(img.Bounds().Dx()) / float32(img.Bounds().Dy()) * float32(height))
+	}
+	preview := imaging.Resize(img, width, height, imaging.Lanczos)
+	return imaging.Encode(w, preview, imaging.PNG)
+}
+
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
@@ -409,8 +453,12 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	m := newDefaultMessage(t.ID, "")
 	if !body.LimitReached && utf8.Valid(body.PeakedBytes) {
 		m.Message = strings.TrimSpace(string(body.PeakedBytes))
-	} else if err := s.writeAttachment(v, m, body); err != nil {
-		return err
+	} else if s.config.AttachmentCacheDir != "" {
+		if err := s.writeAttachment(r, v, m, body); err != nil {
+			return err
+		}
+	} else {
+		return errHTTPBadRequestInvalidMessage
 	}
 	cache, firebase, email, err := s.parsePublishParams(r, m)
 	if err != nil {
@@ -522,29 +570,30 @@ func readParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func (s *Server) writeAttachment(v *visitor, m *message, body *util.PeakedReadCloser) error {
-	if s.config.AttachmentCacheDir == "" || !util.FileExists(s.config.AttachmentCacheDir) {
-		return errHTTPBadRequestAttachmentsPublishDisallowed
+func (s *Server) writeAttachment(r *http.Request, v *visitor, m *message, body *util.PeakedReadCloser) error {
+	if s.config.AttachmentCacheDir == "" {
+		return errHTTPBadRequestInvalidMessage
 	}
 	contentType := http.DetectContentType(body.PeakedBytes)
-	exts, err := mime.ExtensionsByType(contentType)
-	if err != nil {
-		return err
-	}
 	ext := ".bin"
-	if len(exts) > 0 {
+	exts, err := mime.ExtensionsByType(contentType)
+	if err == nil && len(exts) > 0 {
 		ext = exts[0]
 	}
-	filename := fmt.Sprintf("attachment%s", ext)
+	filename := readParam(r, "x-filename", "filename", "file", "f")
+	if filename == "" {
+		filename = fmt.Sprintf("attachment%s", ext)
+	}
 	file := filepath.Join(s.config.AttachmentCacheDir, m.ID)
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	fileSizeLimiter := util.NewLimiter(s.config.AttachmentSizeLimit)
-	limitWriter := util.NewLimitWriter(f, fileSizeLimiter)
-	if _, err := io.Copy(limitWriter, body); err != nil {
+	maxSizeLimiter := util.NewLimiter(s.config.AttachmentSizeLimit) //FIXME visitor limit
+	limitWriter := util.NewLimitWriter(f, maxSizeLimiter)
+	size, err := io.Copy(limitWriter, body)
+	if err != nil {
 		os.Remove(file)
 		if err == util.ErrLimitReached {
 			return errHTTPBadRequestMessageTooLarge
@@ -555,11 +604,13 @@ func (s *Server) writeAttachment(v *visitor, m *message, body *util.PeakedReadCl
 		os.Remove(file)
 		return err
 	}
-	m.Message = fmt.Sprintf("You received a file: %s", filename)
+	m.Message = fmt.Sprintf("You received a file: %s", filename) // May be overwritten later
 	m.Attachment = &attachment{
-		Name: filename,
-		Type: contentType,
-		URL:  fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext),
+		Name:    filename,
+		Type:    contentType,
+		Size:    size,
+		Expires: time.Now().Add(s.config.AttachmentExpiryDuration).Unix(),
+		URL:     fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext),
 	}
 	return nil
 }

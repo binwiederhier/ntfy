@@ -592,6 +592,26 @@ Here's an example with a custom message, tags and a priority:
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
+## Send files + URLs
+```
+curl -T image.jpg ntfy.sh/howdy
+
+curl \
+    -T flower.jpg \
+    -H "Message: Here's a flower for you" \
+    -H "Filename: flower.jpg" \
+    ntfy.sh/howdy
+
+curl \
+    -T files.zip \
+    "ntfy.sh/howdy?m=Important+documents+attached"
+
+curl \
+    -d "A link for you" \
+    -H "Link: https://unifiedpush.org" \
+    "ntfy.sh/howdy"
+```
+
 ## E-mail notifications
 You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
 you'd like to persist longer, or to blast-notify yourself on all possible channels. 
@@ -883,6 +903,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
 | `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
+| `X-Filename` | `Filename`, `file`, `f` | XXXXXXXXXXXXXXXX |
 | `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
 | `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |

@@ -24,8 +24,9 @@ type visitor struct {
 	config        *Config
 	ip            string
 	requests      *rate.Limiter
-	emails        *rate.Limiter
 	subscriptions *util.Limiter
+	emails        *rate.Limiter
+	attachments   *rate.Limiter
 	seen          time.Time
 	mu            sync.Mutex
 }
@@ -35,9 +36,10 @@ func newVisitor(conf *Config, ip string) *visitor {
 		config:        conf,
 		ip:            ip,
 		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
-		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewLimiter(int64(conf.VisitorSubscriptionLimit)),
-		seen:          time.Now(),
+		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
+		//attachments:   rate.NewLimiter(rate.Every(conf.VisitorAttachmentBytesLimitReplenish * 1024), conf.VisitorAttachmentBytesLimitBurst),
+		seen: time.Now(),
 	}
 }
 

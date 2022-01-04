@@ -238,9 +238,10 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 		return m
 	}
 	if len(s) > fcmMessageLimitReal {
-		over := len(s) - fcmMessageLimitReal
+		over := len(s) - fcmMessageLimitReal + 16 // = len("truncated":"1",), sigh ...
 		message, ok := m.Data["message"]
 		if ok && len(message) > over {
+			m.Data["truncated"] = "1"
 			m.Data["message"] = message[:len(message)-over]
 		}
 	}

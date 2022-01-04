@@ -16,7 +16,6 @@ import (
 	"html/template"
 	"io"
 	"log"
-	"mime"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -233,6 +232,7 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				data["attachment_type"] = m.Attachment.Type
 				data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
+				data["attachment_preview_url"] = m.Attachment.PreviewURL
 				data["attachment_url"] = m.Attachment.URL
 			}
 		}
@@ -326,9 +326,9 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.handleDocs(w, r)
 	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
-		return s.handleFile(w, r)
+		return s.withRateLimit(w, r, s.handleFile)
 	} else if r.Method == http.MethodGet && previewRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
-		return s.handlePreview(w, r)
+		return s.withRateLimit(w, r, s.handlePreview)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
 	} else if r.Method == http.MethodGet && topicPathRegex.MatchString(r.URL.Path) {
@@ -384,7 +384,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	if s.config.AttachmentCacheDir == "" {
 		return errHTTPInternalError
 	}
@@ -408,7 +408,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) error {
 	return err
 }
 
-func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	if s.config.AttachmentCacheDir == "" {
 		return errHTTPInternalError
 	}
@@ -422,12 +422,12 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return errHTTPNotFound
 	}
-	if stat.Size() > 20*1024*1024 {
-		return errHTTPInternalError
+	if stat.Size() > s.config.AttachmentSizePreviewMax {
+		return errHTTPNotFoundTooLarge
 	}
 	img, err := imaging.Open(file)
 	if err != nil {
-		return errHTTPNotFoundTooLarge
+		return err
 	}
 	var width, height int
 	if width >= height {
@@ -438,7 +438,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) error {
 		width = int(float32(img.Bounds().Dx()) / float32(img.Bounds().Dy()) * float32(height))
 	}
 	preview := imaging.Resize(img, width, height, imaging.Lanczos)
-	return imaging.Encode(w, preview, imaging.PNG)
+	return imaging.Encode(w, preview, imaging.JPEG, imaging.JPEGQuality(80))
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -575,10 +575,11 @@ func (s *Server) writeAttachment(r *http.Request, v *visitor, m *message, body *
 		return errHTTPBadRequestInvalidMessage
 	}
 	contentType := http.DetectContentType(body.PeakedBytes)
-	ext := ".bin"
-	exts, err := mime.ExtensionsByType(contentType)
-	if err == nil && len(exts) > 0 {
-		ext = exts[0]
+	ext := util.ExtensionByType(contentType)
+	fileURL := fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
+	previewURL := ""
+	if strings.HasPrefix(contentType, "image/") {
+		previewURL = fmt.Sprintf("%s/preview/%s%s", s.config.BaseURL, m.ID, ext)
 	}
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	if filename == "" {
@@ -606,11 +607,12 @@ func (s *Server) writeAttachment(r *http.Request, v *visitor, m *message, body *
 	}
 	m.Message = fmt.Sprintf("You received a file: %s", filename) // May be overwritten later
 	m.Attachment = &attachment{
-		Name:    filename,
-		Type:    contentType,
-		Size:    size,
-		Expires: time.Now().Add(s.config.AttachmentExpiryDuration).Unix(),
-		URL:     fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext),
+		Name:       filename,
+		Type:       contentType,
+		Size:       size,
+		Expires:    time.Now().Add(s.config.AttachmentExpiryDuration).Unix(),
+		PreviewURL: previewURL,
+		URL:        fileURL,
 	}
 	return nil
 }

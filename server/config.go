@@ -13,8 +13,9 @@ const (
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
-	DefaultMessageLimit              = 4096
-	DefaultAttachmentSizeLimit       = 5 * 1024 * 1024
+	DefaultMessageLimit              = 4096 // Bytes
+	DefaultAttachmentSizeLimit       = 15 * 1024 * 1024
+	DefaultAttachmentSizePreviewMax  = 20 * 1024 * 1024 // Bytes
 	DefaultAttachmentExpiryDuration  = 3 * time.Hour
 	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery
 )
@@ -48,6 +49,7 @@ type Config struct {
 	CacheDuration                        time.Duration
 	AttachmentCacheDir                   string
 	AttachmentSizeLimit                  int64
+	AttachmentSizePreviewMax             int64
 	AttachmentExpiryDuration             time.Duration
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
@@ -88,6 +90,7 @@ func NewConfig() *Config {
 		CacheDuration:                        DefaultCacheDuration,
 		AttachmentCacheDir:                   "",
 		AttachmentSizeLimit:                  DefaultAttachmentSizeLimit,
+		AttachmentSizePreviewMax:             DefaultAttachmentSizePreviewMax,
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,

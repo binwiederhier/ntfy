@@ -26,6 +26,7 @@ const (
 			attachment_type TEXT NOT NULL,
 			attachment_size INT NOT NULL,
 			attachment_expires INT NOT NULL,
+			attachment_preview_url TEXT NOT NULL,
 			attachment_url TEXT NOT NULL,
 			published INT NOT NULL
 		);
@@ -33,24 +34,24 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time ASC
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE time <= ? AND published = 0
 	`
@@ -124,13 +125,14 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	}
 	published := m.Time <= time.Now().Unix()
 	tags := strings.Join(m.Tags, ",")
-	var attachmentName, attachmentType, attachmentURL string
+	var attachmentName, attachmentType, attachmentPreviewURL, attachmentURL string
 	var attachmentSize, attachmentExpires int64
 	if m.Attachment != nil {
 		attachmentName = m.Attachment.Name
 		attachmentType = m.Attachment.Type
 		attachmentSize = m.Attachment.Size
 		attachmentExpires = m.Attachment.Expires
+		attachmentPreviewURL = m.Attachment.PreviewURL
 		attachmentURL = m.Attachment.URL
 	}
 	_, err := c.db.Exec(
@@ -146,6 +148,7 @@ func (c *sqliteCache) AddMessage(m *message) error {
 		attachmentType,
 		attachmentSize,
 		attachmentExpires,
+		attachmentPreviewURL,
 		attachmentURL,
 		published,
 	)
@@ -231,8 +234,8 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, attachmentName, attachmentType, attachmentURL string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL); err != nil {
+		var id, topic, msg, title, tagsStr, attachmentName, attachmentType, attachmentPreviewURL, attachmentURL string
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentPreviewURL, &attachmentURL); err != nil {
 			return nil, err
 		}
 		var tags []string
@@ -242,11 +245,12 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 		var att *attachment
 		if attachmentName != "" && attachmentURL != "" {
 			att = &attachment{
-				Name:    attachmentName,
-				Type:    attachmentType,
-				Size:    attachmentSize,
-				Expires: attachmentExpires,
-				URL:     attachmentURL,
+				Name:       attachmentName,
+				Type:       attachmentType,
+				Size:       attachmentSize,
+				Expires:    attachmentExpires,
+				PreviewURL: attachmentPreviewURL,
+				URL:        attachmentURL,
 			}
 		}
 		messages = append(messages, &message{

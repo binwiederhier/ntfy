@@ -30,11 +30,12 @@ type message struct {
 }
 
 type attachment struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Size    int64  `json:"size"`
-	Expires int64  `json:"expires"`
-	URL     string `json:"url"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Size       int64  `json:"size"`
+	Expires    int64  `json:"expires"`
+	PreviewURL string `json:"preview_url"`
+	URL        string `json:"url"`
 }
 
 // messageEncoder is a function that knows how to encode a message

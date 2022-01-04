@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"mime"
 	"os"
 	"strings"
 	"sync"
@@ -162,4 +163,18 @@ func ExpandHome(path string) string {
 // ShortTopicURL shortens the topic URL to be human-friendly, removing the http:// or https://
 func ShortTopicURL(s string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+}
+
+// ExtensionByType is a wrapper around mime.ExtensionByType with a few sensible corrections
+func ExtensionByType(contentType string) string {
+	switch contentType {
+	case "image/jpeg":
+		return ".jpg"
+	default:
+		exts, err := mime.ExtensionsByType(contentType)
+		if err == nil && len(exts) > 0 {
+			return exts[0]
+		}
+		return ".bin"
+	}
 }

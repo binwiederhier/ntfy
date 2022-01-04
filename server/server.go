@@ -210,6 +210,7 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"topic":    m.Topic,
 				"priority": fmt.Sprintf("%d", m.Priority),
 				"tags":     strings.Join(m.Tags, ","),
+				"click":    m.Click,
 				"title":    m.Title,
 				"message":  m.Message,
 			}
@@ -449,6 +450,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	m.Title = readParam(r, "x-title", "title", "t")
+	m.Click = readParam(r, "x-click", "click")
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
 		m.Message = messageStr

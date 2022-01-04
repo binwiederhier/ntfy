@@ -24,6 +24,7 @@ type message struct {
 	Topic    string   `json:"topic"`
 	Priority int      `json:"priority,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
+	Click    string   `json:"click,omitempty"`
 	Title    string   `json:"title,omitempty"`
 	Message  string   `json:"message,omitempty"`
 }

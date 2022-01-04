@@ -22,27 +22,28 @@ const (
 			title TEXT NOT NULL,
 			priority INT NOT NULL,
 			tags TEXT NOT NULL,
+			click TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
-	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags, click, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags
+		SELECT id, time, topic, message, title, priority, tags, click
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time ASC
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags
+		SELECT id, time, topic, message, title, priority, tags, click
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags
+		SELECT id, time, topic, message, title, priority, tags, click
 		FROM messages 
 		WHERE time <= ? AND published = 0
 	`
@@ -54,7 +55,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 2
+	currentSchemaVersion          = 3
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -77,6 +78,11 @@ const (
 	// 1 -> 2
 	migrate1To2AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN published INT NOT NULL DEFAULT(1);
+	`
+
+	// 2 -> 3
+	migrate2To3AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN click TEXT NOT NULL DEFAULT('');
 	`
 )
 
@@ -104,7 +110,7 @@ func (c *sqliteCache) AddMessage(m *message) error {
 		return errUnexpectedMessageType
 	}
 	published := m.Time <= time.Now().Unix()
-	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","), published)
+	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","), m.Click, published)
 	return err
 }
 
@@ -187,8 +193,8 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp int64
 		var priority int
-		var id, topic, msg, title, tagsStr string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr); err != nil {
+		var id, topic, msg, title, tagsStr, click string
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click); err != nil {
 			return nil, err
 		}
 		var tags []string
@@ -204,6 +210,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Title:    title,
 			Priority: priority,
 			Tags:     tags,
+			Click:    click,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -241,6 +248,8 @@ func setupDB(db *sql.DB) error {
 		return migrateFrom0(db)
 	} else if schemaVersion == 1 {
 		return migrateFrom1(db)
+	} else if schemaVersion == 2 {
+		return migrateFrom2(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -278,6 +287,17 @@ func migrateFrom1(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 2); err != nil {
+		return err
+	}
+	return migrateFrom2(db)
+}
+
+func migrateFrom2(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 2 to 3")
+	if _, err := db.Exec(migrate2To3AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 3); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"firebase.google.com/go/messaging"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -589,6 +590,35 @@ func TestServer_UnifiedPushDiscovery(t *testing.T) {
 	response := request(t, s, "GET", "/mytopic?up=1", "", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"unifiedpush":{"version":1}}`+"\n", response.Body.String())
+}
+
+func TestServer_MaybeTruncateFCMMessage(t *testing.T) {
+	origMessage := strings.Repeat("this is a long string", 300)
+	origFCMMessage := &messaging.Message{
+		Topic: "mytopic",
+		Data: map[string]string{
+			"id":       "abcdefg",
+			"time":     "1641324761",
+			"event":    "message",
+			"topic":    "mytopic",
+			"priority": "0",
+			"tags":     "",
+			"title":    "",
+			"message":  origMessage,
+		},
+		Android: &messaging.AndroidConfig{
+			Priority: "high",
+		},
+	}
+	origMessageLength := len(origFCMMessage.Data["message"])
+	serializedOrigFCMMessage, _ := json.Marshal(origFCMMessage)
+	require.Greater(t, len(serializedOrigFCMMessage), fcmMessageLimitReal) // Pre-condition
+
+	truncatedFCMMessage := maybeTruncateFCMMessage(origFCMMessage)
+	truncatedMessageLength := len(truncatedFCMMessage.Data["message"])
+	serializedTruncatedFCMMessage, _ := json.Marshal(truncatedFCMMessage)
+	require.Equal(t, fcmMessageLimitReal, len(serializedTruncatedFCMMessage))
+	require.NotEqual(t, origMessageLength, truncatedMessageLength)
 }
 
 func newTestConfig(t *testing.T) *Config {

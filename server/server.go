@@ -138,6 +138,7 @@ var (
 const (
 	firebaseControlTopic = "~control" // See Android if changed
 	emptyMessageBody     = "triggered"
+	fcmMessageLimitReal  = 4100 // see maybeTruncateFCMMessage for details
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -219,13 +220,31 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				Priority: "high",
 			}
 		}
-		_, err := msg.Send(context.Background(), &messaging.Message{
+		_, err := msg.Send(context.Background(), maybeTruncateFCMMessage(&messaging.Message{
 			Topic:   m.Topic,
 			Data:    data,
 			Android: androidConfig,
-		})
+		}))
 		return err
 	}, nil
+}
+
+// maybeTruncateFCMMessage performs best-effort truncation of FCM messages.
+// The docs says the limit is 4000 characters, but the real FCM message limit is 4100 of the
+// serialized payload; I tested this diligently.
+func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
+	s, err := json.Marshal(m)
+	if err != nil {
+		return m
+	}
+	if len(s) > fcmMessageLimitReal {
+		over := len(s) - fcmMessageLimitReal
+		message, ok := m.Data["message"]
+		if ok && len(message) > over {
+			m.Data["message"] = message[:len(message)-over]
+		}
+	}
+	return m
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts

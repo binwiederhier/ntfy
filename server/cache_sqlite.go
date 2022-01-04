@@ -22,6 +22,7 @@ const (
 			title TEXT NOT NULL,
 			priority INT NOT NULL,
 			tags TEXT NOT NULL,
+			click TEXT NOT NULL,
 			attachment_name TEXT NOT NULL,
 			attachment_type TEXT NOT NULL,
 			attachment_size INT NOT NULL,
@@ -34,24 +35,24 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time ASC
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_preview_url, attachment_url
 		FROM messages 
 		WHERE time <= ? AND published = 0
 	`
@@ -91,11 +92,13 @@ const (
 	// 2 -> 3
 	migrate2To3AlterMessagesTableQuery = `
 		BEGIN;
-		ALTER TABLE messages ADD COLUMN attachment_name TEXT NOT NULL;
-		ALTER TABLE messages ADD COLUMN attachment_type TEXT NOT NULL;
-		ALTER TABLE messages ADD COLUMN attachment_size INT NOT NULL;
-		ALTER TABLE messages ADD COLUMN attachment_expires INT NOT NULL;
-		ALTER TABLE messages ADD COLUMN attachment_url TEXT NOT NULL;
+		ALTER TABLE messages ADD COLUMN click TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_name TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_type TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_size INT NOT NULL DEFAULT('0');
+		ALTER TABLE messages ADD COLUMN attachment_expires INT NOT NULL DEFAULT('0');
+		ALTER TABLE messages ADD COLUMN attachment_preview_url TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_url TEXT NOT NULL DEFAULT('');
 		COMMIT;
 	`
 )
@@ -144,6 +147,7 @@ func (c *sqliteCache) AddMessage(m *message) error {
 		m.Title,
 		m.Priority,
 		tags,
+		m.Click,
 		attachmentName,
 		attachmentType,
 		attachmentSize,
@@ -234,8 +238,8 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, attachmentName, attachmentType, attachmentPreviewURL, attachmentURL string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentPreviewURL, &attachmentURL); err != nil {
+		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentPreviewURL, attachmentURL string
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentPreviewURL, &attachmentURL); err != nil {
 			return nil, err
 		}
 		var tags []string
@@ -262,6 +266,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Title:      title,
 			Priority:   priority,
 			Tags:       tags,
+			Click:      click,
 			Attachment: att,
 		})
 	}

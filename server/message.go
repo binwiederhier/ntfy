@@ -24,9 +24,10 @@ type message struct {
 	Topic      string      `json:"topic"`
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
+	Click      string      `json:"click,omitempty"`
+	Attachment *attachment `json:"attachment,omitempty"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
-	Attachment *attachment `json:"attachment,omitempty"`
 }
 
 type attachment struct {

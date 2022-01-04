@@ -592,6 +592,73 @@ Here's an example with a custom message, tags and a priority:
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
+## Click action
+You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
+to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
+the web browser (or the app) and open the website.
+
+Here's an example that will open Reddit when the notification is clicked:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "New messages on Reddit" \
+        -H "Click: https://www.reddit.com/message/messages" \
+        ntfy.sh/reddit_alerts
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --click="https://www.reddit.com/message/messages" \
+        reddit_alerts "New messages on Reddit"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /reddit_alerts HTTP/1.1
+    Host: ntfy.sh
+    Click: https://www.reddit.com/message/messages 
+
+    New messages on Reddit
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/reddit_alerts', {
+        method: 'POST',
+        body: 'New messages on Reddit',
+        headers: { 'Click': 'https://www.reddit.com/message/messages' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
+    req.Header.Set("Click", "https://www.reddit.com/message/messages")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/reddit_alerts",
+        data="New messages on Reddit",
+        headers={ "Click": "https://www.reddit.com/message/messages" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Click: https://www.reddit.com/message/messages",
+            'content' => 'New messages on Reddit'
+        ]
+    ]));
+    ```
+
 ## Send files + URLs
 ```
 curl -T image.jpg ntfy.sh/howdy
@@ -903,6 +970,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
 | `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
+| `X-Click` | `Click` | URL to open when [notification is clicked](#click-action) |
 | `X-Filename` | `Filename`, `file`, `f` | XXXXXXXXXXXXXXXX |
 | `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |

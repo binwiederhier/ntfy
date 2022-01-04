@@ -20,6 +20,7 @@ var cmdPublish = &cli.Command{
 		&cli.StringFlag{Name: "priority", Aliases: []string{"p"}, Usage: "priority of the message (1=min, 2=low, 3=default, 4=high, 5=max)"},
 		&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, Usage: "comma separated list of tags and emojis"},
 		&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, Usage: "delay/schedule message"},
+		&cli.StringFlag{Name: "click", Aliases: []string{"U"}, Usage: "URL to open when notification is clicked"},
 		&cli.StringFlag{Name: "email", Aliases: []string{"e-mail", "mail", "e"}, Usage: "also send to e-mail address"},
 		&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, Usage: "do not cache message server-side"},
 		&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, Usage: "do not forward message to Firebase"},
@@ -35,6 +36,7 @@ Examples:
   ntfy pub --delay=10s delayed_topic Laterzz              # Delay message by 10s
   ntfy pub --at=8:30am delayed_topic Laterzz              # Send message at 8:30am
   ntfy pub -e phil@example.com alerts 'App is down!'      # Also send email to phil@example.com
+  ntfy pub --click="https://reddit.com" redd 'New msg'    # Opens Reddit when notification is clicked
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
 
 Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
@@ -56,6 +58,7 @@ func execPublish(c *cli.Context) error {
 	priority := c.String("priority")
 	tags := c.String("tags")
 	delay := c.String("delay")
+	click := c.String("click")
 	email := c.String("email")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
@@ -77,6 +80,9 @@ func execPublish(c *cli.Context) error {
 	}
 	if delay != "" {
 		options = append(options, client.WithDelay(delay))
+	}
+	if click != "" {
+		options = append(options, client.WithClick(email))
 	}
 	if email != "" {
 		options = append(options, client.WithEmail(email))

@@ -148,6 +148,7 @@ var (
 const (
 	firebaseControlTopic = "~control" // See Android if changed
 	emptyMessageBody     = "triggered"
+	fcmMessageLimit      = 4000 // see maybeTruncateFCMMessage for details
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -224,6 +225,7 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"topic":    m.Topic,
 				"priority": fmt.Sprintf("%d", m.Priority),
 				"tags":     strings.Join(m.Tags, ","),
+				"click":    m.Click,
 				"title":    m.Title,
 				"message":  m.Message,
 			}
@@ -236,12 +238,38 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				data["attachment_url"] = m.Attachment.URL
 			}
 		}
-		_, err := msg.Send(context.Background(), &messaging.Message{
-			Topic: m.Topic,
-			Data:  data,
-		})
+		var androidConfig *messaging.AndroidConfig
+		if m.Priority >= 4 {
+			androidConfig = &messaging.AndroidConfig{
+				Priority: "high",
+			}
+		}
+		_, err := msg.Send(context.Background(), maybeTruncateFCMMessage(&messaging.Message{
+			Topic:   m.Topic,
+			Data:    data,
+			Android: androidConfig,
+		}))
 		return err
 	}, nil
+}
+
+// maybeTruncateFCMMessage performs best-effort truncation of FCM messages.
+// The docs say the limit is 4000 characters, but during testing it wasn't quite clear
+// what fields matter; so we're just capping the serialized JSON to 4000 bytes.
+func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
+	s, err := json.Marshal(m)
+	if err != nil {
+		return m
+	}
+	if len(s) > fcmMessageLimit {
+		over := len(s) - fcmMessageLimit + 16 // = len("truncated":"1",), sigh ...
+		message, ok := m.Data["message"]
+		if ok && len(message) > over {
+			m.Data["truncated"] = "1"
+			m.Data["message"] = message[:len(message)-over]
+		}
+	}
+	return m
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
@@ -514,6 +542,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	m.Title = readParam(r, "x-title", "title", "t")
+	m.Click = readParam(r, "x-click", "click")
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
 		m.Message = messageStr

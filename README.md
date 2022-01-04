@@ -6,7 +6,8 @@
 [![Tests](https://github.com/binwiederhier/ntfy/workflows/test/badge.svg)](https://github.com/binwiederhier/ntfy/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/binwiederhier/ntfy)](https://goreportcard.com/report/github.com/binwiederhier/ntfy)
 [![codecov](https://codecov.io/gh/binwiederhier/ntfy/branch/main/graph/badge.svg?token=A597KQ463G)](https://codecov.io/gh/binwiederhier/ntfy)
-[![Discord](https://img.shields.io/discord/874398661709295626)](https://discord.gg/cT7ECsZj9w)
+[![Discord](https://img.shields.io/discord/874398661709295626?label=Discord)](https://discord.gg/cT7ECsZj9w)
+[![Matrix](https://img.shields.io/matrix/ntfy:matrix.org?label=Matrix)](https://matrix.to/#/#ntfy:matrix.org)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
@@ -36,8 +37,9 @@ too.
 I welcome any and all contributions. Just create a PR or an issue.
 
 ## Contact me
-You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)**, or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues),
-or find more contact information [on my website](https://heckel.io/about).
+You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 
+(bridged from Discord), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues), or find more contact information
+[on my website](https://heckel.io/about).
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

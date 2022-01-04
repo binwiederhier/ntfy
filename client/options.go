@@ -45,6 +45,11 @@ func WithDelay(delay string) PublishOption {
 	return WithHeader("X-Delay", delay)
 }
 
+// WithClick makes the notification action open the given URL as opposed to entering the detail view
+func WithClick(url string) PublishOption {
+	return WithHeader("X-Click", url)
+}
+
 // WithEmail instructs the server to also send the message to the given e-mail address
 func WithEmail(email string) PublishOption {
 	return WithHeader("X-Email", email)

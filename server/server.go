@@ -138,7 +138,7 @@ var (
 const (
 	firebaseControlTopic = "~control" // See Android if changed
 	emptyMessageBody     = "triggered"
-	fcmMessageLimitReal  = 4100 // see maybeTruncateFCMMessage for details
+	fcmMessageLimit      = 4000 // see maybeTruncateFCMMessage for details
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -230,15 +230,15 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 }
 
 // maybeTruncateFCMMessage performs best-effort truncation of FCM messages.
-// The docs says the limit is 4000 characters, but the real FCM message limit is 4100 of the
-// serialized payload; I tested this diligently.
+// The docs say the limit is 4000 characters, but during testing it wasn't quite clear
+// what fields matter; so we're just capping the serialized JSON to 4000 bytes.
 func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 	s, err := json.Marshal(m)
 	if err != nil {
 		return m
 	}
-	if len(s) > fcmMessageLimitReal {
-		over := len(s) - fcmMessageLimitReal + 16 // = len("truncated":"1",), sigh ...
+	if len(s) > fcmMessageLimit {
+		over := len(s) - fcmMessageLimit + 16 // = len("truncated":"1",), sigh ...
 		message, ok := m.Data["message"]
 		if ok && len(message) > over {
 			m.Data["truncated"] = "1"

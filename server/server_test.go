@@ -612,12 +612,12 @@ func TestServer_MaybeTruncateFCMMessage(t *testing.T) {
 	}
 	origMessageLength := len(origFCMMessage.Data["message"])
 	serializedOrigFCMMessage, _ := json.Marshal(origFCMMessage)
-	require.Greater(t, len(serializedOrigFCMMessage), fcmMessageLimitReal) // Pre-condition
+	require.Greater(t, len(serializedOrigFCMMessage), fcmMessageLimit) // Pre-condition
 
 	truncatedFCMMessage := maybeTruncateFCMMessage(origFCMMessage)
 	truncatedMessageLength := len(truncatedFCMMessage.Data["message"])
 	serializedTruncatedFCMMessage, _ := json.Marshal(truncatedFCMMessage)
-	require.Equal(t, fcmMessageLimitReal, len(serializedTruncatedFCMMessage))
+	require.Equal(t, fcmMessageLimit, len(serializedTruncatedFCMMessage))
 	require.Equal(t, "1", truncatedFCMMessage.Data["truncated"])
 	require.NotEqual(t, origMessageLength, truncatedMessageLength)
 }
@@ -639,7 +639,7 @@ func TestServer_MaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 	}
 	origMessageLength := len(origFCMMessage.Data["message"])
 	serializedOrigFCMMessage, _ := json.Marshal(origFCMMessage)
-	require.LessOrEqual(t, len(serializedOrigFCMMessage), fcmMessageLimitReal) // Pre-condition
+	require.LessOrEqual(t, len(serializedOrigFCMMessage), fcmMessageLimit) // Pre-condition
 
 	notTruncatedFCMMessage := maybeTruncateFCMMessage(origFCMMessage)
 	notTruncatedMessageLength := len(notTruncatedFCMMessage.Data["message"])

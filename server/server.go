@@ -213,9 +213,16 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"message":  m.Message,
 			}
 		}
+		var androidConfig *messaging.AndroidConfig
+		if m.Priority >= 4 {
+			androidConfig = &messaging.AndroidConfig{
+				Priority: "high",
+			}
+		}
 		_, err := msg.Send(context.Background(), &messaging.Message{
-			Topic: m.Topic,
-			Data:  data,
+			Topic:   m.Topic,
+			Data:    data,
+			Android: androidConfig,
 		})
 		return err
 	}, nil

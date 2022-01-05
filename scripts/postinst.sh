@@ -6,33 +6,34 @@ set -e
 #
 # TODO: This is only tested on Debian.
 #
-if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
-  # Create ntfy user/group
-  id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy
-  chown ntfy.ntfy /var/cache/ntfy
-  chmod 700 /var/cache/ntfy
+if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
+  if [ -d /run/systemd/system ]; then
+    # Create ntfy user/group
+    id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy
+    chown ntfy.ntfy /var/cache/ntfy
+    chmod 700 /var/cache/ntfy
 
-  # Hack to change permissions on cache file
-  configfile="/etc/ntfy/server.yml"
-  if [ -f "$configfile" ]; then
-    cachefile="$(cat "$configfile" | perl -n -e'/^\s*cache-file: ["'"'"']?([^"'"'"']+)["'"'"']?/ && print $1')" # Oh my, see #47
-    if [ -n "$cachefile" ]; then
-      chown ntfy.ntfy "$cachefile" || true
-      chmod 600 "$cachefile" || true
+    # Hack to change permissions on cache file
+    configfile="/etc/ntfy/server.yml"
+    if [ -f "$configfile" ]; then
+      cachefile="$(cat "$configfile" | perl -n -e'/^\s*cache-file: ["'"'"']?([^"'"'"']+)["'"'"']?/ && print $1')" # Oh my, see #47
+      if [ -n "$cachefile" ]; then
+        chown ntfy.ntfy "$cachefile" || true
+        chmod 600 "$cachefile" || true
+      fi
     fi
-  fi
 
-  # Restart services
-  systemctl --system daemon-reload >/dev/null || true
-  if systemctl is-active -q ntfy.service; then
-    echo "Restarting ntfy.service ..."
-    if [ -x /usr/bin/deb-systemd-invoke ]; then
-      deb-systemd-invoke try-restart ntfy.service >/dev/null || true
-    else
-      systemctl restart ntfy.service >/dev/null || true
+    # Restart services
+    systemctl --system daemon-reload >/dev/null || true
+    if systemctl is-active -q ntfy.service; then
+      echo "Restarting ntfy.service ..."
+      if [ -x /usr/bin/deb-systemd-invoke ]; then
+        deb-systemd-invoke try-restart ntfy.service >/dev/null || true
+      else
+        systemctl restart ntfy.service >/dev/null || true
+      fi
     fi
-  fi
-  if systemctl is-active -q ntfy-client.service; then
+    if systemctl is-active -q ntfy-client.service; then
       echo "Restarting ntfy-client.service ..."
       if [ -x /usr/bin/deb-systemd-invoke ]; then
         deb-systemd-invoke try-restart ntfy-client.service >/dev/null || true
@@ -40,4 +41,5 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
         systemctl restart ntfy-client.service >/dev/null || true
       fi
     fi
+  fi
 fi

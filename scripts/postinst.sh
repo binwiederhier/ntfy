@@ -6,7 +6,7 @@ set -e
 #
 # TODO: This is only tested on Debian.
 #
-if [ "$1" = "configure" ] || [ "$1" = "1" ]; then
+if [ "$1" = "configure" ] || [ "$1" -gt 1 ]; then
   if [ -d /run/systemd/system ]; then
     # Create ntfy user/group
     id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy

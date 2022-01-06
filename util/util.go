@@ -18,10 +18,10 @@ const (
 )
 
 var (
-	random       = rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomMutex  = sync.Mutex{}
-	sizeStrRegex = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
-
+	random             = rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMutex        = sync.Mutex{}
+	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
+	extRegex           = regexp.MustCompile(`^\.[-_A-Za-z0-9]+$`)
 	errInvalidPriority = errors.New("invalid priority")
 )
 
@@ -175,7 +175,7 @@ func ExtensionByType(contentType string) string {
 		return ".jpg"
 	default:
 		exts, err := mime.ExtensionsByType(contentType)
-		if err == nil && len(exts) > 0 {
+		if err == nil && len(exts) > 0 && extRegex.MatchString(exts[0]) {
 			return exts[0]
 		}
 		return ".bin"

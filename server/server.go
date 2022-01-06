@@ -293,7 +293,7 @@ func (s *Server) Run() error {
 		errChan <- s.httpServer.ListenAndServe()
 	}()
 	if s.config.ListenHTTPS != "" {
-		s.httpsServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
+		s.httpsServer = &http.Server{Addr: s.config.ListenHTTPS, Handler: mux}
 		go func() {
 			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
 		}()
@@ -479,7 +479,8 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	m := newDefaultMessage(t.ID, "")
-	if !body.LimitReached && utf8.Valid(body.PeakedBytes) {
+	filename := readParam(r, "x-filename", "filename", "file", "f")
+	if filename == "" && !body.LimitReached && utf8.Valid(body.PeakedBytes) {
 		m.Message = strings.TrimSpace(string(body.PeakedBytes))
 	} else if s.config.AttachmentCacheDir != "" {
 		if err := s.writeAttachment(r, v, m, body); err != nil {

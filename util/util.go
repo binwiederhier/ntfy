@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"mime"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,8 +18,9 @@ const (
 )
 
 var (
-	random      = rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomMutex = sync.Mutex{}
+	random       = rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMutex  = sync.Mutex{}
+	sizeStrRegex = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
 
 	errInvalidPriority = errors.New("invalid priority")
 )
@@ -176,5 +179,27 @@ func ExtensionByType(contentType string) string {
 			return exts[0]
 		}
 		return ".bin"
+	}
+}
+
+// ParseSize parses a size string like 2K or 2M into bytes. If no unit is found, e.g. 123, bytes is assumed.
+func ParseSize(s string) (int64, error) {
+	matches := sizeStrRegex.FindStringSubmatch(s)
+	if matches == nil {
+		return -1, fmt.Errorf("invalid size %s", s)
+	}
+	value, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return -1, fmt.Errorf("cannot convert number %s", matches[1])
+	}
+	switch strings.ToUpper(matches[2]) {
+	case "G":
+		return int64(value) * 1024 * 1024 * 1024, nil
+	case "M":
+		return int64(value) * 1024 * 1024, nil
+	case "K":
+		return int64(value) * 1024, nil
+	default:
+		return int64(value), nil
 	}
 }

@@ -21,6 +21,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_SIZE_LIMIT"}, DefaultText: "15M", Usage: "attachment size limit (e.g. 10k, 2M)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
@@ -71,6 +72,7 @@ func execServe(c *cli.Context) error {
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
 	attachmentCacheDir := c.String("attachment-cache-dir")
+	attachmentSizeLimitStr := c.String("attachment-size-limit")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
 	smtpSenderAddr := c.String("smtp-sender-addr")
@@ -109,6 +111,16 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	}
 
+	// Convert
+	attachmentSizeLimit := server.DefaultAttachmentSizeLimit
+	if attachmentSizeLimitStr != "" {
+		var err error
+		attachmentSizeLimit, err = util.ParseSize(attachmentSizeLimitStr)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Run server
 	conf := server.NewConfig()
 	conf.BaseURL = baseURL
@@ -120,6 +132,7 @@ func execServe(c *cli.Context) error {
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.AttachmentCacheDir = attachmentCacheDir
+	conf.AttachmentSizeLimit = attachmentSizeLimit
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.SMTPSenderAddr = smtpSenderAddr

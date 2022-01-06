@@ -32,10 +32,10 @@ type message struct {
 
 type attachment struct {
 	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Size       int64  `json:"size"`
-	Expires    int64  `json:"expires"`
-	PreviewURL string `json:"preview_url"`
+	Type       string `json:"type,omitempty"`
+	Size       int64  `json:"size,omitempty"`
+	Expires    int64  `json:"expires,omitempty"`
+	PreviewURL string `json:"preview_url,omitempty"`
 	URL        string `json:"url"`
 }
 

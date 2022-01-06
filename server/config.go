@@ -14,7 +14,7 @@ const (
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
 	DefaultMessageLimit              = 4096 // Bytes
-	DefaultAttachmentSizeLimit       = 15 * 1024 * 1024
+	DefaultAttachmentSizeLimit       = int64(15 * 1024 * 1024)
 	DefaultAttachmentSizePreviewMax  = 20 * 1024 * 1024 // Bytes
 	DefaultAttachmentExpiryDuration  = 3 * time.Hour
 	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery

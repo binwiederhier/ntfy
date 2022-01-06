@@ -345,12 +345,57 @@ to maintain the client connection and the connection to ntfy.
       worker_connections 40500;
     }
     ```
+
 === "/etc/systemd/system/nginx.service.d/override.conf"
     ```
     # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
     # and give room for other file handles)
     [Service]
     LimitNOFILE=40500
+    ```
+
+### Banning bad actors (fail2ban)
+If you put stuff on the Internet, bad actors will try to break them or break in. [fail2ban](https://www.fail2ban.org/)
+and nginx's [ngx_http_limit_req_module module](http://nginx.org/en/docs/http/ngx_http_limit_req_module.html) can be used
+to ban client IPs if they misbehave. This is on top of the [rate limiting](#rate-limiting) inside the ntfy server.
+
+Here's an example for how ntfy.sh is configured, following the instructions from two tutorials ([here](https://easyengine.io/tutorials/nginx/fail2ban/) 
+and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-attack/)):
+
+=== "/etc/nginx/nginx.conf"
+    ```
+    http {
+	  limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
+    }
+    ```
+
+=== "/etc/nginx/sites-enabled/ntfy.sh"
+    ```
+    # For each server/location block
+    server {
+      location / {
+        limit_req zone=one burst=1000 nodelay;
+      }
+    }    
+    ```
+
+=== "/etc/fail2ban/filter.d/nginx-req-limit.conf"
+    ```
+    [Definition]
+    failregex = limiting requests, excess:.* by zone.*client: <HOST>
+    ignoreregex =
+    ```
+
+=== "/etc/fail2ban/jail.local"
+    ```
+    [nginx-req-limit]
+    enabled = true
+    filter = nginx-req-limit
+    action = iptables-multiport[name=ReqLimit, port="http,https", protocol=tcp]
+    logpath = /var/log/nginx/error.log
+    findtime = 600
+    bantime = 7200
+    maxretry = 10
     ```
 
 ## Config options

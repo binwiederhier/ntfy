@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
+if [ "$1" = "install" ] || [ "$1" = "upgrade" ] || [ "$1" -ge 1 ]; then
   # Migration of old to new config file name
   oldconfigfile="/etc/ntfy/config.yml"
   configfile="/etc/ntfy/server.yml"

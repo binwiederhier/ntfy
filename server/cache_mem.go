@@ -139,6 +139,20 @@ func (c *memCache) AttachmentsSize(owner string) (int64, error) {
 	return size, nil
 }
 
+func (c *memCache) AttachmentsExpired() ([]string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ids := make([]string, 0)
+	for topic := range c.messages {
+		for _, m := range c.messages[topic] {
+			if m.Attachment != nil && m.Attachment.Expires > 0 && m.Attachment.Expires < time.Now().Unix() {
+				ids = append(ids, m.ID)
+			}
+		}
+	}
+	return ids, nil
+}
+
 func (c *memCache) pruneTopic(topic string, olderThan time.Time) {
 	messages := make([]*message, 0)
 	for _, m := range c.messages[topic] {

@@ -21,4 +21,5 @@ type cache interface {
 	Prune(olderThan time.Time) error
 	MarkPublished(m *message) error
 	AttachmentsSize(owner string) (int64, error)
+	AttachmentsExpired() ([]string, error)
 }

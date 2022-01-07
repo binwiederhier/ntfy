@@ -832,6 +832,16 @@ func (s *Server) updateStatsAndPrune() {
 		}
 	}
 
+	// Delete expired attachments
+	ids, err := s.cache.AttachmentsExpired()
+	if err == nil {
+		if err := s.fileCache.Remove(ids); err != nil {
+			log.Printf("error while deleting attachments: %s", err.Error())
+		}
+	} else {
+		log.Printf("error retrieving expired attachments: %s", err.Error())
+	}
+
 	// Prune message cache
 	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
 	if err := s.cache.Prune(olderThan); err != nil {

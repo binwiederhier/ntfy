@@ -28,17 +28,9 @@ func newFileCache(dir string, totalSizeLimit int64, fileSizeLimit int64) (*fileC
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(dir)
+	size, err := dirSize(dir)
 	if err != nil {
 		return nil, err
-	}
-	var size int64
-	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil {
-			return nil, err
-		}
-		size += info.Size()
 	}
 	return &fileCache{
 		dir:              dir,
@@ -58,8 +50,8 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 		return 0, err
 	}
 	defer f.Close()
-	log.Printf("remaining total: %d", c.remainingTotalSize())
-	limiters = append(limiters, util.NewLimiter(c.remainingTotalSize()), util.NewLimiter(c.fileSizeLimit))
+	log.Printf("remaining total: %d", c.Remaining())
+	limiters = append(limiters, util.NewLimiter(c.Remaining()), util.NewLimiter(c.fileSizeLimit))
 	limitWriter := util.NewLimitWriter(f, limiters...)
 	size, err := io.Copy(limitWriter, in)
 	if err != nil {
@@ -77,7 +69,40 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 
 }
 
-func (c *fileCache) remainingTotalSize() int64 {
+func (c *fileCache) Remove(ids []string) error {
+	var firstErr error
+	for _, id := range ids {
+		if err := c.removeFile(id); err != nil {
+			if firstErr == nil {
+				firstErr = err // Continue despite error; we want to delete as many as we can
+			}
+		}
+	}
+	size, err := dirSize(c.dir)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	c.totalSizeCurrent = size
+	c.mu.Unlock()
+	return firstErr
+}
+
+func (c *fileCache) removeFile(id string) error {
+	if !fileIDRegex.MatchString(id) {
+		return errInvalidFileID
+	}
+	file := filepath.Join(c.dir, id)
+	return os.Remove(file)
+}
+
+func (c *fileCache) Size() int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.totalSizeCurrent
+}
+
+func (c *fileCache) Remaining() int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	remaining := c.totalSizeLimit - c.totalSizeCurrent
@@ -85,4 +110,20 @@ func (c *fileCache) remainingTotalSize() int64 {
 		return 0
 	}
 	return remaining
+}
+
+func dirSize(dir string) (int64, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	var size int64
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil {
+			return 0, err
+		}
+		size += info.Size()
+	}
+	return size, nil
 }

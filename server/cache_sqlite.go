@@ -60,7 +60,8 @@ const (
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
-	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE attachment_owner = ?`
+	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE attachment_owner = ? AND attachment_expires >= ?`
+	selectAttachmentsExpiredQuery   = `SELECT id FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
 // Schema management queries
@@ -234,7 +235,7 @@ func (c *sqliteCache) Prune(olderThan time.Time) error {
 }
 
 func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
-	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner)
+	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
@@ -249,6 +250,26 @@ func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
 		return 0, err
 	}
 	return size, nil
+}
+
+func (c *sqliteCache) AttachmentsExpired() ([]string, error) {
+	rows, err := c.db.Query(selectAttachmentsExpiredQuery, time.Now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func readMessages(rows *sql.Rows) ([]*message, error) {

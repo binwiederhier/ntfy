@@ -21,7 +21,8 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_SIZE_LIMIT"}, DefaultText: "15M", Usage: "attachment size limit (e.g. 10k, 2M)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "1G", Usage: "limit of the on-disk attachment cache"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
@@ -33,6 +34,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "50M", Usage: "total storage limit used for attachments per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: server.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
@@ -72,7 +74,8 @@ func execServe(c *cli.Context) error {
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
 	attachmentCacheDir := c.String("attachment-cache-dir")
-	attachmentSizeLimitStr := c.String("attachment-size-limit")
+	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
+	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
 	smtpSenderAddr := c.String("smtp-sender-addr")
@@ -82,8 +85,9 @@ func execServe(c *cli.Context) error {
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
-	globalTopicLimit := c.Int("global-topic-limit")
+	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
+	visitorAttachmentTotalSizeLimitStr := c.String("visitor-attachment-total-size-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
 	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
@@ -111,14 +115,18 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	}
 
-	// Convert
-	attachmentSizeLimit := server.DefaultAttachmentSizeLimit
-	if attachmentSizeLimitStr != "" {
-		var err error
-		attachmentSizeLimit, err = util.ParseSize(attachmentSizeLimitStr)
-		if err != nil {
-			return err
-		}
+	// Convert sizes to bytes
+	attachmentTotalSizeLimit, err := parseSize(attachmentTotalSizeLimitStr, server.DefaultAttachmentTotalSizeLimit)
+	if err != nil {
+		return err
+	}
+	attachmentFileSizeLimit, err := parseSize(attachmentFileSizeLimitStr, server.DefaultAttachmentFileSizeLimit)
+	if err != nil {
+		return err
+	}
+	visitorAttachmentTotalSizeLimit, err := parseSize(visitorAttachmentTotalSizeLimitStr, server.DefaultVisitorAttachmentTotalSizeLimit)
+	if err != nil {
+		return err
 	}
 
 	// Run server
@@ -132,7 +140,8 @@ func execServe(c *cli.Context) error {
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.AttachmentCacheDir = attachmentCacheDir
-	conf.AttachmentSizeLimit = attachmentSizeLimit
+	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
+	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.SMTPSenderAddr = smtpSenderAddr
@@ -142,8 +151,9 @@ func execServe(c *cli.Context) error {
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
-	conf.TotalTopicLimit = globalTopicLimit
+	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
+	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
 	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
@@ -158,4 +168,15 @@ func execServe(c *cli.Context) error {
 	}
 	log.Printf("Exiting.")
 	return nil
+}
+
+func parseSize(s string, defaultValue int64) (v int64, err error) {
+	if s == "" {
+		return defaultValue, nil
+	}
+	v, err = util.ParseSize(s)
+	if err != nil {
+		return 0, err
+	}
+	return v, nil
 }

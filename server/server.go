@@ -9,7 +9,6 @@ import (
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"fmt"
-	"github.com/disintegration/imaging"
 	"github.com/emersion/go-smtp"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/util"
@@ -45,6 +44,7 @@ type Server struct {
 	mailer      mailer
 	messages    int64
 	cache       cache
+	fileCache   *fileCache
 	closeChan   chan bool
 	mu          sync.Mutex
 }
@@ -101,8 +101,7 @@ var (
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	previewRegex     = regexp.MustCompile(`^/preview/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics = []string{"docs", "static", "file", "preview"}
+	disallowedTopics = []string{"docs", "static", "file"}
 
 	templateFnMap = template.FuncMap{
 		"durationToHuman": util.DurationToHuman,
@@ -124,7 +123,6 @@ var (
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
 	errHTTPNotFound                          = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
-	errHTTPNotFoundTooLarge                  = &errHTTP{40402, http.StatusNotFound, "page not found: preview not available, file too large", ""}
 	errHTTPTooManyRequestsLimitRequests      = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitEmails        = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitSubscriptions = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
@@ -174,18 +172,21 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	var fileCache *fileCache
 	if conf.AttachmentCacheDir != "" {
-		if err := os.MkdirAll(conf.AttachmentCacheDir, 0700); err != nil {
+		fileCache, err = newFileCache(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit, conf.AttachmentFileSizeLimit)
+		if err != nil {
 			return nil, err
 		}
 	}
 	return &Server{
-		config:   conf,
-		cache:    cache,
-		firebase: firebaseSubscriber,
-		mailer:   mailer,
-		topics:   topics,
-		visitors: make(map[string]*visitor),
+		config:    conf,
+		cache:     cache,
+		fileCache: fileCache,
+		firebase:  firebaseSubscriber,
+		mailer:    mailer,
+		topics:    topics,
+		visitors:  make(map[string]*visitor),
 	}, nil
 }
 
@@ -234,7 +235,6 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				data["attachment_type"] = m.Attachment.Type
 				data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
-				data["attachment_preview_url"] = m.Attachment.PreviewURL
 				data["attachment_url"] = m.Attachment.URL
 			}
 		}
@@ -355,8 +355,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.handleDocs(w, r)
 	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
 		return s.withRateLimit(w, r, s.handleFile)
-	} else if r.Method == http.MethodGet && previewRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
-		return s.withRateLimit(w, r, s.handlePreview)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
 	} else if r.Method == http.MethodGet && topicPathRegex.MatchString(r.URL.Path) {
@@ -436,39 +434,6 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) 
 	return err
 }
 
-func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	if s.config.AttachmentCacheDir == "" {
-		return errHTTPInternalError
-	}
-	matches := previewRegex.FindStringSubmatch(r.URL.Path)
-	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidFilePath
-	}
-	messageID := matches[1]
-	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
-	stat, err := os.Stat(file)
-	if err != nil {
-		return errHTTPNotFound
-	}
-	if stat.Size() > s.config.AttachmentSizePreviewMax {
-		return errHTTPNotFoundTooLarge
-	}
-	img, err := imaging.Open(file)
-	if err != nil {
-		return err
-	}
-	var width, height int
-	if width >= height {
-		width = 200
-		height = int(float32(img.Bounds().Dy()) / float32(img.Bounds().Dx()) * float32(width))
-	} else {
-		height = 200
-		width = int(float32(img.Bounds().Dx()) / float32(img.Bounds().Dy()) * float32(height))
-	}
-	preview := imaging.Resize(img, width, height, imaging.Lanczos)
-	return imaging.Encode(w, preview, imaging.JPEG, imaging.JPEGQuality(80))
-}
-
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
@@ -482,7 +447,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	if filename == "" && !body.LimitReached && utf8.Valid(body.PeakedBytes) {
 		m.Message = strings.TrimSpace(string(body.PeakedBytes))
-	} else if s.config.AttachmentCacheDir != "" {
+	} else if s.fileCache != nil {
 		if err := s.writeAttachment(r, v, m, body); err != nil {
 			return err
 		}
@@ -601,48 +566,34 @@ func readParam(r *http.Request, names ...string) string {
 }
 
 func (s *Server) writeAttachment(r *http.Request, v *visitor, m *message, body *util.PeakedReadCloser) error {
-	if s.config.AttachmentCacheDir == "" {
-		return errHTTPBadRequestInvalidMessage
-	}
 	contentType := http.DetectContentType(body.PeakedBytes)
 	ext := util.ExtensionByType(contentType)
 	fileURL := fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
-	previewURL := ""
-	if strings.HasPrefix(contentType, "image/") {
-		previewURL = fmt.Sprintf("%s/preview/%s%s", s.config.BaseURL, m.ID, ext)
-	}
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	if filename == "" {
 		filename = fmt.Sprintf("attachment%s", ext)
 	}
-	file := filepath.Join(s.config.AttachmentCacheDir, m.ID)
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	// TODO do not allowed delayed delivery for attachments
+	visitorAttachmentsSize, err := s.cache.AttachmentsSize(v.ip)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	maxSizeLimiter := util.NewLimiter(s.config.AttachmentSizeLimit) //FIXME visitor limit
-	limitWriter := util.NewLimitWriter(f, maxSizeLimiter)
-	size, err := io.Copy(limitWriter, body)
-	if err != nil {
-		os.Remove(file)
-		if err == util.ErrLimitReached {
-			return errHTTPBadRequestMessageTooLarge
-		}
-		return err
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(file)
+	remainingVisitorAttachmentSize := s.config.VisitorAttachmentTotalSizeLimit - visitorAttachmentsSize
+	log.Printf("remaining visitor: %d", remainingVisitorAttachmentSize)
+	size, err := s.fileCache.Write(m.ID, body, util.NewLimiter(remainingVisitorAttachmentSize))
+	if err == util.ErrLimitReached {
+		return errHTTPBadRequestMessageTooLarge
+	} else if err != nil {
 		return err
 	}
 	m.Message = fmt.Sprintf("You received a file: %s", filename) // May be overwritten later
 	m.Attachment = &attachment{
-		Name:       filename,
-		Type:       contentType,
-		Size:       size,
-		Expires:    time.Now().Add(s.config.AttachmentExpiryDuration).Unix(),
-		PreviewURL: previewURL,
-		URL:        fileURL,
+		Name:    filename,
+		Type:    contentType,
+		Size:    size,
+		Expires: time.Now().Add(s.config.AttachmentExpiryDuration).Unix(),
+		URL:     fileURL,
+		Owner:   v.ip, // Important for attachment rate limiting
 	}
 	return nil
 }

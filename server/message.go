@@ -31,12 +31,12 @@ type message struct {
 }
 
 type attachment struct {
-	Name       string `json:"name"`
-	Type       string `json:"type,omitempty"`
-	Size       int64  `json:"size,omitempty"`
-	Expires    int64  `json:"expires,omitempty"`
-	PreviewURL string `json:"preview_url,omitempty"`
-	URL        string `json:"url"`
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	Expires int64  `json:"expires,omitempty"`
+	URL     string `json:"url"`
+	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
 // messageEncoder is a function that knows how to encode a message

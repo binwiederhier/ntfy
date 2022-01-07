@@ -125,6 +125,20 @@ func (c *memCache) Prune(olderThan time.Time) error {
 	return nil
 }
 
+func (c *memCache) AttachmentsSize(owner string) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var size int64
+	for topic := range c.messages {
+		for _, m := range c.messages[topic] {
+			if m.Attachment != nil && m.Attachment.Owner == owner {
+				size += m.Attachment.Size
+			}
+		}
+	}
+	return size, nil
+}
+
 func (c *memCache) pruneTopic(topic string, olderThan time.Time) {
 	messages := make([]*message, 0)
 	for _, m := range c.messages[topic] {

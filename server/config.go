@@ -13,9 +13,9 @@ const (
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
-	DefaultMessageLimit              = 4096 // Bytes
-	DefaultAttachmentSizeLimit       = int64(15 * 1024 * 1024)
-	DefaultAttachmentSizePreviewMax  = 20 * 1024 * 1024 // Bytes
+	DefaultMessageLimit              = 4096                      // Bytes
+	DefaultAttachmentTotalSizeLimit  = int64(1024 * 1024 * 1024) // 1 GB
+	DefaultAttachmentFileSizeLimit   = int64(15 * 1024 * 1024)   // 15 MB
 	DefaultAttachmentExpiryDuration  = 3 * time.Hour
 	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery
 )
@@ -33,80 +33,78 @@ const (
 	DefaultVisitorRequestLimitReplenish         = 10 * time.Second
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
-	DefaultVisitorAttachmentBytesLimitBurst     = 50 * 1024 * 1024
+	DefaultVisitorAttachmentTotalSizeLimit      = 50 * 1024 * 1024
 	DefaultVisitorAttachmentBytesLimitReplenish = time.Hour
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	BaseURL                              string
-	ListenHTTP                           string
-	ListenHTTPS                          string
-	KeyFile                              string
-	CertFile                             string
-	FirebaseKeyFile                      string
-	CacheFile                            string
-	CacheDuration                        time.Duration
-	AttachmentCacheDir                   string
-	AttachmentSizeLimit                  int64
-	AttachmentSizePreviewMax             int64
-	AttachmentExpiryDuration             time.Duration
-	KeepaliveInterval                    time.Duration
-	ManagerInterval                      time.Duration
-	AtSenderInterval                     time.Duration
-	FirebaseKeepaliveInterval            time.Duration
-	SMTPSenderAddr                       string
-	SMTPSenderUser                       string
-	SMTPSenderPass                       string
-	SMTPSenderFrom                       string
-	SMTPServerListen                     string
-	SMTPServerDomain                     string
-	SMTPServerAddrPrefix                 string
-	MessageLimit                         int
-	MinDelay                             time.Duration
-	MaxDelay                             time.Duration
-	TotalTopicLimit                      int
-	TotalAttachmentSizeLimit             int64
-	VisitorSubscriptionLimit             int
-	VisitorRequestLimitBurst             int
-	VisitorRequestLimitReplenish         time.Duration
-	VisitorEmailLimitBurst               int
-	VisitorEmailLimitReplenish           time.Duration
-	VisitorAttachmentBytesLimitBurst     int64
-	VisitorAttachmentBytesLimitReplenish time.Duration
-	BehindProxy                          bool
+	BaseURL                         string
+	ListenHTTP                      string
+	ListenHTTPS                     string
+	KeyFile                         string
+	CertFile                        string
+	FirebaseKeyFile                 string
+	CacheFile                       string
+	CacheDuration                   time.Duration
+	AttachmentCacheDir              string
+	AttachmentTotalSizeLimit        int64
+	AttachmentFileSizeLimit         int64
+	AttachmentExpiryDuration        time.Duration
+	KeepaliveInterval               time.Duration
+	ManagerInterval                 time.Duration
+	AtSenderInterval                time.Duration
+	FirebaseKeepaliveInterval       time.Duration
+	SMTPSenderAddr                  string
+	SMTPSenderUser                  string
+	SMTPSenderPass                  string
+	SMTPSenderFrom                  string
+	SMTPServerListen                string
+	SMTPServerDomain                string
+	SMTPServerAddrPrefix            string
+	MessageLimit                    int
+	MinDelay                        time.Duration
+	MaxDelay                        time.Duration
+	TotalTopicLimit                 int
+	TotalAttachmentSizeLimit        int64
+	VisitorSubscriptionLimit        int
+	VisitorAttachmentTotalSizeLimit int64
+	VisitorRequestLimitBurst        int
+	VisitorRequestLimitReplenish    time.Duration
+	VisitorEmailLimitBurst          int
+	VisitorEmailLimitReplenish      time.Duration
+	BehindProxy                     bool
 }
 
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
-		BaseURL:                              "",
-		ListenHTTP:                           DefaultListenHTTP,
-		ListenHTTPS:                          "",
-		KeyFile:                              "",
-		CertFile:                             "",
-		FirebaseKeyFile:                      "",
-		CacheFile:                            "",
-		CacheDuration:                        DefaultCacheDuration,
-		AttachmentCacheDir:                   "",
-		AttachmentSizeLimit:                  DefaultAttachmentSizeLimit,
-		AttachmentSizePreviewMax:             DefaultAttachmentSizePreviewMax,
-		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
-		KeepaliveInterval:                    DefaultKeepaliveInterval,
-		ManagerInterval:                      DefaultManagerInterval,
-		MessageLimit:                         DefaultMessageLimit,
-		MinDelay:                             DefaultMinDelay,
-		MaxDelay:                             DefaultMaxDelay,
-		AtSenderInterval:                     DefaultAtSenderInterval,
-		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
-		TotalTopicLimit:                      DefaultTotalTopicLimit,
-		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
-		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
-		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
-		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
-		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
-		VisitorAttachmentBytesLimitBurst:     DefaultVisitorAttachmentBytesLimitBurst,
-		VisitorAttachmentBytesLimitReplenish: DefaultVisitorAttachmentBytesLimitReplenish,
-		BehindProxy:                          false,
+		BaseURL:                         "",
+		ListenHTTP:                      DefaultListenHTTP,
+		ListenHTTPS:                     "",
+		KeyFile:                         "",
+		CertFile:                        "",
+		FirebaseKeyFile:                 "",
+		CacheFile:                       "",
+		CacheDuration:                   DefaultCacheDuration,
+		AttachmentCacheDir:              "",
+		AttachmentTotalSizeLimit:        DefaultAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:         DefaultAttachmentFileSizeLimit,
+		AttachmentExpiryDuration:        DefaultAttachmentExpiryDuration,
+		KeepaliveInterval:               DefaultKeepaliveInterval,
+		ManagerInterval:                 DefaultManagerInterval,
+		MessageLimit:                    DefaultMessageLimit,
+		MinDelay:                        DefaultMinDelay,
+		MaxDelay:                        DefaultMaxDelay,
+		AtSenderInterval:                DefaultAtSenderInterval,
+		FirebaseKeepaliveInterval:       DefaultFirebaseKeepaliveInterval,
+		TotalTopicLimit:                 DefaultTotalTopicLimit,
+		VisitorSubscriptionLimit:        DefaultVisitorSubscriptionLimit,
+		VisitorAttachmentTotalSizeLimit: DefaultVisitorAttachmentTotalSizeLimit,
+		VisitorRequestLimitBurst:        DefaultVisitorRequestLimitBurst,
+		VisitorRequestLimitReplenish:    DefaultVisitorRequestLimitReplenish,
+		VisitorEmailLimitBurst:          DefaultVisitorEmailLimitBurst,
+		VisitorEmailLimitReplenish:      DefaultVisitorEmailLimitReplenish,
+		BehindProxy:                     false,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"heckel.io/ntfy/util"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +13,7 @@ import (
 var (
 	fileIDRegex      = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 	errInvalidFileID = errors.New("invalid file ID")
+	errFileExists    = errors.New("file exists")
 )
 
 type fileCache struct {
@@ -45,12 +45,14 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 		return 0, errInvalidFileID
 	}
 	file := filepath.Join(c.dir, id)
+	if _, err := os.Stat(file); err == nil {
+		return 0, errFileExists
+	}
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
-	log.Printf("remaining total: %d", c.Remaining())
 	limiters = append(limiters, util.NewLimiter(c.Remaining()), util.NewLimiter(c.fileSizeLimit))
 	limitWriter := util.NewLimitWriter(f, limiters...)
 	size, err := io.Copy(limitWriter, in)
@@ -66,10 +68,9 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 	c.totalSizeCurrent += size
 	c.mu.Unlock()
 	return size, nil
-
 }
 
-func (c *fileCache) Remove(ids []string) error {
+func (c *fileCache) Remove(ids ...string) error {
 	var firstErr error
 	for _, id := range ids {
 		if err := c.removeFile(id); err != nil {

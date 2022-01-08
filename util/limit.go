@@ -24,15 +24,12 @@ func NewLimiter(limit int64) *Limiter {
 	}
 }
 
-// Add adds n to the limiters internal value, but only if the limit has not been reached. If the limit would be
+// Add adds n to the limiters internal value, but only if the limit has not been reached. If the limit was
 // exceeded after adding n, ErrLimitReached is returned.
 func (l *Limiter) Add(n int64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.limit == 0 {
-		l.value += n
-		return nil
-	} else if l.value+n <= l.limit {
+	if l.value+n <= l.limit {
 		l.value += n
 		return nil
 	} else {

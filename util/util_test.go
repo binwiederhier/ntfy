@@ -127,7 +127,7 @@ func TestParseSize_10GSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, 10*1024*1024*1024, s)
+	require.Equal(t, int64(10*1024*1024*1024), s)
 }
 
 func TestParseSize_10MUpperCaseSuccess(t *testing.T) {
@@ -135,7 +135,7 @@ func TestParseSize_10MUpperCaseSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, 10*1024*1024, s)
+	require.Equal(t, int64(10*1024*1024), s)
 }
 
 func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
@@ -143,7 +143,7 @@ func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, 10*1024, s)
+	require.Equal(t, int64(10*1024), s)
 }
 
 func TestParseSize_FailureInvalid(t *testing.T) {

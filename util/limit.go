@@ -29,12 +29,11 @@ func NewLimiter(limit int64) *Limiter {
 func (l *Limiter) Add(n int64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.value+n <= l.limit {
-		l.value += n
-		return nil
-	} else {
+	if l.value+n > l.limit {
 		return ErrLimitReached
 	}
+	l.value += n
+	return nil
 }
 
 // Sub subtracts a value from the limiters internal value

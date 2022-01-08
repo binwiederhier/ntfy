@@ -666,26 +666,21 @@ Here's an example that will open Reddit when the notification is clicked:
 - Preview without attachment 
 
 
-# Send attachment
+# Upload and send attachment
 curl -T image.jpg ntfy.sh/howdy
 
-# Send attachment with custom message and filename
+# Upload and send attachment with custom message and filename
 curl \
     -T flower.jpg \
     -H "Message: Here's a flower for you" \
     -H "Filename: flower.jpg" \
     ntfy.sh/howdy
 
-# Send attachment from another URL, with custom preview and message 
+# Send external attachment from other URL, with custom message 
 curl \
     -H "Attachment: https://example.com/files.zip" \
-    -H "Preview: https://example.com/filespreview.jpg" \
     "ntfy.sh/howdy?m=Important+documents+attached"
-    
-# Send normal message with external image
-curl \    
-    -H "Image: https://example.com/someimage.jpg" \
-    "ntfy.sh/howdy?m=Important+documents+attached"
+
 ```
 
 ## E-mail notifications

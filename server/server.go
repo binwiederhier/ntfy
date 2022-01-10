@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,19 +31,20 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config      *Config
-	httpServer  *http.Server
-	httpsServer *http.Server
-	smtpServer  *smtp.Server
-	smtpBackend *smtpBackend
-	topics      map[string]*topic
-	visitors    map[string]*visitor
-	firebase    subscriber
-	mailer      mailer
-	messages    int64
-	cache       cache
-	closeChan   chan bool
-	mu          sync.Mutex
+	config       *Config
+	httpServer   *http.Server
+	httpsServer  *http.Server
+	unixListener net.Listener
+	smtpServer   *smtp.Server
+	smtpBackend  *smtpBackend
+	topics       map[string]*topic
+	visitors     map[string]*visitor
+	firebase     subscriber
+	mailer       mailer
+	messages     int64
+	cache        cache
+	closeChan    chan bool
+	mu           sync.Mutex
 }
 
 // errHTTP is a generic HTTP error for any non-200 HTTP error
@@ -252,27 +254,50 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
-	listenStr := fmt.Sprintf("%s/http", s.config.ListenHTTP)
+	var listenStr string
+	if s.config.ListenHTTP != "" {
+		listenStr += fmt.Sprintf(" %s[http]", s.config.ListenHTTP)
+	}
 	if s.config.ListenHTTPS != "" {
-		listenStr += fmt.Sprintf(" %s/https", s.config.ListenHTTPS)
+		listenStr += fmt.Sprintf(" %s[https]", s.config.ListenHTTPS)
+	}
+	if s.config.ListenUnix != "" {
+		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
 	}
 	if s.config.SMTPServerListen != "" {
-		listenStr += fmt.Sprintf(" %s/smtp", s.config.SMTPServerListen)
+		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
-	log.Printf("Listening on %s", listenStr)
+	log.Printf("Listening on%s", listenStr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
 	s.mu.Lock()
 	s.closeChan = make(chan bool)
-	s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
-	go func() {
-		errChan <- s.httpServer.ListenAndServe()
-	}()
+	if s.config.ListenHTTP != "" {
+		s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
+		go func() {
+			errChan <- s.httpServer.ListenAndServe()
+		}()
+	}
 	if s.config.ListenHTTPS != "" {
 		s.httpsServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
 		go func() {
 			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
+		}()
+	}
+	if s.config.ListenUnix != "" {
+		go func() {
+			var err error
+			s.mu.Lock()
+			os.Remove(s.config.ListenUnix)
+			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			s.mu.Unlock()
+			httpServer := &http.Server{Handler: mux}
+			errChan <- httpServer.Serve(s.unixListener)
 		}()
 	}
 	if s.config.SMTPServerListen != "" {
@@ -297,6 +322,9 @@ func (s *Server) Stop() {
 	}
 	if s.httpsServer != nil {
 		s.httpsServer.Close()
+	}
+	if s.unixListener != nil {
+		s.unixListener.Close()
 	}
 	if s.smtpServer != nil {
 		s.smtpServer.Close()

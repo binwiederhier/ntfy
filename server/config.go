@@ -36,6 +36,7 @@ type Config struct {
 	BaseURL                      string
 	ListenHTTP                   string
 	ListenHTTPS                  string
+	ListenUnix                   string
 	KeyFile                      string
 	CertFile                     string
 	FirebaseKeyFile              string

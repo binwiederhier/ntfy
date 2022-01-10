@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	peakAttachmentTimeout    = 2500 * time.Millisecond
-	peakAttachmeantReadBytes = 128
+	peakAttachmentTimeout   = 2500 * time.Millisecond
+	peakAttachmentReadBytes = 128
 )
 
 func maybePeakAttachmentURL(m *message) error {
@@ -47,20 +47,21 @@ func maybePeakAttachmentURLInternal(m *message, timeout time.Duration) error {
 	if size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64); err == nil {
 		m.Attachment.Size = size
 	}
+	buf := make([]byte, peakAttachmentReadBytes)
+	io.ReadFull(resp.Body, buf) // Best effort: We don't care about the error
+	mimeType, ext := util.DetectContentType(buf, m.Attachment.URL)
 	m.Attachment.Type = resp.Header.Get("Content-Type")
-	if m.Attachment.Type == "" || m.Attachment.Type == "application/octet-stream" {
-		buf := make([]byte, peakAttachmeantReadBytes)
-		io.ReadFull(resp.Body, buf) // Best effort: We don't care about the error
-		m.Attachment.Type = http.DetectContentType(buf)
+	if m.Attachment.Type == "" {
+		m.Attachment.Type = mimeType
 	}
 	if m.Attachment.Name == "" {
 		u, err := url.Parse(m.Attachment.URL)
 		if err != nil {
-			m.Attachment.Name = fmt.Sprintf("attachment%s", util.ExtensionByType(m.Attachment.Type))
+			m.Attachment.Name = fmt.Sprintf("attachment%s", ext)
 		} else {
 			m.Attachment.Name = path.Base(u.Path)
 			if m.Attachment.Name == "." || m.Attachment.Name == "/" {
-				m.Attachment.Name = fmt.Sprintf("attachment%s", util.ExtensionByType(m.Attachment.Type))
+				m.Attachment.Name = fmt.Sprintf("attachment%s", ext)
 			}
 		}
 	}

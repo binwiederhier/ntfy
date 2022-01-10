@@ -11,13 +11,14 @@ import (
 // It will always set a Content-Type based on http.DetectContentType, but will never send the "text/html"
 // content type.
 type ContentTypeWriter struct {
-	w       http.ResponseWriter
-	sniffed bool
+	w        http.ResponseWriter
+	filename string
+	sniffed  bool
 }
 
 // NewContentTypeWriter creates a new ContentTypeWriter
-func NewContentTypeWriter(w http.ResponseWriter) *ContentTypeWriter {
-	return &ContentTypeWriter{w, false}
+func NewContentTypeWriter(w http.ResponseWriter, filename string) *ContentTypeWriter {
+	return &ContentTypeWriter{w, filename, false}
 }
 
 func (w *ContentTypeWriter) Write(p []byte) (n int, err error) {
@@ -27,7 +28,7 @@ func (w *ContentTypeWriter) Write(p []byte) (n int, err error) {
 	// Detect and set Content-Type header
 	// Fix content types that we don't want to inline-render in the browser. In particular,
 	// we don't want to render HTML in the browser for security reasons.
-	contentType := http.DetectContentType(p)
+	contentType, _ := DetectContentType(p, w.filename)
 	if strings.HasPrefix(contentType, "text/html") {
 		contentType = strings.ReplaceAll(contentType, "text/html", "text/plain")
 	} else if contentType == "application/octet-stream" {

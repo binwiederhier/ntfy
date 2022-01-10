@@ -3,8 +3,8 @@ package util
 import (
 	"errors"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"math/rand"
-	"mime"
 	"os"
 	"regexp"
 	"strconv"
@@ -21,7 +21,6 @@ var (
 	random             = rand.New(rand.NewSource(time.Now().UnixNano()))
 	randomMutex        = sync.Mutex{}
 	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
-	extRegex           = regexp.MustCompile(`^\.[-_A-Za-z0-9]+$`)
 	errInvalidPriority = errors.New("invalid priority")
 )
 
@@ -168,20 +167,18 @@ func ShortTopicURL(s string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
 }
 
-// ExtensionByType is a wrapper around mime.ExtensionByType with a few sensible corrections
-func ExtensionByType(contentType string) string {
-	switch contentType {
-	case "image/jpeg":
-		return ".jpg"
-	case "video/mp4":
-		return ".mp4"
-	default:
-		exts, err := mime.ExtensionsByType(contentType)
-		if err == nil && len(exts) > 0 && extRegex.MatchString(exts[0]) {
-			return exts[0]
-		}
-		return ".bin"
+// DetectContentType probes the byte array b and returns mime type and file extension.
+// The filename is only used to override certain special cases.
+func DetectContentType(b []byte, filename string) (mimeType string, ext string) {
+	if strings.HasSuffix(strings.ToLower(filename), ".apk") {
+		return "application/vnd.android.package-archive", ".apk"
 	}
+	m := mimetype.Detect(b)
+	mimeType, ext = m.String(), m.Extension()
+	if ext == "" {
+		ext = ".bin"
+	}
+	return
 }
 
 // ParseSize parses a size string like 2K or 2M into bytes. If no unit is found, e.g. 123, bytes is assumed.

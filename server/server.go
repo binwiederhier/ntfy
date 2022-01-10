@@ -150,9 +150,10 @@ var (
 )
 
 const (
-	firebaseControlTopic = "~control" // See Android if changed
-	emptyMessageBody     = "triggered"
-	fcmMessageLimit      = 4000 // see maybeTruncateFCMMessage for details
+	firebaseControlTopic     = "~control" // See Android if changed
+	emptyMessageBody         = "triggered"
+	fcmMessageLimit          = 4000 // see maybeTruncateFCMMessage for details
+	defaultAttachmentMessage = "You received a file: %s"
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -436,7 +437,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) 
 		return err
 	}
 	defer f.Close()
-	_, err = io.Copy(util.NewContentTypeWriter(w), f)
+	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
 	return err
 }
 
@@ -609,6 +610,9 @@ func (s *Server) handleBodyAsMessage(m *message, body *util.PeakedReadCloser) er
 	if len(body.PeakedBytes) > 0 { // Empty body should not override message (publish via GET!)
 		m.Message = strings.TrimSpace(string(body.PeakedBytes)) // Truncates the message to the peak limit if required
 	}
+	if m.Attachment != nil && m.Attachment.Name != "" && m.Message == "" {
+		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
+	}
 	return nil
 }
 
@@ -622,16 +626,16 @@ func (s *Server) handleBodyAsAttachment(v *visitor, m *message, body *util.Peake
 		m.Attachment = &attachment{}
 	}
 	var err error
+	var ext string
 	m.Attachment.Owner = v.ip // Important for attachment rate limiting
 	m.Attachment.Expires = time.Now().Add(s.config.AttachmentExpiryDuration).Unix()
-	m.Attachment.Type = http.DetectContentType(body.PeakedBytes)
-	ext := util.ExtensionByType(m.Attachment.Type)
+	m.Attachment.Type, ext = util.DetectContentType(body.PeakedBytes, m.Attachment.Name)
 	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
 	if m.Attachment.Name == "" {
 		m.Attachment.Name = fmt.Sprintf("attachment%s", ext)
 	}
 	if m.Message == "" {
-		m.Message = fmt.Sprintf("You received a file: %s", m.Attachment.Name)
+		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
 	// TODO do not allowed delayed delivery for attachments
 	visitorAttachmentsSize, err := s.cache.AttachmentsSize(v.ip)

@@ -173,6 +173,8 @@ func ExtensionByType(contentType string) string {
 	switch contentType {
 	case "image/jpeg":
 		return ".jpg"
+	case "video/mp4":
+		return ".mp4"
 	default:
 		exts, err := mime.ExtensionsByType(contentType)
 		if err == nil && len(exts) > 0 && extRegex.MatchString(exts[0]) {

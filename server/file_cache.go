@@ -71,13 +71,12 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 }
 
 func (c *fileCache) Remove(ids ...string) error {
-	var firstErr error
 	for _, id := range ids {
-		if err := c.removeFile(id); err != nil {
-			if firstErr == nil {
-				firstErr = err // Continue despite error; we want to delete as many as we can
-			}
+		if !fileIDRegex.MatchString(id) {
+			return errInvalidFileID
 		}
+		file := filepath.Join(c.dir, id)
+		_ = os.Remove(file) // Best effort delete
 	}
 	size, err := dirSize(c.dir)
 	if err != nil {
@@ -86,15 +85,7 @@ func (c *fileCache) Remove(ids ...string) error {
 	c.mu.Lock()
 	c.totalSizeCurrent = size
 	c.mu.Unlock()
-	return firstErr
-}
-
-func (c *fileCache) removeFile(id string) error {
-	if !fileIDRegex.MatchString(id) {
-		return errInvalidFileID
-	}
-	file := filepath.Join(c.dir, id)
-	return os.Remove(file)
+	return nil
 }
 
 func (c *fileCache) Size() int64 {

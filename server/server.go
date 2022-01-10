@@ -637,7 +637,6 @@ func (s *Server) handleBodyAsAttachment(v *visitor, m *message, body *util.Peake
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	// TODO do not allowed delayed delivery for attachments
 	visitorAttachmentsSize, err := s.cache.AttachmentsSize(v.ip)
 	if err != nil {
 		return err
@@ -1015,10 +1014,10 @@ func (s *Server) sendDelayedMessages() error {
 			if err := t.Publish(m); err != nil {
 				log.Printf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
 			}
-			if s.firebase != nil {
-				if err := s.firebase(m); err != nil {
-					log.Printf("unable to publish to Firebase: %v", err.Error())
-				}
+		}
+		if s.firebase != nil { // Firebase subscribers may not show up in topics map
+			if err := s.firebase(m); err != nil {
+				log.Printf("unable to publish to Firebase: %v", err.Error())
 			}
 		}
 		if err := s.cache.MarkPublished(m); err != nil {

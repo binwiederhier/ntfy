@@ -279,7 +279,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
 		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentOwner, &attachmentURL); err != nil {
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL, &attachmentOwner); err != nil {
 			return nil, err
 		}
 		var tags []string

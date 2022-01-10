@@ -27,14 +27,13 @@ const (
 // - per visitor email limit: max number of emails (here: 16 email bucket, replenished at a rate of one per hour)
 // - per visitor attachment size limit:
 const (
-	DefaultTotalTopicLimit                      = 5000
-	DefaultVisitorSubscriptionLimit             = 30
-	DefaultVisitorRequestLimitBurst             = 60
-	DefaultVisitorRequestLimitReplenish         = 10 * time.Second
-	DefaultVisitorEmailLimitBurst               = 16
-	DefaultVisitorEmailLimitReplenish           = time.Hour
-	DefaultVisitorAttachmentTotalSizeLimit      = 50 * 1024 * 1024
-	DefaultVisitorAttachmentBytesLimitReplenish = time.Hour
+	DefaultTotalTopicLimit                 = 5000
+	DefaultVisitorSubscriptionLimit        = 30
+	DefaultVisitorRequestLimitBurst        = 60
+	DefaultVisitorRequestLimitReplenish    = 10 * time.Second
+	DefaultVisitorEmailLimitBurst          = 16
+	DefaultVisitorEmailLimitReplenish      = time.Hour
+	DefaultVisitorAttachmentTotalSizeLimit = 50 * 1024 * 1024
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.

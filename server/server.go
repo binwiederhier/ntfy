@@ -127,7 +127,7 @@ var (
 	errHTTPTooManyRequestsLimitRequests              = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitEmails                = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitSubscriptions         = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitGlobalTopics          = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitTotalTopics           = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPBadRequestEmailDisabled                   = &errHTTP{40001, http.StatusBadRequest, "e-mail notifications are not enabled", "https://ntfy.sh/docs/config/#e-mail-notifications"}
 	errHTTPBadRequestDelayNoCache                    = &errHTTP{40002, http.StatusBadRequest, "cannot disable cache for delayed message", ""}
 	errHTTPBadRequestDelayNoEmail                    = &errHTTP{40003, http.StatusBadRequest, "delayed e-mail notifications are not supported", ""}
@@ -431,7 +431,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) 
 	if err != nil {
 		return errHTTPNotFound
 	}
-	w.Header().Set("Length", fmt.Sprintf("%d", stat.Size()))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -503,7 +503,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
-	attach := readParam(r, "x-attachment", "attachment", "attach", "a")
+	attach := readParam(r, "x-attach", "attach", "a")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	if attach != "" || filename != "" {
 		m.Attachment = &attachment{}
@@ -617,7 +617,7 @@ func (s *Server) handleBodyAsMessage(m *message, body *util.PeakedReadCloser) er
 }
 
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeakedReadCloser) error {
-	if s.fileCache == nil {
+	if s.fileCache == nil || s.config.BaseURL == "" || s.config.AttachmentCacheDir == "" {
 		return errHTTPBadRequestAttachmentsDisallowed
 	} else if m.Time > time.Now().Add(s.config.AttachmentExpiryDuration).Unix() {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
@@ -871,7 +871,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 		}
 		if _, ok := s.topics[id]; !ok {
 			if len(s.topics) >= s.config.TotalTopicLimit {
-				return nil, errHTTPTooManyRequestsLimitGlobalTopics
+				return nil, errHTTPTooManyRequestsLimitTotalTopics
 			}
 			s.topics[id] = newTopic(id)
 		}

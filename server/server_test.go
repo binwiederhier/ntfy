@@ -7,6 +7,7 @@ import (
 	"firebase.google.com/go/messaging"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/util"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -163,7 +164,9 @@ func TestServer_StaticSites(t *testing.T) {
 }
 
 func TestServer_PublishLargeMessage(t *testing.T) {
-	s := newTestServer(t, newTestConfig(t))
+	c := newTestConfig(t)
+	c.AttachmentCacheDir = "" // Disable attachments
+	s := newTestServer(t, c)
 
 	body := strings.Repeat("this is a large message", 5000)
 	response := request(t, s, "PUT", "/mytopic", body, nil)
@@ -196,6 +199,9 @@ func TestServer_PublishPriority(t *testing.T) {
 
 	response = request(t, s, "GET", "/mytopic/trigger?priority=urgent", "test", nil)
 	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "GET", "/mytopic/trigger?priority=INVALID", "test", nil)
+	require.Equal(t, 40007, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishNoCache(t *testing.T) {
@@ -259,11 +265,26 @@ func TestServer_PublishAtTooShortDelay(t *testing.T) {
 
 func TestServer_PublishAtTooLongDelay(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-
 	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
 		"In": "99999999h",
 	})
 	require.Equal(t, 400, response.Code)
+}
+
+func TestServer_PublishAtInvalidDelay(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?delay=INVALID", "a message", nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40004, err.Code)
+}
+
+func TestServer_PublishAtTooLarge(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?x-in=99999h", "a message", nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40006, err.Code)
 }
 
 func TestServer_PublishAtAndPrune(t *testing.T) {
@@ -347,6 +368,19 @@ func TestServer_PublishAndPollSince(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "test 2", messages[0].Message)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1&since=10s", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 2, len(messages))
+	require.Equal(t, "test 1", messages[0].Message)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1&since=100ms", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "test 2", messages[0].Message)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1&since=INVALID", "", nil)
+	require.Equal(t, 40008, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishViaGET(t *testing.T) {
@@ -385,6 +419,13 @@ func TestServer_PublishFirebase(t *testing.T) {
 	require.Nil(t, s.firebase(newKeepaliveMessage(firebaseControlTopic)))
 
 	time.Sleep(500 * time.Millisecond) // Time for sends
+}
+
+func TestServer_PublishInvalidTopic(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	s.mailer = &testMailer{}
+	response := request(t, s, "PUT", "/docs", "fail", nil)
+	require.Equal(t, 40010, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PollWithQueryFilters(t *testing.T) {
@@ -640,9 +681,175 @@ func TestServer_MaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 	require.Equal(t, "", notTruncatedFCMMessage.Data["truncated"])
 }
 
+func TestServer_PublishAttachment(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	msg := toMessage(t, response.Body.String())
+	require.Equal(t, "attachment.txt", msg.Attachment.Name)
+	require.Equal(t, "text/plain; charset=utf-8", msg.Attachment.Type)
+	require.Equal(t, int64(5000), msg.Attachment.Size)
+	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(3*time.Hour).Unix())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
+
+	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "5000", response.Header().Get("Content-Length"))
+	require.Equal(t, content, response.Body.String())
+}
+
+func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	content := "this is an ATTACHMENT"
+	response := request(t, s, "PUT", "/mytopic?f=myfile.txt", content, nil)
+	msg := toMessage(t, response.Body.String())
+	require.Equal(t, "myfile.txt", msg.Attachment.Name)
+	require.Equal(t, "text/plain; charset=utf-8", msg.Attachment.Type)
+	require.Equal(t, int64(21), msg.Attachment.Size)
+	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(3*time.Hour).Unix())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
+
+	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "21", response.Header().Get("Content-Length"))
+	require.Equal(t, content, response.Body.String())
+}
+
+func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "", map[string]string{
+		"Attach": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg",
+	})
+	msg := toMessage(t, response.Body.String())
+	require.Equal(t, "You received a file: Pink_flower.jpg", msg.Message)
+	require.Equal(t, "Pink_flower.jpg", msg.Attachment.Name)
+	require.Equal(t, "image/jpeg", msg.Attachment.Type)
+	require.Equal(t, int64(190173), msg.Attachment.Size)
+	require.Equal(t, int64(0), msg.Attachment.Expires)
+	require.Equal(t, "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg", msg.Attachment.URL)
+	require.Equal(t, "", msg.Attachment.Owner)
+}
+
+func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "This is a custom message", map[string]string{
+		"X-Attach": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg",
+		"File":     "some file.jpg",
+	})
+	msg := toMessage(t, response.Body.String())
+	require.Equal(t, "This is a custom message", msg.Message)
+	require.Equal(t, "some file.jpg", msg.Attachment.Name)
+	require.Equal(t, "image/jpeg", msg.Attachment.Type)
+	require.Equal(t, int64(190173), msg.Attachment.Size)
+	require.Equal(t, int64(0), msg.Attachment.Expires)
+	require.Equal(t, "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg", msg.Attachment.URL)
+	require.Equal(t, "", msg.Attachment.Owner)
+}
+
+func TestServer_PublishAttachmentBadURL(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?a=not+a+URL", "", nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40013, err.Code)
+}
+
+func TestServer_PublishAttachmentTooLargeContentLength(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", content, map[string]string{
+		"Content-Length": "20000000",
+	})
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40012, err.Code)
+}
+
+func TestServer_PublishAttachmentTooLargeBodyAttachmentFileSizeLimit(t *testing.T) {
+	content := util.RandomString(5001) // > 5000, see below
+	c := newTestConfig(t)
+	c.AttachmentFileSizeLimit = 5000
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40012, err.Code)
+}
+
+func TestServer_PublishAttachmentExpiryBeforeDelivery(t *testing.T) {
+	c := newTestConfig(t)
+	c.AttachmentExpiryDuration = 10 * time.Minute
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", util.RandomString(5000), map[string]string{
+		"Delay": "11 min", // > AttachmentExpiryDuration
+	})
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40017, err.Code)
+}
+
+func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorAttachmentTotalSizeLimit = 10000
+	s := newTestServer(t, c)
+
+	response := request(t, s, "PUT", "/mytopic", util.RandomString(5000), nil)
+	msg := toMessage(t, response.Body.String())
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "You received a file: attachment.txt", msg.Message)
+	require.Equal(t, int64(5000), msg.Attachment.Size)
+
+	content := util.RandomString(5001) // 5000+5001 > , see below
+	response = request(t, s, "PUT", "/mytopic", content, nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40012, err.Code)
+}
+
+func TestServer_PublishAttachmentAndPrune(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+
+	c := newTestConfig(t)
+	c.AttachmentExpiryDuration = time.Millisecond // Hack
+	s := newTestServer(t, c)
+
+	// Publish and make sure we can retrieve it
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	println(response.Body.String())
+	msg := toMessage(t, response.Body.String())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	file := filepath.Join(s.config.AttachmentCacheDir, msg.ID)
+	require.FileExists(t, file)
+
+	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, content, response.Body.String())
+
+	// Prune and makes sure it's gone
+	time.Sleep(time.Second) // Sigh ...
+	s.updateStatsAndPrune()
+	require.NoFileExists(t, file)
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 404, response.Code)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
+	conf.BaseURL = "http://127.0.0.1:12345"
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
+	conf.AttachmentCacheDir = t.TempDir()
 	return conf
 }
 
@@ -700,6 +907,13 @@ func toMessage(t *testing.T, s string) *message {
 	var m message
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&m))
 	return &m
+}
+
+func tempFile(t *testing.T, length int) (filename string, content string) {
+	filename = filepath.Join(t.TempDir(), util.RandomString(10))
+	content = util.RandomString(length)
+	require.Nil(t, os.WriteFile(filename, []byte(content), 0600))
+	return
 }
 
 func toHTTPError(t *testing.T, s string) *errHTTP {

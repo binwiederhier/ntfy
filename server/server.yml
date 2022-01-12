@@ -87,7 +87,7 @@
 
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
-# global-topic-limit: 5000
+# global-topic-limit: 15000
 
 # Rate limiting: Number of subscriptions per visitor (IP address)
 #

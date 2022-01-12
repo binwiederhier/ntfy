@@ -139,12 +139,13 @@ var (
 	errHTTPBadRequestTopicInvalid                    = &errHTTP{40009, http.StatusBadRequest, "invalid topic: path invalid", ""}
 	errHTTPBadRequestTopicDisallowed                 = &errHTTP{40010, http.StatusBadRequest, "invalid topic: topic name is disallowed", ""}
 	errHTTPBadRequestMessageNotUTF8                  = &errHTTP{40011, http.StatusBadRequest, "invalid message: message must be UTF-8 encoded", ""}
-	errHTTPBadRequestAttachmentTooLarge              = &errHTTP{40012, http.StatusBadRequest, "invalid request: attachment too large", ""}
+	errHTTPBadRequestAttachmentTooLarge              = &errHTTP{40012, http.StatusBadRequest, "invalid request: attachment too large, or traffic limit reached", ""}
 	errHTTPBadRequestAttachmentURLInvalid            = &errHTTP{40013, http.StatusBadRequest, "invalid request: attachment URL is invalid", ""}
 	errHTTPBadRequestAttachmentURLPeakGeneral        = &errHTTP{40014, http.StatusBadRequest, "invalid request: attachment URL peak failed", ""}
 	errHTTPBadRequestAttachmentURLPeakNon2xx         = &errHTTP{40015, http.StatusBadRequest, "invalid request: attachment URL peak failed with non-2xx status code", ""}
 	errHTTPBadRequestAttachmentsDisallowed           = &errHTTP{40016, http.StatusBadRequest, "invalid request: attachments not allowed", ""}
 	errHTTPBadRequestAttachmentsExpiryBeforeDelivery = &errHTTP{40017, http.StatusBadRequest, "invalid request: attachment expiry before delayed delivery date", ""}
+	errHTTPTooManyRequestsAttachmentTrafficLimit     = &errHTTP{42901, http.StatusTooManyRequests, "too many requests: daily traffic limit reached", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPInternalError                             = &errHTTP{50001, http.StatusInternalServerError, "internal server error", ""}
 	errHTTPInternalErrorInvalidFilePath              = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid file path", ""}
 )
@@ -341,7 +342,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		if e, ok = err.(*errHTTP); !ok {
 			e = errHTTPInternalError
 		}
-		log.Printf("[%s] %s - %d - %s", r.RemoteAddr, r.Method, e.HTTPCode, err.Error())
+		log.Printf("[%s] %s - %d - %d - %s", r.RemoteAddr, r.Method, e.HTTPCode, e.Code, err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 		w.WriteHeader(e.HTTPCode)
@@ -417,7 +418,7 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if s.config.AttachmentCacheDir == "" {
 		return errHTTPInternalError
 	}
@@ -430,6 +431,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, _ *visitor) 
 	stat, err := os.Stat(file)
 	if err != nil {
 		return errHTTPNotFound
+	}
+	if err := v.TrafficLimiter().Allow(stat.Size()); err != nil {
+		return errHTTPTooManyRequestsAttachmentTrafficLimit
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 	f, err := os.Open(file)
@@ -648,7 +652,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, util.NewFixedLimiter(remainingVisitorAttachmentSize))
+	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.TrafficLimiter(), util.NewFixedLimiter(remainingVisitorAttachmentSize))
 	if err == util.ErrLimitReached {
 		return errHTTPBadRequestAttachmentTooLarge
 	} else if err != nil {

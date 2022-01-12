@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/server"
 	"heckel.io/ntfy/util"
 	"log"
+	"math"
 	"time"
 )
 
@@ -36,6 +38,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "50M", Usage: "total storage limit used for attachments per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-traffic-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_TRAFFIC_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload traffic limit per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: server.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
@@ -90,6 +93,7 @@ func execServe(c *cli.Context) error {
 	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorAttachmentTotalSizeLimitStr := c.String("visitor-attachment-total-size-limit")
+	visitorAttachmentDailyTrafficLimitStr := c.String("visitor-attachment-daily-traffic-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
 	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
@@ -130,6 +134,12 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	visitorAttachmentDailyTrafficLimit, err := parseSize(visitorAttachmentDailyTrafficLimitStr, server.DefaultVisitorAttachmentDailyTrafficLimit)
+	if err != nil {
+		return err
+	} else if visitorAttachmentDailyTrafficLimit > math.MaxInt {
+		return fmt.Errorf("config option visitor-attachment-daily-traffic-limit must be lower than %d", math.MaxInt)
+	}
 
 	// Run server
 	conf := server.NewConfig()
@@ -157,6 +167,7 @@ func execServe(c *cli.Context) error {
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
+	conf.VisitorAttachmentDailyTrafficLimit = int(visitorAttachmentDailyTrafficLimit)
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
 	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst

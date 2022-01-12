@@ -274,7 +274,7 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 By default, ntfy runs without authentication, so it is vitally important that we protect the server from abuse or overload.
 There are various limits and rate limits in place that you can use to configure the server. Let's do the easy ones first:
 
-* `global-topic-limit` defines the total number of topics before the server rejects new topics. It defaults to 5000.
+* `global-topic-limit` defines the total number of topics before the server rejects new topics. It defaults to 15,000.
 * `visitor-subscription-limit` is the number of subscriptions (open connections) per visitor. This value defaults to 30.
 
 A **visitor** is identified by its IP address (or the `X-Forwarded-For` header if `behind-proxy` is set). All config 
@@ -309,7 +309,7 @@ Depending on *how you run it*, here are a few limits that are relevant:
 
 ### For systemd services
 If you're running ntfy in a systemd service (e.g. for .deb/.rpm packages), the main limiting factor is the
-`LimitNOFILE` setting in the systemd unit. The default open files limit for `ntfy.service` is 10000. You can override it
+`LimitNOFILE` setting in the systemd unit. The default open files limit for `ntfy.service` is 10,000. You can override it
 by creating a `/etc/systemd/system/ntfy.service.d/override.conf` file. As far as I can tell, `/etc/security/limits.conf`
 is not relevant.
 
@@ -322,7 +322,7 @@ is not relevant.
 
 ### Outside of systemd
 If you're running outside systemd, you may want to adjust your `/etc/security/limits.conf` file to
-increase the `nofile` setting. Here's an example that increases the limit to 5000. You can find out the current setting
+increase the `nofile` setting. Here's an example that increases the limit to 5,000. You can find out the current setting
 by running `ulimit -n`, or manually override it temporarily by running `ulimit -n 50000`.
 
 === "/etc/security/limits.conf"
@@ -423,12 +423,16 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `smtp-server-addr-prefix` | `NTFY_SMTP_SERVER_ADDR_PREFIX` | `[ip]:port` | - |  Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-` |
 | `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 55s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
-| `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 5000 | Rate limiting: Total number of topics before the server rejects new topics. |
+| `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 15,000 | Rate limiting: Total number of topics before the server rejects new topics. |
 | `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
 | `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
 | `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
 | `visitor-email-limit-burst` | `NTFY_VISITOR_EMAIL_LIMIT_BURST` | *number* | 16 |Initial limit of e-mails per visitor |
 | `visitor-email-limit-replenish` | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH` | *duration* | 1h | Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled |
+xx daily traffic limit
+xx DefaultVisitorAttachmentTotalSizeLimit
+xx attachment cache dir
+xx attachment 
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 

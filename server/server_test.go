@@ -826,7 +826,6 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 
 	// Publish and make sure we can retrieve it
 	response := request(t, s, "PUT", "/mytopic", content, nil)
-	println(response.Body.String())
 	msg := toMessage(t, response.Body.String())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
 	file := filepath.Join(s.config.AttachmentCacheDir, msg.ID)
@@ -843,6 +842,54 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 	require.NoFileExists(t, file)
 	response = request(t, s, "GET", path, "", nil)
 	require.Equal(t, 404, response.Code)
+}
+
+func TestServer_PublishAttachmentTrafficLimit(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+
+	c := newTestConfig(t)
+	c.VisitorAttachmentDailyTrafficLimit = 5*5000 + 123 // A little more than 1 upload and 3 downloads
+	s := newTestServer(t, c)
+
+	// Publish attachment
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	msg := toMessage(t, response.Body.String())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+
+	// Get it 4 times successfully
+	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
+	for i := 1; i <= 4; i++ { // 4 successful downloads
+		response = request(t, s, "GET", path, "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, content, response.Body.String())
+	}
+
+	// And then fail with a 429
+	response = request(t, s, "GET", path, "", nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42901, err.Code)
+}
+
+func TestServer_PublishAttachmentTrafficLimitUploadOnly(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+
+	c := newTestConfig(t)
+	c.VisitorAttachmentDailyTrafficLimit = 5*5000 + 500 // 5 successful uploads
+	s := newTestServer(t, c)
+
+	// 5 successful uploads
+	for i := 1; i <= 5; i++ {
+		response := request(t, s, "PUT", "/mytopic", content, nil)
+		msg := toMessage(t, response.Body.String())
+		require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	}
+
+	// And a failed one
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40012, err.Code)
 }
 
 func newTestConfig(t *testing.T) *Config {

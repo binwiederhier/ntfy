@@ -16,7 +16,7 @@ var (
 
 func TestFileCache_Write_Success(t *testing.T) {
 	dir, c := newTestFileCache(t)
-	size, err := c.Write("abc", strings.NewReader("normal file"), util.NewLimiter(999))
+	size, err := c.Write("abc", strings.NewReader("normal file"), util.NewFixedLimiter(999))
 	require.Nil(t, err)
 	require.Equal(t, int64(11), size)
 	require.Equal(t, "normal file", readFile(t, dir+"/abc"))
@@ -64,7 +64,7 @@ func TestFileCache_Write_FailedFileSizeLimit(t *testing.T) {
 
 func TestFileCache_Write_FailedAdditionalLimiter(t *testing.T) {
 	dir, c := newTestFileCache(t)
-	_, err := c.Write("abc", bytes.NewReader(make([]byte, 1001)), util.NewLimiter(1000))
+	_, err := c.Write("abc", bytes.NewReader(make([]byte, 1001)), util.NewFixedLimiter(1000))
 	require.Equal(t, util.ErrLimitReached, err)
 	require.NoFileExists(t, dir+"/abc")
 }

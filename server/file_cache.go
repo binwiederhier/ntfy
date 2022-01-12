@@ -40,7 +40,7 @@ func newFileCache(dir string, totalSizeLimit int64, fileSizeLimit int64) (*fileC
 	}, nil
 }
 
-func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (int64, error) {
+func (c *fileCache) Write(id string, in io.Reader, limiters ...util.Limiter) (int64, error) {
 	if !fileIDRegex.MatchString(id) {
 		return 0, errInvalidFileID
 	}
@@ -53,7 +53,7 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...*util.Limiter) (i
 		return 0, err
 	}
 	defer f.Close()
-	limiters = append(limiters, util.NewLimiter(c.Remaining()), util.NewLimiter(c.fileSizeLimit))
+	limiters = append(limiters, util.NewFixedLimiter(c.Remaining()), util.NewFixedLimiter(c.fileSizeLimit))
 	limitWriter := util.NewLimitWriter(f, limiters...)
 	size, err := io.Copy(limitWriter, in)
 	if err != nil {

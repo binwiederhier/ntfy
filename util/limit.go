@@ -2,31 +2,39 @@ package util
 
 import (
 	"errors"
+	"golang.org/x/time/rate"
 	"io"
 	"sync"
+	"time"
 )
 
 // ErrLimitReached is the error returned by the Limiter and LimitWriter when the predefined limit has been reached
 var ErrLimitReached = errors.New("limit reached")
 
-// Limiter is a helper that allows adding values up to a well-defined limit. Once the limit is reached
-// ErrLimitReached will be returned. Limiter may be used by multiple goroutines.
-type Limiter struct {
+// Limiter is an interface that implements a rate limiting mechanism, e.g. based on time or a fixed value
+type Limiter interface {
+	// Allow adds n to the limiters internal value, or returns ErrLimitReached if the limit has been reached
+	Allow(n int64) error
+}
+
+// FixedLimiter is a helper that allows adding values up to a well-defined limit. Once the limit is reached
+// ErrLimitReached will be returned. FixedLimiter may be used by multiple goroutines.
+type FixedLimiter struct {
 	value int64
 	limit int64
 	mu    sync.Mutex
 }
 
-// NewLimiter creates a new Limiter
-func NewLimiter(limit int64) *Limiter {
-	return &Limiter{
+// NewFixedLimiter creates a new Limiter
+func NewFixedLimiter(limit int64) *FixedLimiter {
+	return &FixedLimiter{
 		limit: limit,
 	}
 }
 
-// Add adds n to the limiters internal value, but only if the limit has not been reached. If the limit was
+// Allow adds n to the limiters internal value, but only if the limit has not been reached. If the limit was
 // exceeded after adding n, ErrLimitReached is returned.
-func (l *Limiter) Add(n int64) error {
+func (l *FixedLimiter) Allow(n int64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.value+n > l.limit {
@@ -36,29 +44,34 @@ func (l *Limiter) Add(n int64) error {
 	return nil
 }
 
-// Sub subtracts a value from the limiters internal value
-func (l *Limiter) Sub(n int64) {
-	l.Add(-n)
+// RateLimiter is a Limiter that wraps a rate.Limiter, allowing a floating time-based limit.
+type RateLimiter struct {
+	limiter *rate.Limiter
 }
 
-// Set sets the value of the limiter to n. This function ignores the limit. It is meant to set the value
-// based on reality.
-func (l *Limiter) Set(n int64) {
-	l.mu.Lock()
-	l.value = n
-	l.mu.Unlock()
+// NewRateLimiter creates a new RateLimiter
+func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
+	return &RateLimiter{
+		limiter: rate.NewLimiter(r, b),
+	}
 }
 
-// Value returns the internal value of the limiter
-func (l *Limiter) Value() int64 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.value
+// NewBytesLimiter creates a RateLimiter that is meant to be used for a bytes-per-interval limit,
+// e.g. 250 MB per day. And example of the underlying idea can be found here: https://go.dev/play/p/0ljgzIZQ6dJ
+func NewBytesLimiter(bytes int, interval time.Duration) *RateLimiter {
+	return NewRateLimiter(rate.Limit(bytes)*rate.Every(interval), bytes)
 }
 
-// Limit returns the defined limit
-func (l *Limiter) Limit() int64 {
-	return l.limit
+// Allow adds n to the limiters internal value, but only if the limit has not been reached. If the limit was
+// exceeded after adding n, ErrLimitReached is returned.
+func (l *RateLimiter) Allow(n int64) error {
+	if n <= 0 {
+		return nil // No-op. Can't take back bytes you're written!
+	}
+	if !l.limiter.AllowN(time.Now(), int(n)) {
+		return ErrLimitReached
+	}
+	return nil
 }
 
 // LimitWriter implements an io.Writer that will pass through all Write calls to the underlying
@@ -67,12 +80,12 @@ func (l *Limiter) Limit() int64 {
 type LimitWriter struct {
 	w        io.Writer
 	written  int64
-	limiters []*Limiter
+	limiters []Limiter
 	mu       sync.Mutex
 }
 
 // NewLimitWriter creates a new LimitWriter
-func NewLimitWriter(w io.Writer, limiters ...*Limiter) *LimitWriter {
+func NewLimitWriter(w io.Writer, limiters ...Limiter) *LimitWriter {
 	return &LimitWriter{
 		w:        w,
 		limiters: limiters,
@@ -84,9 +97,9 @@ func (w *LimitWriter) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for i := 0; i < len(w.limiters); i++ {
-		if err := w.limiters[i].Add(int64(len(p))); err != nil {
+		if err := w.limiters[i].Allow(int64(len(p))); err != nil {
 			for j := i - 1; j >= 0; j-- {
-				w.limiters[j].Sub(int64(len(p)))
+				w.limiters[j].Allow(-int64(len(p))) // Revert limiters limits if allowed
 			}
 			return 0, ErrLimitReached
 		}

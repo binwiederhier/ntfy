@@ -909,13 +909,6 @@ func toMessage(t *testing.T, s string) *message {
 	return &m
 }
 
-func tempFile(t *testing.T, length int) (filename string, content string) {
-	filename = filepath.Join(t.TempDir(), util.RandomString(10))
-	content = util.RandomString(length)
-	require.Nil(t, os.WriteFile(filename, []byte(content), 0600))
-	return
-}
-
 func toHTTPError(t *testing.T, s string) *errHTTP {
 	var e errHTTP
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&e))

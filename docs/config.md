@@ -517,7 +517,7 @@ The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
 ```
 $ ntfy serve --help
 NAME:
-   main serve - Run the ntfy server
+   ntfy serve - Run the ntfy server
 
 USAGE:
    ntfy serve [OPTIONS..]

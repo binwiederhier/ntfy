@@ -660,7 +660,7 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 ## Attachments
-You can send images and other files to your phone as attachments to a notification. The attachments are then downloaded
+You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
 onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
 
 There are two different ways to send attachments: 
@@ -669,7 +669,7 @@ There are two different ways to send attachments:
 * or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk` 
 
 ### Attach local file
-To send an attachment from your computer as a file, you can send it as the PUT request body. If a message is greater 
+To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater 
 than the maximum message size (4,096 bytes) or consists of non UTF-8 characters, the ntfy server will automatically 
 detect the mime type and size, and send the message as an attachment file. To send smaller text-only messages or files 
 as attachments, you must pass a filename by passing the `X-Filename` header or query parameter (or any of its aliases 
@@ -701,6 +701,7 @@ Here's an example showing how to upload an image:
     PUT /flowers HTTP/1.1
     Host: ntfy.sh
     Filename: flower.jpg
+    Content-Type: 52312
 
     <binary JPEG data>
     ```
@@ -750,15 +751,13 @@ Here's what that looks like on Android:
 </figure>
 
 ### Attach file from a URL
-Instead of sending a local file to your phone, you can use an external URL to specify where the attachment is hosted.
+Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
 This could be a Google Drive or Dropbox link, or any other publicly available URL. The ntfy server will briefly probe
 the URL to retrieve type and size for you. Since the files are externally hosted, the expiration or size limits from 
 above do not apply here.
 
 To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
-to specify the attachment URL. It can be any type of file.
-
-Here's an example showing how to upload an image:
+to specify the attachment URL. It can be any type of file. Here's an example showing how to upload an image:
 
 === "Command line (curl)"
     ```
@@ -819,7 +818,6 @@ Here's an example showing how to upload an image:
   ![file attachment](static/img/android-screenshot-attachment-file.png){ width=500 }
   <figcaption>File attachment sent from an external URL</figcaption>
 </figure>
-
 
 ## E-mail notifications
 You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 

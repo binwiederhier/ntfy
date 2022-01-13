@@ -659,15 +659,80 @@ Here's an example that will open Reddit when the notification is clicked:
     ]));
     ```
 
-## Send files + URLs
+## Attachments (send files)
+You can send images and other files to your phone as attachments to a notification. The attachments are then downloaded
+onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
+
+There are two different ways to send attachments, either via PUT or by passing an external URL.  
+
+**Upload attachments from your computer**: To send an attachment from your computer as a file, you can send it as the 
+PUT request body. If a message is greater than the maximum message size or consists of non-UTF-8 characters, the ntfy 
+server will automatically detect the mime type and size, and send the message as an attachment file. 
+
+You can optionally pass a filename (or force attachment mode for small text-messages) by passing the `X-Filename` header
+or query parameter (or any of its aliases `Filename`, `File` or `f`). 
+
+Here's an example showing how to upload an image:
+
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -T flower.jpg \
+        ntfy.sh/flowers
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --file=flower.jpg \
+        flowers
+    ```
+
+=== "HTTP"
+    ``` http
+    PUT /flowers HTTP/1.1
+    Host: ntfy.sh
+
+    <binary JPEG data>
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/flowers', {
+        method: 'PUT',
+        body: document.getElementById("file").files[0]
+    })
+    ```
+
+=== "Go"
+    ``` go
+    file, _ := os.Open("flower.jpg")
+    req, _ := http.NewRequest("PUT", "https://ntfy.sh/flowers", file)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.put("https://ntfy.sh/flowers",
+        data=open("flower.jpg", 'rb'))
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'PUT',
+            'content' => XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx 
+        ]
+    ]));
+    ```
+
 ```
 - Uploaded attachment
 - External attachment
 - Preview without attachment 
 
-
-# Upload and send attachment
-curl -T image.jpg ntfy.sh/howdy
 
 # Upload and send attachment with custom message and filename
 curl \
@@ -951,17 +1016,30 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ]));
     ```
 
+### UnifiedPush
+!!! info
+    This setting is not relevant to users, only to app developers and people interested in [UnifiedPush](https://unifiedpush.org). 
+
+[UnifiedPush](https://unifiedpush.org) is a standard for receiving push notifications without using the Google-owned
+[Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications
+in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwarding messages to apps that support it.
+
+When publishing messages to a topic, apps using ntfy as a UnifiedPush distributor can set the `X-UnifiedPush` header or query
+parameter (or any of its aliases `unifiedpush` or `up`) to `1` to [disable Firebase](#disable-firebase). As of today, this
+option is equivalent to `Firebase: no`, but was introduced to allow future flexibility.
+
 ## Limitations
 There are a few limitations to the API to prevent abuse and to keep the server healthy. Most of them you won't run into,
 but just in case, let's list them all:
 
 | Limit | Description |
 |---|---|
-| **Message length** | Each message can be up to 4096 bytes long. Longer messages are truncated. |
+| **Message length** | Each message can be up to 4,096 bytes long. Longer messages are truncated. |
 | **Requests** | By default, the server is configured to allow 60 requests at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **E-mails** | By default, the server is configured to allow sending 16 e-mails at once, and then refills the your allowed e-mail bucket at a rate of one per hour. You can read more about this in the [rate limiting](config.md#rate-limiting) section. |
 | **Subscription limits** | By default, the server allows each visitor to keep 30 connections to the server open. |
-| **Total number of topics** | By default, the server is configured to allow 5,000 topics. The ntfy.sh server has higher limits though. |
+| **Bandwidth** | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected. |
+| **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though. |
 
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
@@ -975,8 +1053,9 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
 | `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
 | `X-Click` | `Click` | URL to open when [notification is clicked](#click-action) |
-| `X-Filename` | `Filename`, `file`, `f` | XXXXXXXXXXXXXXXX |
+| `X-Attach` | `Attach`, `a` | URL to send as an [attachment](#attachments-send-files), as an alternative to PUT/POST-ing an attachment |
+| `X-Filename` | `Filename`, `file`, `f` | Optional [attachment](#attachments-send-files) filename, as it appears in the client |
 | `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications) |
 | `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
 | `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |
-| `X-UnifiedPush` | `UnifiedPush`, `up` | XXXXXXXXXXXXXXXX |
+| `X-UnifiedPush` | `UnifiedPush`, `up` | [UnifiedPush](#unifiedpush) publish option, currently equivalent to `Firebase: no` |

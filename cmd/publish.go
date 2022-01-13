@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,6 +24,9 @@ var cmdPublish = &cli.Command{
 		&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, Usage: "comma separated list of tags and emojis"},
 		&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, Usage: "delay/schedule message"},
 		&cli.StringFlag{Name: "click", Aliases: []string{"U"}, Usage: "URL to open when notification is clicked"},
+		&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, Usage: "URL to send as an external attachment"},
+		&cli.StringFlag{Name: "filename", Aliases: []string{"n"}, Usage: "Filename for the attachment"},
+		&cli.StringFlag{Name: "file", Aliases: []string{"f"}, Usage: "File to upload as an attachment"},
 		&cli.StringFlag{Name: "email", Aliases: []string{"e-mail", "mail", "e"}, Usage: "also send to e-mail address"},
 		&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, Usage: "do not cache message server-side"},
 		&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, Usage: "do not forward message to Firebase"},
@@ -37,6 +43,9 @@ Examples:
   ntfy pub --at=8:30am delayed_topic Laterzz              # Send message at 8:30am
   ntfy pub -e phil@example.com alerts 'App is down!'      # Also send email to phil@example.com
   ntfy pub --click="https://reddit.com" redd 'New msg'    # Opens Reddit when notification is clicked
+  ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
+  ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
+  cat flower.jpg | ntfy pub --file=- flowers 'Nice!'      # Same as above, send image.jpg as attachment
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
 
 Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
@@ -59,6 +68,9 @@ func execPublish(c *cli.Context) error {
 	tags := c.String("tags")
 	delay := c.String("delay")
 	click := c.String("click")
+	attach := c.String("attach")
+	filename := c.String("filename")
+	file := c.String("file")
 	email := c.String("email")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
@@ -82,7 +94,13 @@ func execPublish(c *cli.Context) error {
 		options = append(options, client.WithDelay(delay))
 	}
 	if click != "" {
-		options = append(options, client.WithClick(email))
+		options = append(options, client.WithClick(click))
+	}
+	if attach != "" {
+		options = append(options, client.WithAttach(attach))
+	}
+	if filename != "" {
+		options = append(options, client.WithFilename(filename))
 	}
 	if email != "" {
 		options = append(options, client.WithEmail(email))
@@ -93,8 +111,30 @@ func execPublish(c *cli.Context) error {
 	if noFirebase {
 		options = append(options, client.WithNoFirebase())
 	}
+	var body io.Reader
+	if file == "" {
+		body = strings.NewReader(message)
+	} else {
+		if message != "" {
+			options = append(options, client.WithMessage(message))
+		}
+		if file == "-" {
+			if filename == "" {
+				options = append(options, client.WithFilename("stdin"))
+			}
+			body = c.App.Reader
+		} else {
+			if filename == "" {
+				options = append(options, client.WithFilename(filepath.Base(file)))
+			}
+			body, err = os.Open(file)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	cl := client.New(conf)
-	m, err := cl.Publish(topic, message, options...)
+	m, err := cl.PublishReader(topic, body, options...)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,11 @@ type PublishOption = RequestOption
 // SubscribeOption is an option that can be passed to a Client.Subscribe or Client.Poll call
 type SubscribeOption = RequestOption
 
+// WithMessage sets the notification message. This is an alternative way to passing the message body.
+func WithMessage(message string) PublishOption {
+	return WithHeader("X-Message", message)
+}
+
 // WithTitle adds a title to a message
 func WithTitle(title string) PublishOption {
 	return WithHeader("X-Title", title)
@@ -48,6 +53,16 @@ func WithDelay(delay string) PublishOption {
 // WithClick makes the notification action open the given URL as opposed to entering the detail view
 func WithClick(url string) PublishOption {
 	return WithHeader("X-Click", url)
+}
+
+// WithAttach sets a URL that will be used by the client to download an attachment
+func WithAttach(attach string) PublishOption {
+	return WithHeader("X-Attach", attach)
+}
+
+// WithFilename sets a filename for the attachment, and/or forces the HTTP body to interpreted as an attachment
+func WithFilename(filename string) PublishOption {
+	return WithHeader("X-Filename", filename)
 }
 
 // WithEmail instructs the server to also send the message to the given e-mail address

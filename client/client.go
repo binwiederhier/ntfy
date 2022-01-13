@@ -67,6 +67,12 @@ func New(config *Config) *Client {
 }
 
 // Publish sends a message to a specific topic, optionally using options.
+// See PublishReader for details.
+func (c *Client) Publish(topic, message string, options ...PublishOption) (*Message, error) {
+	return c.PublishReader(topic, strings.NewReader(message), options...)
+}
+
+// PublishReader sends a message to a specific topic, optionally using options.
 //
 // A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
 // (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
@@ -74,9 +80,9 @@ func New(config *Config) *Client {
 //
 // To pass title, priority and tags, check out WithTitle, WithPriority, WithTagsList, WithDelay, WithNoCache,
 // WithNoFirebase, and the generic WithHeader.
-func (c *Client) Publish(topic, message string, options ...PublishOption) (*Message, error) {
+func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishOption) (*Message, error) {
 	topicURL := c.expandTopicURL(topic)
-	req, _ := http.NewRequest("POST", topicURL, strings.NewReader(message))
+	req, _ := http.NewRequest("POST", topicURL, body)
 	for _, option := range options {
 		if err := option(req); err != nil {
 			return nil, err

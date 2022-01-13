@@ -123,11 +123,6 @@ var (
 	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
 
-	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
-	errHTTPTooManyRequestsLimitRequests              = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitEmails                = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitSubscriptions         = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
-	errHTTPTooManyRequestsLimitTotalTopics           = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPBadRequestEmailDisabled                   = &errHTTP{40001, http.StatusBadRequest, "e-mail notifications are not enabled", "https://ntfy.sh/docs/config/#e-mail-notifications"}
 	errHTTPBadRequestDelayNoCache                    = &errHTTP{40002, http.StatusBadRequest, "cannot disable cache for delayed message", ""}
 	errHTTPBadRequestDelayNoEmail                    = &errHTTP{40003, http.StatusBadRequest, "delayed e-mail notifications are not supported", ""}
@@ -139,22 +134,27 @@ var (
 	errHTTPBadRequestTopicInvalid                    = &errHTTP{40009, http.StatusBadRequest, "invalid topic: path invalid", ""}
 	errHTTPBadRequestTopicDisallowed                 = &errHTTP{40010, http.StatusBadRequest, "invalid topic: topic name is disallowed", ""}
 	errHTTPBadRequestMessageNotUTF8                  = &errHTTP{40011, http.StatusBadRequest, "invalid message: message must be UTF-8 encoded", ""}
-	errHTTPBadRequestAttachmentTooLarge              = &errHTTP{40012, http.StatusBadRequest, "invalid request: attachment too large, or traffic limit reached", ""}
+	errHTTPBadRequestAttachmentTooLarge              = &errHTTP{40012, http.StatusBadRequest, "invalid request: attachment too large, or bandwidth limit reached", ""}
 	errHTTPBadRequestAttachmentURLInvalid            = &errHTTP{40013, http.StatusBadRequest, "invalid request: attachment URL is invalid", ""}
 	errHTTPBadRequestAttachmentURLPeakGeneral        = &errHTTP{40014, http.StatusBadRequest, "invalid request: attachment URL peak failed", ""}
 	errHTTPBadRequestAttachmentURLPeakNon2xx         = &errHTTP{40015, http.StatusBadRequest, "invalid request: attachment URL peak failed with non-2xx status code", ""}
 	errHTTPBadRequestAttachmentsDisallowed           = &errHTTP{40016, http.StatusBadRequest, "invalid request: attachments not allowed", ""}
 	errHTTPBadRequestAttachmentsExpiryBeforeDelivery = &errHTTP{40017, http.StatusBadRequest, "invalid request: attachment expiry before delayed delivery date", ""}
-	errHTTPTooManyRequestsAttachmentTrafficLimit     = &errHTTP{42901, http.StatusTooManyRequests, "too many requests: daily traffic limit reached", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
+	errHTTPTooManyRequestsLimitRequests              = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitEmails                = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitSubscriptions         = &errHTTP{42903, http.StatusTooManyRequests, "limit reached: too many active subscriptions, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsLimitTotalTopics           = &errHTTP{42904, http.StatusTooManyRequests, "limit reached: the total number of topics on the server has been reached, please contact the admin", "https://ntfy.sh/docs/publish/#limitations"}
+	errHTTPTooManyRequestsAttachmentBandwidthLimit   = &errHTTP{42905, http.StatusTooManyRequests, "too many requests: daily bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPInternalError                             = &errHTTP{50001, http.StatusInternalServerError, "internal server error", ""}
 	errHTTPInternalErrorInvalidFilePath              = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid file path", ""}
 )
 
 const (
-	firebaseControlTopic     = "~control" // See Android if changed
-	emptyMessageBody         = "triggered"
-	fcmMessageLimit          = 4000 // see maybeTruncateFCMMessage for details
-	defaultAttachmentMessage = "You received a file: %s"
+	firebaseControlTopic     = "~control"                // See Android if changed
+	emptyMessageBody         = "triggered"               // Used if message body is empty
+	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
+	fcmMessageLimit          = 4000                      // see maybeTruncateFCMMessage for details
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -432,8 +432,8 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	if err != nil {
 		return errHTTPNotFound
 	}
-	if err := v.TrafficLimiter().Allow(stat.Size()); err != nil {
-		return errHTTPTooManyRequestsAttachmentTrafficLimit
+	if err := v.BandwidthLimiter().Allow(stat.Size()); err != nil {
+		return errHTTPTooManyRequestsAttachmentBandwidthLimit
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 	f, err := os.Open(file)
@@ -652,7 +652,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.TrafficLimiter(), util.NewFixedLimiter(remainingVisitorAttachmentSize))
+	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(remainingVisitorAttachmentSize))
 	if err == util.ErrLimitReached {
 		return errHTTPBadRequestAttachmentTooLarge
 	} else if err != nil {

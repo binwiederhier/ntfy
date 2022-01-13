@@ -844,11 +844,11 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 	require.Equal(t, 404, response.Code)
 }
 
-func TestServer_PublishAttachmentTrafficLimit(t *testing.T) {
+func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfig(t)
-	c.VisitorAttachmentDailyTrafficLimit = 5*5000 + 123 // A little more than 1 upload and 3 downloads
+	c.VisitorAttachmentDailyBandwidthLimit = 5*5000 + 123 // A little more than 1 upload and 3 downloads
 	s := newTestServer(t, c)
 
 	// Publish attachment
@@ -868,14 +868,14 @@ func TestServer_PublishAttachmentTrafficLimit(t *testing.T) {
 	response = request(t, s, "GET", path, "", nil)
 	err := toHTTPError(t, response.Body.String())
 	require.Equal(t, 429, response.Code)
-	require.Equal(t, 42901, err.Code)
+	require.Equal(t, 42905, err.Code)
 }
 
-func TestServer_PublishAttachmentTrafficLimitUploadOnly(t *testing.T) {
+func TestServer_PublishAttachmentBandwidthLimitUploadOnly(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfig(t)
-	c.VisitorAttachmentDailyTrafficLimit = 5*5000 + 500 // 5 successful uploads
+	c.VisitorAttachmentDailyBandwidthLimit = 5*5000 + 500 // 5 successful uploads
 	s := newTestServer(t, c)
 
 	// 5 successful uploads

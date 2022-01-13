@@ -26,7 +26,7 @@ type visitor struct {
 	requests      *rate.Limiter
 	emails        *rate.Limiter
 	subscriptions util.Limiter
-	traffic       util.Limiter
+	bandwidth     util.Limiter
 	seen          time.Time
 	mu            sync.Mutex
 }
@@ -38,7 +38,7 @@ func newVisitor(conf *Config, ip string) *visitor {
 		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
 		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		traffic:       util.NewBytesLimiter(conf.VisitorAttachmentDailyTrafficLimit, 24*time.Hour),
+		bandwidth:     util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
 		seen:          time.Now(),
 	}
 }
@@ -82,8 +82,8 @@ func (v *visitor) Keepalive() {
 	v.seen = time.Now()
 }
 
-func (v *visitor) TrafficLimiter() util.Limiter {
-	return v.traffic
+func (v *visitor) BandwidthLimiter() util.Limiter {
+	return v.bandwidth
 }
 
 func (v *visitor) Stale() bool {

@@ -153,6 +153,7 @@ or the root domain:
         proxy_http_version 1.1;
     
         proxy_buffering off;
+        proxy_request_buffering off;
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
@@ -161,6 +162,8 @@ or the root domain:
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
+
+        client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }
     
@@ -179,8 +182,9 @@ or the root domain:
       location / {
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
-    
+
         proxy_buffering off;
+        proxy_request_buffering off;
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
@@ -189,6 +193,8 @@ or the root domain:
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
+        
+        client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }
     ```
@@ -413,7 +419,12 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm). |
 | `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
 | `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely. |
-| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+| `attachment-cache-dir` | `NTFY_ATTACHMENT_CACHE_DIR` | *directory* | - | Cache directory for attached files. To enable attachments, this has to be set. |
+| `attachment-total-size-limit` | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT` | *size* | 5G | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected. |
+| `attachment-file-size-limit` | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT` | *size* | 15M | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected. |
+| `attachment-expiry-duration` | `NTFY_ATTACHMENT_EXPIRY_DURATION` | *duration* | 3h | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`. |
+| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 55s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
+| `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `smtp-sender-addr` | `NTFY_SMTP_SENDER_ADDR` | `host:port` | - | SMTP server address to allow email sending |
 | `smtp-sender-user` | `NTFY_SMTP_SENDER_USER` | *string* | - | SMTP user; only used if e-mail sending is enabled |
 | `smtp-sender-pass` | `NTFY_SMTP_SENDER_PASS` | *string* | - | SMTP password; only used if e-mail sending is enabled |
@@ -421,26 +432,24 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `smtp-server-listen` | `NTFY_SMTP_SERVER_LISTEN` | `[ip]:port` | - | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25` |
 | `smtp-server-domain` | `NTFY_SMTP_SERVER_DOMAIN` | *domain name* | - | SMTP server e-mail domain, e.g. `ntfy.sh` |
 | `smtp-server-addr-prefix` | `NTFY_SMTP_SERVER_ADDR_PREFIX` | `[ip]:port` | - |  Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-` |
-| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 55s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
-| `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
 | `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 15,000 | Rate limiting: Total number of topics before the server rejects new topics. |
 | `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
+| `visitor-attachment-total-size-limit` | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT` | *size* | 100M | Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`. |
+| `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size* | 500M | Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding. |
 | `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
 | `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
-| `visitor-email-limit-burst` | `NTFY_VISITOR_EMAIL_LIMIT_BURST` | *number* | 16 |Initial limit of e-mails per visitor |
+| `visitor-email-limit-burst` | `NTFY_VISITOR_EMAIL_LIMIT_BURST` | *number* | 16 | Initial limit of e-mails per visitor |
 | `visitor-email-limit-replenish` | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH` | *duration* | 1h | Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled |
-xx daily traffic limit
-xx DefaultVisitorAttachmentTotalSizeLimit
-xx attachment cache dir
-xx attachment 
+| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
 
-The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
+The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
+The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
 
 ## Command line options
 ```
 $ ntfy serve --help
 NAME:
-   ntfy serve - Run the ntfy server
+   main serve - Run the ntfy server
 
 USAGE:
    ntfy serve [OPTIONS..]
@@ -456,31 +465,37 @@ DESCRIPTION:
      ntfy serve --listen-http :8080  # Starts server with alternate port
 
 OPTIONS:
-   --config value, -c value                 config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
-   --base-url value, -B value               externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
-   --listen-http value, -l value            ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
-   --listen-https value, -L value           ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
-   --key-file value, -K value               private key file, if listen-https is set [$NTFY_KEY_FILE]
-   --cert-file value, -E value              certificate file, if listen-https is set [$NTFY_CERT_FILE]
-   --firebase-key-file value, -F value      Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
-   --cache-file value, -C value             cache file used for message caching [$NTFY_CACHE_FILE]
-   --cache-duration since, -b since         buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
-   --keepalive-interval value, -k value     interval of keepalive messages (default: 55s) [$NTFY_KEEPALIVE_INTERVAL]
-   --manager-interval value, -m value       interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
-   --smtp-sender-addr value                 SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
-   --smtp-sender-user value                 SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
-   --smtp-sender-pass value                 SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
-   --smtp-sender-from value                 SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_FROM]
-   --smtp-server-listen value               SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
-   --smtp-server-domain value               SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
-   --smtp-server-addr-prefix value          SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
-   --global-topic-limit value, -T value     total number of topics allowed (default: 5000) [$NTFY_GLOBAL_TOPIC_LIMIT]
-   --visitor-subscription-limit value       number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
-   --visitor-request-limit-burst value      initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
-   --visitor-request-limit-replenish value  interval at which burst limit is replenished (one per x) (default: 10s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
-   --visitor-email-limit-burst value        initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
-   --visitor-email-limit-replenish value    interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
-   --behind-proxy, -P                       if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
-   --help, -h                               show help (default: false)
+   --config value, -c value                          config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
+   --base-url value, -B value                        externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
+   --listen-http value, -l value                     ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-https value, -L value                    ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
+   --key-file value, -K value                        private key file, if listen-https is set [$NTFY_KEY_FILE]
+   --cert-file value, -E value                       certificate file, if listen-https is set [$NTFY_CERT_FILE]
+   --firebase-key-file value, -F value               Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
+   --cache-file value, -C value                      cache file used for message caching [$NTFY_CACHE_FILE]
+   --cache-duration since, -b since                  buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
+   --attachment-cache-dir value                      cache directory for attached files [$NTFY_ATTACHMENT_CACHE_DIR]
+   --attachment-total-size-limit value, -A value     limit of the on-disk attachment cache (default: 5G) [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
+   --attachment-file-size-limit value, -Y value      per-file attachment size limit (e.g. 300k, 2M, 100M) (default: 15M) [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
+   --attachment-expiry-duration value, -X value      duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: 3h) [$NTFY_ATTACHMENT_EXPIRY_DURATION]
+   --keepalive-interval value, -k value              interval of keepalive messages (default: 55s) [$NTFY_KEEPALIVE_INTERVAL]
+   --manager-interval value, -m value                interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
+   --smtp-sender-addr value                          SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
+   --smtp-sender-user value                          SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
+   --smtp-sender-pass value                          SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
+   --smtp-sender-from value                          SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_FROM]
+   --smtp-server-listen value                        SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
+   --smtp-server-domain value                        SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
+   --smtp-server-addr-prefix value                   SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
+   --global-topic-limit value, -T value              total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
+   --visitor-subscription-limit value                number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
+   --visitor-attachment-total-size-limit value       total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
+   --visitor-attachment-daily-bandwidth-limit value  total daily attachment download/upload bandwidth limit per visitor (default: "500M") [$NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT]
+   --visitor-request-limit-burst value               initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
+   --visitor-request-limit-replenish value           interval at which burst limit is replenished (one per x) (default: 10s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
+   --visitor-email-limit-burst value                 initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
+   --visitor-email-limit-replenish value             interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
+   --behind-proxy, -P                                if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+   --help, -h                                        show help (default: false)
 ```
 

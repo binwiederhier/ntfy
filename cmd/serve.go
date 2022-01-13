@@ -23,7 +23,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "1G", Usage: "limit of the on-disk attachment cache"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "attachment-expiry-duration", Aliases: []string{"X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: server.DefaultAttachmentExpiryDuration, DefaultText: "3h", Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
@@ -37,8 +37,8 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "50M", Usage: "total storage limit used for attachments per visitor"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-traffic-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_TRAFFIC_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload traffic limit per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "100M", Usage: "total storage limit used for attachments per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-bandwidth-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload bandwidth limit per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: server.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
@@ -93,7 +93,7 @@ func execServe(c *cli.Context) error {
 	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorAttachmentTotalSizeLimitStr := c.String("visitor-attachment-total-size-limit")
-	visitorAttachmentDailyTrafficLimitStr := c.String("visitor-attachment-daily-traffic-limit")
+	visitorAttachmentDailyBandwidthLimitStr := c.String("visitor-attachment-daily-bandwidth-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
 	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
@@ -134,11 +134,11 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	visitorAttachmentDailyTrafficLimit, err := parseSize(visitorAttachmentDailyTrafficLimitStr, server.DefaultVisitorAttachmentDailyTrafficLimit)
+	visitorAttachmentDailyBandwidthLimit, err := parseSize(visitorAttachmentDailyBandwidthLimitStr, server.DefaultVisitorAttachmentDailyBandwidthLimit)
 	if err != nil {
 		return err
-	} else if visitorAttachmentDailyTrafficLimit > math.MaxInt {
-		return fmt.Errorf("config option visitor-attachment-daily-traffic-limit must be lower than %d", math.MaxInt)
+	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
+		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
 
 	// Run server
@@ -167,7 +167,7 @@ func execServe(c *cli.Context) error {
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
-	conf.VisitorAttachmentDailyTrafficLimit = int(visitorAttachmentDailyTrafficLimit)
+	conf.VisitorAttachmentDailyBandwidthLimit = int(visitorAttachmentDailyBandwidthLimit)
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
 	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst

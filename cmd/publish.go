@@ -25,7 +25,7 @@ var cmdPublish = &cli.Command{
 		&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, Usage: "delay/schedule message"},
 		&cli.StringFlag{Name: "click", Aliases: []string{"U"}, Usage: "URL to open when notification is clicked"},
 		&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, Usage: "URL to send as an external attachment"},
-		&cli.StringFlag{Name: "filename", Aliases: []string{"n"}, Usage: "Filename for the attachment"},
+		&cli.StringFlag{Name: "filename", Aliases: []string{"name", "n"}, Usage: "Filename for the attachment"},
 		&cli.StringFlag{Name: "file", Aliases: []string{"f"}, Usage: "File to upload as an attachment"},
 		&cli.StringFlag{Name: "email", Aliases: []string{"e-mail", "mail", "e"}, Usage: "also send to e-mail address"},
 		&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, Usage: "do not cache message server-side"},

@@ -36,13 +36,13 @@ Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscri
 [`since=` parameter](subscribe/api.md#fetch-cached-messages).
 
 ## Attachments
-If desired, you may allow users to upload and [attach files to notifications](publish.md#attachments-send-files). To enable
+If desired, you may allow users to upload and [attach files to notifications](publish.md#attachments). To enable
 this feature, you have to simply configure an attachment cache directory and a base URL (`attachment-cache-dir`, `base-url`). 
 Once these options are set and the directory is writable by the server user, you can upload attachments via PUT.
 
-By default, attachments are stored in the disk-case **for only 3 hours**. The main reason for this is to avoid legal issues
-and such when hosting user controlled content. Typically, this is more than enough time for the user (or the phone) to download 
-the file. The following config options are relevant to attachments:
+By default, attachments are stored in the disk-cache **for only 3 hours**. The main reason for this is to avoid legal issues
+and such when hosting user controlled content. Typically, this is more than enough time for the user (or the auto download 
+feature) to download the file. The following config options are relevant to attachments:
 
 * `base-url` is the root URL for the ntfy server; this is needed for the generated attachment URLs
 * `attachment-cache-dir` is the cache directory for attached files
@@ -356,8 +356,15 @@ request every 10s (defined by `visitor-request-limit-replenish`)
 * `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 10s.
 
 ### Attachment limits
+Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
+per-visitor limits:
 
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+* `visitor-attachment-total-size-limit` is the total storage limit used for attachments per visitor. It defaults to 100M.
+  The per-visitor storage is automatically decreased as attachments expire. External attachments (attached via `X-Attach`, 
+  see [publishing docs](publish.md#attachments)) do not count here. 
+* `visitor-attachment-daily-bandwidth-limit` is the total daily attachment download/upload bandwidth limit per visitor, 
+  including PUT and GET requests. This is to protect your precious bandwidth from abuse, since egress costs money in
+  most cloud providers. This defaults to 500M.
 
 ### E-mail limits
 Similarly to the request limit, there is also an e-mail limit (only relevant if [e-mail notifications](#e-mail-notifications) 
@@ -470,38 +477,38 @@ Each config option can be set in the config file `/etc/ntfy/server.yml` (e.g. `l
 CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
 variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
-| Config option | Env variable | Format | Default | Description |
-|---|---|---|---|---|
-| `base-url` | `NTFY_BASE_URL` | *URL* | - | Public facing base URL of the service (e.g. `https://ntfy.sh`) |
-| `listen-http` | `NTFY_LISTEN_HTTP` | `[host]:port` | `:80` | Listen address for the HTTP web server |
-| `listen-https` | `NTFY_LISTEN_HTTPS` | `[host]:port` | - | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`. |
-| `key-file` | `NTFY_KEY_FILE` | *filename* | - | HTTPS/TLS private key file, only used if `listen-https` is set. |
-| `cert-file` | `NTFY_CERT_FILE` | *filename* | - | HTTPS/TLS certificate file, only used if `listen-https` is set. |
-| `firebase-key-file` | `NTFY_FIREBASE_KEY_FILE` | *filename* | - | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm). |
-| `cache-file` | `NTFY_CACHE_FILE` | *filename* | - | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache). |
-| `cache-duration` | `NTFY_CACHE_DURATION` | *duration* | 12h | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely. |
-| `attachment-cache-dir` | `NTFY_ATTACHMENT_CACHE_DIR` | *directory* | - | Cache directory for attached files. To enable attachments, this has to be set. |
-| `attachment-total-size-limit` | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT` | *size* | 5G | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected. |
-| `attachment-file-size-limit` | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT` | *size* | 15M | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected. |
-| `attachment-expiry-duration` | `NTFY_ATTACHMENT_EXPIRY_DURATION` | *duration* | 3h | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`. |
-| `keepalive-interval` | `NTFY_KEEPALIVE_INTERVAL` | *duration* | 55s | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
-| `manager-interval` | `$NTFY_MANAGER_INTERVAL` | *duration* | 1m | Interval in which the manager prunes old messages, deletes topics and prints the stats. |
-| `smtp-sender-addr` | `NTFY_SMTP_SENDER_ADDR` | `host:port` | - | SMTP server address to allow email sending |
-| `smtp-sender-user` | `NTFY_SMTP_SENDER_USER` | *string* | - | SMTP user; only used if e-mail sending is enabled |
-| `smtp-sender-pass` | `NTFY_SMTP_SENDER_PASS` | *string* | - | SMTP password; only used if e-mail sending is enabled |
-| `smtp-sender-from` | `NTFY_SMTP_SENDER_FROM` | *e-mail address* | - | SMTP sender e-mail address; only used if e-mail sending is enabled |
-| `smtp-server-listen` | `NTFY_SMTP_SERVER_LISTEN` | `[ip]:port` | - | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25` |
-| `smtp-server-domain` | `NTFY_SMTP_SERVER_DOMAIN` | *domain name* | - | SMTP server e-mail domain, e.g. `ntfy.sh` |
-| `smtp-server-addr-prefix` | `NTFY_SMTP_SERVER_ADDR_PREFIX` | `[ip]:port` | - |  Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-` |
-| `global-topic-limit` | `NTFY_GLOBAL_TOPIC_LIMIT` | *number* | 15,000 | Rate limiting: Total number of topics before the server rejects new topics. |
-| `visitor-subscription-limit` | `NTFY_VISITOR_SUBSCRIPTION_LIMIT` | *number* | 30 | Rate limiting: Number of subscriptions per visitor (IP address) |
-| `visitor-attachment-total-size-limit` | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT` | *size* | 100M | Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`. |
-| `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size* | 500M | Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding. |
-| `visitor-request-limit-burst` | `NTFY_VISITOR_REQUEST_LIMIT_BURST` | *number* | 60 | Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has |
-| `visitor-request-limit-replenish` | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH` | *duration* | 10s | Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled |
-| `visitor-email-limit-burst` | `NTFY_VISITOR_EMAIL_LIMIT_BURST` | *number* | 16 | Initial limit of e-mails per visitor |
-| `visitor-email-limit-replenish` | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH` | *duration* | 1h | Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled |
-| `behind-proxy` | `NTFY_BEHIND_PROXY` | *bool* | false | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection. |
+| Config option                              | Env variable                                    | Format           | Default | Description                                                                                                                                                                                                                     |
+|--------------------------------------------|-------------------------------------------------|------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*            | -       | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                  |
+| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`    | `:80`   | Listen address for the HTTP web server                                                                                                                                                                                          |
+| `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`    | -       | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                               |
+| `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*       | -       | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                 |
+| `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*       | -       | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                 |
+| `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*       | -       | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm).                        |
+| `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*       | -       | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).             |
+| `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*       | 12h     | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                        |
+| `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*           | false   | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection.                                                                                                 |
+| `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory*      | -       | Cache directory for attached files. To enable attachments, this has to be set.                                                                                                                                                  |
+| `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*           | 5G      | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                   |
+| `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*           | 15M     | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                       |
+| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*       | 3h      | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                               |
+| `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`      | -       | SMTP server address to allow email sending                                                                                                                                                                                      |
+| `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*         | -       | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                               |
+| `smtp-sender-pass`                         | `NTFY_SMTP_SENDER_PASS`                         | *string*         | -       | SMTP password; only used if e-mail sending is enabled                                                                                                                                                                           |
+| `smtp-sender-from`                         | `NTFY_SMTP_SENDER_FROM`                         | *e-mail address* | -       | SMTP sender e-mail address; only used if e-mail sending is enabled                                                                                                                                                              |
+| `smtp-server-listen`                       | `NTFY_SMTP_SERVER_LISTEN`                       | `[ip]:port`      | -       | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`                                                                                                                                      |
+| `smtp-server-domain`                       | `NTFY_SMTP_SERVER_DOMAIN`                       | *domain name*    | -       | SMTP server e-mail domain, e.g. `ntfy.sh`                                                                                                                                                                                       |
+| `smtp-server-addr-prefix`                  | `NTFY_SMTP_SERVER_ADDR_PREFIX`                  | `[ip]:port`      | -       | Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-`                                                                                                                                                          |
+| `keepalive-interval`                       | `NTFY_KEEPALIVE_INTERVAL`                       | *duration*       | 55s     | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
+| `manager-interval`                         | `$NTFY_MANAGER_INTERVAL`                        | *duration*       | 1m      | Interval in which the manager prunes old messages, deletes topics and prints the stats.                                                                                                                                         |
+| `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*         | 15,000  | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                     |
+| `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*         | 30      | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
+| `visitor-attachment-total-size-limit`      | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT`      | *size*           | 100M    | Rate limiting: Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`.                                                 |
+| `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*           | 500M    | Rate limiting: Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding.                                                                                        |
+| `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*         | 60      | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                           |
+| `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*       | 10s     | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
+| `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*         | 16      | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                              |
+| `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*       | 1h      | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                        |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.

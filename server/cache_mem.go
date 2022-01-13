@@ -131,7 +131,8 @@ func (c *memCache) AttachmentsSize(owner string) (int64, error) {
 	var size int64
 	for topic := range c.messages {
 		for _, m := range c.messages[topic] {
-			if m.Attachment != nil && m.Attachment.Owner == owner {
+			counted := m.Attachment != nil && m.Attachment.Owner == owner && m.Attachment.Expires > time.Now().Unix()
+			if counted {
 				size += m.Attachment.Size
 			}
 		}

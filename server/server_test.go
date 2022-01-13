@@ -699,12 +699,21 @@ func TestServer_PublishAttachment(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "5000", response.Header().Get("Content-Length"))
 	require.Equal(t, content, response.Body.String())
+
+	// Slightly unrelated cross-test: make sure we add an owner for internal attachments
+	size, err := s.cache.AttachmentsSize("9.9.9.9") // See request()
+	require.Nil(t, err)
+	require.Equal(t, int64(5000), size)
 }
 
 func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
-	s := newTestServer(t, newTestConfig(t))
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	s := newTestServer(t, c)
 	content := "this is an ATTACHMENT"
-	response := request(t, s, "PUT", "/mytopic?f=myfile.txt", content, nil)
+	response := request(t, s, "PUT", "/mytopic?f=myfile.txt", content, map[string]string{
+		"X-Forwarded-For": "1.2.3.4",
+	})
 	msg := toMessage(t, response.Body.String())
 	require.Equal(t, "myfile.txt", msg.Attachment.Name)
 	require.Equal(t, "text/plain; charset=utf-8", msg.Attachment.Type)
@@ -719,6 +728,11 @@ func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "21", response.Header().Get("Content-Length"))
 	require.Equal(t, content, response.Body.String())
+
+	// Slightly unrelated cross-test: make sure we add an owner for internal attachments
+	size, err := s.cache.AttachmentsSize("1.2.3.4")
+	require.Nil(t, err)
+	require.Equal(t, int64(21), size)
 }
 
 func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
@@ -734,6 +748,11 @@ func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
 	require.Equal(t, int64(0), msg.Attachment.Expires)
 	require.Equal(t, "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg", msg.Attachment.URL)
 	require.Equal(t, "", msg.Attachment.Owner)
+
+	// Slightly unrelated cross-test: make sure we don't add an owner for external attachments
+	size, err := s.cache.AttachmentsSize("127.0.0.1")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), size)
 }
 
 func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
@@ -914,6 +933,7 @@ func request(t *testing.T, s *Server, method, url, body string, headers map[stri
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.RemoteAddr = "9.9.9.9" // Used for tests
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

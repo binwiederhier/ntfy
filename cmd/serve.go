@@ -119,6 +119,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-sender-addr is set, base-url, smtp-sender-user, smtp-sender-pass and smtp-sender-from must also be set")
 	} else if smtpServerListen != "" && smtpServerDomain == "" {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
+	} else if attachmentCacheDir != "" && baseURL == "" {
+		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	}
 
 	// Convert sizes to bytes

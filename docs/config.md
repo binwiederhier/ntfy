@@ -35,6 +35,43 @@ the message to the subscribers.
 Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscribe/api.md#poll-for-messages), as well as the
 [`since=` parameter](subscribe/api.md#fetch-cached-messages).
 
+## Attachments
+If desired, you may allow users to upload and [attach files to notifications](publish.md#attachments-send-files). To enable
+this feature, you have to simply configure an attachment cache directory and a base URL (`attachment-cache-dir`, `base-url`). 
+Once these options are set and the directory is writable by the server user, you can upload attachments via PUT.
+
+By default, attachments are stored in the disk-case **for only 3 hours**. The main reason for this is to avoid legal issues
+and such when hosting user controlled content. Typically, this is more than enough time for the user (or the phone) to download 
+the file. The following config options are relevant to attachments:
+
+* `base-url` is the root URL for the ntfy server; this is needed for the generated attachment URLs
+* `attachment-cache-dir` is the cache directory for attached files
+* `attachment-total-size-limit` is the size limit of the on-disk attachment cache (default: 5G)
+* `attachment-file-size-limit` is the per-file attachment size limit (e.g. 300k, 2M, 100M, default: 15M)
+* `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h)
+
+Here's an example config using mostly the defaults (except for the cache directory, which is empty by default): 
+
+=== "/etc/ntfy/server.yml (minimal)"
+    ``` yaml
+    base-url: "https://ntfy.sh"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
+=== "/etc/ntfy/server.yml (all options)"
+    ``` yaml
+    base-url: "https://ntfy.sh"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    attachment-total-size-limit: "5G"
+    attachment-file-size-limit: "15M"
+    attachment-expiry-duration: "3h"
+    visitor-attachment-total-size-limit: "100M"
+    visitor-attachment-daily-bandwidth-limit: "500M"
+    ```
+
+Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-attachment-total-size-limit`
+and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is necessary to avoid abuse.
+
 ## E-mail notifications
 To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 
 you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g. 
@@ -124,7 +161,7 @@ which lets you use [AWS Route 53](https://aws.amazon.com/route53/) as the challe
 HTTP challenge. I've found [this guide](https://nandovieira.com/using-lets-encrypt-in-development-with-nginx-and-aws-route53) to
 be incredibly helpful.
 
-### nginx/Apache2
+### nginx/Apache2/caddy
 For your convenience, here's a working config that'll help configure things behind a proxy. In this 
 example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
@@ -245,6 +282,19 @@ or the root domain:
     </VirtualHost>
     ```
 
+=== "caddy"
+    ```
+    # Note that this config is most certainly incomplete. Please help out and let me know what's missing
+    # via Discord/Matrix or in a GitHub issue.
+
+    ntfy.sh {
+        reverse_proxy 127.0.0.1:2586
+    }
+    http://nfty.sh {
+        reverse_proxy 127.0.0.1:2586
+    }
+    ```
+
 ## Firebase (FCM)
 !!! info
     Using Firebase is **optional** and only works if you modify and [build your own Android .apk](develop.md#android-app).
@@ -278,14 +328,23 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
     Otherwise, all visitors are rate limited as if they are one.
 
 By default, ntfy runs without authentication, so it is vitally important that we protect the server from abuse or overload.
-There are various limits and rate limits in place that you can use to configure the server. Let's do the easy ones first:
+There are various limits and rate limits in place that you can use to configure the server:
+
+* **Global limit**: A global limit applies across all visitors (IPs, clients, users)
+* **Visitor limit**: A visitor limit only applies to a certain visitor. A **visitor** is identified by its IP address 
+  (or the `X-Forwarded-For` header if `behind-proxy` is set). All config options that start with the word `visitor` apply 
+  only on a per-visitor basis.
+
+During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
+(e.g. when you reconnect after a connection drop), it shouldn't have any effect.
+
+### General limits
+Let's do the easy limits first:
 
 * `global-topic-limit` defines the total number of topics before the server rejects new topics. It defaults to 15,000.
 * `visitor-subscription-limit` is the number of subscriptions (open connections) per visitor. This value defaults to 30.
 
-A **visitor** is identified by its IP address (or the `X-Forwarded-For` header if `behind-proxy` is set). All config 
-options that start with the word `visitor` apply only on a per-visitor basis.   
-
+### Request limits
 In addition to the limits above, there is a requests/second limit per visitor for all sensitive GET/PUT/POST requests.
 This limit uses a [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (using Go's [rate package](https://pkg.go.dev/golang.org/x/time/rate)):
 
@@ -296,14 +355,16 @@ request every 10s (defined by `visitor-request-limit-replenish`)
 * `visitor-request-limit-burst` is the initial bucket of requests each visitor has. This defaults to 60.
 * `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 10s.
 
+### Attachment limits
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+
+### E-mail limits
 Similarly to the request limit, there is also an e-mail limit (only relevant if [e-mail notifications](#e-mail-notifications) 
 are enabled):
 
 * `visitor-email-limit-burst` is the initial bucket of emails each visitor has. This defaults to 16.
 * `visitor-email-limit-replenish` is the rate at which the bucket is refilled (one email per x). Defaults to 1h.
-
-During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
-(e.g. when you reconnect after a connection drop), it shouldn't have any effect.
 
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,

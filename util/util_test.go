@@ -121,3 +121,34 @@ func TestShortTopicURL(t *testing.T) {
 	require.Equal(t, "ntfy.sh/mytopic", ShortTopicURL("http://ntfy.sh/mytopic"))
 	require.Equal(t, "lalala", ShortTopicURL("lalala"))
 }
+
+func TestParseSize_10GSuccess(t *testing.T) {
+	s, err := ParseSize("10G")
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, int64(10*1024*1024*1024), s)
+}
+
+func TestParseSize_10MUpperCaseSuccess(t *testing.T) {
+	s, err := ParseSize("10M")
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, int64(10*1024*1024), s)
+}
+
+func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
+	s, err := ParseSize("10k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, int64(10*1024), s)
+}
+
+func TestParseSize_FailureInvalid(t *testing.T) {
+	_, err := ParseSize("not a size")
+	if err == nil {
+		t.Fatalf("expected error, but got none")
+	}
+}

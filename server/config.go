@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Defines default config settings
+// Defines default config settings (excluding limits, see below)
 const (
 	DefaultListenHTTP                = ":80"
 	DefaultCacheDuration             = 12 * time.Hour
@@ -13,81 +13,107 @@ const (
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
-	DefaultMessageLimit              = 4096
 	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery
 )
 
-// Defines all the limits
-// - global topic limit: max number of topics overall
+// Defines all global and per-visitor limits
+// - message size limit: the max number of bytes for a message
+// - total topic limit: max number of topics overall
+// - various attachment limits
+const (
+	DefaultMessageLengthLimit       = 4096 // Bytes
+	DefaultTotalTopicLimit          = 15000
+	DefaultAttachmentTotalSizeLimit = int64(5 * 1024 * 1024 * 1024) // 5 GB
+	DefaultAttachmentFileSizeLimit  = int64(15 * 1024 * 1024)       // 15 MB
+	DefaultAttachmentExpiryDuration = 3 * time.Hour
+)
+
+// Defines all per-visitor limits
+// - per visitor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
 // - per visitor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
 // - per visitor email limit: max number of emails (here: 16 email bucket, replenished at a rate of one per hour)
-// - per visitor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
+// - per visitor attachment size limit: total per-visitor attachment size in bytes to be stored on the server
+// - per visitor attachment daily bandwidth limit: number of bytes that can be transferred to/from the server
 const (
-	DefaultGlobalTopicLimit             = 5000
-	DefaultVisitorRequestLimitBurst     = 60
-	DefaultVisitorRequestLimitReplenish = 10 * time.Second
-	DefaultVisitorEmailLimitBurst       = 16
-	DefaultVisitorEmailLimitReplenish   = time.Hour
-	DefaultVisitorSubscriptionLimit     = 30
+	DefaultVisitorSubscriptionLimit             = 30
+	DefaultVisitorRequestLimitBurst             = 60
+	DefaultVisitorRequestLimitReplenish         = 10 * time.Second
+	DefaultVisitorEmailLimitBurst               = 16
+	DefaultVisitorEmailLimitReplenish           = time.Hour
+	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB
+	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
-	BaseURL                      string
-	ListenHTTP                   string
-	ListenHTTPS                  string
-	KeyFile                      string
-	CertFile                     string
-	FirebaseKeyFile              string
-	CacheFile                    string
-	CacheDuration                time.Duration
-	KeepaliveInterval            time.Duration
-	ManagerInterval              time.Duration
-	AtSenderInterval             time.Duration
-	FirebaseKeepaliveInterval    time.Duration
-	SMTPSenderAddr               string
-	SMTPSenderUser               string
-	SMTPSenderPass               string
-	SMTPSenderFrom               string
-	SMTPServerListen             string
-	SMTPServerDomain             string
-	SMTPServerAddrPrefix         string
-	MessageLimit                 int
-	MinDelay                     time.Duration
-	MaxDelay                     time.Duration
-	GlobalTopicLimit             int
-	VisitorRequestLimitBurst     int
-	VisitorRequestLimitReplenish time.Duration
-	VisitorEmailLimitBurst       int
-	VisitorEmailLimitReplenish   time.Duration
-	VisitorSubscriptionLimit     int
-	BehindProxy                  bool
+	BaseURL                              string
+	ListenHTTP                           string
+	ListenHTTPS                          string
+	KeyFile                              string
+	CertFile                             string
+	FirebaseKeyFile                      string
+	CacheFile                            string
+	CacheDuration                        time.Duration
+	AttachmentCacheDir                   string
+	AttachmentTotalSizeLimit             int64
+	AttachmentFileSizeLimit              int64
+	AttachmentExpiryDuration             time.Duration
+	KeepaliveInterval                    time.Duration
+	ManagerInterval                      time.Duration
+	AtSenderInterval                     time.Duration
+	FirebaseKeepaliveInterval            time.Duration
+	SMTPSenderAddr                       string
+	SMTPSenderUser                       string
+	SMTPSenderPass                       string
+	SMTPSenderFrom                       string
+	SMTPServerListen                     string
+	SMTPServerDomain                     string
+	SMTPServerAddrPrefix                 string
+	MessageLimit                         int
+	MinDelay                             time.Duration
+	MaxDelay                             time.Duration
+	TotalTopicLimit                      int
+	TotalAttachmentSizeLimit             int64
+	VisitorSubscriptionLimit             int
+	VisitorAttachmentTotalSizeLimit      int64
+	VisitorAttachmentDailyBandwidthLimit int
+	VisitorRequestLimitBurst             int
+	VisitorRequestLimitReplenish         time.Duration
+	VisitorEmailLimitBurst               int
+	VisitorEmailLimitReplenish           time.Duration
+	BehindProxy                          bool
 }
 
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
-		BaseURL:                      "",
-		ListenHTTP:                   DefaultListenHTTP,
-		ListenHTTPS:                  "",
-		KeyFile:                      "",
-		CertFile:                     "",
-		FirebaseKeyFile:              "",
-		CacheFile:                    "",
-		CacheDuration:                DefaultCacheDuration,
-		KeepaliveInterval:            DefaultKeepaliveInterval,
-		ManagerInterval:              DefaultManagerInterval,
-		MessageLimit:                 DefaultMessageLimit,
-		MinDelay:                     DefaultMinDelay,
-		MaxDelay:                     DefaultMaxDelay,
-		AtSenderInterval:             DefaultAtSenderInterval,
-		FirebaseKeepaliveInterval:    DefaultFirebaseKeepaliveInterval,
-		GlobalTopicLimit:             DefaultGlobalTopicLimit,
-		VisitorRequestLimitBurst:     DefaultVisitorRequestLimitBurst,
-		VisitorRequestLimitReplenish: DefaultVisitorRequestLimitReplenish,
-		VisitorEmailLimitBurst:       DefaultVisitorEmailLimitBurst,
-		VisitorEmailLimitReplenish:   DefaultVisitorEmailLimitReplenish,
-		VisitorSubscriptionLimit:     DefaultVisitorSubscriptionLimit,
-		BehindProxy:                  false,
+		BaseURL:                              "",
+		ListenHTTP:                           DefaultListenHTTP,
+		ListenHTTPS:                          "",
+		KeyFile:                              "",
+		CertFile:                             "",
+		FirebaseKeyFile:                      "",
+		CacheFile:                            "",
+		CacheDuration:                        DefaultCacheDuration,
+		AttachmentCacheDir:                   "",
+		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,
+		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
+		KeepaliveInterval:                    DefaultKeepaliveInterval,
+		ManagerInterval:                      DefaultManagerInterval,
+		MessageLimit:                         DefaultMessageLengthLimit,
+		MinDelay:                             DefaultMinDelay,
+		MaxDelay:                             DefaultMaxDelay,
+		AtSenderInterval:                     DefaultAtSenderInterval,
+		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
+		TotalTopicLimit:                      DefaultTotalTopicLimit,
+		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
+		VisitorAttachmentTotalSizeLimit:      DefaultVisitorAttachmentTotalSizeLimit,
+		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
+		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
+		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
+		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
+		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
+		BehindProxy:                          false,
 	}
 }

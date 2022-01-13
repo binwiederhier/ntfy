@@ -23,27 +23,36 @@ const (
 			priority INT NOT NULL,
 			tags TEXT NOT NULL,
 			click TEXT NOT NULL,
+			attachment_name TEXT NOT NULL,
+			attachment_type TEXT NOT NULL,
+			attachment_size INT NOT NULL,
+			attachment_expires INT NOT NULL,
+			attachment_url TEXT NOT NULL,
+			attachment_owner TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
-	insertMessageQuery           = `INSERT INTO messages (id, time, topic, message, title, priority, tags, click, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	insertMessageQuery = `
+		INSERT INTO messages (id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time ASC
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
 		FROM messages 
 		WHERE time <= ? AND published = 0
 	`
@@ -51,6 +60,8 @@ const (
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
+	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE attachment_owner = ? AND attachment_expires >= ?`
+	selectAttachmentsExpiredQuery   = `SELECT id FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
 // Schema management queries
@@ -82,7 +93,15 @@ const (
 
 	// 2 -> 3
 	migrate2To3AlterMessagesTableQuery = `
+		BEGIN;
 		ALTER TABLE messages ADD COLUMN click TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_name TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_type TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_size INT NOT NULL DEFAULT('0');
+		ALTER TABLE messages ADD COLUMN attachment_expires INT NOT NULL DEFAULT('0');
+		ALTER TABLE messages ADD COLUMN attachment_owner TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN attachment_url TEXT NOT NULL DEFAULT('');
+		COMMIT;
 	`
 )
 
@@ -110,7 +129,35 @@ func (c *sqliteCache) AddMessage(m *message) error {
 		return errUnexpectedMessageType
 	}
 	published := m.Time <= time.Now().Unix()
-	_, err := c.db.Exec(insertMessageQuery, m.ID, m.Time, m.Topic, m.Message, m.Title, m.Priority, strings.Join(m.Tags, ","), m.Click, published)
+	tags := strings.Join(m.Tags, ",")
+	var attachmentName, attachmentType, attachmentURL, attachmentOwner string
+	var attachmentSize, attachmentExpires int64
+	if m.Attachment != nil {
+		attachmentName = m.Attachment.Name
+		attachmentType = m.Attachment.Type
+		attachmentSize = m.Attachment.Size
+		attachmentExpires = m.Attachment.Expires
+		attachmentURL = m.Attachment.URL
+		attachmentOwner = m.Attachment.Owner
+	}
+	_, err := c.db.Exec(
+		insertMessageQuery,
+		m.ID,
+		m.Time,
+		m.Topic,
+		m.Message,
+		m.Title,
+		m.Priority,
+		tags,
+		m.Click,
+		attachmentName,
+		attachmentType,
+		attachmentSize,
+		attachmentExpires,
+		attachmentURL,
+		attachmentOwner,
+		published,
+	)
 	return err
 }
 
@@ -187,30 +234,80 @@ func (c *sqliteCache) Prune(olderThan time.Time) error {
 	return err
 }
 
+func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
+	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner, time.Now().Unix())
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	var size int64
+	if !rows.Next() {
+		return 0, errors.New("no rows found")
+	}
+	if err := rows.Scan(&size); err != nil {
+		return 0, err
+	} else if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+func (c *sqliteCache) AttachmentsExpired() ([]string, error) {
+	rows, err := c.db.Query(selectAttachmentsExpiredQuery, time.Now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 func readMessages(rows *sql.Rows) ([]*message, error) {
 	defer rows.Close()
 	messages := make([]*message, 0)
 	for rows.Next() {
-		var timestamp int64
+		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, click string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click); err != nil {
+		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner string
+		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL, &attachmentOwner); err != nil {
 			return nil, err
 		}
 		var tags []string
 		if tagsStr != "" {
 			tags = strings.Split(tagsStr, ",")
 		}
+		var att *attachment
+		if attachmentName != "" && attachmentURL != "" {
+			att = &attachment{
+				Name:    attachmentName,
+				Type:    attachmentType,
+				Size:    attachmentSize,
+				Expires: attachmentExpires,
+				URL:     attachmentURL,
+				Owner:   attachmentOwner,
+			}
+		}
 		messages = append(messages, &message{
-			ID:       id,
-			Time:     timestamp,
-			Event:    messageEvent,
-			Topic:    topic,
-			Message:  msg,
-			Title:    title,
-			Priority: priority,
-			Tags:     tags,
-			Click:    click,
+			ID:         id,
+			Time:       timestamp,
+			Event:      messageEvent,
+			Topic:      topic,
+			Message:    msg,
+			Title:      title,
+			Priority:   priority,
+			Tags:       tags,
+			Click:      click,
+			Attachment: att,
 		})
 	}
 	if err := rows.Err(); err != nil {

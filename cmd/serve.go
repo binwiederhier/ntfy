@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/server"
 	"heckel.io/ntfy/util"
 	"log"
+	"math"
 	"time"
 )
 
@@ -20,6 +22,10 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
+	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "attachment-expiry-duration", Aliases: []string{"X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: server.DefaultAttachmentExpiryDuration, DefaultText: "3h", Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
@@ -29,8 +35,10 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "SMTP server address (ip:port) for incoming emails, e.g. :25"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "SMTP domain for incoming e-mail, e.g. ntfy.sh"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
-	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultGlobalTopicLimit, Usage: "total number of topics allowed"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "100M", Usage: "total storage limit used for attachments per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-bandwidth-limit", EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload bandwidth limit per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: server.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
@@ -69,6 +77,10 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
+	attachmentCacheDir := c.String("attachment-cache-dir")
+	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
+	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
+	attachmentExpiryDuration := c.Duration("attachment-expiry-duration")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
 	smtpSenderAddr := c.String("smtp-sender-addr")
@@ -78,8 +90,10 @@ func execServe(c *cli.Context) error {
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
-	globalTopicLimit := c.Int("global-topic-limit")
+	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
+	visitorAttachmentTotalSizeLimitStr := c.String("visitor-attachment-total-size-limit")
+	visitorAttachmentDailyBandwidthLimitStr := c.String("visitor-attachment-daily-bandwidth-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
 	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
@@ -105,6 +119,28 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-sender-addr is set, base-url, smtp-sender-user, smtp-sender-pass and smtp-sender-from must also be set")
 	} else if smtpServerListen != "" && smtpServerDomain == "" {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
+	} else if attachmentCacheDir != "" && baseURL == "" {
+		return errors.New("if attachment-cache-dir is set, base-url must also be set")
+	}
+
+	// Convert sizes to bytes
+	attachmentTotalSizeLimit, err := parseSize(attachmentTotalSizeLimitStr, server.DefaultAttachmentTotalSizeLimit)
+	if err != nil {
+		return err
+	}
+	attachmentFileSizeLimit, err := parseSize(attachmentFileSizeLimitStr, server.DefaultAttachmentFileSizeLimit)
+	if err != nil {
+		return err
+	}
+	visitorAttachmentTotalSizeLimit, err := parseSize(visitorAttachmentTotalSizeLimitStr, server.DefaultVisitorAttachmentTotalSizeLimit)
+	if err != nil {
+		return err
+	}
+	visitorAttachmentDailyBandwidthLimit, err := parseSize(visitorAttachmentDailyBandwidthLimitStr, server.DefaultVisitorAttachmentDailyBandwidthLimit)
+	if err != nil {
+		return err
+	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
+		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
 
 	// Run server
@@ -117,6 +153,10 @@ func execServe(c *cli.Context) error {
 	conf.FirebaseKeyFile = firebaseKeyFile
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
+	conf.AttachmentCacheDir = attachmentCacheDir
+	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
+	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit
+	conf.AttachmentExpiryDuration = attachmentExpiryDuration
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.SMTPSenderAddr = smtpSenderAddr
@@ -126,8 +166,10 @@ func execServe(c *cli.Context) error {
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
-	conf.GlobalTopicLimit = globalTopicLimit
+	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
+	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
+	conf.VisitorAttachmentDailyBandwidthLimit = int(visitorAttachmentDailyBandwidthLimit)
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
 	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
@@ -142,4 +184,15 @@ func execServe(c *cli.Context) error {
 	}
 	log.Printf("Exiting.")
 	return nil
+}
+
+func parseSize(s string, defaultValue int64) (v int64, err error) {
+	if s == "" {
+		return defaultValue, nil
+	}
+	v, err = util.ParseSize(s)
+	if err != nil {
+		return 0, err
+	}
+	return v, nil
 }

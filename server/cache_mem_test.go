@@ -25,6 +25,10 @@ func TestMemCache_Prune(t *testing.T) {
 	testCachePrune(t, newMemCache())
 }
 
+func TestMemCache_Attachments(t *testing.T) {
+	testCacheAttachments(t, newMemCache())
+}
+
 func TestMemCache_NopCache(t *testing.T) {
 	c := newNopCache()
 	assert.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))

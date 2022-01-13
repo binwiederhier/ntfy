@@ -4,8 +4,6 @@ set -e
 # Restart systemd service if it was already running. Note that "deb-systemd-invoke try-restart" will
 # only act if the service is already running. If it's not running, it's a no-op.
 #
-# TODO: This is only tested on Debian.
-#
 if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
   if [ -d /run/systemd/system ]; then
     # Create ntfy user/group

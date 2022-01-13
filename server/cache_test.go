@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -13,71 +13,71 @@ func testCacheMessages(t *testing.T, c cache) {
 	m2 := newDefaultMessage("mytopic", "my other message")
 	m2.Time = 2
 
-	assert.Nil(t, c.AddMessage(m1))
-	assert.Nil(t, c.AddMessage(newDefaultMessage("example", "my example message")))
-	assert.Nil(t, c.AddMessage(m2))
+	require.Nil(t, c.AddMessage(m1))
+	require.Nil(t, c.AddMessage(newDefaultMessage("example", "my example message")))
+	require.Nil(t, c.AddMessage(m2))
 
 	// Adding invalid
-	assert.Equal(t, errUnexpectedMessageType, c.AddMessage(newKeepaliveMessage("mytopic"))) // These should not be added!
-	assert.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example")))      // These should not be added!
+	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newKeepaliveMessage("mytopic"))) // These should not be added!
+	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example")))      // These should not be added!
 
 	// mytopic: count
 	count, err := c.MessageCount("mytopic")
-	assert.Nil(t, err)
-	assert.Equal(t, 2, count)
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
 
 	// mytopic: since all
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
-	assert.Equal(t, 2, len(messages))
-	assert.Equal(t, "my message", messages[0].Message)
-	assert.Equal(t, "mytopic", messages[0].Topic)
-	assert.Equal(t, messageEvent, messages[0].Event)
-	assert.Equal(t, "", messages[0].Title)
-	assert.Equal(t, 0, messages[0].Priority)
-	assert.Nil(t, messages[0].Tags)
-	assert.Equal(t, "my other message", messages[1].Message)
+	require.Equal(t, 2, len(messages))
+	require.Equal(t, "my message", messages[0].Message)
+	require.Equal(t, "mytopic", messages[0].Topic)
+	require.Equal(t, messageEvent, messages[0].Event)
+	require.Equal(t, "", messages[0].Title)
+	require.Equal(t, 0, messages[0].Priority)
+	require.Nil(t, messages[0].Tags)
+	require.Equal(t, "my other message", messages[1].Message)
 
 	// mytopic: since none
 	messages, _ = c.Messages("mytopic", sinceNoMessages, false)
-	assert.Empty(t, messages)
+	require.Empty(t, messages)
 
 	// mytopic: since 2
 	messages, _ = c.Messages("mytopic", sinceTime(time.Unix(2, 0)), false)
-	assert.Equal(t, 1, len(messages))
-	assert.Equal(t, "my other message", messages[0].Message)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "my other message", messages[0].Message)
 
 	// example: count
 	count, err = c.MessageCount("example")
-	assert.Nil(t, err)
-	assert.Equal(t, 1, count)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
 
 	// example: since all
 	messages, _ = c.Messages("example", sinceAllMessages, false)
-	assert.Equal(t, "my example message", messages[0].Message)
+	require.Equal(t, "my example message", messages[0].Message)
 
 	// non-existing: count
 	count, err = c.MessageCount("doesnotexist")
-	assert.Nil(t, err)
-	assert.Equal(t, 0, count)
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
 
 	// non-existing: since all
 	messages, _ = c.Messages("doesnotexist", sinceAllMessages, false)
-	assert.Empty(t, messages)
+	require.Empty(t, messages)
 }
 
 func testCacheTopics(t *testing.T, c cache) {
-	assert.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
-	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
-	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
-	assert.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 3")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 3")))
 
 	topics, err := c.Topics()
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 2, len(topics))
-	assert.Equal(t, "topic1", topics["topic1"].ID)
-	assert.Equal(t, "topic2", topics["topic2"].ID)
+	require.Equal(t, 2, len(topics))
+	require.Equal(t, "topic1", topics["topic1"].ID)
+	require.Equal(t, "topic2", topics["topic2"].ID)
 }
 
 func testCachePrune(t *testing.T, c cache) {
@@ -90,23 +90,23 @@ func testCachePrune(t *testing.T, c cache) {
 	m3 := newDefaultMessage("another_topic", "and another one")
 	m3.Time = 1
 
-	assert.Nil(t, c.AddMessage(m1))
-	assert.Nil(t, c.AddMessage(m2))
-	assert.Nil(t, c.AddMessage(m3))
-	assert.Nil(t, c.Prune(time.Unix(2, 0)))
+	require.Nil(t, c.AddMessage(m1))
+	require.Nil(t, c.AddMessage(m2))
+	require.Nil(t, c.AddMessage(m3))
+	require.Nil(t, c.Prune(time.Unix(2, 0)))
 
 	count, err := c.MessageCount("mytopic")
-	assert.Nil(t, err)
-	assert.Equal(t, 1, count)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
 
 	count, err = c.MessageCount("another_topic")
-	assert.Nil(t, err)
-	assert.Equal(t, 0, count)
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
 
 	messages, err := c.Messages("mytopic", sinceAllMessages, false)
-	assert.Nil(t, err)
-	assert.Equal(t, 1, len(messages))
-	assert.Equal(t, "my other message", messages[0].Message)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "my other message", messages[0].Message)
 }
 
 func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
@@ -114,12 +114,12 @@ func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
 	m.Tags = []string{"tag1", "tag2"}
 	m.Priority = 5
 	m.Title = "some title"
-	assert.Nil(t, c.AddMessage(m))
+	require.Nil(t, c.AddMessage(m))
 
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
-	assert.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
-	assert.Equal(t, 5, messages[0].Priority)
-	assert.Equal(t, "some title", messages[0].Title)
+	require.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
+	require.Equal(t, 5, messages[0].Priority)
+	require.Equal(t, "some title", messages[0].Title)
 }
 
 func testCacheMessagesScheduled(t *testing.T, c cache) {
@@ -130,20 +130,93 @@ func testCacheMessagesScheduled(t *testing.T, c cache) {
 	m3.Time = time.Now().Add(time.Minute).Unix() // earlier than m2!
 	m4 := newDefaultMessage("mytopic2", "message 4")
 	m4.Time = time.Now().Add(time.Minute).Unix()
-	assert.Nil(t, c.AddMessage(m1))
-	assert.Nil(t, c.AddMessage(m2))
-	assert.Nil(t, c.AddMessage(m3))
+	require.Nil(t, c.AddMessage(m1))
+	require.Nil(t, c.AddMessage(m2))
+	require.Nil(t, c.AddMessage(m3))
 
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false) // exclude scheduled
-	assert.Equal(t, 1, len(messages))
-	assert.Equal(t, "message 1", messages[0].Message)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "message 1", messages[0].Message)
 
 	messages, _ = c.Messages("mytopic", sinceAllMessages, true) // include scheduled
-	assert.Equal(t, 3, len(messages))
-	assert.Equal(t, "message 1", messages[0].Message)
-	assert.Equal(t, "message 3", messages[1].Message) // Order!
-	assert.Equal(t, "message 2", messages[2].Message)
+	require.Equal(t, 3, len(messages))
+	require.Equal(t, "message 1", messages[0].Message)
+	require.Equal(t, "message 3", messages[1].Message) // Order!
+	require.Equal(t, "message 2", messages[2].Message)
 
 	messages, _ = c.MessagesDue()
-	assert.Empty(t, messages)
+	require.Empty(t, messages)
+}
+
+func testCacheAttachments(t *testing.T, c cache) {
+	expires1 := time.Now().Add(-4 * time.Hour).Unix()
+	m := newDefaultMessage("mytopic", "flower for you")
+	m.ID = "m1"
+	m.Attachment = &attachment{
+		Name:    "flower.jpg",
+		Type:    "image/jpeg",
+		Size:    5000,
+		Expires: expires1,
+		URL:     "https://ntfy.sh/file/AbDeFgJhal.jpg",
+		Owner:   "1.2.3.4",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	expires2 := time.Now().Add(2 * time.Hour).Unix() // Future
+	m = newDefaultMessage("mytopic", "sending you a car")
+	m.ID = "m2"
+	m.Attachment = &attachment{
+		Name:    "car.jpg",
+		Type:    "image/jpeg",
+		Size:    10000,
+		Expires: expires2,
+		URL:     "https://ntfy.sh/file/aCaRURL.jpg",
+		Owner:   "1.2.3.4",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	expires3 := time.Now().Add(1 * time.Hour).Unix() // Future
+	m = newDefaultMessage("another-topic", "sending you another car")
+	m.ID = "m3"
+	m.Attachment = &attachment{
+		Name:    "another-car.jpg",
+		Type:    "image/jpeg",
+		Size:    20000,
+		Expires: expires3,
+		URL:     "https://ntfy.sh/file/zakaDHFW.jpg",
+		Owner:   "1.2.3.4",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+
+	require.Equal(t, "flower for you", messages[0].Message)
+	require.Equal(t, "flower.jpg", messages[0].Attachment.Name)
+	require.Equal(t, "image/jpeg", messages[0].Attachment.Type)
+	require.Equal(t, int64(5000), messages[0].Attachment.Size)
+	require.Equal(t, expires1, messages[0].Attachment.Expires)
+	require.Equal(t, "https://ntfy.sh/file/AbDeFgJhal.jpg", messages[0].Attachment.URL)
+	require.Equal(t, "1.2.3.4", messages[0].Attachment.Owner)
+
+	require.Equal(t, "sending you a car", messages[1].Message)
+	require.Equal(t, "car.jpg", messages[1].Attachment.Name)
+	require.Equal(t, "image/jpeg", messages[1].Attachment.Type)
+	require.Equal(t, int64(10000), messages[1].Attachment.Size)
+	require.Equal(t, expires2, messages[1].Attachment.Expires)
+	require.Equal(t, "https://ntfy.sh/file/aCaRURL.jpg", messages[1].Attachment.URL)
+	require.Equal(t, "1.2.3.4", messages[1].Attachment.Owner)
+
+	size, err := c.AttachmentsSize("1.2.3.4")
+	require.Nil(t, err)
+	require.Equal(t, int64(30000), size)
+
+	size, err = c.AttachmentsSize("5.6.7.8")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), size)
+
+	ids, err := c.AttachmentsExpired()
+	require.Nil(t, err)
+	require.Equal(t, []string{"m1"}, ids)
 }

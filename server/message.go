@@ -18,15 +18,25 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID       string   `json:"id"`    // Random message ID
-	Time     int64    `json:"time"`  // Unix time in seconds
-	Event    string   `json:"event"` // One of the above
-	Topic    string   `json:"topic"`
-	Priority int      `json:"priority,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	Click    string   `json:"click,omitempty"`
-	Title    string   `json:"title,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	ID         string      `json:"id"`    // Random message ID
+	Time       int64       `json:"time"`  // Unix time in seconds
+	Event      string      `json:"event"` // One of the above
+	Topic      string      `json:"topic"`
+	Priority   int         `json:"priority,omitempty"`
+	Tags       []string    `json:"tags,omitempty"`
+	Click      string      `json:"click,omitempty"`
+	Attachment *attachment `json:"attachment,omitempty"`
+	Title      string      `json:"title,omitempty"`
+	Message    string      `json:"message,omitempty"`
+}
+
+type attachment struct {
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	Expires int64  `json:"expires,omitempty"`
+	URL     string `json:"url"`
+	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
 // messageEncoder is a function that knows how to encode a message

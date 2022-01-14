@@ -743,10 +743,10 @@ func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.Equal(t, "You received a file: Pink_flower.jpg", msg.Message)
 	require.Equal(t, "Pink_flower.jpg", msg.Attachment.Name)
-	require.Equal(t, "image/jpeg", msg.Attachment.Type)
-	require.Equal(t, int64(190173), msg.Attachment.Size)
-	require.Equal(t, int64(0), msg.Attachment.Expires)
 	require.Equal(t, "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg", msg.Attachment.URL)
+	require.Equal(t, "", msg.Attachment.Type)
+	require.Equal(t, int64(0), msg.Attachment.Size)
+	require.Equal(t, int64(0), msg.Attachment.Expires)
 	require.Equal(t, "", msg.Attachment.Owner)
 
 	// Slightly unrelated cross-test: make sure we don't add an owner for external attachments
@@ -764,10 +764,10 @@ func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.Equal(t, "This is a custom message", msg.Message)
 	require.Equal(t, "some file.jpg", msg.Attachment.Name)
-	require.Equal(t, "image/jpeg", msg.Attachment.Type)
-	require.Equal(t, int64(190173), msg.Attachment.Size)
-	require.Equal(t, int64(0), msg.Attachment.Expires)
 	require.Equal(t, "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pink_flower.jpg", msg.Attachment.URL)
+	require.Equal(t, "", msg.Attachment.Type)
+	require.Equal(t, int64(0), msg.Attachment.Size)
+	require.Equal(t, int64(0), msg.Attachment.Expires)
 	require.Equal(t, "", msg.Attachment.Owner)
 }
 

@@ -18,7 +18,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -459,9 +461,6 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
-	if err := maybePeakAttachmentURL(m); err != nil {
-		return err
-	}
 	if err := s.handlePublishBody(r, v, m, body); err != nil {
 		return err
 	}
@@ -507,19 +506,31 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	firebase = readParam(r, "x-firebase", "firebase") != "no"
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
-	attach := readParam(r, "x-attach", "attach", "a")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
+	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
 		m.Attachment = &attachment{}
+	}
+	if filename != "" {
+		m.Attachment.Name = filename
 	}
 	if attach != "" {
 		if !attachURLRegex.MatchString(attach) {
 			return false, false, "", errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
-	}
-	if filename != "" {
-		m.Attachment.Name = filename
+		if m.Attachment.Name == "" {
+			u, err := url.Parse(m.Attachment.URL)
+			if err == nil {
+				m.Attachment.Name = path.Base(u.Path)
+				if m.Attachment.Name == "." || m.Attachment.Name == "/" {
+					m.Attachment.Name = ""
+				}
+			}
+		}
+		if m.Attachment.Name == "" {
+			m.Attachment.Name = "attachment"
+		}
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {

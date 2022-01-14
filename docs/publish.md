@@ -752,9 +752,8 @@ Here's what that looks like on Android:
 
 ### Attach file from a URL
 Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
-This could be a Google Drive or Dropbox link, or any other publicly available URL. The ntfy server will briefly probe
-the URL to retrieve type and size for you. Since the files are externally hosted, the expiration or size limits from 
-above do not apply here.
+This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are 
+externally hosted, the expiration or size limits from above do not apply here.
 
 To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
 to specify the attachment URL. It can be any type of file. Here's an example showing how to upload an image:

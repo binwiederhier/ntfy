@@ -814,7 +814,7 @@ func TestServer_PublishAttachmentExpiryBeforeDelivery(t *testing.T) {
 	err := toHTTPError(t, response.Body.String())
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, 400, err.HTTPCode)
-	require.Equal(t, 40017, err.Code)
+	require.Equal(t, 40015, err.Code)
 }
 
 func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *testing.T) {

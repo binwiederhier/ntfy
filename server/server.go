@@ -138,10 +138,8 @@ var (
 	errHTTPBadRequestMessageNotUTF8                  = &errHTTP{40011, http.StatusBadRequest, "invalid message: message must be UTF-8 encoded", ""}
 	errHTTPBadRequestAttachmentTooLarge              = &errHTTP{40012, http.StatusBadRequest, "invalid request: attachment too large, or bandwidth limit reached", ""}
 	errHTTPBadRequestAttachmentURLInvalid            = &errHTTP{40013, http.StatusBadRequest, "invalid request: attachment URL is invalid", ""}
-	errHTTPBadRequestAttachmentURLPeakGeneral        = &errHTTP{40014, http.StatusBadRequest, "invalid request: attachment URL peak failed", ""}
-	errHTTPBadRequestAttachmentURLPeakNon2xx         = &errHTTP{40015, http.StatusBadRequest, "invalid request: attachment URL peak failed with non-2xx status code", ""}
-	errHTTPBadRequestAttachmentsDisallowed           = &errHTTP{40016, http.StatusBadRequest, "invalid request: attachments not allowed", ""}
-	errHTTPBadRequestAttachmentsExpiryBeforeDelivery = &errHTTP{40017, http.StatusBadRequest, "invalid request: attachment expiry before delayed delivery date", ""}
+	errHTTPBadRequestAttachmentsDisallowed           = &errHTTP{40014, http.StatusBadRequest, "invalid request: attachments not allowed", ""}
+	errHTTPBadRequestAttachmentsExpiryBeforeDelivery = &errHTTP{40015, http.StatusBadRequest, "invalid request: attachment expiry before delayed delivery date", ""}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
 	errHTTPTooManyRequestsLimitRequests              = &errHTTP{42901, http.StatusTooManyRequests, "limit reached: too many requests, please be nice", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPTooManyRequestsLimitEmails                = &errHTTP{42902, http.StatusTooManyRequests, "limit reached: too many emails, please be nice", "https://ntfy.sh/docs/publish/#limitations"}

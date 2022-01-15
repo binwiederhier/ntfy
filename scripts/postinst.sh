@@ -4,14 +4,12 @@ set -e
 # Restart systemd service if it was already running. Note that "deb-systemd-invoke try-restart" will
 # only act if the service is already running. If it's not running, it's a no-op.
 #
-# TODO: This is only tested on Debian.
-#
 if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
   if [ -d /run/systemd/system ]; then
     # Create ntfy user/group
     id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy
-    chown ntfy.ntfy /var/cache/ntfy
-    chmod 700 /var/cache/ntfy
+    chown ntfy.ntfy /var/cache/ntfy /var/cache/ntfy/attachments
+    chmod 700 /var/cache/ntfy /var/cache/ntfy/attachments
 
     # Hack to change permissions on cache file
     configfile="/etc/ntfy/server.yml"

@@ -8,8 +8,15 @@
 # Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
 # set "key-file" and "cert-file". Format: <hostname>:<port>
 #
+# To disable HTTP, set "listen-http" to "-".
+#
 # listen-http: ":80"
 # listen-https:
+
+# Listen on a Unix socket, e.g. /var/lib/ntfy/ntfy.sock
+# This can be useful to avoid port issues on local systems, and to simplify permissions.
+#
+# listen-unix: <socket-path>
 
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #
@@ -36,7 +43,7 @@
 #
 # You can disable the cache entirely by setting this to 0.
 #
-# cache-duration: 12h
+# cache-duration: "12h"
 
 # If set, the X-Forwarded-For header is used to determine the visitor IP address
 # instead of the remote address of the connection.
@@ -45,6 +52,19 @@
 #          as if they are one.
 #
 # behind-proxy: false
+
+# If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
+# are "attachment-cache-dir" and "base-url".
+#
+# - attachment-cache-dir is the cache directory for attached files
+# - attachment-total-size-limit is the limit of the on-disk attachment cache directory (total size)
+# - attachment-file-size-limit is the per-file attachment size limit (e.g. 300k, 2M, 100M)
+# - attachment-expiry-duration is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h)
+#
+# attachment-cache-dir:
+# attachment-total-size-limit: "5G"
+# attachment-file-size-limit: "15M"
+# attachment-expiry-duration: "3h"
 
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
 # messages will additionally be sent out as e-mail using an external SMTP server. As of today, only
@@ -78,16 +98,16 @@
 #
 # Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.
 #
-# keepalive-interval: 30s
+# keepalive-interval: "30s"
 
 # Interval in which the manager prunes old messages, deletes topics
 # and prints the stats.
 #
-# manager-interval: 1m
+# manager-interval: "1m"
 
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
-# global-topic-limit: 5000
+# global-topic-limit: 15000
 
 # Rate limiting: Number of subscriptions per visitor (IP address)
 #
@@ -98,11 +118,18 @@
 # - visitor-request-limit-replenish is the rate at which the bucket is refilled
 #
 # visitor-request-limit-burst: 60
-# visitor-request-limit-replenish: 10s
+# visitor-request-limit-replenish: "10s"
 
 # Rate limiting: Allowed emails per visitor:
 # - visitor-email-limit-burst is the initial bucket of emails each visitor has
 # - visitor-email-limit-replenish is the rate at which the bucket is refilled
 #
 # visitor-email-limit-burst: 16
-# visitor-email-limit-replenish: 1h
+# visitor-email-limit-replenish: "1h"
+
+# Rate limiting: Attachment size and bandwidth limits per visitor:
+# - visitor-attachment-total-size-limit is the total storage limit used for attachments per visitor
+# - visitor-attachment-daily-bandwidth-limit is the total daily attachment download/upload traffic limit per visitor
+#
+# visitor-attachment-total-size-limit: "100M"
+# visitor-attachment-daily-bandwidth-limit: "500M"

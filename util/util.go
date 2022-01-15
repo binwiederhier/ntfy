@@ -3,8 +3,11 @@ package util
 import (
 	"errors"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"math/rand"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +18,9 @@ const (
 )
 
 var (
-	random      = rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomMutex = sync.Mutex{}
-
+	random             = rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomMutex        = sync.Mutex{}
+	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
 	errInvalidPriority = errors.New("invalid priority")
 )
 
@@ -162,4 +165,40 @@ func ExpandHome(path string) string {
 // ShortTopicURL shortens the topic URL to be human-friendly, removing the http:// or https://
 func ShortTopicURL(s string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+}
+
+// DetectContentType probes the byte array b and returns mime type and file extension.
+// The filename is only used to override certain special cases.
+func DetectContentType(b []byte, filename string) (mimeType string, ext string) {
+	if strings.HasSuffix(strings.ToLower(filename), ".apk") {
+		return "application/vnd.android.package-archive", ".apk"
+	}
+	m := mimetype.Detect(b)
+	mimeType, ext = m.String(), m.Extension()
+	if ext == "" {
+		ext = ".bin"
+	}
+	return
+}
+
+// ParseSize parses a size string like 2K or 2M into bytes. If no unit is found, e.g. 123, bytes is assumed.
+func ParseSize(s string) (int64, error) {
+	matches := sizeStrRegex.FindStringSubmatch(s)
+	if matches == nil {
+		return -1, fmt.Errorf("invalid size %s", s)
+	}
+	value, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return -1, fmt.Errorf("cannot convert number %s", matches[1])
+	}
+	switch strings.ToUpper(matches[2]) {
+	case "G":
+		return int64(value) * 1024 * 1024 * 1024, nil
+	case "M":
+		return int64(value) * 1024 * 1024, nil
+	case "K":
+		return int64(value) * 1024, nil
+	default:
+		return int64(value), nil
+	}
 }

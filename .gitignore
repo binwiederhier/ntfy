@@ -3,4 +3,5 @@ build/
 .idea/
 server/docs/
 tools/fbsend/fbsend
+playground/
 *.iml

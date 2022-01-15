@@ -29,6 +29,10 @@ func TestSqliteCache_Prune(t *testing.T) {
 	testCachePrune(t, newSqliteTestCache(t))
 }
 
+func TestSqliteCache_Attachments(t *testing.T) {
+	testCacheAttachments(t, newSqliteTestCache(t))
+}
+
 func TestSqliteCache_Migration_From0(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
 	db, err := sql.Open("sqlite3", filename)

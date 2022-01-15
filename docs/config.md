@@ -16,6 +16,55 @@ You can immediately start [publishing messages](publish.md), or subscribe via th
 the server further, check out the [config options table](#config-options) or simply type `ntfy serve --help` to
 get a list of [command line options](#command-line-options).
 
+## Example config
+!!! info
+    Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/config/server.yml)** file.
+    It contains examples and detailed descriptions of all the settings.
+
+The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
+and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
+
+Here are two working sample configs:
+
+=== "server.yml (HTTP-only, with cache + attachments)"
+    ```
+    base-url: "http://ntfy.example.com"
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
+=== "server.yml (HTTP+HTTPS, with cache + attachments)"
+    ```
+    base-url: "http://ntfy.example.com"
+    listen-http: ":80"
+    listen-https: ":443"
+    key-file: "/etc/letsencrypt/live/ntfy.example.com.key"
+    cert-file: "/etc/letsencrypt/live/ntfy.example.com.crt"
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
+=== "server.yml (ntfy.sh config)"
+    ``` yaml
+    # All the things: Behind a proxy, Firebase, cache, attachments, 
+    # SMTP publishing & receiving
+
+    base-url: "https://ntfy.sh"
+    listen-http: "127.0.0.1:2586"
+    firebase-key-file: "/etc/ntfy/firebase.json"
+    cache-file: "/var/cache/ntfy/cache.db"
+    behind-proxy: true
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
+    smtp-sender-user: "AKIDEADBEEFAFFE12345"
+    smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
+    smtp-sender-from: "ntfy@ntfy.sh"
+    smtp-server-listen: ":25"
+    smtp-server-domain: "ntfy.sh"
+    smtp-server-addr-prefix: "ntfy-"
+    keepalive-interval: "45s"
+    ```
+
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period
 of time is important to allow [phones](subscribe/phone.md) and other devices with brittle Internet connections to be able to retrieve
@@ -482,7 +531,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*            | -       | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                  |
 | `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`    | `:80`   | Listen address for the HTTP web server                                                                                                                                                                                          |
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`    | -       | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                               |
-| `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | `[host]:port`    | -       | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                               |
+| `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*       | -       | Path to a Unix socket to listen on                                                                                                                                                                                              |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*       | -       | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                 |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*       | -       | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                 |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*       | -       | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm).                        |
@@ -538,6 +587,7 @@ OPTIONS:
    --base-url value, -B value                        externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
    --listen-http value, -l value                     ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
    --listen-https value, -L value                    ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
+   --listen-unix value, -U value                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --key-file value, -K value                        private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, -E value                       certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, -F value               Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

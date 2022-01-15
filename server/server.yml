@@ -98,7 +98,7 @@
 #
 # Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.
 #
-# keepalive-interval: "30s"
+# keepalive-interval: "45s"
 
 # Interval in which the manager prunes old messages, deletes topics
 # and prints the stats.

@@ -53,6 +53,7 @@ type Message struct { // TODO combine with server.message
 	Raw            string
 }
 
+// Attachment represents a message attachment
 type Attachment struct {
 	Name    string `json:"name"`
 	Type    string `json:"type,omitempty"`

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
-	"io"
-	"log"
 	"os"
 	"strings"
 	"testing"
@@ -15,7 +13,7 @@ import (
 // This only contains helpers so far
 
 func TestMain(m *testing.M) {
-	log.SetOutput(io.Discard)
+	// log.SetOutput(io.Discard)
 	os.Exit(m.Run())
 }
 

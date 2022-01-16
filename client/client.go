@@ -36,19 +36,31 @@ type Client struct {
 
 // Message is a struct that represents a ntfy message
 type Message struct { // TODO combine with server.message
-	ID       string
-	Event    string
-	Time     int64
-	Topic    string
-	Message  string
-	Title    string
-	Priority int
-	Tags     []string
+	ID         string
+	Event      string
+	Time       int64
+	Topic      string
+	Message    string
+	Title      string
+	Priority   int
+	Tags       []string
+	Click      string
+	Attachment *Attachment
 
 	// Additional fields
 	TopicURL       string
 	SubscriptionID string
 	Raw            string
+}
+
+// Attachment represents a message attachment
+type Attachment struct {
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	Expires int64  `json:"expires,omitempty"`
+	URL     string `json:"url"`
+	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
 type subscription struct {

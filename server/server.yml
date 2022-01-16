@@ -6,8 +6,9 @@
 # base-url:
 
 # Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
-# set "key-file" and "cert-file". Format: <hostname>:<port>
+# set "key-file" and "cert-file". Format: [<ip>]:<port>, e.g. "1.2.3.4:8080".
 #
+# To listen on all interfaces, you may omit the IP address, e.g. ":443".
 # To disable HTTP, set "listen-http" to "-".
 #
 # listen-http: ":80"
@@ -98,7 +99,7 @@
 #
 # Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.
 #
-# keepalive-interval: "30s"
+# keepalive-interval: "45s"
 
 # Interval in which the manager prunes old messages, deletes topics
 # and prints the stats.

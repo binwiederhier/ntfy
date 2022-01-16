@@ -2,6 +2,7 @@ package server
 
 import (
 	"heckel.io/ntfy/util"
+	"net/http"
 	"time"
 )
 
@@ -69,4 +70,73 @@ func newKeepaliveMessage(topic string) *message {
 // newDefaultMessage is a convenience method to create a notification message
 func newDefaultMessage(topic, msg string) *message {
 	return newMessage(messageEvent, topic, msg)
+}
+
+type sinceTime time.Time
+
+func (t sinceTime) IsAll() bool {
+	return t == sinceAllMessages
+}
+
+func (t sinceTime) IsNone() bool {
+	return t == sinceNoMessages
+}
+
+func (t sinceTime) Time() time.Time {
+	return time.Time(t)
+}
+
+var (
+	sinceAllMessages = sinceTime(time.Unix(0, 0))
+	sinceNoMessages  = sinceTime(time.Unix(1, 0))
+)
+
+type queryFilter struct {
+	Message  string
+	Title    string
+	Tags     []string
+	Priority []int
+}
+
+func parseQueryFilters(r *http.Request) (*queryFilter, error) {
+	messageFilter := readParam(r, "x-message", "message", "m")
+	titleFilter := readParam(r, "x-title", "title", "t")
+	tagsFilter := util.SplitNoEmpty(readParam(r, "x-tags", "tags", "tag", "ta"), ",")
+	priorityFilter := make([]int, 0)
+	for _, p := range util.SplitNoEmpty(readParam(r, "x-priority", "priority", "prio", "p"), ",") {
+		priority, err := util.ParsePriority(p)
+		if err != nil {
+			return nil, err
+		}
+		priorityFilter = append(priorityFilter, priority)
+	}
+	return &queryFilter{
+		Message:  messageFilter,
+		Title:    titleFilter,
+		Tags:     tagsFilter,
+		Priority: priorityFilter,
+	}, nil
+}
+
+func (q *queryFilter) Pass(msg *message) bool {
+	if msg.Event != messageEvent {
+		return true // filters only apply to messages
+	}
+	if q.Message != "" && msg.Message != q.Message {
+		return false
+	}
+	if q.Title != "" && msg.Title != q.Title {
+		return false
+	}
+	messagePriority := msg.Priority
+	if messagePriority == 0 {
+		messagePriority = 3 // For query filters, default priority (3) is the same as "not set" (0)
+	}
+	if len(q.Priority) > 0 && !util.InIntList(q.Priority, messagePriority) {
+		return false
+	}
+	if len(q.Tags) > 0 && !util.InStringListAll(msg.Tags, q.Tags) {
+		return false
+	}
+	return true
 }

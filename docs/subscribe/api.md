@@ -3,7 +3,11 @@ You can create and subscribe to a topic in the [web UI](web.md), via the [phone 
 or in your own app or script by subscribing the API. This page describes how to subscribe via API. You may also want to 
 check out the page that describes how to [publish messages](../publish.md).
 
-The subscription API relies on a simple HTTP GET request with a streaming HTTP response, i.e **you open a GET request and
+You can consume the subscription API as either a **[simple HTTP stream (JSON, SSE or raw)](#http-stream)**, or 
+**[via WebSockets](#websockets)**. Both are incredibly simple to use.
+
+## HTTP stream
+The HTTP stream-based API relies on a simple GET request with a streaming HTTP response, i.e **you open a GET request and
 the connection stays open forever**, sending messages back as they come in. There are three different API endpoints, which 
 only differ in the response format:
 
@@ -12,7 +16,7 @@ only differ in the response format:
   can be used with [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource)
 * [Raw stream](#subscribe-as-raw-stream): `<topic>/raw` returns messages as raw text, with one line per message
 
-## Subscribe as JSON stream
+### Subscribe as JSON stream
 Here are a few examples of how to consume the JSON endpoint (`<topic>/json`). For almost all languages, **this is the 
 recommended way to subscribe to a topic**. The notable exception is JavaScript, for which the 
 [SSE/EventSource stream](#subscribe-as-sse-stream) is much easier to work with.
@@ -80,7 +84,7 @@ recommended way to subscribe to a topic**. The notable exception is JavaScript, 
     fclose($fp);
     ```
 
-## Subscribe as SSE stream
+### Subscribe as SSE stream
 Using [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) in JavaScript, you can consume
 notifications via a [Server-Sent Events (SSE)](https://en.wikipedia.org/wiki/Server-sent_events) stream. It's incredibly 
 easy to use. Here's what it looks like. You may also want to check out the [live example](/example.html).
@@ -125,7 +129,7 @@ easy to use. Here's what it looks like. You may also want to check out the [live
     };
     ```
 
-## Subscribe as raw stream
+### Subscribe as raw stream
 The `/raw` endpoint will output one line per message, and **will only include the message body**. It's useful for extremely
 simple scripts, and doesn't include all the data. Additional fields such as [priority](../publish.md#message-priority), 
 [tags](../publish.md#tags--emojis--) or [message title](../publish.md#message-title) are not included in this output 
@@ -184,8 +188,50 @@ format. Keepalive messages are sent as empty lines.
     fclose($fp);
     ```
 
-### Subscribe via WebSockets
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+## WebSockets
+You may also subscribe to topics via [WebSockets](https://en.wikipedia.org/wiki/WebSocket), which is also widely 
+supported in many languages. Most notably, WebSockets are natively supported in JavaScript. On the command line, 
+I recommend [websocat](https://github.com/vi/websocat), a fantastic tool similar to `socat` or `curl`, but specifically
+for WebSockets.  
+
+The WebSockets endpoint is available at `<topic>/ws` and returns messages as JSON objects similar to the 
+[JSON stream endpoint](#subscribe-as-json-stream). 
+
+=== "Command line (websocat)"
+    ```
+    $ websocat wss://ntfy.sh/mytopic/ws
+    {"id":"qRHUCCvjj8","time":1642307388,"event":"open","topic":"mytopic"}
+    {"id":"eOWoUBJ14x","time":1642307754,"event":"message","topic":"mytopic","message":"hi there"}
+    ```
+
+=== "HTTP"
+    ``` http
+    GET /disk-alerts/ws HTTP/1.1
+    Host: ntfy.sh
+    Upgrade: websocket
+    Connection: Upgrade
+
+    HTTP/1.1 101 Switching Protocols
+    Upgrade: websocket
+    Connection: Upgrade
+    ...
+    ```
+
+=== "Go"
+    ``` go
+    import "github.com/gorilla/websocket"
+	ws, _, _ := websocket.DefaultDialer.Dial("wss://ntfy.sh/mytopic/ws", nil)
+	messageType, data, err := ws.ReadMessage()
+    ...
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    const socket = new WebSocket('wss://ntfy.sh/mytopic/ws');
+    socket.addEventListener('message', function (event) {
+        console.log(event.data);
+    });
+    ```
 
 ## Advanced features
 

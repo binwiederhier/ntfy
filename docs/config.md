@@ -243,6 +243,8 @@ or the root domain:
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     
         proxy_connect_timeout 3m;
@@ -274,6 +276,8 @@ or the root domain:
         proxy_redirect off;
      
         proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     
         proxy_connect_timeout 3m;

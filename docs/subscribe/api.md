@@ -184,6 +184,9 @@ format. Keepalive messages are sent as empty lines.
     fclose($fp);
     ```
 
+### Subscribe via WebSockets
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
 ## Advanced features
 
 ### Poll for messages

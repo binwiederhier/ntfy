@@ -741,6 +741,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	defer conn.Close()
+	var wlock sync.Mutex
 	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
 		pongWait := s.config.KeepaliveInterval + wsPongWait
@@ -760,6 +761,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	})
 	g.Go(func() error {
 		ping := func() error {
+			wlock.Lock()
+			defer wlock.Unlock()
 			if err := conn.SetWriteDeadline(time.Now().Add(wsWriteWait)); err != nil {
 				return err
 			}
@@ -781,6 +784,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		if !filters.Pass(msg) {
 			return nil
 		}
+		wlock.Lock()
+		defer wlock.Unlock()
 		if err := conn.SetWriteDeadline(time.Now().Add(wsWriteWait)); err != nil {
 			return err
 		}

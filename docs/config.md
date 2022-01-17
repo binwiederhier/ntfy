@@ -24,17 +24,17 @@ get a list of [command line options](#command-line-options).
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
 
-Here are two working sample configs:
+Here are a few working sample configs:
 
 === "server.yml (HTTP-only, with cache + attachments)"
-    ```
+    ``` yaml
     base-url: "http://ntfy.example.com"
     cache-file: "/var/cache/ntfy/cache.db"
     attachment-cache-dir: "/var/cache/ntfy/attachments"
     ```
 
 === "server.yml (HTTP+HTTPS, with cache + attachments)"
-    ```
+    ``` yaml
     base-url: "http://ntfy.example.com"
     listen-http: ":80"
     listen-https: ":443"

@@ -187,6 +187,7 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"click":    m.Click,
 				"title":    m.Title,
 				"message":  m.Message,
+				"encoding": m.Encoding,
 			}
 			if m.Attachment != nil {
 				data["attachment_name"] = m.Attachment.Name

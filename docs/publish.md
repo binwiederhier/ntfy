@@ -1096,39 +1096,40 @@ in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwa
 
 When publishing messages to a topic, apps using ntfy as a UnifiedPush distributor can set the `X-UnifiedPush` header or query
 parameter (or any of its aliases `unifiedpush` or `up`) to `1` to [disable Firebase](#disable-firebase). As of today, this
-option is equivalent to `Firebase: no`, but was introduced to allow future flexibility.
+option is mostly equivalent to `Firebase: no`, but was introduced to allow future flexibility. The flag additionally 
+enables auto-detection of the message encoding. If the message is binary, it'll be encoded as base64.
 
 ## Limitations
 There are a few limitations to the API to prevent abuse and to keep the server healthy. Almost all of these settings 
 are configurable via the server side [rate limiting settings](config.md#rate-limiting). Most of these limits you won't run into,
 but just in case, let's list them all:
 
-| Limit                     | Description                                                                                                                                                               |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Message length**        | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                   |
-| **Requests**              | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. |
-| **E-mails**               | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour.          |
-| **Subscription limit**    | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                     |
-| **Attachment size limit** | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors.                                      |
-| **Attachment expiry**     | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                              |
-| **Attachment bandwidth**  | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected.                         |
+| Limit                      | Description                                                                                                                                                               |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Message length**         | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                   |
+| **Requests**               | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 10 seconds. |
+| **E-mails**                | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour.          |
+| **Subscription limit**     | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                     |
+| **Attachment size limit**  | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors.                                      |
+| **Attachment expiry**      | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                              |
+| **Attachment bandwidth**   | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected.                         |
 | **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                 |
 
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
 and can be passed as **HTTP headers** or **query parameters in the URL**. They are listed in the table in their canonical form.
 
-| Parameter | Aliases (case-insensitive) | Description |
-|---|---|---|
-| `X-Message` | `Message`, `m` | Main body of the message as shown in the notification |
-| `X-Title` | `Title`, `t` | [Message title](#message-title) |
-| `X-Priority` | `Priority`, `prio`, `p` | [Message priority](#message-priority) |
-| `X-Tags` | `Tags`, `Tag`, `ta` | [Tags and emojis](#tags-emojis) |
-| `X-Delay` | `Delay`, `X-At`, `At`, `X-In`, `In` | Timestamp or duration for [delayed delivery](#scheduled-delivery) |
-| `X-Click` | `Click` | URL to open when [notification is clicked](#click-action) |
-| `X-Attach` | `Attach`, `a` | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
-| `X-Filename` | `Filename`, `file`, `f` | Optional [attachment](#attachments) filename, as it appears in the client |
-| `X-Email` | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications) |
-| `X-Cache` | `Cache` | Allows disabling [message caching](#message-caching) |
-| `X-Firebase` | `Firebase` | Allows disabling [sending to Firebase](#disable-firebase) |
-| `X-UnifiedPush` | `UnifiedPush`, `up` | [UnifiedPush](#unifiedpush) publish option, currently equivalent to `Firebase: no` |
+| Parameter       | Aliases (case-insensitive)                 | Description                                                                                   |
+|-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `X-Message`     | `Message`, `m`                             | Main body of the message as shown in the notification                                         |
+| `X-Title`       | `Title`, `t`                               | [Message title](#message-title)                                                               |
+| `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |
+| `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
+| `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
+| `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
+| `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
+| `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
+| `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
+| `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |
+| `X-Firebase`    | `Firebase`                                 | Allows disabling [sending to Firebase](#disable-firebase)                                     |
+| `X-UnifiedPush` | `UnifiedPush`, `up`                        | [UnifiedPush](#unifiedpush) publish option, only to be used by UnifiedPush apps               |

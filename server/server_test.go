@@ -3,10 +3,12 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/util"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -621,6 +623,49 @@ func TestServer_UnifiedPushDiscovery(t *testing.T) {
 	response := request(t, s, "GET", "/mytopic?up=1", "", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"unifiedpush":{"version":1}}`+"\n", response.Body.String())
+}
+
+func TestServer_PublishUnifiedPushBinary(t *testing.T) {
+	b := make([]byte, 12) // Max length
+	_, err := rand.Read(b)
+	require.Nil(t, err)
+
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "base64", m.Encoding)
+	b2, err := base64.StdEncoding.DecodeString(m.Message)
+	require.Nil(t, err)
+	require.Equal(t, b, b2)
+}
+
+func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
+	b := make([]byte, 5000) // Longer than max length
+	_, err := rand.Read(b)
+	require.Nil(t, err)
+
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "base64", m.Encoding)
+	b2, err := base64.StdEncoding.DecodeString(m.Message)
+	require.Nil(t, err)
+	require.Equal(t, 4096, len(b2))
+	require.Equal(t, b[:4096], b2)
+}
+
+func TestServer_PublishUnifiedPushText(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "", m.Encoding)
+	require.Equal(t, "this is a unifiedpush text message", m.Message)
 }
 
 func TestServer_PublishAttachment(t *testing.T) {

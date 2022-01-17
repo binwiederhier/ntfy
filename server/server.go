@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	firebase "firebase.google.com/go"
@@ -95,6 +96,7 @@ const (
 	firebaseControlTopic     = "~control"                // See Android if changed
 	emptyMessageBody         = "triggered"               // Used if message body is empty
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
+	encodingBase64           = "base64"
 )
 
 // WebSocket constants
@@ -415,11 +417,11 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, err := s.parsePublishParams(r, v, m)
+	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, v, m)
 	if err != nil {
 		return err
 	}
-	if err := s.handlePublishBody(r, v, m, body); err != nil {
+	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return err
 	}
 	if m.Message == "" {
@@ -461,7 +463,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	return nil
 }
 
-func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (cache bool, firebase bool, email string, err error) {
+func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
@@ -476,7 +478,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	}
 	if attach != "" {
 		if !attachURLRegex.MatchString(attach) {
-			return false, false, "", errHTTPBadRequestAttachmentURLInvalid
+			return false, false, "", false, errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
 		if m.Attachment.Name == "" {
@@ -495,11 +497,11 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {
 		if err := v.EmailAllowed(); err != nil {
-			return false, false, "", errHTTPTooManyRequestsLimitEmails
+			return false, false, "", false, errHTTPTooManyRequestsLimitEmails
 		}
 	}
 	if s.mailer == nil && email != "" {
-		return false, false, "", errHTTPBadRequestEmailDisabled
+		return false, false, "", false, errHTTPBadRequestEmailDisabled
 	}
 	messageStr := readParam(r, "x-message", "message", "m")
 	if messageStr != "" {
@@ -507,7 +509,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	}
 	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if err != nil {
-		return false, false, "", errHTTPBadRequestPriorityInvalid
+		return false, false, "", false, errHTTPBadRequestPriorityInvalid
 	}
 	tagsStr := readParam(r, "x-tags", "tags", "tag", "ta")
 	if tagsStr != "" {
@@ -519,50 +521,65 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, "", errHTTPBadRequestDelayNoCache
+			return false, false, "", false, errHTTPBadRequestDelayNoCache
 		}
 		if email != "" {
-			return false, false, "", errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+			return false, false, "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, "", errHTTPBadRequestDelayCannotParse
+			return false, false, "", false, errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", errHTTPBadRequestDelayTooSmall
+			return false, false, "", false, errHTTPBadRequestDelayTooSmall
 		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", errHTTPBadRequestDelayTooLarge
+			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
 	}
-	unifiedpush := readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
+	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {
 		firebase = false
+		unifiedpush = true
 	}
-	return cache, firebase, email, nil
+	return cache, firebase, email, unifiedpush, nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
 //
-// 1. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
+// 1. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
+//    If body is binary, encode as base64, if not do not encode
+// 2. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
 //    Body must be a message, because we attached an external URL
-// 2. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
+// 3. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
 //    Body must be attachment, because we passed a filename
-// 3. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 // 4. curl -T file.txt ntfy.sh/mytopic
+//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
+// 5. curl -T file.txt ntfy.sh/mytopic
 //    If file.txt is > message limit, treat it as an attachment
-func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeakedReadCloser) error {
-	if m.Attachment != nil && m.Attachment.URL != "" {
-		return s.handleBodyAsMessage(m, body) // Case 1
+func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeakedReadCloser, unifiedpush bool) error {
+	if unifiedpush {
+		return s.handleBodyAsMessageAutoDetect(m, body) // Case 1
+	} else if m.Attachment != nil && m.Attachment.URL != "" {
+		return s.handleBodyAsTextMessage(m, body) // Case 2
 	} else if m.Attachment != nil && m.Attachment.Name != "" {
-		return s.handleBodyAsAttachment(r, v, m, body) // Case 2
+		return s.handleBodyAsAttachment(r, v, m, body) // Case 3
 	} else if !body.LimitReached && utf8.Valid(body.PeakedBytes) {
-		return s.handleBodyAsMessage(m, body) // Case 3
+		return s.handleBodyAsTextMessage(m, body) // Case 4
 	}
-	return s.handleBodyAsAttachment(r, v, m, body) // Case 4
+	return s.handleBodyAsAttachment(r, v, m, body) // Case 5
 }
 
-func (s *Server) handleBodyAsMessage(m *message, body *util.PeakedReadCloser) error {
+func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeakedReadCloser) error {
+	if utf8.Valid(body.PeakedBytes) {
+		m.Message = string(body.PeakedBytes) // Do not trim
+	} else {
+		m.Message = base64.StdEncoding.EncodeToString(body.PeakedBytes)
+		m.Encoding = encodingBase64
+	}
+	return nil
+}
+
+func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeakedReadCloser) error {
 	if !utf8.Valid(body.PeakedBytes) {
 		return errHTTPBadRequestMessageNotUTF8
 	}

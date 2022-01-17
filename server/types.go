@@ -29,6 +29,7 @@ type message struct {
 	Attachment *attachment `json:"attachment,omitempty"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
+	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
 }
 
 type attachment struct {

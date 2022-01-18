@@ -1,6 +1,6 @@
 # Configuring the ntfy server
 The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/server.yml`, 
-see [server.yml](https://github.com/binwiederhier/ntfy/blob/main/config/server.yml)), via command line arguments 
+see [server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)), via command line arguments 
 or using environment variables.
 
 ## Quick start

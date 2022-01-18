@@ -29,30 +29,31 @@ const (
 			attachment_expires INT NOT NULL,
 			attachment_url TEXT NOT NULL,
 			attachment_owner TEXT NOT NULL,
+			encoding TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time ASC
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time ASC
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner
+		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
 	`
@@ -66,7 +67,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 3
+	currentSchemaVersion          = 4
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -102,6 +103,10 @@ const (
 		ALTER TABLE messages ADD COLUMN attachment_owner TEXT NOT NULL DEFAULT('');
 		ALTER TABLE messages ADD COLUMN attachment_url TEXT NOT NULL DEFAULT('');
 		COMMIT;
+	`
+	// 3 -> 4
+	migrate3To4AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN encoding TEXT NOT NULL DEFAULT('');
 	`
 )
 
@@ -156,6 +161,7 @@ func (c *sqliteCache) AddMessage(m *message) error {
 		attachmentExpires,
 		attachmentURL,
 		attachmentOwner,
+		m.Encoding,
 		published,
 	)
 	return err
@@ -278,8 +284,25 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner string
-		if err := rows.Scan(&id, &timestamp, &topic, &msg, &title, &priority, &tagsStr, &click, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL, &attachmentOwner); err != nil {
+		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner, encoding string
+		err := rows.Scan(
+			&id,
+			&timestamp,
+			&topic,
+			&msg,
+			&title,
+			&priority,
+			&tagsStr,
+			&click,
+			&attachmentName,
+			&attachmentType,
+			&attachmentSize,
+			&attachmentExpires,
+			&attachmentURL,
+			&attachmentOwner,
+			&encoding,
+		)
+		if err != nil {
 			return nil, err
 		}
 		var tags []string
@@ -308,6 +331,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Tags:       tags,
 			Click:      click,
 			Attachment: att,
+			Encoding:   encoding,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -347,6 +371,8 @@ func setupDB(db *sql.DB) error {
 		return migrateFrom1(db)
 	} else if schemaVersion == 2 {
 		return migrateFrom2(db)
+	} else if schemaVersion == 3 {
+		return migrateFrom3(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -395,6 +421,17 @@ func migrateFrom2(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 3); err != nil {
+		return err
+	}
+	return migrateFrom3(db)
+}
+
+func migrateFrom3(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 3 to 4")
+	if _, err := db.Exec(migrate3To4AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 4); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

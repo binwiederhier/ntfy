@@ -625,7 +625,7 @@ func TestServer_UnifiedPushDiscovery(t *testing.T) {
 	require.Equal(t, `{"unifiedpush":{"version":1}}`+"\n", response.Body.String())
 }
 
-func TestServer_PublishUnifiedPushBinary(t *testing.T) {
+func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	b := make([]byte, 12) // Max length
 	_, err := rand.Read(b)
 	require.Nil(t, err)
@@ -637,6 +637,14 @@ func TestServer_PublishUnifiedPushBinary(t *testing.T) {
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, "base64", m.Encoding)
 	b2, err := base64.StdEncoding.DecodeString(m.Message)
+	require.Nil(t, err)
+	require.Equal(t, b, b2)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", string(b), nil)
+	require.Equal(t, 200, response.Code)
+	m = toMessage(t, response.Body.String())
+	require.Equal(t, "base64", m.Encoding)
+	b2, err = base64.StdEncoding.DecodeString(m.Message)
 	require.Nil(t, err)
 	require.Equal(t, b, b2)
 }

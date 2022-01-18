@@ -18,7 +18,7 @@ get a list of [command line options](#command-line-options).
 
 ## Example config
 !!! info
-    Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/config/server.yml)** file.
+    Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)** file.
     It contains examples and detailed descriptions of all the settings.
 
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`

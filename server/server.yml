@@ -1,7 +1,7 @@
 # ntfy server config file
 
 # Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
-# This setting is currently only used by the e-mail sending feature (outgoing mail only).
+# This setting is currently only used by the attachments and e-mail sending feature (outgoing mail only).
 #
 # base-url:
 
@@ -33,9 +33,15 @@
 # allows for service restarts without losing messages in support of the since= parameter.
 #
 # To disable the cache entirely (on-disk/in-memory), set "cache-duration" to 0.
+# The cache file is created automatically, provided that the correct permissions are set.
 #
-# Note: If you are running ntfy with systemd, make sure this cache file is owned by the
-#       ntfy user and group by running: chown ntfy.ntfy <filename>.
+# Debian/RPM package users:
+#   Use /var/cache/ntfy/cache.db as cache file to avoid permission issues. The package
+#   creates this folder for you.
+#
+# Check your permissions:
+#   If you are running ntfy with systemd, make sure this cache file is owned by the
+#   ntfy user and group by running: chown ntfy.ntfy <filename>.
 #
 # cache-file: <filename>
 

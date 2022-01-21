@@ -269,7 +269,7 @@ func (s *Server) Run() error {
 	s.mu.Unlock()
 	go s.runManager()
 	go s.runAtSender()
-	go s.runFirebaseKeepliver()
+	go s.runFirebaseKeepaliver()
 
 	return <-errChan
 }
@@ -1052,7 +1052,7 @@ func (s *Server) runAtSender() {
 	}
 }
 
-func (s *Server) runFirebaseKeepliver() {
+func (s *Server) runFirebaseKeepaliver() {
 	if s.firebase == nil {
 		return
 	}

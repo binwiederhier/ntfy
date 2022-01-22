@@ -121,7 +121,7 @@ func newSqliteCache(filename string) (*sqliteCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := setupDB(db); err != nil {
+	if err := setupCacheDB(db); err != nil {
 		return nil, err
 	}
 	return &sqliteCache{
@@ -340,11 +340,11 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	return messages, nil
 }
 
-func setupDB(db *sql.DB) error {
+func setupCacheDB(db *sql.DB) error {
 	// If 'messages' table does not exist, this must be a new database
 	rowsMC, err := db.Query(selectMessagesCountQuery)
 	if err != nil {
-		return setupNewDB(db)
+		return setupNewCacheDB(db)
 	}
 	rowsMC.Close()
 
@@ -377,7 +377,7 @@ func setupDB(db *sql.DB) error {
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
 
-func setupNewDB(db *sql.DB) error {
+func setupNewCacheDB(db *sql.DB) error {
 	if _, err := db.Exec(createMessagesTableQuery); err != nil {
 		return err
 	}

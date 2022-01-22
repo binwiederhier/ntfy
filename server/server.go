@@ -141,6 +141,10 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	auther, err := newSqliteAuther("user.db", false, false)
+	if err != nil {
+		return nil, err
+	}
 	return &Server{
 		config:    conf,
 		cache:     cache,
@@ -148,7 +152,7 @@ func New(conf *Config) (*Server, error) {
 		firebase:  firebaseSubscriber,
 		mailer:    mailer,
 		topics:    topics,
-		auther:    &memAuther{},
+		auther:    auther,
 		visitors:  make(map[string]*visitor),
 	}, nil
 }
@@ -1128,13 +1132,15 @@ func (s *Server) withAuth(next handleFunc, perm int) handleFunc {
 		}
 		user, pass, ok := r.BasicAuth()
 		if ok {
-			if !s.auther.Authenticate(user, pass) {
+			if err := s.auther.Authenticate(user, pass); err != nil {
+				log.Printf("authentication failed: %s", err.Error())
 				return errHTTPUnauthorized
 			}
 		} else {
 			user = "" // Just in case
 		}
-		if !s.auther.Authorize(user, t.ID, perm) {
+		if err := s.auther.Authorize(user, t.ID, perm); err != nil {
+			log.Printf("unauthorized: %s", err.Error())
 			return errHTTPUnauthorized
 		}
 		return next(w, r, v)

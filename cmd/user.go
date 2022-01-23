@@ -32,7 +32,7 @@ dabbling for CLI
 var flagsUser = []cli.Flag{
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-permissions", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_PERMISSIONS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 }
 
 var cmdUser = &cli.Command{
@@ -41,6 +41,7 @@ var cmdUser = &cli.Command{
 	UsageText: "ntfy user [add|del|...] ...",
 	Flags:     flagsUser,
 	Before:    initConfigFileInputSource("config", flagsUser),
+	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{
 			Name:    "add",
@@ -127,16 +128,16 @@ func execUserChangePass(c *cli.Context) error {
 
 func createAuthManager(c *cli.Context) (auth.Manager, error) {
 	authFile := c.String("auth-file")
-	authDefaultPermissions := c.String("auth-default-permissions")
+	authDefaultAccess := c.String("auth-default-access")
 	if authFile == "" {
 		return nil, errors.New("option auth-file not set; auth is unconfigured for this server")
 	} else if !util.FileExists(authFile) {
 		return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
-	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultPermissions) {
-		return nil, errors.New("if set, auth-default-permissions must start set to 'read-write', 'read-only' or 'deny-all'")
+	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultAccess) {
+		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only' or 'deny-all'")
 	}
-	authDefaultRead := authDefaultPermissions == "read-write" || authDefaultPermissions == "read-only"
-	authDefaultWrite := authDefaultPermissions == "read-write"
+	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
+	authDefaultWrite := authDefaultAccess == "read-write"
 	return auth.NewSQLiteAuth(authFile, authDefaultRead, authDefaultWrite)
 }
 

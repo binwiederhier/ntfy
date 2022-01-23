@@ -25,7 +25,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-permissions", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_PERMISSIONS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
@@ -55,6 +55,7 @@ var cmdServe = &cli.Command{
 	Usage:     "Run the ntfy server",
 	UsageText: "ntfy serve [OPTIONS..]",
 	Action:    execServe,
+	Category:  categoryServer,
 	Flags:     flagsServe,
 	Before:    initConfigFileInputSource("config", flagsServe),
 	Description: `Run the ntfy server and listen for incoming requests
@@ -83,7 +84,7 @@ func execServe(c *cli.Context) error {
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
 	authFile := c.String("auth-file")
-	authDefaultPermissions := c.String("auth-default-permissions")
+	authDefaultAccess := c.String("auth-default-access")
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
@@ -130,13 +131,13 @@ func execServe(c *cli.Context) error {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		return errors.New("if set, base-url must start with http:// or https://")
-	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultPermissions) {
-		return errors.New("if set, auth-default-permissions must start set to 'read-write', 'read-only' or 'deny-all'")
+	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultAccess) {
+		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only' or 'deny-all'")
 	}
 
 	// Default auth permissions
-	authDefaultRead := authDefaultPermissions == "read-write" || authDefaultPermissions == "read-only"
-	authDefaultWrite := authDefaultPermissions == "read-write"
+	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
+	authDefaultWrite := authDefaultAccess == "read-write"
 
 	// Special case: Unset default
 	if listenHTTP == "-" {

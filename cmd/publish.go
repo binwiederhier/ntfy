@@ -17,6 +17,7 @@ var cmdPublish = &cli.Command{
 	Usage:     "Send message via a ntfy server",
 	UsageText: "ntfy send [OPTIONS..] TOPIC [MESSAGE]",
 	Action:    execPublish,
+	Category:  categoryClient,
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 		&cli.StringFlag{Name: "title", Aliases: []string{"t"}, Usage: "message title"},

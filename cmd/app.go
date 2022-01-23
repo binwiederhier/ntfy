@@ -14,6 +14,11 @@ var (
 	defaultClientUserConfigFile = "~/.config/ntfy/client.yml"
 )
 
+const (
+	categoryClient = "Client-side commands"
+	categoryServer = "Server-side commands"
+)
+
 // New creates a new CLI application
 func New() *cli.App {
 	return &cli.App{
@@ -29,10 +34,13 @@ func New() *cli.App {
 		Before:                 initConfigFileInputSource("config", flagsServe), // DEPRECATED, see deprecation notice
 		Flags:                  flagsServe,                                      // DEPRECATED, see deprecation notice
 		Commands: []*cli.Command{
+			// Server commands
 			cmdServe,
+			cmdUser,
+
+			// Client commands
 			cmdPublish,
 			cmdSubscribe,
-			cmdUser,
 		},
 	}
 }

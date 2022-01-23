@@ -19,6 +19,7 @@ var cmdSubscribe = &cli.Command{
 	Usage:     "Subscribe to one or more topics on a ntfy server",
 	UsageText: "ntfy subscribe [OPTIONS..] [TOPIC]",
 	Action:    execSubscribe,
+	Category:  categoryClient,
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},

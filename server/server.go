@@ -46,7 +46,7 @@ type Server struct {
 	firebase     subscriber
 	mailer       mailer
 	messages     int64
-	auther       auther
+	auth         auth
 	cache        cache
 	fileCache    *fileCache
 	closeChan    chan bool
@@ -141,9 +141,12 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	auther, err := newSqliteAuther("user.db", false, false)
-	if err != nil {
-		return nil, err
+	var auth auth
+	if conf.AuthFile != "" {
+		auth, err = newSqliteAuth(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &Server{
 		config:    conf,
@@ -152,7 +155,7 @@ func New(conf *Config) (*Server, error) {
 		firebase:  firebaseSubscriber,
 		mailer:    mailer,
 		topics:    topics,
-		auther:    auther,
+		auth:      auth,
 		visitors:  make(map[string]*visitor),
 	}, nil
 }
@@ -1123,23 +1126,22 @@ func (s *Server) authRead(next handleFunc) handleFunc {
 
 func (s *Server) withAuth(next handleFunc, perm int) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if s.auther == nil {
+		if s.auth == nil {
 			return next(w, r, v)
 		}
 		t, err := s.topicFromPath(r.URL.Path)
 		if err != nil {
 			return err
 		}
-		user, pass, ok := r.BasicAuth()
+		user := everyone
+		username, password, ok := r.BasicAuth()
 		if ok {
-			if err := s.auther.Authenticate(user, pass); err != nil {
+			if user, err = s.auth.Authenticate(username, password); err != nil {
 				log.Printf("authentication failed: %s", err.Error())
 				return errHTTPUnauthorized
 			}
-		} else {
-			user = "" // Just in case
 		}
-		if err := s.auther.Authorize(user, t.ID, perm); err != nil {
+		if err := s.auth.Authorize(user, t.ID, perm); err != nil {
 			log.Printf("unauthorized: %s", err.Error())
 			return errHTTPUnauthorized
 		}

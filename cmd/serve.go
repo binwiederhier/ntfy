@@ -24,6 +24,8 @@ var flagsServe = []cli.Flag{
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-permissions", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_PERMISSIONS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
@@ -80,6 +82,8 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
+	authFile := c.String("auth-file")
+	authDefaultPermissions := c.String("auth-default-permissions")
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
@@ -126,7 +130,13 @@ func execServe(c *cli.Context) error {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		return errors.New("if set, base-url must start with http:// or https://")
+	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultPermissions) {
+		return errors.New("if set, auth-default-permissions must start set to 'read-write', 'read-only' or 'deny-all'")
 	}
+
+	// Default auth permissions
+	authDefaultRead := authDefaultPermissions == "read-write" || authDefaultPermissions == "read-only"
+	authDefaultWrite := authDefaultPermissions == "read-write"
 
 	// Special case: Unset default
 	if listenHTTP == "-" {
@@ -164,6 +174,9 @@ func execServe(c *cli.Context) error {
 	conf.FirebaseKeyFile = firebaseKeyFile
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
+	conf.AuthFile = authFile
+	conf.AuthDefaultRead = authDefaultRead
+	conf.AuthDefaultWrite = authDefaultWrite
 	conf.AttachmentCacheDir = attachmentCacheDir
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
 	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit

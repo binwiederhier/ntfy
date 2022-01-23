@@ -55,6 +55,9 @@ type Config struct {
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
+	AuthFile                             string
+	AuthDefaultRead                      bool
+	AuthDefaultWrite                     bool
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
@@ -97,6 +100,9 @@ func NewConfig() *Config {
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
+		AuthFile:                             "",
+		AuthDefaultRead:                      true,
+		AuthDefaultWrite:                     true,
 		AttachmentCacheDir:                   "",
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,

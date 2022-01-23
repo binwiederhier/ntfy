@@ -8,16 +8,16 @@ import (
 /*
 
 SELECT * FROM user;
-SELECT * FROM user_topic;
+SELECT * FROM access;
 
 INSERT INTO user VALUES ('phil','$2a$06$.4W0LI5mcxzxhpjUvpTaNeu0MhRO0T7B.CYnmAkRnlztIy7PrSODu', 'admin');
 INSERT INTO user VALUES ('ben','$2a$06$skJK/AecWCUmiCjr69ke.Ow/hFA616RdvJJPxnI221zyohsRlyXL.', 'user');
 INSERT INTO user VALUES ('marian','$2a$10$8U90swQIatvHHI4sw0Wo7.OUy6dUwzMcoOABi6BsS4uF0x3zcSXRW', 'user');
 
-INSERT INTO user_topic VALUES ('ben','alerts',1,1);
-INSERT INTO user_topic VALUES ('marian','alerts',1,0);
-INSERT INTO user_topic VALUES ('','announcements',1,0);
-INSERT INTO user_topic VALUES ('','write-all',1,1);
+INSERT INTO access VALUES ('ben','alerts',1,1);
+INSERT INTO access VALUES ('marian','alerts',1,0);
+INSERT INTO access VALUES ('','announcements',1,0);
+INSERT INTO access VALUES ('','write-all',1,1);
 
 */
 
@@ -34,7 +34,7 @@ const (
 			pass TEXT NOT NULL,
 			role TEXT NOT NULL
 		);
-		CREATE TABLE IF NOT EXISTS user_topic (
+		CREATE TABLE IF NOT EXISTS access (
 			user TEXT NOT NULL,		
 			topic TEXT NOT NULL,
 			read INT NOT NULL,
@@ -50,7 +50,7 @@ const (
 	selectUserQuery       = `SELECT pass, role FROM user WHERE user = ?`
 	selectTopicPermsQuery = `
 		SELECT read, write 
-		FROM user_topic 
+		FROM access 
 		WHERE user IN ('', ?) AND topic = ?
 		ORDER BY user DESC
 	`
@@ -58,10 +58,17 @@ const (
 
 // Manager-related queries
 const (
-	insertUser      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
-	updateUserPass  = `UPDATE user SET pass = ? WHERE user = ?`
+	insertUser     = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	updateUserPass = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRole = `UPDATE user SET role = ? WHERE user = ?`
+	upsertAccess   = `
+		INSERT INTO access (user, topic, read, write) 
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT (user, topic) DO UPDATE SET read=excluded.read, write=excluded.write
+	`
 	deleteUser      = `DELETE FROM user WHERE user = ?`
-	deleteUserTopic = `DELETE FROM user_topic WHERE user = ?`
+	deleteAllAccess = `DELETE FROM access WHERE user = ?`
+	deleteAccess    = `DELETE FROM access WHERE user = ? AND topic = ?`
 )
 
 type SQLiteAuth struct {
@@ -167,7 +174,7 @@ func (a *SQLiteAuth) RemoveUser(username string) error {
 	if _, err := a.db.Exec(deleteUser, username); err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteUserTopic, username); err != nil {
+	if _, err := a.db.Exec(deleteAllAccess, username); err != nil {
 		return err
 	}
 	return nil
@@ -180,6 +187,33 @@ func (a *SQLiteAuth) ChangePassword(username, password string) error {
 	}
 	if _, err := a.db.Exec(updateUserPass, hash, username); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
+	if _, err := a.db.Exec(updateUserRole, string(role), username); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write bool) error {
+	if _, err := a.db.Exec(upsertAccess, username, topic, read, write); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
+	if topic == "" {
+		if _, err := a.db.Exec(deleteAllAccess, username); err != nil {
+			return err
+		}
+	} else {
+		if _, err := a.db.Exec(deleteAccess, username, topic); err != nil {
+			return err
+		}
 	}
 	return nil
 }

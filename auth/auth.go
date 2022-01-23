@@ -12,6 +12,9 @@ type Manager interface {
 	AddUser(username, password string, role Role) error
 	RemoveUser(username string) error
 	ChangePassword(username, password string) error
+	ChangeRole(username string, role Role) error
+	AllowAccess(username string, topic string, read bool, write bool) error
+	ResetAccess(username string, topic string) error
 }
 
 type User struct {
@@ -37,6 +40,16 @@ const (
 var Everyone = &User{
 	Name: "",
 	Role: RoleNone,
+}
+
+var Roles = []Role{
+	RoleAdmin,
+	RoleUser,
+	RoleNone,
+}
+
+func AllowedRole(role Role) bool {
+	return role == RoleUser || role == RoleAdmin
 }
 
 var ErrUnauthorized = errors.New("unauthorized")

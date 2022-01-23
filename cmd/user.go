@@ -29,12 +29,7 @@ dabbling for CLI
 
 */
 
-var flagsUser = []cli.Flag{
-	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
-}
-
+var flagsUser = userCommandFlags()
 var cmdUser = &cli.Command{
 	Name:      "user",
 	Usage:     "Manage users and access to topics",
@@ -60,21 +55,33 @@ var cmdUser = &cli.Command{
 		},
 		{
 			Name:    "change-pass",
-			Aliases: []string{"ch"},
+			Aliases: []string{"chp"},
 			Usage:   "change user password",
 			Action:  execUserChangePass,
+		},
+		{
+			Name:    "change-role",
+			Aliases: []string{"chr"},
+			Usage:   "change user role",
+			Action:  execUserChangeRole,
+		},
+		{
+			Name:    "list",
+			Aliases: []string{"chr"},
+			Usage:   "change user role",
+			Action:  execUserChangeRole,
 		},
 	},
 }
 
 func execUserAdd(c *cli.Context) error {
-	role := c.String("role")
-	if c.NArg() == 0 {
+	username := c.Args().Get(0)
+	role := auth.Role(c.String("role"))
+	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
-	} else if role != string(auth.RoleUser) && role != string(auth.RoleAdmin) {
+	} else if !auth.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-	username := c.Args().Get(0)
 	password, err := readPassword(c)
 	if err != nil {
 		return err
@@ -91,10 +98,10 @@ func execUserAdd(c *cli.Context) error {
 }
 
 func execUserDel(c *cli.Context) error {
-	if c.NArg() == 0 {
+	username := c.Args().Get(0)
+	if username == "" {
 		return errors.New("username expected, type 'ntfy user del --help' for help")
 	}
-	username := c.Args().Get(0)
 	manager, err := createAuthManager(c)
 	if err != nil {
 		return err
@@ -107,10 +114,10 @@ func execUserDel(c *cli.Context) error {
 }
 
 func execUserChangePass(c *cli.Context) error {
-	if c.NArg() == 0 {
+	username := c.Args().Get(0)
+	if username == "" {
 		return errors.New("username expected, type 'ntfy user change-pass --help' for help")
 	}
-	username := c.Args().Get(0)
 	password, err := readPassword(c)
 	if err != nil {
 		return err
@@ -123,6 +130,23 @@ func execUserChangePass(c *cli.Context) error {
 		return err
 	}
 	fmt.Fprintf(c.App.ErrWriter, "Changed password for user %s\n", username)
+	return nil
+}
+
+func execUserChangeRole(c *cli.Context) error {
+	username := c.Args().Get(0)
+	role := auth.Role(c.Args().Get(1))
+	if username == "" || !auth.AllowedRole(role) {
+		return errors.New("username and new role expected, type 'ntfy user change-role --help' for help")
+	}
+	manager, err := createAuthManager(c)
+	if err != nil {
+		return err
+	}
+	if err := manager.ChangeRole(username, role); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.App.ErrWriter, "Changed role for user %s to %s\n", username, role)
 	return nil
 }
 
@@ -157,4 +181,12 @@ func readPassword(c *cli.Context) (string, error) {
 		return "", errors.New("passwords do not match: try it again, but this time type slooowwwlly")
 	}
 	return string(password), nil
+}
+
+func userCommandFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
+		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
+		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
+	}
 }

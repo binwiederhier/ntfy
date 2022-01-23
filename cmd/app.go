@@ -15,8 +15,8 @@ var (
 )
 
 const (
-	categoryClient = "Client-side commands"
-	categoryServer = "Server-side commands"
+	categoryClient = "Client commands"
+	categoryServer = "Server commands"
 )
 
 // New creates a new CLI application
@@ -37,6 +37,8 @@ func New() *cli.App {
 			// Server commands
 			cmdServe,
 			cmdUser,
+			cmdAllow,
+			cmdDeny,
 
 			// Client commands
 			cmdPublish,

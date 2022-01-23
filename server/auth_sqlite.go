@@ -12,7 +12,7 @@ SELECT * FROM user_topic;
 
 INSERT INTO user VALUES ('phil','$2a$06$.4W0LI5mcxzxhpjUvpTaNeu0MhRO0T7B.CYnmAkRnlztIy7PrSODu', 'admin');
 INSERT INTO user VALUES ('ben','$2a$06$skJK/AecWCUmiCjr69ke.Ow/hFA616RdvJJPxnI221zyohsRlyXL.', 'user');
-INSERT INTO user VALUES ('marian','$2a$06$N/BcXR0g6XUlmWttMqciWugR6xQKm2lVj31HLid6Mc4cnzpeOMgnq', 'user');
+INSERT INTO user VALUES ('marian','$2a$10$8U90swQIatvHHI4sw0Wo7.OUy6dUwzMcoOABi6BsS4uF0x3zcSXRW', 'user');
 
 INSERT INTO user_topic VALUES ('ben','alerts',1,1);
 INSERT INTO user_topic VALUES ('marian','alerts',1,0);

@@ -1,4 +1,4 @@
-package server
+package auth
 
 import (
 	"database/sql"
@@ -69,15 +69,15 @@ const (
 	`
 )
 
-type sqliteAuth struct {
+type SQLiteAuth struct {
 	db           *sql.DB
 	defaultRead  bool
 	defaultWrite bool
 }
 
-var _ auth = (*sqliteAuth)(nil)
+var _ Auth = (*SQLiteAuth)(nil)
 
-func newSqliteAuth(filename string, defaultRead, defaultWrite bool) (*sqliteAuth, error) {
+func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func newSqliteAuth(filename string, defaultRead, defaultWrite bool) (*sqliteAuth
 	if err := setupNewAuthDB(db); err != nil {
 		return nil, err
 	}
-	return &sqliteAuth{
+	return &SQLiteAuth{
 		db:           db,
 		defaultRead:  defaultRead,
 		defaultWrite: defaultWrite,
@@ -100,7 +100,7 @@ func setupNewAuthDB(db *sql.DB) error {
 	return nil
 }
 
-func (a *sqliteAuth) Authenticate(username, password string) (*user, error) {
+func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 	rows, err := a.db.Query(selectUserQuery, username)
 	if err != nil {
 		return nil, err
@@ -117,14 +117,14 @@ func (a *sqliteAuth) Authenticate(username, password string) (*user, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		return nil, err
 	}
-	return &user{
+	return &User{
 		Name: username,
-		Role: role,
+		Role: Role(role),
 	}, nil
 }
 
-func (a *sqliteAuth) Authorize(user *user, topic string, perm int) error {
-	if user.Role == roleAdmin {
+func (a *SQLiteAuth) Authorize(user *User, topic string, perm Permission) error {
+	if user.Role == RoleAdmin {
 		return nil // Admin can do everything
 	}
 	// Select the read/write permissions for this user/topic combo. The query may return two
@@ -147,11 +147,11 @@ func (a *sqliteAuth) Authorize(user *user, topic string, perm int) error {
 	return a.resolvePerms(read, write, perm)
 }
 
-func (a *sqliteAuth) resolvePerms(read, write bool, perm int) error {
-	if perm == permRead && read {
+func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
+	if perm == PermissionRead && read {
 		return nil
-	} else if perm == permWrite && write {
+	} else if perm == PermissionWrite && write {
 		return nil
 	}
-	return errHTTPUnauthorized
+	return ErrUnauthorized
 }

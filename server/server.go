@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
+	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
 	"html/template"
 	"io"
@@ -46,7 +47,7 @@ type Server struct {
 	firebase     subscriber
 	mailer       mailer
 	messages     int64
-	auth         auth
+	auth         auth.Auth
 	cache        cache
 	fileCache    *fileCache
 	closeChan    chan bool
@@ -141,9 +142,9 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var auth auth
+	var auther auth.Auth
 	if conf.AuthFile != "" {
-		auth, err = newSqliteAuth(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
+		auther, err = auth.NewSQLiteAuth(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +156,7 @@ func New(conf *Config) (*Server, error) {
 		firebase:  firebaseSubscriber,
 		mailer:    mailer,
 		topics:    topics,
-		auth:      auth,
+		auth:      auther,
 		visitors:  make(map[string]*visitor),
 	}, nil
 }
@@ -1117,14 +1118,14 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 }
 
 func (s *Server) authWrite(next handleFunc) handleFunc {
-	return s.withAuth(next, permWrite)
+	return s.withAuth(next, auth.PermissionWrite)
 }
 
 func (s *Server) authRead(next handleFunc) handleFunc {
-	return s.withAuth(next, permRead)
+	return s.withAuth(next, auth.PermissionRead)
 }
 
-func (s *Server) withAuth(next handleFunc, perm int) handleFunc {
+func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.auth == nil {
 			return next(w, r, v)
@@ -1133,7 +1134,7 @@ func (s *Server) withAuth(next handleFunc, perm int) handleFunc {
 		if err != nil {
 			return err
 		}
-		user := everyone
+		user := auth.Everyone
 		username, password, ok := r.BasicAuth()
 		if ok {
 			if user, err = s.auth.Authenticate(username, password); err != nil {

@@ -19,26 +19,13 @@ INSERT INTO user_topic VALUES ('marian','alerts',1,0);
 INSERT INTO user_topic VALUES ('','announcements',1,0);
 INSERT INTO user_topic VALUES ('','write-all',1,1);
 
----
-dabbling for CLI
-	ntfy user add phil --role=admin
-	ntfy user del phil
-	ntfy user change-pass phil
-	ntfy user allow phil mytopic
-	ntfy user allow phil mytopic --read-only
-	ntfy user deny phil mytopic
-	ntfy user list
-	   phil (admin)
-	   - read-write access to everything
-	   ben (user)
-	   - read-write access to a topic alerts
-	   - read access to
-       everyone (no user)
-       - read-only access to topic announcements
-
-
 */
 
+const (
+	bcryptCost = 11
+)
+
+// Auther-related queries
 const (
 	createAuthTablesQueries = `
 		BEGIN;
@@ -69,13 +56,22 @@ const (
 	`
 )
 
+// Manager-related queries
+const (
+	insertUser      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	updateUserPass  = `UPDATE user SET pass = ? WHERE user = ?`
+	deleteUser      = `DELETE FROM user WHERE user = ?`
+	deleteUserTopic = `DELETE FROM user_topic WHERE user = ?`
+)
+
 type SQLiteAuth struct {
 	db           *sql.DB
 	defaultRead  bool
 	defaultWrite bool
 }
 
-var _ Auth = (*SQLiteAuth)(nil)
+var _ Auther = (*SQLiteAuth)(nil)
+var _ Manager = (*SQLiteAuth)(nil)
 
 func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth, error) {
 	db, err := sql.Open("sqlite3", filename)
@@ -154,4 +150,36 @@ func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
 		return nil
 	}
 	return ErrUnauthorized
+}
+
+func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		return err
+	}
+	if _, err = a.db.Exec(insertUser, username, hash, role); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) RemoveUser(username string) error {
+	if _, err := a.db.Exec(deleteUser, username); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(deleteUserTopic, username); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) ChangePassword(username, password string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(updateUserPass, hash, username); err != nil {
+		return err
+	}
+	return nil
 }

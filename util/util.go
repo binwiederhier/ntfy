@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
+	"golang.org/x/term"
+	"io"
 	"math/rand"
 	"os"
 	"regexp"
@@ -201,4 +203,40 @@ func ParseSize(s string) (int64, error) {
 	default:
 		return int64(value), nil
 	}
+}
+
+// ReadPassword will read a password from STDIN. If the terminal supports it, it will not print the
+// input characters to the screen. If not, it'll just read using normal readline semantics (useful for testing).
+func ReadPassword(in io.Reader) ([]byte, error) {
+	// If in is a file and a character device (a TTY), use term.ReadPassword
+	if f, ok := in.(*os.File); ok {
+		stat, err := f.Stat()
+		if err != nil {
+			return nil, err
+		}
+		if (stat.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
+			password, err := term.ReadPassword(int(f.Fd())) // This is always going to be 0
+			if err != nil {
+				return nil, err
+			}
+			return password, nil
+		}
+	}
+
+	// Fallback: Manually read util \n if found, see #69 for details why this is so manual
+	password := make([]byte, 0)
+	buf := make([]byte, 1)
+	for {
+		_, err := in.Read(buf)
+		if err == io.EOF || buf[0] == '\n' {
+			break
+		} else if err != nil {
+			return nil, err
+		} else if len(password) > 10240 {
+			return nil, errors.New("passwords this long are not supported")
+		}
+		password = append(password, buf[0])
+	}
+
+	return password, nil
 }

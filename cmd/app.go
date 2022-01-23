@@ -32,6 +32,7 @@ func New() *cli.App {
 			cmdServe,
 			cmdPublish,
 			cmdSubscribe,
+			cmdUser,
 		},
 	}
 }

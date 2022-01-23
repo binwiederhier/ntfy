@@ -2,10 +2,16 @@ package auth
 
 import "errors"
 
-// auth is a generic interface to implement password-based authentication and authorization
-type Auth interface {
+// Auther is a generic interface to implement password-based authentication and authorization
+type Auther interface {
 	Authenticate(user, pass string) (*User, error)
 	Authorize(user *User, topic string, perm Permission) error
+}
+
+type Manager interface {
+	AddUser(username, password string, role Role) error
+	RemoveUser(username string) error
+	ChangePassword(username, password string) error
 }
 
 type User struct {

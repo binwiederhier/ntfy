@@ -47,7 +47,7 @@ type Server struct {
 	firebase     subscriber
 	mailer       mailer
 	messages     int64
-	auth         auth.Auth
+	auth         auth.Auther
 	cache        cache
 	fileCache    *fileCache
 	closeChan    chan bool
@@ -142,7 +142,7 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var auther auth.Auth
+	var auther auth.Auther
 	if conf.AuthFile != "" {
 		auther, err = auth.NewSQLiteAuth(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
 		if err != nil {

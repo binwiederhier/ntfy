@@ -21,10 +21,6 @@ INSERT INTO access VALUES ('','write-all',1,1);
 
 */
 
-const (
-	bcryptCost = 11
-)
-
 // Auther-related queries
 const (
 	createAuthTablesQueries = `
@@ -51,26 +47,28 @@ const (
 	selectTopicPermsQuery = `
 		SELECT read, write 
 		FROM access 
-		WHERE user IN ('', ?) AND topic = ?
+		WHERE user IN ('*', ?) AND topic = ?
 		ORDER BY user DESC
 	`
 )
 
 // Manager-related queries
 const (
-	insertUserQuery           = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
-	selectUsernamesQuery      = `SELECT user FROM user ORDER BY role, user`
-	selectUserTopicPermsQuery = `SELECT topic, read, write FROM access WHERE user = ?`
-	updateUserPassQuery       = `UPDATE user SET pass = ? WHERE user = ?`
-	updateUserRoleQuery       = `UPDATE user SET role = ? WHERE user = ?`
-	upsertAccessQuery         = `
+	insertUserQuery      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	selectUsernamesQuery = `SELECT user FROM user ORDER BY role, user`
+	updateUserPassQuery  = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRoleQuery  = `UPDATE user SET role = ? WHERE user = ?`
+	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
+
+	upsertUserAccessQuery = `
 		INSERT INTO access (user, topic, read, write) 
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (user, topic) DO UPDATE SET read=excluded.read, write=excluded.write
 	`
-	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
-	deleteAllAccessQuery = `DELETE FROM access WHERE user = ?`
-	deleteAccessQuery    = `DELETE FROM access WHERE user = ? AND topic = ?`
+	selectUserAccessQuery  = `SELECT topic, read, write FROM access WHERE user = ?`
+	deleteAllAccessQuery   = `DELETE FROM access`
+	deleteUserAccessQuery  = `DELETE FROM access WHERE user = ?`
+	deleteTopicAccessQuery = `DELETE FROM access WHERE user = ? AND topic = ?`
 )
 
 type SQLiteAuth struct {
@@ -106,6 +104,9 @@ func setupNewAuthDB(db *sql.DB) error {
 }
 
 func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
+	if username == Everyone {
+		return nil, ErrUnauthorized
+	}
 	rows, err := a.db.Query(selectUserQuery, username)
 	if err != nil {
 		return nil, err
@@ -135,7 +136,7 @@ func (a *SQLiteAuth) Authorize(user *User, topic string, perm Permission) error 
 	// Select the read/write permissions for this user/topic combo. The query may return two
 	// rows (one for everyone, and one for the user), but prioritizes the user. The value for
 	// user.Name may be empty (= everyone).
-	var username string
+	username := Everyone
 	if user != nil {
 		username = user.Name
 	}
@@ -166,7 +167,7 @@ func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
 }
 
 func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -180,7 +181,7 @@ func (a *SQLiteAuth) RemoveUser(username string) error {
 	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
+	if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
 		return err
 	}
 	return nil
@@ -211,10 +212,18 @@ func (a *SQLiteAuth) Users() ([]*User, error) {
 		}
 		users = append(users, user)
 	}
+	everyone, err := a.everyoneUser()
+	if err != nil {
+		return nil, err
+	}
+	users = append(users, everyone)
 	return users, nil
 }
 
 func (a *SQLiteAuth) User(username string) (*User, error) {
+	if username == Everyone {
+		return a.everyoneUser()
+	}
 	urows, err := a.db.Query(selectUserQuery, username)
 	if err != nil {
 		return nil, err
@@ -229,25 +238,9 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 	} else if err := urows.Err(); err != nil {
 		return nil, err
 	}
-	arows, err := a.db.Query(selectUserTopicPermsQuery, username)
+	grants, err := a.readGrants(username)
 	if err != nil {
 		return nil, err
-	}
-	defer arows.Close()
-	grants := make([]Grant, 0)
-	for arows.Next() {
-		var topic string
-		var read, write bool
-		if err := arows.Scan(&topic, &read, &write); err != nil {
-			return nil, err
-		} else if err := arows.Err(); err != nil {
-			return nil, err
-		}
-		grants = append(grants, Grant{
-			Topic: topic,
-			Read:  read,
-			Write: write,
-		})
 	}
 	return &User{
 		Name:   username,
@@ -257,8 +250,45 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 	}, nil
 }
 
+func (a *SQLiteAuth) everyoneUser() (*User, error) {
+	grants, err := a.readGrants(Everyone)
+	if err != nil {
+		return nil, err
+	}
+	return &User{
+		Name:   Everyone,
+		Pass:   "",
+		Role:   RoleAnonymous,
+		Grants: grants,
+	}, nil
+}
+
+func (a *SQLiteAuth) readGrants(username string) ([]Grant, error) {
+	rows, err := a.db.Query(selectUserAccessQuery, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	grants := make([]Grant, 0)
+	for rows.Next() {
+		var topic string
+		var read, write bool
+		if err := rows.Scan(&topic, &read, &write); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		grants = append(grants, Grant{
+			Topic: topic,
+			Read:  read,
+			Write: write,
+		})
+	}
+	return grants, nil
+}
+
 func (a *SQLiteAuth) ChangePassword(username, password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -273,29 +303,32 @@ func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
 		return err
 	}
 	if role == RoleAdmin {
-		if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
+		if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func (a *SQLiteAuth) DefaultAccess() (read bool, write bool) {
+	return a.defaultRead, a.defaultWrite
+}
+
 func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write bool) error {
-	if _, err := a.db.Exec(upsertAccessQuery, username, topic, read, write); err != nil {
+	if _, err := a.db.Exec(upsertUserAccessQuery, username, topic, read, write); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
-	if topic == "" {
-		if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
-			return err
-		}
-	} else {
-		if _, err := a.db.Exec(deleteAccessQuery, username, topic); err != nil {
-			return err
-		}
+	if username == "" && topic == "" {
+		_, err := a.db.Exec(deleteAllAccessQuery, username)
+		return err
+	} else if topic == "" {
+		_, err := a.db.Exec(deleteUserAccessQuery, username)
+		return err
 	}
-	return nil
+	_, err := a.db.Exec(deleteTopicAccessQuery, username, topic)
+	return err
 }

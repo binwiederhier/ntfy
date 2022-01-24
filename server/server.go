@@ -1144,7 +1144,7 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		}
 		if err := s.auth.Authorize(user, t.ID, perm); err != nil {
 			log.Printf("unauthorized: %s", err.Error())
-			return errHTTPUnauthorized
+			return errHTTPForbidden
 		}
 		return next(w, r, v)
 	}

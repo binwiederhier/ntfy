@@ -37,8 +37,7 @@ func New() *cli.App {
 			// Server commands
 			cmdServe,
 			cmdUser,
-			cmdAllow,
-			cmdDeny,
+			cmdAccess,
 
 			// Client commands
 			cmdPublish,

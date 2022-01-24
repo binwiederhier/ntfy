@@ -15,6 +15,7 @@ type Manager interface {
 	User(username string) (*User, error)
 	ChangePassword(username, password string) error
 	ChangeRole(username string, role Role) error
+	DefaultAccess() (read bool, write bool)
 	AllowAccess(username string, topic string, read bool, write bool) error
 	ResetAccess(username string, topic string) error
 }
@@ -42,21 +43,14 @@ const (
 type Role string
 
 const (
-	RoleAdmin = Role("admin")
-	RoleUser  = Role("user")
-	RoleNone  = Role("none")
+	RoleAdmin     = Role("admin")
+	RoleUser      = Role("user")
+	RoleAnonymous = Role("anonymous")
 )
 
-var Everyone = &User{
-	Name: "",
-	Role: RoleNone,
-}
-
-var Roles = []Role{
-	RoleAdmin,
-	RoleUser,
-	RoleNone,
-}
+const (
+	Everyone = "*"
+)
 
 func AllowedRole(role Role) bool {
 	return role == RoleUser || role == RoleAdmin

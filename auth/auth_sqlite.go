@@ -58,17 +58,19 @@ const (
 
 // Manager-related queries
 const (
-	insertUser     = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
-	updateUserPass = `UPDATE user SET pass = ? WHERE user = ?`
-	updateUserRole = `UPDATE user SET role = ? WHERE user = ?`
-	upsertAccess   = `
+	insertUserQuery           = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	selectUsernamesQuery      = `SELECT user FROM user ORDER BY role, user`
+	selectUserTopicPermsQuery = `SELECT topic, read, write FROM access WHERE user = ?`
+	updateUserPassQuery       = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRoleQuery       = `UPDATE user SET role = ? WHERE user = ?`
+	upsertAccessQuery         = `
 		INSERT INTO access (user, topic, read, write) 
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (user, topic) DO UPDATE SET read=excluded.read, write=excluded.write
 	`
-	deleteUser      = `DELETE FROM user WHERE user = ?`
-	deleteAllAccess = `DELETE FROM access WHERE user = ?`
-	deleteAccess    = `DELETE FROM access WHERE user = ? AND topic = ?`
+	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
+	deleteAllAccessQuery = `DELETE FROM access WHERE user = ?`
+	deleteAccessQuery    = `DELETE FROM access WHERE user = ? AND topic = ?`
 )
 
 type SQLiteAuth struct {
@@ -127,13 +129,17 @@ func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 }
 
 func (a *SQLiteAuth) Authorize(user *User, topic string, perm Permission) error {
-	if user.Role == RoleAdmin {
+	if user != nil && user.Role == RoleAdmin {
 		return nil // Admin can do everything
 	}
 	// Select the read/write permissions for this user/topic combo. The query may return two
 	// rows (one for everyone, and one for the user), but prioritizes the user. The value for
 	// user.Name may be empty (= everyone).
-	rows, err := a.db.Query(selectTopicPermsQuery, user.Name, topic)
+	var username string
+	if user != nil {
+		username = user.Name
+	}
+	rows, err := a.db.Query(selectTopicPermsQuery, username, topic)
 	if err != nil {
 		return err
 	}
@@ -164,20 +170,91 @@ func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
 	if err != nil {
 		return err
 	}
-	if _, err = a.db.Exec(insertUser, username, hash, role); err != nil {
+	if _, err = a.db.Exec(insertUserQuery, username, hash, role); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (a *SQLiteAuth) RemoveUser(username string) error {
-	if _, err := a.db.Exec(deleteUser, username); err != nil {
+	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteAllAccess, username); err != nil {
+	if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (a *SQLiteAuth) Users() ([]*User, error) {
+	rows, err := a.db.Query(selectUsernamesQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	usernames := make([]string, 0)
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		usernames = append(usernames, username)
+	}
+	rows.Close()
+	users := make([]*User, 0)
+	for _, username := range usernames {
+		user, err := a.User(username)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+func (a *SQLiteAuth) User(username string) (*User, error) {
+	urows, err := a.db.Query(selectUserQuery, username)
+	if err != nil {
+		return nil, err
+	}
+	defer urows.Close()
+	var hash, role string
+	if !urows.Next() {
+		return nil, ErrNotFound
+	}
+	if err := urows.Scan(&hash, &role); err != nil {
+		return nil, err
+	} else if err := urows.Err(); err != nil {
+		return nil, err
+	}
+	arows, err := a.db.Query(selectUserTopicPermsQuery, username)
+	if err != nil {
+		return nil, err
+	}
+	defer arows.Close()
+	grants := make([]Grant, 0)
+	for arows.Next() {
+		var topic string
+		var read, write bool
+		if err := arows.Scan(&topic, &read, &write); err != nil {
+			return nil, err
+		} else if err := arows.Err(); err != nil {
+			return nil, err
+		}
+		grants = append(grants, Grant{
+			Topic: topic,
+			Read:  read,
+			Write: write,
+		})
+	}
+	return &User{
+		Name:   username,
+		Pass:   hash,
+		Role:   Role(role),
+		Grants: grants,
+	}, nil
 }
 
 func (a *SQLiteAuth) ChangePassword(username, password string) error {
@@ -185,21 +262,26 @@ func (a *SQLiteAuth) ChangePassword(username, password string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(updateUserPass, hash, username); err != nil {
+	if _, err := a.db.Exec(updateUserPassQuery, hash, username); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
-	if _, err := a.db.Exec(updateUserRole, string(role), username); err != nil {
+	if _, err := a.db.Exec(updateUserRoleQuery, string(role), username); err != nil {
 		return err
+	}
+	if role == RoleAdmin {
+		if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write bool) error {
-	if _, err := a.db.Exec(upsertAccess, username, topic, read, write); err != nil {
+	if _, err := a.db.Exec(upsertAccessQuery, username, topic, read, write); err != nil {
 		return err
 	}
 	return nil
@@ -207,11 +289,11 @@ func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write
 
 func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
 	if topic == "" {
-		if _, err := a.db.Exec(deleteAllAccess, username); err != nil {
+		if _, err := a.db.Exec(deleteAllAccessQuery, username); err != nil {
 			return err
 		}
 	} else {
-		if _, err := a.db.Exec(deleteAccess, username, topic); err != nil {
+		if _, err := a.db.Exec(deleteAccessQuery, username, topic); err != nil {
 			return err
 		}
 	}

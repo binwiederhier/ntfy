@@ -1134,7 +1134,7 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		if err != nil {
 			return err
 		}
-		user := auth.Everyone
+		var user *auth.User // may stay nil if no auth header!
 		username, password, ok := r.BasicAuth()
 		if ok {
 			if user, err = s.auth.Authenticate(username, password); err != nil {

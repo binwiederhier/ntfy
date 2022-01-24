@@ -69,7 +69,7 @@ var cmdUser = &cli.Command{
 			Name:    "list",
 			Aliases: []string{"chr"},
 			Usage:   "change user role",
-			Action:  execUserChangeRole,
+			Action:  execUserList,
 		},
 	},
 }
@@ -147,6 +147,42 @@ func execUserChangeRole(c *cli.Context) error {
 		return err
 	}
 	fmt.Fprintf(c.App.ErrWriter, "Changed role for user %s to %s\n", username, role)
+	return nil
+}
+
+func execUserList(c *cli.Context) error {
+	manager, err := createAuthManager(c)
+	if err != nil {
+		return err
+	}
+	users, err := manager.Users()
+	if err != nil {
+		return err
+	}
+	return showUsers(c, users)
+}
+
+func showUsers(c *cli.Context, users []*auth.User) error {
+	for _, user := range users {
+		fmt.Fprintf(c.App.Writer, "User %s (%s)\n", user.Name, user.Role)
+		if user.Role == auth.RoleAdmin {
+			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
+		} else if len(user.Grants) > 0 {
+			for _, grant := range user.Grants {
+				if grant.Read && grant.Write {
+					fmt.Fprintf(c.App.ErrWriter, "- read-write access to topic %s\n", grant.Topic)
+				} else if grant.Read {
+					fmt.Fprintf(c.App.ErrWriter, "- read-only access to topic %s\n", grant.Topic)
+				} else if grant.Write {
+					fmt.Fprintf(c.App.ErrWriter, "- write-only access to topic %s\n", grant.Topic)
+				} else {
+					fmt.Fprintf(c.App.ErrWriter, "- no access to topic %s\n", grant.Topic)
+				}
+			}
+		} else {
+			fmt.Fprintf(c.App.ErrWriter, "- no topic-specific permissions\n")
+		}
+	}
 	return nil
 }
 

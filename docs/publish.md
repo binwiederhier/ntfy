@@ -756,7 +756,7 @@ This could be a Dropbox link, a file from social media, or any other publicly av
 externally hosted, the expiration or size limits from above do not apply here.
 
 To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
-to specify the attachment URL. It can be any type of file. Here's an example showing how to upload an image:
+to specify the attachment URL. It can be any type of file. Here's an example showing how to attach an APK file:
 
 === "Command line (curl)"
     ```

@@ -22,7 +22,7 @@ type Manager interface {
 
 type User struct {
 	Name   string
-	Pass   string // hashed
+	Hash   string // password hash (bcrypt)
 	Role   Role
 	Grants []Grant
 }
@@ -57,6 +57,8 @@ func AllowedRole(role Role) bool {
 }
 
 var (
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrNotFound     = errors.New("not found")
+	ErrUnauthenticated = errors.New("unauthenticated")
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrInvalidArgument = errors.New("invalid argument")
+	ErrNotFound        = errors.New("not found")
 )

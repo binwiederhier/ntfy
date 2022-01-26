@@ -2,24 +2,14 @@ package auth
 
 import (
 	"database/sql"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
+	"regexp"
 )
 
-/*
-
-SELECT * FROM user;
-SELECT * FROM access;
-
-INSERT INTO user VALUES ('phil','$2a$06$.4W0LI5mcxzxhpjUvpTaNeu0MhRO0T7B.CYnmAkRnlztIy7PrSODu', 'admin');
-INSERT INTO user VALUES ('ben','$2a$06$skJK/AecWCUmiCjr69ke.Ow/hFA616RdvJJPxnI221zyohsRlyXL.', 'user');
-INSERT INTO user VALUES ('marian','$2a$10$8U90swQIatvHHI4sw0Wo7.OUy6dUwzMcoOABi6BsS4uF0x3zcSXRW', 'user');
-
-INSERT INTO access VALUES ('ben','alerts',1,1);
-INSERT INTO access VALUES ('marian','alerts',1,0);
-INSERT INTO access VALUES ('','announcements',1,0);
-INSERT INTO access VALUES ('','write-all',1,1);
-
-*/
+const (
+	bcryptCost = 11
+)
 
 // Auther-related queries
 const (
@@ -77,6 +67,10 @@ type SQLiteAuth struct {
 	defaultWrite bool
 }
 
+var (
+	allowedUsernameRegex = regexp.MustCompile(`^[-_.@a-zA-Z0-9]+$`)
+)
+
 var _ Auther = (*SQLiteAuth)(nil)
 var _ Manager = (*SQLiteAuth)(nil)
 
@@ -105,28 +99,18 @@ func setupNewAuthDB(db *sql.DB) error {
 
 func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 	if username == Everyone {
-		return nil, ErrUnauthorized
+		return nil, ErrUnauthenticated
 	}
-	rows, err := a.db.Query(selectUserQuery, username)
+	user, err := a.User(username)
 	if err != nil {
-		return nil, err
+		bcrypt.CompareHashAndPassword([]byte("$2a$11$eX15DeF27FwAgXt9wqJF0uAUMz74XywJcGBH3kP93pzKYv6ATk2ka"),
+			[]byte("intentional slow-down to avoid timing attacks"))
+		return nil, ErrUnauthenticated
 	}
-	defer rows.Close()
-	var hash, role string
-	if rows.Next() {
-		if err := rows.Scan(&hash, &role); err != nil {
-			return nil, err
-		} else if err := rows.Err(); err != nil {
-			return nil, err
-		}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
+		return nil, ErrUnauthenticated
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-		return nil, err
-	}
-	return &User{
-		Name: username,
-		Role: Role(role),
-	}, nil
+	return user, nil
 }
 
 func (a *SQLiteAuth) Authorize(user *User, topic string, perm Permission) error {
@@ -167,7 +151,10 @@ func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
 }
 
 func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if !allowedUsernameRegex.MatchString(username) || (role != RoleAdmin && role != RoleUser) {
+		return ErrInvalidArgument
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -178,6 +165,9 @@ func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
 }
 
 func (a *SQLiteAuth) RemoveUser(username string) error {
+	if !allowedUsernameRegex.MatchString(username) || username == Everyone {
+		return ErrInvalidArgument
+	}
 	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
 		return err
 	}
@@ -224,18 +214,18 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 	if username == Everyone {
 		return a.everyoneUser()
 	}
-	urows, err := a.db.Query(selectUserQuery, username)
+	rows, err := a.db.Query(selectUserQuery, username)
 	if err != nil {
 		return nil, err
 	}
-	defer urows.Close()
+	defer rows.Close()
 	var hash, role string
-	if !urows.Next() {
+	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := urows.Scan(&hash, &role); err != nil {
+	if err := rows.Scan(&hash, &role); err != nil {
 		return nil, err
-	} else if err := urows.Err(); err != nil {
+	} else if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	grants, err := a.readGrants(username)
@@ -244,7 +234,7 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 	}
 	return &User{
 		Name:   username,
-		Pass:   hash,
+		Hash:   hash,
 		Role:   Role(role),
 		Grants: grants,
 	}, nil
@@ -257,7 +247,7 @@ func (a *SQLiteAuth) everyoneUser() (*User, error) {
 	}
 	return &User{
 		Name:   Everyone,
-		Pass:   "",
+		Hash:   "",
 		Role:   RoleAnonymous,
 		Grants: grants,
 	}, nil
@@ -288,7 +278,7 @@ func (a *SQLiteAuth) readGrants(username string) ([]Grant, error) {
 }
 
 func (a *SQLiteAuth) ChangePassword(username, password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -299,6 +289,9 @@ func (a *SQLiteAuth) ChangePassword(username, password string) error {
 }
 
 func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
+	if !allowedUsernameRegex.MatchString(username) || (role != RoleAdmin && role != RoleUser) {
+		return ErrInvalidArgument
+	}
 	if _, err := a.db.Exec(updateUserRoleQuery, string(role), username); err != nil {
 		return err
 	}

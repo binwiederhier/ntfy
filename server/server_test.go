@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
 	"math/rand"
 	"net/http"
@@ -524,6 +525,104 @@ func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 	require.Equal(t, keepaliveEvent, messages[2].Event)
 }
 
+func TestServer_Auth_Success_Admin(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		"Authorization": basicAuth("phil:phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
+}
+
+func TestServer_Auth_Success_User(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = false
+	c.AuthDefaultWrite = false
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true)) // Not mytopic!
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		"Authorization": basicAuth("ben:ben"),
+	})
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = false
+	c.AuthDefaultWrite = false
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		"Authorization": basicAuth("phil:INVALID"),
+	})
+	require.Equal(t, 401, response.Code)
+}
+
+func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = false
+	c.AuthDefaultWrite = false
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	require.Nil(t, manager.AllowAccess("ben", "sometopic", true, true)) // Not mytopic!
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		"Authorization": basicAuth("ben:ben"),
+	})
+	require.Equal(t, 403, response.Code)
+}
+
+func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = true  // Open by default
+	c.AuthDefaultWrite = true // Open by default
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
+	require.Nil(t, manager.AllowAccess(auth.Everyone, "private", false, false))
+	require.Nil(t, manager.AllowAccess(auth.Everyone, "announcements", true, false))
+
+	response := request(t, s, "PUT", "/mytopic", "test", nil)
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "PUT", "/announcements", "test", nil)
+	require.Equal(t, 403, response.Code) // Cannot write as anonymous
+
+	response = request(t, s, "PUT", "/announcements", "test", map[string]string{
+		"Authorization": basicAuth("phil:phil"),
+	})
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "GET", "/announcements/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code) // Anonymous read allowed
+
+	response = request(t, s, "GET", "/private/json?poll=1", "", nil)
+	require.Equal(t, 403, response.Code) // Anonymous read not allowed
+}
+
 /*
 func TestServer_Curl_Publish_Poll(t *testing.T) {
 	s, port := test.StartServer(t)
@@ -987,4 +1086,8 @@ func firebaseServiceAccountFile(t *testing.T) string {
 	}
 	t.SkipNow()
 	return ""
+}
+
+func basicAuth(s string) string {
+	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(s)))
 }

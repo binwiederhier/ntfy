@@ -69,6 +69,7 @@ var (
 	ssePathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
 	rawPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
 	wsPathRegex      = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
+	authPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
 
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
@@ -331,7 +332,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
 		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
-		return s.handleEmpty(w, r)
+		return s.handleEmpty(w, r, v)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.handleStatic(w, r)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
@@ -354,6 +355,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
 		return s.limitRequests(s.authRead(s.handleSubscribeRaw))(w, r, v)
 	} else if r.Method == http.MethodGet && wsPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authRead(s.handleSubscribeWS))(w, r, v)
+	} else if r.Method == http.MethodGet && authPathRegex.MatchString(r.URL.Path) {
+		return s.limitRequests(s.authRead(s.handleTopicAuth))(w, r, v)
 	}
 	return errHTTPNotFound
 }
@@ -376,8 +379,15 @@ func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
 	return s.handleHome(w, r)
 }
 
-func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	return nil
+}
+
+func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	_, err := io.WriteString(w, `{"success":true}`+"\n")
+	return err
 }
 
 func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {

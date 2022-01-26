@@ -8,6 +8,7 @@ import (
 	"heckel.io/ntfy/test"
 	"heckel.io/ntfy/util"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -20,9 +21,10 @@ func init() {
 
 func TestCLI_Serve_Unix_Curl(t *testing.T) {
 	sockFile := filepath.Join(t.TempDir(), "ntfy.sock")
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
 	go func() {
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", "--listen-http=-", "--listen-unix=" + sockFile})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile})
 		require.Nil(t, err)
 	}()
 	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
@@ -40,8 +42,9 @@ func TestCLI_Serve_Unix_Curl(t *testing.T) {
 func TestCLI_Serve_WebSocket(t *testing.T) {
 	port := 10000 + rand.Intn(20000)
 	go func() {
+		configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", fmt.Sprintf("--listen-http=:%d", port)})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, fmt.Sprintf("--listen-http=:%d", port)})
 		require.Nil(t, err)
 	}()
 	test.WaitForPortUp(t, port)
@@ -65,4 +68,10 @@ func TestCLI_Serve_WebSocket(t *testing.T) {
 	m := toMessage(t, string(data))
 	require.Equal(t, "my message", m.Message)
 	require.Equal(t, "mytopic", m.Topic)
+}
+
+func newEmptyFile(t *testing.T) string {
+	filename := filepath.Join(t.TempDir(), "empty")
+	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))
+	return filename
 }

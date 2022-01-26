@@ -61,6 +61,8 @@ const (
 	deleteTopicAccessQuery = `DELETE FROM access WHERE user = ? AND topic = ?`
 )
 
+// SQLiteAuth is an implementation of Auther and Manager. It stores users and access control list
+// in a SQLite database.
 type SQLiteAuth struct {
 	db           *sql.DB
 	defaultRead  bool
@@ -74,6 +76,7 @@ var (
 var _ Auther = (*SQLiteAuth)(nil)
 var _ Manager = (*SQLiteAuth)(nil)
 
+// NewSQLiteAuth creates a new SQLiteAuth instance
 func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
@@ -97,6 +100,9 @@ func setupNewAuthDB(db *sql.DB) error {
 	return nil
 }
 
+// Authenticate checks username and password and returns a user if correct. The method
+// returns in constant-ish time, regardless of whether the user exists or the password is
+// correct or incorrect.
 func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 	if username == Everyone {
 		return nil, ErrUnauthenticated
@@ -113,17 +119,19 @@ func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 	return user, nil
 }
 
+// Authorize returns nil if the given user has access to the given topic using the desired
+// permission. The user param may be nil to signal an anonymous user.
 func (a *SQLiteAuth) Authorize(user *User, topic string, perm Permission) error {
 	if user != nil && user.Role == RoleAdmin {
 		return nil // Admin can do everything
 	}
-	// Select the read/write permissions for this user/topic combo. The query may return two
-	// rows (one for everyone, and one for the user), but prioritizes the user. The value for
-	// user.Name may be empty (= everyone).
 	username := Everyone
 	if user != nil {
 		username = user.Name
 	}
+	// Select the read/write permissions for this user/topic combo. The query may return two
+	// rows (one for everyone, and one for the user), but prioritizes the user. The value for
+	// user.Name may be empty (= everyone).
 	rows, err := a.db.Query(selectTopicPermsQuery, username, topic)
 	if err != nil {
 		return err
@@ -150,8 +158,10 @@ func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
 	return ErrUnauthorized
 }
 
+// AddUser adds a user with the given username, password and role. The password should be hashed
+// before it is stored in a persistence layer.
 func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
-	if !allowedUsernameRegex.MatchString(username) || (role != RoleAdmin && role != RoleUser) {
+	if !allowedUsernameRegex.MatchString(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
@@ -164,6 +174,8 @@ func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
 	return nil
 }
 
+// RemoveUser deletes the user with the given username. The function returns nil on success, even
+// if the user did not exist in the first place.
 func (a *SQLiteAuth) RemoveUser(username string) error {
 	if !allowedUsernameRegex.MatchString(username) || username == Everyone {
 		return ErrInvalidArgument
@@ -177,6 +189,7 @@ func (a *SQLiteAuth) RemoveUser(username string) error {
 	return nil
 }
 
+// Users returns a list of users. It always also returns the Everyone user ("*").
 func (a *SQLiteAuth) Users() ([]*User, error) {
 	rows, err := a.db.Query(selectUsernamesQuery)
 	if err != nil {
@@ -210,6 +223,8 @@ func (a *SQLiteAuth) Users() ([]*User, error) {
 	return users, nil
 }
 
+// User returns the user with the given username if it exists, or ErrNotFound otherwise.
+// You may also pass Everyone to retrieve the anonymous user and its Grant list.
 func (a *SQLiteAuth) User(username string) (*User, error) {
 	if username == Everyone {
 		return a.everyoneUser()
@@ -277,6 +292,7 @@ func (a *SQLiteAuth) readGrants(username string) ([]Grant, error) {
 	return grants, nil
 }
 
+// ChangePassword changes a user's password
 func (a *SQLiteAuth) ChangePassword(username, password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
@@ -288,8 +304,10 @@ func (a *SQLiteAuth) ChangePassword(username, password string) error {
 	return nil
 }
 
+// ChangeRole changes a user's role. When a role is changed from RoleUser to RoleAdmin,
+// all existing access control entries (Grant) are removed, since they are no longer needed.
 func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
-	if !allowedUsernameRegex.MatchString(username) || (role != RoleAdmin && role != RoleUser) {
+	if !allowedUsernameRegex.MatchString(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
 	if _, err := a.db.Exec(updateUserRoleQuery, string(role), username); err != nil {
@@ -303,10 +321,8 @@ func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
 	return nil
 }
 
-func (a *SQLiteAuth) DefaultAccess() (read bool, write bool) {
-	return a.defaultRead, a.defaultWrite
-}
-
+// AllowAccess adds or updates an entry in th access control list for a specific user. It controls
+// read/write access to a topic.
 func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write bool) error {
 	if _, err := a.db.Exec(upsertUserAccessQuery, username, topic, read, write); err != nil {
 		return err
@@ -314,6 +330,8 @@ func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write
 	return nil
 }
 
+// ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
+// empty) for an entire user.
 func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
 	if username == "" && topic == "" {
 		_, err := a.db.Exec(deleteAllAccessQuery, username)
@@ -324,4 +342,9 @@ func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
 	}
 	_, err := a.db.Exec(deleteTopicAccessQuery, username, topic)
 	return err
+}
+
+// DefaultAccess returns the default read/write access if no access control entry matches
+func (a *SQLiteAuth) DefaultAccess() (read bool, write bool) {
+	return a.defaultRead, a.defaultWrite
 }

@@ -80,7 +80,7 @@ vet:
 	go vet ./...
 
 lint:
-	which golint || go get -u golang.org/x/lint/golint
+	which golint || go install golang.org/x/lint/golint@latest
 	go list ./... | grep -v /vendor/ | xargs -L1 golint -set_exit_status
 
 staticcheck: .PHONY

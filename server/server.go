@@ -1140,7 +1140,7 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		if s.auth == nil {
 			return next(w, r, v)
 		}
-		t, err := s.topicFromPath(r.URL.Path)
+		topics, _, err := s.topicsFromPath(r.URL.Path)
 		if err != nil {
 			return err
 		}
@@ -1152,9 +1152,11 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 				return errHTTPUnauthorized
 			}
 		}
-		if err := s.auth.Authorize(user, t.ID, perm); err != nil {
-			log.Printf("unauthorized: %s", err.Error())
-			return errHTTPForbidden
+		for _, t := range topics {
+			if err := s.auth.Authorize(user, t.ID, perm); err != nil {
+				log.Printf("unauthorized: %s", err.Error())
+				return errHTTPForbidden
+			}
 		}
 		return next(w, r, v)
 	}

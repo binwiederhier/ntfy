@@ -549,12 +549,35 @@ func TestServer_Auth_Success_User(t *testing.T) {
 
 	manager := s.auth.(auth.Manager)
 	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
-	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true)) // Not mytopic!
+	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
 	})
 	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = false
+	c.AuthDefaultWrite = false
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
+	require.Nil(t, manager.AllowAccess("ben", "anothertopic", true, true))
+
+	response := request(t, s, "GET", "/mytopic,anothertopic/auth", "", map[string]string{
+		"Authorization": basicAuth("ben:ben"),
+	})
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "GET", "/mytopic,anothertopic,NOT-THIS-ONE/auth", "", map[string]string{
+		"Authorization": basicAuth("ben:ben"),
+	})
+	require.Equal(t, 403, response.Code)
 }
 
 func TestServer_Auth_Fail_InvalidPass(t *testing.T) {

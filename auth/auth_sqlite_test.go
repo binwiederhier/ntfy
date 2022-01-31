@@ -19,6 +19,7 @@ func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Nil(t, a.AllowAccess("ben", "everyonewrite", false, false)) // How unfair!
 	require.Nil(t, a.AllowAccess(auth.Everyone, "announcements", true, false))
 	require.Nil(t, a.AllowAccess(auth.Everyone, "everyonewrite", true, true))
+	require.Nil(t, a.AllowAccess(auth.Everyone, "up*", false, true)) // Everyone can write to /up*
 
 	phil, err := a.Authenticate("phil", "phil")
 	require.Nil(t, err)
@@ -77,6 +78,8 @@ func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Nil(t, a.Authorize(nil, "announcements", auth.PermissionRead))
 	require.Nil(t, a.Authorize(nil, "everyonewrite", auth.PermissionRead))
 	require.Nil(t, a.Authorize(nil, "everyonewrite", auth.PermissionWrite))
+	require.Nil(t, a.Authorize(nil, "up1234", auth.PermissionWrite)) // Wildcard permission
+	require.Nil(t, a.Authorize(nil, "up5678", auth.PermissionWrite))
 }
 
 func TestSQLiteAuth_AddUser_Invalid(t *testing.T) {

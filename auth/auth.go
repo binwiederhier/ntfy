@@ -1,6 +1,9 @@
 package auth
 
-import "errors"
+import (
+	"errors"
+	"regexp"
+)
 
 // Auther is a generic interface to implement password-based authentication and authorization
 type Auther interface {
@@ -39,12 +42,12 @@ type Manager interface {
 	ChangeRole(username string, role Role) error
 
 	// AllowAccess adds or updates an entry in th access control list for a specific user. It controls
-	// read/write access to a topic.
-	AllowAccess(username string, topic string, read bool, write bool) error
+	// read/write access to a topic. The parameter topicPattern may include wildcards (*).
+	AllowAccess(username string, topicPattern string, read bool, write bool) error
 
 	// ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
-	// empty) for an entire user.
-	ResetAccess(username string, topic string) error
+	// empty) for an entire user. The parameter topicPattern may include wildcards (*).
+	ResetAccess(username string, topicPattern string) error
 
 	// DefaultAccess returns the default read/write access if no access control entry matches
 	DefaultAccess() (read bool, write bool)
@@ -89,9 +92,24 @@ const (
 	Everyone = "*"
 )
 
+var (
+	allowedUsernameRegex     = regexp.MustCompile(`^[-_.@a-zA-Z0-9]+$`)     // Does not include Everyone (*)
+	allowedTopicPatternRegex = regexp.MustCompile(`^[-_*A-Za-z0-9]{1,64}$`) // Adds '*' for wildcards!
+)
+
 // AllowedRole returns true if the given role can be used for new users
 func AllowedRole(role Role) bool {
 	return role == RoleUser || role == RoleAdmin
+}
+
+// AllowedUsername returns true if the given username is valid
+func AllowedUsername(username string) bool {
+	return allowedUsernameRegex.MatchString(username)
+}
+
+// AllowedTopicPattern returns true if the given topic pattern is valid; this includes the wildcard character (*)
+func AllowedTopicPattern(username string) bool {
+	return allowedTopicPatternRegex.MatchString(username)
 }
 
 // Error constants used by the package

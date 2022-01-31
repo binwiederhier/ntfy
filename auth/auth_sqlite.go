@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
-	"regexp"
+	"strings"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 	selectTopicPermsQuery = `
 		SELECT read, write 
 		FROM access 
-		WHERE user IN ('*', ?) AND topic = ?
+		WHERE user IN ('*', ?) AND ? LIKE topic
 		ORDER BY user DESC
 	`
 )
@@ -68,10 +68,6 @@ type SQLiteAuth struct {
 	defaultRead  bool
 	defaultWrite bool
 }
-
-var (
-	allowedUsernameRegex = regexp.MustCompile(`^[-_.@a-zA-Z0-9]+$`)
-)
 
 var _ Auther = (*SQLiteAuth)(nil)
 var _ Manager = (*SQLiteAuth)(nil)
@@ -161,7 +157,7 @@ func (a *SQLiteAuth) resolvePerms(read, write bool, perm Permission) error {
 // AddUser adds a user with the given username, password and role. The password should be hashed
 // before it is stored in a persistence layer.
 func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
-	if !allowedUsernameRegex.MatchString(username) || !AllowedRole(role) {
+	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
@@ -177,7 +173,7 @@ func (a *SQLiteAuth) AddUser(username, password string, role Role) error {
 // RemoveUser deletes the user with the given username. The function returns nil on success, even
 // if the user did not exist in the first place.
 func (a *SQLiteAuth) RemoveUser(username string) error {
-	if !allowedUsernameRegex.MatchString(username) || username == Everyone {
+	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
 	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
@@ -284,7 +280,7 @@ func (a *SQLiteAuth) readGrants(username string) ([]Grant, error) {
 			return nil, err
 		}
 		grants = append(grants, Grant{
-			Topic: topic,
+			Topic: fromSQLWildcard(topic),
 			Read:  read,
 			Write: write,
 		})
@@ -307,7 +303,7 @@ func (a *SQLiteAuth) ChangePassword(username, password string) error {
 // ChangeRole changes a user's role. When a role is changed from RoleUser to RoleAdmin,
 // all existing access control entries (Grant) are removed, since they are no longer needed.
 func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
-	if !allowedUsernameRegex.MatchString(username) || !AllowedRole(role) {
+	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
 	if _, err := a.db.Exec(updateUserRoleQuery, string(role), username); err != nil {
@@ -322,29 +318,43 @@ func (a *SQLiteAuth) ChangeRole(username string, role Role) error {
 }
 
 // AllowAccess adds or updates an entry in th access control list for a specific user. It controls
-// read/write access to a topic.
-func (a *SQLiteAuth) AllowAccess(username string, topic string, read bool, write bool) error {
-	if _, err := a.db.Exec(upsertUserAccessQuery, username, topic, read, write); err != nil {
+// read/write access to a topic. The parameter topicPattern may include wildcards (*).
+func (a *SQLiteAuth) AllowAccess(username string, topicPattern string, read bool, write bool) error {
+	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopicPattern(topicPattern) {
+		return ErrInvalidArgument
+	}
+	if _, err := a.db.Exec(upsertUserAccessQuery, username, toSQLWildcard(topicPattern), read, write); err != nil {
 		return err
 	}
 	return nil
 }
 
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
-// empty) for an entire user.
-func (a *SQLiteAuth) ResetAccess(username string, topic string) error {
-	if username == "" && topic == "" {
+// empty) for an entire user. The parameter topicPattern may include wildcards (*).
+func (a *SQLiteAuth) ResetAccess(username string, topicPattern string) error {
+	if (!AllowedUsername(username) && username != Everyone) || (!AllowedTopicPattern(topicPattern) && topicPattern != "") {
+		return ErrInvalidArgument
+	}
+	if username == "" && topicPattern == "" {
 		_, err := a.db.Exec(deleteAllAccessQuery, username)
 		return err
-	} else if topic == "" {
+	} else if topicPattern == "" {
 		_, err := a.db.Exec(deleteUserAccessQuery, username)
 		return err
 	}
-	_, err := a.db.Exec(deleteTopicAccessQuery, username, topic)
+	_, err := a.db.Exec(deleteTopicAccessQuery, username, toSQLWildcard(topicPattern))
 	return err
 }
 
 // DefaultAccess returns the default read/write access if no access control entry matches
 func (a *SQLiteAuth) DefaultAccess() (read bool, write bool) {
 	return a.defaultRead, a.defaultWrite
+}
+
+func toSQLWildcard(s string) string {
+	return strings.ReplaceAll(s, "*", "%")
+}
+
+func fromSQLWildcard(s string) string {
+	return strings.ReplaceAll(s, "%", "*")
 }

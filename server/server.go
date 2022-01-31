@@ -63,6 +63,7 @@ type indexPage struct {
 type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 
 var (
+	// If changed, don't forget to update Android App and auth_sqlite.go
 	topicRegex       = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No /!
 	topicPathRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
 	jsonPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
@@ -75,7 +76,7 @@ var (
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics = []string{"docs", "static", "file"}
+	disallowedTopics = []string{"docs", "static", "file"} // If updated, also update in Android app
 	attachURLRegex   = regexp.MustCompile(`^https?://`)
 
 	templateFnMap = template.FuncMap{

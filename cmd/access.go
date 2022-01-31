@@ -145,13 +145,13 @@ func showUsers(c *cli.Context, manager auth.Manager, users []*auth.User) error {
 		} else if len(user.Grants) > 0 {
 			for _, grant := range user.Grants {
 				if grant.Read && grant.Write {
-					fmt.Fprintf(c.App.ErrWriter, "- read-write access to topic %s\n", grant.Topic)
+					fmt.Fprintf(c.App.ErrWriter, "- read-write access to topic %s\n", grant.TopicPattern)
 				} else if grant.Read {
-					fmt.Fprintf(c.App.ErrWriter, "- read-only access to topic %s\n", grant.Topic)
+					fmt.Fprintf(c.App.ErrWriter, "- read-only access to topic %s\n", grant.TopicPattern)
 				} else if grant.Write {
-					fmt.Fprintf(c.App.ErrWriter, "- write-only access to topic %s\n", grant.Topic)
+					fmt.Fprintf(c.App.ErrWriter, "- write-only access to topic %s\n", grant.TopicPattern)
 				} else {
-					fmt.Fprintf(c.App.ErrWriter, "- no access to topic %s\n", grant.Topic)
+					fmt.Fprintf(c.App.ErrWriter, "- no access to topic %s\n", grant.TopicPattern)
 				}
 			}
 		} else {

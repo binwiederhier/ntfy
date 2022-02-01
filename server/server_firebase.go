@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
 	"fmt"
@@ -9,6 +10,29 @@ import (
 	"heckel.io/ntfy/auth"
 	"strings"
 )
+
+const (
+	fcmMessageLimit = 4000
+)
+
+// maybeTruncateFCMMessage performs best-effort truncation of FCM messages.
+// The docs say the limit is 4000 characters, but during testing it wasn't quite clear
+// what fields matter; so we're just capping the serialized JSON to 4000 bytes.
+func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
+	s, err := json.Marshal(m)
+	if err != nil {
+		return m
+	}
+	if len(s) > fcmMessageLimit {
+		over := len(s) - fcmMessageLimit + 16 // = len("truncated":"1",), sigh ...
+		message, ok := m.Data["message"]
+		if ok && len(message) > over {
+			m.Data["truncated"] = "1"
+			m.Data["message"] = message[:len(message)-over]
+		}
+	}
+	return m
+}
 
 func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subscriber, error) {
 	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(credentialsFile))

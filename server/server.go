@@ -142,11 +142,8 @@ func New(conf *Config) (*Server, error) {
 	}
 	var firebaseSubscriber subscriber
 	if conf.FirebaseKeyFile != "" {
-		sender, err := createFirebaseSender(conf)
-		if err != nil {
-			return nil, err
-		}
-		firebaseSubscriber, err = createFirebaseSubscriber(auther, sender)
+		var err error
+		firebaseSubscriber, err = createFirebaseSubscriber(conf.FirebaseKeyFile, auther)
 		if err != nil {
 			return nil, err
 		}

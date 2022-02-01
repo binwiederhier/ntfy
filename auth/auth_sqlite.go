@@ -332,7 +332,9 @@ func (a *SQLiteAuth) AllowAccess(username string, topicPattern string, read bool
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
 // empty) for an entire user. The parameter topicPattern may include wildcards (*).
 func (a *SQLiteAuth) ResetAccess(username string, topicPattern string) error {
-	if (!AllowedUsername(username) && username != Everyone) || (!AllowedTopicPattern(topicPattern) && topicPattern != "") {
+	if !AllowedUsername(username) && username != Everyone && username != "" {
+		return ErrInvalidArgument
+	} else if !AllowedTopicPattern(topicPattern) && topicPattern != "" {
 		return ErrInvalidArgument
 	}
 	if username == "" && topicPattern == "" {

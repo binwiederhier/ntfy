@@ -15,11 +15,11 @@ type testAuther struct {
 	Allow bool
 }
 
-func (t testAuther) Authenticate(username, password string) (*auth.User, error) {
+func (t testAuther) Authenticate(_, _ string) (*auth.User, error) {
 	return nil, errors.New("not used")
 }
 
-func (t testAuther) Authorize(user *auth.User, topic string, perm auth.Permission) error {
+func (t testAuther) Authorize(_ *auth.User, _ string, _ auth.Permission) error {
 	if t.Allow {
 		return nil
 	}

@@ -117,14 +117,6 @@ const (
 // New instantiates a new Server. It creates the cache and adds a Firebase
 // subscriber (if configured).
 func New(conf *Config) (*Server, error) {
-	var firebaseSubscriber subscriber
-	if conf.FirebaseKeyFile != "" {
-		var err error
-		firebaseSubscriber, err = createFirebaseSubscriber(conf)
-		if err != nil {
-			return nil, err
-		}
-	}
 	var mailer mailer
 	if conf.SMTPSenderAddr != "" {
 		mailer = &smtpSender{config: conf}
@@ -151,6 +143,14 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	var firebaseSubscriber subscriber
+	if conf.FirebaseKeyFile != "" {
+		var err error
+		firebaseSubscriber, err = createFirebaseSubscriber(conf, auther)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &Server{
 		config:    conf,
 		cache:     cache,
@@ -172,7 +172,7 @@ func createCache(conf *Config) (cache, error) {
 	return newMemCache(), nil
 }
 
-func createFirebaseSubscriber(conf *Config) (subscriber, error) {
+func createFirebaseSubscriber(conf *Config, auther auth.Auther) (subscriber, error) {
 	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(conf.FirebaseKeyFile))
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 		return nil, err
 	}
 	return func(m *message) error {
-		var data map[string]string // Matches https://ntfy.sh/docs/subscribe/api/#json-message-format
+		var data map[string]string // Mostly matches https://ntfy.sh/docs/subscribe/api/#json-message-format
 		switch m.Event {
 		case keepaliveEvent, openEvent:
 			data = map[string]string{
@@ -192,24 +192,39 @@ func createFirebaseSubscriber(conf *Config) (subscriber, error) {
 				"topic": m.Topic,
 			}
 		case messageEvent:
-			data = map[string]string{
-				"id":       m.ID,
-				"time":     fmt.Sprintf("%d", m.Time),
-				"event":    m.Event,
-				"topic":    m.Topic,
-				"priority": fmt.Sprintf("%d", m.Priority),
-				"tags":     strings.Join(m.Tags, ","),
-				"click":    m.Click,
-				"title":    m.Title,
-				"message":  m.Message,
-				"encoding": m.Encoding,
+			allowForward := true
+			if auther != nil {
+				allowForward = auther.Authorize(nil, m.Topic, auth.PermissionRead) == nil
 			}
-			if m.Attachment != nil {
-				data["attachment_name"] = m.Attachment.Name
-				data["attachment_type"] = m.Attachment.Type
-				data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
-				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
-				data["attachment_url"] = m.Attachment.URL
+			if allowForward {
+				data = map[string]string{
+					"id":       m.ID,
+					"time":     fmt.Sprintf("%d", m.Time),
+					"event":    m.Event,
+					"topic":    m.Topic,
+					"priority": fmt.Sprintf("%d", m.Priority),
+					"tags":     strings.Join(m.Tags, ","),
+					"click":    m.Click,
+					"title":    m.Title,
+					"message":  m.Message,
+					"encoding": m.Encoding,
+				}
+				if m.Attachment != nil {
+					data["attachment_name"] = m.Attachment.Name
+					data["attachment_type"] = m.Attachment.Type
+					data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
+					data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
+					data["attachment_url"] = m.Attachment.URL
+				}
+			} else {
+				// If anonymous read for a topic is not allowed, we cannot send the message along
+				// via Firebase. Instead, we send a "poll_request" message, asking the client to poll.
+				data = map[string]string{
+					"id":    m.ID,
+					"time":  fmt.Sprintf("%d", m.Time),
+					"event": pollRequestEvent,
+					"topic": m.Topic,
+				}
 			}
 		}
 		var androidConfig *messaging.AndroidConfig

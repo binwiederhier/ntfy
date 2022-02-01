@@ -281,8 +281,8 @@ func (a *SQLiteAuth) readGrants(username string) ([]Grant, error) {
 		}
 		grants = append(grants, Grant{
 			TopicPattern: fromSQLWildcard(topic),
-			Read:         read,
-			Write:        write,
+			AllowRead:    read,
+			AllowWrite:   write,
 		})
 	}
 	return grants, nil

@@ -64,8 +64,8 @@ type User struct {
 // Grant is a struct that represents an access control entry to a topic
 type Grant struct {
 	TopicPattern string // May include wildcard (*)
-	Read         bool
-	Write        bool
+	AllowRead    bool
+	AllowWrite   bool
 }
 
 // Permission represents a read or write permission to a topic

@@ -8,9 +8,10 @@ import (
 
 // List of possible events
 const (
-	openEvent      = "open"
-	keepaliveEvent = "keepalive"
-	messageEvent   = "message"
+	openEvent        = "open"
+	keepaliveEvent   = "keepalive"
+	messageEvent     = "message"
+	pollRequestEvent = "poll_request"
 )
 
 const (

@@ -8,8 +8,8 @@ if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
   if [ -d /run/systemd/system ]; then
     # Create ntfy user/group
     id ntfy >/dev/null 2>&1 || useradd --system --no-create-home ntfy
-    chown ntfy.ntfy /var/cache/ntfy /var/cache/ntfy/attachments
-    chmod 700 /var/cache/ntfy /var/cache/ntfy/attachments
+    chown ntfy.ntfy /var/cache/ntfy /var/cache/ntfy/attachments /var/lib/ntfy
+    chmod 700 /var/cache/ntfy /var/cache/ntfy/attachments /var/lib/ntfy
 
     # Hack to change permissions on cache file
     configfile="/etc/ntfy/server.yml"

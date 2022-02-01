@@ -131,13 +131,13 @@ func execServe(c *cli.Context) error {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		return errors.New("if set, base-url must start with http:// or https://")
-	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultAccess) {
-		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only' or 'deny-all'")
+	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
+		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	}
 
 	// Default auth permissions
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
-	authDefaultWrite := authDefaultAccess == "read-write"
+	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
 
 	// Special case: Unset default
 	if listenHTTP == "-" {

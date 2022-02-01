@@ -1,3 +1,4 @@
+// Package auth deals with authentication and authorization against topics
 package auth
 
 import (

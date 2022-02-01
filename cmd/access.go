@@ -10,16 +10,9 @@ import (
 
 /*
 
-ntfy access                        # Shows access control list
-ntfy access phil                   # Shows access for user phil
-ntfy access phil mytopic           # Shows access for user phil and topic mytopic
-ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
-ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
-ntfy access --reset                # Reset entire access control list
-ntfy access --reset phil           # Reset all access for user phil
-ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic
 
-*/
+
+ */
 
 const (
 	userEveryone = "everyone"
@@ -38,9 +31,45 @@ var cmdAccess = &cli.Command{
 	Before:    initConfigFileInputSource("config", flagsAccess),
 	Action:    execUserAccess,
 	Category:  categoryServer,
+	Description: `Manage the access control list for the ntfy server.
+
+This is a server-only command. It directly manages the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
+to the related command 'ntfy user'.
+
+The command allows you to show the access control list, as well as change it, depending on how
+it is called.
+
+Usage:
+  ntfy access                            # Shows the entire access control list
+  ntfy access USERNAME                   # Shows access control entries for USERNAME
+  ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
+
+Arguments:
+  USERNAME     an existing user, as created with 'ntfy user add'
+  TOPIC        name of a topic with optional wildcards, e.g. "mytopic*"
+  PERMISSION   one of the following:
+               - read-write (alias: rw) 
+               - read-only (aliases: read, ro)
+               - write-only (aliases: write, wo)
+               - deny (alias: none)
+
+Examples:
+  ntfy access                        
+  ntfy access phil                   # Shows access for user phil
+  ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
+  ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
+  ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..." 
+  ntfy access --reset                # Reset entire access control list
+  ntfy access --reset phil           # Reset all access for user phil
+  ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic
+`,
 }
 
 func execUserAccess(c *cli.Context) error {
+	if c.NArg() > 3 {
+		return errors.New("too many arguments, please check 'ntfy access --help' for usage details")
+	}
 	manager, err := createAuthManager(c)
 	if err != nil {
 		return err
@@ -53,6 +82,9 @@ func execUserAccess(c *cli.Context) error {
 	perms := c.Args().Get(2)
 	reset := c.Bool("reset")
 	if reset {
+		if perms != "" {
+			return errors.New("too many arguments, please check 'ntfy access --help' for usage details")
+		}
 		return resetAccess(c, manager, username, topic)
 	} else if perms == "" {
 		return showAccess(c, manager, username)

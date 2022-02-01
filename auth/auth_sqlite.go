@@ -2,13 +2,16 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
 	"strings"
 )
 
 const (
-	bcryptCost = 11
+	bcryptCost              = 11
+	intentionalSlowDownHash = "$2a$11$eX15DeF27FwAgXt9wqJF0uAUMz74XywJcGBH3kP93pzKYv6ATk2ka" // Cost should match bcryptCost
 )
 
 // Auther-related queries
@@ -27,7 +30,7 @@ const (
 			write INT NOT NULL,
 			PRIMARY KEY (topic, user)
 		);
-		CREATE TABLE IF NOT EXISTS schema_version (
+		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
@@ -61,6 +64,13 @@ const (
 	deleteTopicAccessQuery = `DELETE FROM access WHERE user = ? AND topic = ?`
 )
 
+// Schema management queries
+const (
+	currentSchemaVersion     = 1
+	insertSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
+	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
+)
+
 // SQLiteAuth is an implementation of Auther and Manager. It stores users and access control list
 // in a SQLite database.
 type SQLiteAuth struct {
@@ -78,7 +88,7 @@ func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth
 	if err != nil {
 		return nil, err
 	}
-	if err := setupNewAuthDB(db); err != nil {
+	if err := setupAuthDB(db); err != nil {
 		return nil, err
 	}
 	return &SQLiteAuth{
@@ -86,14 +96,6 @@ func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth
 		defaultRead:  defaultRead,
 		defaultWrite: defaultWrite,
 	}, nil
-}
-
-func setupNewAuthDB(db *sql.DB) error {
-	if _, err := db.Exec(createAuthTablesQueries); err != nil {
-		return err
-	}
-	// FIXME schema version
-	return nil
 }
 
 // Authenticate checks username and password and returns a user if correct. The method
@@ -105,7 +107,7 @@ func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 	}
 	user, err := a.User(username)
 	if err != nil {
-		bcrypt.CompareHashAndPassword([]byte("$2a$11$eX15DeF27FwAgXt9wqJF0uAUMz74XywJcGBH3kP93pzKYv6ATk2ka"),
+		bcrypt.CompareHashAndPassword([]byte(intentionalSlowDownHash),
 			[]byte("intentional slow-down to avoid timing attacks"))
 		return nil, ErrUnauthenticated
 	}
@@ -359,4 +361,39 @@ func toSQLWildcard(s string) string {
 
 func fromSQLWildcard(s string) string {
 	return strings.ReplaceAll(s, "%", "*")
+}
+
+func setupAuthDB(db *sql.DB) error {
+	// If 'schemaVersion' table does not exist, this must be a new database
+	rowsSV, err := db.Query(selectSchemaVersionQuery)
+	if err != nil {
+		return setupNewAuthDB(db)
+	}
+	defer rowsSV.Close()
+
+	// If 'schemaVersion' table exists, read version and potentially upgrade
+	schemaVersion := 0
+	if !rowsSV.Next() {
+		return errors.New("cannot determine schema version: database file may be corrupt")
+	}
+	if err := rowsSV.Scan(&schemaVersion); err != nil {
+		return err
+	}
+	rowsSV.Close()
+
+	// Do migrations
+	if schemaVersion == currentSchemaVersion {
+		return nil
+	}
+	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
+}
+
+func setupNewAuthDB(db *sql.DB) error {
+	if _, err := db.Exec(createAuthTablesQueries); err != nil {
+		return err
+	}
+	if _, err := db.Exec(insertSchemaVersion, currentSchemaVersion); err != nil {
+		return err
+	}
+	return nil
 }

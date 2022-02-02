@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
@@ -239,4 +240,9 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 	}
 
 	return password, nil
+}
+
+// BasicAuth encodes the Authorization header value for basic auth
+func BasicAuth(user, pass string) string {
+	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, pass))))
 }

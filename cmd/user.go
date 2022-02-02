@@ -11,67 +11,108 @@ import (
 	"strings"
 )
 
-/*
-
----
-dabbling for CLI
-	ntfy user allow phil mytopic
-	ntfy user allow phil mytopic --read-only
-	ntfy user deny phil mytopic
-	ntfy user list
-	   phil (admin)
-	   - read-write access to everything
-	   ben (user)
-	   - read-write access to a topic alerts
-	   - read access to
-       everyone (no user)
-       - read-only access to topic announcements
-
-*/
-
 var flagsUser = userCommandFlags()
 var cmdUser = &cli.Command{
 	Name:      "user",
-	Usage:     "Manage users and access to topics",
-	UsageText: "ntfy user [add|del|...] ...",
+	Usage:     "Manage/show users",
+	UsageText: "ntfy user [list|add|remove|change-pass|change-role] ...",
 	Flags:     flagsUser,
 	Before:    initConfigFileInputSource("config", flagsUser),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{
-			Name:    "add",
-			Aliases: []string{"a"},
-			Usage:   "add user to auth database",
-			Action:  execUserAdd,
+			Name:      "add",
+			Aliases:   []string{"a"},
+			Usage:     "add user",
+			UsageText: "ntfy user add [--role=admin|user] USERNAME",
+			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
 			},
+			Description: `Add a new user to the ntfy user database.
+
+A user can be either a regular user, or an admin. A regular user has no read or write access (unless
+granted otherwise by the auth-default-access setting). An admin user has read and write access to all
+topics.
+
+Examples:
+  ntfy user add phil                 # Add regular user phil  
+  ntfy user add --role=admin phil    # Add admin user phil
+`,
 		},
 		{
-			Name:    "remove",
-			Aliases: []string{"del", "rm"},
-			Usage:   "remove user from auth database",
-			Action:  execUserDel,
+			Name:      "remove",
+			Aliases:   []string{"del", "rm"},
+			Usage:     "remove user",
+			UsageText: "ntfy user remove USERNAME",
+			Action:    execUserDel,
+			Description: `Remove a user from the ntfy user database.
+
+Example:
+  ntfy user del phil
+`,
 		},
 		{
-			Name:    "change-pass",
-			Aliases: []string{"chp"},
-			Usage:   "change user password",
-			Action:  execUserChangePass,
+			Name:      "change-pass",
+			Aliases:   []string{"chp"},
+			Usage:     "change user password",
+			UsageText: "ntfy user change-pass USERNAME",
+			Action:    execUserChangePass,
+			Description: `Change the password for the given user.
+
+The new password will be read from STDIN, and it'll be confirmed by typing
+it twice. 
+
+Example:
+    ntfy user change-pass phil
+`,
 		},
 		{
-			Name:    "change-role",
-			Aliases: []string{"chr"},
-			Usage:   "change user role",
-			Action:  execUserChangeRole,
+			Name:      "change-role",
+			Aliases:   []string{"chr"},
+			Usage:     "change user role",
+			UsageText: "ntfy user change-role USERNAME ROLE",
+			Action:    execUserChangeRole,
+			Description: `Change the role for the given user to admin or user.
+
+This command can be used to change the role of a user either from a regular user
+to an admin user, or the other way around:
+
+- admin: an admin has read/write access to all topics
+- user: a regular user only has access to what was explicitly granted via 'ntfy access'
+
+When changing the role of a user to "admin", all access control entries for that 
+user are removed, since they are no longer necessary.
+
+Example:
+  ntfy user change-role phil admin   # Make user phil an admin 
+  ntfy user change-role phil user    # Remove admin role from user phil 
+`,
 		},
 		{
 			Name:    "list",
-			Aliases: []string{"chr"},
-			Usage:   "change user role",
+			Aliases: []string{"l"},
+			Usage:   "list users",
 			Action:  execUserList,
 		},
 	},
+	Description: `Manage users of the ntfy server.
+
+This is a server-only command. It directly manages the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
+to the related command 'ntfy access'.
+
+The command allows you to add/remove/change users in the ntfy user database, as well as change 
+passwords or roles.
+
+Examples:
+  ntfy user list                     # Shows list of users                        
+  ntfy user add phil                 # Add regular user phil  
+  ntfy user add --role=admin phil    # Add admin user phil
+  ntfy user del phil                 # Delete user phil
+  ntfy user change-pass phil         # Change password for user phil
+  ntfy user change-role phil admin   # Make user phil an admin 
+`,
 }
 
 func execUserAdd(c *cli.Context) error {
@@ -79,6 +120,8 @@ func execUserAdd(c *cli.Context) error {
 	role := auth.Role(c.String("role"))
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
 	} else if !auth.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
@@ -101,6 +144,8 @@ func execUserDel(c *cli.Context) error {
 	username := c.Args().Get(0)
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user del --help' for help")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
 	}
 	manager, err := createAuthManager(c)
 	if err != nil {
@@ -117,6 +162,8 @@ func execUserChangePass(c *cli.Context) error {
 	username := c.Args().Get(0)
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user change-pass --help' for help")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
 	}
 	password, err := readPassword(c)
 	if err != nil {
@@ -138,6 +185,8 @@ func execUserChangeRole(c *cli.Context) error {
 	role := auth.Role(c.Args().Get(1))
 	if username == "" || !auth.AllowedRole(role) {
 		return errors.New("username and new role expected, type 'ntfy user change-role --help' for help")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
 	}
 	manager, err := createAuthManager(c)
 	if err != nil {
@@ -169,11 +218,11 @@ func createAuthManager(c *cli.Context) (auth.Manager, error) {
 		return nil, errors.New("option auth-file not set; auth is unconfigured for this server")
 	} else if !util.FileExists(authFile) {
 		return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
-	} else if !util.InStringList([]string{"read-write", "read-only", "deny-all"}, authDefaultAccess) {
+	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only' or 'deny-all'")
 	}
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
-	authDefaultWrite := authDefaultAccess == "read-write"
+	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
 	return auth.NewSQLiteAuth(authFile, authDefaultRead, authDefaultWrite)
 }
 

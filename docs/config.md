@@ -122,7 +122,7 @@ Please also refer to the [rate limiting](#rate-limiting) settings below, specifi
 and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is necessary to avoid abuse.
 
 ## Access control
-By default, the ntfy server is open for everyone, meaning everyone can read and write to any topic. To restrict access
+By default, the ntfy server is open for everyone, meaning **everyone can read and write to any topic**. To restrict access
 to your own server, you can optionally configure authentication and authorization. 
 
 ntfy's auth is implemented with a simple SQLite-based backend. It implements two roles (`user` and `admin`) and per-topic
@@ -135,10 +135,13 @@ To set up auth, simply configure the following two options:
 * `auth-default-access` defines the default/fallback access if no access control entry is found; it can be
   set to `read-write` (default), `read-only`, `write-only` or `deny-all`.
 
-Once configured, you can use the `ntfy user` command to add/modify/delete users (with either a `user` or an `admin` role).
-To control granular access to specific topics, you can use the `ntfy access` command to modify the access control list.
+### Managing users + access
+Once configured, you can use the `ntfy user` command to add/modify/delete users, and  the `ntfy access` command
+to modify the access control list to allow/deny access to specific topic or topic patterns.
 
-### Example: private instance
+XXXXXXXXXXXXXXXXXXXx
+
+### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
 
 ``` yaml
@@ -156,75 +159,73 @@ User phil added with role admin
 ```
 
 Once you've done that, you can publish and subscribe using [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) 
-with the given username/password. Here's a simple example:
+with the given username/password. Be sure to use HTTPS to avoid eavesdropping and exposing your password. Here's a simple example:
 
 === "Command line (curl)"
     ```
     curl \
         -u phil:mypass \
         -d "Look ma, with auth" \
-        ntfy.example.com/secrets
+        https://ntfy.example.com/mysecrets
     ```
 
 === "ntfy CLI"
     ```
-    ntfy publish ntfy.example.com/mytopic "Look ma, with auth"
-
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
-    XXXXXXXXXXX
+    ntfy publish \
+        -u phil:mypass \
+        ntfy.example.com/mysecrets \
+        "Look ma, with auth"
     ```
 
 === "HTTP"
     ``` http
-    POST /mytopic HTTP/1.1
-    Host: ntfy.sh
+    POST /mysecrets HTTP/1.1
+    Host: ntfy.example.com
     Authorization: Basic cGhpbDpteXBhc3M=
 
-    Backup successful 😀
+    Look ma, with auth
     ```
+
 === "JavaScript"
-``` javascript
-fetch('https://ntfy.sh/mytopic', {
-method: 'POST', // PUT works too
-body: 'Backup successful 😀'
-})
-```
+    ``` javascript
+    fetch('https://ntfy.example.com/mysecrets', {
+        method: 'POST', // PUT works too
+        body: 'Look ma, with auth',
+        headers: {
+            'Authorization': 'Basic cGhpbDpteXBhc3M='
+        }
+    })
+    ```
 
 === "Go"
-``` go
-http.Post("https://ntfy.sh/mytopic", "text/plain",
-strings.NewReader("Backup successful 😀"))
-```
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
+        strings.NewReader("Look ma, with auth"))
+    req.Header.Set("Authorization", "Basic cGhpbDpteXBhc3M=")
+    http.DefaultClient.Do(req)
+    ```
 
 === "Python"
-``` python
-requests.post("https://ntfy.sh/mytopic",
-data="Backup successful 😀".encode(encoding='utf-8'))
-```
+    ``` python
+    requests.post("https://ntfy.example.com/mysecrets",
+        data="Look ma, with auth",
+        headers={
+            "Authorization": "Basic cGhpbDpteXBhc3M="
+        })
+    ```
 
 === "PHP"
-``` php-inline
-file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
-'http' => [
-'method' => 'POST', // PUT also works
-'header' => 'Content-Type: text/plain',
-'content' => 'Backup successful 😀'
-]
-]));
-```
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' => 
+                'Content-Type: text/plain\r\n' .
+                'Authorization: Basic cGhpbDpteXBhc3M=',
+            'content' => 'Look ma, with auth'
+        ]
+    ]));
+    ```
 
 ## E-mail notifications
 To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 

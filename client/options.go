@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
 	"time"
@@ -68,6 +69,11 @@ func WithFilename(filename string) PublishOption {
 // WithEmail instructs the server to also send the message to the given e-mail address
 func WithEmail(email string) PublishOption {
 	return WithHeader("X-Email", email)
+}
+
+// WithBasicAuth adds the Authorization header for basic auth to the request
+func WithBasicAuth(user, pass string) PublishOption {
+	return WithHeader("Authorization", util.BasicAuth(user, pass))
 }
 
 // WithNoCache instructs the server not to cache the message server-side

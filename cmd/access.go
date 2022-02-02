@@ -8,12 +8,6 @@ import (
 	"heckel.io/ntfy/util"
 )
 
-/*
-
-
-
- */
-
 const (
 	userEveryone = "everyone"
 )
@@ -46,7 +40,8 @@ Usage:
   ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
 
 Arguments:
-  USERNAME     an existing user, as created with 'ntfy user add'
+  USERNAME     an existing user, as created with 'ntfy user add', or "everyone"/"*"
+               to define access rules for anonymous/unauthenticated clients
   TOPIC        name of a topic with optional wildcards, e.g. "mytopic*"
   PERMISSION   one of the following:
                - read-write (alias: rw) 

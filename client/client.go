@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"heckel.io/ntfy/util"
 	"io"
@@ -105,12 +106,12 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response %d from server", resp.StatusCode)
-	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(strings.TrimSpace(string(b)))
 	}
 	m, err := toMessage(string(b), topicURL, "")
 	if err != nil {

@@ -23,8 +23,9 @@ var cmdUser = &cli.Command{
 		{
 			Name:      "add",
 			Aliases:   []string{"a"},
-			Usage:     "add user",
+			Usage:     "Adds a new user",
 			UsageText: "ntfy user add [--role=admin|user] USERNAME",
+			Before:    inheritRootReaderFunc,
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
@@ -43,8 +44,9 @@ Examples:
 		{
 			Name:      "remove",
 			Aliases:   []string{"del", "rm"},
-			Usage:     "remove user",
+			Usage:     "Removes a user",
 			UsageText: "ntfy user remove USERNAME",
+			Before:    inheritRootReaderFunc,
 			Action:    execUserDel,
 			Description: `Remove a user from the ntfy user database.
 
@@ -55,8 +57,9 @@ Example:
 		{
 			Name:      "change-pass",
 			Aliases:   []string{"chp"},
-			Usage:     "change user password",
+			Usage:     "Changes a user's password",
 			UsageText: "ntfy user change-pass USERNAME",
+			Before:    inheritRootReaderFunc,
 			Action:    execUserChangePass,
 			Description: `Change the password for the given user.
 
@@ -70,8 +73,9 @@ Example:
 		{
 			Name:      "change-role",
 			Aliases:   []string{"chr"},
-			Usage:     "change user role",
+			Usage:     "Changes the role of a user",
 			UsageText: "ntfy user change-role USERNAME ROLE",
+			Before:    inheritRootReaderFunc,
 			Action:    execUserChangeRole,
 			Description: `Change the role for the given user to admin or user.
 
@@ -92,7 +96,8 @@ Example:
 		{
 			Name:    "list",
 			Aliases: []string{"l"},
-			Usage:   "list users",
+			Usage:   "Shows a list of users",
+			Before:  inheritRootReaderFunc,
 			Action:  execUserList,
 		},
 	},
@@ -125,18 +130,21 @@ func execUserAdd(c *cli.Context) error {
 	} else if !auth.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-	password, err := readPassword(c)
-	if err != nil {
-		return err
-	}
 	manager, err := createAuthManager(c)
 	if err != nil {
 		return err
 	}
-	if err := manager.AddUser(username, password, auth.Role(role)); err != nil {
+	if user, _ := manager.User(username); user != nil {
+		return fmt.Errorf("user %s already exists", username)
+	}
+	password, err := readPassword(c)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "User %s added with role %s\n", username, role)
+	if err := manager.AddUser(username, password, role); err != nil {
+		return err
+	}
+	fmt.Fprintf(c.App.ErrWriter, "user %s added with role %s\n", username, role)
 	return nil
 }
 
@@ -151,10 +159,13 @@ func execUserDel(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	if _, err := manager.User(username); err == auth.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	}
 	if err := manager.RemoveUser(username); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "User %s removed\n", username)
+	fmt.Fprintf(c.App.ErrWriter, "user %s removed\n", username)
 	return nil
 }
 
@@ -165,18 +176,21 @@ func execUserChangePass(c *cli.Context) error {
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
 	}
-	password, err := readPassword(c)
+	manager, err := createAuthManager(c)
 	if err != nil {
 		return err
 	}
-	manager, err := createAuthManager(c)
+	if _, err := manager.User(username); err == auth.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	}
+	password, err := readPassword(c)
 	if err != nil {
 		return err
 	}
 	if err := manager.ChangePassword(username, password); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "Changed password for user %s\n", username)
+	fmt.Fprintf(c.App.ErrWriter, "changed password for user %s\n", username)
 	return nil
 }
 
@@ -192,10 +206,13 @@ func execUserChangeRole(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	if _, err := manager.User(username); err == auth.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	}
 	if err := manager.ChangeRole(username, role); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "Changed role for user %s to %s\n", username, role)
+	fmt.Fprintf(c.App.ErrWriter, "changed role for user %s to %s\n", username, role)
 	return nil
 }
 
@@ -250,4 +267,15 @@ func userCommandFlags() []cli.Flag {
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	}
+}
+
+// inheritRootReaderFunc is a workaround for a urfave/cli bug that makes subcommands not inherit the App.Reader.
+// This bug was fixed in master, but not in v2.3.0.
+func inheritRootReaderFunc(ctx *cli.Context) error {
+	for _, c := range ctx.Lineage() {
+		if c.App != nil && c.App.Reader != nil {
+			ctx.App.Reader = c.App.Reader
+		}
+	}
+	return nil
 }

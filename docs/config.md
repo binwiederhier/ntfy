@@ -122,14 +122,14 @@ Please also refer to the [rate limiting](#rate-limiting) settings below, specifi
 and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is necessary to avoid abuse.
 
 ## Access control
-By default, the ntfy server is open for everyone, meaning **everyone can read and write to any topic**. To restrict access
-to your own server, you can optionally configure authentication and authorization. 
+By default, the ntfy server is open for everyone, meaning **everyone can read and write to any topic** (this is how
+ntfy.sh is configured). To restrict access to your own server, you can optionally configure authentication and authorization. 
 
 ntfy's auth is implemented with a simple [SQLite](https://www.sqlite.org/)-based backend. It implements two roles 
 (`user` and `admin`) and per-topic `read` and `write` permissions using an [access control list (ACL)](https://en.wikipedia.org/wiki/Access-control_list). 
 Access control entries can be applied to users as well as the special everyone user (`*`), which represents anonymous API access. 
 
-To set up auth, simply configure the following two options:
+To set up auth, simply **configure the following two options**:
 
 * `auth-file` is the user/access database; it is created automatically if it doesn't already exist
 * `auth-default-access` defines the default/fallback access if no access control entry is found; it can be
@@ -137,7 +137,7 @@ To set up auth, simply configure the following two options:
 
 Once configured, you can use the `ntfy user` command to [add or modify users](#users-and-roles), and the `ntfy access` command
 lets you [modify the access control list](#access-control-list-acl) for specific users and topic patterns. Both of these 
-commands directly edit the auth database (as defined in `auth-file`), so they only work on the server, and only if the user 
+commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, and only if the user 
 accessing them has the right permissions.
 
 ### Users and roles
@@ -163,9 +163,46 @@ ntfy user change-role phil admin   # Make user phil an admin
 ```
 
 ### Access control list (ACL)
-The access control list manages access to topics for non-admin users. Each entry represents the access permissions for
-a user to a specific topic or topic pattern. Here's an example ACL:
+The access control list (ACL) **manages access to topics for non-admin users, and for anonymous access**. Each entry 
+represents the access permissions for a user to a specific topic or topic pattern. 
 
+**Modifying the ACL:**   
+The access control list can be displayed or modified with the `ntfy access` command:
+
+```
+ntfy access                            # Shows the entire access control list
+ntfy access USERNAME                   # Shows access control entries for USERNAME
+ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
+```
+
+A `USERNAME` is an existing user, as created with `ntfy user add` (see [users and roles](#users-and-roles)), or the 
+anonymous user `everyone` or `*`, which represents clients that access the API without username/password.
+
+A `TOPIC` is either a specific topic name (e.g. `mytopic`, or `phil_alerts`), or a wildcard pattern that matches any
+number of topics (e.g. `alerts_*` or `ben-*`). Only the wildcard character `*` is supported. It stands for zero to any 
+number of characters.
+
+A `PERMISSION` is any of the following supported permissions:
+
+* `read-write` (alias: `rw`): Allows [publishing messages](publish.md) to the given topic, as well as 
+  [subscribing](subscribe/api.md) and reading messages
+* `read-only` (aliases: `read`, `ro`): Allows only subscribing and reading messages, but not publishing to the topic
+* `write-only` (aliases: `write`, `wo`): Allows only publishing to the topic, but not subscribing to it
+* `deny` (alias: `none`): Allows neither publishing nor subscribing to a topic 
+
+**Example commands** (type `ntfy access --help` for more details):
+```
+ntfy access                        # Shows entire access control list
+ntfy access phil                   # Shows access for user phil
+ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
+ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
+ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..."
+ntfy access --reset                # Reset entire access control list
+ntfy access --reset phil           # Reset all access for user phil
+ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic
+```
+
+**Example ACL:**
 ```
 $ ntfy access
 User phil (admin)
@@ -182,42 +219,8 @@ User * (anonymous)
 
 In this example, `phil` has the role `admin`, so he has read-write access to all topics (no ACL entries are necessary).
 User `ben` has three topic-specific entries. He can read, but not write to topic `furnace`, and has read-write access
-to topic `garagedoor` and all topics starting with the word `alerts` (wildcards). Clients that are not authenticated 
+to topic `garagedoor` and all topics starting with the word `alerts` (wildcards). Clients that are not authenticated
 (called `*`/`everyone`) only have read access to the `announcements` and `server-stats` topics.
-
-**Modifying the ACL**
-The access control list can be modified with the `ntfy access` command:
-
-```
-ntfy access                            # Shows the entire access control list
-ntfy access USERNAME                   # Shows access control entries for USERNAME
-ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
-```
-XXXXXXXXXXXXXXXXXXXXXXXX
-
-USERNAME     an existing user, as created with 'ntfy user add', or "everyone"/"*"
-to define access rules for anonymous/unauthenticated clients
-TOPIC        name of a topic with optional wildcards, e.g. "mytopic*"
-
-**Permissions:**
-
-* read-write (alias: rw)
-- read-only (aliases: read, ro)
-- write-only (aliases: write, wo)
-- deny (alias: none)
-
-**Example commands** (type `ntfy access --help` for more details):
-
-```
-ntfy access                        # Shows entire access control list
-ntfy access phil                   # Shows access for user phil
-ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
-ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
-ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..."
-ntfy access --reset                # Reset entire access control list
-ntfy access --reset phil           # Reset all access for user phil
-ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic
-```
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
@@ -714,39 +717,41 @@ Each config option can be set in the config file `/etc/ntfy/server.yml` (e.g. `l
 CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Alternatively, you can set an environment
 variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
-| Config option                              | Env variable                                    | Format           | Default | Description                                                                                                                                                                                                                     |
-|--------------------------------------------|-------------------------------------------------|------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*            | -       | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                  |
-| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`    | `:80`   | Listen address for the HTTP web server                                                                                                                                                                                          |
-| `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`    | -       | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                               |
-| `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*       | -       | Path to a Unix socket to listen on                                                                                                                                                                                              |
-| `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*       | -       | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                 |
-| `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*       | -       | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                 |
-| `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*       | -       | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm).                        |
-| `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*       | -       | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).             |
-| `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*       | 12h     | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                        |
-| `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*           | false   | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection.                                                                                                 |
-| `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory*      | -       | Cache directory for attached files. To enable attachments, this has to be set.                                                                                                                                                  |
-| `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*           | 5G      | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                   |
-| `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*           | 15M     | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                       |
-| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*       | 3h      | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                               |
-| `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`      | -       | SMTP server address to allow email sending                                                                                                                                                                                      |
-| `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*         | -       | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                               |
-| `smtp-sender-pass`                         | `NTFY_SMTP_SENDER_PASS`                         | *string*         | -       | SMTP password; only used if e-mail sending is enabled                                                                                                                                                                           |
-| `smtp-sender-from`                         | `NTFY_SMTP_SENDER_FROM`                         | *e-mail address* | -       | SMTP sender e-mail address; only used if e-mail sending is enabled                                                                                                                                                              |
-| `smtp-server-listen`                       | `NTFY_SMTP_SERVER_LISTEN`                       | `[ip]:port`      | -       | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`                                                                                                                                      |
-| `smtp-server-domain`                       | `NTFY_SMTP_SERVER_DOMAIN`                       | *domain name*    | -       | SMTP server e-mail domain, e.g. `ntfy.sh`                                                                                                                                                                                       |
-| `smtp-server-addr-prefix`                  | `NTFY_SMTP_SERVER_ADDR_PREFIX`                  | `[ip]:port`      | -       | Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-`                                                                                                                                                          |
-| `keepalive-interval`                       | `NTFY_KEEPALIVE_INTERVAL`                       | *duration*       | 45s     | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
-| `manager-interval`                         | `$NTFY_MANAGER_INTERVAL`                        | *duration*       | 1m      | Interval in which the manager prunes old messages, deletes topics and prints the stats.                                                                                                                                         |
-| `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*         | 15,000  | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                     |
-| `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*         | 30      | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
-| `visitor-attachment-total-size-limit`      | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT`      | *size*           | 100M    | Rate limiting: Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`.                                                 |
-| `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*           | 500M    | Rate limiting: Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding.                                                                                        |
-| `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*         | 60      | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                           |
-| `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*       | 10s     | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
-| `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*         | 16      | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                              |
-| `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*       | 1h      | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                        |
+| Config option                              | Env variable                                    | Format                                              | Default | Description                                                                                                                                                                                                                     |
+|--------------------------------------------|-------------------------------------------------|-----------------------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*                                               | -       | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                  |
+| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`                                       | `:80`   | Listen address for the HTTP web server                                                                                                                                                                                          |
+| `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -       | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                               |
+| `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -       | Path to a Unix socket to listen on                                                                                                                                                                                              |
+| `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -       | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                 |
+| `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -       | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                 |
+| `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -       | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM](#firebase-fcm).                        |
+| `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -       | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).             |
+| `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h     | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                        |
+| `auth-file`                                | `NTFY_AUTH_FILE`                                | *filename*                                          | -       | Auth database file used for access control. If set, enables authentication and access control. See [access control](#access-control).                                                                                           |
+| `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | -       | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                             |
+| `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false   | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection.                                                                                                 |
+| `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory*                                         | -       | Cache directory for attached files. To enable attachments, this has to be set.                                                                                                                                                  |
+| `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G      | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                   |
+| `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M     | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                       |
+| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h      | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                               |
+| `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`                                         | -       | SMTP server address to allow email sending                                                                                                                                                                                      |
+| `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*                                            | -       | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                               |
+| `smtp-sender-pass`                         | `NTFY_SMTP_SENDER_PASS`                         | *string*                                            | -       | SMTP password; only used if e-mail sending is enabled                                                                                                                                                                           |
+| `smtp-sender-from`                         | `NTFY_SMTP_SENDER_FROM`                         | *e-mail address*                                    | -       | SMTP sender e-mail address; only used if e-mail sending is enabled                                                                                                                                                              |
+| `smtp-server-listen`                       | `NTFY_SMTP_SERVER_LISTEN`                       | `[ip]:port`                                         | -       | Defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`                                                                                                                                      |
+| `smtp-server-domain`                       | `NTFY_SMTP_SERVER_DOMAIN`                       | *domain name*                                       | -       | SMTP server e-mail domain, e.g. `ntfy.sh`                                                                                                                                                                                       |
+| `smtp-server-addr-prefix`                  | `NTFY_SMTP_SERVER_ADDR_PREFIX`                  | `[ip]:port`                                         | -       | Optional prefix for the e-mail addresses to prevent spam, e.g. `ntfy-`                                                                                                                                                          |
+| `keepalive-interval`                       | `NTFY_KEEPALIVE_INTERVAL`                       | *duration*                                          | 45s     | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
+| `manager-interval`                         | `$NTFY_MANAGER_INTERVAL`                        | *duration*                                          | 1m      | Interval in which the manager prunes old messages, deletes topics and prints the stats.                                                                                                                                         |
+| `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*                                            | 15,000  | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                     |
+| `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*                                            | 30      | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
+| `visitor-attachment-total-size-limit`      | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT`      | *size*                                              | 100M    | Rate limiting: Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`.                                                 |
+| `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*                                              | 500M    | Rate limiting: Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding.                                                                                        |
+| `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*                                            | 60      | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                           |
+| `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 10s     | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
+| `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*                                            | 16      | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                              |
+| `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*                                          | 1h      | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                        |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
@@ -759,6 +764,9 @@ NAME:
 
 USAGE:
    ntfy serve [OPTIONS..]
+
+CATEGORY:
+   Server commands
 
 DESCRIPTION:
    Run the ntfy server and listen for incoming requests
@@ -781,6 +789,8 @@ OPTIONS:
    --firebase-key-file value, -F value               Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
    --cache-file value, -C value                      cache file used for message caching [$NTFY_CACHE_FILE]
    --cache-duration since, -b since                  buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
+   --auth-file value, -H value                       auth database file used for access control [$NTFY_AUTH_FILE]
+   --auth-default-access value, -p value             default permissions if no matching entries in the auth database are found (default: "read-write") [$NTFY_AUTH_DEFAULT_ACCESS]
    --attachment-cache-dir value                      cache directory for attached files [$NTFY_ATTACHMENT_CACHE_DIR]
    --attachment-total-size-limit value, -A value     limit of the on-disk attachment cache (default: 5G) [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
    --attachment-file-size-limit value, -Y value      per-file attachment size limit (e.g. 300k, 2M, 100M) (default: 15M) [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]

@@ -50,7 +50,7 @@ Arguments:
                - deny (alias: none)
 
 Examples:
-  ntfy access                        
+  ntfy access                        # Shows entire access control list
   ntfy access phil                   # Shows access for user phil
   ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
   ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic

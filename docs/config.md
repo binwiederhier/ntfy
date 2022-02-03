@@ -125,21 +125,99 @@ and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is 
 By default, the ntfy server is open for everyone, meaning **everyone can read and write to any topic**. To restrict access
 to your own server, you can optionally configure authentication and authorization. 
 
-ntfy's auth is implemented with a simple SQLite-based backend. It implements two roles (`user` and `admin`) and per-topic
-`read` and `write` permissions using an access control list (ACL). Access control entries can be applied to users as well
-as the special everyone user (`*`), which represents anonymous API access. 
+ntfy's auth is implemented with a simple [SQLite](https://www.sqlite.org/)-based backend. It implements two roles 
+(`user` and `admin`) and per-topic `read` and `write` permissions using an [access control list (ACL)](https://en.wikipedia.org/wiki/Access-control_list). 
+Access control entries can be applied to users as well as the special everyone user (`*`), which represents anonymous API access. 
 
 To set up auth, simply configure the following two options:
 
-* `auth-file` is the SQLite user/access database; it is created automatically if it doesn't already exist
+* `auth-file` is the user/access database; it is created automatically if it doesn't already exist
 * `auth-default-access` defines the default/fallback access if no access control entry is found; it can be
   set to `read-write` (default), `read-only`, `write-only` or `deny-all`.
 
-### Managing users + access
-Once configured, you can use the `ntfy user` command to add/modify/delete users, and  the `ntfy access` command
-to modify the access control list to allow/deny access to specific topic or topic patterns.
+Once configured, you can use the `ntfy user` command to [add or modify users](#users-and-roles), and the `ntfy access` command
+lets you [modify the access control list](#access-control-list-acl) for specific users and topic patterns. Both of these 
+commands directly edit the auth database (as defined in `auth-file`), so they only work on the server, and only if the user 
+accessing them has the right permissions.
 
-XXXXXXXXXXXXXXXXXXXx
+### Users and roles
+The `ntfy user` command allows you to add/remove/change users in the ntfy user database, as well as change
+passwords or roles (`user` or `admin`). In practice, you'll often just create one admin 
+user with `ntfy user add --role=admin ...` and be done with all this (see [example below](#example-private-instance)).
+
+**Roles:**
+
+* Role `user` (default): Users with this role have no special permissions. Manage access using `ntfy access`
+  (see [below](#access-control-list-acl)).
+* Role `admin`: Users with this role can read/write to all topics. Granular access control is not necessary.
+
+**Example commands** (type `ntfy user --help` or `ntfy user COMMAND --help` for more details):
+
+```
+ntfy user list                     # Shows list of users                        
+ntfy user add phil                 # Add regular user phil  
+ntfy user add --role=admin phil    # Add admin user phil
+ntfy user del phil                 # Delete user phil
+ntfy user change-pass phil         # Change password for user phil
+ntfy user change-role phil admin   # Make user phil an admin
+```
+
+### Access control list (ACL)
+The access control list manages access to topics for non-admin users. Each entry represents the access permissions for
+a user to a specific topic or topic pattern. Here's an example ACL:
+
+```
+$ ntfy access
+User phil (admin)
+- read-write access to all topics (admin role)
+User ben (user)
+- read-write access to topic garagedoor
+- read-write access to topic alerts*
+- read-only access to topic furnace
+User * (anonymous)
+- read-only access to topic announcements
+- read-only access to topic server-stats
+- no access to any (other) topics (server config)
+```
+
+In this example, `phil` has the role `admin`, so he has read-write access to all topics (no ACL entries are necessary).
+User `ben` has three topic-specific entries. He can read, but not write to topic `furnace`, and has read-write access
+to topic `garagedoor` and all topics starting with the word `alerts` (wildcards). Clients that are not authenticated 
+(called `*`/`everyone`) only have read access to the `announcements` and `server-stats` topics.
+
+**Modifying the ACL**
+The access control list can be modified with the `ntfy access` command:
+
+```
+ntfy access                            # Shows the entire access control list
+ntfy access USERNAME                   # Shows access control entries for USERNAME
+ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
+```
+XXXXXXXXXXXXXXXXXXXXXXXX
+
+USERNAME     an existing user, as created with 'ntfy user add', or "everyone"/"*"
+to define access rules for anonymous/unauthenticated clients
+TOPIC        name of a topic with optional wildcards, e.g. "mytopic*"
+
+**Permissions:**
+
+* read-write (alias: rw)
+- read-only (aliases: read, ro)
+- write-only (aliases: write, wo)
+- deny (alias: none)
+
+**Example commands** (type `ntfy access --help` for more details):
+
+```
+ntfy access                        # Shows entire access control list
+ntfy access phil                   # Shows access for user phil
+ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
+ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
+ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..."
+ntfy access --reset                # Reset entire access control list
+ntfy access --reset phil           # Reset all access for user phil
+ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic
+```
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:

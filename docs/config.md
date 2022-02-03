@@ -131,7 +131,8 @@ Access control entries can be applied to users as well as the special everyone u
 
 To set up auth, simply **configure the following two options**:
 
-* `auth-file` is the user/access database; it is created automatically if it doesn't already exist
+* `auth-file` is the user/access database; it is created automatically if it doesn't already exist; suggested 
+  location `/var/lib/ntfy/user.db` (easiest if deb/rpm package is used)
 * `auth-default-access` defines the default/fallback access if no access control entry is found; it can be
   set to `read-write` (default), `read-only`, `write-only` or `deny-all`.
 
@@ -166,8 +167,7 @@ ntfy user change-role phil admin   # Make user phil an admin
 The access control list (ACL) **manages access to topics for non-admin users, and for anonymous access**. Each entry 
 represents the access permissions for a user to a specific topic or topic pattern. 
 
-**Modifying the ACL:**   
-The access control list can be displayed or modified with the `ntfy access` command:
+The ACL can be displayed or modified with the `ntfy access` command:
 
 ```
 ntfy access                            # Shows the entire access control list

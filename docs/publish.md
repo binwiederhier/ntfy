@@ -941,6 +941,81 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
 
 ## Advanced features
 
+### Authentication
+Depending on whether the server is configured to support [access control](config.md#access-control), some topics
+may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
+To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
+with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
+your password. 
+
+Here's a simple example:
+
+=== "Command line (curl)"
+    ```
+    curl \
+      -u phil:mypass \
+      -d "Look ma, with auth" \
+      https://ntfy.example.com/mysecrets
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+      -u phil:mypass \
+      ntfy.example.com/mysecrets \
+      "Look ma, with auth"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mysecrets HTTP/1.1
+    Host: ntfy.example.com
+    Authorization: Basic cGhpbDpteXBhc3M=
+
+    Look ma, with auth
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mysecrets', {
+        method: 'POST', // PUT works too
+        body: 'Look ma, with auth',
+        headers: {
+            'Authorization': 'Basic cGhpbDpteXBhc3M='
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
+    strings.NewReader("Look ma, with auth"))
+    req.Header.Set("Authorization", "Basic cGhpbDpteXBhc3M=")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mysecrets",
+    data="Look ma, with auth",
+    headers={
+        "Authorization": "Basic cGhpbDpteXBhc3M="
+    })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' =>
+                'Content-Type: text/plain\r\n' .
+                'Authorization: Basic cGhpbDpteXBhc3M=',
+            'content' => 'Look ma, with auth'
+        ]
+    ]));
+    ```
+
 ### Message caching
 !!! info
     If `Cache: no` is used, messages will only be delivered to connected subscribers, and won't be re-delivered if a 
@@ -1133,3 +1208,4 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |
 | `X-Firebase`    | `Firebase`                                 | Allows disabling [sending to Firebase](#disable-firebase)                                     |
 | `X-UnifiedPush` | `UnifiedPush`, `up`                        | [UnifiedPush](#unifiedpush) publish option, only to be used by UnifiedPush apps               |
+| `Authorization` | -                                          | If supported by the server, you can [login to access](#authentication) protected topics       |

@@ -103,16 +103,16 @@ The message fields are passed to the command as environment variables and can be
 these are environment variables, you typically don't have to worry about quoting too much, as long as you enclose them
 in double-quotes, you should be fine:
 
-| Variable | Aliases | Description |
-|---|---|---
-| `$NTFY_ID` | `$id` | Unique message ID |
-| `$NTFY_TIME` | `$time` | Unix timestamp of the message delivery |
-| `$NTFY_TOPIC` | `$topic` | Topic name |
-| `$NTFY_MESSAGE` | `$message`, `$m` | Message body |
-| `$NTFY_TITLE` | `$title`, `$t` | Message title |
-| `$NTFY_PRIORITY` | `$priority`, `$prio`, `$p` | Message priority (1=min, 5=max) |
-| `$NTFY_TAGS` | `$tags`, `$tag`, `$ta` | Message tags (comma separated list) |
-| `$NTFY_RAW` | `$raw` | Raw JSON message |
+| Variable         | Aliases                    | Description                            |
+|------------------|----------------------------|----------------------------------------|
+| `$NTFY_ID`       | `$id`                      | Unique message ID                      |
+| `$NTFY_TIME`     | `$time`                    | Unix timestamp of the message delivery |
+| `$NTFY_TOPIC`    | `$topic`                   | Topic name                             |
+| `$NTFY_MESSAGE`  | `$message`, `$m`           | Message body                           |
+| `$NTFY_TITLE`    | `$title`, `$t`             | Message title                          |
+| `$NTFY_PRIORITY` | `$priority`, `$prio`, `$p` | Message priority (1=min, 5=max)        |
+| `$NTFY_TAGS`     | `$tags`, `$tag`, `$ta`     | Message tags (comma separated list)    |
+| `$NTFY_RAW`      | `$raw`                     | Raw JSON message                       |
    
 ### Subscribe to multiple topics
 ```

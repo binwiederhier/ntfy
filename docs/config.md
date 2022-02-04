@@ -155,7 +155,7 @@ user with `ntfy user add --role=admin ...` and be done with all this (see [examp
 **Example commands** (type `ntfy user --help` or `ntfy user COMMAND --help` for more details):
 
 ```
-ntfy user list                     # Shows list of users                        
+ntfy user list                     # Shows list of users (alias: 'ntfy access')
 ntfy user add phil                 # Add regular user phil  
 ntfy user add --role=admin phil    # Add admin user phil
 ntfy user del phil                 # Delete user phil
@@ -164,13 +164,13 @@ ntfy user change-role phil admin   # Make user phil an admin
 ```
 
 ### Access control list (ACL)
-The access control list (ACL) **manages access to topics for non-admin users, and for anonymous access**. Each entry 
-represents the access permissions for a user to a specific topic or topic pattern. 
+The access control list (ACL) **manages access to topics for non-admin users, and for anonymous access (`everyone`/`*`)**.
+Each entry represents the access permissions for a user to a specific topic or topic pattern. 
 
 The ACL can be displayed or modified with the `ntfy access` command:
 
 ```
-ntfy access                            # Shows the entire access control list
+ntfy access                            # Shows access control list (alias: 'ntfy user list')
 ntfy access USERNAME                   # Shows access control entries for USERNAME
 ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
 ```
@@ -225,10 +225,11 @@ to topic `garagedoor` and all topics starting with the word `alerts` (wildcards)
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
 
-``` yaml
-auth-file "/var/lib/ntfy/user.db"
-auth-default-access: "deny-all"
-```
+=== "/etc/ntfy/server.yml"
+    ``` yaml
+    auth-file "/var/lib/ntfy/user.db"
+    auth-default-access: "deny-all"
+    ```
 
 After that, simply create an `admin` user:
 

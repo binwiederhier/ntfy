@@ -28,7 +28,7 @@ func TestCLI_User_Add_Exists(t *testing.T) {
 	require.Nil(t, runUserCommand(app, conf, "add", "phil"))
 	require.Contains(t, stderr.String(), "user phil added with role user")
 
-	app, stdin, _, stderr = newTestApp()
+	app, stdin, _, _ = newTestApp()
 	stdin.WriteString("mypass\nmypass")
 	err := runUserCommand(app, conf, "add", "phil")
 	require.Error(t, err)
@@ -71,6 +71,44 @@ func TestCLI_User_ChangePass(t *testing.T) {
 	stdin.WriteString("newpass\nnewpass")
 	require.Nil(t, runUserCommand(app, conf, "change-pass", "phil"))
 	require.Contains(t, stderr.String(), "changed password for user phil")
+}
+
+func TestCLI_User_ChangeRole(t *testing.T) {
+	s, conf, port := newTestServerWithAuth(t)
+	defer test.StopServer(t, s, port)
+
+	// Add user
+	app, stdin, _, stderr := newTestApp()
+	stdin.WriteString("mypass\nmypass")
+	require.Nil(t, runUserCommand(app, conf, "add", "phil"))
+	require.Contains(t, stderr.String(), "user phil added with role user")
+
+	// Change role
+	app, _, _, stderr = newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "change-role", "phil", "admin"))
+	require.Contains(t, stderr.String(), "changed role for user phil to admin")
+}
+
+func TestCLI_User_Delete(t *testing.T) {
+	s, conf, port := newTestServerWithAuth(t)
+	defer test.StopServer(t, s, port)
+
+	// Add user
+	app, stdin, _, stderr := newTestApp()
+	stdin.WriteString("mypass\nmypass")
+	require.Nil(t, runUserCommand(app, conf, "add", "phil"))
+	require.Contains(t, stderr.String(), "user phil added with role user")
+
+	// Delete user
+	app, _, _, stderr = newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "del", "phil"))
+	require.Contains(t, stderr.String(), "user phil removed")
+
+	// Delete user again (does not exist)
+	app, _, _, _ = newTestApp()
+	err := runUserCommand(app, conf, "del", "phil")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user phil does not exist")
 }
 
 func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config, port int) {

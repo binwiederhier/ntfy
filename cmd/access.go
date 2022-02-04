@@ -35,7 +35,7 @@ The command allows you to show the access control list, as well as change it, de
 it is called.
 
 Usage:
-  ntfy access                            # Shows the entire access control list
+  ntfy access                            # Shows access control list (alias: 'ntfy user list')
   ntfy access USERNAME                   # Shows access control entries for USERNAME
   ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
 
@@ -50,7 +50,7 @@ Arguments:
                - deny (alias: none)
 
 Examples:
-  ntfy access                        # Shows entire access control list
+  ntfy access                        # Shows access control list (alias: 'ntfy user list')
   ntfy access phil                   # Shows access for user phil
   ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
   ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
@@ -82,6 +82,9 @@ func execUserAccess(c *cli.Context) error {
 		}
 		return resetAccess(c, manager, username, topic)
 	} else if perms == "" {
+		if topic != "" {
+			return errors.New("invalid syntax, please check 'ntfy access --help' for usage details")
+		}
 		return showAccess(c, manager, username)
 	}
 	return changeAccess(c, manager, username, topic, perms)
@@ -97,13 +100,13 @@ func changeAccess(c *cli.Context, manager auth.Manager, username string, topic s
 		return err
 	}
 	if read && write {
-		fmt.Fprintf(c.App.Writer, "Granted read-write access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "Granted read-write access to topic %s\n\n", topic)
 	} else if read {
-		fmt.Fprintf(c.App.Writer, "Granted read-only access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "Granted read-only access to topic %s\n\n", topic)
 	} else if write {
-		fmt.Fprintf(c.App.Writer, "Granted write-only access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "Granted write-only access to topic %s\n\n", topic)
 	} else {
-		fmt.Fprintf(c.App.Writer, "Revoked all access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "Revoked all access to topic %s\n\n", topic)
 	}
 	return showUserAccess(c, manager, username)
 }
@@ -121,7 +124,7 @@ func resetAllAccess(c *cli.Context, manager auth.Manager) error {
 	if err := manager.ResetAccess("", ""); err != nil {
 		return err
 	}
-	fmt.Fprintln(c.App.Writer, "Reset access for all users")
+	fmt.Fprintln(c.App.ErrWriter, "Reset access for all users")
 	return nil
 }
 
@@ -129,7 +132,7 @@ func resetUserAccess(c *cli.Context, manager auth.Manager, username string) erro
 	if err := manager.ResetAccess(username, ""); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.Writer, "Reset access for user %s\n\n", username)
+	fmt.Fprintf(c.App.ErrWriter, "Reset access for user %s\n\n", username)
 	return showUserAccess(c, manager, username)
 }
 
@@ -137,7 +140,7 @@ func resetUserTopicAccess(c *cli.Context, manager auth.Manager, username string,
 	if err := manager.ResetAccess(username, topic); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.Writer, "Reset access for user %s and topic %s\n\n", username, topic)
+	fmt.Fprintf(c.App.ErrWriter, "Reset access for user %s and topic %s\n\n", username, topic)
 	return showUserAccess(c, manager, username)
 }
 
@@ -158,7 +161,9 @@ func showAllAccess(c *cli.Context, manager auth.Manager) error {
 
 func showUserAccess(c *cli.Context, manager auth.Manager, username string) error {
 	users, err := manager.User(username)
-	if err != nil {
+	if err == auth.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	} else if err != nil {
 		return err
 	}
 	return showUsers(c, manager, []*auth.User{users})
@@ -166,7 +171,7 @@ func showUserAccess(c *cli.Context, manager auth.Manager, username string) error
 
 func showUsers(c *cli.Context, manager auth.Manager, users []*auth.User) error {
 	for _, user := range users {
-		fmt.Fprintf(c.App.Writer, "User %s (%s)\n", user.Name, user.Role)
+		fmt.Fprintf(c.App.ErrWriter, "User %s (%s)\n", user.Name, user.Role)
 		if user.Role == auth.RoleAdmin {
 			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
 		} else if len(user.Grants) > 0 {

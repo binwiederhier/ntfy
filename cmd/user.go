@@ -99,6 +99,13 @@ Example:
 			Usage:   "Shows a list of users",
 			Before:  inheritRootReaderFunc,
 			Action:  execUserList,
+			Description: `Shows a list of all configured users, including the everyone ('*') user.
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined. 
+
+This command is an alias to calling 'ntfy access' (display access control list).
+`,
 		},
 	},
 	Description: `Manage users of the ntfy server.
@@ -111,7 +118,7 @@ The command allows you to add/remove/change users in the ntfy user database, as 
 passwords or roles.
 
 Examples:
-  ntfy user list                     # Shows list of users                        
+  ntfy user list                     # Shows list of users (alias: 'ntfy access')                      
   ntfy user add phil                 # Add regular user phil  
   ntfy user add --role=admin phil    # Add admin user phil
   ntfy user del phil                 # Delete user phil

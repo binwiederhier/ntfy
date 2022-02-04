@@ -278,12 +278,12 @@ $ curl "ntfy.sh/alerts/json?priority=high&tags=zfs-error"
 
 Available filters (all case-insensitive):
 
-| Filter variable | Alias | Example | Description |
-|---|---|---|---|
-| `message` | `X-Message`, `m` | `ntfy.sh/mytopic?message=lalala` | Only return messages that match this exact message string |
-| `title` | `X-Title`, `t` | `ntfy.sh/mytopic?title=some+title` | Only return messages that match this exact title string |
-| `priority` | `X-Priority`, `prio`, `p` | `ntfy.sh/mytopic?p=high,urgent` | Only return messages that match *any priority listed* (comma-separated) |
-| `tags` | `X-Tags`, `tag`, `ta` | `ntfy.sh/mytopic?tags=error,alert` | Only return messages that match *all listed tags* (comma-separated) |
+| Filter variable | Alias                     | Example                            | Description                                                             |
+|-----------------|---------------------------|------------------------------------|-------------------------------------------------------------------------|
+| `message`       | `X-Message`, `m`          | `ntfy.sh/mytopic?message=lalala`   | Only return messages that match this exact message string               |
+| `title`         | `X-Title`, `t`            | `ntfy.sh/mytopic?title=some+title` | Only return messages that match this exact title string                 |
+| `priority`      | `X-Priority`, `prio`, `p` | `ntfy.sh/mytopic?p=high,urgent`    | Only return messages that match *any priority listed* (comma-separated) |
+| `tags`          | `X-Tags`, `tag`, `ta`     | `ntfy.sh/mytopic?tags=error,alert` | Only return messages that match *all listed tags* (comma-separated)     |
 
 ### Subscribe to multiple topics
 It's possible to subscribe to multiple topics in one HTTP call by providing a comma-separated list of topics 
@@ -296,37 +296,70 @@ $ curl -s ntfy.sh/mytopic1,mytopic2/json
 {"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
 ```
 
+### Authentication
+Depending on whether the server is configured to support [access control](../config.md#access-control), some topics
+may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
+To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
+with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
+your password.
+
+```
+curl -u phil:mypass -s "https://ntfy.example.com/mytopic/json"
+```
+
 ## JSON message format
 Both the [`/json` endpoint](#subscribe-as-json-stream) and the [`/sse` endpoint](#subscribe-as-sse-stream) return a JSON
 format of the message. It's very straight forward:
 
-| Field | Required | Type | Example | Description |
-|---|---|---|---|---|
-| `id` | ✔️ | *string* | `hwQ2YpKdmg` | Randomly chosen message identifier |
-| `time` | ✔️ | *int* | `1635528741` | Message date time, as Unix time stamp |  
-| `event` | ✔️ | `open`, `keepalive` or `message` | `message` | Message type, typically you'd be only interested in `message` |
-| `topic` | ✔️ | *string* | `topic1,topic2` | Comma-separated list of topics the message is associated with; only one for all `message` events, but may be a list in `open` events |
-| `message` | - | *string* | `Some message` | Message body; always present in `message` events |
-| `title` | - | *string* | `Some title` | Message [title](../publish.md#message-title); if not set defaults to `ntfy.sh/<topic>` |
-| `tags` | - | *string array* | `["tag1","tag2"]` | List of [tags](../publish.md#tags-emojis) that may or not map to emojis |
-| `priority` | - | *1, 2, 3, 4, or 5* | `4` | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+**Message**:
+
+| Field        | Required | Type                                              | Example               | Description                                                                                                                          |
+|--------------|----------|---------------------------------------------------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `id`         | ✔️       | *string*                                          | `hwQ2YpKdmg`          | Randomly chosen message identifier                                                                                                   |
+| `time`       | ✔️       | *number*                                          | `1635528741`          | Message date time, as Unix time stamp                                                                                                |  
+| `event`      | ✔️       | `open`, `keepalive`, `message`, or `poll_request` | `message`             | Message type, typically you'd be only interested in `message`                                                                        |
+| `topic`      | ✔️       | *string*                                          | `topic1,topic2`       | Comma-separated list of topics the message is associated with; only one for all `message` events, but may be a list in `open` events |
+| `message`    | -        | *string*                                          | `Some message`        | Message body; always present in `message` events                                                                                     |
+| `title`      | -        | *string*                                          | `Some title`          | Message [title](../publish.md#message-title); if not set defaults to `ntfy.sh/<topic>`                                               |
+| `tags`       | -        | *string array*                                    | `["tag1","tag2"]`     | List of [tags](../publish.md#tags-emojis) that may or not map to emojis                                                              |
+| `priority`   | -        | *1, 2, 3, 4, or 5*                                | `4`                   | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max                                                   |
+| `click`      | -        | *URL*                                             | `https://example.com` | Website opened when notification is [clicked](../publish.md#click-action)                                                            |
+| `attachment` | -        | *JSON object*                                     | *see below*           | Details about an attachment (name, URL, size, ...)                                                                                   |
+
+**Attachment** (part of the message, see [attachments](../publish.md#attachments) for details):
+
+| Field     | Required | Type        | Example                        | Description                                                                                               |
+|-----------|----------|-------------|--------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `name`    | ✔️       | *string*    | `attachment.jpg`               | Name of the attachment, can be overridden with `X-Filename`, see [attachments](../publish.md#attachments) |
+| `url`     | ✔️       | *URL*       | `https://example.com/file.jpg` | URL of the attachment                                                                                     |  
+| `type`    | -️       | *mime type* | `image/jpeg`                   | Mime type of the attachment, only defined if attachment was uploaded to ntfy server                       |
+| `size`    | -️       | *number*    | `33848`                        | Size of the attachment in bytes, only defined if attachment was uploaded to ntfy server                   |
+| `expires` | -️       | *number*    | `1635528741`                   | Attachment expiry date as Unix time stamp, only defined if attachment was uploaded to ntfy server         |
 
 Here's an example for each message type:
 
 === "Notification message"
     ``` json
     {
-        "id": "wze9zgqK41",
-        "time": 1638542110,
+        "id": "sPs71M8A2T",
+        "time": 1643935928,
         "event": "message",
-        "topic": "phil_alerts",
+        "topic": "mytopic",
         "priority": 5,
         "tags": [
             "warning",
             "skull"
         ],
+        "click": "https://homecam.mynet.lan/incident/1234",
+        "attachment": {
+            "name": "camera.jpg",
+            "type": "image/png",
+            "size": 33848,
+            "expires": 1643946728,
+            "url": "https://ntfy.sh/file/sPs71M8A2T.png"
+        },
         "title": "Unauthorized access detected",
-        "message": "Remote access to phils-laptop detected. Act right away."
+        "message": "Movement detected in the yard. You better go check"
     }
     ```
 
@@ -362,15 +395,26 @@ Here's an example for each message type:
     }
     ```    
 
+
+=== "Poll request message"
+    ``` json
+    {
+        "id": "371sevb0pD",
+        "time": 1638542275,
+        "event": "poll_request",
+        "topic": "phil_alerts"
+    }
+    ```
+
 ## List of all parameters
-The following is a list of all parameters that can be passed when subscribing to a message. Parameter names are **case-insensitive**,
+The following is a list of all parameters that can be passed **when subscribing to a message**. Parameter names are **case-insensitive**,
 and can be passed as **HTTP headers** or **query parameters in the URL**. They are listed in the table in their canonical form.
 
-| Parameter | Aliases (case-insensitive) | Description |
-|---|---|---|
-| `poll` | `X-Poll`, `po` | Return cached messages and close connection |
-| `scheduled` | `X-Scheduled`, `sched` | Include scheduled/delayed messages in message list |
-| `message` | `X-Message`, `m` | Filter: Only return messages that match this exact message string |
-| `title` | `X-Title`, `t` | Filter: Only return messages that match this exact title string |
-| `priority` | `X-Priority`, `prio`, `p` | Filter: Only return messages that match *any priority listed* (comma-separated) |
-| `tags` | `X-Tags`, `tag`, `ta` | Filter: Only return messages that match *all listed tags* (comma-separated) |
+| Parameter   | Aliases (case-insensitive) | Description                                                                     |
+|-------------|----------------------------|---------------------------------------------------------------------------------|
+| `poll`      | `X-Poll`, `po`             | Return cached messages and close connection                                     |
+| `scheduled` | `X-Scheduled`, `sched`     | Include scheduled/delayed messages in message list                              |
+| `message`   | `X-Message`, `m`           | Filter: Only return messages that match this exact message string               |
+| `title`     | `X-Title`, `t`             | Filter: Only return messages that match this exact title string                 |
+| `priority`  | `X-Priority`, `prio`, `p`  | Filter: Only return messages that match *any priority listed* (comma-separated) |
+| `tags`      | `X-Tags`, `tag`, `ta`      | Filter: Only return messages that match *all listed tags* (comma-separated)     |

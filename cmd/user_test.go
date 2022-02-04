@@ -121,6 +121,16 @@ func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config,
 }
 
 func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
+	userArgs := []string{
+		"ntfy",
+		"user",
+		"--auth-file=" + conf.AuthFile,
+		"--auth-default-access=" + confToDefaultAccess(conf),
+	}
+	return app.Run(append(userArgs, args...))
+}
+
+func confToDefaultAccess(conf *server.Config) string {
 	var defaultAccess string
 	if conf.AuthDefaultRead && conf.AuthDefaultWrite {
 		defaultAccess = "read-write"
@@ -131,11 +141,5 @@ func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 	} else if !conf.AuthDefaultRead && !conf.AuthDefaultWrite {
 		defaultAccess = "deny-all"
 	}
-	userArgs := []string{
-		"ntfy",
-		"user",
-		"--auth-file=" + conf.AuthFile,
-		"--auth-default-access=" + defaultAccess,
-	}
-	return app.Run(append(userArgs, args...))
+	return defaultAccess
 }

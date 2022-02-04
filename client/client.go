@@ -18,9 +18,10 @@ import (
 
 // Event type constants
 const (
-	MessageEvent   = "message"
-	KeepaliveEvent = "keepalive"
-	OpenEvent      = "open"
+	MessageEvent     = "message"
+	KeepaliveEvent   = "keepalive"
+	OpenEvent        = "open"
+	PollRequestEvent = "poll_request"
 )
 
 const (
@@ -251,6 +252,13 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+		if err != nil {
+			return err
+		}
+		return errors.New(strings.TrimSpace(string(b)))
+	}
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		m, err := toMessage(scanner.Text(), topicURL, subscriptionID)

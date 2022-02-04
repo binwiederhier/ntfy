@@ -96,17 +96,23 @@ func changeAccess(c *cli.Context, manager auth.Manager, username string, topic s
 	}
 	read := util.InStringList([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
 	write := util.InStringList([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
+	user, err := manager.User(username)
+	if err == auth.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	} else if user.Role == auth.RoleAdmin {
+		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
+	}
 	if err := manager.AllowAccess(username, topic, read, write); err != nil {
 		return err
 	}
 	if read && write {
-		fmt.Fprintf(c.App.ErrWriter, "Granted read-write access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "granted read-write access to topic %s\n\n", topic)
 	} else if read {
-		fmt.Fprintf(c.App.ErrWriter, "Granted read-only access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "granted read-only access to topic %s\n\n", topic)
 	} else if write {
-		fmt.Fprintf(c.App.ErrWriter, "Granted write-only access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "granted write-only access to topic %s\n\n", topic)
 	} else {
-		fmt.Fprintf(c.App.ErrWriter, "Revoked all access to topic %s\n\n", topic)
+		fmt.Fprintf(c.App.ErrWriter, "revoked all access to topic %s\n\n", topic)
 	}
 	return showUserAccess(c, manager, username)
 }
@@ -124,7 +130,7 @@ func resetAllAccess(c *cli.Context, manager auth.Manager) error {
 	if err := manager.ResetAccess("", ""); err != nil {
 		return err
 	}
-	fmt.Fprintln(c.App.ErrWriter, "Reset access for all users")
+	fmt.Fprintln(c.App.ErrWriter, "reset access for all users")
 	return nil
 }
 
@@ -132,7 +138,7 @@ func resetUserAccess(c *cli.Context, manager auth.Manager, username string) erro
 	if err := manager.ResetAccess(username, ""); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "Reset access for user %s\n\n", username)
+	fmt.Fprintf(c.App.ErrWriter, "reset access for user %s\n\n", username)
 	return showUserAccess(c, manager, username)
 }
 
@@ -140,7 +146,7 @@ func resetUserTopicAccess(c *cli.Context, manager auth.Manager, username string,
 	if err := manager.ResetAccess(username, topic); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "Reset access for user %s and topic %s\n\n", username, topic)
+	fmt.Fprintf(c.App.ErrWriter, "reset access for user %s and topic %s\n\n", username, topic)
 	return showUserAccess(c, manager, username)
 }
 
@@ -171,7 +177,7 @@ func showUserAccess(c *cli.Context, manager auth.Manager, username string) error
 
 func showUsers(c *cli.Context, manager auth.Manager, users []*auth.User) error {
 	for _, user := range users {
-		fmt.Fprintf(c.App.ErrWriter, "User %s (%s)\n", user.Name, user.Role)
+		fmt.Fprintf(c.App.ErrWriter, "user %s (%s)\n", user.Name, user.Role)
 		if user.Role == auth.RoleAdmin {
 			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
 		} else if len(user.Grants) > 0 {

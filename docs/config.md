@@ -205,13 +205,13 @@ ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopi
 **Example ACL:**
 ```
 $ ntfy access
-User phil (admin)
+user phil (admin)
 - read-write access to all topics (admin role)
-User ben (user)
+user ben (user)
 - read-write access to topic garagedoor
 - read-write access to topic alerts*
 - read-only access to topic furnace
-User * (anonymous)
+user * (anonymous)
 - read-only access to topic announcements
 - read-only access to topic server-stats
 - no access to any (other) topics (server config)
@@ -235,9 +235,9 @@ After that, simply create an `admin` user:
 
 ```
 $ ntfy user add --role=admin phil
-Password: mypass
-Confirm: mypass
-User phil added with role admin 
+password: mypass
+confirm: mypass
+user phil added with role admin 
 ```
 
 Once you've done that, you can publish and subscribe using [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) 

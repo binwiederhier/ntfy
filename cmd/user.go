@@ -144,7 +144,7 @@ func execUserAdd(c *cli.Context) error {
 	if user, _ := manager.User(username); user != nil {
 		return fmt.Errorf("user %s already exists", username)
 	}
-	password, err := readPassword(c)
+	password, err := readPasswordAndConfirm(c)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func execUserChangePass(c *cli.Context) error {
 	if _, err := manager.User(username); err == auth.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
-	password, err := readPassword(c)
+	password, err := readPasswordAndConfirm(c)
 	if err != nil {
 		return err
 	}
@@ -250,13 +250,13 @@ func createAuthManager(c *cli.Context) (auth.Manager, error) {
 	return auth.NewSQLiteAuth(authFile, authDefaultRead, authDefaultWrite)
 }
 
-func readPassword(c *cli.Context) (string, error) {
-	fmt.Fprint(c.App.ErrWriter, "Enter Password: ")
+func readPasswordAndConfirm(c *cli.Context) (string, error) {
+	fmt.Fprint(c.App.ErrWriter, "password: ")
 	password, err := util.ReadPassword(c.App.Reader)
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(c.App.ErrWriter, "\r%s\rConfirm: ", strings.Repeat(" ", 25))
+	fmt.Fprintf(c.App.ErrWriter, "\r%s\rconfirm: ", strings.Repeat(" ", 25))
 	confirm, err := util.ReadPassword(c.App.Reader)
 	if err != nil {
 		return "", err

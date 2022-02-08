@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	bcryptCost              = 11
-	intentionalSlowDownHash = "$2a$11$eX15DeF27FwAgXt9wqJF0uAUMz74XywJcGBH3kP93pzKYv6ATk2ka" // Cost should match bcryptCost
+	bcryptCost              = 10
+	intentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match bcryptCost
 )
 
 // Auther-related queries

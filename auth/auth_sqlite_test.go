@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
+
 func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	a := newTestAuth(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", auth.RoleAdmin))
@@ -24,14 +26,14 @@ func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	phil, err := a.Authenticate("phil", "phil")
 	require.Nil(t, err)
 	require.Equal(t, "phil", phil.Name)
-	require.True(t, strings.HasPrefix(phil.Hash, "$2a$11$"))
+	require.True(t, strings.HasPrefix(phil.Hash, "$2a$10$"))
 	require.Equal(t, auth.RoleAdmin, phil.Role)
 	require.Equal(t, []auth.Grant{}, phil.Grants)
 
 	ben, err := a.Authenticate("ben", "ben")
 	require.Nil(t, err)
 	require.Equal(t, "ben", ben.Name)
-	require.True(t, strings.HasPrefix(ben.Hash, "$2a$11$"))
+	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, auth.RoleUser, ben.Role)
 	require.Equal(t, []auth.Grant{
 		{"mytopic", true, true},
@@ -92,7 +94,7 @@ func TestSQLiteAuth_AddUser_Timing(t *testing.T) {
 	a := newTestAuth(t, false, false)
 	start := time.Now().UnixMilli()
 	require.Nil(t, a.AddUser("user", "pass", auth.RoleAdmin))
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, int64(100)) // Ideally should be > 200ms, but let's not make a brittle
+	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestSQLiteAuth_Authenticate_Timing(t *testing.T) {
@@ -103,19 +105,19 @@ func TestSQLiteAuth_Authenticate_Timing(t *testing.T) {
 	start := time.Now().UnixMilli()
 	_, err := a.Authenticate("user", "pass")
 	require.Nil(t, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, int64(100)) // Ideally should be > 200ms, but let's not make a brittle
+	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 
 	// Timing an incorrect attempt
 	start = time.Now().UnixMilli()
 	_, err = a.Authenticate("user", "INCORRECT")
 	require.Equal(t, auth.ErrUnauthenticated, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, int64(100)) // Ideally should be > 200ms, but let's not make a brittle
+	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 
 	// Timing a non-existing user attempt
 	start = time.Now().UnixMilli()
 	_, err = a.Authenticate("DOES-NOT-EXIST", "hithere")
 	require.Equal(t, auth.ErrUnauthenticated, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, int64(100)) // Ideally should be > 200ms, but let's not make a brittle
+	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestSQLiteAuth_UserManagement(t *testing.T) {
@@ -133,14 +135,14 @@ func TestSQLiteAuth_UserManagement(t *testing.T) {
 	phil, err := a.User("phil")
 	require.Nil(t, err)
 	require.Equal(t, "phil", phil.Name)
-	require.True(t, strings.HasPrefix(phil.Hash, "$2a$11$"))
+	require.True(t, strings.HasPrefix(phil.Hash, "$2a$10$"))
 	require.Equal(t, auth.RoleAdmin, phil.Role)
 	require.Equal(t, []auth.Grant{}, phil.Grants)
 
 	ben, err := a.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, "ben", ben.Name)
-	require.True(t, strings.HasPrefix(ben.Hash, "$2a$11$"))
+	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, auth.RoleUser, ben.Role)
 	require.Equal(t, []auth.Grant{
 		{"mytopic", true, true},

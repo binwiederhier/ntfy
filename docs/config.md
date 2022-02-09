@@ -528,10 +528,7 @@ or the root domain:
     # Note that this config is most certainly incomplete. Please help out and let me know what's missing
     # via Discord/Matrix or in a GitHub issue.
 
-    ntfy.sh {
-        reverse_proxy 127.0.0.1:2586
-    }
-    http://nfty.sh {
+    ntfy.sh, http://nfty.sh {
         reverse_proxy 127.0.0.1:2586
     }
     ```

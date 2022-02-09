@@ -1174,6 +1174,18 @@ parameter (or any of its aliases `unifiedpush` or `up`) to `1` to [disable Fireb
 option is mostly equivalent to `Firebase: no`, but was introduced to allow future flexibility. The flag additionally 
 enables auto-detection of the message encoding. If the message is binary, it'll be encoded as base64.
 
+## Public topics
+Obviously all topics on ntfy.sh are public, but there are a few designated topics that are used in examples, and topics
+that you can use to try out what [authentication and access control](#authentication) looks like.
+
+| Topic                                          | User                              | Permissions                                          | Description                          |
+|------------------------------------------------|-----------------------------------|------------------------------------------------------|--------------------------------------|
+| [announcements](https://ntfy.sh/announcements) | `*` (unauthenticated)             | Read-only for everyone                               | Release announcements and such       |
+| [stats](https://ntfy.sh/stats)                 | `*` (unauthenticated)             | Read-only for everyone                               | Daily statistics about ntfy.sh usage |
+| [mytopic-rw](https://ntfy.sh/mytopic-rw)       | `testuser` (password: `testuser`) | Read-write for `testuser`, no access for anyone else | Test topic                           |
+| [mytopic-ro](https://ntfy.sh/mytopic-ro)       | `testuser` (password: `testuser`) | Read-only for `testuser`, no access for anyone else  | Test topic                           |
+| [mytopic-wo](https://ntfy.sh/mytopic-wo)       | `testuser` (password: `testuser`) | Write-only for `testuser`, no access for anyone else | Test topic                           |
+
 ## Limitations
 There are a few limitations to the API to prevent abuse and to keep the server healthy. Almost all of these settings 
 are configurable via the server side [rate limiting settings](config.md#rate-limiting). Most of these limits you won't run into,

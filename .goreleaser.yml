@@ -105,6 +105,7 @@ dockers:
       - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
     use: buildx
     dockerfile: Dockerfile
+    goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
   - image_templates:

@@ -403,6 +403,17 @@ func TestServer_PublishViaGET(t *testing.T) {
 	require.Greater(t, msg.Time, time.Now().Add(23*time.Hour).Unix())
 }
 
+func TestServer_PublishMessageInHeaderWithNewlines(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic", "", map[string]string{
+		"Message": "Line 1\\nLine 2",
+	})
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+	require.Equal(t, "Line 1\nLine 2", msg.Message) // \\n -> \n !
+}
+
 func TestServer_PublishFirebase(t *testing.T) {
 	// This is unfortunately not much of a test, since it merely fires the messages towards Firebase,
 	// but cannot re-read them. There is no way from Go to read the messages back, or even get an error back.

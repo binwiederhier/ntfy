@@ -471,7 +471,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	if s.mailer == nil && email != "" {
 		return false, false, "", false, errHTTPBadRequestEmailDisabled
 	}
-	messageStr := readParam(r, "x-message", "message", "m")
+	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
 		m.Message = messageStr
 	}

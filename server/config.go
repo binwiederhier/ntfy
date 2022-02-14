@@ -83,6 +83,7 @@ type Config struct {
 	VisitorAttachmentDailyBandwidthLimit int
 	VisitorRequestLimitBurst             int
 	VisitorRequestLimitReplenish         time.Duration
+	VisitorRequestExemptIPAddrs          []string
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
 	BehindProxy                          bool
@@ -120,6 +121,7 @@ func NewConfig() *Config {
 		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
 		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
+		VisitorRequestExemptIPAddrs:          make([]string, 0),
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		BehindProxy:                          false,

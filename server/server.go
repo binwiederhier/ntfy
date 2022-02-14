@@ -251,16 +251,17 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
-	if err := s.handleInternal(w, r); err != nil {
+	v := s.visitor(r)
+	if err := s.handleInternal(w, r, v); err != nil {
 		if websocket.IsWebSocketUpgrade(r) {
-			log.Printf("[%s] WS %s %s - %s", r.RemoteAddr, r.Method, r.URL.Path, err.Error())
+			log.Printf("[%s] WS %s %s - %s", v.ip, r.Method, r.URL.Path, err.Error())
 			return // Do not attempt to write to upgraded connection
 		}
 		httpErr, ok := err.(*errHTTP)
 		if !ok {
 			httpErr = errHTTPInternalError
 		}
-		log.Printf("[%s] HTTP %s %s - %d - %d - %s", r.RemoteAddr, r.Method, r.URL.Path, httpErr.HTTPCode, httpErr.Code, err.Error())
+		log.Printf("[%s] HTTP %s %s - %d - %d - %s", v.ip, r.Method, r.URL.Path, httpErr.HTTPCode, httpErr.Code, err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 		w.WriteHeader(httpErr.HTTPCode)
@@ -268,8 +269,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request) error {
-	v := s.visitor(r)
+func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
@@ -404,14 +404,14 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if s.firebase != nil && firebase && !delayed {
 		go func() {
 			if err := s.firebase(m); err != nil {
-				log.Printf("Unable to publish to Firebase: %v", err.Error())
+				log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
 			}
 		}()
 	}
 	if s.mailer != nil && email != "" && !delayed {
 		go func() {
 			if err := s.mailer.Send(v.ip, email, m); err != nil {
-				log.Printf("Unable to send email: %v", err.Error())
+				log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
 			}
 		}()
 	}
@@ -1063,7 +1063,9 @@ func (s *Server) sendDelayedMessages() error {
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if err := v.RequestAllowed(); err != nil {
+		if util.InStringList(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+			return next(w, r, v)
+		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests
 		}
 		return next(w, r, v)

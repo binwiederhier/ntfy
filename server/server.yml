@@ -137,9 +137,12 @@
 # Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
 # - visitor-request-limit-burst is the initial bucket of requests each visitor has
 # - visitor-request-limit-replenish is the rate at which the bucket is refilled
+# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames and IPs to be
+#   exempt from request rate limiting; hostnames are resolved at the time the server is started
 #
 # visitor-request-limit-burst: 60
-# visitor-request-limit-replenish: "10s"
+# visitor-request-limit-replenish: "5s"
+# visitor-request-limit-exempt-hosts: ""
 
 # Rate limiting: Allowed emails per visitor:
 # - visitor-email-limit-burst is the initial bucket of emails each visitor has

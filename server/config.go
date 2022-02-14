@@ -30,14 +30,14 @@ const (
 
 // Defines all per-visitor limits
 // - per visitor subscription limit: max number of subscriptions (active HTTP connections) per per-visitor/IP
-// - per visitor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 10 seconds)
+// - per visitor request limit: max number of PUT/GET/.. requests (here: 60 requests bucket, replenished at a rate of one per 5 seconds)
 // - per visitor email limit: max number of emails (here: 16 email bucket, replenished at a rate of one per hour)
 // - per visitor attachment size limit: total per-visitor attachment size in bytes to be stored on the server
 // - per visitor attachment daily bandwidth limit: number of bytes that can be transferred to/from the server
 const (
 	DefaultVisitorSubscriptionLimit             = 30
 	DefaultVisitorRequestLimitBurst             = 60
-	DefaultVisitorRequestLimitReplenish         = 10 * time.Second
+	DefaultVisitorRequestLimitReplenish         = 5 * time.Second
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
 	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB

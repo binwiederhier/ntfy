@@ -779,6 +779,7 @@ DESCRIPTION:
      ntfy serve                      # Starts server in the foreground (on port 80)
      ntfy serve --listen-http :8080  # Starts server with alternate port
 
+OPTIONS:
    --config value, -c value                          config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
    --base-url value, -B value                        externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
    --listen-http value, -l value                     ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]

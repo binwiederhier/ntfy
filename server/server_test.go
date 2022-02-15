@@ -690,6 +690,43 @@ func (t *testMailer) Send(from, to string, m *message) error {
 	return nil
 }
 
+func TestServer_PublishTooRequests_Defaults(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	for i := 0; i < 60; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "message", nil)
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestExemptIPAddrs = []string{"9.9.9.9"} // see request()
+	s := newTestServer(t, c)
+	for i := 0; i < 65; i++ { // > 60
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
+		require.Equal(t, 200, response.Code)
+	}
+}
+
+func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 60
+	c.VisitorRequestLimitReplenish = 500 * time.Millisecond
+	s := newTestServer(t, c)
+	for i := 0; i < 60; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "message", nil)
+	require.Equal(t, 429, response.Code)
+
+	time.Sleep(510 * time.Millisecond)
+	response = request(t, s, "PUT", "/mytopic", "message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
 func TestServer_PublishTooManyEmails_Defaults(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	s.mailer = &testMailer{}

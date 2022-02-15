@@ -1,6 +1,7 @@
 before:
   hooks:
     - go mod download
+    - go mod tidy
 builds:
   -
     id: ntfy
@@ -12,6 +13,9 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [amd64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
   -
     id: ntfy_armv7
     binary: ntfy
@@ -24,6 +28,9 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [7]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
   -
     id: ntfy_arm64
     binary: ntfy
@@ -35,6 +42,9 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [arm64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
 nfpms:
   -
     package_name: ntfy

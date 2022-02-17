@@ -23,6 +23,7 @@ var cmdSubscribe = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
+		&cli.StringFlag{Name: "user", Aliases: []string{"u"}, Usage: "username[:password] used to auth against the server"},
 		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
@@ -40,6 +41,7 @@ ntfy subscribe TOPIC
     ntfy subscribe mytopic            # Prints JSON for incoming messages for ntfy.sh/mytopic
     ntfy sub home.lan/backups         # Subscribe to topic on different server
     ntfy sub --poll home.lan/backups  # Just query for latest messages and exit
+    ntfy sub -u phil:mypass secret    # Subscribe with username/password
   
 ntfy subscribe TOPIC COMMAND
   This executes COMMAND for every incoming messages. The message fields are passed to the
@@ -81,6 +83,7 @@ func execSubscribe(c *cli.Context) error {
 	}
 	cl := client.New(conf)
 	since := c.String("since")
+	user := c.String("user")
 	poll := c.Bool("poll")
 	scheduled := c.Bool("scheduled")
 	fromConfig := c.Bool("from-config")
@@ -92,6 +95,23 @@ func execSubscribe(c *cli.Context) error {
 	var options []client.SubscribeOption
 	if since != "" {
 		options = append(options, client.WithSince(since))
+	}
+	if user != "" {
+		var pass string
+		parts := strings.SplitN(user, ":", 2)
+		if len(parts) == 2 {
+			user = parts[0]
+			pass = parts[1]
+		} else {
+			fmt.Fprint(c.App.ErrWriter, "Enter Password: ")
+			p, err := util.ReadPassword(c.App.Reader)
+			if err != nil {
+				return err
+			}
+			pass = string(p)
+			fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
+		}
+		options = append(options, client.WithBasicAuth(user, pass))
 	}
 	if poll {
 		options = append(options, client.WithPoll())

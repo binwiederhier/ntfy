@@ -162,6 +162,9 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		for filter, value := range s.If {
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
 		}
+		if s.User != "" && s.Password != "" {
+			topicOptions = append(topicOptions, client.WithBasicAuth(s.User, s.Password))
+		}
 		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
 		commands[subscriptionID] = s.Command
 	}

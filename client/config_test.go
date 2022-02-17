@@ -13,7 +13,9 @@ func TestConfig_Load(t *testing.T) {
 	require.Nil(t, os.WriteFile(filename, []byte(`
 default-host: http://localhost
 subscribe:
-  - topic: no-command
+  - topic: no-command-with-auth
+    user: phil
+    password: mypass
   - topic: echo-this
     command: 'echo "Message received: $message"'
   - topic: alerts
@@ -26,8 +28,10 @@ subscribe:
 	require.Nil(t, err)
 	require.Equal(t, "http://localhost", conf.DefaultHost)
 	require.Equal(t, 3, len(conf.Subscribe))
-	require.Equal(t, "no-command", conf.Subscribe[0].Topic)
+	require.Equal(t, "no-command-with-auth", conf.Subscribe[0].Topic)
 	require.Equal(t, "", conf.Subscribe[0].Command)
+	require.Equal(t, "phil", conf.Subscribe[0].User)
+	require.Equal(t, "mypass", conf.Subscribe[0].Password)
 	require.Equal(t, "echo-this", conf.Subscribe[1].Topic)
 	require.Equal(t, `echo "Message received: $message"`, conf.Subscribe[1].Command)
 	require.Equal(t, "alerts", conf.Subscribe[2].Topic)

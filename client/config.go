@@ -14,9 +14,11 @@ const (
 type Config struct {
 	DefaultHost string `yaml:"default-host"`
 	Subscribe   []struct {
-		Topic   string            `yaml:"topic"`
-		Command string            `yaml:"command"`
-		If      map[string]string `yaml:"if"`
+		Topic    string            `yaml:"topic"`
+		User     string            `yaml:"user"`
+		Password string            `yaml:"password"`
+		Command  string            `yaml:"command"`
+		If       map[string]string `yaml:"if"`
 	} `yaml:"subscribe"`
 }
 

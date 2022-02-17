@@ -16,6 +16,10 @@
 #         command: 'echo "$message"'
 #         if:
 #             priority: high,urgent
+#       - topic: secret
+#         command: 'notify-send "$m"'
+#         user: phill
+#         password: mypass
 #
 # Variables:
 #     Variable        Aliases               Description

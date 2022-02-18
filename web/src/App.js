@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import ProTip from './ProTip';
+import {useState} from "react";
 
 function Copyright() {
     return (
@@ -57,22 +58,53 @@ function NotificationItem(props) {
     );
 }
 
+function SubscriptionAddForm(props) {
+    const [topic, setTopic] = useState("");
+    const handleSubmit = (ev) => {
+        ev.preventDefault();
+        props.onSubmit({
+            base_url: "https://ntfy.sh",
+            topic: topic,
+        });
+    }
+    return (
+        <form onSubmit={handleSubmit}>
+            <input
+                type="text"
+                value={topic}
+                onChange={ev => setTopic(ev.target.value)}
+                placeholder="Topic name, e.g. phil_alerts"
+                required
+                />
+        </form>
+    );
+}
+
 export default function App() {
-    const subscriptions = [
+    const [state, setState] = useState({
+        subscriptions: [],
+    });
+    /*const subscriptions = [
         {base_url: "https://ntfy.sh", topic: "mytopic"},
         {base_url: "https://ntfy.sh", topic: "phils_alerts"},
-    ];
+    ];*/
     const notifications = [
         {id: "qGrfmhp3vK", times: 1645193395, message: "Message 1"},
         {id: "m4YYjfxwyT", times: 1645193428, message: "Message 2"}
     ];
+    const addSubscription = (newSubscription) => {
+        setState(prevState => ({
+            subscriptions: [...prevState.subscriptions, newSubscription],
+        }));
+    }
     return (
         <Container maxWidth="sm">
             <Box sx={{my: 4}}>
                 <Typography variant="h4" component="h1" gutterBottom>
                     ntfy
                 </Typography>
-                <SubscriptionList subscriptions={subscriptions}/>
+                <SubscriptionAddForm onSubmit={addSubscription}/>
+                <SubscriptionList subscriptions={state.subscriptions}/>
                 <NotificationList notifications={notifications}/>
                 <ProTip/>
                 <Copyright/>

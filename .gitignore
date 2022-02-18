@@ -5,3 +5,4 @@ server/docs/
 tools/fbsend/fbsend
 playground/
 *.iml
+node_modules/

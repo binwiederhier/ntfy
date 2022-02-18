@@ -1,28 +1,47 @@
 
 export default class WsConnection {
-    constructor(url) {
-        this.url = url;
+    id = '';
+    constructor(subscription, onNotification) {
+        this.id = subscription.id;
+        this.subscription = subscription;
+        this.onNotification = onNotification;
         this.ws = null;
     }
     start() {
-        const socket = new WebSocket(this.url);
-        socket.onopen = function(e) {
-            console.log(this.url, "[open] Connection established");
+        const socket = new WebSocket(this.subscription.wsUrl());
+        socket.onopen = (event) => {
+            console.log(this.id, "[open] Connection established");
+        }
+        socket.onmessage = (event) => {
+            console.log(this.id, `[message] Data received from server: ${event.data}`);
+            try {
+                const data = JSON.parse(event.data);
+                const relevantAndValid =
+                    data.event === 'message' &&
+                    'id' in data &&
+                    'time' in data &&
+                    'message' in data;
+                if (!relevantAndValid) {
+                    return;
+                }
+                console.log('adding')
+                this.subscription.addNotification(data);
+                this.onNotification(this.subscription);
+            } catch (e) {
+                console.log(this.id, `[message] Error handling message: ${e}`);
+            }
         };
-        socket.onmessage = function(event) {
-            console.log(this.url, `[message] Data received from server: ${event.data}`);
-        };
-        socket.onclose = function(event) {
+        socket.onclose = (event) => {
             if (event.wasClean) {
-                console.log(this.url, `[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                console.log(this.id, `[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
             } else {
-                console.log(this.url, `[close] Connection died`);
+                console.log(this.id, `[close] Connection died`);
                 // e.g. server process killed or network down
                 // event.code is usually 1006 in this case
             }
         };
-        socket.onerror = function(error) {
-            console.log(this.url, `[error] ${error.message}`);
+        socket.onerror = (event) => {
+            console.log(this.id, `[error] ${event.message}`);
         };
         this.ws = socket;
     }

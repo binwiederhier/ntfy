@@ -3,44 +3,56 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import Subscription from './Subscription';
 import WsConnection from './WsConnection';
 
-function SubscriptionList(props) {
+const SubscriptionList = (props) => {
+    const subscriptions = props.subscriptions;
     return (
         <div className="subscriptionList">
-            {props.subscriptions.map(subscription =>
-                <SubscriptionItem key={subscription.url} subscription={subscription}/>)}
+            {Object.keys(subscriptions).map(id =>
+                <SubscriptionItem
+                    key={id}
+                    subscription={subscriptions[id]}
+                    selected={props.selectedSubscription === subscriptions[id]}
+                    onClick={() => props.handleSubscriptionClick(id)}
+                />)
+            }
         </div>
     );
 }
 
-function SubscriptionItem(props) {
+const SubscriptionItem = (props) => {
     const subscription = props.subscription;
     return (
-        <div>
-            <div>{subscription.shortUrl()}</div>
-        </div>
+        <>
+            <div
+                onClick={props.onClick}
+                style={{ fontWeight: props.selected ? 'bold' : '' }}
+            >
+                {subscription.shortUrl()}
+            </div>
+        </>
     );
 }
 
-function NotificationList(props) {
+const NotificationList = (props) => {
     return (
         <div className="notificationList">
-            {props.notifications.map(notification => <NotificationItem key={notification.id} {...notification}/>)}
-            <div className="date">{props.timestamp}</div>
-            <div className="message">{props.message}</div>
+            {props.notifications.map(notification =>
+                <NotificationItem key={notification.id} notification={notification}/>)}
         </div>
     );
 }
 
 const NotificationItem = (props) => {
+    const notification = props.notification;
     return (
-        <div>
-            <div className="date">{props.time}</div>
-            <div className="message">{props.message}</div>
-        </div>
+        <>
+            <div className="date">{notification.time}</div>
+            <div className="message">{notification.message}</div>
+        </>
     );
 }
 
@@ -67,20 +79,23 @@ const SubscriptionAddForm = (props) => {
 }
 
 const App = () => {
-    const [state, setState] = useState({
-        subscriptions: [],
-    });
-    const notifications = [
-        {id: "qGrfmhp3vK", times: 1645193395, message: "Message 1"},
-        {id: "m4YYjfxwyT", times: 1645193428, message: "Message 2"}
-    ];
-    const addSubscription = (newSubscription) => {
-        const connection = new WsConnection(newSubscription.wsUrl());
+    const [subscriptions, setSubscriptions] = useState({});
+    const [selectedSubscription, setSelectedSubscription] = useState(null);
+    const [connections, setConnections] = useState({});
+    const subscriptionChanged = (subscription) => {
+        setSubscriptions(prev => ({...prev, [subscription.id]: subscription})); // Fake-replace
+    };
+    const addSubscription = (subscription) => {
+        const connection = new WsConnection(subscription, subscriptionChanged);
+        setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
+        setConnections(prev => ({...prev, [connection.id]: connection}));
         connection.start();
-        setState(prevState => ({
-            subscriptions: [...prevState.subscriptions, newSubscription],
-        }));
-    }
+    };
+    const handleSubscriptionClick = (subscriptionId) => {
+        console.log(`handleSubscriptionClick ${subscriptionId}`)
+        setSelectedSubscription(subscriptions[subscriptionId]);
+    };
+    const notifications = (selectedSubscription !== null) ? selectedSubscription.notifications : [];
     return (
         <Container maxWidth="sm">
             <Box sx={{my: 4}}>
@@ -88,7 +103,11 @@ const App = () => {
                     ntfy
                 </Typography>
                 <SubscriptionAddForm onSubmit={addSubscription}/>
-                <SubscriptionList subscriptions={state.subscriptions}/>
+                <SubscriptionList
+                    subscriptions={subscriptions}
+                    selectedSubscription={selectedSubscription}
+                    handleSubscriptionClick={handleSubscriptionClick}
+                />
                 <NotificationList notifications={notifications}/>
             </Box>
         </Container>

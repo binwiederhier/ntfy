@@ -3,8 +3,7 @@ import {useState} from 'react';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
-import WsConnection from './WsConnection';
+import WsConnection from '../app/WsConnection';
 import {styled, ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import MuiDrawer from '@mui/material/Drawer';
@@ -25,7 +24,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import Card from "@mui/material/Card";
-import {Button, CardActions, CardContent, Stack} from "@mui/material";
+import {CardContent, Stack} from "@mui/material";
 import AddDialog from "./AddDialog";
 import theme from "./theme";
 

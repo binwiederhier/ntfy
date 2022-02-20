@@ -7,7 +7,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import {useState} from "react";
-import Subscription from "./Subscription";
+import Subscription from "../app/Subscription";
 
 const defaultBaseUrl = "https://ntfy.sh"
 

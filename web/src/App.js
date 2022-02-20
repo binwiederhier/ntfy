@@ -4,9 +4,8 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import Subscription from './Subscription';
 import WsConnection from './WsConnection';
-import {createTheme, styled, ThemeProvider} from '@mui/material/styles';
+import {styled, ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import MuiDrawer from '@mui/material/Drawer';
 import MuiAppBar from '@mui/material/AppBar';
@@ -17,7 +16,6 @@ import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Badge from '@mui/material/Badge';
 import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -28,19 +26,8 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import Card from "@mui/material/Card";
 import {Button, CardActions, CardContent, Stack} from "@mui/material";
-
-function Copyright(props) {
-    return (
-        <Typography variant="body2" color="text.secondary" align="center" {...props}>
-            {'Copyright © '}
-            <Link color="inherit" href="https://mui.com/">
-                Your Website
-            </Link>{' '}
-            {new Date().getFullYear()}
-            {'.'}
-        </Typography>
-    );
-}
+import AddDialog from "./AddDialog";
+import theme from "./theme";
 
 const drawerWidth = 240;
 
@@ -88,32 +75,29 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     }),
 );
 
-const mdTheme = createTheme();
 
 const SubscriptionNav = (props) => {
     const subscriptions = props.subscriptions;
     return (
-        <div className="subscriptionList">
+        <>
             {Object.keys(subscriptions).map(id =>
-                <SubscriptionItem
+                <SubscriptionNavItem
                     key={id}
                     subscription={subscriptions[id]}
                     selected={props.selectedSubscription === subscriptions[id]}
                     onClick={() => props.handleSubscriptionClick(id)}
                 />)
             }
-        </div>
+        </>
     );
 }
 
-const SubscriptionItem = (props) => {
+const SubscriptionNavItem = (props) => {
     const subscription = props.subscription;
     return (
-        <ListItemButton onClick={props.onClick}>
-            <ListItemIcon>
-                <ChatBubbleOutlineIcon />
-            </ListItemIcon>
-            <ListItemText primary={subscription.shortUrl()} />
+        <ListItemButton onClick={props.onClick} selected={props.selected}>
+            <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
+            <ListItemText primary={subscription.shortUrl()}/>
         </ListItemButton>
     );
 }
@@ -136,68 +120,48 @@ const NotificationItem = (props) => {
                     {notification.time}
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">
-                    title: {notification.title}
+                    {notification.title}
                 </Typography>}
                 <Typography variant="body1">
-                    msg: {notification.message}
+                    {notification.message}
                 </Typography>
             </CardContent>
-            <CardActions>
-                <Button size="small">Learn More</Button>
-            </CardActions>
         </Card>
     );
 }
 
-const defaultBaseUrl = "https://ntfy.sh"
-
-const SubscriptionAddForm = (props) => {
-    const [topic, setTopic] = useState("");
-    const handleSubmit = (ev) => {
-        ev.preventDefault();
-        props.onSubmit(new Subscription(defaultBaseUrl, topic));
-        setTopic('');
-    }
-    return (
-        <form onSubmit={handleSubmit}>
-            <input
-                type="text"
-                value={topic}
-                onChange={ev => setTopic(ev.target.value)}
-                placeholder="Topic name, e.g. phil_alerts"
-                required
-                />
-        </form>
-    );
-}
-
 const App = () => {
-    const [open, setOpen] = React.useState(true);
+    const [drawerOpen, setDrawerOpen] = useState(true);
     const [subscriptions, setSubscriptions] = useState({});
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [connections, setConnections] = useState({});
+    const [addDialogOpen, setAddDialogOpen] = useState(false);
     const subscriptionChanged = (subscription) => {
         setSubscriptions(prev => ({...prev, [subscription.id]: subscription})); // Fake-replace
     };
-    const addSubscription = (subscription) => {
+    const handleAddSubmit = (subscription) => {
+        setAddDialogOpen(false);
         const connection = new WsConnection(subscription, subscriptionChanged);
         setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
         setConnections(prev => ({...prev, [connection.id]: connection}));
         connection.start();
     };
+    const handleAddCancel = () => {
+        setAddDialogOpen(false);
+    }
     const handleSubscriptionClick = (subscriptionId) => {
         console.log(`handleSubscriptionClick ${subscriptionId}`)
         setSelectedSubscription(subscriptions[subscriptionId]);
     };
     const notifications = (selectedSubscription !== null) ? selectedSubscription.notifications : [];
     const toggleDrawer = () => {
-        setOpen(!open);
+        setDrawerOpen(!drawerOpen);
     };
     return (
-        <ThemeProvider theme={mdTheme}>
+        <ThemeProvider theme={theme}>
             <Box sx={{ display: 'flex' }}>
                 <CssBaseline />
-                <AppBar position="absolute" open={open}>
+                <AppBar position="absolute" open={drawerOpen}>
                     <Toolbar
                         sx={{
                             pr: '24px', // keep right padding when drawer closed
@@ -211,7 +175,7 @@ const App = () => {
                             onClick={toggleDrawer}
                             sx={{
                                 marginRight: '36px',
-                                ...(open && { display: 'none' }),
+                                ...(drawerOpen && { display: 'none' }),
                             }}
                         >
                             <MenuIcon />
@@ -232,7 +196,7 @@ const App = () => {
                         </IconButton>
                     </Toolbar>
                 </AppBar>
-                <Drawer variant="permanent" open={open}>
+                <Drawer variant="permanent" open={drawerOpen}>
                     <Toolbar
                         sx={{
                             display: 'flex',
@@ -259,7 +223,7 @@ const App = () => {
                             </ListItemIcon>
                             <ListItemText primary="Settings" />
                         </ListItemButton>
-                        <ListItemButton>
+                        <ListItemButton onClick={() => setAddDialogOpen(true)}>
                             <ListItemIcon>
                                 <AddIcon />
                             </ListItemIcon>
@@ -281,21 +245,17 @@ const App = () => {
                 >
                     <Toolbar />
                     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-
                         <Grid container spacing={3}>
-                            <SubscriptionAddForm onSubmit={addSubscription}/>
                             <NotificationList notifications={notifications}/>
-                            {/* Recent Orders */}
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-
-                                </Paper>
-                            </Grid>
                         </Grid>
-                        <Copyright sx={{ pt: 4 }} />
                     </Container>
                 </Box>
             </Box>
+            <AddDialog
+                open={addDialogOpen}
+                onCancel={handleAddCancel}
+                onSubmit={handleAddSubmit}
+            />
         </ThemeProvider>
     );
 }

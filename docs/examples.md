@@ -75,3 +75,21 @@ One of my co-workers uses the following Ansible task to let him know when things
     method: POST
     body: "{{ inventory_hostname }} reseeding complete"
 ```
+
+## Watchtower notifications (shoutrrr)
+You can use `shoutrrr` generic webhook support to send watchtower notifications to your ntfy topic.
+
+Example docker-compose.yml:
+```yml
+services:
+  watchtower:
+    image: containrrr/watchtower
+    environment:
+      - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_URL=generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
+```
+
+Or, if you only want to send notifications using shoutrrr:
+```
+shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
+```

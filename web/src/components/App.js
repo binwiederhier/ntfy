@@ -1,6 +1,5 @@
 import * as React from 'react';
 import {useEffect, useState} from 'react';
-import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import WsConnection from '../app/WsConnection';
@@ -13,19 +12,16 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import List from '@mui/material/List';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
-import Badge from '@mui/material/Badge';
-import Grid from '@mui/material/Grid';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemButton from "@mui/material/ListItemButton";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
-import Card from "@mui/material/Card";
-import {CardContent, Stack} from "@mui/material";
 import AddDialog from "./AddDialog";
+import NotificationList from "./NotificationList";
+import DetailSettingsIcon from "./DetailSettingsIcon";
 import theme from "./theme";
 import LocalStorage from "../app/Storage";
 
@@ -102,34 +98,6 @@ const SubscriptionNavItem = (props) => {
     );
 }
 
-const NotificationList = (props) => {
-    return (
-        <Stack spacing={3} className="notificationList">
-            {props.notifications.map(notification =>
-                <NotificationItem key={notification.id} notification={notification}/>)}
-        </Stack>
-    );
-}
-
-const NotificationItem = (props) => {
-    const notification = props.notification;
-    return (
-        <Card sx={{ minWidth: 275 }}>
-            <CardContent>
-                <Typography sx={{ fontSize: 14 }} color="text.secondary" gutterBottom>
-                    {notification.time}
-                </Typography>
-                {notification.title && <Typography variant="h5" component="div">
-                    {notification.title}
-                </Typography>}
-                <Typography variant="body1">
-                    {notification.message}
-                </Typography>
-            </CardContent>
-        </Card>
-    );
-}
-
 const App = () => {
     console.log("Launching App component");
 
@@ -149,11 +117,11 @@ const App = () => {
         connection.start();
     };
     const handleAddCancel = () => {
-        console.log(`Cancel clicked`)
+        console.log(`Cancel clicked`);
         setAddDialogOpen(false);
     }
     const handleSubscriptionClick = (subscriptionId) => {
-        console.log(`Selected subscription ${subscriptionId}`)
+        console.log(`Selected subscription ${subscriptionId}`);
         setSelectedSubscription(subscriptions[subscriptionId]);
     };
     const notifications = (selectedSubscription !== null) ? selectedSubscription.notifications : [];
@@ -183,15 +151,10 @@ const App = () => {
     }, [subscriptions]);
     return (
         <ThemeProvider theme={theme}>
+            <CssBaseline />
             <Box sx={{ display: 'flex' }}>
-                <CssBaseline />
                 <AppBar position="absolute" open={drawerOpen}>
-                    <Toolbar
-                        sx={{
-                            pr: '24px', // keep right padding when drawer closed
-                        }}
-                        color="primary"
-                    >
+                    <Toolbar sx={{pr: '24px'}} color="primary">
                         <IconButton
                             edge="start"
                             color="inherit"
@@ -211,13 +174,9 @@ const App = () => {
                             noWrap
                             sx={{ flexGrow: 1 }}
                         >
-                            ntfy
+                            {(selectedSubscription != null) ? selectedSubscription.shortUrl() : "ntfy.sh"}
                         </Typography>
-                        <IconButton color="inherit">
-                            <Badge badgeContent={4} color="secondary">
-                                <NotificationsIcon />
-                            </Badge>
-                        </IconButton>
+                        <DetailSettingsIcon/>
                     </Toolbar>
                 </AppBar>
                 <Drawer variant="permanent" open={drawerOpen}>
@@ -268,11 +227,7 @@ const App = () => {
                     }}
                 >
                     <Toolbar />
-                    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-                        <Grid container spacing={3}>
-                            <NotificationList notifications={notifications}/>
-                        </Grid>
-                    </Container>
+                    <NotificationList notifications={notifications}/>
                 </Box>
             </Box>
             <AddDialog

@@ -1,10 +1,10 @@
 
 export default class WsConnection {
     id = '';
-    constructor(subscription, onNotification) {
+    constructor(subscription, onChange) {
         this.id = subscription.id;
         this.subscription = subscription;
-        this.onNotification = onNotification;
+        this.onChange = onChange;
         this.ws = null;
     }
     start() {
@@ -26,7 +26,7 @@ export default class WsConnection {
                 }
                 console.log('adding')
                 this.subscription.addNotification(data);
-                this.onNotification(this.subscription);
+                this.onChange(this.subscription);
             } catch (e) {
                 console.log(this.id, `[message] Error handling message: ${e}`);
             }

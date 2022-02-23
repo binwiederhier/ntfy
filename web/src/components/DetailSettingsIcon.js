@@ -8,6 +8,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import Api from "../app/Api";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
 const DetailSettingsIcon = (props) => {
@@ -23,8 +24,19 @@ const DetailSettingsIcon = (props) => {
             return;
         }
         setOpen(false);
+    };
+
+    const handleUnsubscribe = (event) => {
+        handleClose(event);
         props.onUnsubscribe(props.subscription);
     };
+
+    const handleSendTestMessage = () => {
+        const baseUrl = props.subscription.baseUrl;
+        const topic = props.subscription.topic;
+        Api.publish(baseUrl, topic, `This is a test notification sent by the ntfy.sh Web UI at ${new Date().toString()}.`); // FIXME result ignored
+        setOpen(false);
+    }
 
     function handleListKeyDown(event) {
         if (event.key === 'Tab') {
@@ -84,8 +96,8 @@ const DetailSettingsIcon = (props) => {
                                     aria-labelledby="composition-button"
                                     onKeyDown={handleListKeyDown}
                                 >
-                                    <MenuItem onClick={handleClose}>Send test notification</MenuItem>
-                                    <MenuItem onClick={handleClose}>Unsubscribe</MenuItem>
+                                    <MenuItem onClick={handleSendTestMessage}>Send test notification</MenuItem>
+                                    <MenuItem onClick={handleUnsubscribe}>Unsubscribe</MenuItem>
                                 </MenuList>
                             </ClickAwayListener>
                         </Paper>

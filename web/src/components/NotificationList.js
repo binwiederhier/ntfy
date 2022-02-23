@@ -26,7 +26,7 @@ const NotificationItem = (props) => {
             <CardContent>
                 <Typography sx={{ fontSize: 14 }} color="text.secondary">{date}</Typography>
                 {notification.title && <Typography variant="h5" component="div">{notification.title}</Typography>}
-                <Typography variant="body1" gutterBottom>{notification.message}</Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{notification.message}</Typography>
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
             </CardContent>
         </Card>

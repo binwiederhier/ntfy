@@ -24,6 +24,7 @@ import NotificationList from "./NotificationList";
 import DetailSettingsIcon from "./DetailSettingsIcon";
 import theme from "./theme";
 import LocalStorage from "../app/Storage";
+import Api from "../app/Api";
 
 const drawerWidth = 240;
 
@@ -107,13 +108,19 @@ const App = () => {
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
     const subscriptionChanged = (subscription) => {
-        setSubscriptions(prev => ({...prev, [subscription.id]: subscription})); // Fake-replace
+        setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
     };
     const handleSubscribeSubmit = (subscription) => {
         const connection = new WsConnection(subscription, subscriptionChanged);
         setSubscribeDialogOpen(false);
         setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
         setConnections(prev => ({...prev, [subscription.id]: connection}));
+        setSelectedSubscription(subscription);
+        Api.poll(subscription.baseUrl, subscription.topic)
+            .then(messages => {
+                messages.forEach(m => subscription.addNotification(m));
+                setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
+            });
         connection.start();
     };
     const handleSubscribeCancel = () => {
@@ -124,8 +131,11 @@ const App = () => {
         setSubscriptions(prev => {
             const newSubscriptions = {...prev};
             delete newSubscriptions[subscription.id];
-            if (newSubscriptions.length > 0) {
-                setSelectedSubscription(newSubscriptions[0]);
+            const newSubscriptionValues = Object.values(newSubscriptions);
+            if (newSubscriptionValues.length > 0) {
+                setSelectedSubscription(newSubscriptionValues[0]);
+            } else {
+                setSelectedSubscription(null);
             }
             return newSubscriptions;
         });
@@ -184,12 +194,12 @@ const App = () => {
                             noWrap
                             sx={{ flexGrow: 1 }}
                         >
-                            {(selectedSubscription != null) ? selectedSubscription.shortUrl() : "ntfy.sh"}
+                            {(selectedSubscription !== null) ? selectedSubscription.shortUrl() : "ntfy"}
                         </Typography>
-                        <DetailSettingsIcon
+                        {selectedSubscription !== null && <DetailSettingsIcon
                             subscription={selectedSubscription}
                             onUnsubscribe={handleUnsubscribe}
-                        />
+                        />}
                     </Toolbar>
                 </AppBar>
                 <Drawer variant="permanent" open={drawerOpen}>

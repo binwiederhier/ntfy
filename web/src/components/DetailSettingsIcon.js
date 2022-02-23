@@ -10,7 +10,7 @@ import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
-const DetailSettingsIcon = () => {
+const DetailSettingsIcon = (props) => {
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
 
@@ -23,6 +23,7 @@ const DetailSettingsIcon = () => {
             return;
         }
         setOpen(false);
+        props.onUnsubscribe(props.subscription);
     };
 
     function handleListKeyDown(event) {

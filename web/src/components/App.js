@@ -105,21 +105,31 @@ const App = () => {
     const [subscriptions, setSubscriptions] = useState(LocalStorage.getSubscriptions());
     const [connections, setConnections] = useState({});
     const [selectedSubscription, setSelectedSubscription] = useState(null);
-    const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
     const subscriptionChanged = (subscription) => {
         setSubscriptions(prev => ({...prev, [subscription.id]: subscription})); // Fake-replace
     };
-    const handleAddSubmit = (subscription) => {
+    const handleSubscribeSubmit = (subscription) => {
         const connection = new WsConnection(subscription, subscriptionChanged);
-        setAddDialogOpen(false);
+        setSubscribeDialogOpen(false);
         setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
         setConnections(prev => ({...prev, [subscription.id]: connection}));
         connection.start();
     };
-    const handleAddCancel = () => {
+    const handleSubscribeCancel = () => {
         console.log(`Cancel clicked`);
-        setAddDialogOpen(false);
-    }
+        setSubscribeDialogOpen(false);
+    };
+    const handleUnsubscribe = (subscription) => {
+        setSubscriptions(prev => {
+            const newSubscriptions = {...prev};
+            delete newSubscriptions[subscription.id];
+            if (newSubscriptions.length > 0) {
+                setSelectedSubscription(newSubscriptions[0]);
+            }
+            return newSubscriptions;
+        });
+    };
     const handleSubscriptionClick = (subscriptionId) => {
         console.log(`Selected subscription ${subscriptionId}`);
         setSelectedSubscription(subscriptions[subscriptionId]);
@@ -176,7 +186,10 @@ const App = () => {
                         >
                             {(selectedSubscription != null) ? selectedSubscription.shortUrl() : "ntfy.sh"}
                         </Typography>
-                        <DetailSettingsIcon/>
+                        <DetailSettingsIcon
+                            subscription={selectedSubscription}
+                            onUnsubscribe={handleUnsubscribe}
+                        />
                     </Toolbar>
                 </AppBar>
                 <Drawer variant="permanent" open={drawerOpen}>
@@ -206,7 +219,7 @@ const App = () => {
                             </ListItemIcon>
                             <ListItemText primary="Settings" />
                         </ListItemButton>
-                        <ListItemButton onClick={() => setAddDialogOpen(true)}>
+                        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                             <ListItemIcon>
                                 <AddIcon />
                             </ListItemIcon>
@@ -231,9 +244,9 @@ const App = () => {
                 </Box>
             </Box>
             <AddDialog
-                open={addDialogOpen}
-                onCancel={handleAddCancel}
-                onSubmit={handleAddSubmit}
+                open={subscribeDialogOpen}
+                onCancel={handleSubscribeCancel}
+                onSubmit={handleSubscribeSubmit}
             />
         </ThemeProvider>
     );

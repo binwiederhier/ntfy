@@ -1,6 +1,6 @@
 {
-  "name": "create-react-app",
-  "version": "5.0.0",
+  "name": "ntfy",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "start": "react-scripts start",
@@ -9,17 +9,12 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@babel/core": "^7.17.5",
-    "@babel/preset-env": "^7.16.11",
-    "@babel/preset-react": "^7.16.7",
-    "@emotion/react": "latest",
-    "@emotion/styled": "latest",
-    "@mui/icons-material": "^5.4.2",
-    "@mui/material": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-scripts": "^3.0.1",
-    "recharts": "^2.1.9"
+    "@mui/icons-material": "^5.4.2",
+    "@mui/material": "latest",
+    "@emotion/styled": "latest"
   },
   "browserslist": {
     "production": [

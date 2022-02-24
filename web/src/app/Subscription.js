@@ -1,24 +1,15 @@
 import {topicUrl, shortTopicUrl, topicUrlWs} from './utils';
 
 export default class Subscription {
-    id = '';
-    baseUrl = '';
-    topic = '';
-    notifications = [];
-    lastActive = null;
-
     constructor(baseUrl, topic) {
         this.id = topicUrl(baseUrl, topic);
         this.baseUrl = baseUrl;
         this.topic = topic;
+        this.notifications = new Map();
     }
 
     addNotification(notification) {
-        if (notification.time === null) {
-            return this;
-        }
-        this.notifications.push(notification);
-        this.lastActive = notification.time;
+        this.notifications.set(notification.id, notification);
         return this;
     }
 
@@ -27,12 +18,8 @@ export default class Subscription {
         return this;
     }
 
-    url() {
-        return this.id;
-    }
-
-    wsUrl() {
-        return topicUrlWs(this.baseUrl, this.topic);
+    getNotifications() {
+        return Array.from(this.notifications.values());
     }
 
     shortUrl() {

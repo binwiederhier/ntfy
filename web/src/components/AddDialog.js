@@ -9,7 +9,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import {useState} from "react";
 import Subscription from "../app/Subscription";
 
-const defaultBaseUrl = "https://ntfy.sh"
+const defaultBaseUrl = "http://127.0.0.1"
+//const defaultBaseUrl = "https://ntfy.sh"
 
 const AddDialog = (props) => {
     const [topic, setTopic] = useState("");

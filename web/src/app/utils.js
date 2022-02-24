@@ -1,5 +1,5 @@
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
-export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
+export const topicUrlWs = (baseUrl, topic, since) => `${topicUrl(baseUrl, topic)}/ws?since=${since}`
     .replaceAll("https://", "wss://")
     .replaceAll("http://", "ws://");
 export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/json`;

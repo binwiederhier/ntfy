@@ -101,7 +101,7 @@ const SubscriptionNavItem = (props) => {
 }
 
 const App = () => {
-    console.log("Launching App component");
+    console.log(`[App] Rendering main view`);
 
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
@@ -114,6 +114,7 @@ const App = () => {
         });
     };
     const handleSubscribeSubmit = (subscription) => {
+        console.log(`[App] New subscription: ${subscription.id}`);
         setSubscribeDialogOpen(false);
         setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
@@ -126,10 +127,11 @@ const App = () => {
             });
     };
     const handleSubscribeCancel = () => {
-        console.log(`Cancel clicked`);
+        console.log(`[App] Cancel clicked`);
         setSubscribeDialogOpen(false);
     };
     const handleUnsubscribe = (subscriptionId) => {
+        console.log(`[App] Unsubscribing from ${subscriptionId}`);
         setSubscriptions(prev => {
             const newSubscriptions = prev.remove(subscriptionId).clone();
             setSelectedSubscription(newSubscriptions.firstOrNull());
@@ -137,10 +139,10 @@ const App = () => {
         });
     };
     const handleSubscriptionClick = (subscriptionId) => {
-        console.log(`Selected subscription ${subscriptionId}`);
+        console.log(`[App] Selected ${subscriptionId}`);
         setSelectedSubscription(subscriptions.get(subscriptionId));
     };
-    const notifications = (selectedSubscription !== null) ? selectedSubscription.notifications : [];
+    const notifications = (selectedSubscription !== null) ? selectedSubscription.getNotifications() : [];
     const toggleDrawer = () => {
         setDrawerOpen(!drawerOpen);
     };

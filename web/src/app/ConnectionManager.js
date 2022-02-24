@@ -14,10 +14,12 @@ export class ConnectionManager {
         subscriptions.forEach((id, subscription) => {
             const added = !this.connections.get(id)
             if (added) {
-                const wsUrl = subscription.wsUrl();
-                const connection = new Connection(wsUrl, id, onNotification);
+                const baseUrl = subscription.baseUrl;
+                const topic = subscription.topic;
+                const since = 0;
+                const connection = new Connection(id, baseUrl, topic, since, onNotification);
                 this.connections.set(id, connection);
-                console.log(`[ConnectionManager] Starting new connection ${id} using URL ${wsUrl}`);
+                console.log(`[ConnectionManager] Starting new connection ${id}`);
                 connection.start();
             }
         });
@@ -27,7 +29,7 @@ export class ConnectionManager {
             console.log(`[ConnectionManager] Closing connection ${id}`);
             const connection = this.connections.get(id);
             this.connections.delete(id);
-            connection.cancel();
+            connection.close();
         });
     }
 }

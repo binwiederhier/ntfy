@@ -1,18 +1,31 @@
+import {shortTopicUrl, topicUrlWs} from "./utils";
+
+const retryBackoffSeconds = [5, 10, 15, 20, 30, 45, 60, 120];
+
 class Connection {
-    constructor(wsUrl, subscriptionId, onNotification) {
-        this.wsUrl = wsUrl;
+    constructor(subscriptionId, baseUrl, topic, since, onNotification) {
         this.subscriptionId = subscriptionId;
+        this.baseUrl = baseUrl;
+        this.topic = topic;
+        this.since = since;
+        this.shortUrl = shortTopicUrl(baseUrl, topic);
         this.onNotification = onNotification;
         this.ws = null;
+        this.retryCount = 0;
+        this.retryTimeout = null;
     }
 
     start() {
-        const socket = new WebSocket(this.wsUrl);
-        socket.onopen = (event) => {
-            console.log(`[Connection] [${this.subscriptionId}] Connection established`);
+        const since = (this.since === 0) ? "all" : this.since.toString();
+        const wsUrl = topicUrlWs(this.baseUrl, this.topic, since);
+        console.log(`[Connection, ${this.shortUrl}] Opening connection to ${wsUrl}`);
+        this.ws = new WebSocket(wsUrl);
+        this.ws.onopen = (event) => {
+            console.log(`[Connection, ${this.shortUrl}] Connection established`, event);
+            this.retryCount = 0;
         }
-        socket.onmessage = (event) => {
-            console.log(`[Connection] [${this.subscriptionId}] Message received from server: ${event.data}`);
+        this.ws.onmessage = (event) => {
+            console.log(`[Connection, ${this.shortUrl}] Message received from server: ${event.data}`);
             try {
                 const data = JSON.parse(event.data);
                 const relevantAndValid =
@@ -21,31 +34,43 @@ class Connection {
                     'time' in data &&
                     'message' in data;
                 if (!relevantAndValid) {
+                    console.log(`[Connection, ${this.shortUrl}] Message irrelevant or invalid. Ignoring.`);
                     return;
                 }
+                this.since = data.time;
                 this.onNotification(this.subscriptionId, data);
             } catch (e) {
-                console.log(`[Connection] [${this.subscriptionId}] Error handling message: ${e}`);
+                console.log(`[Connection, ${this.shortUrl}] Error handling message: ${e}`);
             }
         };
-        socket.onclose = (event) => {
+        this.ws.onclose = (event) => {
             if (event.wasClean) {
-                console.log(`[Connection] [${this.subscriptionId}] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                console.log(`[Connection, ${this.shortUrl}] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                this.ws = null;
             } else {
-                console.log(`[Connection] [${this.subscriptionId}] Connection died`);
+                const retrySeconds = retryBackoffSeconds[Math.min(this.retryCount, retryBackoffSeconds.length-1)];
+                this.retryCount++;
+                console.log(`[Connection, ${this.shortUrl}] Connection died, retrying in ${retrySeconds} seconds`);
+                this.retryTimeout = setTimeout(() => this.start(), retrySeconds * 1000);
             }
         };
-        socket.onerror = (event) => {
-            console.log(this.subscriptionId, `[Connection] [${this.subscriptionId}] ${event.message}`);
+        this.ws.onerror = (event) => {
+            console.log(`[Connection, ${this.shortUrl}] Error occurred: ${event}`, event);
         };
-        this.ws = socket;
     }
 
-    cancel() {
-        if (this.ws !== null) {
-            this.ws.close();
-            this.ws = null;
+    close() {
+        console.log(`[Connection, ${this.shortUrl}] Closing connection`);
+        const socket = this.ws;
+        const retryTimeout = this.retryTimeout;
+        if (socket !== null) {
+            socket.close();
         }
+        if (retryTimeout !== null) {
+            clearTimeout(retryTimeout);
+        }
+        this.retryTimeout = null;
+        this.ws = null;
     }
 }
 

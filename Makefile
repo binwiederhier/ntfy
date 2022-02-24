@@ -25,6 +25,7 @@ help:
 	@echo "  make build                       - Build"
 	@echo "  make build-snapshot              - Build snapshot"
 	@echo "  make build-simple                - Build (using go build, without goreleaser)"
+	@echo "  make build-simple-darwin         - Build (using go build, without goreleaser) on macOS systems"
 	@echo "  make clean                       - Clean build folder"
 	@echo
 	@echo "Releasing (requires goreleaser):"
@@ -113,6 +114,17 @@ build-simple: clean
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
 		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+
+build-simple-darwin: clean
+	mkdir -p dist/ntfy_linux_amd64 server/docs
+	touch server/docs/dummy
+	export CGO_ENABLED=1
+	go build \
+		-o dist/ntfy_linux_amd64/ntfy \
+		-tags sqlite_omit_load_extension,osusergo,netgo \
+		-ldflags \
+		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+
 
 clean: .PHONY
 	rm -rf dist build server/docs

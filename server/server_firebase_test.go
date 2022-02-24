@@ -32,6 +32,7 @@ func TestToFirebaseMessage_Keepalive(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
+	require.Nil(t, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":    m.ID,
 		"time":  fmt.Sprintf("%d", m.Time),
@@ -46,6 +47,7 @@ func TestToFirebaseMessage_Open(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
+	require.Nil(t, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":    m.ID,
 		"time":  fmt.Sprintf("%d", m.Time),
@@ -74,6 +76,17 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 	require.Equal(t, &messaging.AndroidConfig{
 		Priority: "high",
 	}, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				MutableContent: true,
+				Alert: &messaging.ApsAlert{
+					Title: "some title",
+					Body:  "this is a message",
+				},
+			},
+		},
+	}, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":                 m.ID,
 		"time":               fmt.Sprintf("%d", m.Time),
@@ -102,6 +115,7 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 	require.Equal(t, &messaging.AndroidConfig{
 		Priority: "high",
 	}, fbm.Android)
+	require.Nil(t, fbm.APNS)
 	require.Equal(t, "", fbm.Data["message"])
 	require.Equal(t, "", fbm.Data["priority"])
 	require.Equal(t, map[string]string{
@@ -128,6 +142,17 @@ func TestMaybeTruncateFCMMessage(t *testing.T) {
 		},
 		Android: &messaging.AndroidConfig{
 			Priority: "high",
+		},
+		APNS: &messaging.APNSConfig{
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					MutableContent: true,
+					Alert: &messaging.ApsAlert{
+						Title: "some title",
+						Body:  maybeTruncateAPNSBodyMessage(origMessage),
+					},
+				},
+			},
 		},
 	}
 	origMessageLength := len(origFCMMessage.Data["message"])

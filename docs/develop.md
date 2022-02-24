@@ -20,6 +20,7 @@ Build:
   make build                       - Build
   make build-snapshot              - Build snapshot
   make build-simple                - Build (using go build, without goreleaser)
+  make build-simple-darwin         - Build (using go build, without goreleaser) on macOS systems
   make clean                       - Clean build folder
 
 Releasing (requires goreleaser):

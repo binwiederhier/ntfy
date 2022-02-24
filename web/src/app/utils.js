@@ -1,3 +1,5 @@
+import { rawEmojis} from "./emojis";
+
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
     .replaceAll("https://", "wss://")
@@ -7,6 +9,46 @@ export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/jso
 export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const shortTopicUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
+
+// Format emojis (see emoji.js)
+const emojis = {};
+rawEmojis.forEach(emoji => {
+    emoji.aliases.forEach(alias => {
+        emojis[alias] = emoji.emoji;
+    });
+});
+
+const toEmojis = (tags) => {
+    if (!tags) return [];
+    else return tags.filter(tag => tag in emojis).map(tag => emojis[tag]);
+}
+
+export const formatTitle = (m) => {
+    const emojiList = toEmojis(m.tags);
+    if (emojiList.length > 0) {
+        return `${emojiList.join(" ")} ${m.title}`;
+    } else {
+        return m.title;
+    }
+};
+
+export const formatMessage = (m) => {
+    if (m.title) {
+        return m.message;
+    } else {
+        const emojiList = toEmojis(m.tags);
+        if (emojiList.length > 0) {
+            return `${emojiList.join(" ")} ${m.message}`;
+        } else {
+            return m.message;
+        }
+    }
+};
+
+export const unmatchedTags = (tags) => {
+    if (!tags) return [];
+    else return tags.filter(tag => !(tag in emojis));
+}
 
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 export async function* fetchLinesIterator(fileURL) {

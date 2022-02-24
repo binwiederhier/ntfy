@@ -1,29 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="initial-scale=1, width=device-width" />
-    <meta name="theme-color" content="#000000" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json">
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
+<head>
+  <meta charset="UTF-8">
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>My page</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
+  <title>ntfy.sh | Send push notifications to your phone via PUT/POST</title>
+
+  <!-- Mobile view -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="HandheldFriendly" content="true">
+
+  <!-- Mobile browsers, background color -->
+  <meta name="theme-color" content="#317f6f">
+  <meta name="msapplication-navbutton-color" content="#317f6f">
+  <meta name="apple-mobile-web-app-status-bar-style" content="#317f6f">
+
+  <!-- Favicon, see favicon.io -->
+  <link rel="icon" type="image/png" href="%PUBLIC_URL%/static/img/favicon.png">
+
+  <!-- Previews in Google, Slack, WhatsApp, etc. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="ntfy.sh" />
+  <meta property="og:title" content="ntfy.sh | Send push notifications to your phone or desktop via PUT/POST" />
+  <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
+  <meta property="og:image" content="/static/img/ntfy.png" />
+  <meta property="og:url" content="https://ntfy.sh" />
+
+  <!-- FIXME Never index topic page -->
+  <!-- <meta name="robots" content="noindex, nofollow" /> -->
+
+  <!-- FIXME Roboto -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+</head>
+<body>
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root"></div>
+</body>
 </html>

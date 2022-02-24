@@ -26,6 +26,11 @@ const DetailSettingsIcon = (props) => {
         setOpen(false);
     };
 
+    const handleClearAll = (event) => {
+        handleClose(event);
+        props.onClearAll(props.subscription.id);
+    };
+
     const handleUnsubscribe = (event) => {
         handleClose(event);
         props.onUnsubscribe(props.subscription.id);
@@ -97,6 +102,7 @@ const DetailSettingsIcon = (props) => {
                                     onKeyDown={handleListKeyDown}
                                 >
                                     <MenuItem onClick={handleSendTestMessage}>Send test notification</MenuItem>
+                                    <MenuItem onClick={handleClearAll}>Clear all notifications</MenuItem>
                                     <MenuItem onClick={handleUnsubscribe}>Unsubscribe</MenuItem>
                                 </MenuList>
                             </ClickAwayListener>

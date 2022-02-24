@@ -130,6 +130,13 @@ const App = () => {
         console.log(`[App] Cancel clicked`);
         setSubscribeDialogOpen(false);
     };
+    const handleClearAll = (subscriptionId) => {
+        console.log(`[App] Deleting all notifications from ${subscriptionId}`);
+        setSubscriptions(prev => {
+            const newSubscription = prev.get(subscriptionId).deleteAllNotifications();
+            return prev.update(newSubscription).clone();
+        });
+    };
     const handleUnsubscribe = (subscriptionId) => {
         console.log(`[App] Unsubscribing from ${subscriptionId}`);
         setSubscriptions(prev => {
@@ -179,6 +186,7 @@ const App = () => {
                         </Typography>
                         {selectedSubscription !== null && <DetailSettingsIcon
                             subscription={selectedSubscription}
+                            onClearAll={handleClearAll}
                             onUnsubscribe={handleUnsubscribe}
                         />}
                     </Toolbar>

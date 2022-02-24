@@ -1,4 +1,4 @@
-import {shortTopicUrl, topicUrlWs} from "./utils";
+import {shortTopicUrl, topicUrlWs, topicUrlWsWithSince} from "./utils";
 
 const retryBackoffSeconds = [5, 10, 15, 20, 30, 45, 60, 120];
 
@@ -16,8 +16,11 @@ class Connection {
     }
 
     start() {
-        const since = (this.since === 0) ? "all" : this.since.toString();
-        const wsUrl = topicUrlWs(this.baseUrl, this.topic, since);
+        // Don't fetch old messages; we do that as a poll() when adding a subscription;
+        // we don't want to re-trigger the main view re-render potentially hundreds of times.
+        const wsUrl = (this.since === 0)
+            ? topicUrlWs(this.baseUrl, this.topic)
+            : topicUrlWsWithSince(this.baseUrl, this.topic, this.since.toString());
         console.log(`[Connection, ${this.shortUrl}] Opening connection to ${wsUrl}`);
         this.ws = new WebSocket(wsUrl);
         this.ws.onopen = (event) => {

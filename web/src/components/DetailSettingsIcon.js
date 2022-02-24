@@ -8,7 +8,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import Api from "../app/Api";
+import api from "../app/Api";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
 const DetailSettingsIcon = (props) => {
@@ -28,13 +28,13 @@ const DetailSettingsIcon = (props) => {
 
     const handleUnsubscribe = (event) => {
         handleClose(event);
-        props.onUnsubscribe(props.subscription);
+        props.onUnsubscribe(props.subscription.id);
     };
 
     const handleSendTestMessage = () => {
         const baseUrl = props.subscription.baseUrl;
         const topic = props.subscription.topic;
-        Api.publish(baseUrl, topic, `This is a test notification sent by the ntfy.sh Web UI at ${new Date().toString()}.`); // FIXME result ignored
+        api.publish(baseUrl, topic, `This is a test notification sent by the ntfy.sh Web UI at ${new Date().toString()}.`); // FIXME result ignored
         setOpen(false);
     }
 

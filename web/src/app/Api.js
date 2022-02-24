@@ -1,7 +1,7 @@
 import {topicUrlJsonPoll, fetchLinesIterator, topicUrl} from "./utils";
 
 class Api {
-    static async poll(baseUrl, topic) {
+    async poll(baseUrl, topic) {
         const url = topicUrlJsonPoll(baseUrl, topic);
         const messages = [];
         console.log(`[Api] Polling ${url}`);
@@ -11,7 +11,7 @@ class Api {
         return messages.sort((a, b) => { return a.time < b.time ? 1 : -1; }); // Newest first
     }
 
-    static async publish(baseUrl, topic, message) {
+    async publish(baseUrl, topic, message) {
         const url = topicUrl(baseUrl, topic);
         console.log(`[Api] Publishing message to ${url}`);
         await fetch(url, {
@@ -21,4 +21,5 @@ class Api {
     }
 }
 
-export default Api;
+const api = new Api();
+export default api;

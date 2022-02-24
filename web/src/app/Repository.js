@@ -1,8 +1,10 @@
 import {topicUrl} from "./utils";
 import Subscription from "./Subscription";
 
-const LocalStorage = {
-    getSubscriptions() {
+export class Repository {
+    loadSubscriptions() {
+        console.log(`[Repository] Loading subscriptions from localStorage`);
+
         const subscriptions = {};
         const rawSubscriptions = localStorage.getItem('subscriptions');
         if (rawSubscriptions === null) {
@@ -20,8 +22,12 @@ const LocalStorage = {
             console.log("LocalStorage", `Unable to deserialize subscriptions: ${e.message}`)
             return {};
         }
-    },
+    }
+
     saveSubscriptions(subscriptions) {
+        return;
+        console.log(`[Repository] Saving subscriptions ${subscriptions} to localStorage`);
+
         const serializedSubscriptions = Object.keys(subscriptions).map(k => {
             const subscription = subscriptions[k];
             return {
@@ -32,6 +38,7 @@ const LocalStorage = {
         });
         localStorage.setItem('subscriptions', JSON.stringify(serializedSubscriptions));
     }
-};
+}
 
-export default LocalStorage;
+const repository = new Repository();
+export default repository;

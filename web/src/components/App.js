@@ -2,7 +2,6 @@ import * as React from 'react';
 import {useEffect, useState} from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import WsConnection from '../app/WsConnection';
 import {styled, ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import MuiDrawer from '@mui/material/Drawer';
@@ -23,8 +22,10 @@ import AddDialog from "./AddDialog";
 import NotificationList from "./NotificationList";
 import DetailSettingsIcon from "./DetailSettingsIcon";
 import theme from "./theme";
-import LocalStorage from "../app/Storage";
-import Api from "../app/Api";
+import api from "../app/Api";
+import repository from "../app/Repository";
+import connectionManager from "../app/ConnectionManager";
+import Subscriptions from "../app/Subscriptions";
 
 const drawerWidth = 240;
 
@@ -77,11 +78,11 @@ const SubscriptionNav = (props) => {
     const subscriptions = props.subscriptions;
     return (
         <>
-            {Object.keys(subscriptions).map(id =>
+            {subscriptions.map((id, subscription) =>
                 <SubscriptionNavItem
                     key={id}
-                    subscription={subscriptions[id]}
-                    selected={props.selectedSubscription === subscriptions[id]}
+                    subscription={subscription}
+                    selected={props.selectedSubscription && props.selectedSubscription.id === id}
                     onClick={() => props.handleSubscriptionClick(id)}
                 />)
             }
@@ -103,71 +104,49 @@ const App = () => {
     console.log("Launching App component");
 
     const [drawerOpen, setDrawerOpen] = useState(true);
-    const [subscriptions, setSubscriptions] = useState(LocalStorage.getSubscriptions());
-    const [connections, setConnections] = useState({});
+    const [subscriptions, setSubscriptions] = useState(new Subscriptions());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
-    const subscriptionChanged = (subscription) => {
-        setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
+    const handleNotification = (subscriptionId, notification) => {
+        setSubscriptions(prev => {
+            const newSubscription = prev.get(subscriptionId).addNotification(notification);
+            return prev.update(newSubscription).clone();
+        });
     };
     const handleSubscribeSubmit = (subscription) => {
-        const connection = new WsConnection(subscription, subscriptionChanged);
         setSubscribeDialogOpen(false);
-        setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
-        setConnections(prev => ({...prev, [subscription.id]: connection}));
+        setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
-        Api.poll(subscription.baseUrl, subscription.topic)
+        api.poll(subscription.baseUrl, subscription.topic)
             .then(messages => {
-                messages.forEach(m => subscription.addNotification(m));
-                setSubscriptions(prev => ({...prev, [subscription.id]: subscription}));
+                setSubscriptions(prev => {
+                    const newSubscription = prev.get(subscription.id).addNotifications(messages);
+                    return prev.update(newSubscription).clone();
+                });
             });
-        connection.start();
     };
     const handleSubscribeCancel = () => {
         console.log(`Cancel clicked`);
         setSubscribeDialogOpen(false);
     };
-    const handleUnsubscribe = (subscription) => {
+    const handleUnsubscribe = (subscriptionId) => {
         setSubscriptions(prev => {
-            const newSubscriptions = {...prev};
-            delete newSubscriptions[subscription.id];
-            const newSubscriptionValues = Object.values(newSubscriptions);
-            if (newSubscriptionValues.length > 0) {
-                setSelectedSubscription(newSubscriptionValues[0]);
-            } else {
-                setSelectedSubscription(null);
-            }
+            const newSubscriptions = prev.remove(subscriptionId).clone();
+            setSelectedSubscription(newSubscriptions.firstOrNull());
             return newSubscriptions;
         });
     };
     const handleSubscriptionClick = (subscriptionId) => {
         console.log(`Selected subscription ${subscriptionId}`);
-        setSelectedSubscription(subscriptions[subscriptionId]);
+        setSelectedSubscription(subscriptions.get(subscriptionId));
     };
     const notifications = (selectedSubscription !== null) ? selectedSubscription.notifications : [];
     const toggleDrawer = () => {
         setDrawerOpen(!drawerOpen);
     };
     useEffect(() => {
-        console.log("Starting connections");
-        Object.keys(subscriptions).forEach(topicUrl => {
-            console.log(`Starting connection for ${topicUrl}`);
-            const subscription = subscriptions[topicUrl];
-            const connection = new WsConnection(subscription, subscriptionChanged);
-            connection.start();
-        });
-        return () => {
-            console.log("Stopping connections");
-            Object.keys(connections).forEach(topicUrl => {
-                console.log(`Stopping connection for ${topicUrl}`);
-                const connection = connections[topicUrl];
-                connection.cancel();
-            });
-        };
-    }, [/* only on initial render */]);
-    useEffect(() => {
-        console.log(`Saving subscriptions`);
-        LocalStorage.saveSubscriptions(subscriptions);
+        connectionManager.refresh(subscriptions, handleNotification);
+        repository.saveSubscriptions(subscriptions);
     }, [subscriptions]);
     return (
         <ThemeProvider theme={theme}>

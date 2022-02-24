@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	fcmMessageLimit = 4000
+	fcmMessageLimit         = 4000
 	fcmApnsBodyMessageLimit = 100
 )
 

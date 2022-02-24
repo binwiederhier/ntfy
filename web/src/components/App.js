@@ -154,6 +154,9 @@ const App = () => {
         setDrawerOpen(!drawerOpen);
     };
     useEffect(() => {
+        setSubscriptions(repository.loadSubscriptions());
+    }, [/* initial render only */]);
+    useEffect(() => {
         connectionManager.refresh(subscriptions, handleNotification);
         repository.saveSubscriptions(subscriptions);
     }, [subscriptions]);

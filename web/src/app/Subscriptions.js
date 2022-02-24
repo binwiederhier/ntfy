@@ -42,6 +42,10 @@ class Subscriptions {
         return first;
     }
 
+    size() {
+        return this.subscriptions.size;
+    }
+
     clone() {
         const c = new Subscriptions();
         c.subscriptions = new Map(this.subscriptions);

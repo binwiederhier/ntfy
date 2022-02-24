@@ -8,7 +8,7 @@ class Api {
         for await (let line of fetchLinesIterator(url)) {
             messages.push(JSON.parse(line));
         }
-        return messages.sort((a, b) => { return a.time < b.time ? 1 : -1; }); // Newest first
+        return messages;
     }
 
     async publish(baseUrl, topic, message) {

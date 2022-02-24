@@ -6,14 +6,15 @@ export default class Subscription {
         this.baseUrl = baseUrl;
         this.topic = topic;
         this.notifications = new Map(); // notification ID -> notification object
-        this.deleted = new Set(); // notification IDs
+        this.last = 0;
     }
 
     addNotification(notification) {
-        if (this.notifications.has(notification.id) || this.deleted.has(notification.id)) {
+        if (this.notifications.has(notification.id) || notification.time < this.last) {
             return this;
         }
         this.notifications.set(notification.id, notification);
+        this.last = notification.time;
         return this;
     }
 
@@ -24,14 +25,11 @@ export default class Subscription {
 
     deleteNotification(notificationId) {
         this.notifications.delete(notificationId);
-        this.deleted.add(notificationId);
         return this;
     }
 
     deleteAllNotifications() {
-        console.log(this.notifications);
         for (const [id] of this.notifications) {
-            console.log(`delete ${id}`);
             this.deleteNotification(id);
         }
         return this;

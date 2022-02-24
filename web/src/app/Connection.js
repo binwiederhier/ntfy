@@ -40,7 +40,7 @@ class Connection {
                     console.log(`[Connection, ${this.shortUrl}] Message irrelevant or invalid. Ignoring.`);
                     return;
                 }
-                this.since = data.time;
+                this.since = data.time + 1; // Sigh. This works because on reconnect, we wait 5+ seconds anyway.
                 this.onNotification(this.subscriptionId, data);
             } catch (e) {
                 console.log(`[Connection, ${this.shortUrl}] Error handling message: ${e}`);

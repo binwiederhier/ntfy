@@ -20,7 +20,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import AddDialog from "./AddDialog";
 import NotificationList from "./NotificationList";
-import DetailSettingsIcon from "./DetailSettingsIcon";
+import SubscriptionSettings from "./SubscriptionSettings";
 import theme from "./theme";
 import api from "../app/Api";
 import repository from "../app/Repository";
@@ -184,7 +184,7 @@ const App = () => {
                         >
                             {(selectedSubscription !== null) ? selectedSubscription.shortUrl() : "ntfy"}
                         </Typography>
-                        {selectedSubscription !== null && <DetailSettingsIcon
+                        {selectedSubscription !== null && <SubscriptionSettings
                             subscription={selectedSubscription}
                             onClearAll={handleClearAll}
                             onUnsubscribe={handleUnsubscribe}

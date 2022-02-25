@@ -10,8 +10,7 @@ class Subscriptions {
 
     get(subscriptionId) {
         const subscription = this.subscriptions.get(subscriptionId);
-        if (subscription === undefined) return null;
-        return subscription;
+        return (subscription) ? subscription : null;
     }
 
     update(subscription) {
@@ -38,8 +37,7 @@ class Subscriptions {
 
     firstOrNull() {
         const first = this.subscriptions.values().next().value;
-        if (first === undefined) return null;
-        return first;
+        return (first) ? first : null;
     }
 
     size() {

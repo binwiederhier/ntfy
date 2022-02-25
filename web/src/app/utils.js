@@ -7,6 +7,7 @@ export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
 export const topicUrlWsWithSince = (baseUrl, topic, since) => `${topicUrlWs(baseUrl, topic)}?since=${since}`;
 export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/json`;
 export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
+export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const shortTopicUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 

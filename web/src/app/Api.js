@@ -1,4 +1,4 @@
-import {topicUrlJsonPoll, fetchLinesIterator, topicUrl} from "./utils";
+import {topicUrlJsonPoll, fetchLinesIterator, topicUrl, topicUrlAuth} from "./utils";
 
 class Api {
     async poll(baseUrl, topic) {
@@ -18,6 +18,20 @@ class Api {
             method: 'PUT',
             body: message
         });
+    }
+
+    async auth(baseUrl, topic, user) {
+        const url = topicUrlAuth(baseUrl, topic);
+        console.log(`[Api] Checking auth for ${url}`);
+        const response = await fetch(url);
+        if (response.status >= 200 && response.status <= 299) {
+            return true;
+        } else if (!user && response.status === 404) {
+            return true; // Special case: Anonymous login to old servers return 404 since /<topic>/auth doesn't exist
+        } else if (response.status === 401 || response.status === 403) { // See server/server.go
+            return false;
+        }
+        throw new Error(`Unexpected server response ${response.status}`);
     }
 }
 

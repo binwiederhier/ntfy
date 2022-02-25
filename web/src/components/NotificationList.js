@@ -1,17 +1,26 @@
 import Container from "@mui/material/Container";
-import {CardContent, Stack} from "@mui/material";
+import {CardContent, CardHeader, Stack} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {formatTitle, formatMessage, unmatchedTags} from "../app/utils";
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from '@mui/icons-material/Close';
 
 const NotificationList = (props) => {
-    const sortedNotifications = props.notifications.sort((a, b) => a.time < b.time);
+    const subscription = props.subscription;
+    const sortedNotifications = subscription.getNotifications()
+        .sort((a, b) => a.time < b.time);
     return (
         <Container maxWidth="lg" sx={{ marginTop: 3, marginBottom: 3 }}>
             <Stack spacing={3}>
                 {sortedNotifications.map(notification =>
-                    <NotificationItem key={notification.id} notification={notification}/>)}
+                    <NotificationItem
+                        key={notification.id}
+                        subscriptionId={subscription.id}
+                        notification={notification}
+                        onDelete={(notificationId) => props.onDeleteNotification(subscription.id, notificationId)}
+                    />)}
             </Stack>
         </Container>
     );
@@ -26,6 +35,9 @@ const NotificationItem = (props) => {
     return (
         <Card sx={{ minWidth: 275 }}>
             <CardContent>
+                <IconButton onClick={() => props.onDelete(notification.id)} sx={{ float: 'right', marginRight: -1, marginTop: -1 }}>
+                    <CloseIcon />
+                </IconButton>
                 <Typography sx={{ fontSize: 14 }} color="text.secondary">
                     {date}
                     {[1,2,4,5].includes(notification.priority) &&

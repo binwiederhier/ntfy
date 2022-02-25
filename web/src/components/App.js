@@ -181,7 +181,14 @@ const App = () => {
                 });
             });
     };
-    const handleClearAll = (subscriptionId) => {
+    const handleDeleteNotification = (subscriptionId, notificationId) => {
+        console.log(`[App] Deleting notification ${notificationId} from ${subscriptionId}`);
+        setSubscriptions(prev => {
+            const newSubscription = prev.get(subscriptionId).deleteNotification(notificationId);
+            return prev.update(newSubscription).clone();
+        });
+    };
+    const handleDeleteAllNotifications = (subscriptionId) => {
         console.log(`[App] Deleting all notifications from ${subscriptionId}`);
         setSubscriptions(prev => {
             const newSubscription = prev.get(subscriptionId).deleteAllNotifications();
@@ -196,7 +203,6 @@ const App = () => {
             return newSubscriptions;
         });
     };
-    const notifications = (selectedSubscription !== null) ? selectedSubscription.getNotifications() : [];
     useEffect(() => {
         setSubscriptions(repository.loadSubscriptions());
     }, [/* initial render only */]);
@@ -212,7 +218,7 @@ const App = () => {
                 <CssBaseline/>
                 <ActionBar
                     selectedSubscription={selectedSubscription}
-                    onClearAll={handleClearAll}
+                    onClearAll={handleDeleteAllNotifications}
                     onUnsubscribe={handleUnsubscribe}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
                 />
@@ -237,7 +243,11 @@ const App = () => {
                         backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
                 }}>
                     <Toolbar/>
-                    <NotificationList notifications={notifications}/>
+                    {selectedSubscription !== null &&
+                        <NotificationList
+                            subscription={selectedSubscription}
+                            onDeleteNotification={handleDeleteNotification}
+                        />}
                 </Box>
             </Box>
         </ThemeProvider>

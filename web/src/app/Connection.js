@@ -1,6 +1,6 @@
 import {shortTopicUrl, topicUrlWs, topicUrlWsWithSince} from "./utils";
 
-const retryBackoffSeconds = [5, 10, 15, 20, 30, 45, 60, 120];
+const retryBackoffSeconds = [5, 10, 15, 20, 30, 45];
 
 class Connection {
     constructor(subscriptionId, baseUrl, topic, since, onNotification) {

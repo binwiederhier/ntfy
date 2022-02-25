@@ -23,7 +23,10 @@ class Api {
     async auth(baseUrl, topic, user) {
         const url = topicUrlAuth(baseUrl, topic);
         console.log(`[Api] Checking auth for ${url}`);
-        const response = await fetch(url);
+        const headers = this.maybeAddAuthorization({}, user);
+        const response = await fetch(url, {
+            headers: headers
+        });
         if (response.status >= 200 && response.status <= 299) {
             return true;
         } else if (!user && response.status === 404) {
@@ -32,6 +35,14 @@ class Api {
             return false;
         }
         throw new Error(`Unexpected server response ${response.status}`);
+    }
+
+    maybeAddAuthorization(headers, user) {
+        if (user) {
+            const encoded = new Buffer(`${user.username}:${user.password}`).toString('base64');
+            headers['Authorization'] = `Basic ${encoded}`;
+        }
+        return headers;
     }
 }
 

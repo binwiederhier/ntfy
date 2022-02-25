@@ -12,6 +12,7 @@
     "@emotion/styled": "latest",
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "latest",
+    "@mui/styles": "^5.4.2",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "^6.2.1",

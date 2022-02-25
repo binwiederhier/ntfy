@@ -12,6 +12,7 @@ import {useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl} from "../app/utils";
+import useStyles from "./styles";
 
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
@@ -19,6 +20,7 @@ const defaultBaseUrl = "http://127.0.0.1"
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState(defaultBaseUrl); // FIXME
     const [topic, setTopic] = useState("");
+    const [user, setUser] = useState(null);
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleCancel = () => {
@@ -45,8 +47,10 @@ const SubscribeDialog = (props) => {
                 onSubmit={handleSubmit}
             />}
             {showLoginPage && <LoginPage
+                baseUrl={baseUrl}
                 topic={topic}
                 onBack={() => setShowLoginPage(false)}
+                onSubmit={handleSubmit}
             />}
         </Dialog>
     );
@@ -82,6 +86,22 @@ const SubscribePage = (props) => {
 };
 
 const LoginPage = (props) => {
+    const styles = useStyles();
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [errorText, setErrorText] = useState("");
+    const baseUrl = props.baseUrl;
+    const topic = props.topic;
+    const handleLogin = async () => {
+        const user = {username: username, password: password};
+        const success = await api.auth(baseUrl, topic, user);
+        if (!success) {
+            console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
+            setErrorText(`User ${username} not authorized`);
+            return;
+        }
+        console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} successful for user ${username}`);
+    };
     return (
         <>
             <DialogTitle>Login required</DialogTitle>
@@ -95,6 +115,8 @@ const LoginPage = (props) => {
                     margin="dense"
                     id="username"
                     label="Username, e.g. phil"
+                    value={username}
+                    onChange={ev => setUsername(ev.target.value)}
                     type="text"
                     fullWidth
                     variant="standard"
@@ -104,14 +126,21 @@ const LoginPage = (props) => {
                     id="password"
                     label="Password"
                     type="password"
+                    value={password}
+                    onChange={ev => setPassword(ev.target.value)}
                     fullWidth
                     variant="standard"
                 />
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.onBack}>Back</Button>
-                <Button>Login</Button>
-            </DialogActions>
+            <div className={styles.bottomBar}>
+                <DialogContentText className={styles.statusText}>
+                    {errorText}
+                </DialogContentText>
+                <DialogActions>
+                    <Button onClick={props.onBack}>Back</Button>
+                    <Button onClick={handleLogin}>Login</Button>
+                </DialogActions>
+            </div>
         </>
     );
 };

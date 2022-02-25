@@ -860,8 +860,9 @@ func parseSince(r *http.Request, poll bool) (sinceTime, error) {
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
+	w.Header().Set("Access-Control-Allow-Origin", "*")              // CORS, allow cross-origin requests
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization") // CORS, allow auth
 	return nil
 }
 

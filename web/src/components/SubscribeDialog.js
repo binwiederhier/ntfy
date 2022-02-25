@@ -12,7 +12,7 @@ import Subscription from "../app/Subscription";
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
 
-const AddDialog = (props) => {
+const SubscribeDialog = (props) => {
     const [topic, setTopic] = useState("");
     const handleCancel = () => {
         setTopic('');
@@ -53,4 +53,4 @@ const AddDialog = (props) => {
     );
 };
 
-export default AddDialog;
+export default SubscribeDialog;

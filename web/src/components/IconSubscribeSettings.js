@@ -11,7 +11,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import api from "../app/Api";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
-const SubscriptionSettings = (props) => {
+const IconSubscribeSettings = (props) => {
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
 
@@ -114,4 +114,4 @@ const SubscriptionSettings = (props) => {
     );
 }
 
-export default SubscriptionSettings;
+export default IconSubscribeSettings;

@@ -2,25 +2,24 @@ import * as React from 'react';
 import {useEffect, useState} from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import {styled, ThemeProvider} from '@mui/material/styles';
+import {ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import MuiDrawer from '@mui/material/Drawer';
-import MuiAppBar from '@mui/material/AppBar';
+import Drawer from '@mui/material/Drawer';
+import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import List from '@mui/material/List';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import MenuIcon from '@mui/icons-material/Menu';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemButton from "@mui/material/ListItemButton";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
-import AddDialog from "./AddDialog";
+import SubscribeDialog from "./SubscribeDialog";
 import NotificationList from "./NotificationList";
-import SubscriptionSettings from "./SubscriptionSettings";
+import IconSubscribeSettings from "./IconSubscribeSettings";
 import theme from "./theme";
 import api from "../app/Api";
 import repository from "../app/Repository";
@@ -29,68 +28,23 @@ import Subscriptions from "../app/Subscriptions";
 
 const drawerWidth = 240;
 
-const AppBar = styled(MuiAppBar, {
-    shouldForwardProp: (prop) => prop !== 'open',
-})(({ theme, open }) => ({
-    zIndex: theme.zIndex.drawer + 1,
-    transition: theme.transitions.create(['width', 'margin'], {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
-    }),
-    ...(open && {
-        marginLeft: drawerWidth,
-        width: `calc(100% - ${drawerWidth}px)`,
-        transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-        }),
-    }),
-}));
-
-const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
-    ({ theme, open }) => ({
-        '& .MuiDrawer-paper': {
-            position: 'relative',
-            whiteSpace: 'nowrap',
-            width: drawerWidth,
-            transition: theme.transitions.create('width', {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-            }),
-            boxSizing: 'border-box',
-            ...(!open && {
-                overflowX: 'hidden',
-                transition: theme.transitions.create('width', {
-                    easing: theme.transitions.easing.sharp,
-                    duration: theme.transitions.duration.leavingScreen,
-                }),
-                width: theme.spacing(7),
-                [theme.breakpoints.up('sm')]: {
-                    width: theme.spacing(9),
-                },
-            }),
-        },
-    }),
-);
-
-
-const SubscriptionNav = (props) => {
+const NavSubscriptionList = (props) => {
     const subscriptions = props.subscriptions;
     return (
         <>
             {subscriptions.map((id, subscription) =>
-                <SubscriptionNavItem
+                <NavSubscriptionItem
                     key={id}
                     subscription={subscription}
                     selected={props.selectedSubscription && props.selectedSubscription.id === id}
-                    onClick={() => props.handleSubscriptionClick(id)}
+                    onClick={() => props.onSubscriptionClick(id)}
                 />)
             }
         </>
     );
 }
 
-const SubscriptionNavItem = (props) => {
+const NavSubscriptionItem = (props) => {
     const subscription = props.subscription;
     return (
         <ListItemButton onClick={props.onClick} selected={props.selected}>
@@ -100,13 +54,115 @@ const SubscriptionNavItem = (props) => {
     );
 }
 
+const NavList = (props) => {
+    const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+    const handleSubscribeSubmit = (subscription) => {
+        setSubscribeDialogOpen(false);
+        props.onSubscribeSubmit(subscription);
+    }
+    return (
+        <>
+            <Toolbar />
+            <Divider />
+            <List component="nav">
+                <NavSubscriptionList
+                    subscriptions={props.subscriptions}
+                    selectedSubscription={props.selectedSubscription}
+                    onSubscriptionClick={props.onSubscriptionClick}
+                />
+                <Divider sx={{ my: 1 }} />
+                <ListItemButton>
+                    <ListItemIcon>
+                        <SettingsIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Settings" />
+                </ListItemButton>
+                <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+                    <ListItemIcon>
+                        <AddIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Add subscription" />
+                </ListItemButton>
+            </List>
+            <SubscribeDialog
+                open={subscribeDialogOpen}
+                onCancel={() => setSubscribeDialogOpen(false)}
+                onSubmit={handleSubscribeSubmit}
+            />
+        </>
+    );
+};
+
+const ActionBar = (props) => {
+    const title = (props.selectedSubscription !== null)
+        ? props.selectedSubscription.shortUrl()
+        : "ntfy";
+    return (
+        <AppBar position="fixed" sx={{ width: { sm: `calc(100% - ${drawerWidth}px)` }, ml: { sm: `${drawerWidth}px` } }}>
+            <Toolbar sx={{pr: '24px'}}>
+                <IconButton
+                    color="inherit"
+                    edge="start"
+                    onClick={props.onMobileDrawerToggle}
+                    sx={{ mr: 2, display: { sm: 'none' } }}
+                >
+                    <MenuIcon />
+                </IconButton>
+                <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>{title}</Typography>
+                {props.selectedSubscription !== null && <IconSubscribeSettings
+                    subscription={props.selectedSubscription}
+                    onClearAll={props.onClearAll}
+                    onUnsubscribe={props.onUnsubscribe}
+                />}
+            </Toolbar>
+        </AppBar>
+    );
+};
+
+const Sidebar = (props) => {
+    const navigationList =
+        <NavList
+            subscriptions={props.subscriptions}
+            selectedSubscription={props.selectedSubscription}
+            onSubscriptionClick={props.onSubscriptionClick}
+            onSubscribeSubmit={props.onSubscribeSubmit}
+        />;
+    return (
+        <>
+            {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
+            <Drawer
+                variant="temporary"
+                open={props.mobileDrawerOpen}
+                onClose={props.onMobileDrawerToggle}
+                ModalProps={{ keepMounted: true }} // Better open performance on mobile.
+                sx={{
+                    display: { xs: 'block', sm: 'none' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                }}
+            >
+                {navigationList}
+            </Drawer>
+            {/* Big screen drawer; persistent, shown if screen is big */}
+            <Drawer
+                open
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', sm: 'block' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                }}
+            >
+                {navigationList}
+            </Drawer>
+        </>
+    );
+};
+
 const App = () => {
     console.log(`[App] Rendering main view`);
 
-    const [drawerOpen, setDrawerOpen] = useState(true);
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
-    const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
     const handleNotification = (subscriptionId, notification) => {
         setSubscriptions(prev => {
             const newSubscription = prev.get(subscriptionId).addNotification(notification);
@@ -115,7 +171,6 @@ const App = () => {
     };
     const handleSubscribeSubmit = (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`);
-        setSubscribeDialogOpen(false);
         setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
         api.poll(subscription.baseUrl, subscription.topic)
@@ -125,10 +180,6 @@ const App = () => {
                     return prev.update(newSubscription).clone();
                 });
             });
-    };
-    const handleSubscribeCancel = () => {
-        console.log(`[App] Cancel clicked`);
-        setSubscribeDialogOpen(false);
     };
     const handleClearAll = (subscriptionId) => {
         console.log(`[App] Deleting all notifications from ${subscriptionId}`);
@@ -145,14 +196,7 @@ const App = () => {
             return newSubscriptions;
         });
     };
-    const handleSubscriptionClick = (subscriptionId) => {
-        console.log(`[App] Selected ${subscriptionId}`);
-        setSelectedSubscription(subscriptions.get(subscriptionId));
-    };
     const notifications = (selectedSubscription !== null) ? selectedSubscription.getNotifications() : [];
-    const toggleDrawer = () => {
-        setDrawerOpen(!drawerOpen);
-    };
     useEffect(() => {
         setSubscriptions(repository.loadSubscriptions());
     }, [/* initial render only */]);
@@ -160,96 +204,42 @@ const App = () => {
         connectionManager.refresh(subscriptions, handleNotification);
         repository.saveSubscriptions(subscriptions);
     }, [subscriptions]);
+
     return (
         <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Box sx={{ display: 'flex' }}>
-                <AppBar position="absolute" open={drawerOpen}>
-                    <Toolbar sx={{pr: '24px'}} color="primary">
-                        <IconButton
-                            edge="start"
-                            color="inherit"
-                            aria-label="open drawer"
-                            onClick={toggleDrawer}
-                            sx={{
-                                marginRight: '36px',
-                                ...(drawerOpen && { display: 'none' }),
-                            }}
-                        >
-                            <MenuIcon />
-                        </IconButton>
-                        <Typography
-                            component="h1"
-                            variant="h6"
-                            color="inherit"
-                            noWrap
-                            sx={{ flexGrow: 1 }}
-                        >
-                            {(selectedSubscription !== null) ? selectedSubscription.shortUrl() : "ntfy"}
-                        </Typography>
-                        {selectedSubscription !== null && <SubscriptionSettings
-                            subscription={selectedSubscription}
-                            onClearAll={handleClearAll}
-                            onUnsubscribe={handleUnsubscribe}
-                        />}
-                    </Toolbar>
-                </AppBar>
-                <Drawer variant="permanent" open={drawerOpen}>
-                    <Toolbar
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                            px: [1],
-                        }}
-                    >
-                        <IconButton onClick={toggleDrawer}>
-                            <ChevronLeftIcon />
-                        </IconButton>
-                    </Toolbar>
-                    <Divider />
-                    <List component="nav">
-                        <SubscriptionNav
-                            subscriptions={subscriptions}
-                            selectedSubscription={selectedSubscription}
-                            handleSubscriptionClick={handleSubscriptionClick}
-                        />
-                        <Divider sx={{ my: 1 }} />
-                        <ListItemButton>
-                            <ListItemIcon>
-                                <SettingsIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Settings" />
-                        </ListItemButton>
-                        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
-                            <ListItemIcon>
-                                <AddIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Add subscription" />
-                        </ListItemButton>
-                    </List>
-                </Drawer>
+            <CssBaseline/>
+            <Box sx={{display: 'flex'}}>
+                <CssBaseline/>
+                <ActionBar
+                    selectedSubscription={selectedSubscription}
+                    onClearAll={handleClearAll}
+                    onUnsubscribe={handleUnsubscribe}
+                    onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+                />
+                <Box component="nav" sx={{width: {sm: drawerWidth}, flexShrink: {sm: 0}}}>
+                    <Sidebar
+                        subscriptions={subscriptions}
+                        selectedSubscription={selectedSubscription}
+                        mobileDrawerOpen={mobileDrawerOpen}
+                        onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+                        onSubscriptionClick={(subscriptionId) => setSelectedSubscription(subscriptions.get(subscriptionId))}
+                        onSubscribeSubmit={handleSubscribeSubmit}
+                    />
+                </Box>
                 <Box
                     component="main"
                     sx={{
-                        backgroundColor: (theme) =>
-                            theme.palette.mode === 'light'
-                                ? theme.palette.grey[100]
-                                : theme.palette.grey[900],
                         flexGrow: 1,
+                        p: 3,
+                        width: {sm: `calc(100% - ${drawerWidth}px)`},
                         height: '100vh',
                         overflow: 'auto',
-                    }}
-                >
-                    <Toolbar />
+                        backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
+                }}>
+                    <Toolbar/>
                     <NotificationList notifications={notifications}/>
                 </Box>
             </Box>
-            <AddDialog
-                open={subscribeDialogOpen}
-                onCancel={handleSubscribeCancel}
-                onSubmit={handleSubscribeSubmit}
-            />
         </ThemeProvider>
     );
 }

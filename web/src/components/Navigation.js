@@ -65,7 +65,9 @@ const NavList = (props) => {
     const showGrantPermissionsBox = props.subscriptions.size() > 0 && !props.notificationsGranted;
     return (
         <>
-            <Toolbar/>
+            <Toolbar sx={{
+                display: { xs: 'none', sm: 'block' }
+            }}/>
             <List component="nav" sx={{
                 paddingTop: (showGrantPermissionsBox) ? '0' : ''
             }}>

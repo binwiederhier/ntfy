@@ -14,7 +14,7 @@ const ActionBar = (props) => {
     return (
         <AppBar position="fixed" sx={{
             width: '100%',
-            zIndex: { sm: 2000 }, // > Navigation
+            zIndex: { sm: 1250 }, // > Navigation (1200), but < Dialog (1300)
             ml: { sm: `${Navigation.width}px` }
         }}>
             <Toolbar sx={{pr: '24px'}}>

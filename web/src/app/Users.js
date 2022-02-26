@@ -1,5 +1,6 @@
 class Users {
     constructor() {
+        this.loaded = false; // FIXME I hate this
         this.users = new Map();
     }
 
@@ -28,6 +29,7 @@ class Users {
 
     clone() {
         const c = new Users();
+        c.loaded = this.loaded;
         c.users = new Map(this.users);
         return c;
     }

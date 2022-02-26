@@ -1,4 +1,5 @@
 import * as React from 'react';
+import {useState} from 'react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
@@ -6,12 +7,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {useState} from "react";
 import Subscription from "../app/Subscription";
 import {useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
-import {topicUrl} from "../app/utils";
+import {topicUrl, validTopic} from "../app/utils";
 import useStyles from "./styles";
 import User from "../app/User";
 
@@ -23,14 +23,9 @@ const SubscribeDialog = (props) => {
     const [topic, setTopic] = useState("");
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const handleCancel = () => {
-        setTopic('');
-        props.onCancel();
-    }
     const handleSuccess = (baseUrl, topic, user) => {
         const subscription = new Subscription(baseUrl, topic);
         props.onSuccess(subscription, user);
-        setTopic('');
     }
     return (
         <Dialog open={props.open} onClose={props.onClose} fullScreen={fullScreen}>
@@ -38,7 +33,8 @@ const SubscribeDialog = (props) => {
                 baseUrl={baseUrl}
                 topic={topic}
                 setTopic={setTopic}
-                onCancel={handleCancel}
+                subscriptions={props.subscriptions}
+                onCancel={props.onCancel}
                 onNeedsLogin={() => setShowLoginPage(true)}
                 onSuccess={handleSuccess}
             />}
@@ -65,6 +61,8 @@ const SubscribePage = (props) => {
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for anonymous user`);
         props.onSuccess(baseUrl, topic, null);
     };
+    const existingTopicUrls = props.subscriptions.map((id, s) => s.url());
+    const subscribeButtonEnabled = validTopic(props.topic) && !existingTopicUrls.includes(topicUrl(baseUrl, topic));
     return (
         <>
             <DialogTitle>Subscribe to topic</DialogTitle>
@@ -87,7 +85,7 @@ const SubscribePage = (props) => {
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onCancel}>Cancel</Button>
-                <Button onClick={handleSubscribe} disabled={props.topic === ""}>Subscribe</Button>
+                <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>Subscribe</Button>
             </DialogActions>
         </>
     );

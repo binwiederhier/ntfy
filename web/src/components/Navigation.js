@@ -111,6 +111,7 @@ const NavList = (props) => {
             <SubscribeDialog
                 key={subscribeDialogKey} // Resets dialog when canceled/closed
                 open={subscribeDialogOpen}
+                subscriptions={props.subscriptions}
                 onCancel={handleSubscribeReset}
                 onSuccess={handleSubscribeSubmit}
             />

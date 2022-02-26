@@ -1,9 +1,9 @@
-import {formatMessage, formatTitle} from "./utils";
+import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
 
 class NotificationManager {
     notify(subscription, notification, onClickFallback) {
         const message = formatMessage(notification);
-        const title = formatTitle(notification);
+        const title = formatTitleWithFallback(notification, topicShortUrl(subscription.baseUrl, subscription.topic));
         const n = new Notification(title, {
             body: message,
             icon: '/static/img/favicon.png'

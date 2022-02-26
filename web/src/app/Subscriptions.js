@@ -1,5 +1,6 @@
 class Subscriptions {
     constructor() {
+        this.loaded = false; // FIXME I hate this
         this.subscriptions = new Map();
     }
 
@@ -46,6 +47,7 @@ class Subscriptions {
 
     clone() {
         const c = new Subscriptions();
+        c.loaded = this.loaded;
         c.subscriptions = new Map(this.subscriptions);
         return c;
     }

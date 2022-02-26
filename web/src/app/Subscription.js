@@ -11,11 +11,11 @@ class Subscription {
 
     addNotification(notification) {
         if (this.notifications.has(notification.id) || notification.time < this.last) {
-            return this;
+            return false;
         }
         this.notifications.set(notification.id, notification);
         this.last = notification.time;
-        return this;
+        return true;
     }
 
     addNotifications(notifications) {
@@ -37,6 +37,10 @@ class Subscription {
 
     getNotifications() {
         return Array.from(this.notifications.values());
+    }
+
+    url() {
+        return topicUrl(this.baseUrl, this.topic);
     }
 
     shortUrl() {

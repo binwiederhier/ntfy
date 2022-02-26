@@ -1,12 +1,24 @@
-import {topicUrlJsonPoll, fetchLinesIterator, topicUrl, topicUrlAuth, maybeWithBasicAuth} from "./utils";
+import {
+    topicUrlJsonPoll,
+    fetchLinesIterator,
+    topicUrl,
+    topicUrlAuth,
+    maybeWithBasicAuth,
+    topicShortUrl,
+    topicUrlJsonPollWithSince
+} from "./utils";
 
 class Api {
-    async poll(baseUrl, topic, user) {
-        const url = topicUrlJsonPoll(baseUrl, topic);
+    async poll(baseUrl, topic, since, user) {
+        const shortUrl = topicShortUrl(baseUrl, topic);
+        const url = (since > 1) // FIXME Ahh, this is >1, because we do +1 when we call this .....
+            ? topicUrlJsonPollWithSince(baseUrl, topic, since)
+            : topicUrlJsonPoll(baseUrl, topic);
         const messages = [];
         const headers = maybeWithBasicAuth({}, user);
         console.log(`[Api] Polling ${url}`);
         for await (let line of fetchLinesIterator(url, headers)) {
+            console.log(`[Api, ${shortUrl}] Received message ${line}`);
             messages.push(JSON.parse(line));
         }
         return messages;

@@ -6,9 +6,14 @@ export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
     .replaceAll("http://", "ws://");
 export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/json`;
 export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
+export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
+
+export const validTopic = (topic) => {
+    return topic.match(/^([-_a-zA-Z0-9]{1,64})$/) // Regex must match Go & Android app!
+}
 
 // Format emojis (see emoji.js)
 const emojis = {};
@@ -22,6 +27,14 @@ const toEmojis = (tags) => {
     if (!tags) return [];
     else return tags.filter(tag => tag in emojis).map(tag => emojis[tag]);
 }
+
+
+export const formatTitleWithFallback = (m, fallback) => {
+    if (m.title) {
+        return formatTitle(m);
+    }
+    return fallback;
+};
 
 export const formatTitle = (m) => {
     const emojiList = toEmojis(m.tags);

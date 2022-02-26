@@ -23,15 +23,6 @@ const App = () => {
     const [users, setUsers] = useState(new Users());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
-    const handleNotification = (subscriptionId, notification) => {
-        setSubscriptions(prev => {
-            const newSubscription = prev.get(subscriptionId).addNotification(notification);
-            notificationManager.notify(newSubscription, notification, () => {
-                setSelectedSubscription(newSubscription);
-            })
-            return prev.update(newSubscription).clone();
-        });
-    };
     const handleSubscribeSubmit = (subscription, user) => {
         console.log(`[App] New subscription: ${subscription.id}`);
         if (user !== null) {
@@ -39,13 +30,7 @@ const App = () => {
         }
         setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
-        api.poll(subscription.baseUrl, subscription.topic, user)
-            .then(messages => {
-                setSubscriptions(prev => {
-                    const newSubscription = prev.get(subscription.id).addNotifications(messages);
-                    return prev.update(newSubscription).clone();
-                });
-            });
+        poll(subscription, user);
         handleRequestPermission();
     };
     const handleDeleteNotification = (subscriptionId, notificationId) => {
@@ -75,15 +60,48 @@ const App = () => {
             setNotificationsGranted(granted);
         })
     };
+    const poll = (subscription, user) => {
+        const since = subscription.last + 1; // FIXME, sigh ...
+        api.poll(subscription.baseUrl, subscription.topic, since, user)
+            .then(notifications => {
+                setSubscriptions(prev => {
+                    subscription.addNotifications(notifications);
+                    return prev.update(subscription).clone();
+                });
+            });
+    };
+
+    // Define hooks: Note that the order of the hooks is important. The "loading" hooks
+    // must be before the "saving" hooks.
     useEffect(() => {
-        setSubscriptions(repository.loadSubscriptions());
-        setUsers(repository.loadUsers());
-    }, [/* initial render only */]);
+        // Load subscriptions and users
+        const subscriptions = repository.loadSubscriptions();
+        const users = repository.loadUsers();
+        setSubscriptions(subscriptions);
+        setUsers(users);
+
+        // Poll all subscriptions
+        subscriptions.forEach((subscriptionId, subscription) => {
+            const user = users.get(subscription.baseUrl); // May be null
+            poll(subscription, user);
+        });
+    }, [/* initial render */]);
     useEffect(() => {
+        const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
+        const handleNotification = (subscriptionId, notification) => {
+            setSubscriptions(prev => {
+                const subscription = prev.get(subscriptionId);
+                if (subscription.addNotification(notification)) {
+                    notificationManager.notify(subscription, notification, notificationClickFallback)
+                }
+                return prev.update(subscription).clone();
+            });
+        };
         connectionManager.refresh(subscriptions, users, handleNotification);
-        repository.saveSubscriptions(subscriptions);
-        repository.saveUsers(users);
     }, [subscriptions, users]);
+    useEffect(() => repository.saveSubscriptions(subscriptions), [subscriptions]);
+    useEffect(() => repository.saveUsers(users), [users]);
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline/>

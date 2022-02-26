@@ -7,6 +7,7 @@ class Repository {
     loadSubscriptions() {
         console.log(`[Repository] Loading subscriptions from localStorage`);
         const subscriptions = new Subscriptions();
+        subscriptions.loaded = true;
         const serialized = localStorage.getItem('subscriptions');
         if (serialized === null) {
             return subscriptions;
@@ -15,6 +16,7 @@ class Repository {
             JSON.parse(serialized).forEach(s => {
                 const subscription = new Subscription(s.baseUrl, s.topic);
                 subscription.addNotifications(s.notifications);
+                subscription.last = s.last; // Explicitly set, in case old notifications have been deleted
                 subscriptions.add(subscription);
             });
             console.log(`[Repository] Loaded ${subscriptions.size()} subscription(s) from localStorage`);
@@ -26,6 +28,9 @@ class Repository {
     }
 
     saveSubscriptions(subscriptions) {
+        if (!subscriptions.loaded) {
+            return; // Avoid saving invalid state, triggered by initial useEffect hook
+        }
         console.log(`[Repository] Saving ${subscriptions.size()} subscription(s) to localStorage`);
         const serialized = JSON.stringify(subscriptions.map( (id, subscription) => {
             return {
@@ -41,6 +46,7 @@ class Repository {
     loadUsers() {
         console.log(`[Repository] Loading users from localStorage`);
         const users = new Users();
+        users.loaded = true;
         const serialized = localStorage.getItem('users');
         if (serialized === null) {
             return users;
@@ -57,6 +63,9 @@ class Repository {
     }
 
     saveUsers(users) {
+        if (!users.loaded) {
+            return; // Avoid saving invalid state, triggered by initial useEffect hook
+        }
         console.log(`[Repository] Saving users to localStorage`);
         const serialized = JSON.stringify(users.map(user => {
             return {

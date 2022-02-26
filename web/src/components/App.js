@@ -15,6 +15,16 @@ import ActionBar from "./ActionBar";
 import Users from "../app/Users";
 import notificationManager from "../app/NotificationManager";
 
+// FIXME chrome notification order
+// TODO subscribe dialog:
+//  - check/use existing user
+//  - add baseUrl
+// TODO user management
+// TODO embed into ntfy server
+// TODO remember selected subscription
+// TODO since=<ID>
+// TODO top left corner
+
 const App = () => {
     console.log(`[App] Rendering main view`);
 

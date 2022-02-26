@@ -14,7 +14,7 @@ var (
 // i.e. message structs with the Event messageEvent.
 type cache interface {
 	AddMessage(m *message) error
-	Messages(topic string, since sinceTime, scheduled bool) ([]*message, error)
+	Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error)
 	MessagesDue() ([]*message, error)
 	MessageCount(topic string) (int, error)
 	Topics() (map[string]*topic, error)

@@ -15,7 +15,8 @@ const (
 	createMessagesTableQuery = `
 		BEGIN;
 		CREATE TABLE IF NOT EXISTS messages (
-			id TEXT PRIMARY KEY,
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			mid TEXT NOT NULL,
 			time INT NOT NULL,
 			topic TEXT NOT NULL,
 			message TEXT NOT NULL,
@@ -32,42 +33,59 @@ const (
 			encoding TEXT NOT NULL,
 			published INT NOT NULL
 		);
+		CREATE INDEX IF NOT EXISTS idx_mid ON messages (mid);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
+		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectMessagesSinceTimeQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
-		ORDER BY time ASC
+		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
-		ORDER BY time ASC
+		ORDER BY time, id
+	`
+	selectMessagesSinceIDQuery = `
+		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		FROM messages 
+		WHERE topic = ?
+          AND published = 1 
+		  AND id > (SELECT IFNULL(id,0) FROM messages WHERE mid = ?) 
+		ORDER BY time, id
+	`
+	selectMessagesSinceIDIncludeScheduledQuery = `
+		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		FROM messages 
+		WHERE topic = ? 
+		  AND id > (SELECT IFNULL(id,0) FROM messages WHERE mid = ?)
+		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
+		ORDER BY time, id
 	`
-	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE id = ?`
+	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
 	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE attachment_owner = ? AND attachment_expires >= ?`
-	selectAttachmentsExpiredQuery   = `SELECT id FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
+	selectAttachmentsExpiredQuery   = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 4
+	currentSchemaVersion          = 5
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -107,6 +125,43 @@ const (
 	// 3 -> 4
 	migrate3To4AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN encoding TEXT NOT NULL DEFAULT('');
+	`
+
+	// 4 -> 5
+	migrate4To5AlterMessagesTableQuery = `
+		BEGIN;
+		CREATE TABLE IF NOT EXISTS messages_new (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			mid TEXT NOT NULL,
+			time INT NOT NULL,
+			topic TEXT NOT NULL,
+			message TEXT NOT NULL,
+			title TEXT NOT NULL,
+			priority INT NOT NULL,
+			tags TEXT NOT NULL,
+			click TEXT NOT NULL,
+			attachment_name TEXT NOT NULL,
+			attachment_type TEXT NOT NULL,
+			attachment_size INT NOT NULL,
+			attachment_expires INT NOT NULL,
+			attachment_url TEXT NOT NULL,
+			attachment_owner TEXT NOT NULL,
+			encoding TEXT NOT NULL,
+			published INT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_mid ON messages_new (mid);
+		CREATE INDEX IF NOT EXISTS idx_topic ON messages_new (topic);
+		INSERT 
+			INTO messages_new (
+				mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, 
+				attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published)
+			SELECT
+				id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, 
+				attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published
+			FROM messages;
+		DROP TABLE messages;
+		ALTER TABLE messages_new RENAME TO messages;
+		COMMIT;
 	`
 )
 
@@ -167,16 +222,24 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	return err
 }
 
-func (c *sqliteCache) Messages(topic string, since sinceTime, scheduled bool) ([]*message, error) {
+func (c *sqliteCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	if since.IsNone() {
 		return make([]*message, 0), nil
 	}
 	var rows *sql.Rows
 	var err error
-	if scheduled {
-		rows, err = c.db.Query(selectMessagesSinceTimeIncludeScheduledQuery, topic, since.Time().Unix())
+	if since.IsID() {
+		if scheduled {
+			rows, err = c.db.Query(selectMessagesSinceIDIncludeScheduledQuery, topic, since.ID())
+		} else {
+			rows, err = c.db.Query(selectMessagesSinceIDQuery, topic, since.ID())
+		}
 	} else {
-		rows, err = c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
+		if scheduled {
+			rows, err = c.db.Query(selectMessagesSinceTimeIncludeScheduledQuery, topic, since.Time().Unix())
+		} else {
+			rows, err = c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -373,6 +436,8 @@ func setupCacheDB(db *sql.DB) error {
 		return migrateFrom2(db)
 	} else if schemaVersion == 3 {
 		return migrateFrom3(db)
+	} else if schemaVersion == 4 {
+		return migrateFrom4(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -432,6 +497,17 @@ func migrateFrom3(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 4); err != nil {
+		return err
+	}
+	return migrateFrom4(db)
+}
+
+func migrateFrom4(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 4 to 5")
+	if _, err := db.Exec(migrate4To5AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 5); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

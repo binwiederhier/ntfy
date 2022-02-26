@@ -88,7 +88,20 @@ func RandomString(length int) string {
 	return string(b)
 }
 
-// DurationToHuman converts a duration to a human readable format
+// ValidRandomString returns true if the given string matches the format created by RandomString
+func ValidRandomString(s string, length int) bool {
+	if len(s) != length {
+		return false
+	}
+	for _, c := range strings.Split(s, "") {
+		if !strings.Contains(randomStringCharset, c) {
+			return false
+		}
+	}
+	return true
+}
+
+// DurationToHuman converts a duration to a human-readable format
 func DurationToHuman(d time.Duration) (str string) {
 	if d == 0 {
 		return "0"

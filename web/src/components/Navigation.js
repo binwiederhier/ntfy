@@ -54,10 +54,15 @@ const Navigation = (props) => {
 Navigation.width = navWidth;
 
 const NavList = (props) => {
+    const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
-    const handleSubscribeSubmit = (subscription) => {
+    const handleSubscribeReset = () => {
         setSubscribeDialogOpen(false);
-        props.onSubscribeSubmit(subscription);
+        setSubscribeDialogKey(prev => prev+1);
+    }
+    const handleSubscribeSubmit = (subscription, user) => {
+        handleSubscribeReset();
+        props.onSubscribeSubmit(subscription, user);
     }
     return (
         <>
@@ -85,13 +90,15 @@ const NavList = (props) => {
                 </ListItemButton>
             </List>
             <SubscribeDialog
+                key={subscribeDialogKey} // Resets dialog when canceled/closed
                 open={subscribeDialogOpen}
-                onCancel={() => setSubscribeDialogOpen(false)}
-                onSubmit={handleSubscribeSubmit}
+                onCancel={handleSubscribeReset}
+                onSuccess={handleSubscribeSubmit}
             />
         </>
     );
 };
+
 const NavSubscriptionList = (props) => {
     const subscriptions = props.subscriptions;
     return (

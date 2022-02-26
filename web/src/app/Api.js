@@ -1,31 +1,32 @@
-import {topicUrlJsonPoll, fetchLinesIterator, topicUrl, topicUrlAuth} from "./utils";
+import {topicUrlJsonPoll, fetchLinesIterator, topicUrl, topicUrlAuth, maybeWithBasicAuth} from "./utils";
 
 class Api {
-    async poll(baseUrl, topic) {
+    async poll(baseUrl, topic, user) {
         const url = topicUrlJsonPoll(baseUrl, topic);
         const messages = [];
+        const headers = maybeWithBasicAuth({}, user);
         console.log(`[Api] Polling ${url}`);
-        for await (let line of fetchLinesIterator(url)) {
+        for await (let line of fetchLinesIterator(url, headers)) {
             messages.push(JSON.parse(line));
         }
         return messages;
     }
 
-    async publish(baseUrl, topic, message) {
+    async publish(baseUrl, topic, user, message) {
         const url = topicUrl(baseUrl, topic);
         console.log(`[Api] Publishing message to ${url}`);
         await fetch(url, {
             method: 'PUT',
-            body: message
+            body: message,
+            headers: maybeWithBasicAuth({}, user)
         });
     }
 
     async auth(baseUrl, topic, user) {
         const url = topicUrlAuth(baseUrl, topic);
         console.log(`[Api] Checking auth for ${url}`);
-        const headers = this.maybeAddAuthorization({}, user);
         const response = await fetch(url, {
-            headers: headers
+            headers: maybeWithBasicAuth({}, user)
         });
         if (response.status >= 200 && response.status <= 299) {
             return true;
@@ -35,14 +36,6 @@ class Api {
             return false;
         }
         throw new Error(`Unexpected server response ${response.status}`);
-    }
-
-    maybeAddAuthorization(headers, user) {
-        if (user) {
-            const encoded = new Buffer(`${user.username}:${user.password}`).toString('base64');
-            headers['Authorization'] = `Basic ${encoded}`;
-        }
-        return headers;
     }
 }
 

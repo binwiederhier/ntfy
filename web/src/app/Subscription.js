@@ -1,6 +1,6 @@
-import {shortTopicUrl, topicUrl} from './utils';
+import {topicShortUrl, topicUrl} from './utils';
 
-export default class Subscription {
+class Subscription {
     constructor(baseUrl, topic) {
         this.id = topicUrl(baseUrl, topic);
         this.baseUrl = baseUrl;
@@ -40,6 +40,8 @@ export default class Subscription {
     }
 
     shortUrl() {
-        return shortTopicUrl(this.baseUrl, this.topic);
+        return topicShortUrl(this.baseUrl, this.topic);
     }
 }
+
+export default Subscription;

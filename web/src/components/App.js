@@ -12,12 +12,14 @@ import connectionManager from "../app/ConnectionManager";
 import Subscriptions from "../app/Subscriptions";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
+import Users from "../app/Users";
 
 const App = () => {
     console.log(`[App] Rendering main view`);
 
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
+    const [users, setUsers] = useState(new Users());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const handleNotification = (subscriptionId, notification) => {
         setSubscriptions(prev => {
@@ -25,11 +27,14 @@ const App = () => {
             return prev.update(newSubscription).clone();
         });
     };
-    const handleSubscribeSubmit = (subscription) => {
+    const handleSubscribeSubmit = (subscription, user) => {
         console.log(`[App] New subscription: ${subscription.id}`);
+        if (user !== null) {
+            setUsers(prev => prev.add(user).clone());
+        }
         setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
-        api.poll(subscription.baseUrl, subscription.topic)
+        api.poll(subscription.baseUrl, subscription.topic, user)
             .then(messages => {
                 setSubscriptions(prev => {
                     const newSubscription = prev.get(subscription.id).addNotifications(messages);
@@ -61,12 +66,13 @@ const App = () => {
     };
     useEffect(() => {
         setSubscriptions(repository.loadSubscriptions());
+        setUsers(repository.loadUsers());
     }, [/* initial render only */]);
     useEffect(() => {
-        connectionManager.refresh(subscriptions, handleNotification);
+        connectionManager.refresh(subscriptions, users, handleNotification);
         repository.saveSubscriptions(subscriptions);
-    }, [subscriptions]);
-
+        repository.saveUsers(users);
+    }, [subscriptions, users]);
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline/>
@@ -74,6 +80,7 @@ const App = () => {
                 <CssBaseline/>
                 <ActionBar
                     selectedSubscription={selectedSubscription}
+                    users={users}
                     onClearAll={handleDeleteAllNotifications}
                     onUnsubscribe={handleUnsubscribe}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}

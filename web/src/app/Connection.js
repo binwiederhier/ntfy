@@ -1,14 +1,15 @@
-import {shortTopicUrl, topicUrlWs, topicUrlWsWithSince} from "./utils";
+import {basicAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 
 const retryBackoffSeconds = [5, 10, 15, 20, 30, 45];
 
 class Connection {
-    constructor(subscriptionId, baseUrl, topic, since, onNotification) {
+    constructor(subscriptionId, baseUrl, topic, user, since, onNotification) {
         this.subscriptionId = subscriptionId;
         this.baseUrl = baseUrl;
         this.topic = topic;
+        this.user = user;
         this.since = since;
-        this.shortUrl = shortTopicUrl(baseUrl, topic);
+        this.shortUrl = topicShortUrl(baseUrl, topic);
         this.onNotification = onNotification;
         this.ws = null;
         this.retryCount = 0;
@@ -18,10 +19,10 @@ class Connection {
     start() {
         // Don't fetch old messages; we do that as a poll() when adding a subscription;
         // we don't want to re-trigger the main view re-render potentially hundreds of times.
-        const wsUrl = (this.since === 0)
-            ? topicUrlWs(this.baseUrl, this.topic)
-            : topicUrlWsWithSince(this.baseUrl, this.topic, this.since.toString());
+
+        const wsUrl = this.wsUrl();
         console.log(`[Connection, ${this.shortUrl}] Opening connection to ${wsUrl}`);
+
         this.ws = new WebSocket(wsUrl);
         this.ws.onopen = (event) => {
             console.log(`[Connection, ${this.shortUrl}] Connection established`, event);
@@ -74,6 +75,19 @@ class Connection {
         }
         this.retryTimeout = null;
         this.ws = null;
+    }
+
+    wsUrl() {
+        const params = [];
+        if (this.since > 0) {
+            params.push(`since=${this.since.toString()}`);
+        }
+        if (this.user !== null) {
+            const auth = encodeBase64Url(basicAuth(this.user.username, this.user.password));
+            params.push(`auth=${auth}`);
+        }
+        const wsUrl = topicUrlWs(this.baseUrl, this.topic);
+        return (params.length === 0) ? wsUrl : `${wsUrl}?${params.join('&')}`;
     }
 }
 

@@ -1,15 +1,14 @@
-import { rawEmojis} from "./emojis";
+import {rawEmojis} from "./emojis";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
     .replaceAll("https://", "wss://")
     .replaceAll("http://", "ws://");
-export const topicUrlWsWithSince = (baseUrl, topic, since) => `${topicUrlWs(baseUrl, topic)}?since=${since}`;
 export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/json`;
 export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
+export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
-export const shortTopicUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 
 // Format emojis (see emoji.js)
 const emojis = {};
@@ -51,10 +50,35 @@ export const unmatchedTags = (tags) => {
     else return tags.filter(tag => !(tag in emojis));
 }
 
+
+export const maybeWithBasicAuth = (headers, user) => {
+    if (user) {
+        headers['Authorization'] = `Basic ${encodeBase64(`${user.username}:${user.password}`)}`;
+    }
+    return headers;
+}
+
+export const basicAuth = (username, password) => {
+    return `Basic ${encodeBase64(`${username}:${password}`)}`;
+}
+
+export const encodeBase64 = (s) => {
+    return new Buffer(s).toString('base64');
+}
+
+export const encodeBase64Url = (s) => {
+    return encodeBase64(s)
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replaceAll('=', '');
+}
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-export async function* fetchLinesIterator(fileURL) {
+export async function* fetchLinesIterator(fileURL, headers) {
     const utf8Decoder = new TextDecoder('utf-8');
-    const response = await fetch(fileURL);
+    const response = await fetch(fileURL, {
+        headers: headers
+    });
     const reader = response.body.getReader();
     let { value: chunk, done: readerDone } = await reader.read();
     chunk = chunk ? utf8Decoder.decode(chunk) : '';

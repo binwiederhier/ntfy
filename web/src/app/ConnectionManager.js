@@ -1,11 +1,11 @@
 import Connection from "./Connection";
 
-export class ConnectionManager {
+class ConnectionManager {
     constructor() {
         this.connections = new Map();
     }
 
-    refresh(subscriptions, onNotification) {
+    refresh(subscriptions, users, onNotification) {
         console.log(`[ConnectionManager] Refreshing connections`);
         const subscriptionIds = subscriptions.ids();
         const deletedIds = Array.from(this.connections.keys()).filter(id => !subscriptionIds.includes(id));
@@ -16,8 +16,9 @@ export class ConnectionManager {
             if (added) {
                 const baseUrl = subscription.baseUrl;
                 const topic = subscription.topic;
+                const user = users.get(baseUrl);
                 const since = 0;
-                const connection = new Connection(id, baseUrl, topic, since, onNotification);
+                const connection = new Connection(id, baseUrl, topic, user, since, onNotification);
                 this.connections.set(id, connection);
                 console.log(`[ConnectionManager] Starting new connection ${id}`);
                 connection.start();

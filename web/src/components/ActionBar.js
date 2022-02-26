@@ -25,6 +25,7 @@ const ActionBar = (props) => {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>{title}</Typography>
                 {props.selectedSubscription !== null && <IconSubscribeSettings
                     subscription={props.selectedSubscription}
+                    users={props.users}
                     onClearAll={props.onClearAll}
                     onUnsubscribe={props.onUnsubscribe}
                 />}

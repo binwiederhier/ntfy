@@ -1,7 +1,9 @@
 import Subscription from "./Subscription";
 import Subscriptions from "./Subscriptions";
+import Users from "./Users";
+import User from "./User";
 
-export class Repository {
+class Repository {
     loadSubscriptions() {
         console.log(`[Repository] Loading subscriptions from localStorage`);
         const subscriptions = new Subscriptions();
@@ -10,8 +12,7 @@ export class Repository {
             return subscriptions;
         }
         try {
-            const serializedSubscriptions = JSON.parse(serialized);
-            serializedSubscriptions.forEach(s => {
+            JSON.parse(serialized).forEach(s => {
                 const subscription = new Subscription(s.baseUrl, s.topic);
                 subscription.addNotifications(s.notifications);
                 subscriptions.add(subscription);
@@ -39,26 +40,32 @@ export class Repository {
 
     loadUsers() {
         console.log(`[Repository] Loading users from localStorage`);
+        const users = new Users();
         const serialized = localStorage.getItem('users');
         if (serialized === null) {
-            return {};
+            return users;
         }
         try {
-            return JSON.parse(serialized);
+            JSON.parse(serialized).forEach(u => {
+                users.add(new User(u.baseUrl, u.username, u.password));
+            });
+            return users;
         } catch (e) {
             console.log(`[Repository] Unable to deserialize users: ${e.message}`);
-            return {};
+            return users;
         }
     }
 
-    saveUser(baseUrl, username, password) {
+    saveUsers(users) {
         console.log(`[Repository] Saving users to localStorage`);
-        const users = this.loadUsers();
-        users[baseUrl] = {
-            username: username,
-            password: password
-        };
-        localStorage.setItem('users', users);
+        const serialized = JSON.stringify(users.map(user => {
+            return {
+                baseUrl: user.baseUrl,
+                username: user.username,
+                password: user.password
+            }
+        }));
+        localStorage.setItem('users', serialized);
     }
 }
 

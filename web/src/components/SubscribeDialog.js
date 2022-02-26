@@ -13,6 +13,7 @@ import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl} from "../app/utils";
 import useStyles from "./styles";
+import User from "../app/User";
 
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
@@ -20,43 +21,50 @@ const defaultBaseUrl = "http://127.0.0.1"
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState(defaultBaseUrl); // FIXME
     const [topic, setTopic] = useState("");
-    const [user, setUser] = useState(null);
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleCancel = () => {
         setTopic('');
         props.onCancel();
     }
-    const handleSubmit = async () => {
-        const success = await api.auth(baseUrl, topic, null);
-        if (!success) {
-            console.log(`[SubscribeDialog] Login required for ${topicUrl(baseUrl, topic)}`)
-            setShowLoginPage(true);
-            return;
-        }
-        const subscription = new Subscription(defaultBaseUrl, topic);
-        props.onSubmit(subscription);
+    const handleSuccess = (baseUrl, topic, user) => {
+        const subscription = new Subscription(baseUrl, topic);
+        props.onSuccess(subscription, user);
         setTopic('');
     }
     return (
         <Dialog open={props.open} onClose={props.onClose} fullScreen={fullScreen}>
             {!showLoginPage && <SubscribePage
+                baseUrl={baseUrl}
                 topic={topic}
                 setTopic={setTopic}
                 onCancel={handleCancel}
-                onSubmit={handleSubmit}
+                onNeedsLogin={() => setShowLoginPage(true)}
+                onSuccess={handleSuccess}
             />}
             {showLoginPage && <LoginPage
                 baseUrl={baseUrl}
                 topic={topic}
                 onBack={() => setShowLoginPage(false)}
-                onSubmit={handleSubmit}
+                onSuccess={handleSuccess}
             />}
         </Dialog>
     );
 };
 
 const SubscribePage = (props) => {
+    const baseUrl = props.baseUrl;
+    const topic = props.topic;
+    const handleSubscribe = async () => {
+        const success = await api.auth(baseUrl, topic, null);
+        if (!success) {
+            console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for anonymous user`);
+            props.onNeedsLogin();
+            return;
+        }
+        console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for anonymous user`);
+        props.onSuccess(baseUrl, topic, null);
+    };
     return (
         <>
             <DialogTitle>Subscribe to topic</DialogTitle>
@@ -79,7 +87,7 @@ const SubscribePage = (props) => {
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onCancel}>Cancel</Button>
-                <Button onClick={props.onSubmit} disabled={props.topic === ""}>Subscribe</Button>
+                <Button onClick={handleSubscribe} disabled={props.topic === ""}>Subscribe</Button>
             </DialogActions>
         </>
     );
@@ -93,14 +101,15 @@ const LoginPage = (props) => {
     const baseUrl = props.baseUrl;
     const topic = props.topic;
     const handleLogin = async () => {
-        const user = {username: username, password: password};
+        const user = new User(baseUrl, username, password);
         const success = await api.auth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
             setErrorText(`User ${username} not authorized`);
             return;
         }
-        console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} successful for user ${username}`);
+        console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
+        props.onSuccess(baseUrl, topic, user);
     };
     return (
         <>

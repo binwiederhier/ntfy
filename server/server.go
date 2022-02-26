@@ -862,7 +862,7 @@ func parseSince(r *http.Request, poll bool) (sinceTime, error) {
 func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
 	w.Header().Set("Access-Control-Allow-Origin", "*")              // CORS, allow cross-origin requests
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization") // CORS, allow auth
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization") // CORS, allow auth via JS
 	return nil
 }
 
@@ -1091,7 +1091,7 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 			return err
 		}
 		var user *auth.User // may stay nil if no auth header!
-		username, password, ok := r.BasicAuth()
+		username, password, ok := extractUserPass(r)
 		if ok {
 			if user, err = s.auth.Authenticate(username, password); err != nil {
 				log.Printf("authentication failed: %s", err.Error())
@@ -1106,6 +1106,27 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		}
 		return next(w, r, v)
 	}
+}
+
+// extractUserPass reads the username/password from the basic auth header (Authorization: Basic ...),
+// or from the ?auth=... query param. The latter is required only to support the WebSocket JavaScript
+// class, which does not support passing headers during the initial request. The auth query param
+// is effectively double base64 encoded. Its format is base64(Basic base64(user:pass)).
+func extractUserPass(r *http.Request) (username string, password string, ok bool) {
+	username, password, ok = r.BasicAuth()
+	if ok {
+		return
+	}
+	authParam := readQueryParam(r, "authorization", "auth")
+	if authParam != "" {
+		a, err := base64.RawURLEncoding.DecodeString(authParam)
+		if err != nil {
+			return
+		}
+		r.Header.Set("Authorization", string(a))
+		return r.BasicAuth()
+	}
+	return
 }
 
 // visitor creates or retrieves a rate.Limiter for the given visitor.

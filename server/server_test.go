@@ -657,6 +657,25 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	require.Equal(t, 403, response.Code) // Anonymous read not allowed
 }
 
+func TestServer_Auth_ViaQuery(t *testing.T) {
+	c := newTestConfig(t)
+	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c.AuthDefaultRead = false
+	c.AuthDefaultWrite = false
+	s := newTestServer(t, c)
+
+	manager := s.auth.(auth.Manager)
+	require.Nil(t, manager.AddUser("ben", "some pass", auth.RoleAdmin))
+
+	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:some pass"))))
+	response := request(t, s, "GET", u, "", nil)
+	require.Equal(t, 200, response.Code)
+
+	u = fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:WRONNNGGGG"))))
+	response = request(t, s, "GET", u, "", nil)
+	require.Equal(t, 401, response.Code)
+}
+
 /*
 func TestServer_Curl_Publish_Poll(t *testing.T) {
 	s, port := test.StartServer(t)

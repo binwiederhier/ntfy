@@ -288,7 +288,7 @@ const formatTitle = (m) => {
     if (m.title) {
         return formatTitleA(m);
     } else {
-        return `${location.host}/${m.topic}`;
+        return `${location.host}/${m.topic}`; // FIXME
     }
 };
 

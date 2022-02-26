@@ -1,27 +1,24 @@
 import Drawer from "@mui/material/Drawer";
 import * as React from "react";
+import {useState} from "react";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ListItemText from "@mui/material/ListItemText";
-import {useState} from "react";
 import Toolbar from "@mui/material/Toolbar";
 import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
+import {Alert, AlertTitle} from "@mui/material";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 
 const navWidth = 240;
 
 const Navigation = (props) => {
-    const navigationList =
-        <NavList
-            subscriptions={props.subscriptions}
-            selectedSubscription={props.selectedSubscription}
-            onSubscriptionClick={props.onSubscriptionClick}
-            onSubscribeSubmit={props.onSubscribeSubmit}
-        />;
+    const navigationList = <NavList {...props}/>;
     return (
         <>
             {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
@@ -64,29 +61,51 @@ const NavList = (props) => {
         handleSubscribeReset();
         props.onSubscribeSubmit(subscription, user);
     }
+    const showSubscriptionsList = props.subscriptions.size() > 0;
+    const showGrantPermissionsBox = props.subscriptions.size() > 0 && !props.notificationsGranted;
     return (
         <>
-            <Toolbar />
-            {props.subscriptions.size() > 0 &&
-                <Divider />}
-            <List component="nav">
-                <NavSubscriptionList
-                    subscriptions={props.subscriptions}
-                    selectedSubscription={props.selectedSubscription}
-                    onSubscriptionClick={props.onSubscriptionClick}
-                />
-                <Divider sx={{ my: 1 }} />
+            <Toolbar/>
+            <List component="nav" sx={{paddingTop: 0}}>
+                {showGrantPermissionsBox &&
+                    <>
+                        <Divider/>
+                        <Alert severity="warning" sx={{paddingTop: 2}}>
+                            <AlertTitle>Notifications are disabled</AlertTitle>
+                            <Typography gutterBottom>
+                                Grant your browser permission to display desktop notifications.
+                            </Typography>
+                            <Button
+                                sx={{float: 'right'}}
+                                color="inherit"
+                                size="small"
+                                onClick={props.onRequestPermissionClick}
+                            >
+                                Grant now
+                            </Button>
+                        </Alert>
+                    </>}
+                {showSubscriptionsList &&
+                    <>
+                        <Divider/>
+                        <SubscriptionList
+                            subscriptions={props.subscriptions}
+                            selectedSubscription={props.selectedSubscription}
+                            onSubscriptionClick={props.onSubscriptionClick}
+                        />
+                    </>}
+                <Divider sx={{my: 1}}/>
                 <ListItemButton>
                     <ListItemIcon>
-                        <SettingsIcon />
+                        <SettingsIcon/>
                     </ListItemIcon>
-                    <ListItemText primary="Settings" />
+                    <ListItemText primary="Settings"/>
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                     <ListItemIcon>
-                        <AddIcon />
+                        <AddIcon/>
                     </ListItemIcon>
-                    <ListItemText primary="Add subscription" />
+                    <ListItemText primary="Add subscription"/>
                 </ListItemButton>
             </List>
             <SubscribeDialog
@@ -99,29 +118,20 @@ const NavList = (props) => {
     );
 };
 
-const NavSubscriptionList = (props) => {
-    const subscriptions = props.subscriptions;
+const SubscriptionList = (props) => {
     return (
         <>
-            {subscriptions.map((id, subscription) =>
-                <NavSubscriptionItem
+            {props.subscriptions.map((id, subscription) =>
+                <ListItemButton
                     key={id}
-                    subscription={subscription}
-                    selected={props.selectedSubscription && props.selectedSubscription.id === id}
                     onClick={() => props.onSubscriptionClick(id)}
-                />)
-            }
+                    selected={props.selectedSubscription && props.selectedSubscription.id === id}
+                >
+                    <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
+                    <ListItemText primary={subscription.shortUrl()}/>
+                </ListItemButton>
+            )}
         </>
-    );
-}
-
-const NavSubscriptionItem = (props) => {
-    const subscription = props.subscription;
-    return (
-        <ListItemButton onClick={props.onClick} selected={props.selected}>
-            <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
-            <ListItemText primary={subscription.shortUrl()}/>
-        </ListItemButton>
     );
 }
 

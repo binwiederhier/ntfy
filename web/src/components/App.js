@@ -13,6 +13,7 @@ import Subscriptions from "../app/Subscriptions";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import Users from "../app/Users";
+import notificationManager from "../app/NotificationManager";
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -21,9 +22,13 @@ const App = () => {
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
     const [users, setUsers] = useState(new Users());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
+    const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
     const handleNotification = (subscriptionId, notification) => {
         setSubscriptions(prev => {
             const newSubscription = prev.get(subscriptionId).addNotification(notification);
+            notificationManager.notify(newSubscription, notification, () => {
+                setSelectedSubscription(newSubscription);
+            })
             return prev.update(newSubscription).clone();
         });
     };
@@ -41,6 +46,7 @@ const App = () => {
                     return prev.update(newSubscription).clone();
                 });
             });
+        handleRequestPermission();
     };
     const handleDeleteNotification = (subscriptionId, notificationId) => {
         console.log(`[App] Deleting notification ${notificationId} from ${subscriptionId}`);
@@ -63,6 +69,11 @@ const App = () => {
             setSelectedSubscription(newSubscriptions.firstOrNull());
             return newSubscriptions;
         });
+    };
+    const handleRequestPermission = () => {
+        notificationManager.maybeRequestPermission((granted) => {
+            setNotificationsGranted(granted);
+        })
     };
     useEffect(() => {
         setSubscriptions(repository.loadSubscriptions());
@@ -90,9 +101,11 @@ const App = () => {
                         subscriptions={subscriptions}
                         selectedSubscription={selectedSubscription}
                         mobileDrawerOpen={mobileDrawerOpen}
+                        notificationsGranted={notificationsGranted}
                         onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
                         onSubscriptionClick={(subscriptionId) => setSelectedSubscription(subscriptions.get(subscriptionId))}
                         onSubscribeSubmit={handleSubscribeSubmit}
+                        onRequestPermissionClick={handleRequestPermission}
                     />
                 </Box>
                 <Box

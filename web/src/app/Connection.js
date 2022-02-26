@@ -32,13 +32,16 @@ class Connection {
             console.log(`[Connection, ${this.shortUrl}] Message received from server: ${event.data}`);
             try {
                 const data = JSON.parse(event.data);
+                if (data.event === 'open') {
+                    return;
+                }
                 const relevantAndValid =
                     data.event === 'message' &&
                     'id' in data &&
                     'time' in data &&
                     'message' in data;
                 if (!relevantAndValid) {
-                    console.log(`[Connection, ${this.shortUrl}] Message irrelevant or invalid. Ignoring.`);
+                    console.log(`[Connection, ${this.shortUrl}] Unexpected message. Ignoring.`);
                     return;
                 }
                 this.since = data.time + 1; // Sigh. This works because on reconnect, we wait 5+ seconds anyway.

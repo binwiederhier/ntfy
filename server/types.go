@@ -15,7 +15,7 @@ const (
 )
 
 const (
-	messageIDLength = 10
+	messageIDLength = 12
 )
 
 // message represents a message published to a topic
@@ -74,23 +74,46 @@ func newDefaultMessage(topic, msg string) *message {
 	return newMessage(messageEvent, topic, msg)
 }
 
-type sinceTime time.Time
+func validMessageID(s string) bool {
+	return util.ValidRandomString(s, messageIDLength)
+}
 
-func (t sinceTime) IsAll() bool {
+type sinceMarker struct {
+	time time.Time
+	id   string
+}
+
+func newSinceTime(timestamp int64) sinceMarker {
+	return sinceMarker{time.Unix(timestamp, 0), ""}
+}
+
+func newSinceID(id string) sinceMarker {
+	return sinceMarker{time.Unix(0, 0), id}
+}
+
+func (t sinceMarker) IsAll() bool {
 	return t == sinceAllMessages
 }
 
-func (t sinceTime) IsNone() bool {
+func (t sinceMarker) IsNone() bool {
 	return t == sinceNoMessages
 }
 
-func (t sinceTime) Time() time.Time {
-	return time.Time(t)
+func (t sinceMarker) IsID() bool {
+	return t.id != ""
+}
+
+func (t sinceMarker) Time() time.Time {
+	return t.time
+}
+
+func (t sinceMarker) ID() string {
+	return t.id
 }
 
 var (
-	sinceAllMessages = sinceTime(time.Unix(0, 0))
-	sinceNoMessages  = sinceTime(time.Unix(1, 0))
+	sinceAllMessages = sinceMarker{time.Unix(0, 0), ""}
+	sinceNoMessages  = sinceMarker{time.Unix(1, 0), ""}
 )
 
 type queryFilter struct {

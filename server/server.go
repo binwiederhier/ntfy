@@ -805,7 +805,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	return err
 }
 
-func parseSubscribeParams(r *http.Request) (poll bool, since sinceTime, scheduled bool, filters *queryFilter, err error) {
+func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, scheduled bool, filters *queryFilter, err error) {
 	poll = readBoolParam(r, false, "x-poll", "poll", "po")
 	scheduled = readBoolParam(r, false, "x-scheduled", "scheduled", "sched")
 	since, err = parseSince(r, poll)
@@ -819,7 +819,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceTime, schedule
 	return
 }
 
-func (s *Server) sendOldMessages(topics []*topic, since sinceTime, scheduled bool, sub subscriber) error {
+func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
@@ -841,20 +841,28 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceTime, scheduled boo
 //
 // Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h), or
 // "all" for all messages.
-func parseSince(r *http.Request, poll bool) (sinceTime, error) {
+func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 	since := readParam(r, "x-since", "since", "si")
+
+	// Easy cases (empty, all, none)
 	if since == "" {
 		if poll {
 			return sinceAllMessages, nil
 		}
 		return sinceNoMessages, nil
-	}
-	if since == "all" {
+	} else if since == "all" {
 		return sinceAllMessages, nil
+	} else if since == "none" {
+		return sinceNoMessages, nil
+	}
+
+	// ID, timestamp, duration
+	if validMessageID(since) {
+		return newSinceID(since), nil
 	} else if s, err := strconv.ParseInt(since, 10, 64); err == nil {
-		return sinceTime(time.Unix(s, 0)), nil
+		return newSinceTime(s), nil
 	} else if d, err := time.ParseDuration(since); err == nil {
-		return sinceTime(time.Now().Add(-1 * d)), nil
+		return newSinceTime(time.Now().Add(-1 * d).Unix()), nil
 	}
 	return sinceNoMessages, errHTTPBadRequestSinceInvalid
 }

@@ -54,7 +54,7 @@ func (c *memCache) AddMessage(m *message) error {
 	return nil
 }
 
-func (c *memCache) Messages(topic string, since sinceTime, scheduled bool) ([]*message, error) {
+func (c *memCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.messages[topic]; !ok || since.IsNone() {

@@ -42,7 +42,7 @@ func testCacheMessages(t *testing.T, c cache) {
 	require.Empty(t, messages)
 
 	// mytopic: since 2
-	messages, _ = c.Messages("mytopic", sinceTime(time.Unix(2, 0)), false)
+	messages, _ = c.Messages("mytopic", newSinceTime(2), false)
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "my other message", messages[0].Message)
 

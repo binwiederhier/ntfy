@@ -11,7 +11,7 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle} from "@mui/material";
+import {Alert, AlertTitle, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 
@@ -66,10 +66,11 @@ const NavList = (props) => {
     return (
         <>
             <Toolbar/>
-            <List component="nav" sx={{paddingTop: 0}}>
+            <List component="nav" sx={{
+                paddingTop: (showGrantPermissionsBox) ? '0' : ''
+            }}>
                 {showGrantPermissionsBox &&
                     <>
-                        <Divider/>
                         <Alert severity="warning" sx={{paddingTop: 2}}>
                             <AlertTitle>Notifications are disabled</AlertTitle>
                             <Typography gutterBottom>
@@ -84,17 +85,20 @@ const NavList = (props) => {
                                 Grant now
                             </Button>
                         </Alert>
+                        <Divider/>
                     </>}
                 {showSubscriptionsList &&
                     <>
-                        <Divider/>
+                        <ListSubheader component="div" id="nested-list-subheader">
+                            Subscribed topics
+                        </ListSubheader>
                         <SubscriptionList
                             subscriptions={props.subscriptions}
                             selectedSubscription={props.selectedSubscription}
                             onSubscriptionClick={props.onSubscriptionClick}
                         />
+                        <Divider sx={{my: 1}}/>
                     </>}
-                <Divider sx={{my: 1}}/>
                 <ListItemButton>
                     <ListItemIcon>
                         <SettingsIcon/>

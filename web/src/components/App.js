@@ -23,7 +23,6 @@ import notificationManager from "../app/NotificationManager";
 // TODO embed into ntfy server
 // TODO remember selected subscription
 // TODO since=<ID>
-// TODO top left corner
 
 const App = () => {
     console.log(`[App] Rendering main view`);

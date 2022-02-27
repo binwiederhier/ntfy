@@ -18,7 +18,7 @@ func TestMemCache_Messages(t *testing.T) {
 	testCacheMessages(t, newMemTestCache(t))
 }
 
-func testCacheMessages(t *testing.T, c *sqliteCache) {
+func testCacheMessages(t *testing.T, c *messageCache) {
 	m1 := newDefaultMessage("mytopic", "my message")
 	m1.Time = 1
 
@@ -92,7 +92,7 @@ func TestMemCache_MessagesScheduled(t *testing.T) {
 	testCacheMessagesScheduled(t, newMemTestCache(t))
 }
 
-func testCacheMessagesScheduled(t *testing.T, c *sqliteCache) {
+func testCacheMessagesScheduled(t *testing.T, c *messageCache) {
 	m1 := newDefaultMessage("mytopic", "message 1")
 	m2 := newDefaultMessage("mytopic", "message 2")
 	m2.Time = time.Now().Add(time.Hour).Unix()
@@ -126,7 +126,7 @@ func TestMemCache_Topics(t *testing.T) {
 	testCacheTopics(t, newMemTestCache(t))
 }
 
-func testCacheTopics(t *testing.T, c *sqliteCache) {
+func testCacheTopics(t *testing.T, c *messageCache) {
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
@@ -149,7 +149,7 @@ func TestMemCache_MessagesTagsPrioAndTitle(t *testing.T) {
 	testCacheMessagesTagsPrioAndTitle(t, newMemTestCache(t))
 }
 
-func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *sqliteCache) {
+func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *messageCache) {
 	m := newDefaultMessage("mytopic", "some message")
 	m.Tags = []string{"tag1", "tag2"}
 	m.Priority = 5
@@ -170,7 +170,7 @@ func TestMemCache_MessagesSinceID(t *testing.T) {
 	testCacheMessagesSinceID(t, newMemTestCache(t))
 }
 
-func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
+func testCacheMessagesSinceID(t *testing.T, c *messageCache) {
 	m1 := newDefaultMessage("mytopic", "message 1")
 	m1.Time = 100
 	m2 := newDefaultMessage("mytopic", "message 2")
@@ -240,7 +240,7 @@ func TestMemCache_Prune(t *testing.T) {
 	testCachePrune(t, newMemTestCache(t))
 }
 
-func testCachePrune(t *testing.T, c *sqliteCache) {
+func testCachePrune(t *testing.T, c *messageCache) {
 	m1 := newDefaultMessage("mytopic", "my message")
 	m1.Time = 1
 
@@ -277,7 +277,7 @@ func TestMemCache_Attachments(t *testing.T) {
 	testCacheAttachments(t, newMemTestCache(t))
 }
 
-func testCacheAttachments(t *testing.T, c *sqliteCache) {
+func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires1 := time.Now().Add(-4 * time.Hour).Unix()
 	m := newDefaultMessage("mytopic", "flower for you")
 	m.ID = "m1"
@@ -467,7 +467,7 @@ func TestMemCache_NopCache(t *testing.T) {
 	assert.Empty(t, topics)
 }
 
-func newSqliteTestCache(t *testing.T) *sqliteCache {
+func newSqliteTestCache(t *testing.T) *messageCache {
 	c, err := newSqliteCache(newSqliteTestCacheFile(t), false)
 	if err != nil {
 		t.Fatal(err)
@@ -479,7 +479,7 @@ func newSqliteTestCacheFile(t *testing.T) string {
 	return filepath.Join(t.TempDir(), "cache.db")
 }
 
-func newSqliteTestCacheFromFile(t *testing.T, filename string) *sqliteCache {
+func newSqliteTestCacheFromFile(t *testing.T, filename string) *messageCache {
 	c, err := newSqliteCache(filename, false)
 	if err != nil {
 		t.Fatal(err)
@@ -487,7 +487,7 @@ func newSqliteTestCacheFromFile(t *testing.T, filename string) *sqliteCache {
 	return c
 }
 
-func newMemTestCache(t *testing.T) *sqliteCache {
+func newMemTestCache(t *testing.T) *messageCache {
 	c, err := newMemCache()
 	if err != nil {
 		t.Fatal(err)

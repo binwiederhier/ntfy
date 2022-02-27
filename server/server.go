@@ -45,7 +45,7 @@ type Server struct {
 	mailer       mailer
 	messages     int64
 	auth         auth.Auther
-	cache        *sqliteCache
+	messageCache *messageCache
 	fileCache    *fileCache
 	closeChan    chan bool
 	mu           sync.Mutex
@@ -118,11 +118,11 @@ func New(conf *Config) (*Server, error) {
 	if conf.SMTPSenderAddr != "" {
 		mailer = &smtpSender{config: conf}
 	}
-	cache, err := createCache(conf)
+	messageCache, err := createMessageCache(conf)
 	if err != nil {
 		return nil, err
 	}
-	topics, err := cache.Topics()
+	topics, err := messageCache.Topics()
 	if err != nil {
 		return nil, err
 	}
@@ -149,18 +149,18 @@ func New(conf *Config) (*Server, error) {
 		}
 	}
 	return &Server{
-		config:    conf,
-		cache:     cache,
-		fileCache: fileCache,
-		firebase:  firebaseSubscriber,
-		mailer:    mailer,
-		topics:    topics,
-		auth:      auther,
-		visitors:  make(map[string]*visitor),
+		config:       conf,
+		messageCache: messageCache,
+		fileCache:    fileCache,
+		firebase:     firebaseSubscriber,
+		mailer:       mailer,
+		topics:       topics,
+		auth:         auther,
+		visitors:     make(map[string]*visitor),
 	}, nil
 }
 
-func createCache(conf *Config) (*sqliteCache, error) {
+func createMessageCache(conf *Config) (*messageCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
 	} else if conf.CacheFile != "" {
@@ -416,7 +416,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		}()
 	}
 	if cache {
-		if err := s.cache.AddMessage(m); err != nil {
+		if err := s.messageCache.AddMessage(m); err != nil {
 			return err
 		}
 	}
@@ -566,7 +566,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	} else if m.Time > time.Now().Add(s.config.AttachmentExpiryDuration).Unix() {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
-	visitorAttachmentsSize, err := s.cache.AttachmentsSize(v.ip)
+	visitorAttachmentsSize, err := s.messageCache.AttachmentsSize(v.ip)
 	if err != nil {
 		return err
 	}
@@ -824,7 +824,7 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled b
 		return nil
 	}
 	for _, t := range topics {
-		messages, err := s.cache.Messages(t.ID, since, scheduled)
+		messages, err := s.messageCache.Messages(t.ID, since, scheduled)
 		if err != nil {
 			return err
 		}
@@ -930,7 +930,7 @@ func (s *Server) updateStatsAndPrune() {
 
 	// Delete expired attachments
 	if s.fileCache != nil {
-		ids, err := s.cache.AttachmentsExpired()
+		ids, err := s.messageCache.AttachmentsExpired()
 		if err == nil {
 			if err := s.fileCache.Remove(ids...); err != nil {
 				log.Printf("error while deleting attachments: %s", err.Error())
@@ -942,7 +942,7 @@ func (s *Server) updateStatsAndPrune() {
 
 	// Prune message cache
 	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
-	if err := s.cache.Prune(olderThan); err != nil {
+	if err := s.messageCache.Prune(olderThan); err != nil {
 		log.Printf("error pruning cache: %s", err.Error())
 	}
 
@@ -950,7 +950,7 @@ func (s *Server) updateStatsAndPrune() {
 	var subscribers, messages int
 	for _, t := range s.topics {
 		subs := t.Subscribers()
-		msgs, err := s.cache.MessageCount(t.ID)
+		msgs, err := s.messageCache.MessageCount(t.ID)
 		if err != nil {
 			log.Printf("cannot get stats for topic %s: %s", t.ID, err.Error())
 			continue
@@ -1046,7 +1046,7 @@ func (s *Server) runFirebaseKeepaliver() {
 func (s *Server) sendDelayedMessages() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	messages, err := s.cache.MessagesDue()
+	messages, err := s.messageCache.MessagesDue()
 	if err != nil {
 		return err
 	}
@@ -1062,7 +1062,7 @@ func (s *Server) sendDelayedMessages() error {
 				log.Printf("unable to publish to Firebase: %v", err.Error())
 			}
 		}
-		if err := s.cache.MarkPublished(m); err != nil {
+		if err := s.messageCache.MarkPublished(m); err != nil {
 			return err
 		}
 	}

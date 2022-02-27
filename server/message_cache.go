@@ -168,12 +168,13 @@ const (
 	`
 )
 
-type sqliteCache struct {
+type messageCache struct {
 	db  *sql.DB
 	nop bool
 }
 
-func newSqliteCache(filename string, nop bool) (*sqliteCache, error) {
+// newSqliteCache creates a SQLite file-backed cache
+func newSqliteCache(filename string, nop bool) (*messageCache, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -181,20 +182,20 @@ func newSqliteCache(filename string, nop bool) (*sqliteCache, error) {
 	if err := setupCacheDB(db); err != nil {
 		return nil, err
 	}
-	return &sqliteCache{
+	return &messageCache{
 		db:  db,
 		nop: nop,
 	}, nil
 }
 
 // newMemCache creates an in-memory cache
-func newMemCache() (*sqliteCache, error) {
+func newMemCache() (*messageCache, error) {
 	return newSqliteCache(createMemoryFilename(), false)
 }
 
 // newNopCache creates an in-memory cache that discards all messages;
 // it is always empty and can be used if caching is entirely disabled
-func newNopCache() (*sqliteCache, error) {
+func newNopCache() (*messageCache, error) {
 	return newSqliteCache(createMemoryFilename(), true)
 }
 
@@ -208,7 +209,7 @@ func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
 }
 
-func (c *sqliteCache) AddMessage(m *message) error {
+func (c *messageCache) AddMessage(m *message) error {
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
 	}
@@ -249,7 +250,7 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	return err
 }
 
-func (c *sqliteCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
+func (c *messageCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	if since.IsNone() {
 		return make([]*message, 0), nil
 	} else if since.IsID() {
@@ -258,7 +259,7 @@ func (c *sqliteCache) Messages(topic string, since sinceMarker, scheduled bool) 
 	return c.messagesSinceTime(topic, since, scheduled)
 }
 
-func (c *sqliteCache) messagesSinceTime(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
+func (c *messageCache) messagesSinceTime(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	var rows *sql.Rows
 	var err error
 	if scheduled {
@@ -272,7 +273,7 @@ func (c *sqliteCache) messagesSinceTime(topic string, since sinceMarker, schedul
 	return readMessages(rows)
 }
 
-func (c *sqliteCache) messagesSinceID(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
+func (c *messageCache) messagesSinceID(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	idrows, err := c.db.Query(selectRowIDFromMessageID, topic, since.ID())
 	if err != nil {
 		return nil, err
@@ -298,7 +299,7 @@ func (c *sqliteCache) messagesSinceID(topic string, since sinceMarker, scheduled
 	return readMessages(rows)
 }
 
-func (c *sqliteCache) MessagesDue() ([]*message, error) {
+func (c *messageCache) MessagesDue() ([]*message, error) {
 	rows, err := c.db.Query(selectMessagesDueQuery, time.Now().Unix())
 	if err != nil {
 		return nil, err
@@ -306,12 +307,12 @@ func (c *sqliteCache) MessagesDue() ([]*message, error) {
 	return readMessages(rows)
 }
 
-func (c *sqliteCache) MarkPublished(m *message) error {
+func (c *messageCache) MarkPublished(m *message) error {
 	_, err := c.db.Exec(updateMessagePublishedQuery, m.ID)
 	return err
 }
 
-func (c *sqliteCache) MessageCount(topic string) (int, error) {
+func (c *messageCache) MessageCount(topic string) (int, error) {
 	rows, err := c.db.Query(selectMessageCountForTopicQuery, topic)
 	if err != nil {
 		return 0, err
@@ -329,7 +330,7 @@ func (c *sqliteCache) MessageCount(topic string) (int, error) {
 	return count, nil
 }
 
-func (c *sqliteCache) Topics() (map[string]*topic, error) {
+func (c *messageCache) Topics() (map[string]*topic, error) {
 	rows, err := c.db.Query(selectTopicsQuery)
 	if err != nil {
 		return nil, err
@@ -349,12 +350,12 @@ func (c *sqliteCache) Topics() (map[string]*topic, error) {
 	return topics, nil
 }
 
-func (c *sqliteCache) Prune(olderThan time.Time) error {
+func (c *messageCache) Prune(olderThan time.Time) error {
 	_, err := c.db.Exec(pruneMessagesQuery, olderThan.Unix())
 	return err
 }
 
-func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
+func (c *messageCache) AttachmentsSize(owner string) (int64, error) {
 	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner, time.Now().Unix())
 	if err != nil {
 		return 0, err
@@ -372,7 +373,7 @@ func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
 	return size, nil
 }
 
-func (c *sqliteCache) AttachmentsExpired() ([]string, error) {
+func (c *messageCache) AttachmentsExpired() ([]string, error) {
 	rows, err := c.db.Query(selectAttachmentsExpiredQuery, time.Now().Unix())
 	if err != nil {
 		return nil, err

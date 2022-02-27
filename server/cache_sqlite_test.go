@@ -25,6 +25,10 @@ func TestSqliteCache_MessagesTagsPrioAndTitle(t *testing.T) {
 	testCacheMessagesTagsPrioAndTitle(t, newSqliteTestCache(t))
 }
 
+func TestSqliteCache_MessagesSinceID(t *testing.T) {
+	testCacheMessagesSinceID(t, newSqliteTestCache(t))
+}
+
 func TestSqliteCache_Prune(t *testing.T) {
 	testCachePrune(t, newSqliteTestCache(t))
 }

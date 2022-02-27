@@ -41,6 +41,13 @@ func testCacheMessages(t *testing.T, c cache) {
 	messages, _ = c.Messages("mytopic", sinceNoMessages, false)
 	require.Empty(t, messages)
 
+	// mytopic: since m1 (by ID)
+	messages, _ = c.Messages("mytopic", newSinceID(m1.ID), false)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, m2.ID, messages[0].ID)
+	require.Equal(t, "my other message", messages[0].Message)
+	require.Equal(t, "mytopic", messages[0].Topic)
+
 	// mytopic: since 2
 	messages, _ = c.Messages("mytopic", newSinceTime(2), false)
 	require.Equal(t, 1, len(messages))
@@ -146,6 +153,71 @@ func testCacheMessagesScheduled(t *testing.T, c cache) {
 
 	messages, _ = c.MessagesDue()
 	require.Empty(t, messages)
+}
+
+func testCacheMessagesSinceID(t *testing.T, c cache) {
+	m1 := newDefaultMessage("mytopic", "message 1")
+	m1.Time = 100
+	m2 := newDefaultMessage("mytopic", "message 2")
+	m2.Time = 200
+	m3 := newDefaultMessage("mytopic", "message 3")
+	m3.Time = 300
+	m4 := newDefaultMessage("mytopic", "message 4")
+	m4.Time = 400
+	m5 := newDefaultMessage("mytopic", "message 5")
+	m5.Time = time.Now().Add(time.Minute).Unix() // Scheduled, in the future, later than m6
+	m6 := newDefaultMessage("mytopic", "message 6")
+	m6.Time = 600
+	m7 := newDefaultMessage("mytopic", "message 7")
+	m7.Time = 700
+
+	require.Nil(t, c.AddMessage(m1))
+	require.Nil(t, c.AddMessage(m2))
+	require.Nil(t, c.AddMessage(m3))
+	require.Nil(t, c.AddMessage(m4))
+	require.Nil(t, c.AddMessage(m5))
+	require.Nil(t, c.AddMessage(m6))
+	require.Nil(t, c.AddMessage(m7))
+
+	// Case 1: Since ID exists, exclude scheduled
+	messages, _ := c.Messages("mytopic", newSinceID(m2.ID), false)
+	require.Equal(t, 4, len(messages))
+	require.Equal(t, "message 3", messages[0].Message)
+	require.Equal(t, "message 4", messages[1].Message)
+	require.Equal(t, "message 6", messages[2].Message) // Not scheduled m5!
+	require.Equal(t, "message 7", messages[3].Message)
+
+	// Case 2: Since ID exists, include scheduled
+	messages, _ = c.Messages("mytopic", newSinceID(m2.ID), true)
+	require.Equal(t, 5, len(messages))
+	require.Equal(t, "message 3", messages[0].Message)
+	require.Equal(t, "message 4", messages[1].Message)
+	require.Equal(t, "message 6", messages[2].Message)
+	require.Equal(t, "message 7", messages[3].Message)
+	require.Equal(t, "message 5", messages[4].Message) // Order!
+
+	// Case 3: Since ID does not exist (-> Return all messages), include scheduled
+	messages, _ = c.Messages("mytopic", newSinceID("doesntexist"), true)
+	require.Equal(t, 7, len(messages))
+	require.Equal(t, "message 1", messages[0].Message)
+	require.Equal(t, "message 2", messages[1].Message)
+	require.Equal(t, "message 3", messages[2].Message)
+	require.Equal(t, "message 4", messages[3].Message)
+	require.Equal(t, "message 6", messages[4].Message)
+	require.Equal(t, "message 7", messages[5].Message)
+	require.Equal(t, "message 5", messages[6].Message) // Order!
+
+	// Case 4: Since ID exists and is last message (-> Return no messages), exclude scheduled
+	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), false)
+	require.Equal(t, 0, len(messages))
+
+	// Case 5: Since ID exists and is last message (-> Return no messages), include scheduled
+	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), false)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "message 5", messages[0].Message)
+
+	// FIXME This test still fails because the behavior of the code is incorrect.
+	// TODO Add more delayed messages
 }
 
 func testCacheAttachments(t *testing.T, c cache) {

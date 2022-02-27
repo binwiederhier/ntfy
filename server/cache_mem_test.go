@@ -21,6 +21,10 @@ func TestMemCache_MessagesTagsPrioAndTitle(t *testing.T) {
 	testCacheMessagesTagsPrioAndTitle(t, newMemCache())
 }
 
+func TestMemCache_MessagesSinceID(t *testing.T) {
+	testCacheMessagesSinceID(t, newMemCache())
+}
+
 func TestMemCache_Prune(t *testing.T) {
 	testCachePrune(t, newMemCache())
 }

@@ -1,10 +1,22 @@
 package server
 
 import (
+	"database/sql"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestSqliteCache_Messages(t *testing.T) {
+	testCacheMessages(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Messages(t *testing.T) {
+	testCacheMessages(t, newMemTestCache(t))
+}
 
 func testCacheMessages(t *testing.T, c *sqliteCache) {
 	m1 := newDefaultMessage("mytopic", "my message")
@@ -72,61 +84,12 @@ func testCacheMessages(t *testing.T, c *sqliteCache) {
 	require.Empty(t, messages)
 }
 
-func testCacheTopics(t *testing.T, c *sqliteCache) {
-	require.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
-	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
-	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
-	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 3")))
-
-	topics, err := c.Topics()
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, 2, len(topics))
-	require.Equal(t, "topic1", topics["topic1"].ID)
-	require.Equal(t, "topic2", topics["topic2"].ID)
+func TestSqliteCache_MessagesScheduled(t *testing.T) {
+	testCacheMessagesScheduled(t, newSqliteTestCache(t))
 }
 
-func testCachePrune(t *testing.T, c *sqliteCache) {
-	m1 := newDefaultMessage("mytopic", "my message")
-	m1.Time = 1
-
-	m2 := newDefaultMessage("mytopic", "my other message")
-	m2.Time = 2
-
-	m3 := newDefaultMessage("another_topic", "and another one")
-	m3.Time = 1
-
-	require.Nil(t, c.AddMessage(m1))
-	require.Nil(t, c.AddMessage(m2))
-	require.Nil(t, c.AddMessage(m3))
-	require.Nil(t, c.Prune(time.Unix(2, 0)))
-
-	count, err := c.MessageCount("mytopic")
-	require.Nil(t, err)
-	require.Equal(t, 1, count)
-
-	count, err = c.MessageCount("another_topic")
-	require.Nil(t, err)
-	require.Equal(t, 0, count)
-
-	messages, err := c.Messages("mytopic", sinceAllMessages, false)
-	require.Nil(t, err)
-	require.Equal(t, 1, len(messages))
-	require.Equal(t, "my other message", messages[0].Message)
-}
-
-func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *sqliteCache) {
-	m := newDefaultMessage("mytopic", "some message")
-	m.Tags = []string{"tag1", "tag2"}
-	m.Priority = 5
-	m.Title = "some title"
-	require.Nil(t, c.AddMessage(m))
-
-	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
-	require.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
-	require.Equal(t, 5, messages[0].Priority)
-	require.Equal(t, "some title", messages[0].Title)
+func TestMemCache_MessagesScheduled(t *testing.T) {
+	testCacheMessagesScheduled(t, newMemTestCache(t))
 }
 
 func testCacheMessagesScheduled(t *testing.T, c *sqliteCache) {
@@ -153,6 +116,58 @@ func testCacheMessagesScheduled(t *testing.T, c *sqliteCache) {
 
 	messages, _ = c.MessagesDue()
 	require.Empty(t, messages)
+}
+
+func TestSqliteCache_Topics(t *testing.T) {
+	testCacheTopics(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Topics(t *testing.T) {
+	testCacheTopics(t, newMemTestCache(t))
+}
+
+func testCacheTopics(t *testing.T, c *sqliteCache) {
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 3")))
+
+	topics, err := c.Topics()
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, 2, len(topics))
+	require.Equal(t, "topic1", topics["topic1"].ID)
+	require.Equal(t, "topic2", topics["topic2"].ID)
+}
+
+func TestSqliteCache_MessagesTagsPrioAndTitle(t *testing.T) {
+	testCacheMessagesTagsPrioAndTitle(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_MessagesTagsPrioAndTitle(t *testing.T) {
+	testCacheMessagesTagsPrioAndTitle(t, newMemTestCache(t))
+}
+
+func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *sqliteCache) {
+	m := newDefaultMessage("mytopic", "some message")
+	m.Tags = []string{"tag1", "tag2"}
+	m.Priority = 5
+	m.Title = "some title"
+	require.Nil(t, c.AddMessage(m))
+
+	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
+	require.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
+	require.Equal(t, 5, messages[0].Priority)
+	require.Equal(t, "some title", messages[0].Title)
+}
+
+func TestSqliteCache_MessagesSinceID(t *testing.T) {
+	testCacheMessagesSinceID(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_MessagesSinceID(t *testing.T) {
+	testCacheMessagesSinceID(t, newMemTestCache(t))
 }
 
 func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
@@ -215,9 +230,51 @@ func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
 	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), true)
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "message 5", messages[0].Message)
+}
 
-	// FIXME This test still fails because the behavior of the code is incorrect.
-	// TODO Add more delayed messages
+func TestSqliteCache_Prune(t *testing.T) {
+	testCachePrune(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Prune(t *testing.T) {
+	testCachePrune(t, newMemTestCache(t))
+}
+
+func testCachePrune(t *testing.T, c *sqliteCache) {
+	m1 := newDefaultMessage("mytopic", "my message")
+	m1.Time = 1
+
+	m2 := newDefaultMessage("mytopic", "my other message")
+	m2.Time = 2
+
+	m3 := newDefaultMessage("another_topic", "and another one")
+	m3.Time = 1
+
+	require.Nil(t, c.AddMessage(m1))
+	require.Nil(t, c.AddMessage(m2))
+	require.Nil(t, c.AddMessage(m3))
+	require.Nil(t, c.Prune(time.Unix(2, 0)))
+
+	count, err := c.MessageCount("mytopic")
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+
+	count, err = c.MessageCount("another_topic")
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "my other message", messages[0].Message)
+}
+
+func TestSqliteCache_Attachments(t *testing.T) {
+	testCacheAttachments(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Attachments(t *testing.T) {
+	testCacheAttachments(t, newMemTestCache(t))
 }
 
 func testCacheAttachments(t *testing.T, c *sqliteCache) {
@@ -291,4 +348,149 @@ func testCacheAttachments(t *testing.T, c *sqliteCache) {
 	ids, err := c.AttachmentsExpired()
 	require.Nil(t, err)
 	require.Equal(t, []string{"m1"}, ids)
+}
+
+func TestSqliteCache_Migration_From0(t *testing.T) {
+	filename := newSqliteTestCacheFile(t)
+	db, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+
+	// Create "version 0" schema
+	_, err = db.Exec(`
+		BEGIN;
+		CREATE TABLE IF NOT EXISTS messages (
+			id VARCHAR(20) PRIMARY KEY,
+			time INT NOT NULL,
+			topic VARCHAR(64) NOT NULL,
+			message VARCHAR(1024) NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
+		COMMIT;
+	`)
+	require.Nil(t, err)
+
+	// Insert a bunch of messages
+	for i := 0; i < 10; i++ {
+		_, err = db.Exec(`INSERT INTO messages (id, time, topic, message) VALUES (?, ?, ?, ?)`,
+			fmt.Sprintf("abcd%d", i), time.Now().Unix(), "mytopic", fmt.Sprintf("some message %d", i))
+		require.Nil(t, err)
+	}
+	require.Nil(t, db.Close())
+
+	// Create cache to trigger migration
+	c := newSqliteTestCacheFromFile(t, filename)
+	checkSchemaVersion(t, c.db)
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 10, len(messages))
+	require.Equal(t, "some message 5", messages[5].Message)
+	require.Equal(t, "", messages[5].Title)
+	require.Nil(t, messages[5].Tags)
+	require.Equal(t, 0, messages[5].Priority)
+}
+
+func TestSqliteCache_Migration_From1(t *testing.T) {
+	filename := newSqliteTestCacheFile(t)
+	db, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+
+	// Create "version 1" schema
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS messages (
+			id VARCHAR(20) PRIMARY KEY,
+			time INT NOT NULL,
+			topic VARCHAR(64) NOT NULL,
+			message VARCHAR(512) NOT NULL,
+			title VARCHAR(256) NOT NULL,
+			priority INT NOT NULL,
+			tags VARCHAR(256) NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
+		CREATE TABLE IF NOT EXISTS schemaVersion (
+			id INT PRIMARY KEY,
+			version INT NOT NULL
+		);		
+		INSERT INTO schemaVersion (id, version) VALUES (1, 1);
+	`)
+	require.Nil(t, err)
+
+	// Insert a bunch of messages
+	for i := 0; i < 10; i++ {
+		_, err = db.Exec(`INSERT INTO messages (id, time, topic, message, title, priority, tags) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			fmt.Sprintf("abcd%d", i), time.Now().Unix(), "mytopic", fmt.Sprintf("some message %d", i), "", 0, "")
+		require.Nil(t, err)
+	}
+	require.Nil(t, db.Close())
+
+	// Create cache to trigger migration
+	c := newSqliteTestCacheFromFile(t, filename)
+	checkSchemaVersion(t, c.db)
+
+	// Add delayed message
+	delayedMessage := newDefaultMessage("mytopic", "some delayed message")
+	delayedMessage.Time = time.Now().Add(time.Minute).Unix()
+	require.Nil(t, c.AddMessage(delayedMessage))
+
+	// 10, not 11!
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 10, len(messages))
+
+	// 11!
+	messages, err = c.Messages("mytopic", sinceAllMessages, true)
+	require.Nil(t, err)
+	require.Equal(t, 11, len(messages))
+}
+
+func checkSchemaVersion(t *testing.T, db *sql.DB) {
+	rows, err := db.Query(`SELECT version FROM schemaVersion`)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+
+	var schemaVersion int
+	require.Nil(t, rows.Scan(&schemaVersion))
+	require.Equal(t, currentSchemaVersion, schemaVersion)
+	require.Nil(t, rows.Close())
+}
+
+func TestMemCache_NopCache(t *testing.T) {
+	c, _ := newNopCache()
+	assert.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	assert.Nil(t, err)
+	assert.Empty(t, messages)
+
+	topics, err := c.Topics()
+	assert.Nil(t, err)
+	assert.Empty(t, topics)
+}
+
+func newSqliteTestCache(t *testing.T) *sqliteCache {
+	c, err := newSqliteCache(newSqliteTestCacheFile(t), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func newSqliteTestCacheFile(t *testing.T) string {
+	return filepath.Join(t.TempDir(), "cache.db")
+}
+
+func newSqliteTestCacheFromFile(t *testing.T, filename string) *sqliteCache {
+	c, err := newSqliteCache(filename, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func newMemTestCache(t *testing.T) *sqliteCache {
+	c, err := newMemCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }

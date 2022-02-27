@@ -65,7 +65,7 @@ const (
 	selectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
-		WHERE topic = ? AND id > ?
+		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
@@ -196,7 +196,7 @@ func newNopCache() (*sqliteCache, error) {
 	return newSqliteCache(createMemoryFilename(), true)
 }
 
-// createMemoryFilename creates a unique filename to use for the SQLite backend.
+// createMemoryFilename creates a unique memory filename to use for the SQLite backend.
 // From mattn/go-sqlite3: "Each connection to ":memory:" opens a brand new in-memory
 // sql database, so if the stdlib's sql engine happens to open another connection and
 // you've only specified ":memory:", that connection will see a brand new database.
@@ -283,6 +283,7 @@ func (c *sqliteCache) messagesSinceID(topic string, since sinceMarker, scheduled
 	if err := idrows.Scan(&rowID); err != nil {
 		return nil, err
 	}
+	idrows.Close()
 	var rows *sql.Rows
 	if scheduled {
 		rows, err = c.db.Query(selectMessagesSinceIDIncludeScheduledQuery, topic, rowID)

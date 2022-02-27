@@ -4,6 +4,14 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 
 ## Active deprecations
 
+### Android app: Using `since=<timestamp>` instead of `since=<id>` 
+> since 2022-02-27
+
+In about 3 months, the Android app will start using `since=<id>` instead of `since=<timestamp>`, which means that it will
+not work with servers older than v1.16.0 anymore. This is to simplify handling of deduplication in the Android app.
+
+The `since=<timestamp>` endpoint will continue to work. This is merely a notice that the Android app behavior will change.
+
 ### Running server via `ntfy` (instead of `ntfy serve`)
 > since 2021-12-17
 

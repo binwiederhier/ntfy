@@ -176,11 +176,11 @@ func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
 	m2 := newDefaultMessage("mytopic", "message 2")
 	m2.Time = 200
 	m3 := newDefaultMessage("mytopic", "message 3")
-	m3.Time = 300
+	m3.Time = time.Now().Add(time.Hour).Unix() // Scheduled, in the future, later than m7 and m5
 	m4 := newDefaultMessage("mytopic", "message 4")
 	m4.Time = 400
 	m5 := newDefaultMessage("mytopic", "message 5")
-	m5.Time = time.Now().Add(time.Minute).Unix() // Scheduled, in the future, later than m6
+	m5.Time = time.Now().Add(time.Minute).Unix() // Scheduled, in the future, later than m7
 	m6 := newDefaultMessage("mytopic", "message 6")
 	m6.Time = 600
 	m7 := newDefaultMessage("mytopic", "message 7")
@@ -196,31 +196,30 @@ func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
 
 	// Case 1: Since ID exists, exclude scheduled
 	messages, _ := c.Messages("mytopic", newSinceID(m2.ID), false)
-	require.Equal(t, 4, len(messages))
-	require.Equal(t, "message 3", messages[0].Message)
-	require.Equal(t, "message 4", messages[1].Message)
-	require.Equal(t, "message 6", messages[2].Message) // Not scheduled m5!
-	require.Equal(t, "message 7", messages[3].Message)
+	require.Equal(t, 3, len(messages))
+	require.Equal(t, "message 4", messages[0].Message)
+	require.Equal(t, "message 6", messages[1].Message) // Not scheduled m3/m5!
+	require.Equal(t, "message 7", messages[2].Message)
 
 	// Case 2: Since ID exists, include scheduled
 	messages, _ = c.Messages("mytopic", newSinceID(m2.ID), true)
 	require.Equal(t, 5, len(messages))
-	require.Equal(t, "message 3", messages[0].Message)
-	require.Equal(t, "message 4", messages[1].Message)
-	require.Equal(t, "message 6", messages[2].Message)
-	require.Equal(t, "message 7", messages[3].Message)
-	require.Equal(t, "message 5", messages[4].Message) // Order!
+	require.Equal(t, "message 4", messages[0].Message)
+	require.Equal(t, "message 6", messages[1].Message)
+	require.Equal(t, "message 7", messages[2].Message)
+	require.Equal(t, "message 5", messages[3].Message) // Order!
+	require.Equal(t, "message 3", messages[4].Message) // Order!
 
 	// Case 3: Since ID does not exist (-> Return all messages), include scheduled
 	messages, _ = c.Messages("mytopic", newSinceID("doesntexist"), true)
 	require.Equal(t, 7, len(messages))
 	require.Equal(t, "message 1", messages[0].Message)
 	require.Equal(t, "message 2", messages[1].Message)
-	require.Equal(t, "message 3", messages[2].Message)
-	require.Equal(t, "message 4", messages[3].Message)
-	require.Equal(t, "message 6", messages[4].Message)
-	require.Equal(t, "message 7", messages[5].Message)
-	require.Equal(t, "message 5", messages[6].Message) // Order!
+	require.Equal(t, "message 4", messages[2].Message)
+	require.Equal(t, "message 6", messages[3].Message)
+	require.Equal(t, "message 7", messages[4].Message)
+	require.Equal(t, "message 5", messages[5].Message) // Order!
+	require.Equal(t, "message 3", messages[6].Message) // Order!
 
 	// Case 4: Since ID exists and is last message (-> Return no messages), exclude scheduled
 	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), false)
@@ -228,8 +227,9 @@ func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
 
 	// Case 5: Since ID exists and is last message (-> Return no messages), include scheduled
 	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), true)
-	require.Equal(t, 1, len(messages))
+	require.Equal(t, 2, len(messages))
 	require.Equal(t, "message 5", messages[0].Message)
+	require.Equal(t, "message 3", messages[1].Message)
 }
 
 func TestSqliteCache_Prune(t *testing.T) {

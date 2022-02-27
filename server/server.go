@@ -162,11 +162,11 @@ func New(conf *Config) (*Server, error) {
 
 func createCache(conf *Config) (cache, error) {
 	if conf.CacheDuration == 0 {
-		return newNopCache(), nil
+		return newNopCache()
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile)
+		return newSqliteCache(conf.CacheFile, false)
 	}
-	return newMemCache(), nil
+	return newMemCache()
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts

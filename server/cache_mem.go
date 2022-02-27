@@ -15,25 +15,6 @@ type memCache struct {
 
 var _ cache = (*memCache)(nil)
 
-// newMemCache creates an in-memory cache
-func newMemCache() *memCache {
-	return &memCache{
-		messages:  make(map[string][]*message),
-		scheduled: make(map[string]*message),
-		nop:       false,
-	}
-}
-
-// newNopCache creates an in-memory cache that discards all messages;
-// it is always empty and can be used if caching is entirely disabled
-func newNopCache() *memCache {
-	return &memCache{
-		messages:  make(map[string][]*message),
-		scheduled: make(map[string]*message),
-		nop:       true,
-	}
-}
-
 func (c *memCache) AddMessage(m *message) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

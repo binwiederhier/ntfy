@@ -212,7 +212,7 @@ func testCacheMessagesSinceID(t *testing.T, c cache) {
 	require.Equal(t, 0, len(messages))
 
 	// Case 5: Since ID exists and is last message (-> Return no messages), include scheduled
-	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), false)
+	messages, _ = c.Messages("mytopic", newSinceID(m7.ID), true)
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "message 5", messages[0].Message)
 

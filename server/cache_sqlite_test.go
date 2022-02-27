@@ -142,7 +142,7 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 }
 
 func newSqliteTestCache(t *testing.T) *sqliteCache {
-	c, err := newSqliteCache(newSqliteTestCacheFile(t))
+	c, err := newSqliteCache(newSqliteTestCacheFile(t), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func newSqliteTestCacheFile(t *testing.T) string {
 }
 
 func newSqliteTestCacheFromFile(t *testing.T, filename string) *sqliteCache {
-	c, err := newSqliteCache(filename)
+	c, err := newSqliteCache(filename, false)
 	if err != nil {
 		t.Fatal(err)
 	}

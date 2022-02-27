@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func testCacheMessages(t *testing.T, c cache) {
+func testCacheMessages(t *testing.T, c *sqliteCache) {
 	m1 := newDefaultMessage("mytopic", "my message")
 	m1.Time = 1
 
@@ -72,7 +72,7 @@ func testCacheMessages(t *testing.T, c cache) {
 	require.Empty(t, messages)
 }
 
-func testCacheTopics(t *testing.T, c cache) {
+func testCacheTopics(t *testing.T, c *sqliteCache) {
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic1", "my example message")))
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 1")))
 	require.Nil(t, c.AddMessage(newDefaultMessage("topic2", "message 2")))
@@ -87,7 +87,7 @@ func testCacheTopics(t *testing.T, c cache) {
 	require.Equal(t, "topic2", topics["topic2"].ID)
 }
 
-func testCachePrune(t *testing.T, c cache) {
+func testCachePrune(t *testing.T, c *sqliteCache) {
 	m1 := newDefaultMessage("mytopic", "my message")
 	m1.Time = 1
 
@@ -116,7 +116,7 @@ func testCachePrune(t *testing.T, c cache) {
 	require.Equal(t, "my other message", messages[0].Message)
 }
 
-func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
+func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *sqliteCache) {
 	m := newDefaultMessage("mytopic", "some message")
 	m.Tags = []string{"tag1", "tag2"}
 	m.Priority = 5
@@ -129,7 +129,7 @@ func testCacheMessagesTagsPrioAndTitle(t *testing.T, c cache) {
 	require.Equal(t, "some title", messages[0].Title)
 }
 
-func testCacheMessagesScheduled(t *testing.T, c cache) {
+func testCacheMessagesScheduled(t *testing.T, c *sqliteCache) {
 	m1 := newDefaultMessage("mytopic", "message 1")
 	m2 := newDefaultMessage("mytopic", "message 2")
 	m2.Time = time.Now().Add(time.Hour).Unix()
@@ -155,7 +155,7 @@ func testCacheMessagesScheduled(t *testing.T, c cache) {
 	require.Empty(t, messages)
 }
 
-func testCacheMessagesSinceID(t *testing.T, c cache) {
+func testCacheMessagesSinceID(t *testing.T, c *sqliteCache) {
 	m1 := newDefaultMessage("mytopic", "message 1")
 	m1.Time = 100
 	m2 := newDefaultMessage("mytopic", "message 2")
@@ -220,7 +220,7 @@ func testCacheMessagesSinceID(t *testing.T, c cache) {
 	// TODO Add more delayed messages
 }
 
-func testCacheAttachments(t *testing.T, c cache) {
+func testCacheAttachments(t *testing.T, c *sqliteCache) {
 	expires1 := time.Now().Add(-4 * time.Hour).Unix()
 	m := newDefaultMessage("mytopic", "flower for you")
 	m.ID = "m1"

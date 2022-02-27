@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
@@ -13,28 +14,56 @@ func TestSqliteCache_Messages(t *testing.T) {
 	testCacheMessages(t, newSqliteTestCache(t))
 }
 
+func TestMemCache_Messages(t *testing.T) {
+	testCacheMessages(t, newMemTestCache(t))
+}
+
 func TestSqliteCache_MessagesScheduled(t *testing.T) {
 	testCacheMessagesScheduled(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_MessagesScheduled(t *testing.T) {
+	testCacheMessagesScheduled(t, newMemTestCache(t))
 }
 
 func TestSqliteCache_Topics(t *testing.T) {
 	testCacheTopics(t, newSqliteTestCache(t))
 }
 
+func TestMemCache_Topics(t *testing.T) {
+	testCacheTopics(t, newMemTestCache(t))
+}
+
 func TestSqliteCache_MessagesTagsPrioAndTitle(t *testing.T) {
 	testCacheMessagesTagsPrioAndTitle(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_MessagesTagsPrioAndTitle(t *testing.T) {
+	testCacheMessagesTagsPrioAndTitle(t, newMemTestCache(t))
 }
 
 func TestSqliteCache_MessagesSinceID(t *testing.T) {
 	testCacheMessagesSinceID(t, newSqliteTestCache(t))
 }
 
+func TestMemCache_MessagesSinceID(t *testing.T) {
+	testCacheMessagesSinceID(t, newMemTestCache(t))
+}
+
 func TestSqliteCache_Prune(t *testing.T) {
 	testCachePrune(t, newSqliteTestCache(t))
 }
 
+func TestMemCache_Prune(t *testing.T) {
+	testCachePrune(t, newMemTestCache(t))
+}
+
 func TestSqliteCache_Attachments(t *testing.T) {
 	testCacheAttachments(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Attachments(t *testing.T) {
+	testCacheAttachments(t, newMemTestCache(t))
 }
 
 func TestSqliteCache_Migration_From0(t *testing.T) {
@@ -141,6 +170,19 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 	require.Nil(t, rows.Close())
 }
 
+func TestMemCache_NopCache(t *testing.T) {
+	c, _ := newNopCache()
+	assert.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	assert.Nil(t, err)
+	assert.Empty(t, messages)
+
+	topics, err := c.Topics()
+	assert.Nil(t, err)
+	assert.Empty(t, topics)
+}
+
 func newSqliteTestCache(t *testing.T) *sqliteCache {
 	c, err := newSqliteCache(newSqliteTestCacheFile(t), false)
 	if err != nil {
@@ -155,6 +197,14 @@ func newSqliteTestCacheFile(t *testing.T) string {
 
 func newSqliteTestCacheFromFile(t *testing.T, filename string) *sqliteCache {
 	c, err := newSqliteCache(filename, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func newMemTestCache(t *testing.T) *sqliteCache {
+	c, err := newMemCache()
 	if err != nil {
 		t.Fatal(err)
 	}

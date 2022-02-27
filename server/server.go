@@ -45,7 +45,7 @@ type Server struct {
 	mailer       mailer
 	messages     int64
 	auth         auth.Auther
-	cache        cache
+	cache        *sqliteCache
 	fileCache    *fileCache
 	closeChan    chan bool
 	mu           sync.Mutex
@@ -160,7 +160,7 @@ func New(conf *Config) (*Server, error) {
 	}, nil
 }
 
-func createCache(conf *Config) (cache, error) {
+func createCache(conf *Config) (*sqliteCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
 	} else if conf.CacheFile != "" {

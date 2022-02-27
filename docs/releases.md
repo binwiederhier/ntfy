@@ -7,7 +7,7 @@ Released Feb 27, 2022
 
 **Features & Bug fixes:**
 
-* Add auth support for subscribing with CLI (#147/#148, thanks @lrabane)
+* Add [auth support](https://ntfy.sh/docs/subscribe/cli/#authentication) for subscribing with CLI (#147/#148, thanks @lrabane)
 * Add support for [?since=<id>](https://ntfy.sh/docs/subscribe/api/#fetch-cached-messages) (#151, thanks for reporting @nachotp)
 
 **Documentation:**

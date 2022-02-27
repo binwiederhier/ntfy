@@ -247,11 +247,13 @@ curl -s "ntfy.sh/mytopic/json?poll=1"
 ### Fetch cached messages
 Messages may be cached for a couple of hours (see [message caching](../config.md#message-cache)) to account for network
 interruptions of subscribers. If the server has configured message caching, you can read back what you missed by using 
-the `since=` query parameter. It takes either a duration (e.g. `10m` or `30s`), a Unix timestamp (e.g. `1635528757`) 
-or `all` (all cached messages).
+the `since=` query parameter. It takes a duration (e.g. `10m` or `30s`), a Unix timestamp (e.g. `1635528757`),
+a message ID (e.g. `nFS3knfcQ1xe`), or `all` (all cached messages).
 
 ```
 curl -s "ntfy.sh/mytopic/json?since=10m"
+curl -s "ntfy.sh/mytopic/json?since=1645970742"
+curl -s "ntfy.sh/mytopic/json?since=nFS3knfcQ1xe"
 ```
 
 ### Fetch scheduled messages
@@ -395,7 +397,6 @@ Here's an example for each message type:
     }
     ```    
 
-
 === "Poll request message"
     ``` json
     {
@@ -413,6 +414,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | Parameter   | Aliases (case-insensitive) | Description                                                                     |
 |-------------|----------------------------|---------------------------------------------------------------------------------|
 | `poll`      | `X-Poll`, `po`             | Return cached messages and close connection                                     |
+| `since`     | `X-Since`, `si`            | Return cached messages since timestamp, duration or message ID                  |
 | `scheduled` | `X-Scheduled`, `sched`     | Include scheduled/delayed messages in message list                              |
 | `message`   | `X-Message`, `m`           | Filter: Only return messages that match this exact message string               |
 | `title`     | `X-Title`, `t`             | Filter: Only return messages that match this exact title string                 |

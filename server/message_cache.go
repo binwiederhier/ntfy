@@ -5,9 +5,14 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"heckel.io/ntfy/util"
 	"log"
 	"strings"
 	"time"
+)
+
+var (
+	errUnexpectedMessageType = errors.New("unexpected message type")
 )
 
 // Messages cache
@@ -42,6 +47,7 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
+	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE topic = ? AND mid = ?`
 	selectMessagesSinceTimeQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
@@ -57,16 +63,13 @@ const (
 	selectMessagesSinceIDQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
-		WHERE topic = ?
-          AND published = 1 
-		  AND id > (SELECT IFNULL(id,0) FROM messages WHERE mid = ?) 
+		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
-		WHERE topic = ? 
-		  AND id > (SELECT IFNULL(id,0) FROM messages WHERE mid = ?)
+		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
@@ -165,13 +168,13 @@ const (
 	`
 )
 
-type sqliteCache struct {
-	db *sql.DB
+type messageCache struct {
+	db  *sql.DB
+	nop bool
 }
 
-var _ cache = (*sqliteCache)(nil)
-
-func newSqliteCache(filename string) (*sqliteCache, error) {
+// newSqliteCache creates a SQLite file-backed cache
+func newSqliteCache(filename string, nop bool) (*messageCache, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -179,14 +182,39 @@ func newSqliteCache(filename string) (*sqliteCache, error) {
 	if err := setupCacheDB(db); err != nil {
 		return nil, err
 	}
-	return &sqliteCache{
-		db: db,
+	return &messageCache{
+		db:  db,
+		nop: nop,
 	}, nil
 }
 
-func (c *sqliteCache) AddMessage(m *message) error {
+// newMemCache creates an in-memory cache
+func newMemCache() (*messageCache, error) {
+	return newSqliteCache(createMemoryFilename(), false)
+}
+
+// newNopCache creates an in-memory cache that discards all messages;
+// it is always empty and can be used if caching is entirely disabled
+func newNopCache() (*messageCache, error) {
+	return newSqliteCache(createMemoryFilename(), true)
+}
+
+// createMemoryFilename creates a unique memory filename to use for the SQLite backend.
+// From mattn/go-sqlite3: "Each connection to ":memory:" opens a brand new in-memory
+// sql database, so if the stdlib's sql engine happens to open another connection and
+// you've only specified ":memory:", that connection will see a brand new database.
+// A workaround is to use "file::memory:?cache=shared" (or "file:foobar?mode=memory&cache=shared").
+// Every connection to this string will point to the same in-memory database."
+func createMemoryFilename() string {
+	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
+}
+
+func (c *messageCache) AddMessage(m *message) error {
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
+	}
+	if c.nop {
+		return nil
 	}
 	published := m.Time <= time.Now().Unix()
 	tags := strings.Join(m.Tags, ",")
@@ -222,24 +250,22 @@ func (c *sqliteCache) AddMessage(m *message) error {
 	return err
 }
 
-func (c *sqliteCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
+func (c *messageCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	if since.IsNone() {
 		return make([]*message, 0), nil
+	} else if since.IsID() {
+		return c.messagesSinceID(topic, since, scheduled)
 	}
+	return c.messagesSinceTime(topic, since, scheduled)
+}
+
+func (c *messageCache) messagesSinceTime(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	var rows *sql.Rows
 	var err error
-	if since.IsID() {
-		if scheduled {
-			rows, err = c.db.Query(selectMessagesSinceIDIncludeScheduledQuery, topic, since.ID())
-		} else {
-			rows, err = c.db.Query(selectMessagesSinceIDQuery, topic, since.ID())
-		}
+	if scheduled {
+		rows, err = c.db.Query(selectMessagesSinceTimeIncludeScheduledQuery, topic, since.Time().Unix())
 	} else {
-		if scheduled {
-			rows, err = c.db.Query(selectMessagesSinceTimeIncludeScheduledQuery, topic, since.Time().Unix())
-		} else {
-			rows, err = c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
-		}
+		rows, err = c.db.Query(selectMessagesSinceTimeQuery, topic, since.Time().Unix())
 	}
 	if err != nil {
 		return nil, err
@@ -247,7 +273,33 @@ func (c *sqliteCache) Messages(topic string, since sinceMarker, scheduled bool) 
 	return readMessages(rows)
 }
 
-func (c *sqliteCache) MessagesDue() ([]*message, error) {
+func (c *messageCache) messagesSinceID(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
+	idrows, err := c.db.Query(selectRowIDFromMessageID, topic, since.ID())
+	if err != nil {
+		return nil, err
+	}
+	defer idrows.Close()
+	if !idrows.Next() {
+		return c.messagesSinceTime(topic, sinceAllMessages, scheduled)
+	}
+	var rowID int64
+	if err := idrows.Scan(&rowID); err != nil {
+		return nil, err
+	}
+	idrows.Close()
+	var rows *sql.Rows
+	if scheduled {
+		rows, err = c.db.Query(selectMessagesSinceIDIncludeScheduledQuery, topic, rowID)
+	} else {
+		rows, err = c.db.Query(selectMessagesSinceIDQuery, topic, rowID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return readMessages(rows)
+}
+
+func (c *messageCache) MessagesDue() ([]*message, error) {
 	rows, err := c.db.Query(selectMessagesDueQuery, time.Now().Unix())
 	if err != nil {
 		return nil, err
@@ -255,12 +307,12 @@ func (c *sqliteCache) MessagesDue() ([]*message, error) {
 	return readMessages(rows)
 }
 
-func (c *sqliteCache) MarkPublished(m *message) error {
+func (c *messageCache) MarkPublished(m *message) error {
 	_, err := c.db.Exec(updateMessagePublishedQuery, m.ID)
 	return err
 }
 
-func (c *sqliteCache) MessageCount(topic string) (int, error) {
+func (c *messageCache) MessageCount(topic string) (int, error) {
 	rows, err := c.db.Query(selectMessageCountForTopicQuery, topic)
 	if err != nil {
 		return 0, err
@@ -278,7 +330,7 @@ func (c *sqliteCache) MessageCount(topic string) (int, error) {
 	return count, nil
 }
 
-func (c *sqliteCache) Topics() (map[string]*topic, error) {
+func (c *messageCache) Topics() (map[string]*topic, error) {
 	rows, err := c.db.Query(selectTopicsQuery)
 	if err != nil {
 		return nil, err
@@ -298,12 +350,12 @@ func (c *sqliteCache) Topics() (map[string]*topic, error) {
 	return topics, nil
 }
 
-func (c *sqliteCache) Prune(olderThan time.Time) error {
+func (c *messageCache) Prune(olderThan time.Time) error {
 	_, err := c.db.Exec(pruneMessagesQuery, olderThan.Unix())
 	return err
 }
 
-func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
+func (c *messageCache) AttachmentsSize(owner string) (int64, error) {
 	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner, time.Now().Unix())
 	if err != nil {
 		return 0, err
@@ -321,7 +373,7 @@ func (c *sqliteCache) AttachmentsSize(owner string) (int64, error) {
 	return size, nil
 }
 
-func (c *sqliteCache) AttachmentsExpired() ([]string, error) {
+func (c *messageCache) AttachmentsExpired() ([]string, error) {
 	rows, err := c.db.Query(selectAttachmentsExpiredQuery, time.Now().Unix())
 	if err != nil {
 		return nil, err

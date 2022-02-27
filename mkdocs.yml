@@ -82,8 +82,9 @@ nav:
 - "Other things":
   - "FAQs": faq.md
   - "Examples": examples.md
-  - "Emojis 🥳 🎉": emojis.md
+  - "Release notes": releases.md
   - "Deprecation notices": deprecations.md
+  - "Emojis 🥳 🎉": emojis.md
   - "Development": develop.md
   - "Privacy policy": privacy.md
 

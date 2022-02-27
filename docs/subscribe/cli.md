@@ -196,3 +196,27 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl restart ntfy-client
 ```
+
+
+### Authentication
+Depending on whether the server is configured to support [access control](../config.md#access-control), some topics
+may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
+To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
+with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
+your password. 
+
+You can either add your username and password to the configuration file:
+=== "~/.config/ntfy/client.yml"
+	```yaml
+	 - topic: secret
+	   command: 'notify-send "$m"'
+	   user: phill
+	   password: mypass
+	```
+
+Or with the `ntfy subscibe` command:
+```
+ntfy subscribe \
+  -u phil:mypass \
+  ntfy.example.com/mysecrets
+```

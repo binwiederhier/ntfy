@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import {ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
-import NotificationList from "./NotificationList";
+import Notifications from "./Notifications";
 import theme from "./theme";
 import api from "../app/Api";
 import repository from "../app/Repository";
@@ -14,14 +14,13 @@ import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import Users from "../app/Users";
 import notificationManager from "../app/NotificationManager";
+import NoTopics from "./NoTopics";
 
-// FIXME chrome notification order
 // TODO subscribe dialog:
 //  - check/use existing user
 //  - add baseUrl
 // TODO user management
 // TODO embed into ntfy server
-// TODO remember selected subscription
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -84,9 +83,16 @@ const App = () => {
     useEffect(() => {
         // Load subscriptions and users
         const subscriptions = repository.loadSubscriptions();
+        const selectedSubscriptionId = repository.loadSelectedSubscriptionId();
         const users = repository.loadUsers();
         setSubscriptions(subscriptions);
         setUsers(users);
+
+        // Set selected subscription
+        const maybeSelectedSubscription = subscriptions.get(selectedSubscriptionId);
+        if (maybeSelectedSubscription) {
+            setSelectedSubscription(maybeSelectedSubscription);
+        }
 
         // Poll all subscriptions
         subscriptions.forEach((subscriptionId, subscription) => {
@@ -109,6 +115,10 @@ const App = () => {
     }, [subscriptions, users]);
     useEffect(() => repository.saveSubscriptions(subscriptions), [subscriptions]);
     useEffect(() => repository.saveUsers(users), [users]);
+    useEffect(() => {
+        const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";
+        repository.saveSelectedSubscriptionId(subscriptionId)
+    }, [selectedSubscription]);
 
     return (
         <ThemeProvider theme={theme}>
@@ -137,8 +147,10 @@ const App = () => {
                 <Box
                     component="main"
                     sx={{
+                        display: 'flex',
                         flexGrow: 1,
-                        p: 3,
+                        flexDirection: 'column',
+                        padding: 3,
                         width: {sm: `calc(100% - ${Navigation.width}px)`},
                         height: '100vh',
                         overflow: 'auto',
@@ -146,10 +158,11 @@ const App = () => {
                 }}>
                     <Toolbar/>
                     {selectedSubscription !== null &&
-                        <NotificationList
+                        <Notifications
                             subscription={selectedSubscription}
                             onDeleteNotification={handleDeleteNotification}
                         />}
+                    {selectedSubscription == null && <NoTopics />}
                 </Box>
             </Box>
         </ThemeProvider>

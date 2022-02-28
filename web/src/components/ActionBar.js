@@ -26,6 +26,7 @@ const ActionBar = (props) => {
                 >
                     <MenuIcon />
                 </IconButton>
+                <img src="static/img/ntfy.svg" height="28" style={{ marginRight: '10px' }}/>
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>

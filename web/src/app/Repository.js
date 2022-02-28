@@ -76,6 +76,17 @@ class Repository {
         }));
         localStorage.setItem('users', serialized);
     }
+
+    loadSelectedSubscriptionId() {
+        console.log(`[Repository] Loading selected subscription ID from localStorage`);
+        const selectedSubscriptionId = localStorage.getItem('selectedSubscriptionId');
+        return (selectedSubscriptionId) ? selectedSubscriptionId : "";
+    }
+
+    saveSelectedSubscriptionId(selectedSubscriptionId) {
+        console.log(`[Repository] Saving selected subscription ${selectedSubscriptionId} to localStorage`);
+        localStorage.setItem('selectedSubscriptionId', selectedSubscriptionId);
+    }
 }
 
 const repository = new Repository();

@@ -22,7 +22,6 @@ import notificationManager from "../app/NotificationManager";
 // TODO user management
 // TODO embed into ntfy server
 // TODO remember selected subscription
-// TODO since=<ID>
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -70,7 +69,7 @@ const App = () => {
         })
     };
     const poll = (subscription, user) => {
-        const since = subscription.last + 1; // FIXME, sigh ...
+        const since = subscription.last;
         api.poll(subscription.baseUrl, subscription.topic, since, user)
             .then(notifications => {
                 setSubscriptions(prev => {

@@ -17,7 +17,7 @@ class ConnectionManager {
                 const baseUrl = subscription.baseUrl;
                 const topic = subscription.topic;
                 const user = users.get(baseUrl);
-                const since = 0;
+                const since = subscription.last;
                 const connection = new Connection(id, baseUrl, topic, user, since, onNotification);
                 this.connections.set(id, connection);
                 console.log(`[ConnectionManager] Starting new connection ${id}`);

@@ -44,7 +44,7 @@ class Connection {
                     console.log(`[Connection, ${this.shortUrl}] Unexpected message. Ignoring.`);
                     return;
                 }
-                this.since = data.time + 1; // Sigh. This works because on reconnect, we wait 5+ seconds anyway.
+                this.since = data.id;
                 this.onNotification(this.subscriptionId, data);
             } catch (e) {
                 console.log(`[Connection, ${this.shortUrl}] Error handling message: ${e}`);
@@ -82,8 +82,8 @@ class Connection {
 
     wsUrl() {
         const params = [];
-        if (this.since > 0) {
-            params.push(`since=${this.since.toString()}`);
+        if (this.since) {
+            params.push(`since=${this.since}`);
         }
         if (this.user !== null) {
             const auth = encodeBase64Url(basicAuth(this.user.username, this.user.password));

@@ -11,7 +11,7 @@ import {
 class Api {
     async poll(baseUrl, topic, since, user) {
         const shortUrl = topicShortUrl(baseUrl, topic);
-        const url = (since > 1) // FIXME Ahh, this is >1, because we do +1 when we call this .....
+        const url = (since)
             ? topicUrlJsonPollWithSince(baseUrl, topic, since)
             : topicUrlJsonPoll(baseUrl, topic);
         const messages = [];

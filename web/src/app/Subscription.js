@@ -6,15 +6,15 @@ class Subscription {
         this.baseUrl = baseUrl;
         this.topic = topic;
         this.notifications = new Map(); // notification ID -> notification object
-        this.last = 0;
+        this.last = null; // Last message ID
     }
 
     addNotification(notification) {
-        if (this.notifications.has(notification.id) || notification.time < this.last) {
+        if (this.notifications.has(notification.id)) {
             return false;
         }
         this.notifications.set(notification.id, notification);
-        this.last = notification.time;
+        this.last = notification.id;
         return true;
     }
 

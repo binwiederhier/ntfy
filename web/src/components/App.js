@@ -15,6 +15,7 @@ import ActionBar from "./ActionBar";
 import Users from "../app/Users";
 import notificationManager from "../app/NotificationManager";
 import NoTopics from "./NoTopics";
+import Preferences from "./Preferences";
 
 // TODO subscribe dialog:
 //  - check/use existing user
@@ -26,10 +27,15 @@ const App = () => {
     console.log(`[App] Rendering main view`);
 
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+    const [prefsOpen, setPrefsOpen] = useState(false);
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
     const [users, setUsers] = useState(new Users());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
+    const handleSubscriptionClick = (subscriptionId) => {
+        setSelectedSubscription(subscriptions.get(subscriptionId));
+        setPrefsOpen(false);
+    }
     const handleSubscribeSubmit = (subscription, user) => {
         console.log(`[App] New subscription: ${subscription.id}`);
         if (user !== null) {
@@ -66,6 +72,10 @@ const App = () => {
         notificationManager.maybeRequestPermission((granted) => {
             setNotificationsGranted(granted);
         })
+    };
+    const handlePrefsClick = () => {
+        setPrefsOpen(true);
+        setSelectedSubscription(null);
     };
     const poll = (subscription, user) => {
         const since = subscription.last;
@@ -138,9 +148,11 @@ const App = () => {
                         selectedSubscription={selectedSubscription}
                         mobileDrawerOpen={mobileDrawerOpen}
                         notificationsGranted={notificationsGranted}
+                        prefsOpen={prefsOpen}
                         onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-                        onSubscriptionClick={(subscriptionId) => setSelectedSubscription(subscriptions.get(subscriptionId))}
+                        onSubscriptionClick={handleSubscriptionClick}
                         onSubscribeSubmit={handleSubscribeSubmit}
+                        onPrefsClick={handlePrefsClick}
                         onRequestPermissionClick={handleRequestPermission}
                     />
                 </Box>
@@ -155,18 +167,34 @@ const App = () => {
                         height: '100vh',
                         overflow: 'auto',
                         backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
-                }}>
+                    }}
+                >
                     <Toolbar/>
-                    {selectedSubscription !== null &&
-                        <Notifications
-                            subscription={selectedSubscription}
-                            onDeleteNotification={handleDeleteNotification}
-                        />}
-                    {selectedSubscription == null && <NoTopics />}
+                    <MainContent
+                        subscription={selectedSubscription}
+                        prefsOpen={prefsOpen}
+                        onDeleteNotification={handleDeleteNotification}
+                    />
                 </Box>
             </Box>
         </ThemeProvider>
     );
 }
+
+const MainContent = (props) => {
+    if (props.prefsOpen) {
+        return <Preferences/>;
+    }
+    if (props.subscription !== null) {
+        return (
+            <Notifications
+                subscription={props.subscription}
+                onDeleteNotification={props.onDeleteNotification}
+            />
+        );
+    } else {
+        return <NoTopics/>;
+    }
+};
 
 export default App;

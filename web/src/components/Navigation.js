@@ -14,6 +14,7 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
+import Preferences from "./Preferences";
 
 const navWidth = 240;
 
@@ -97,11 +98,15 @@ const NavList = (props) => {
                         <SubscriptionList
                             subscriptions={props.subscriptions}
                             selectedSubscription={props.selectedSubscription}
+                            prefsOpen={props.prefsOpen}
                             onSubscriptionClick={props.onSubscriptionClick}
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
-                <ListItemButton>
+                <ListItemButton
+                    onClick={props.onPrefsClick}
+                    selected={props.prefsOpen}
+                >
                     <ListItemIcon>
                         <SettingsIcon/>
                     </ListItemIcon>
@@ -115,7 +120,7 @@ const NavList = (props) => {
                 </ListItemButton>
             </List>
             <SubscribeDialog
-                key={subscribeDialogKey} // Resets dialog when canceled/closed
+                key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
                 open={subscribeDialogOpen}
                 subscriptions={props.subscriptions}
                 onCancel={handleSubscribeReset}
@@ -132,7 +137,7 @@ const SubscriptionList = (props) => {
                 <ListItemButton
                     key={id}
                     onClick={() => props.onSubscriptionClick(id)}
-                    selected={props.selectedSubscription && props.selectedSubscription.id === id}
+                    selected={props.selectedSubscription && !props.prefsOpen && props.selectedSubscription.id === id}
                 >
                     <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
                     <ListItemText primary={subscription.shortUrl()}/>

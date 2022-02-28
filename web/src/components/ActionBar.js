@@ -6,6 +6,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import Typography from "@mui/material/Typography";
 import IconSubscribeSettings from "./IconSubscribeSettings";
 import * as React from "react";
+import Box from "@mui/material/Box";
 
 const ActionBar = (props) => {
     const title = (props.selectedSubscription !== null)
@@ -26,7 +27,11 @@ const ActionBar = (props) => {
                 >
                     <MenuIcon />
                 </IconButton>
-                <img src="static/img/ntfy.svg" height="28" style={{ marginRight: '10px' }}/>
+                <Box component="img" src="static/img/ntfy.svg" sx={{
+                    display: { xs: 'none', sm: 'block' },
+                    marginRight: '10px',
+                    height: '28px'
+                }}/>
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>

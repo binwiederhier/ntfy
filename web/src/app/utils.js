@@ -11,8 +11,12 @@ export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/aut
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 
+export const validUrl = (url) => {
+    return url.match(/^https?:\/\//);
+}
+
 export const validTopic = (topic) => {
-    return topic.match(/^([-_a-zA-Z0-9]{1,64})$/) // Regex must match Go & Android app!
+    return topic.match(/^([-_a-zA-Z0-9]{1,64})$/); // Regex must match Go & Android app!
 }
 
 // Format emojis (see emoji.js)

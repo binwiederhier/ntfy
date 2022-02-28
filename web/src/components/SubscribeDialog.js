@@ -8,10 +8,10 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Subscription from "../app/Subscription";
-import {useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
-import {topicUrl, validTopic} from "../app/utils";
+import {topicUrl, validTopic, validUrl} from "../app/utils";
 import useStyles from "./styles";
 import User from "../app/User";
 
@@ -19,18 +19,20 @@ const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
 
 const SubscribeDialog = (props) => {
-    const [baseUrl, setBaseUrl] = useState(defaultBaseUrl); // FIXME
+    const [baseUrl, setBaseUrl] = useState("");
     const [topic, setTopic] = useState("");
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const handleSuccess = (baseUrl, topic, user) => {
-        const subscription = new Subscription(baseUrl, topic);
+    const handleSuccess = (user) => {
+        const actualBaseUrl = (baseUrl) ? baseUrl : defaultBaseUrl; // FIXME
+        const subscription = new Subscription(actualBaseUrl, topic);
         props.onSuccess(subscription, user);
     }
     return (
-        <Dialog open={props.open} onClose={props.onClose} fullScreen={fullScreen}>
+        <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
             {!showLoginPage && <SubscribePage
                 baseUrl={baseUrl}
+                setBaseUrl={setBaseUrl}
                 topic={topic}
                 setTopic={setTopic}
                 subscriptions={props.subscriptions}
@@ -49,8 +51,12 @@ const SubscribeDialog = (props) => {
 };
 
 const SubscribePage = (props) => {
-    const baseUrl = props.baseUrl;
+    const [anotherServerVisible, setAnotherServerVisible] = useState(false);
+    const baseUrl = (anotherServerVisible) ? props.baseUrl : defaultBaseUrl;
     const topic = props.topic;
+    const existingTopicUrls = props.subscriptions.map((id, s) => s.url());
+    const existingBaseUrls = Array.from(new Set(["https://ntfy.sh", ...props.subscriptions.map((id, s) => s.baseUrl)]))
+        .filter(s => s !== defaultBaseUrl);
     const handleSubscribe = async () => {
         const success = await api.auth(baseUrl, topic, null);
         if (!success) {
@@ -59,10 +65,21 @@ const SubscribePage = (props) => {
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for anonymous user`);
-        props.onSuccess(baseUrl, topic, null);
+        props.onSuccess(null);
     };
-    const existingTopicUrls = props.subscriptions.map((id, s) => s.url());
-    const subscribeButtonEnabled = validTopic(props.topic) && !existingTopicUrls.includes(topicUrl(baseUrl, topic));
+    const handleUseAnotherChanged = (e) => {
+        props.setBaseUrl("");
+        setAnotherServerVisible(e.target.checked);
+    };
+    const subscribeButtonEnabled = (() => {
+        if (anotherServerVisible) {
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
+            return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
+        } else {
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(defaultBaseUrl, topic)); // FIXME
+            return validTopic(topic) && !isExistingTopicUrl;
+        }
+    })();
     return (
         <>
             <DialogTitle>Subscribe to topic</DialogTitle>
@@ -75,13 +92,27 @@ const SubscribePage = (props) => {
                     autoFocus
                     margin="dense"
                     id="topic"
-                    label="Topic name, e.g. phil_alerts"
+                    placeholder="Topic name, e.g. phil_alerts"
                     value={props.topic}
                     onChange={ev => props.setTopic(ev.target.value)}
                     type="text"
                     fullWidth
                     variant="standard"
                 />
+                <FormControlLabel
+                    sx={{pt: 1}}
+                    control={<Checkbox onChange={handleUseAnotherChanged}/>}
+                    label="Use another server" />
+                {anotherServerVisible && <Autocomplete
+                    freeSolo
+                    options={existingBaseUrls}
+                    sx={{ maxWidth: 400 }}
+                    inputValue={props.baseUrl}
+                    onInputChange={(ev, newVal) => props.setBaseUrl(newVal)}
+                    renderInput={ (params) =>
+                        <TextField {...params} placeholder={defaultBaseUrl} variant="standard"/>
+                    }
+                />}
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onCancel}>Cancel</Button>
@@ -96,7 +127,7 @@ const LoginPage = (props) => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
-    const baseUrl = props.baseUrl;
+    const baseUrl = (props.baseUrl) ? props.baseUrl : defaultBaseUrl;
     const topic = props.topic;
     const handleLogin = async () => {
         const user = new User(baseUrl, username, password);
@@ -107,7 +138,7 @@ const LoginPage = (props) => {
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
-        props.onSuccess(baseUrl, topic, user);
+        props.onSuccess(user);
     };
     return (
         <>

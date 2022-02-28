@@ -16,6 +16,15 @@ const theme = createTheme({
       main: '#444',
     }
   },
+  components: {
+    MuiListItemIcon: {
+      styleOverrides: {
+        root: {
+          minWidth: '36px',
+        },
+      },
+    },
+  },
 });
 
 export default theme;

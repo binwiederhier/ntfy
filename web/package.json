@@ -15,7 +15,6 @@
     "@mui/styles": "^5.4.2",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "^6.2.1",
     "react-scripts": "^3.0.1"
   },
   "browserslist": {

@@ -10,7 +10,7 @@ class Subscription {
     }
 
     addNotification(notification) {
-        if (this.notifications.has(notification.id)) {
+        if (!notification.event || notification.event !== 'message' || this.notifications.has(notification.id)) {
             return false;
         }
         this.notifications.set(notification.id, notification);

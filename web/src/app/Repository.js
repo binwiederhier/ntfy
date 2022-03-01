@@ -87,6 +87,24 @@ class Repository {
         console.log(`[Repository] Saving selected subscription ${selectedSubscriptionId} to localStorage`);
         localStorage.setItem('selectedSubscriptionId', selectedSubscriptionId);
     }
+
+    setMinPriority(minPriority) {
+        localStorage.setItem('minPriority', minPriority.toString());
+    }
+
+    getMinPriority() {
+        const minPriority = localStorage.getItem('minPriority');
+        return (minPriority) ? Number(minPriority) : 1;
+    }
+
+    setDeleteAfter(deleteAfter) {
+        localStorage.setItem('deleteAfter', deleteAfter.toString());
+    }
+
+    getDeleteAfter() {
+        const deleteAfter = localStorage.getItem('deleteAfter');
+        return (deleteAfter) ? Number(deleteAfter) : 604800; // Default is one week
+    }
 }
 
 const repository = new Repository();

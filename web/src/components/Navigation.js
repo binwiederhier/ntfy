@@ -14,7 +14,6 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import Preferences from "./Preferences";
 
 const navWidth = 240;
 
@@ -72,24 +71,7 @@ const NavList = (props) => {
             <List component="nav" sx={{
                 paddingTop: (showGrantPermissionsBox) ? '0' : ''
             }}>
-                {showGrantPermissionsBox &&
-                    <>
-                        <Alert severity="warning" sx={{paddingTop: 2}}>
-                            <AlertTitle>Notifications are disabled</AlertTitle>
-                            <Typography gutterBottom>
-                                Grant your browser permission to display desktop notifications.
-                            </Typography>
-                            <Button
-                                sx={{float: 'right'}}
-                                color="inherit"
-                                size="small"
-                                onClick={props.onRequestPermissionClick}
-                            >
-                                Grant now
-                            </Button>
-                        </Alert>
-                        <Divider/>
-                    </>}
+                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.onRequestPermissionClick}/>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader component="div" id="nested-list-subheader">
@@ -146,5 +128,27 @@ const SubscriptionList = (props) => {
         </>
     );
 }
+
+const PermissionAlert = (props) => {
+    return (
+        <>
+            <Alert severity="warning" sx={{paddingTop: 2}}>
+                <AlertTitle>Notifications are disabled</AlertTitle>
+                <Typography gutterBottom>
+                    Grant your browser permission to display desktop notifications.
+                </Typography>
+                <Button
+                    sx={{float: 'right'}}
+                    color="inherit"
+                    size="small"
+                    onClick={props.onRequestPermissionClick}
+                >
+                    Grant now
+                </Button>
+            </Alert>
+            <Divider/>
+        </>
+    );
+};
 
 export default Navigation;

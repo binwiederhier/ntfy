@@ -12,7 +12,6 @@
     "@emotion/styled": "latest",
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "latest",
-    "@mui/styles": "^5.4.2",
     "react": "latest",
     "react-dom": "latest",
     "react-scripts": "^3.0.1"

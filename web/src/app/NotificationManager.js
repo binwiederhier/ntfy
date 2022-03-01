@@ -1,7 +1,11 @@
 import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
+import repository from "./Repository";
 
 class NotificationManager {
     notify(subscription, notification, onClickFallback) {
+        if (!this.shouldNotify(subscription, notification)) {
+            return;
+        }
         const message = formatMessage(notification);
         const title = formatTitleWithFallback(notification, topicShortUrl(subscription.baseUrl, subscription.topic));
         const n = new Notification(title, {
@@ -26,6 +30,14 @@ class NotificationManager {
                 cb(granted);
             });
         }
+    }
+
+    shouldNotify(subscription, notification) {
+        const priority = (notification.priority) ? notification.priority : 3;
+        if (priority < repository.getMinPriority()) {
+            return false;
+        }
+        return true;
     }
 }
 

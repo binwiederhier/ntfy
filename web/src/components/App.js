@@ -22,6 +22,9 @@ import Preferences from "./Preferences";
 //  - add baseUrl
 // TODO user management
 // TODO embed into ntfy server
+// TODO make default server functional
+// TODO indexeddb for notifications + subscriptions
+// TODO business logic with callbacks
 
 const App = () => {
     console.log(`[App] Rendering main view`);

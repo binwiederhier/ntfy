@@ -12,8 +12,8 @@ import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/mate
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
-import useStyles from "./styles";
 import User from "../app/User";
+import Box from "@mui/material/Box";
 
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
@@ -123,7 +123,6 @@ const SubscribePage = (props) => {
 };
 
 const LoginPage = (props) => {
-    const styles = useStyles();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
@@ -170,16 +169,34 @@ const LoginPage = (props) => {
                     variant="standard"
                 />
             </DialogContent>
-            <div className={styles.bottomBar}>
-                <DialogContentText className={styles.statusText}>
-                    {errorText}
-                </DialogContentText>
-                <DialogActions>
-                    <Button onClick={props.onBack}>Back</Button>
-                    <Button onClick={handleLogin}>Login</Button>
-                </DialogActions>
-            </div>
+            <DialogFooter status={errorText}>
+                <Button onClick={props.onBack}>Back</Button>
+                <Button onClick={handleLogin}>Login</Button>
+            </DialogFooter>
         </>
+    );
+};
+
+const DialogFooter = (props) => {
+    return (
+        <Box sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingLeft: '24px',
+            paddingTop: '8px 24px',
+            paddingBottom: '8px 24px',
+        }}>
+            <DialogContentText sx={{
+                margin: '0px',
+                paddingTop: '8px',
+            }}>
+                {props.status}
+            </DialogContentText>
+            <DialogActions>
+                {props.children}
+            </DialogActions>
+        </Box>
     );
 };
 

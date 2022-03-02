@@ -1,5 +1,5 @@
 import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
-import repository from "./Repository";
+import prefs from "./Prefs";
 
 class NotificationManager {
     async notify(subscription, notification, onClickFallback) {
@@ -7,8 +7,11 @@ class NotificationManager {
         if (!shouldNotify) {
             return;
         }
+        const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
         const message = formatMessage(notification);
-        const title = formatTitleWithFallback(notification, topicShortUrl(subscription.baseUrl, subscription.topic));
+        const title = formatTitleWithFallback(notification, shortUrl);
+
+        console.log(`[NotificationManager, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
         const n = new Notification(title, {
             body: message,
             icon: '/static/img/favicon.png'
@@ -35,7 +38,7 @@ class NotificationManager {
 
     async shouldNotify(subscription, notification) {
         const priority = (notification.priority) ? notification.priority : 3;
-        const minPriority = await repository.getMinPriority();
+        const minPriority = await prefs.minPriority();
         if (priority < minPriority) {
             return false;
         }

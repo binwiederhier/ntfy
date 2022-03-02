@@ -7,10 +7,11 @@ import Typography from "@mui/material/Typography";
 import IconSubscribeSettings from "./IconSubscribeSettings";
 import * as React from "react";
 import Box from "@mui/material/Box";
+import {topicShortUrl} from "../app/utils";
 
 const ActionBar = (props) => {
-    const title = (props.selectedSubscription !== null)
-        ? props.selectedSubscription.shortUrl()
+    const title = (props.selectedSubscription)
+        ? topicShortUrl(props.selectedSubscription.baseUrl, props.selectedSubscription.topic)
         : "ntfy";
     return (
         <AppBar position="fixed" sx={{
@@ -37,25 +38,11 @@ const ActionBar = (props) => {
                 </Typography>
                 {props.selectedSubscription !== null && <IconSubscribeSettings
                     subscription={props.selectedSubscription}
-                    onClearAll={props.onClearAll}
                     onUnsubscribe={props.onUnsubscribe}
                 />}
             </Toolbar>
         </AppBar>
     );
 };
-
-/*
-    To add a top left corner logo box:
-        <Typography variant="h5" noWrap component="div" sx={{
-            display: { xs: 'none', sm: 'block' },
-            width: { sm: `${Navigation.width}px` }
-        }}>
-            ntfy
-        </Typography>
-
-    To make the size of the top bar dynamic based on the drawer:
-        width: { sm: `calc(100% - ${Navigation.width}px)` }
-*/
 
 export default ActionBar;

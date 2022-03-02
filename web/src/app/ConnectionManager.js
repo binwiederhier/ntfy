@@ -10,11 +10,12 @@ class ConnectionManager {
             return;
         }
         console.log(`[ConnectionManager] Refreshing connections`);
-        const subscriptionIds = subscriptions.ids();
+        const subscriptionIds = subscriptions.map(s => s.id);
         const deletedIds = Array.from(this.connections.keys()).filter(id => !subscriptionIds.includes(id));
 
         // Create and add new connections
-        subscriptions.forEach((id, subscription) => {
+        subscriptions.forEach(subscription => {
+            const id = subscription.id;
             const added = !this.connections.get(id)
             if (added) {
                 const baseUrl = subscription.baseUrl;

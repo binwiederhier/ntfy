@@ -7,7 +7,6 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import Subscription from "../app/Subscription";
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
@@ -25,7 +24,12 @@ const SubscribeDialog = (props) => {
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSuccess = () => {
         const actualBaseUrl = (baseUrl) ? baseUrl : defaultBaseUrl; // FIXME
-        const subscription = new Subscription(actualBaseUrl, topic);
+        const subscription = {
+            id: topicUrl(actualBaseUrl, topic),
+            baseUrl: actualBaseUrl,
+            topic: topic,
+            last: null
+        };
         props.onSuccess(subscription);
     }
     return (
@@ -54,8 +58,8 @@ const SubscribePage = (props) => {
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const baseUrl = (anotherServerVisible) ? props.baseUrl : defaultBaseUrl;
     const topic = props.topic;
-    const existingTopicUrls = props.subscriptions.map((id, s) => s.url());
-    const existingBaseUrls = Array.from(new Set(["https://ntfy.sh", ...props.subscriptions.map((id, s) => s.baseUrl)]))
+    const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
+    const existingBaseUrls = Array.from(new Set(["https://ntfy.sh", ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== defaultBaseUrl);
     const handleSubscribe = async () => {
         const success = await api.auth(baseUrl, topic, null);

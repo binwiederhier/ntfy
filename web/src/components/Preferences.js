@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
-import repository from "../app/Repository";
+import prefs from "../app/Prefs";
 import {Paragraph} from "./styles";
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from "@mui/icons-material/Close";
@@ -60,9 +60,9 @@ const Notifications = () => {
 };
 
 const MinPriority = () => {
-    const minPriority = useLiveQuery(() => repository.getMinPriority());
+    const minPriority = useLiveQuery(() => prefs.minPriority());
     const handleChange = async (ev) => {
-        await repository.setMinPriority(ev.target.value);
+        await prefs.setMinPriority(ev.target.value);
     }
     if (!minPriority) {
         return null; // While loading
@@ -83,9 +83,9 @@ const MinPriority = () => {
 };
 
 const DeleteAfter = () => {
-    const deleteAfter = useLiveQuery(async () => repository.getDeleteAfter());
+    const deleteAfter = useLiveQuery(async () => prefs.deleteAfter());
     const handleChange = async (ev) => {
-        await repository.setDeleteAfter(ev.target.value);
+        await prefs.setDeleteAfter(ev.target.value);
     }
     if (!deleteAfter) {
         return null; // While loading
@@ -95,7 +95,7 @@ const DeleteAfter = () => {
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={deleteAfter} onChange={handleChange}>
                     <MenuItem value={0}>Never</MenuItem>
-                    <MenuItem value={10800}>After three hour</MenuItem>
+                    <MenuItem value={10800}>After three hours</MenuItem>
                     <MenuItem value={86400}>After one day</MenuItem>
                     <MenuItem value={604800}>After one week</MenuItem>
                     <MenuItem value={2592000}>After one month</MenuItem>

@@ -14,6 +14,7 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
+import {topicShortUrl} from "../app/utils";
 
 const navWidth = 240;
 
@@ -61,8 +62,8 @@ const NavList = (props) => {
         handleSubscribeReset();
         props.onSubscribeSubmit(subscription);
     }
-    const showSubscriptionsList = props.subscriptions.size() > 0;
-    const showGrantPermissionsBox = props.subscriptions.size() > 0 && !props.notificationsGranted;
+    const showSubscriptionsList = props.subscriptions?.length > 0;
+    const showGrantPermissionsBox = props.subscriptions?.length > 0 && !props.notificationsGranted;
     return (
         <>
             <Toolbar sx={{
@@ -115,14 +116,14 @@ const NavList = (props) => {
 const SubscriptionList = (props) => {
     return (
         <>
-            {props.subscriptions.map((id, subscription) =>
+            {props.subscriptions.map(subscription =>
                 <ListItemButton
-                    key={id}
-                    onClick={() => props.onSubscriptionClick(id)}
-                    selected={props.selectedSubscription && !props.prefsOpen && props.selectedSubscription.id === id}
+                    key={subscription.id}
+                    onClick={() => props.onSubscriptionClick(subscription.id)}
+                    selected={props.selectedSubscription && !props.prefsOpen && props.selectedSubscription.id === subscription.id}
                 >
                     <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
-                    <ListItemText primary={subscription.shortUrl()}/>
+                    <ListItemText primary={topicShortUrl(subscription.baseUrl, subscription.topic)}/>
                 </ListItemButton>
             )}
         </>

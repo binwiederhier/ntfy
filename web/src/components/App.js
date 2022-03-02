@@ -6,10 +6,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
 import Notifications from "./Notifications";
 import theme from "./theme";
-import api from "../app/Api";
-import repository from "../app/Repository";
+import prefs from "../app/Prefs";
 import connectionManager from "../app/ConnectionManager";
-import Subscriptions from "../app/Subscriptions";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notificationManager from "../app/NotificationManager";
@@ -17,52 +15,52 @@ import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
 import db from "../app/db";
 import {useLiveQuery} from "dexie-react-hooks";
-import {topicUrl} from "../app/utils";
+import poller from "../app/Poller";
+import pruner from "../app/Pruner";
 
 // TODO subscribe dialog:
 //  - check/use existing user
 //  - add baseUrl
 // TODO embed into ntfy server
 // TODO make default server functional
-// TODO indexeddb for notifications + subscriptions
 // TODO business logic with callbacks
 // TODO connection indicator in subscription list
+// TODO connectionmanager should react on users changes
+// TODO attachments
 
 const App = () => {
     console.log(`[App] Rendering main view`);
 
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [prefsOpen, setPrefsOpen] = useState(false);
-    const [subscriptions, setSubscriptions] = useState(new Subscriptions());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
+    const subscriptions = useLiveQuery(() => db.subscriptions.toArray());
     const users = useLiveQuery(() => db.users.toArray());
-    const handleSubscriptionClick = (subscriptionId) => {
-        setSelectedSubscription(subscriptions.get(subscriptionId));
+    const handleSubscriptionClick = async (subscriptionId) => {
+        const subscription = await db.subscriptions.get(subscriptionId); // FIXME
+        setSelectedSubscription(subscription);
         setPrefsOpen(false);
     }
-    const handleSubscribeSubmit = (subscription) => {
-        console.log(`[App] New subscription: ${subscription.id}`);
-        setSubscriptions(prev => prev.add(subscription).clone());
+    const handleSubscribeSubmit = async (subscription) => {
+        console.log(`[App] New subscription: ${subscription.id}`, subscription);
+        await db.subscriptions.put(subscription); // FIXME
         setSelectedSubscription(subscription);
-        poll(subscription);
         handleRequestPermission();
+        try {
+            await poller.poll(subscription);
+        } catch (e) {
+            console.error(`[App] Error polling newly added subscription ${subscription.id}`, e);
+        }
     };
-    const handleDeleteNotification = (subscriptionId, notificationId) => {
-        console.log(`[App] Deleting notification ${notificationId} from ${subscriptionId}`);
-        db.notifications.delete(notificationId); // FIXME
-    };
-    const handleDeleteAllNotifications = (subscriptionId) => {
-        console.log(`[App] Deleting all notifications from ${subscriptionId}`);
-        db.notifications.where({subscriptionId}).delete(); // FIXME
-    };
-    const handleUnsubscribe = (subscriptionId) => {
+    const handleUnsubscribe = async (subscriptionId) => {
         console.log(`[App] Unsubscribing from ${subscriptionId}`);
-        setSubscriptions(prev => {
-            const newSubscriptions = prev.remove(subscriptionId).clone();
-            setSelectedSubscription(newSubscriptions.firstOrNull());
-            return newSubscriptions;
-        });
+        await db.subscriptions.delete(subscriptionId); // FIXME
+        await db.notifications
+            .where({subscriptionId: subscriptionId})
+            .delete(); // FIXME
+        const newSelected = await db.subscriptions.toCollection().first(); // FIXME May be undefined
+        setSelectedSubscription(newSelected);
     };
     const handleRequestPermission = () => {
         notificationManager.maybeRequestPermission((granted) => {
@@ -73,61 +71,41 @@ const App = () => {
         setPrefsOpen(true);
         setSelectedSubscription(null);
     };
-    const poll = (subscription) => {
-        const since = subscription.last;
-        api.poll(subscription.baseUrl, subscription.topic, since)
-            .then(notifications => {
-                setSubscriptions(prev => {
-                    subscription.addNotifications(notifications);
-                    const subscriptionId = topicUrl(subscription.baseUrl, subscription.topic);
-                    const notificationsWithSubscriptionId = notifications
-                        .map(notification => ({ ...notification, subscriptionId }));
-                    db.notifications.bulkPut(notificationsWithSubscriptionId); // FIXME
-                    return prev.update(subscription).clone();
-                });
-            });
-    };
-
     // Define hooks: Note that the order of the hooks is important. The "loading" hooks
     // must be before the "saving" hooks.
     useEffect(() => {
+        poller.startWorker();
+        pruner.startWorker();
         const load = async () => {
-            // Load subscriptions
-            const subscriptions = repository.loadSubscriptions();
-            const selectedSubscriptionId = await repository.getSelectedSubscriptionId();
-            setSubscriptions(subscriptions);
+            const subs = await db.subscriptions.toArray(); // Cannot be 'subscriptions'
+            const selectedSubscriptionId = await prefs.selectedSubscriptionId();
 
             // Set selected subscription
-            const maybeSelectedSubscription = subscriptions.get(selectedSubscriptionId);
-            if (maybeSelectedSubscription) {
-                setSelectedSubscription(maybeSelectedSubscription);
+            const maybeSelectedSubscription = subs?.filter(s => s.id = selectedSubscriptionId);
+            if (maybeSelectedSubscription.length > 0) {
+                setSelectedSubscription(maybeSelectedSubscription[0]);
             }
 
-            // Poll all subscriptions
-            subscriptions.forEach((subscriptionId, subscription) => {
-                poll(subscription);
-            });
         };
-        load();
+        setTimeout(() => load(), 5000);
     }, [/* initial render */]);
     useEffect(() => {
         const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
-        const handleNotification = (subscriptionId, notification) => {
-            db.notifications.put({ ...notification, subscriptionId }); // FIXME
-            setSubscriptions(prev => {
-                const subscription = prev.get(subscriptionId);
-                if (subscription.addNotification(notification)) {
-                    notificationManager.notify(subscription, notification, notificationClickFallback)
-                }
-                return prev.update(subscription).clone();
-            });
+        const handleNotification = async (subscriptionId, notification) => {
+            try {
+                const subscription = await db.subscriptions.get(subscriptionId); // FIXME
+                await db.notifications.add({ ...notification, subscriptionId }); // FIXME, will throw if exists!
+                await db.subscriptions.update(subscriptionId, { last: notification.id });
+                await notificationManager.notify(subscription, notification, notificationClickFallback)
+            } catch (e) {
+                console.error(`[App] Error handling notification`, e);
+            }
         };
         connectionManager.refresh(subscriptions, users, handleNotification);
     }, [subscriptions, users]);
-    useEffect(() => repository.saveSubscriptions(subscriptions), [subscriptions]);
     useEffect(() => {
         const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";
-        repository.setSelectedSubscriptionId(subscriptionId)
+        prefs.setSelectedSubscriptionId(subscriptionId)
     }, [selectedSubscription]);
 
     return (
@@ -137,7 +115,6 @@ const App = () => {
                 <CssBaseline/>
                 <ActionBar
                     selectedSubscription={selectedSubscription}
-                    onClearAll={handleDeleteAllNotifications}
                     onUnsubscribe={handleUnsubscribe}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
                 />
@@ -155,45 +132,46 @@ const App = () => {
                         onRequestPermissionClick={handleRequestPermission}
                     />
                 </Box>
-                <Box
-                    component="main"
-                    sx={{
-                        display: 'flex',
-                        flexGrow: 1,
-                        flexDirection: 'column',
-                        padding: 3,
-                        width: {sm: `calc(100% - ${Navigation.width}px)`},
-                        height: '100vh',
-                        overflow: 'auto',
-                        backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
-                    }}
-                >
+                <Main>
                     <Toolbar/>
-                    <MainContent
+                    <Content
                         subscription={selectedSubscription}
                         prefsOpen={prefsOpen}
-                        onDeleteNotification={handleDeleteNotification}
                     />
-                </Box>
+                </Main>
             </Box>
         </ThemeProvider>
     );
 }
 
-const MainContent = (props) => {
+const Main = (props) => {
+    return (
+        <Box
+            component="main"
+            sx={{
+                display: 'flex',
+                flexGrow: 1,
+                flexDirection: 'column',
+                padding: 3,
+                width: {sm: `calc(100% - ${Navigation.width}px)`},
+                height: '100vh',
+                overflow: 'auto',
+                backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
+            }}
+        >
+            {props.children}
+        </Box>
+    );
+};
+
+const Content = (props) => {
     if (props.prefsOpen) {
         return <Preferences/>;
     }
-    if (props.subscription !== null) {
-        return (
-            <Notifications
-                subscription={props.subscription}
-                onDeleteNotification={props.onDeleteNotification}
-            />
-        );
-    } else {
-        return <NoTopics/>;
+    if (props.subscription) {
+        return <Notifications subscription={props.subscription}/>;
     }
+    return <NoTopics/>;
 };
 
 export default App;

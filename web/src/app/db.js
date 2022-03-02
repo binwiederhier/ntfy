@@ -9,8 +9,8 @@ import Dexie from 'dexie';
 const db = new Dexie('ntfy');
 
 db.version(1).stores({
-    subscriptions: '&id',
-    notifications: '&id,subscriptionId',
+    subscriptions: '&id,baseUrl',
+    notifications: '&id,subscriptionId,time',
     users: '&baseUrl,username',
     prefs: '&key'
 });

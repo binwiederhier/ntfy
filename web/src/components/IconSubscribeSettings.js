@@ -9,6 +9,7 @@ import MenuList from '@mui/material/MenuList';
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import api from "../app/Api";
+import db from "../app/db";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
 const IconSubscribeSettings = (props) => {
@@ -28,7 +29,10 @@ const IconSubscribeSettings = (props) => {
 
     const handleClearAll = (event) => {
         handleClose(event);
-        props.onClearAll(props.subscription.id);
+        console.log(`[IconSubscribeSettings] Deleting all notifications from ${props.subscription.id}`);
+        db.notifications
+            .where({subscriptionId: props.subscription.id})
+            .delete(); // FIXME
     };
 
     const handleUnsubscribe = (event) => {
@@ -59,7 +63,6 @@ const IconSubscribeSettings = (props) => {
         if (prevOpen.current === true && open === false) {
             anchorRef.current.focus();
         }
-
         prevOpen.current = open;
     }, [open]);
 
@@ -71,9 +74,6 @@ const IconSubscribeSettings = (props) => {
                 edge="end"
                 ref={anchorRef}
                 id="composition-button"
-                aria-controls={open ? 'composition-menu' : undefined}
-                aria-expanded={open ? 'true' : undefined}
-                aria-haspopup="true"
                 onClick={handleToggle}
             >
                 <MoreVertIcon/>
@@ -99,7 +99,6 @@ const IconSubscribeSettings = (props) => {
                                 <MenuList
                                     autoFocusItem={open}
                                     id="composition-menu"
-                                    aria-labelledby="composition-button"
                                     onKeyDown={handleListKeyDown}
                                 >
                                     <MenuItem onClick={handleSendTestMessage}>Send test notification</MenuItem>

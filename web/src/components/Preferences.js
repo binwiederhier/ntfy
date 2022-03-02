@@ -45,7 +45,7 @@ const Preferences = (props) => {
     );
 };
 
-const Notifications = (props) => {
+const Notifications = () => {
     return (
         <Card sx={{p: 3}}>
             <Typography variant="h5">
@@ -60,10 +60,12 @@ const Notifications = (props) => {
 };
 
 const MinPriority = () => {
-    const [minPriority, setMinPriority] = useState(repository.getMinPriority());
-    const handleChange = (ev) => {
-        setMinPriority(ev.target.value);
-        repository.setMinPriority(ev.target.value);
+    const minPriority = useLiveQuery(() => repository.getMinPriority());
+    const handleChange = async (ev) => {
+        await repository.setMinPriority(ev.target.value);
+    }
+    if (!minPriority) {
+        return null; // While loading
     }
     return (
         <Pref title="Minimum priority">
@@ -81,10 +83,12 @@ const MinPriority = () => {
 };
 
 const DeleteAfter = () => {
-    const [deleteAfter, setDeleteAfter] = useState(repository.getDeleteAfter());
-    const handleChange = (ev) => {
-        setDeleteAfter(ev.target.value);
-        repository.setDeleteAfter(ev.target.value);
+    const deleteAfter = useLiveQuery(async () => repository.getDeleteAfter());
+    const handleChange = async (ev) => {
+        await repository.setDeleteAfter(ev.target.value);
+    }
+    if (!deleteAfter) {
+        return null; // While loading
     }
     return (
         <Pref title="Delete notifications">
@@ -100,7 +104,6 @@ const DeleteAfter = () => {
         </Pref>
     )
 };
-
 
 const PrefGroup = (props) => {
     return (
@@ -159,7 +162,7 @@ const DefaultServer = (props) => {
     );
 };
 
-const Users = (props) => {
+const Users = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const users = useLiveQuery(() => db.users.toArray());

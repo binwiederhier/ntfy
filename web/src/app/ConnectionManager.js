@@ -10,7 +10,6 @@ class ConnectionManager {
             return;
         }
         console.log(`[ConnectionManager] Refreshing connections`);
-        console.log(users);
         const subscriptionIds = subscriptions.ids();
         const deletedIds = Array.from(this.connections.keys()).filter(id => !subscriptionIds.includes(id));
 

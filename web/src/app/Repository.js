@@ -1,5 +1,6 @@
 import Subscription from "./Subscription";
 import Subscriptions from "./Subscriptions";
+import db from "./db";
 
 class Repository {
     loadSubscriptions() {
@@ -41,33 +42,41 @@ class Repository {
         localStorage.setItem('subscriptions', serialized);
     }
 
-    loadSelectedSubscriptionId() {
-        console.log(`[Repository] Loading selected subscription ID from localStorage`);
-        const selectedSubscriptionId = localStorage.getItem('selectedSubscriptionId');
-        return (selectedSubscriptionId) ? selectedSubscriptionId : "";
+    async setSelectedSubscriptionId(selectedSubscriptionId) {
+        console.log(`[Repository] Saving selected subscription ${selectedSubscriptionId}`);
+        db.prefs.put({key: 'selectedSubscriptionId', value: selectedSubscriptionId});
     }
 
-    saveSelectedSubscriptionId(selectedSubscriptionId) {
-        console.log(`[Repository] Saving selected subscription ${selectedSubscriptionId} to localStorage`);
-        localStorage.setItem('selectedSubscriptionId', selectedSubscriptionId);
+    async getSelectedSubscriptionId() {
+        console.log(`[Repository] Loading selected subscription ID`);
+        const selectedSubscriptionId = await db.prefs.get('selectedSubscriptionId');
+        return (selectedSubscriptionId) ? selectedSubscriptionId.value : "";
     }
 
-    setMinPriority(minPriority) {
-        localStorage.setItem('minPriority', minPriority.toString());
+    async setMinPriority(minPriority) {
+        db.prefs.put({key: 'minPriority', value: minPriority.toString()});
     }
 
-    getMinPriority() {
-        const minPriority = localStorage.getItem('minPriority');
-        return (minPriority) ? Number(minPriority) : 1;
+    async getMinPriority() {
+        const minPriority = await db.prefs.get('minPriority');
+        return (minPriority) ? Number(minPriority.value) : 1;
     }
 
-    setDeleteAfter(deleteAfter) {
-        localStorage.setItem('deleteAfter', deleteAfter.toString());
+    minPriority() {
+        return db.prefs.get('minPriority');
     }
 
-    getDeleteAfter() {
-        const deleteAfter = localStorage.getItem('deleteAfter');
-        return (deleteAfter) ? Number(deleteAfter) : 604800; // Default is one week
+    async setDeleteAfter(deleteAfter) {
+        db.prefs.put({key:'deleteAfter', value: deleteAfter.toString()});
+    }
+
+    async getDeleteAfter() {
+        const deleteAfter = await db.prefs.get('deleteAfter');
+        return (deleteAfter) ? Number(deleteAfter.value) : 604800; // Default is one week
+    }
+
+    deleteAfter() {
+        return db.prefs.get('deleteAfter');
     }
 }
 

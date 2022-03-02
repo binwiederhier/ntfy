@@ -9,7 +9,10 @@ import Dexie from 'dexie';
 const db = new Dexie('ntfy');
 
 db.version(1).stores({
-    users: '&baseUrl, username',
+    subscriptions: '&id',
+    notifications: '&id,subscriptionId',
+    users: '&baseUrl,username',
+    prefs: '&key'
 });
 
 export default db;

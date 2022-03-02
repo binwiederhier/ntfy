@@ -92,21 +92,24 @@ const App = () => {
     // Define hooks: Note that the order of the hooks is important. The "loading" hooks
     // must be before the "saving" hooks.
     useEffect(() => {
-        // Load subscriptions
-        const subscriptions = repository.loadSubscriptions();
-        const selectedSubscriptionId = repository.loadSelectedSubscriptionId();
-        setSubscriptions(subscriptions);
+        const load = async () => {
+            // Load subscriptions
+            const subscriptions = repository.loadSubscriptions();
+            const selectedSubscriptionId = await repository.getSelectedSubscriptionId();
+            setSubscriptions(subscriptions);
 
-        // Set selected subscription
-        const maybeSelectedSubscription = subscriptions.get(selectedSubscriptionId);
-        if (maybeSelectedSubscription) {
-            setSelectedSubscription(maybeSelectedSubscription);
-        }
+            // Set selected subscription
+            const maybeSelectedSubscription = subscriptions.get(selectedSubscriptionId);
+            if (maybeSelectedSubscription) {
+                setSelectedSubscription(maybeSelectedSubscription);
+            }
 
-        // Poll all subscriptions
-        subscriptions.forEach((subscriptionId, subscription) => {
-            poll(subscription);
-        });
+            // Poll all subscriptions
+            subscriptions.forEach((subscriptionId, subscription) => {
+                poll(subscription);
+            });
+        };
+        load();
     }, [/* initial render */]);
     useEffect(() => {
         const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
@@ -124,7 +127,7 @@ const App = () => {
     useEffect(() => repository.saveSubscriptions(subscriptions), [subscriptions]);
     useEffect(() => {
         const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";
-        repository.saveSelectedSubscriptionId(subscriptionId)
+        repository.setSelectedSubscriptionId(subscriptionId)
     }, [selectedSubscription]);
 
     return (

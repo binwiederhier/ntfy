@@ -35,7 +35,6 @@ class Repository {
             return {
                 baseUrl: subscription.baseUrl,
                 topic: subscription.topic,
-                notifications: subscription.getNotifications(),
                 last: subscription.last
             }
         }));

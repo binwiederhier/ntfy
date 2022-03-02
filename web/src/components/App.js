@@ -17,6 +17,7 @@ import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
 import db from "../app/db";
 import {useLiveQuery} from "dexie-react-hooks";
+import {topicUrl} from "../app/utils";
 
 // TODO subscribe dialog:
 //  - check/use existing user
@@ -49,17 +50,11 @@ const App = () => {
     };
     const handleDeleteNotification = (subscriptionId, notificationId) => {
         console.log(`[App] Deleting notification ${notificationId} from ${subscriptionId}`);
-        setSubscriptions(prev => {
-            const newSubscription = prev.get(subscriptionId).deleteNotification(notificationId);
-            return prev.update(newSubscription).clone();
-        });
+        db.notifications.delete(notificationId); // FIXME
     };
     const handleDeleteAllNotifications = (subscriptionId) => {
         console.log(`[App] Deleting all notifications from ${subscriptionId}`);
-        setSubscriptions(prev => {
-            const newSubscription = prev.get(subscriptionId).deleteAllNotifications();
-            return prev.update(newSubscription).clone();
-        });
+        db.notifications.where({subscriptionId}).delete(); // FIXME
     };
     const handleUnsubscribe = (subscriptionId) => {
         console.log(`[App] Unsubscribing from ${subscriptionId}`);
@@ -84,6 +79,10 @@ const App = () => {
             .then(notifications => {
                 setSubscriptions(prev => {
                     subscription.addNotifications(notifications);
+                    const subscriptionId = topicUrl(subscription.baseUrl, subscription.topic);
+                    const notificationsWithSubscriptionId = notifications
+                        .map(notification => ({ ...notification, subscriptionId }));
+                    db.notifications.bulkPut(notificationsWithSubscriptionId); // FIXME
                     return prev.update(subscription).clone();
                 });
             });
@@ -114,6 +113,7 @@ const App = () => {
     useEffect(() => {
         const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
         const handleNotification = (subscriptionId, notification) => {
+            db.notifications.put({ ...notification, subscriptionId }); // FIXME
             setSubscriptions(prev => {
                 const subscription = prev.get(subscriptionId);
                 if (subscription.addNotification(notification)) {

@@ -3,18 +3,25 @@ import {CardContent, Link, Stack} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
-import {formatMessage, formatTitle, unmatchedTags} from "../app/utils";
+import {formatMessage, formatTitle, topicUrl, unmatchedTags} from "../app/utils";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from '@mui/icons-material/Close';
 import {Paragraph, VerticallyCenteredContainer} from "./styles";
+import {useLiveQuery} from "dexie-react-hooks";
+import db from "../app/db";
 
 const Notifications = (props) => {
     const subscription = props.subscription;
-    const sortedNotifications = subscription.getNotifications()
-        .sort((a, b) => a.time < b.time ? 1 : -1);
-    if (sortedNotifications.length === 0) {
+    const subscriptionId = topicUrl(subscription.baseUrl, subscription.topic);
+    const notifications = useLiveQuery(() => {
+        return db.notifications
+            .where({ subscriptionId: subscriptionId })
+            .toArray();
+    }, [subscription]);
+    if (!notifications || notifications.length === 0) {
         return <NothingHereYet subscription={subscription}/>;
     }
+    const sortedNotifications = Array.from(notifications).sort((a, b) => a.time < b.time ? 1 : -1);
     return (
         <Container maxWidth="lg" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>

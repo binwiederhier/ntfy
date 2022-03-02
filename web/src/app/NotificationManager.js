@@ -2,8 +2,9 @@ import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
 import repository from "./Repository";
 
 class NotificationManager {
-    notify(subscription, notification, onClickFallback) {
-        if (!this.shouldNotify(subscription, notification)) {
+    async notify(subscription, notification, onClickFallback) {
+        const shouldNotify = await this.shouldNotify(subscription, notification);
+        if (!shouldNotify) {
             return;
         }
         const message = formatMessage(notification);
@@ -32,9 +33,10 @@ class NotificationManager {
         }
     }
 
-    shouldNotify(subscription, notification) {
+    async shouldNotify(subscription, notification) {
         const priority = (notification.priority) ? notification.priority : 3;
-        if (priority < repository.getMinPriority()) {
+        const minPriority = await repository.getMinPriority();
+        if (priority < minPriority) {
             return false;
         }
         return true;

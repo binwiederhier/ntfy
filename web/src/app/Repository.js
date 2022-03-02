@@ -1,7 +1,5 @@
 import Subscription from "./Subscription";
 import Subscriptions from "./Subscriptions";
-import Users from "./Users";
-import User from "./User";
 
 class Repository {
     loadSubscriptions() {
@@ -41,40 +39,6 @@ class Repository {
             }
         }));
         localStorage.setItem('subscriptions', serialized);
-    }
-
-    loadUsers() {
-        console.log(`[Repository] Loading users from localStorage`);
-        const users = new Users();
-        users.loaded = true;
-        const serialized = localStorage.getItem('users');
-        if (serialized === null) {
-            return users;
-        }
-        try {
-            JSON.parse(serialized).forEach(u => {
-                users.add(new User(u.baseUrl, u.username, u.password));
-            });
-            return users;
-        } catch (e) {
-            console.log(`[Repository] Unable to deserialize users: ${e.message}`);
-            return users;
-        }
-    }
-
-    saveUsers(users) {
-        if (!users.loaded) {
-            return; // Avoid saving invalid state, triggered by initial useEffect hook
-        }
-        console.log(`[Repository] Saving users to localStorage`);
-        const serialized = JSON.stringify(users.map(user => {
-            return {
-                baseUrl: user.baseUrl,
-                username: user.username,
-                password: user.password
-            }
-        }));
-        localStorage.setItem('users', serialized);
     }
 
     loadSelectedSubscriptionId() {

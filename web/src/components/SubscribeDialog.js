@@ -12,8 +12,8 @@ import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/mate
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
-import User from "../app/User";
 import Box from "@mui/material/Box";
+import db from "../app/db";
 
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
@@ -23,10 +23,10 @@ const SubscribeDialog = (props) => {
     const [topic, setTopic] = useState("");
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const handleSuccess = (user) => {
+    const handleSuccess = () => {
         const actualBaseUrl = (baseUrl) ? baseUrl : defaultBaseUrl; // FIXME
         const subscription = new Subscription(actualBaseUrl, topic);
-        props.onSuccess(subscription, user);
+        props.onSuccess(subscription);
     }
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
@@ -65,7 +65,7 @@ const SubscribePage = (props) => {
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for anonymous user`);
-        props.onSuccess(null);
+        props.onSuccess();
     };
     const handleUseAnotherChanged = (e) => {
         props.setBaseUrl("");
@@ -129,7 +129,7 @@ const LoginPage = (props) => {
     const baseUrl = (props.baseUrl) ? props.baseUrl : defaultBaseUrl;
     const topic = props.topic;
     const handleLogin = async () => {
-        const user = new User(baseUrl, username, password);
+        const user = {baseUrl, username, password};
         const success = await api.auth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
@@ -137,7 +137,8 @@ const LoginPage = (props) => {
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
-        props.onSuccess(user);
+        db.users.put(user);
+        props.onSuccess();
     };
     return (
         <>

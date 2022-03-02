@@ -7,9 +7,11 @@ import {
     topicShortUrl,
     topicUrlJsonPollWithSince
 } from "./utils";
+import db from "./db";
 
 class Api {
-    async poll(baseUrl, topic, since, user) {
+    async poll(baseUrl, topic, since) {
+        const user = await db.users.get(baseUrl);
         const shortUrl = topicShortUrl(baseUrl, topic);
         const url = (since)
             ? topicUrlJsonPollWithSince(baseUrl, topic, since)
@@ -24,7 +26,8 @@ class Api {
         return messages;
     }
 
-    async publish(baseUrl, topic, user, message) {
+    async publish(baseUrl, topic, message) {
+        const user = await db.users.get(baseUrl);
         const url = topicUrl(baseUrl, topic);
         console.log(`[Api] Publishing message to ${url}`);
         await fetch(url, {

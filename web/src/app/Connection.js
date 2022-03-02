@@ -85,7 +85,7 @@ class Connection {
         if (this.since) {
             params.push(`since=${this.since}`);
         }
-        if (this.user !== null) {
+        if (this.user) {
             const auth = encodeBase64Url(basicAuth(this.user.username, this.user.password));
             params.push(`auth=${auth}`);
         }

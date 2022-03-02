@@ -14,7 +14,6 @@ import api from "../app/Api";
 const IconSubscribeSettings = (props) => {
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
-    const users = props.users;
 
     const handleToggle = () => {
         setOpen((prevOpen) => !prevOpen);
@@ -40,8 +39,7 @@ const IconSubscribeSettings = (props) => {
     const handleSendTestMessage = () => {
         const baseUrl = props.subscription.baseUrl;
         const topic = props.subscription.topic;
-        const user = users.get(baseUrl); // May be null
-        api.publish(baseUrl, topic, user,
+        api.publish(baseUrl, topic,
             `This is a test notification sent by the ntfy Web UI at ${new Date().toString()}.`); // FIXME result ignored
         setOpen(false);
     }

@@ -37,7 +37,6 @@ const ActionBar = (props) => {
                 </Typography>
                 {props.selectedSubscription !== null && <IconSubscribeSettings
                     subscription={props.selectedSubscription}
-                    users={props.users}
                     onClearAll={props.onClearAll}
                     onUnsubscribe={props.onUnsubscribe}
                 />}

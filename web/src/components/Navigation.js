@@ -57,9 +57,9 @@ const NavList = (props) => {
         setSubscribeDialogOpen(false);
         setSubscribeDialogKey(prev => prev+1);
     }
-    const handleSubscribeSubmit = (subscription, user) => {
+    const handleSubscribeSubmit = (subscription) => {
         handleSubscribeReset();
-        props.onSubscribeSubmit(subscription, user);
+        props.onSubscribeSubmit(subscription);
     }
     const showSubscriptionsList = props.subscriptions.size() > 0;
     const showGrantPermissionsBox = props.subscriptions.size() > 0 && !props.notificationsGranted;

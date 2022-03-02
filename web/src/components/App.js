@@ -12,19 +12,20 @@ import connectionManager from "../app/ConnectionManager";
 import Subscriptions from "../app/Subscriptions";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
-import Users from "../app/Users";
 import notificationManager from "../app/NotificationManager";
 import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
+import db from "../app/db";
+import {useLiveQuery} from "dexie-react-hooks";
 
 // TODO subscribe dialog:
 //  - check/use existing user
 //  - add baseUrl
-// TODO user management
 // TODO embed into ntfy server
 // TODO make default server functional
 // TODO indexeddb for notifications + subscriptions
 // TODO business logic with callbacks
+// TODO connection indicator in subscription list
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -32,21 +33,18 @@ const App = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [prefsOpen, setPrefsOpen] = useState(false);
     const [subscriptions, setSubscriptions] = useState(new Subscriptions());
-    const [users, setUsers] = useState(new Users());
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
+    const users = useLiveQuery(() => db.users.toArray());
     const handleSubscriptionClick = (subscriptionId) => {
         setSelectedSubscription(subscriptions.get(subscriptionId));
         setPrefsOpen(false);
     }
-    const handleSubscribeSubmit = (subscription, user) => {
+    const handleSubscribeSubmit = (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`);
-        if (user !== null) {
-            setUsers(prev => prev.add(user).clone());
-        }
         setSubscriptions(prev => prev.add(subscription).clone());
         setSelectedSubscription(subscription);
-        poll(subscription, user);
+        poll(subscription);
         handleRequestPermission();
     };
     const handleDeleteNotification = (subscriptionId, notificationId) => {
@@ -80,9 +78,9 @@ const App = () => {
         setPrefsOpen(true);
         setSelectedSubscription(null);
     };
-    const poll = (subscription, user) => {
+    const poll = (subscription) => {
         const since = subscription.last;
-        api.poll(subscription.baseUrl, subscription.topic, since, user)
+        api.poll(subscription.baseUrl, subscription.topic, since)
             .then(notifications => {
                 setSubscriptions(prev => {
                     subscription.addNotifications(notifications);
@@ -94,12 +92,10 @@ const App = () => {
     // Define hooks: Note that the order of the hooks is important. The "loading" hooks
     // must be before the "saving" hooks.
     useEffect(() => {
-        // Load subscriptions and users
+        // Load subscriptions
         const subscriptions = repository.loadSubscriptions();
         const selectedSubscriptionId = repository.loadSelectedSubscriptionId();
-        const users = repository.loadUsers();
         setSubscriptions(subscriptions);
-        setUsers(users);
 
         // Set selected subscription
         const maybeSelectedSubscription = subscriptions.get(selectedSubscriptionId);
@@ -109,8 +105,7 @@ const App = () => {
 
         // Poll all subscriptions
         subscriptions.forEach((subscriptionId, subscription) => {
-            const user = users.get(subscription.baseUrl); // May be null
-            poll(subscription, user);
+            poll(subscription);
         });
     }, [/* initial render */]);
     useEffect(() => {
@@ -127,7 +122,6 @@ const App = () => {
         connectionManager.refresh(subscriptions, users, handleNotification);
     }, [subscriptions, users]);
     useEffect(() => repository.saveSubscriptions(subscriptions), [subscriptions]);
-    useEffect(() => repository.saveUsers(users), [users]);
     useEffect(() => {
         const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";
         repository.saveSelectedSubscriptionId(subscriptionId)
@@ -140,7 +134,6 @@ const App = () => {
                 <CssBaseline/>
                 <ActionBar
                     selectedSubscription={selectedSubscription}
-                    users={users}
                     onClearAll={handleDeleteAllNotifications}
                     onUnsubscribe={handleUnsubscribe}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}

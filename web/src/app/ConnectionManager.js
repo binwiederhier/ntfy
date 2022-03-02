@@ -6,7 +6,11 @@ class ConnectionManager {
     }
 
     refresh(subscriptions, users, onNotification) {
+        if (!subscriptions || !users) {
+            return;
+        }
         console.log(`[ConnectionManager] Refreshing connections`);
+        console.log(users);
         const subscriptionIds = subscriptions.ids();
         const deletedIds = Array.from(this.connections.keys()).filter(id => !subscriptionIds.includes(id));
 
@@ -16,7 +20,7 @@ class ConnectionManager {
             if (added) {
                 const baseUrl = subscription.baseUrl;
                 const topic = subscription.topic;
-                const user = users.get(baseUrl);
+                const [user] = users.filter(user => user.baseUrl === baseUrl);
                 const since = subscription.last;
                 const connection = new Connection(id, baseUrl, topic, user, since, onNotification);
                 this.connections.set(id, connection);

@@ -35,7 +35,7 @@ import DialogActions from "@mui/material/DialogActions";
 
 const Preferences = (props) => {
     return (
-        <Container maxWidth="lg" sx={{marginTop: 3, marginBottom: 3}}>
+        <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Notifications/>
                 <DefaultServer/>

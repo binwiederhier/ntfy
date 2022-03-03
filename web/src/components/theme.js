@@ -12,9 +12,6 @@ const theme = createTheme({
     error: {
       main: red.A400,
     },
-    body: {
-      main: '#444',
-    }
   },
   components: {
     MuiListItemIcon: {
@@ -24,6 +21,13 @@ const theme = createTheme({
         },
       },
     },
+    MuiBackdrop: {
+      styleOverrides: {
+        root: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)' // was: 0.5
+        }
+      }
+    }
   },
 });
 

@@ -90,6 +90,20 @@ export const encodeBase64Url = (s) => {
         .replaceAll('=', '');
 }
 
+export const formatShortDateTime = (timestamp) => {
+    return new Intl.DateTimeFormat('default', {dateStyle: 'short', timeStyle: 'short'})
+        .format(new Date(timestamp * 1000));
+}
+
+export const formatBytes = (bytes, decimals = 2) => {
+    if (bytes === 0) return '0 bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 export async function* fetchLinesIterator(fileURL, headers) {
     const utf8Decoder = new TextDecoder('utf-8');

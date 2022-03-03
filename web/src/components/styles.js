@@ -14,5 +14,5 @@ export const VerticallyCenteredContainer = styled(Container)({
   flexDirection: 'column',
   justifyContent: 'center',
   alignContent: 'center',
-  color: theme.palette.body.main
+  color: theme.palette.text.primary
 });

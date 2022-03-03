@@ -1,9 +1,9 @@
 import Container from "@mui/material/Container";
-import {CardActions, CardContent, Link, Stack} from "@mui/material";
+import {ButtonBase, CardActions, CardContent, Fade, Link, Modal, Stack, styled} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
-import {formatMessage, formatTitle, topicShortUrl, unmatchedTags} from "../app/utils";
+import {formatBytes, formatMessage, formatShortDateTime, formatTitle, topicShortUrl, unmatchedTags} from "../app/utils";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from '@mui/icons-material/Close';
 import {Paragraph, VerticallyCenteredContainer} from "./styles";
@@ -11,6 +11,8 @@ import {useLiveQuery} from "dexie-react-hooks";
 import db from "../app/db";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import theme from "./theme";
+import {useState} from "react";
 
 const Notifications = (props) => {
     const subscription = props.subscription;
@@ -25,7 +27,7 @@ const Notifications = (props) => {
     const sortedNotifications = Array.from(notifications)
         .sort((a, b) => a.time < b.time ? 1 : -1);
     return (
-        <Container maxWidth="lg" sx={{marginTop: 3, marginBottom: 3}}>
+        <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 {sortedNotifications.map(notification =>
                     <NotificationItem
@@ -41,19 +43,17 @@ const Notifications = (props) => {
 const NotificationItem = (props) => {
     const subscriptionId = props.subscriptionId;
     const notification = props.notification;
-    const date = new Intl.DateTimeFormat('default', {dateStyle: 'short', timeStyle: 'short'})
-        .format(new Date(notification.time * 1000));
+    const attachment = notification.attachment;
+    const date = formatShortDateTime(notification.time);
     const otherTags = unmatchedTags(notification.tags);
     const tags = (otherTags.length > 0) ? otherTags.join(', ') : null;
     const handleDelete = async () => {
         console.log(`[Notifications] Deleting notification ${notification.id} from ${subscriptionId}`);
         await db.notifications.delete(notification.id); // FIXME
     }
-    const attachment = notification.attachment;
-    const expired = attachment?.expires <= Date.now()/1000;
-    const image = attachment?.type.startsWith("image/") && !expired;
+    const expired = attachment && attachment.expires && attachment.expires < Date.now()/1000;
     return (
-        <Card sx={{ minWidth: 275 }}>
+        <Card sx={{ minWidth: 275, padding: 1 }}>
             <CardContent>
                 <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }}>
                     <CloseIcon />
@@ -69,27 +69,11 @@ const NotificationItem = (props) => {
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{formatMessage(notification)}</Typography>
-                {image && <Box
-                    component="img"
-                    src={`${attachment.url}`}
-                    loading="lazy"
-                    sx={{
-                        marginTop: 2,
-                        borderRadius: '4px',
-                        boxShadow: 2,
-                        maxWidth: 1,
-                        maxHeight: '400px'
-                    }}
-                    />}
-                {attachment && !image &&
-                    <Typography>
-                        <b>{attachment.name}</b><br/>
-                        {attachment.size}, {attachment.expires}
-                    </Typography>}
+                {attachment && <Attachment attachment={attachment}/>}
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
             </CardContent>
-            {attachment &&
-                <CardActions>
+            {attachment && !expired &&
+                <CardActions sx={{paddingTop: 0}}>
                     <Button onClick={() => navigator.clipboard.writeText(attachment.url)}>Copy URL</Button>
                     <Button onClick={() => window.open(attachment.url)}>Open</Button>
                 </CardActions>
@@ -98,6 +82,151 @@ const NotificationItem = (props) => {
     );
 }
 
+const Attachment = (props) => {
+    const attachment = props.attachment;
+    const expired = attachment.expires && attachment.expires < Date.now()/1000;
+    const expires = attachment.expires && attachment.expires > Date.now()/1000;
+    const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
+
+    // Unexpired image
+    if (displayableImage) {
+        return <Image attachment={attachment}/>;
+    }
+
+    // Anything else: Show box
+    const infos = [];
+    if (attachment.size) {
+        infos.push(formatBytes(attachment.size));
+    }
+    if (expires) {
+        infos.push(`link expires ${formatShortDateTime(attachment.expires)}`);
+    }
+    if (expired) {
+        infos.push(`download link expired`);
+    }
+    const maybeInfoText = (infos.length > 0) ? <><br/>{infos.join(", ")}</> : null;
+
+    // If expired, just show infos without click target
+    if (expired) {
+        return (
+            <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginTop: 2,
+                    padding: 1,
+                    borderRadius: '4px',
+            }}>
+                <Icon type={attachment.type}/>
+                <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
+                    <b>{attachment.name}</b>
+                    {maybeInfoText}
+                </Typography>
+            </Box>
+        );
+    }
+
+    // Not expired
+    return (
+        <ButtonBase sx={{
+            marginTop: 2,
+        }}>
+            <Link
+                href={attachment.url}
+                target="_blank"
+                rel="noopener"
+                underline="none"
+                sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: 1,
+                        borderRadius: '4px',
+                        '&:hover': {
+                            backgroundColor: 'rgba(0, 0, 0, 0.05)'
+                        }
+                }}
+            >
+                <Icon type={attachment.type}/>
+                <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
+                    <b>{attachment.name}</b>
+                    {maybeInfoText}
+                </Typography>
+            </Link>
+        </ButtonBase>
+    );
+};
+
+const Image = (props) => {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <Box
+                component="img"
+                src={`${props.attachment.url}`}
+                loading="lazy"
+                onClick={() => setOpen(true)}
+                sx={{
+                    marginTop: 2,
+                    borderRadius: '4px',
+                    boxShadow: 2,
+                    width: 1,
+                    maxHeight: '400px',
+                    objectFit: 'cover',
+                    cursor: 'pointer'
+                }}
+            />
+            <Modal
+                open={open}
+                onClose={() => setOpen(false)}
+            >
+                <Fade in={open}>
+                    <Box
+                        component="img"
+                        src={`${props.attachment.url}`}
+                        loading="lazy"
+                        sx={{
+                            maxWidth: 1,
+                            maxHeight: 1,
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            padding: 4,
+                        }}
+                    />
+                </Fade>
+            </Modal>
+        </>
+    );
+}
+
+const Icon = (props) => {
+    const type = props.type;
+    let imageFile;
+    if (!type) {
+        imageFile = 'file-document.svg';
+    } else if (type.startsWith('image/')) {
+        imageFile = 'file-image.svg';
+    } else if (type.startsWith('video/')) {
+        imageFile = 'file-video.svg';
+    } else if (type.startsWith('audio/')) {
+        imageFile = 'file-audio.svg';
+    } else if (type === "application/vnd.android.package-archive") {
+        imageFile = 'file-app.svg';
+    } else {
+        imageFile = 'file-document.svg';
+    }
+    return (
+        <Box
+            component="img"
+            src={`static/img/${imageFile}`}
+            loading="lazy"
+            sx={{
+                width: '28px',
+                height: '28px'
+            }}
+        />
+    );
+}
 
 const NothingHereYet = (props) => {
     const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);

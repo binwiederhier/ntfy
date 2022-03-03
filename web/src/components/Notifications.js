@@ -1,5 +1,5 @@
 import Container from "@mui/material/Container";
-import {CardContent, Link, Stack} from "@mui/material";
+import {CardActions, CardContent, Link, Stack} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
@@ -9,6 +9,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import {Paragraph, VerticallyCenteredContainer} from "./styles";
 import {useLiveQuery} from "dexie-react-hooks";
 import db from "../app/db";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 
 const Notifications = (props) => {
     const subscription = props.subscription;
@@ -47,6 +49,9 @@ const NotificationItem = (props) => {
         console.log(`[Notifications] Deleting notification ${notification.id} from ${subscriptionId}`);
         await db.notifications.delete(notification.id); // FIXME
     }
+    const attachment = notification.attachment;
+    const expired = attachment?.expires <= Date.now()/1000;
+    const image = attachment?.type.startsWith("image/") && !expired;
     return (
         <Card sx={{ minWidth: 275 }}>
             <CardContent>
@@ -64,11 +69,35 @@ const NotificationItem = (props) => {
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{formatMessage(notification)}</Typography>
+                {image && <Box
+                    component="img"
+                    src={`${attachment.url}`}
+                    loading="lazy"
+                    sx={{
+                        marginTop: 2,
+                        borderRadius: '4px',
+                        boxShadow: 2,
+                        maxWidth: 1,
+                        maxHeight: '400px'
+                    }}
+                    />}
+                {attachment && !image &&
+                    <Typography>
+                        <b>{attachment.name}</b><br/>
+                        {attachment.size}, {attachment.expires}
+                    </Typography>}
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
             </CardContent>
+            {attachment &&
+                <CardActions>
+                    <Button onClick={() => navigator.clipboard.writeText(attachment.url)}>Copy URL</Button>
+                    <Button onClick={() => window.open(attachment.url)}>Open</Button>
+                </CardActions>
+            }
         </Card>
     );
 }
+
 
 const NothingHereYet = (props) => {
     const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);

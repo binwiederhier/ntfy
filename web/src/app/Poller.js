@@ -1,5 +1,6 @@
 import db from "./db";
 import api from "./Api";
+import subscriptionManager from "./SubscriptionManager";
 
 const delayMillis = 3000; // 3 seconds
 const intervalMillis = 300000; // 5 minutes
@@ -19,7 +20,7 @@ class Poller {
 
     async pollAll() {
         console.log(`[Poller] Polling all subscriptions`);
-        const subscriptions = await db.subscriptions.toArray();
+        const subscriptions = await subscriptionManager.all();
         for (const s of subscriptions) {
             try {
                 await this.poll(s);
@@ -38,11 +39,20 @@ class Poller {
             console.log(`[Poller] No new notifications found for ${subscription.id}`);
             return;
         }
-        const notificationsWithSubscriptionId = notifications
-            .map(notification => ({ ...notification, subscriptionId: subscription.id }));
-        await db.notifications.bulkPut(notificationsWithSubscriptionId); // FIXME
-        await db.subscriptions.update(subscription.id, {last: notifications.at(-1).id}); // FIXME
-    };
+        console.log(`[Poller] Adding ${notifications.length} notification(s) for ${subscription.id}`);
+        await subscriptionManager.addNotifications(subscription.id, notifications);
+    }
+
+    pollInBackground(subscription) {
+        const fn = async () => {
+            try {
+                await this.poll(subscription);
+            } catch (e) {
+                console.error(`[App] Error polling subscription ${subscription.id}`, e);
+            }
+        };
+        setTimeout(() => fn(), 0);
+    }
 }
 
 const poller = new Poller();

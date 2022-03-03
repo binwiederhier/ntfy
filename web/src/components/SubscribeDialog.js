@@ -12,7 +12,9 @@ import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
-import db from "../app/db";
+import userManager from "../app/UserManager";
+import subscriptionManager from "../app/SubscriptionManager";
+import poller from "../app/Poller";
 
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
@@ -22,7 +24,7 @@ const SubscribeDialog = (props) => {
     const [topic, setTopic] = useState("");
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const handleSuccess = () => {
+    const handleSuccess = async () => {
         const actualBaseUrl = (baseUrl) ? baseUrl : defaultBaseUrl; // FIXME
         const subscription = {
             id: topicUrl(actualBaseUrl, topic),
@@ -30,6 +32,8 @@ const SubscribeDialog = (props) => {
             topic: topic,
             last: null
         };
+        await subscriptionManager.save(subscription);
+        poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }
     return (
@@ -141,7 +145,7 @@ const LoginPage = (props) => {
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
-        db.users.put(user);
+        await userManager.save(user);
         props.onSuccess();
     };
     return (

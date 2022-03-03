@@ -13,10 +13,11 @@ import ActionBar from "./ActionBar";
 import notificationManager from "../app/NotificationManager";
 import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
-import db from "../app/db";
 import {useLiveQuery} from "dexie-react-hooks";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
+import subscriptionManager from "../app/SubscriptionManager";
+import userManager from "../app/UserManager";
 
 // TODO subscribe dialog:
 //  - check/use existing user
@@ -26,7 +27,6 @@ import pruner from "../app/Pruner";
 // TODO business logic with callbacks
 // TODO connection indicator in subscription list
 // TODO connectionmanager should react on users changes
-// TODO attachments
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -35,31 +35,21 @@ const App = () => {
     const [prefsOpen, setPrefsOpen] = useState(false);
     const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
-    const subscriptions = useLiveQuery(() => db.subscriptions.toArray());
-    const users = useLiveQuery(() => db.users.toArray());
+    const subscriptions = useLiveQuery(() => subscriptionManager.all());
+    const users = useLiveQuery(() => userManager.all());
     const handleSubscriptionClick = async (subscriptionId) => {
-        const subscription = await db.subscriptions.get(subscriptionId); // FIXME
+        const subscription = await subscriptionManager.get(subscriptionId);
         setSelectedSubscription(subscription);
         setPrefsOpen(false);
     }
     const handleSubscribeSubmit = async (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`, subscription);
-        await db.subscriptions.put(subscription); // FIXME
         setSelectedSubscription(subscription);
         handleRequestPermission();
-        try {
-            await poller.poll(subscription);
-        } catch (e) {
-            console.error(`[App] Error polling newly added subscription ${subscription.id}`, e);
-        }
     };
     const handleUnsubscribe = async (subscriptionId) => {
         console.log(`[App] Unsubscribing from ${subscriptionId}`);
-        await db.subscriptions.delete(subscriptionId); // FIXME
-        await db.notifications
-            .where({subscriptionId: subscriptionId})
-            .delete(); // FIXME
-        const newSelected = await db.subscriptions.toCollection().first(); // FIXME May be undefined
+        const newSelected = await subscriptionManager.first(); // May be undefined
         setSelectedSubscription(newSelected);
     };
     const handleRequestPermission = () => {
@@ -77,7 +67,7 @@ const App = () => {
         poller.startWorker();
         pruner.startWorker();
         const load = async () => {
-            const subs = await db.subscriptions.toArray(); // Cannot be 'subscriptions'
+            const subs = await subscriptionManager.all();             // FIXME this is broken
             const selectedSubscriptionId = await prefs.selectedSubscriptionId();
 
             // Set selected subscription
@@ -93,10 +83,10 @@ const App = () => {
         const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
         const handleNotification = async (subscriptionId, notification) => {
             try {
-                const subscription = await db.subscriptions.get(subscriptionId); // FIXME
-                await db.notifications.add({ ...notification, subscriptionId }); // FIXME, will throw if exists!
-                await db.subscriptions.update(subscriptionId, { last: notification.id });
-                await notificationManager.notify(subscription, notification, notificationClickFallback)
+                const added = await subscriptionManager.addNotification(subscriptionId, notification);
+                if (added) {
+                    await notificationManager.notify(subscriptionId, notification, notificationClickFallback)
+                }
             } catch (e) {
                 console.error(`[App] Error handling notification`, e);
             }

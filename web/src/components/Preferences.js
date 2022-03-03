@@ -32,6 +32,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
+import userManager from "../app/UserManager";
 
 const Preferences = (props) => {
     return (
@@ -165,7 +166,7 @@ const DefaultServer = (props) => {
 const Users = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const users = useLiveQuery(() => db.users.toArray());
+    const users = useLiveQuery(() => userManager.all());
     const handleAddClick = () => {
         setDialogKey(prev => prev+1);
         setDialogOpen(true);
@@ -176,7 +177,7 @@ const Users = () => {
     const handleDialogSubmit = async (user) => {
         setDialogOpen(false);
         try {
-            await db.users.add(user);
+            await userManager.save(user);
             console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} added`);
         } catch (e) {
             console.log(`[Preferences] Error adding user.`, e);
@@ -224,7 +225,7 @@ const UserTable = (props) => {
     const handleDialogSubmit = async (user) => {
         setDialogOpen(false);
         try {
-            await db.users.put(user); // put() is an upsert
+            await userManager.save(user);
             console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} updated`);
         } catch (e) {
             console.log(`[Preferences] Error updating user.`, e);
@@ -232,7 +233,7 @@ const UserTable = (props) => {
     };
     const handleDeleteClick = async (user) => {
         try {
-            await db.users.delete(user.baseUrl);
+            await userManager.delete(user.baseUrl);
             console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} deleted`);
         } catch (e) {
             console.error(`[Preferences] Error deleting user for ${user.baseUrl}`, e);

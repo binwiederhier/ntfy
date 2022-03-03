@@ -1,25 +1,22 @@
 import Container from "@mui/material/Container";
-import {ButtonBase, CardActions, CardContent, Fade, Link, Modal, Stack, styled} from "@mui/material";
+import {ButtonBase, CardActions, CardContent, Fade, Link, Modal, Stack} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
+import {useState} from "react";
 import {formatBytes, formatMessage, formatShortDateTime, formatTitle, topicShortUrl, unmatchedTags} from "../app/utils";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from '@mui/icons-material/Close';
 import {Paragraph, VerticallyCenteredContainer} from "./styles";
 import {useLiveQuery} from "dexie-react-hooks";
-import db from "../app/db";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import theme from "./theme";
-import {useState} from "react";
+import subscriptionManager from "../app/SubscriptionManager";
 
 const Notifications = (props) => {
     const subscription = props.subscription;
     const notifications = useLiveQuery(() => {
-        return db.notifications
-            .where({ subscriptionId: subscription.id })
-            .toArray();
+        return subscriptionManager.getNotifications(subscription.id);
     }, [subscription]);
     if (!notifications || notifications.length === 0) {
         return <NothingHereYet subscription={subscription}/>;
@@ -49,7 +46,7 @@ const NotificationItem = (props) => {
     const tags = (otherTags.length > 0) ? otherTags.join(', ') : null;
     const handleDelete = async () => {
         console.log(`[Notifications] Deleting notification ${notification.id} from ${subscriptionId}`);
-        await db.notifications.delete(notification.id); // FIXME
+        await subscriptionManager.deleteNotification(notification.id)
     }
     const expired = attachment && attachment.expires && attachment.expires < Date.now()/1000;
     return (

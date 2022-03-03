@@ -9,10 +9,10 @@ import MenuList from '@mui/material/MenuList';
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import api from "../app/Api";
-import db from "../app/db";
+import subscriptionManager from "../app/SubscriptionManager";
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
-const IconSubscribeSettings = (props) => {
+const SubscribeSettings = (props) => {
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
 
@@ -27,16 +27,15 @@ const IconSubscribeSettings = (props) => {
         setOpen(false);
     };
 
-    const handleClearAll = (event) => {
+    const handleClearAll = async (event) => {
         handleClose(event);
         console.log(`[IconSubscribeSettings] Deleting all notifications from ${props.subscription.id}`);
-        db.notifications
-            .where({subscriptionId: props.subscription.id})
-            .delete(); // FIXME
+        await subscriptionManager.deleteNotifications(props.subscription.id);
     };
 
-    const handleUnsubscribe = (event) => {
+    const handleUnsubscribe = async (event) => {
         handleClose(event);
+        await subscriptionManager.remove(props.subscription.id);
         props.onUnsubscribe(props.subscription.id);
     };
 
@@ -48,7 +47,7 @@ const IconSubscribeSettings = (props) => {
         setOpen(false);
     }
 
-    function handleListKeyDown(event) {
+    const handleListKeyDown = (event) => {
         if (event.key === 'Tab') {
             event.preventDefault();
             setOpen(false);
@@ -114,4 +113,4 @@ const IconSubscribeSettings = (props) => {
     );
 }
 
-export default IconSubscribeSettings;
+export default SubscribeSettings;

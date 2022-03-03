@@ -4,7 +4,7 @@ import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import Typography from "@mui/material/Typography";
-import IconSubscribeSettings from "./IconSubscribeSettings";
+import SubscribeSettings from "./SubscribeSettings";
 import * as React from "react";
 import Box from "@mui/material/Box";
 import {topicShortUrl} from "../app/utils";
@@ -36,7 +36,7 @@ const ActionBar = (props) => {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>
-                {props.selectedSubscription !== null && <IconSubscribeSettings
+                {props.selectedSubscription !== null && <SubscribeSettings
                     subscription={props.selectedSubscription}
                     onUnsubscribe={props.onUnsubscribe}
                 />}

@@ -1,5 +1,5 @@
-import db from "./db";
 import prefs from "./Prefs";
+import subscriptionManager from "./SubscriptionManager";
 
 const delayMillis = 15000; // 15 seconds
 const intervalMillis = 1800000; // 30 minutes
@@ -26,9 +26,7 @@ class Pruner {
         }
         console.log(`[Pruner] Pruning notifications older than ${deleteAfterSeconds}s (timestamp ${pruneThresholdTimestamp})`);
         try {
-            await db.notifications
-                .where("time").below(pruneThresholdTimestamp)
-                .delete();
+            await subscriptionManager.pruneNotifications(pruneThresholdTimestamp);
         } catch (e) {
             console.log(`[Pruner] Error pruning old subscriptions`, e);
         }

@@ -1,17 +1,17 @@
 import {
-    topicUrlJsonPoll,
     fetchLinesIterator,
-    topicUrl,
-    topicUrlAuth,
     maybeWithBasicAuth,
     topicShortUrl,
+    topicUrl,
+    topicUrlAuth,
+    topicUrlJsonPoll,
     topicUrlJsonPollWithSince
 } from "./utils";
-import db from "./db";
+import userManager from "./UserManager";
 
 class Api {
     async poll(baseUrl, topic, since) {
-        const user = await db.users.get(baseUrl);
+        const user = await userManager.get(baseUrl);
         const shortUrl = topicShortUrl(baseUrl, topic);
         const url = (since)
             ? topicUrlJsonPollWithSince(baseUrl, topic, since)
@@ -27,7 +27,7 @@ class Api {
     }
 
     async publish(baseUrl, topic, message) {
-        const user = await db.users.get(baseUrl);
+        const user = await userManager.get(baseUrl);
         const url = topicUrl(baseUrl, topic);
         console.log(`[Api] Publishing message to ${url}`);
         await fetch(url, {

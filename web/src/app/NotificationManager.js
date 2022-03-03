@@ -1,8 +1,10 @@
 import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
 import prefs from "./Prefs";
+import subscriptionManager from "./SubscriptionManager";
 
 class NotificationManager {
-    async notify(subscription, notification, onClickFallback) {
+    async notify(subscriptionId, notification, onClickFallback) {
+        const subscription = await subscriptionManager.get(subscriptionId);
         const shouldNotify = await this.shouldNotify(subscription, notification);
         if (!shouldNotify) {
             return;

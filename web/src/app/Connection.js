@@ -1,9 +1,9 @@
 import {basicAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 
-const retryBackoffSeconds = [5, 10, 15, 20, 30, 45];
+const retryBackoffSeconds = [5, 10, 15, 20, 30];
 
 class Connection {
-    constructor(connectionId, subscriptionId, baseUrl, topic, user, since, onNotification) {
+    constructor(connectionId, subscriptionId, baseUrl, topic, user, since, onNotification, onStateChanged) {
         this.connectionId = connectionId;
         this.subscriptionId = subscriptionId;
         this.baseUrl = baseUrl;
@@ -12,6 +12,7 @@ class Connection {
         this.since = since;
         this.shortUrl = topicShortUrl(baseUrl, topic);
         this.onNotification = onNotification;
+        this.onStateChanged = onStateChanged;
         this.ws = null;
         this.retryCount = 0;
         this.retryTimeout = null;
@@ -28,6 +29,7 @@ class Connection {
         this.ws.onopen = (event) => {
             console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection established`, event);
             this.retryCount = 0;
+            this.onStateChanged(this.subscriptionId, ConnectionState.Connected);
         }
         this.ws.onmessage = (event) => {
             console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Message received from server: ${event.data}`);
@@ -60,6 +62,7 @@ class Connection {
                 this.retryCount++;
                 console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection died, retrying in ${retrySeconds} seconds`);
                 this.retryTimeout = setTimeout(() => this.start(), retrySeconds * 1000);
+                this.onStateChanged(this.subscriptionId, ConnectionState.Connecting);
             }
         };
         this.ws.onerror = (event) => {
@@ -93,6 +96,11 @@ class Connection {
         const wsUrl = topicUrlWs(this.baseUrl, this.topic);
         return (params.length === 0) ? wsUrl : `${wsUrl}?${params.join('&')}`;
     }
+}
+
+export class ConnectionState {
+    static Connected = "connected";
+    static Connecting = "connecting";
 }
 
 export default Connection;

@@ -4,7 +4,15 @@ import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {useState} from "react";
-import {formatBytes, formatMessage, formatShortDateTime, formatTitle, topicShortUrl, unmatchedTags} from "../app/utils";
+import {
+    formatBytes,
+    formatMessage,
+    formatShortDateTime,
+    formatTitle,
+    openUrl,
+    topicShortUrl,
+    unmatchedTags
+} from "../app/utils";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from '@mui/icons-material/Close';
 import {LightboxBackdrop, Paragraph, VerticallyCenteredContainer} from "./styles";
@@ -49,6 +57,9 @@ const NotificationItem = (props) => {
         await subscriptionManager.deleteNotification(notification.id)
     }
     const expired = attachment && attachment.expires && attachment.expires < Date.now()/1000;
+    const showAttachmentActions = attachment && !expired;
+    const showClickAction = notification.click;
+    const showActions = showAttachmentActions || showClickAction;
     return (
         <Card sx={{ minWidth: 275, padding: 1 }}>
             <CardContent>
@@ -69,10 +80,13 @@ const NotificationItem = (props) => {
                 {attachment && <Attachment attachment={attachment}/>}
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
             </CardContent>
-            {attachment && !expired &&
+            {showActions &&
                 <CardActions sx={{paddingTop: 0}}>
-                    <Button onClick={() => navigator.clipboard.writeText(attachment.url)}>Copy URL</Button>
-                    <Button onClick={() => window.open(attachment.url)}>Open</Button>
+                    {showAttachmentActions && <>
+                        <Button onClick={() => navigator.clipboard.writeText(attachment.url)}>Copy URL</Button>
+                        <Button onClick={() => openUrl(attachment.url)}>Open attachment</Button>
+                    </>}
+                    {showClickAction && <Button onClick={() => openUrl(notification.click)}>Open link</Button>}
                 </CardActions>
             }
         </Card>

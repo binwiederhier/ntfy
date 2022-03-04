@@ -13,6 +13,11 @@ class SubscriptionManager {
         await db.subscriptions.put(subscription);
     }
 
+    async updateState(subscriptionId, state) {
+        console.log(`Update state: ${subscriptionId} ${state}`)
+        db.subscriptions.update(subscriptionId, { state: state });
+    }
+
     async remove(subscriptionId) {
         await db.subscriptions.delete(subscriptionId);
         await db.notifications

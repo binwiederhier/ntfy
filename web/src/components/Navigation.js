@@ -11,10 +11,11 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, ListSubheader} from "@mui/material";
+import {Alert, AlertTitle, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {topicShortUrl} from "../app/utils";
+import {ConnectionState} from "../app/Connection";
 
 const navWidth = 240;
 
@@ -117,18 +118,28 @@ const SubscriptionList = (props) => {
     return (
         <>
             {props.subscriptions.map(subscription =>
-                <ListItemButton
+                <SubscriptionItem
                     key={subscription.id}
-                    onClick={() => props.onSubscriptionClick(subscription.id)}
+                    subscription={subscription}
                     selected={props.selectedSubscription && !props.prefsOpen && props.selectedSubscription.id === subscription.id}
-                >
-                    <ListItemIcon><ChatBubbleOutlineIcon /></ListItemIcon>
-                    <ListItemText primary={topicShortUrl(subscription.baseUrl, subscription.topic)}/>
-                </ListItemButton>
-            )}
+                    onClick={() => props.onSubscriptionClick(subscription.id)}
+            />)}
         </>
     );
 }
+
+const SubscriptionItem = (props) => {
+    const subscription = props.subscription;
+    const icon = (subscription.state === ConnectionState.Connecting)
+        ? <CircularProgress size="24px"/>
+        : <ChatBubbleOutlineIcon/>;
+    return (
+        <ListItemButton onClick={props.onClick} selected={props.selected}>
+            <ListItemIcon>{icon}</ListItemIcon>
+            <ListItemText primary={topicShortUrl(subscription.baseUrl, subscription.topic)}/>
+        </ListItemButton>
+    );
+};
 
 const PermissionAlert = (props) => {
     return (

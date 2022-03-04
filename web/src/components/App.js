@@ -23,11 +23,8 @@ import userManager from "../app/UserManager";
 // TODO make default server functional
 // TODO routing
 // TODO embed into ntfy server
-// TODO connection indicator in subscription list
 
 const App = () => {
-    console.log(`[App] Rendering main view`);
-
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [prefsOpen, setPrefsOpen] = useState(false);
     const [selectedSubscription, setSelectedSubscription] = useState(null);
@@ -75,18 +72,26 @@ const App = () => {
         setTimeout(() => load(), 5000);
     }, [/* initial render */]);
     useEffect(() => {
-        const notificationClickFallback = (subscription) => setSelectedSubscription(subscription);
         const handleNotification = async (subscriptionId, notification) => {
             try {
                 const added = await subscriptionManager.addNotification(subscriptionId, notification);
                 if (added) {
-                    await notificationManager.notify(subscriptionId, notification, notificationClickFallback)
+                    const defaultClickAction = (subscription) => setSelectedSubscription(subscription);
+                    await notificationManager.notify(subscriptionId, notification, defaultClickAction)
                 }
             } catch (e) {
                 console.error(`[App] Error handling notification`, e);
             }
         };
-        connectionManager.refresh(subscriptions, users, handleNotification); // Dangle
+        connectionManager.registerStateListener(subscriptionManager.updateState);
+        connectionManager.registerNotificationListener(handleNotification);
+        return () => {
+            connectionManager.resetStateListener();
+            connectionManager.resetNotificationListener();
+        }
+    }, [/* initial render */]);
+    useEffect(() => {
+        connectionManager.refresh(subscriptions, users); // Dangle
     }, [subscriptions, users]);
     useEffect(() => {
         const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";

@@ -1,4 +1,4 @@
-import {formatMessage, formatTitleWithFallback, topicShortUrl} from "./utils";
+import {formatMessage, formatTitleWithFallback, openUrl, topicShortUrl} from "./utils";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 
@@ -19,7 +19,7 @@ class NotificationManager {
             icon: '/static/img/favicon.png'
         });
         if (notification.click) {
-            n.onclick = (e) => window.open(notification.click);
+            n.onclick = (e) => openUrl(notification.click);
         } else {
             n.onclick = onClickFallback;
         }

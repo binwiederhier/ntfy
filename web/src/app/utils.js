@@ -110,6 +110,10 @@ export const formatBytes = (bytes, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+export const openUrl = (url) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+};
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 export async function* fetchLinesIterator(fileURL, headers) {
     const utf8Decoder = new TextDecoder('utf-8');

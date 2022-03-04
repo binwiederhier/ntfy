@@ -7,7 +7,7 @@ import {useState} from "react";
 import {formatBytes, formatMessage, formatShortDateTime, formatTitle, topicShortUrl, unmatchedTags} from "../app/utils";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from '@mui/icons-material/Close';
-import {Paragraph, VerticallyCenteredContainer} from "./styles";
+import {LightboxBackdrop, Paragraph, VerticallyCenteredContainer} from "./styles";
 import {useLiveQuery} from "dexie-react-hooks";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -174,6 +174,7 @@ const Image = (props) => {
             <Modal
                 open={open}
                 onClose={() => setOpen(false)}
+                BackdropComponent={LightboxBackdrop}
             >
                 <Fade in={open}>
                     <Box

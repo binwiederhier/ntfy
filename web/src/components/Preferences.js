@@ -25,7 +25,6 @@ import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import Card from "@mui/material/Card";
 import Button from "@mui/material/Button";
-import db from "../app/db";
 import {useLiveQuery} from "dexie-react-hooks";
 import theme from "./theme";
 import Dialog from "@mui/material/Dialog";

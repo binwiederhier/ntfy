@@ -1,7 +1,7 @@
 import Typography from "@mui/material/Typography";
 import theme from "./theme";
 import Container from "@mui/material/Container";
-import {styled} from "@mui/material";
+import {Backdrop, styled} from "@mui/material";
 
 export const Paragraph = styled(Typography)({
   paddingTop: 8,
@@ -15,4 +15,8 @@ export const VerticallyCenteredContainer = styled(Container)({
   justifyContent: 'center',
   alignContent: 'center',
   color: theme.palette.text.primary
+});
+
+export const LightboxBackdrop = styled(Backdrop)({
+  backgroundColor: 'rgba(0, 0, 0, 0.8)' // was: 0.5
 });

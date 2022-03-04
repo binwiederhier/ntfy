@@ -1,4 +1,4 @@
-import {formatMessage, formatTitleWithFallback, openUrl, topicShortUrl} from "./utils";
+import {formatMessage, formatTitleWithDefault, openUrl, topicShortUrl} from "./utils";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 
@@ -11,7 +11,7 @@ class NotificationManager {
         }
         const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
         const message = formatMessage(notification);
-        const title = formatTitleWithFallback(notification, shortUrl);
+        const title = formatTitleWithDefault(notification, shortUrl);
 
         console.log(`[NotificationManager, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
         const n = new Notification(title, {

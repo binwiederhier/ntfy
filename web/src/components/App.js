@@ -19,10 +19,10 @@ import pruner from "../app/Pruner";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
 
-// TODO subscribe dialog check/use existing user
 // TODO make default server functional
 // TODO routing
 // TODO embed into ntfy server
+// TODO new notification indicator
 
 const App = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);

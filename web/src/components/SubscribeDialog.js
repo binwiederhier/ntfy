@@ -16,6 +16,7 @@ import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 
+const publicBaseUrl = "https://ntfy.sh"
 const defaultBaseUrl = "http://127.0.0.1"
 //const defaultBaseUrl = "https://ntfy.sh"
 
@@ -60,19 +61,27 @@ const SubscribeDialog = (props) => {
 
 const SubscribePage = (props) => {
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
+    const [errorText, setErrorText] = useState("");
     const baseUrl = (anotherServerVisible) ? props.baseUrl : defaultBaseUrl;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
-    const existingBaseUrls = Array.from(new Set(["https://ntfy.sh", ...props.subscriptions.map(s => s.baseUrl)]))
+    const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== defaultBaseUrl);
     const handleSubscribe = async () => {
-        const success = await api.auth(baseUrl, topic, null);
+        const user = await userManager.get(baseUrl); // May be undefined
+        const username = (user) ? user.username : "anonymous";
+        const success = await api.auth(baseUrl, topic, user);
         if (!success) {
-            console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for anonymous user`);
-            props.onNeedsLogin();
-            return;
+            console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
+            if (user) {
+                setErrorText(`User ${username} not authorized`);
+                return;
+            } else {
+                props.onNeedsLogin();
+                return;
+            }
         }
-        console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for anonymous user`);
+        console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         props.onSuccess();
     };
     const handleUseAnotherChanged = (e) => {
@@ -122,10 +131,10 @@ const SubscribePage = (props) => {
                     }
                 />}
             </DialogContent>
-            <DialogActions>
+            <DialogFooter status={errorText}>
                 <Button onClick={props.onCancel}>Cancel</Button>
                 <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>Subscribe</Button>
-            </DialogActions>
+            </DialogFooter>
         </>
     );
 };

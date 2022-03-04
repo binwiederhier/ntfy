@@ -143,22 +143,24 @@ const Pref = (props) => {
 
 const DefaultServer = (props) => {
     return (
-        <Paper sx={{p: 3}}>
-            <Typography variant="h5">
-                Default server
-            </Typography>
-            <Paragraph>
-                This server is used as a default when adding new topics.
-            </Paragraph>
-            <TextField
-                margin="dense"
-                id="defaultBaseUrl"
-                placeholder="https://ntfy.sh"
-                type="text"
-                fullWidth
-                variant="standard"
-            />
-        </Paper>
+        <Card sx={{ padding: 1 }}>
+            <CardContent>
+                <Typography variant="h5">
+                    Default server
+                </Typography>
+                <Paragraph>
+                    This server is used as a default when adding new topics.
+                </Paragraph>
+                <TextField
+                    margin="dense"
+                    id="defaultBaseUrl"
+                    placeholder="https://ntfy.sh"
+                    type="text"
+                    fullWidth
+                    variant="standard"
+                />
+            </CardContent>
+        </Card>
     );
 };
 
@@ -183,7 +185,7 @@ const Users = () => {
         }
     };
     return (
-        <Card sx={{p: 3}}>
+        <Card sx={{ padding: 1 }}>
             <CardContent>
                 <Typography variant="h5">
                     Manage users

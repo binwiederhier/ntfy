@@ -33,7 +33,7 @@ const toEmojis = (tags) => {
 }
 
 
-export const formatTitleWithFallback = (m, fallback) => {
+export const formatTitleWithDefault = (m, fallback) => {
     if (m.title) {
         return formatTitle(m);
     }

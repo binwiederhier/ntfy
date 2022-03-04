@@ -8,11 +8,16 @@ import SubscribeSettings from "./SubscribeSettings";
 import * as React from "react";
 import Box from "@mui/material/Box";
 import {topicShortUrl} from "../app/utils";
+import {useLocation} from "react-router-dom";
 
 const ActionBar = (props) => {
-    const title = (props.selectedSubscription)
-        ? topicShortUrl(props.selectedSubscription.baseUrl, props.selectedSubscription.topic)
-        : "ntfy";
+    const location = useLocation();
+    let title = "ntfy";
+    if (props.selectedSubscription) {
+        title = topicShortUrl(props.selectedSubscription.baseUrl, props.selectedSubscription.topic);
+    } else if (location.pathname === "/settings") {
+        title = "Settings";
+    }
     return (
         <AppBar position="fixed" sx={{
             width: '100%',
@@ -36,7 +41,7 @@ const ActionBar = (props) => {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>
-                {props.selectedSubscription !== null && <SubscribeSettings
+                {props.selectedSubscription && <SubscribeSettings
                     subscription={props.selectedSubscription}
                     onUnsubscribe={props.onUnsubscribe}
                 />}

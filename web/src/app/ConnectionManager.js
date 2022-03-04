@@ -3,7 +3,6 @@ import {sha256} from "./utils";
 
 class ConnectionManager {
     constructor() {
-        console.log(`connection manager`)
         this.connections = new Map(); // ConnectionId -> Connection (hash, see below)
         this.stateListener = null; // Fired when connection state changes
         this.notificationListener = null; // Fired when new notifications arrive

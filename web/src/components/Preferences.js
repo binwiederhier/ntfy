@@ -14,7 +14,6 @@ import {
     useMediaQuery
 } from "@mui/material";
 import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
 import prefs from "../app/Prefs";
 import {Paragraph} from "./styles";
 import EditIcon from '@mui/icons-material/Edit';
@@ -33,7 +32,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 
-const Preferences = (props) => {
+const Preferences = () => {
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>

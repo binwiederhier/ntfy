@@ -14,8 +14,9 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import {topicShortUrl} from "../app/utils";
+import {subscriptionRoute, topicShortUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
+import {useLocation, useNavigate} from "react-router-dom";
 
 const navWidth = 240;
 
@@ -53,6 +54,8 @@ const Navigation = (props) => {
 Navigation.width = navWidth;
 
 const NavList = (props) => {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
     const handleSubscribeReset = () => {
@@ -67,39 +70,24 @@ const NavList = (props) => {
     const showGrantPermissionsBox = props.subscriptions?.length > 0 && !props.notificationsGranted;
     return (
         <>
-            <Toolbar sx={{
-                display: { xs: 'none', sm: 'block' }
-            }}/>
-            <List component="nav" sx={{
-                paddingTop: (showGrantPermissionsBox) ? '0' : ''
-            }}>
+            <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
+            <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
                 {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.onRequestPermissionClick}/>}
                 {showSubscriptionsList &&
                     <>
-                        <ListSubheader component="div" id="nested-list-subheader">
-                            Subscribed topics
-                        </ListSubheader>
+                        <ListSubheader>Subscribed topics</ListSubheader>
                         <SubscriptionList
                             subscriptions={props.subscriptions}
                             selectedSubscription={props.selectedSubscription}
-                            prefsOpen={props.prefsOpen}
-                            onSubscriptionClick={props.onSubscriptionClick}
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
-                <ListItemButton
-                    onClick={props.onPrefsClick}
-                    selected={props.prefsOpen}
-                >
-                    <ListItemIcon>
-                        <SettingsIcon/>
-                    </ListItemIcon>
+                <ListItemButton onClick={() => navigate("/settings")} selected={location.pathname === "/settings"}>
+                    <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary="Settings"/>
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
-                    <ListItemIcon>
-                        <AddIcon/>
-                    </ListItemIcon>
+                    <ListItemIcon><AddIcon/></ListItemIcon>
                     <ListItemText primary="Add subscription"/>
                 </ListItemButton>
             </List>
@@ -121,20 +109,20 @@ const SubscriptionList = (props) => {
                 <SubscriptionItem
                     key={subscription.id}
                     subscription={subscription}
-                    selected={props.selectedSubscription && !props.prefsOpen && props.selectedSubscription.id === subscription.id}
-                    onClick={() => props.onSubscriptionClick(subscription.id)}
+                    selected={props.selectedSubscription && props.selectedSubscription.id === subscription.id}
             />)}
         </>
     );
 }
 
 const SubscriptionItem = (props) => {
+    const navigate = useNavigate();
     const subscription = props.subscription;
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
         : <ChatBubbleOutlineIcon/>;
     return (
-        <ListItemButton onClick={props.onClick} selected={props.selected}>
+        <ListItemButton onClick={() => navigate(subscriptionRoute(subscription))} selected={props.selected}>
             <ListItemIcon>{icon}</ListItemIcon>
             <ListItemText primary={topicShortUrl(subscription.baseUrl, subscription.topic)}/>
         </ListItemButton>

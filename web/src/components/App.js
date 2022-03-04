@@ -6,7 +6,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
 import Notifications from "./Notifications";
 import theme from "./theme";
-import prefs from "../app/Prefs";
 import connectionManager from "../app/ConnectionManager";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
@@ -18,65 +17,64 @@ import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
+import {BrowserRouter, Route, Routes, useLocation, useNavigate} from "react-router-dom";
+import {subscriptionRoute} from "../app/utils";
 
 // TODO make default server functional
-// TODO routing
 // TODO embed into ntfy server
 // TODO new notification indicator
 
 const App = () => {
+    return (
+        <BrowserRouter>
+            <ThemeProvider theme={theme}>
+                <CssBaseline/>
+                <Root/>
+            </ThemeProvider>
+        </BrowserRouter>
+    );
+}
+
+const Root = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-    const [prefsOpen, setPrefsOpen] = useState(false);
-    const [selectedSubscription, setSelectedSubscription] = useState(null);
     const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
-    const subscriptions = useLiveQuery(() => subscriptionManager.all());
+    const navigate = useNavigate();
+    const location = useLocation();
     const users = useLiveQuery(() => userManager.all());
+    const subscriptions = useLiveQuery(() => subscriptionManager.all());
+    const [selectedSubscription] = (subscriptions && location) ? subscriptions.filter(s => location.pathname === subscriptionRoute(s)) : [];
+
     const handleSubscriptionClick = async (subscriptionId) => {
         const subscription = await subscriptionManager.get(subscriptionId);
-        setSelectedSubscription(subscription);
-        setPrefsOpen(false);
+        navigate(subscriptionRoute(subscription));
     }
     const handleSubscribeSubmit = async (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`, subscription);
-        setSelectedSubscription(subscription);
+        navigate(subscriptionRoute(subscription));
         handleRequestPermission();
     };
     const handleUnsubscribe = async (subscriptionId) => {
         console.log(`[App] Unsubscribing from ${subscriptionId}`);
         const newSelected = await subscriptionManager.first(); // May be undefined
-        setSelectedSubscription(newSelected);
+        if (newSelected) {
+            navigate(subscriptionRoute(newSelected));
+        }
     };
     const handleRequestPermission = () => {
         notificationManager.maybeRequestPermission(granted => setNotificationsGranted(granted));
-    };
-    const handlePrefsClick = () => {
-        setPrefsOpen(true);
-        setSelectedSubscription(null);
     };
     // Define hooks: Note that the order of the hooks is important. The "loading" hooks
     // must be before the "saving" hooks.
     useEffect(() => {
         poller.startWorker();
         pruner.startWorker();
-        const load = async () => {
-            const subs = await subscriptionManager.all();             // FIXME this is broken
-            const selectedSubscriptionId = await prefs.selectedSubscriptionId();
-
-            // Set selected subscription
-            const maybeSelectedSubscription = subs?.filter(s => s.id = selectedSubscriptionId);
-            if (maybeSelectedSubscription.length > 0) {
-                setSelectedSubscription(maybeSelectedSubscription[0]);
-            }
-
-        };
-        setTimeout(() => load(), 5000);
     }, [/* initial render */]);
     useEffect(() => {
         const handleNotification = async (subscriptionId, notification) => {
             try {
                 const added = await subscriptionManager.addNotification(subscriptionId, notification);
                 if (added) {
-                    const defaultClickAction = (subscription) => setSelectedSubscription(subscription);
+                    const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription));
                     await notificationManager.notify(subscriptionId, notification, defaultClickAction)
                 }
             } catch (e) {
@@ -90,47 +88,37 @@ const App = () => {
             connectionManager.resetNotificationListener();
         }
     }, [/* initial render */]);
-    useEffect(() => {
-        connectionManager.refresh(subscriptions, users); // Dangle
-    }, [subscriptions, users]);
-    useEffect(() => {
-        const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";
-        prefs.setSelectedSubscriptionId(subscriptionId)
-    }, [selectedSubscription]);
-
+    useEffect(() => { connectionManager.refresh(subscriptions, users) }, [subscriptions, users]); // Dangle!
     return (
-        <ThemeProvider theme={theme}>
+        <Box sx={{display: 'flex'}}>
             <CssBaseline/>
-            <Box sx={{display: 'flex'}}>
-                <CssBaseline/>
-                <ActionBar
+            <ActionBar
+                subscriptions={subscriptions}
+                selectedSubscription={selectedSubscription}
+                onUnsubscribe={handleUnsubscribe}
+                onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+            />
+            <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
+                <Navigation
+                    subscriptions={subscriptions}
                     selectedSubscription={selectedSubscription}
-                    onUnsubscribe={handleUnsubscribe}
+                    mobileDrawerOpen={mobileDrawerOpen}
+                    notificationsGranted={notificationsGranted}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+                    onSubscriptionClick={handleSubscriptionClick}
+                    onSubscribeSubmit={handleSubscribeSubmit}
+                    onRequestPermissionClick={handleRequestPermission}
                 />
-                <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
-                    <Navigation
-                        subscriptions={subscriptions}
-                        selectedSubscription={selectedSubscription}
-                        mobileDrawerOpen={mobileDrawerOpen}
-                        notificationsGranted={notificationsGranted}
-                        prefsOpen={prefsOpen}
-                        onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-                        onSubscriptionClick={handleSubscriptionClick}
-                        onSubscribeSubmit={handleSubscribeSubmit}
-                        onPrefsClick={handlePrefsClick}
-                        onRequestPermissionClick={handleRequestPermission}
-                    />
-                </Box>
-                <Main>
-                    <Toolbar/>
-                    <Content
-                        subscription={selectedSubscription}
-                        prefsOpen={prefsOpen}
-                    />
-                </Main>
             </Box>
-        </ThemeProvider>
+            <Main>
+                <Toolbar/>
+                <Routes>
+                    <Route path="/" element={<NoTopics />} />
+                    <Route path="settings" element={<Preferences />} />
+                    <Route path=":topic" element={<Notifications subscriptions={subscriptions}/>} />
+                </Routes>
+            </Main>
+        </Box>
     );
 }
 
@@ -152,16 +140,6 @@ const Main = (props) => {
             {props.children}
         </Box>
     );
-};
-
-const Content = (props) => {
-    if (props.prefsOpen) {
-        return <Preferences/>;
-    }
-    if (props.subscription) {
-        return <Notifications subscription={props.subscription}/>;
-    }
-    return <NoTopics/>;
 };
 
 export default App;

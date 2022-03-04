@@ -114,6 +114,10 @@ export const openUrl = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
 };
 
+export const subscriptionRoute = (subscription) => {
+    return `/${subscription.topic}`;
+}
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 export async function* fetchLinesIterator(fileURL, headers) {
     const utf8Decoder = new TextDecoder('utf-8');

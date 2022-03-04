@@ -3,7 +3,8 @@ import {basicAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 const retryBackoffSeconds = [5, 10, 15, 20, 30, 45];
 
 class Connection {
-    constructor(subscriptionId, baseUrl, topic, user, since, onNotification) {
+    constructor(connectionId, subscriptionId, baseUrl, topic, user, since, onNotification) {
+        this.connectionId = connectionId;
         this.subscriptionId = subscriptionId;
         this.baseUrl = baseUrl;
         this.topic = topic;
@@ -21,15 +22,15 @@ class Connection {
         // we don't want to re-trigger the main view re-render potentially hundreds of times.
 
         const wsUrl = this.wsUrl();
-        console.log(`[Connection, ${this.shortUrl}] Opening connection to ${wsUrl}`);
+        console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Opening connection to ${wsUrl}`);
 
         this.ws = new WebSocket(wsUrl);
         this.ws.onopen = (event) => {
-            console.log(`[Connection, ${this.shortUrl}] Connection established`, event);
+            console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection established`, event);
             this.retryCount = 0;
         }
         this.ws.onmessage = (event) => {
-            console.log(`[Connection, ${this.shortUrl}] Message received from server: ${event.data}`);
+            console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Message received from server: ${event.data}`);
             try {
                 const data = JSON.parse(event.data);
                 if (data.event === 'open') {
@@ -41,33 +42,33 @@ class Connection {
                     'time' in data &&
                     'message' in data;
                 if (!relevantAndValid) {
-                    console.log(`[Connection, ${this.shortUrl}] Unexpected message. Ignoring.`);
+                    console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Unexpected message. Ignoring.`);
                     return;
                 }
                 this.since = data.id;
                 this.onNotification(this.subscriptionId, data);
             } catch (e) {
-                console.log(`[Connection, ${this.shortUrl}] Error handling message: ${e}`);
+                console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Error handling message: ${e}`);
             }
         };
         this.ws.onclose = (event) => {
             if (event.wasClean) {
-                console.log(`[Connection, ${this.shortUrl}] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
                 this.ws = null;
             } else {
                 const retrySeconds = retryBackoffSeconds[Math.min(this.retryCount, retryBackoffSeconds.length-1)];
                 this.retryCount++;
-                console.log(`[Connection, ${this.shortUrl}] Connection died, retrying in ${retrySeconds} seconds`);
+                console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection died, retrying in ${retrySeconds} seconds`);
                 this.retryTimeout = setTimeout(() => this.start(), retrySeconds * 1000);
             }
         };
         this.ws.onerror = (event) => {
-            console.log(`[Connection, ${this.shortUrl}] Error occurred: ${event}`, event);
+            console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Error occurred: ${event}`, event);
         };
     }
 
     close() {
-        console.log(`[Connection, ${this.shortUrl}] Closing connection`);
+        console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Closing connection`);
         const socket = this.ws;
         const retryTimeout = this.retryTimeout;
         if (socket !== null) {

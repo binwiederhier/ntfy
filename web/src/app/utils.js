@@ -90,6 +90,12 @@ export const encodeBase64Url = (s) => {
         .replaceAll('=', '');
 }
 
+// https://jameshfisher.com/2017/10/30/web-cryptography-api-hello-world/
+export const sha256 = async (s) => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder("utf-8").encode(s));
+    return Array.prototype.map.call(new Uint8Array(buf), x=>(('00'+x.toString(16)).slice(-2))).join('');
+}
+
 export const formatShortDateTime = (timestamp) => {
     return new Intl.DateTimeFormat('default', {dateStyle: 'short', timeStyle: 'short'})
         .format(new Date(timestamp * 1000));

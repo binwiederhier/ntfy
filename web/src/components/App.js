@@ -19,14 +19,11 @@ import pruner from "../app/Pruner";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
 
-// TODO subscribe dialog:
-//  - check/use existing user
-//  - add baseUrl
-// TODO embed into ntfy server
+// TODO subscribe dialog check/use existing user
 // TODO make default server functional
-// TODO business logic with callbacks
+// TODO routing
+// TODO embed into ntfy server
 // TODO connection indicator in subscription list
-// TODO connectionmanager should react on users changes
 
 const App = () => {
     console.log(`[App] Rendering main view`);
@@ -53,9 +50,7 @@ const App = () => {
         setSelectedSubscription(newSelected);
     };
     const handleRequestPermission = () => {
-        notificationManager.maybeRequestPermission((granted) => {
-            setNotificationsGranted(granted);
-        })
+        notificationManager.maybeRequestPermission(granted => setNotificationsGranted(granted));
     };
     const handlePrefsClick = () => {
         setPrefsOpen(true);
@@ -91,7 +86,7 @@ const App = () => {
                 console.error(`[App] Error handling notification`, e);
             }
         };
-        connectionManager.refresh(subscriptions, users, handleNotification);
+        connectionManager.refresh(subscriptions, users, handleNotification); // Dangle
     }, [subscriptions, users]);
     useEffect(() => {
         const subscriptionId = (selectedSubscription) ? selectedSubscription.id : "";

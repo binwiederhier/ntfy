@@ -20,9 +20,11 @@ import userManager from "../app/UserManager";
 import {BrowserRouter, Route, Routes, useLocation, useNavigate} from "react-router-dom";
 import {subscriptionRoute} from "../app/utils";
 
-// TODO make default server functional
+// TODO support unsubscribed routes
 // TODO embed into ntfy server
+// TODO googlefonts
 // TODO new notification indicator
+// TODO sound
 
 const App = () => {
     return (
@@ -42,7 +44,7 @@ const Root = () => {
     const location = useLocation();
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
-    const [selectedSubscription] = (subscriptions && location) ? subscriptions.filter(s => location.pathname === subscriptionRoute(s)) : [];
+    const selectedSubscription = findSelected(location, subscriptions);
 
     const handleSubscriptionClick = async (subscriptionId) => {
         const subscription = await subscriptionManager.get(subscriptionId);
@@ -74,7 +76,7 @@ const Root = () => {
             try {
                 const added = await subscriptionManager.addNotification(subscriptionId, notification);
                 if (added) {
-                    const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription));
+                    const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription)); // FIXME
                     await notificationManager.notify(subscriptionId, notification, defaultClickAction)
                 }
             } catch (e) {
@@ -115,7 +117,8 @@ const Root = () => {
                 <Routes>
                     <Route path="/" element={<NoTopics />} />
                     <Route path="settings" element={<Preferences />} />
-                    <Route path=":topic" element={<Notifications subscriptions={subscriptions}/>} />
+                    <Route path=":baseUrl/:topic" element={<Notifications subscription={selectedSubscription}/>} />
+                    <Route path=":topic" element={<Notifications subscription={selectedSubscription}/>} />
                 </Routes>
             </Main>
         </Box>
@@ -140,6 +143,15 @@ const Main = (props) => {
             {props.children}
         </Box>
     );
+};
+
+const findSelected = (location, subscriptions) => {
+    if (!subscriptions || !location)  {
+        return null;
+    }
+    const [subscription] = subscriptions
+        .filter(s => location.pathname === subscriptionRoute(s));
+    return subscription;
 };
 
 export default App;

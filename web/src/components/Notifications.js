@@ -20,19 +20,14 @@ import {useLiveQuery} from "dexie-react-hooks";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
-import { useParams } from "react-router-dom";
 
 const Notifications = (props) => {
-    const params = useParams();
-    if (!props.subscriptions) {
+    const subscription = props.subscription;
+    if (!subscription) {
         return null;
     }
-    const [subscription] = props.subscriptions.filter(s => s.topic === params.topic);
-    if (!subscription) {
-        return null; // FIXME
-    }
     return <NotificationList subscription={subscription}/>;
-};
+}
 
 const NotificationList = (props) => {
     const subscription = props.subscription;

@@ -1,4 +1,5 @@
 import {rawEmojis} from "./emojis";
+import config from "./config";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
@@ -115,6 +116,9 @@ export const openUrl = (url) => {
 };
 
 export const subscriptionRoute = (subscription) => {
+    if (subscription.baseUrl !== config.defaultBaseUrl) {
+        return `/${shortUrl(subscription.baseUrl)}/${subscription.topic}`;
+    }
     return `/${subscription.topic}`;
 }
 

@@ -10,6 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
+import config from "../app/config";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import userManager from "../app/UserManager";
@@ -17,8 +18,6 @@ import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 
 const publicBaseUrl = "https://ntfy.sh"
-const defaultBaseUrl = "http://127.0.0.1"
-//const defaultBaseUrl = "https://ntfy.sh"
 
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState("");
@@ -26,7 +25,7 @@ const SubscribeDialog = (props) => {
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSuccess = async () => {
-        const actualBaseUrl = (baseUrl) ? baseUrl : defaultBaseUrl; // FIXME
+        const actualBaseUrl = (baseUrl) ? baseUrl : config.defaultBaseUrl;
         const subscription = {
             id: topicUrl(actualBaseUrl, topic),
             baseUrl: actualBaseUrl,
@@ -62,11 +61,11 @@ const SubscribeDialog = (props) => {
 const SubscribePage = (props) => {
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
-    const baseUrl = (anotherServerVisible) ? props.baseUrl : defaultBaseUrl;
+    const baseUrl = (anotherServerVisible) ? props.baseUrl : config.defaultBaseUrl;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
     const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
-        .filter(s => s !== defaultBaseUrl);
+        .filter(s => s !== config.defaultBaseUrl);
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
         const username = (user) ? user.username : "anonymous";
@@ -93,7 +92,7 @@ const SubscribePage = (props) => {
             const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
             return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
         } else {
-            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(defaultBaseUrl, topic)); // FIXME
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.defaultBaseUrl, topic)); // FIXME
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();
@@ -127,7 +126,7 @@ const SubscribePage = (props) => {
                     inputValue={props.baseUrl}
                     onInputChange={(ev, newVal) => props.setBaseUrl(newVal)}
                     renderInput={ (params) =>
-                        <TextField {...params} placeholder={defaultBaseUrl} variant="standard"/>
+                        <TextField {...params} placeholder={config.defaultBaseUrl} variant="standard"/>
                     }
                 />}
             </DialogContent>
@@ -143,7 +142,7 @@ const LoginPage = (props) => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
-    const baseUrl = (props.baseUrl) ? props.baseUrl : defaultBaseUrl;
+    const baseUrl = (props.baseUrl) ? props.baseUrl : config.defaultBaseUrl;
     const topic = props.topic;
     const handleLogin = async () => {
         const user = {baseUrl, username, password};

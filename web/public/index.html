@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-
   <title>ntfy web</title>
 
   <!-- Mobile view -->
@@ -24,11 +23,14 @@
   <meta property="og:site_name" content="ntfy.sh" />
   <meta property="og:title" content="ntfy.sh | Send push notifications to your phone or desktop via PUT/POST" />
   <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
-  <meta property="og:image" content="/static/img/ntfy.png" />
+  <meta property="og:image" content="%PUBLIC_URL%/static/img/ntfy.png" />
   <meta property="og:url" content="https://ntfy.sh" />
 
-  <!-- FIXME Never index topic page -->
-  <!-- <meta name="robots" content="noindex, nofollow" /> -->
+  <!-- Never index -->
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- Server configuration -->
+  <script src="%PUBLIC_URL%/config.js"></script>
 
   <!-- FIXME Roboto -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />

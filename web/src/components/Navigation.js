@@ -14,9 +14,10 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import {subscriptionRoute, topicShortUrl} from "../app/utils";
+import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
+import config from "../app/config";
 
 const navWidth = 240;
 
@@ -103,9 +104,12 @@ const NavList = (props) => {
 };
 
 const SubscriptionList = (props) => {
+    const sortedSubscriptions = props.subscriptions.sort( (a, b) => {
+        return (topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic)) ? -1 : 1;
+    });
     return (
         <>
-            {props.subscriptions.map(subscription =>
+            {sortedSubscriptions.map(subscription =>
                 <SubscriptionItem
                     key={subscription.id}
                     subscription={subscription}
@@ -121,10 +125,13 @@ const SubscriptionItem = (props) => {
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
         : <ChatBubbleOutlineIcon/>;
+    const label = (subscription.baseUrl === config.defaultBaseUrl)
+        ? subscription.topic
+        : topicShortUrl(subscription.baseUrl, subscription.topic);
     return (
         <ListItemButton onClick={() => navigate(subscriptionRoute(subscription))} selected={props.selected}>
             <ListItemIcon>{icon}</ListItemIcon>
-            <ListItemText primary={topicShortUrl(subscription.baseUrl, subscription.topic)}/>
+            <ListItemText primary={label}/>
         </ListItemButton>
     );
 };

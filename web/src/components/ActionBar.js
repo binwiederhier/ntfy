@@ -33,7 +33,7 @@ const ActionBar = (props) => {
                 >
                     <MenuIcon />
                 </IconButton>
-                <Box component="img" src="static/img/ntfy.svg" sx={{
+                <Box component="img" src="/static/img/ntfy.svg" sx={{
                     display: { xs: 'none', sm: 'block' },
                     marginRight: '10px',
                     height: '28px'

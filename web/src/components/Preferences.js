@@ -37,7 +37,6 @@ const Preferences = () => {
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Notifications/>
-                <DefaultServer/>
                 <Users/>
             </Stack>
         </Container>
@@ -137,29 +136,6 @@ const Pref = (props) => {
                 {props.children}
             </div>
         </>
-    );
-};
-
-const DefaultServer = (props) => {
-    return (
-        <Card sx={{ padding: 1 }}>
-            <CardContent>
-                <Typography variant="h5">
-                    Default server
-                </Typography>
-                <Paragraph>
-                    This server is used as a default when adding new topics.
-                </Paragraph>
-                <TextField
-                    margin="dense"
-                    id="defaultBaseUrl"
-                    placeholder="https://ntfy.sh"
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                />
-            </CardContent>
-        </Card>
     );
 };
 

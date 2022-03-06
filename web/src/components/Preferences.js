@@ -19,6 +19,7 @@ import {Paragraph} from "./styles";
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import Container from "@mui/material/Container";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
@@ -31,6 +32,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
+import {playSound} from "../app/utils";
 
 const Preferences = () => {
     return (
@@ -50,6 +52,7 @@ const Notifications = () => {
                 Notifications
             </Typography>
             <PrefGroup>
+                <Sound/>
                 <MinPriority/>
                 <DeleteAfter/>
             </PrefGroup>
@@ -57,8 +60,40 @@ const Notifications = () => {
     );
 };
 
+
+const Sound = () => {
+    const sound = useLiveQuery(async () => prefs.sound());
+    const handleChange = async (ev) => {
+        await prefs.setSound(ev.target.value);
+    }
+    if (!sound) {
+        return null; // While loading
+    }
+    return (
+        <Pref title="Notification sound">
+            <div style={{ display: 'flex', width: '100%' }}>
+                <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
+                    <Select value={sound} onChange={handleChange}>
+                        <MenuItem value={"none"}>No sound</MenuItem>
+                        <MenuItem value={"mixkit-correct-answer-tone"}>Ding</MenuItem>
+                        <MenuItem value={"juntos"}>Juntos</MenuItem>
+                        <MenuItem value={"pristine"}>Pristine</MenuItem>
+                        <MenuItem value={"mixkit-software-interface-start"}>Dadum</MenuItem>
+                        <MenuItem value={"mixkit-message-pop-alert"}>Pop</MenuItem>
+                        <MenuItem value={"mixkit-long-pop"}>Pop swoosh</MenuItem>
+                        <MenuItem value={"beep"}>Beep</MenuItem>
+                    </Select>
+                </FormControl>
+                <IconButton onClick={() => playSound(sound)} disabled={sound === "none"}>
+                    <PlayArrowIcon />
+                </IconButton>
+            </div>
+        </Pref>
+    )
+};
+
 const MinPriority = () => {
-    const minPriority = useLiveQuery(() => prefs.minPriority());
+    const minPriority = useLiveQuery(async () => prefs.minPriority());
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
     }

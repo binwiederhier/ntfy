@@ -41,7 +41,7 @@ class SubscriptionManager {
         if (exists) {
             return false;
         }
-        await db.notifications.add({ ...notification, subscriptionId });
+        await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
         await db.subscriptions.update(subscriptionId, {
             last: notification.id
         });

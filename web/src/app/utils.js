@@ -121,6 +121,11 @@ export const subscriptionRoute = (subscription) => {
     return `/${subscription.topic}`;
 }
 
+export const playSound = async (sound) => {
+    const audio = new Audio(`/static/sounds/${sound}.mp3`);
+    return audio.play();
+};
+
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 export async function* fetchLinesIterator(fileURL, headers) {
     const utf8Decoder = new TextDecoder('utf-8');

@@ -9,7 +9,7 @@ import theme from "./theme";
 import connectionManager from "../app/ConnectionManager";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
-import notificationManager from "../app/NotificationManager";
+import notifier from "../app/Notifier";
 import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
@@ -26,6 +26,11 @@ import {subscriptionRoute} from "../app/utils";
 // TODO sound
 // TODO "copy url" toast
 // TODO "copy link url" button
+// TODO races when two tabs are open
+// TODO sound mentions
+//  https://notificationsounds.com/message-tones/pristine-609
+//  https://notificationsounds.com/message-tones/juntos-607
+//  https://notificationsounds.com/notification-sounds/beep-472
 
 const App = () => {
     return (
@@ -40,7 +45,7 @@ const App = () => {
 
 const Root = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-    const [notificationsGranted, setNotificationsGranted] = useState(notificationManager.granted());
+    const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
     const navigate = useNavigate();
     const location = useLocation();
     const users = useLiveQuery(() => userManager.all());
@@ -54,7 +59,7 @@ const Root = () => {
     };
 
     const handleRequestPermission = () => {
-        notificationManager.maybeRequestPermission(granted => setNotificationsGranted(granted));
+        notifier.maybeRequestPermission(granted => setNotificationsGranted(granted));
     };
 
     useEffect(() => {
@@ -68,7 +73,7 @@ const Root = () => {
                 const added = await subscriptionManager.addNotification(subscriptionId, notification);
                 if (added) {
                     const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription)); // FIXME
-                    await notificationManager.notify(subscriptionId, notification, defaultClickAction)
+                    await notifier.notify(subscriptionId, notification, defaultClickAction)
                 }
             } catch (e) {
                 console.error(`[App] Error handling notification`, e);

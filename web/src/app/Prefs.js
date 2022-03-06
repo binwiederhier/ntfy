@@ -1,13 +1,13 @@
 import db from "./db";
 
 class Prefs {
-    async setSelectedSubscriptionId(selectedSubscriptionId) {
-        db.prefs.put({key: 'selectedSubscriptionId', value: selectedSubscriptionId});
+    async setSound(sound) {
+        db.prefs.put({key: 'sound', value: sound.toString()});
     }
 
-    async selectedSubscriptionId() {
-        const selectedSubscriptionId = await db.prefs.get('selectedSubscriptionId');
-        return (selectedSubscriptionId) ? selectedSubscriptionId.value : "";
+    async sound() {
+        const sound = await db.prefs.get('sound');
+        return (sound) ? sound.value : "mixkit-correct-answer-tone";
     }
 
     async setMinPriority(minPriority) {

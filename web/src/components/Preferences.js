@@ -69,7 +69,7 @@ const MinPriority = () => {
         <Pref title="Minimum priority">
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={minPriority} onChange={handleChange}>
-                    <MenuItem value={1}><em>Any priority</em></MenuItem>
+                    <MenuItem value={1}>Any priority</MenuItem>
                     <MenuItem value={2}>Low priority and higher</MenuItem>
                     <MenuItem value={3}>Default priority and higher</MenuItem>
                     <MenuItem value={4}>High priority and higher</MenuItem>

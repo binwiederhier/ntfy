@@ -21,7 +21,6 @@ import {BrowserRouter, Route, Routes, useLocation, useNavigate} from "react-rout
 import {subscriptionRoute} from "../app/utils";
 
 // TODO support unsubscribed routes
-// TODO googlefonts
 // TODO new notification indicator
 // TODO sound
 

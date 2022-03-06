@@ -8,12 +8,18 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: '1.17.x'
+      - name: Install node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y python3-pip curl
       - name: Build docs (required for tests)
         run: make docs
+      - name: Build web app (required for tests)
+        run: make web
       - name: Run tests, formatting, vetting and linting
         run: make check
       - name: Run coverage

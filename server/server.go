@@ -50,11 +50,6 @@ type Server struct {
 	mu           sync.Mutex
 }
 
-type indexPage struct {
-	Topic         string
-	CacheDuration time.Duration
-}
-
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
 type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 

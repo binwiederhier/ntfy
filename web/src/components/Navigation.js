@@ -58,16 +58,20 @@ const NavList = (props) => {
     const location = useLocation();
     const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+
     const handleSubscribeReset = () => {
         setSubscribeDialogOpen(false);
         setSubscribeDialogKey(prev => prev+1);
     }
+
     const handleSubscribeSubmit = (subscription) => {
         handleSubscribeReset();
         props.onSubscribeSubmit(subscription);
     }
+
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showGrantPermissionsBox = props.subscriptions?.length > 0 && !props.notificationsGranted;
+
     return (
         <>
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>

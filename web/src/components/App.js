@@ -47,31 +47,21 @@ const Root = () => {
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const selectedSubscription = findSelected(location, subscriptions);
 
-    const handleSubscriptionClick = async (subscriptionId) => {
-        const subscription = await subscriptionManager.get(subscriptionId);
-        navigate(subscriptionRoute(subscription));
-    }
     const handleSubscribeSubmit = async (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`, subscription);
         navigate(subscriptionRoute(subscription));
         handleRequestPermission();
     };
-    const handleUnsubscribe = async (subscriptionId) => {
-        console.log(`[App] Unsubscribing from ${subscriptionId}`);
-        const newSelected = await subscriptionManager.first(); // May be undefined
-        if (newSelected) {
-            navigate(subscriptionRoute(newSelected));
-        }
-    };
+
     const handleRequestPermission = () => {
         notificationManager.maybeRequestPermission(granted => setNotificationsGranted(granted));
     };
-    // Define hooks: Note that the order of the hooks is important. The "loading" hooks
-    // must be before the "saving" hooks.
+
     useEffect(() => {
         poller.startWorker();
         pruner.startWorker();
     }, [/* initial render */]);
+
     useEffect(() => {
         const handleNotification = async (subscriptionId, notification) => {
             try {
@@ -93,14 +83,17 @@ const Root = () => {
 // This is for the use of 'navigate' // FIXME
 //eslint-disable-next-line
     }, [/* initial render */]);
-    useEffect(() => { connectionManager.refresh(subscriptions, users) }, [subscriptions, users]); // Dangle!
+
+    useEffect(() => {
+        connectionManager.refresh(subscriptions, users);
+    }, [subscriptions, users]); // Dangle!
+
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>
             <ActionBar
                 subscriptions={subscriptions}
                 selectedSubscription={selectedSubscription}
-                onUnsubscribe={handleUnsubscribe}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
             <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
@@ -110,7 +103,6 @@ const Root = () => {
                     mobileDrawerOpen={mobileDrawerOpen}
                     notificationsGranted={notificationsGranted}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-                    onSubscriptionClick={handleSubscriptionClick}
                     onSubscribeSubmit={handleSubscribeSubmit}
                     onRequestPermissionClick={handleRequestPermission}
                 />

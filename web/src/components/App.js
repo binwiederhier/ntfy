@@ -23,7 +23,6 @@ import {subscriptionRoute} from "../app/utils";
 // TODO support unsubscribed routes
 // TODO add "home" route that is selected when nothing else fits
 // TODO new notification indicator
-// TODO sound autoplay error warning
 // TODO "copy url" toast
 // TODO "copy link url" button
 // TODO races when two tabs are open
@@ -49,6 +48,7 @@ const Root = () => {
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const selectedSubscription = findSelected(location, subscriptions);
 
+    console.log(window.location);
     const handleSubscribeSubmit = async (subscription) => {
         console.log(`[App] New subscription: ${subscription.id}`, subscription);
         navigate(subscriptionRoute(subscription));
@@ -148,6 +148,24 @@ const findSelected = (location, subscriptions) => {
     }
     const [subscription] = subscriptions.filter(s => location.pathname === subscriptionRoute(s));
     return subscription;
+
+    /*
+    if (location.pathname === "/" || location.pathname === "/settings") {
+        return null;
+    }
+    if (!subscription) {
+        const [, topic] = location.pathname.split("/");
+        const subscription = {
+            id: topicUrl(window.location.origin, topic),
+            baseUrl: window.location.origin,
+            topic: topic,
+            last: ""
+        }
+        subscriptionManager.save(subscription);
+        return subscription;
+    }
+
+     */
 };
 
 export default App;

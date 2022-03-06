@@ -89,6 +89,8 @@ const SettingsIcon = (props) => {
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {
             navigate(subscriptionRoute(newSelected));
+        } else {
+            navigate("/");
         }
     };
 

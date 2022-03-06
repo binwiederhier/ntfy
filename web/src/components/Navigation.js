@@ -9,6 +9,7 @@ import Toolbar from "@mui/material/Toolbar";
 import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
+import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, CircularProgress, ListSubheader} from "@mui/material";
@@ -86,6 +87,10 @@ const NavList = (props) => {
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
+                <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
+                    <ListItemIcon><HomeIcon/></ListItemIcon>
+                    <ListItemText primary="Home"/>
+                </ListItemButton>
                 <ListItemButton onClick={() => navigate("/settings")} selected={location.pathname === "/settings"}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary="Settings"/>

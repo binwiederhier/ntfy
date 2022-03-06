@@ -47,13 +47,18 @@ The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GP
 
 Third party libraries and resources:
 * [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI
-* [Mixkit sound](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) used as notification sound
-* [Lato Font](https://www.latofonts.com/) (OFL) is used as a font in the Web UI
+* [Mixkit sounds](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) are used as notification sounds
+* [Sounds from notificationsounds.com](https://notificationsounds.com) (Creative Commons Attribution) are used as notification sounds
+* [Roboto Font](https://fonts.google.com/specimen/Roboto) (Apache 2.0) is used as a font in everything web
+* [React](https://reactjs.org/) (MIT) is used for the web app
+* [Material UI components](https://mui.com/) (MIT) are used in the web app
+* [MUI dashboard template](https://github.com/mui/material-ui/tree/master/docs/data/material/getting-started/templates/dashboard) (MIT) was used as a basis for the web app
+* [Dexie.js](https://github.com/dexie/Dexie.js) (Apache 2.0) is used for web app persistence in IndexedDB
 * [GoReleaser](https://goreleaser.com/) (MIT) is used to create releases
 * [go-smtp](https://github.com/emersion/go-smtp) (MIT) is used to receive e-mails
 * [stretchr/testify](https://github.com/stretchr/testify) (MIT) is used for unit and integration tests
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
 * [github/gemoji](https://github.com/github/gemoji) (MIT) is used for emoji support (specifically the [emoji.json](https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json) file)
-* [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) 
+* [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) as a lightbox on the landing page 
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)

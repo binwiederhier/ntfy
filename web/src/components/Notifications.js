@@ -236,7 +236,7 @@ const Icon = (props) => {
     return (
         <Box
             component="img"
-            src={`static/img/${imageFile}`}
+            src={`/static/img/${imageFile}`}
             loading="lazy"
             sx={{
                 width: '28px',

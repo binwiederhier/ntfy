@@ -23,14 +23,11 @@ import {subscriptionRoute} from "../app/utils";
 // TODO support unsubscribed routes
 // TODO add "home" route that is selected when nothing else fits
 // TODO new notification indicator
-// TODO sound
+// TODO sound autoplay error warning
 // TODO "copy url" toast
 // TODO "copy link url" button
 // TODO races when two tabs are open
-// TODO sound mentions
-//  https://notificationsounds.com/message-tones/pristine-609
-//  https://notificationsounds.com/message-tones/juntos-607
-//  https://notificationsounds.com/notification-sounds/beep-472
+// TODO investigate service workers
 
 const App = () => {
     return (
@@ -149,8 +146,7 @@ const findSelected = (location, subscriptions) => {
     if (!subscriptions || !location)  {
         return null;
     }
-    const [subscription] = subscriptions
-        .filter(s => location.pathname === subscriptionRoute(s));
+    const [subscription] = subscriptions.filter(s => location.pathname === subscriptionRoute(s));
     return subscription;
 };
 

@@ -17,7 +17,6 @@ import Typography from "@mui/material/Typography";
 import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
-import config from "../app/config";
 
 const navWidth = 240;
 
@@ -125,7 +124,7 @@ const SubscriptionItem = (props) => {
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
         : <ChatBubbleOutlineIcon/>;
-    const label = (subscription.baseUrl === config.defaultBaseUrl)
+    const label = (subscription.baseUrl === window.location.origin)
         ? subscription.topic
         : topicShortUrl(subscription.baseUrl, subscription.topic);
     return (

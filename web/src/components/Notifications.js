@@ -76,7 +76,7 @@ const NotificationItem = (props) => {
                     {date}
                     {[1,2,4,5].includes(notification.priority) &&
                         <img
-                            src={`static/img/priority-${notification.priority}.svg`}
+                            src={`/static/img/priority-${notification.priority}.svg`}
                             alt={`Priority ${notification.priority}`}
                             style={{ verticalAlign: 'bottom' }}
                         />}

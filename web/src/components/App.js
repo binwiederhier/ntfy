@@ -21,8 +21,11 @@ import {BrowserRouter, Route, Routes, useLocation, useNavigate} from "react-rout
 import {subscriptionRoute} from "../app/utils";
 
 // TODO support unsubscribed routes
+// TODO add "home" route that is selected when nothing else fits
 // TODO new notification indicator
 // TODO sound
+// TODO "copy url" toast
+// TODO "copy link url" button
 
 const App = () => {
     return (
@@ -87,6 +90,8 @@ const Root = () => {
             connectionManager.resetStateListener();
             connectionManager.resetNotificationListener();
         }
+// This is for the use of 'navigate' // FIXME
+//eslint-disable-next-line
     }, [/* initial render */]);
     useEffect(() => { connectionManager.refresh(subscriptions, users) }, [subscriptions, users]); // Dangle!
     return (

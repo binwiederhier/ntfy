@@ -281,7 +281,7 @@ const UserDialog = (props) => {
             setUsername(props.user.username);
             setPassword(props.user.password);
         }
-    }, []);
+    }, [editMode, props.user]);
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
             <DialogTitle>{editMode ? "Edit user" : "Add user"}</DialogTitle>

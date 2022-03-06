@@ -64,6 +64,7 @@ type Config struct {
 	AttachmentExpiryDuration             time.Duration
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
+	WebRootIsApp                         bool
 	AtSenderInterval                     time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	SMTPSenderAddr                       string

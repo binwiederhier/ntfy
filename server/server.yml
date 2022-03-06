@@ -126,6 +126,11 @@
 #
 # manager-interval: "1m"
 
+# Defines if the root route (/) is pointing to the landing page (as on ntfy.sh) or the
+# web app. If you self-host, you don't want to change this. Can be "app" (default) or "home".
+#
+# web-root: app
+
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
 # global-topic-limit: 15000

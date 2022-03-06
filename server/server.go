@@ -83,7 +83,7 @@ var (
 	webFs        embed.FS
 	webFsCached  = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
 	webSiteDir   = "/site"
-	webHomeIndex = "/home.html" // Landing page, only if "web-index: home"
+	webHomeIndex = "/home.html" // Landing page, only if "web-root: home"
 	webAppIndex  = "/app.html"  // React app
 
 	//go:embed docs
@@ -300,7 +300,11 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
-	r.URL.Path = webHomeIndex
+	if s.config.WebRootIsApp {
+		r.URL.Path = webAppIndex
+	} else {
+		r.URL.Path = webHomeIndex
+	}
 	return s.handleStatic(w, r)
 }
 

@@ -251,7 +251,7 @@ const NothingHereYet = (props) => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src="static/img/ntfy-outline.svg" height="64" width="64" alt="No notifications"/><br />
+                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No notifications"/><br />
                 You haven't received any notifications for this topic yet.
             </Typography>
             <Paragraph>

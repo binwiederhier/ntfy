@@ -2,6 +2,7 @@ dist/
 build/
 .idea/
 server/docs/
+server/site/
 tools/fbsend/fbsend
 playground/
 *.iml

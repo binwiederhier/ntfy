@@ -44,6 +44,28 @@ docs-deps: .PHONY
 docs: docs-deps
 	mkdocs build
 
+
+# Web app
+
+web-deps:
+	cd web && npm install
+
+web-build:
+	cd web \
+		&& npm run build \
+		&& mv build/index.html build/app.html \
+		&& rm -rf ../server/site \
+		&& mv build ../server/site \
+		&& rm \
+			../server/site/precache* \
+			../server/site/service-worker.js \
+			../server/site/asset-manifest.json \
+			../server/site/static/js/*.js.map \
+			../server/site/static/js/*.js.LICENSE.txt
+
+web: web-deps web-build
+
+
 # Test/check targets
 
 check: test fmt-check vet lint staticcheck
@@ -94,7 +116,7 @@ staticcheck: .PHONY
 
 # Building targets
 
-build-deps: docs
+build-deps: docs web
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/v7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
@@ -105,8 +127,9 @@ build-snapshot: build-deps
 	goreleaser build --snapshot --rm-dist --debug
 
 build-simple: clean
-	mkdir -p dist/ntfy_linux_amd64 server/docs
-	touch server/docs/dummy
+	mkdir -p dist/ntfy_linux_amd64 server/docs server/site
+	touch server/docs/index.html
+	touch server/site/app.html
 	export CGO_ENABLED=1
 	go build \
 		-o dist/ntfy_linux_amd64/ntfy \

@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
-	"html/template"
 	"io"
 	"log"
 	"net"
@@ -61,35 +60,31 @@ type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 
 var (
 	// If changed, don't forget to update Android App and auth_sqlite.go
-	topicRegex       = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No /!
-	topicPathRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
-	jsonPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
-	ssePathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
-	rawPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
-	wsPathRegex      = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
-	authPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
-	publishPathRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
+	topicRegex        = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)               // No /!
+	topicPathRegex    = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)              // Regex must match JS & Android app!
+	extTopicPathRegex = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`) // Extended topic path, for web-app, e.g. /example.com/mytopic
+	jsonPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
+	ssePathRegex      = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
+	rawPathRegex      = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
+	wsPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
+	authPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
+	publishPathRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
 
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics = []string{"docs", "static", "file"} // If updated, also update in Android app
+	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
 	attachURLRegex   = regexp.MustCompile(`^https?://`)
-
-	templateFnMap = template.FuncMap{
-		"durationToHuman": util.DurationToHuman,
-	}
-
-	//go:embed "index.gohtml"
-	indexSource   string
-	indexTemplate = template.Must(template.New("index").Funcs(templateFnMap).Parse(indexSource))
 
 	//go:embed "example.html"
 	exampleSource string
 
-	//go:embed static
-	webStaticFs       embed.FS
-	webStaticFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webStaticFs}
+	//go:embed site
+	webFs        embed.FS
+	webFsCached  = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
+	webSiteDir   = "/site"
+	webHomeIndex = "/home.html" // Landing page, only if "web-index: home"
+	webAppIndex  = "/app.html"  // React app
 
 	//go:embed docs
 	docsStaticFs     embed.FS
@@ -284,8 +279,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
-	} else if r.Method == http.MethodGet && topicPathRegex.MatchString(r.URL.Path) {
-		return s.handleTopic(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
@@ -300,15 +293,15 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.authRead(s.handleSubscribeWS))(w, r, v)
 	} else if r.Method == http.MethodGet && authPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authRead(s.handleTopicAuth))(w, r, v)
+	} else if r.Method == http.MethodGet && (topicPathRegex.MatchString(r.URL.Path) || extTopicPathRegex.MatchString(r.URL.Path)) {
+		return s.handleTopic(w, r)
 	}
 	return errHTTPNotFound
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
-	return indexTemplate.Execute(w, &indexPage{
-		Topic:         r.URL.Path[1:],
-		CacheDuration: s.config.CacheDuration,
-	})
+	r.URL.Path = webHomeIndex
+	return s.handleStatic(w, r)
 }
 
 func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
@@ -319,7 +312,8 @@ func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
 		_, err := io.WriteString(w, `{"unifiedpush":{"version":1}}`+"\n")
 		return err
 	}
-	return s.handleHome(w, r)
+	r.URL.Path = webAppIndex
+	return s.handleStatic(w, r)
 }
 
 func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor) error {
@@ -339,7 +333,8 @@ func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
-	http.FileServer(http.FS(webStaticFsCached)).ServeHTTP(w, r)
+	r.URL.Path = webSiteDir + r.URL.Path
+	http.FileServer(http.FS(webFsCached)).ServeHTTP(w, r)
 	return nil
 }
 

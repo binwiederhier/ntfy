@@ -109,6 +109,7 @@ const SubscribePage = (props) => {
                     margin="dense"
                     id="topic"
                     placeholder="Topic name, e.g. phil_alerts"
+                    inputProps={{ maxLength: 64 }}
                     value={props.topic}
                     onChange={ev => props.setTopic(ev.target.value)}
                     type="text"

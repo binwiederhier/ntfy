@@ -82,13 +82,21 @@ class ConnectionManager {
 
     stateChanged(subscriptionId, state) {
         if (this.stateListener) {
-            this.stateListener(subscriptionId, state);
+            try {
+                this.stateListener(subscriptionId, state);
+            } catch (e) {
+                console.error(`[ConnectionManager] Error updating state of ${subscriptionId} to ${state}`, e);
+            }
         }
     }
 
     notificationReceived(subscriptionId, notification) {
         if (this.notificationListener) {
-            this.notificationListener(subscriptionId, notification);
+            try {
+                this.notificationListener(subscriptionId, notification);
+            } catch (e) {
+                console.error(`[ConnectionManager] Error handling notification for ${subscriptionId}`, e);
+            }
         }
     }
 }

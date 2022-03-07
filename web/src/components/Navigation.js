@@ -66,8 +66,10 @@ const NavList = (props) => {
     }
 
     const handleSubscribeSubmit = (subscription) => {
+        console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
         handleSubscribeReset();
-        props.onSubscribeSubmit(subscription);
+        navigate(subscriptionRoute(subscription));
+        props.requestNotificationPermission();
     }
 
     const showSubscriptionsList = props.subscriptions?.length > 0;
@@ -77,7 +79,7 @@ const NavList = (props) => {
         <>
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
             <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
-                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.onRequestPermissionClick}/>}
+                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.requestNotificationPermission}/>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader>Subscribed topics</ListSubheader>

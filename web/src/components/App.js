@@ -42,49 +42,13 @@ const App = () => {
 const Root = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
-    const navigate = useNavigate();
     const location = useLocation();
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const selectedSubscription = findSelected(location, subscriptions);
 
-    console.log(window.location);
-    const handleSubscribeSubmit = async (subscription) => {
-        console.log(`[App] New subscription: ${subscription.id}`, subscription);
-        navigate(subscriptionRoute(subscription));
-        handleRequestPermission();
-    };
-
-    const handleRequestPermission = () => {
-        notifier.maybeRequestPermission(granted => setNotificationsGranted(granted));
-    };
-
-    useEffect(() => {
-        poller.startWorker();
-        pruner.startWorker();
-    }, [/* initial render */]);
-
-    useEffect(() => {
-        const handleNotification = async (subscriptionId, notification) => {
-            try {
-                const added = await subscriptionManager.addNotification(subscriptionId, notification);
-                if (added) {
-                    const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription)); // FIXME
-                    await notifier.notify(subscriptionId, notification, defaultClickAction)
-                }
-            } catch (e) {
-                console.error(`[App] Error handling notification`, e);
-            }
-        };
-        connectionManager.registerStateListener(subscriptionManager.updateState);
-        connectionManager.registerNotificationListener(handleNotification);
-        return () => {
-            connectionManager.resetStateListener();
-            connectionManager.resetNotificationListener();
-        }
-// This is for the use of 'navigate' // FIXME
-//eslint-disable-next-line
-    }, [/* initial render */]);
+    useWorkers();
+    useConnectionListeners();
 
     useEffect(() => {
         connectionManager.refresh(subscriptions, users);
@@ -102,11 +66,10 @@ const Root = () => {
                 <Navigation
                     subscriptions={subscriptions}
                     selectedSubscription={selectedSubscription}
-                    mobileDrawerOpen={mobileDrawerOpen}
                     notificationsGranted={notificationsGranted}
+                    requestNotificationPermission={() => notifier.maybeRequestPermission(granted => setNotificationsGranted(granted))}
+                    mobileDrawerOpen={mobileDrawerOpen}
                     onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-                    onSubscribeSubmit={handleSubscribeSubmit}
-                    onRequestPermissionClick={handleRequestPermission}
                 />
             </Box>
             <Main>
@@ -166,6 +129,36 @@ const findSelected = (location, subscriptions) => {
     }
 
      */
+};
+
+
+const useWorkers = () => {
+    useEffect(() => {
+        poller.startWorker();
+        pruner.startWorker();
+    }, []);
+};
+
+const useConnectionListeners = () => {
+    const navigate = useNavigate();
+    useEffect(() => {
+        const handleNotification = async (subscriptionId, notification) => {
+            const added = await subscriptionManager.addNotification(subscriptionId, notification);
+            if (added) {
+                const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription));
+                await notifier.notify(subscriptionId, notification, defaultClickAction)
+            }
+        };
+        connectionManager.registerStateListener(subscriptionManager.updateState);
+        connectionManager.registerNotificationListener(handleNotification);
+        return () => {
+            connectionManager.resetStateListener();
+            connectionManager.resetNotificationListener();
+        }
+    },
+    // We have to disable dep checking for "navigate". This is fine, it never changes.
+    // eslint-disable-next-line
+    []);
 };
 
 export default App;

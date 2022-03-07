@@ -10,7 +10,6 @@ import connectionManager from "../app/ConnectionManager";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
-import NoTopics from "./NoTopics";
 import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
 import poller from "../app/Poller";
@@ -56,7 +55,6 @@ const Root = () => {
     }, [subscriptions, users]); // Dangle!
 
     useEffect(() => {
-        console.log(`hello ${newNotificationsCount}`)
         document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy web` : "ntfy web";
     }, [newNotificationsCount]);
 
@@ -81,10 +79,10 @@ const Root = () => {
             <Main>
                 <Toolbar/>
                 <Routes>
-                    <Route path="/" element={<NoTopics />} />
                     <Route path="settings" element={<Preferences />} />
-                    <Route path=":baseUrl/:topic" element={<Notifications subscription={selectedSubscription}/>} />
-                    <Route path=":topic" element={<Notifications subscription={selectedSubscription}/>} />
+                    <Route path="/" element={<Notifications mode="all" subscriptions={subscriptions} />} />
+                    <Route path=":baseUrl/:topic" element={<Notifications mode="one" subscription={selectedSubscription}/>} />
+                    <Route path=":topic" element={<Notifications mode="one" subscription={selectedSubscription}/>} />
                 </Routes>
             </Main>
         </Box>

@@ -133,9 +133,10 @@ const SubscriptionList = (props) => {
 const SubscriptionItem = (props) => {
     const navigate = useNavigate();
     const subscription = props.subscription;
+    const iconBadge = (subscription.new <= 99) ? subscription.new : "99+";
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
-        : <Badge badgeContent={subscription.new} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
+        : <Badge badgeContent={iconBadge} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
     const label = (subscription.baseUrl === window.location.origin)
         ? subscription.topic
         : topicShortUrl(subscription.baseUrl, subscription.topic);

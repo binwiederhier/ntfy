@@ -1,5 +1,5 @@
 import Container from "@mui/material/Container";
-import {ButtonBase, CardActions, CardContent, Fade, Link, Modal, Stack} from "@mui/material";
+import {ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Modal, Stack} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
@@ -22,28 +22,43 @@ import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
 
 const Notifications = (props) => {
-    const subscription = props.subscription;
-    if (!subscription) {
-        return null;
+    if (props.mode === "all") {
+        return (props.subscriptions) ? <AllSubscriptions subscriptions={props.subscriptions}/> : <Loading/>;
     }
-    return <NotificationList subscription={subscription}/>;
+    return (props.subscription) ? <SingleSubscription subscription={props.subscription}/> : <Loading/>;
+}
+
+const AllSubscriptions = () => {
+    const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
+    if (notifications === null || notifications === undefined) {
+        return <Loading/>;
+    } else if (notifications.length === 0) {
+        return <NoSubscriptions/>;
+    }
+    return <NotificationList notifications={notifications}/>;
+}
+
+const SingleSubscription = (props) => {
+    const subscription = props.subscription;
+    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
+    if (notifications === null || notifications === undefined) {
+        return <Loading/>;
+    } else if (notifications.length === 0) {
+        return <NoNotifications subscription={subscription}/>;
+    }
+    return <NotificationList notifications={notifications}/>;
 }
 
 const NotificationList = (props) => {
-    const subscription = props.subscription;
-    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
-    if (!notifications || notifications.length === 0) {
-        return <NothingHereYet subscription={subscription}/>;
-    }
-    const sortedNotifications = Array.from(notifications)
-        .sort((a, b) => a.time < b.time ? 1 : -1);
+    const sortedNotifications = props.notifications;
+    /*const sortedNotifications = Array.from(props.notifications)
+        .sort((a, b) => a.time < b.time ? 1 : -1);*/
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 {sortedNotifications.map(notification =>
                     <NotificationItem
                         key={notification.id}
-                        subscriptionId={subscription.id}
                         notification={notification}
                     />)}
             </Stack>
@@ -52,8 +67,8 @@ const NotificationList = (props) => {
 }
 
 const NotificationItem = (props) => {
-    const subscriptionId = props.subscriptionId;
     const notification = props.notification;
+    const subscriptionId = notification.subscriptionId;
     const attachment = notification.attachment;
     const date = formatShortDateTime(notification.time);
     const otherTags = unmatchedTags(notification.tags);
@@ -250,7 +265,7 @@ const Icon = (props) => {
     );
 }
 
-const NothingHereYet = (props) => {
+const NoNotifications = (props) => {
     const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
     return (
         <VerticallyCenteredContainer maxWidth="xs">
@@ -271,6 +286,36 @@ const NothingHereYet = (props) => {
                 For more detailed instructions, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
                 {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
             </Paragraph>
+        </VerticallyCenteredContainer>
+    );
+};
+
+const NoSubscriptions = () => {
+    return (
+        <VerticallyCenteredContainer maxWidth="xs">
+            <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
+                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No topics"/><br />
+                It looks like you don't have any subscriptions yet.
+            </Typography>
+            <Paragraph>
+                Click the "Add subscription" link to create or subscribe to a topic. After that, you can send messages
+                via PUT or POST and you'll receive notifications here.
+            </Paragraph>
+            <Paragraph>
+                For more information, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
+                {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
+            </Paragraph>
+        </VerticallyCenteredContainer>
+    );
+};
+
+const Loading = () => {
+    return (
+        <VerticallyCenteredContainer>
+            <Typography variant="h5" color="text.secondary" align="center" sx={{ paddingBottom: 1 }}>
+                <CircularProgress disableShrink sx={{marginBottom: 1}}/><br />
+                Loading notifications ...
+            </Typography>
         </VerticallyCenteredContainer>
     );
 };

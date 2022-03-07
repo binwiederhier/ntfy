@@ -38,6 +38,14 @@ class SubscriptionManager {
     async getNotifications(subscriptionId) {
         return db.notifications
             .where({ subscriptionId: subscriptionId })
+            .reverse()
+            .sortBy("time"); // Inefficient, but there is no other way (see docs)
+    }
+
+    async getAllNotifications() {
+        return db.notifications
+            .orderBy("time") // Efficient, see docs
+            .reverse()
             .toArray();
     }
 

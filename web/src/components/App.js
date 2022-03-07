@@ -46,6 +46,7 @@ const Root = () => {
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const selectedSubscription = findSelected(location, subscriptions);
+    const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
 
     useWorkers();
     useConnectionListeners();
@@ -53,6 +54,11 @@ const Root = () => {
     useEffect(() => {
         connectionManager.refresh(subscriptions, users);
     }, [subscriptions, users]); // Dangle!
+
+    useEffect(() => {
+        console.log(`hello ${newNotificationsCount}`)
+        document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy web` : "ntfy web";
+    }, [newNotificationsCount]);
 
     return (
         <Box sx={{display: 'flex'}}>

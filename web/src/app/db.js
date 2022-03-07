@@ -10,7 +10,7 @@ const db = new Dexie('ntfy');
 
 db.version(1).stores({
     subscriptions: '&id,baseUrl',
-    notifications: '&id,subscriptionId,time',
+    notifications: '&id,subscriptionId,time,new,[subscriptionId+new]', // compound key for query performance
     users: '&baseUrl,username',
     prefs: '&key'
 });

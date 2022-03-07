@@ -80,6 +80,10 @@ const NotificationItem = (props) => {
                             alt={`Priority ${notification.priority}`}
                             style={{ verticalAlign: 'bottom' }}
                         />}
+                    {notification.new === 1 &&
+                        <svg style={{ width: '8px', height: '8px', marginLeft: '4px' }} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="50" cy="50" r="50" fill="#338574"/>
+                        </svg>}
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{formatMessage(notification)}</Typography>

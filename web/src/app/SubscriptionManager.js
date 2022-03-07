@@ -2,7 +2,14 @@ import db from "./db";
 
 class SubscriptionManager {
     async all() {
-        return db.subscriptions.toArray();
+        // All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining
+        const subscriptions = await db.subscriptions.toArray();
+        await Promise.all(subscriptions.map(async s => {
+            s.new = await db.notifications
+                .where({ subscriptionId: s.id, new: 1 })
+                .count();
+        }));
+        return subscriptions;
     }
 
     async get(subscriptionId) {
@@ -14,7 +21,6 @@ class SubscriptionManager {
     }
 
     async updateState(subscriptionId, state) {
-        console.log(`Update state: ${subscriptionId} ${state}`)
         db.subscriptions.update(subscriptionId, { state: state });
     }
 
@@ -41,10 +47,15 @@ class SubscriptionManager {
         if (exists) {
             return false;
         }
-        await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
-        await db.subscriptions.update(subscriptionId, {
-            last: notification.id
-        });
+        try {
+            notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+            await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
+            await db.subscriptions.update(subscriptionId, {
+                last: notification.id
+            });
+        } catch (e) {
+            console.error(`[SubscriptionManager] Error adding notification`, e);
+        }
         return true;
     }
 
@@ -67,6 +78,12 @@ class SubscriptionManager {
         await db.notifications
             .where({subscriptionId: subscriptionId})
             .delete();
+    }
+
+    async markNotificationsRead(subscriptionId) {
+        await db.notifications
+            .where({subscriptionId: subscriptionId, new: 1})
+            .modify({new: 0});
     }
 
     async pruneNotifications(thresholdTimestamp) {

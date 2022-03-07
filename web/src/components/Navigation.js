@@ -12,12 +12,13 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, CircularProgress, ListSubheader} from "@mui/material";
+import {Alert, AlertTitle, Badge, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
+import subscriptionManager from "../app/SubscriptionManager";
 
 const navWidth = 240;
 
@@ -134,12 +135,16 @@ const SubscriptionItem = (props) => {
     const subscription = props.subscription;
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
-        : <ChatBubbleOutlineIcon/>;
+        : <Badge badgeContent={subscription.new} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
     const label = (subscription.baseUrl === window.location.origin)
         ? subscription.topic
         : topicShortUrl(subscription.baseUrl, subscription.topic);
+    const handleClick = async () => {
+        navigate(subscriptionRoute(subscription));
+        await subscriptionManager.markNotificationsRead(subscription.id);
+    };
     return (
-        <ListItemButton onClick={() => navigate(subscriptionRoute(subscription))} selected={props.selected}>
+        <ListItemButton onClick={handleClick} selected={props.selected}>
             <ListItemIcon>{icon}</ListItemIcon>
             <ListItemText primary={label}/>
         </ListItemButton>

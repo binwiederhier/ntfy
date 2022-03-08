@@ -3,7 +3,7 @@ import {ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Moda
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {
     formatBytes,
     formatMessage,
@@ -36,37 +36,43 @@ const AllSubscriptions = () => {
     } else if (notifications.length === 0) {
         return <NoSubscriptions/>;
     }
-    return <NotificationList notifications={notifications}/>;
+    return <NotificationList key="all" notifications={notifications}/>;
 }
 
 const SingleSubscription = (props) => {
     const subscription = props.subscription;
-    const [offset, setOffset] = useState(0);
-    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id, offset), [subscription, offset]);
+    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
     if (notifications === null || notifications === undefined) {
         return <Loading/>;
     } else if (notifications.length === 0) {
         return <NoNotifications subscription={subscription}/>;
     }
-    return <NotificationList notifications={notifications} onFetch={() => {
-        console.log(`setOffset`)
-        setOffset(prev => prev + 20)
-    }}/>;
+    return <NotificationList id={subscription.id} notifications={notifications}/>;
 }
 
 const NotificationList = (props) => {
-    const notifications = props.notifications;
     const pageSize = 20;
-    const [count, setCount] = useState(Math.min(notifications.length, pageSize));
+    const notifications = props.notifications;
+    const [maxCount, setMaxCount] = useState(pageSize);
 
-    console.log(`count ${count}`)
+    // Reset state when the list identifier changes, i.e when we switch between subscriptions
+    useEffect(() => {
+        return () => {
+            setMaxCount(pageSize);
+            document.getElementById("main").scrollTo(0, 0);
+        }
+    }, [props.id]);
+
+    const count = Math.min(notifications.length, maxCount);
+    console.log(`xxx id=${props.id} scrollMax=${maxCount} count=${count} len=${notifications.length}`)
+
     return (
         <InfiniteScroll
             dataLength={count}
-            next={() => setCount(prev => Math.min(notifications.length, prev + 20))}
+            next={() => setMaxCount(prev => prev + pageSize)}
             hasMore={count < notifications.length}
             loader={<h1>aa</h1>}
-            scrollThreshold="400px"
+            scrollThreshold={0.7}
             scrollableTarget="main"
         >
             <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>

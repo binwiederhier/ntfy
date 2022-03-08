@@ -35,18 +35,14 @@ class SubscriptionManager {
         return db.subscriptions.toCollection().first(); // May be undefined
     }
 
-    async getNotifications(subscriptionId, offset) {
+    async getNotifications(subscriptionId) {
         // This is quite awkward, but it is the recommended approach as per the Dexie docs.
         // It's actually fine, because the reading and filtering is quite fast. The rendering is what's
         // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
 
-        console.log(`getNotifications(${subscriptionId}, ${offset})`)
-        const pageSize = 2000;
         return db.notifications
             .orderBy("time") // Sort by time first
             .filter(n => n.subscriptionId === subscriptionId)
-            .offset(offset)
-            .limit(pageSize)
             .reverse()
             .toArray();
     }

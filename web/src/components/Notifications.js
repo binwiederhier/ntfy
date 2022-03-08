@@ -40,19 +40,18 @@ const AllSubscriptions = () => {
 
 const SingleSubscription = (props) => {
     const subscription = props.subscription;
-    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
+    const [offset, setOffset] = useState(0);
+    const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id, offset), [subscription, offset]);
     if (notifications === null || notifications === undefined) {
         return <Loading/>;
     } else if (notifications.length === 0) {
         return <NoNotifications subscription={subscription}/>;
     }
-    return <NotificationList notifications={notifications}/>;
+    return <NotificationList notifications={notifications} onScroll={() => setOffset(prev => prev + 20)}/>;
 }
 
 const NotificationList = (props) => {
     const sortedNotifications = props.notifications;
-    /*const sortedNotifications = Array.from(props.notifications)
-        .sort((a, b) => a.time < b.time ? 1 : -1);*/
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>

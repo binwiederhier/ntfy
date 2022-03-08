@@ -9,7 +9,6 @@ import Toolbar from "@mui/material/Toolbar";
 import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
-import HomeIcon from '@mui/icons-material/Home';
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, Badge, CircularProgress, ListSubheader} from "@mui/material";
@@ -19,6 +18,7 @@ import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
+import {ChatBubble} from "@mui/icons-material";
 
 const navWidth = 240;
 
@@ -81,19 +81,24 @@ const NavList = (props) => {
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
             <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
                 {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.requestNotificationPermission}/>}
+                {!showSubscriptionsList &&
+                    <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
+                        <ListItemIcon><ChatBubble/></ListItemIcon>
+                        <ListItemText primary="All notifications"/>
+                    </ListItemButton>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader>Subscribed topics</ListSubheader>
+                        <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
+                            <ListItemIcon><ChatBubble/></ListItemIcon>
+                            <ListItemText primary="All notifications"/>
+                        </ListItemButton>
                         <SubscriptionList
                             subscriptions={props.subscriptions}
                             selectedSubscription={props.selectedSubscription}
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
-                <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
-                    <ListItemIcon><HomeIcon/></ListItemIcon>
-                    <ListItemText primary="Home"/>
-                </ListItemButton>
                 <ListItemButton onClick={() => navigate("/settings")} selected={location.pathname === "/settings"}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary="Settings"/>

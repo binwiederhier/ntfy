@@ -1,8 +1,9 @@
 import db from "./db";
+import {topicUrl} from "./utils";
 
 class SubscriptionManager {
+    /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
     async all() {
-        // All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining
         const subscriptions = await db.subscriptions.toArray();
         await Promise.all(subscriptions.map(async s => {
             s.new = await db.notifications
@@ -16,8 +17,16 @@ class SubscriptionManager {
         return await db.subscriptions.get(subscriptionId)
     }
 
-    async save(subscription) {
+    async add(baseUrl, topic, ephemeral) {
+        const subscription = {
+            id: topicUrl(baseUrl, topic),
+            baseUrl: baseUrl,
+            topic: topic,
+            ephemeral: ephemeral,
+            last: null
+        };
         await db.subscriptions.put(subscription);
+        return subscription;
     }
 
     async updateState(subscriptionId, state) {

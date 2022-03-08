@@ -11,6 +11,7 @@ export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/aut
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
+export const expandSecureUrl = (url) => `https://${url}`;
 
 export const validUrl = (url) => {
     return url.match(/^https?:\/\//);

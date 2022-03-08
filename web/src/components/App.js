@@ -14,8 +14,8 @@ import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {BrowserRouter, Route, Routes, Outlet, useOutletContext, useNavigate, useParams} from "react-router-dom";
-import {expandUrl, subscriptionRoute} from "../app/utils";
+import {BrowserRouter, Outlet, Route, Routes, useNavigate, useOutletContext, useParams} from "react-router-dom";
+import {expandSecureUrl, expandUrl, subscriptionRoute, topicUrl} from "../app/utils";
 
 // TODO support unsubscribed routes
 // TODO "copy url" toast
@@ -44,12 +44,25 @@ const App = () => {
 const AllSubscriptions = () => {
     const { subscriptions } = useOutletContext();
     return <Notifications mode="all" subscriptions={subscriptions}/>;
-}
+};
 
 const SingleSubscription = () => {
-    const { selected } = useOutletContext();
+    const { subscriptions, selected } = useOutletContext();
+    const [missingAdded, setMissingAdded] = useState(false);
+    const params = useParams();
+    useEffect(() => {
+        const loaded = subscriptions !== null && subscriptions !== undefined;
+        const missing = loaded && params.topic && !selected && !missingAdded;
+        if (missing) {
+            setMissingAdded(true);
+            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
+            console.log(`[App] Adding ephemeral subscription for ${topicUrl(baseUrl, params.topic)}`);
+            // subscriptionManager.add(baseUrl, params.topic, true); // Dangle!
+        }
+    }, [params, subscriptions, selected, missingAdded]);
+
     return <Notifications mode="one" subscription={selected}/>;
-}
+};
 
 const Layout = () => {
     const params = useParams();

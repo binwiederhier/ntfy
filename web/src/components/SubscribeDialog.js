@@ -25,13 +25,7 @@ const SubscribeDialog = (props) => {
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSuccess = async () => {
         const actualBaseUrl = (baseUrl) ? baseUrl : window.location.origin;
-        const subscription = {
-            id: topicUrl(actualBaseUrl, topic),
-            baseUrl: actualBaseUrl,
-            topic: topic,
-            last: null
-        };
-        await subscriptionManager.save(subscription);
+        const subscription = await subscriptionManager.add(actualBaseUrl, topic, false);
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }

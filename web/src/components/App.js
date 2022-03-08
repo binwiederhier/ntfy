@@ -14,7 +14,7 @@ import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {BrowserRouter, Route, Routes, useNavigate, useParams} from "react-router-dom";
+import {BrowserRouter, Route, Routes, Outlet, useOutletContext, useNavigate, useParams} from "react-router-dom";
 import {expandUrl, subscriptionRoute} from "../app/utils";
 
 // TODO support unsubscribed routes
@@ -28,62 +28,40 @@ const App = () => {
         <BrowserRouter>
             <ThemeProvider theme={theme}>
                 <CssBaseline/>
-                <Content/>
+                <Routes>
+                    <Route element={<Layout/>}>
+                        <Route path="/" element={<AllSubscriptions/>} />
+                        <Route path="settings" element={<Preferences/>} />
+                        <Route path=":topic" element={<SingleSubscription/>} />
+                        <Route path=":baseUrl/:topic" element={<SingleSubscription/>} />
+                    </Route>
+                </Routes>
             </ThemeProvider>
         </BrowserRouter>
     );
 }
 
-const Content = () => {
-    const subscriptions = useLiveQuery(() => subscriptionManager.all());
-    // const context = { subscriptions };
-    return (
-        <Routes>
-            <Route path="settings" element={<PrefLayout subscriptions={subscriptions}/>} />
-            <Route path="settings" element={<PrefLayout subscriptions={subscriptions}/>} />
-            <Route path="/" element={<AllSubscriptions subscriptions={subscriptions}/>} />
-            <Route path=":baseUrl/:topic" element={<SingleSubscription subscriptions={subscriptions}/>} />
-            <Route path=":topic" element={<SingleSubscription subscriptions={subscriptions}/>} />
-        </Routes>
-    )
-};
-
-const AllSubscriptions = (props) => {
-    return (
-        <Layout subscriptions={props.subscriptions}>
-            <Notifications mode="all" subscriptions={props.subscriptions}/>
-        </Layout>
-    );
+const AllSubscriptions = () => {
+    const { subscriptions } = useOutletContext();
+    return <Notifications mode="all" subscriptions={subscriptions}/>;
 }
 
-const SingleSubscription = (props) => {
+const SingleSubscription = () => {
+    const { selected } = useOutletContext();
+    return <Notifications mode="one" subscription={selected}/>;
+}
+
+const Layout = () => {
     const params = useParams();
-    const [selected] = (props.subscriptions || []).filter(s => {
-        return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
-            || (window.location.origin === s.baseUrl && params.topic === s.topic)
-    });
-    return (
-        <Layout subscriptions={props.subscriptions} selected={selected}>
-            <Notifications mode="one" subscription={selected}/>
-        </Layout>
-    );
-}
-
-const PrefLayout = (props) => {
-    return (
-        <Layout subscriptions={props.subscriptions}>
-            <Preferences/>
-        </Layout>
-    );
-}
-
-const Layout = (props) => {
-    const subscriptions = props.subscriptions; // May be null/undefined
-    const selected = props.selected; // May be null/undefined
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
     const users = useLiveQuery(() => userManager.all());
+    const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
+    const [selected] = (subscriptions || []).filter(s => {
+        return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
+            || (window.location.origin === s.baseUrl && params.topic === s.topic)
+    });
 
     useConnectionListeners();
 
@@ -107,7 +85,7 @@ const Layout = (props) => {
             />
             <Main>
                 <Toolbar/>
-                {props.children}
+                <Outlet context={{ subscriptions, selected }}/>
             </Main>
         </Box>
     );

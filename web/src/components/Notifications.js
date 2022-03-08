@@ -29,12 +29,15 @@ const Notifications = (props) => {
     return (props.subscription) ? <SingleSubscription subscription={props.subscription}/> : <Loading/>;
 }
 
-const AllSubscriptions = () => {
+const AllSubscriptions = (props) => {
+    const subscriptions = props.subscriptions;
     const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
     if (notifications === null || notifications === undefined) {
         return <Loading/>;
-    } else if (notifications.length === 0) {
+    } else if (subscriptions.length === 0) {
         return <NoSubscriptions/>;
+    } else if (notifications.length === 0) {
+        return <NoNotificationsWithoutSubscription subscriptions={subscriptions}/>;
     }
     return <NotificationList key="all" notifications={notifications}/>;
 }
@@ -293,6 +296,33 @@ const NoNotifications = (props) => {
             </Typography>
             <Paragraph>
                 To send notifications to this topic, simply PUT or POST to the topic URL.
+            </Paragraph>
+            <Paragraph>
+                Example:<br/>
+                <tt>
+                    $ curl -d "Hi" {shortUrl}
+                </tt>
+            </Paragraph>
+            <Paragraph>
+                For more detailed instructions, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
+                {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
+            </Paragraph>
+        </VerticallyCenteredContainer>
+    );
+};
+
+const NoNotificationsWithoutSubscription = (props) => {
+    const subscription = props.subscriptions[0];
+    const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
+    return (
+        <VerticallyCenteredContainer maxWidth="xs">
+            <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
+                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No notifications"/><br />
+                You haven't received any notifications.
+            </Typography>
+            <Paragraph>
+                To send notifications to a topic, simply PUT or POST to the topic URL. Here's
+                an example using one of your topics.
             </Paragraph>
             <Paragraph>
                 Example:<br/>

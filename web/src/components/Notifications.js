@@ -20,6 +20,7 @@ import {useLiveQuery} from "dexie-react-hooks";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
+import InfiniteScroll from "react-infinite-scroll-component";
 
 const Notifications = (props) => {
     if (props.mode === "all") {
@@ -47,21 +48,37 @@ const SingleSubscription = (props) => {
     } else if (notifications.length === 0) {
         return <NoNotifications subscription={subscription}/>;
     }
-    return <NotificationList notifications={notifications} onScroll={() => setOffset(prev => prev + 20)}/>;
+    return <NotificationList notifications={notifications} onFetch={() => {
+        console.log(`setOffset`)
+        setOffset(prev => prev + 20)
+    }}/>;
 }
 
 const NotificationList = (props) => {
-    const sortedNotifications = props.notifications;
+    const notifications = props.notifications;
+    const pageSize = 20;
+    const [count, setCount] = useState(Math.min(notifications.length, pageSize));
+
+    console.log(`count ${count}`)
     return (
-        <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
-            <Stack spacing={3}>
-                {sortedNotifications.map(notification =>
-                    <NotificationItem
-                        key={notification.id}
-                        notification={notification}
-                    />)}
-            </Stack>
-        </Container>
+        <InfiniteScroll
+            dataLength={count}
+            next={() => setCount(prev => Math.min(notifications.length, prev + 20))}
+            hasMore={count < notifications.length}
+            loader={<h1>aa</h1>}
+            scrollThreshold="400px"
+            scrollableTarget="main"
+        >
+            <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
+                <Stack spacing={3}>
+                    {notifications.slice(0, count).map(notification =>
+                        <NotificationItem
+                            key={notification.id}
+                            notification={notification}
+                        />)}
+                </Stack>
+            </Container>
+        </InfiniteScroll>
     );
 }
 
@@ -111,8 +128,7 @@ const NotificationItem = (props) => {
                         <Button onClick={() => openUrl(attachment.url)}>Open attachment</Button>
                     </>}
                     {showClickAction && <Button onClick={() => openUrl(notification.click)}>Open link</Button>}
-                </CardActions>
-            }
+                </CardActions>}
         </Card>
     );
 }

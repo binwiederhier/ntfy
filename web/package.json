@@ -16,6 +16,7 @@
     "dexie-react-hooks": "^1.1.1",
     "react": "latest",
     "react-dom": "latest",
+    "react-infinite-scroll-component": "^6.1.0",
     "react-router-dom": "^6.2.2",
     "react-scripts": "^3.0.1"
   },

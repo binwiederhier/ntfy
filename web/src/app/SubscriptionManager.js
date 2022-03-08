@@ -40,7 +40,8 @@ class SubscriptionManager {
         // It's actually fine, because the reading and filtering is quite fast. The rendering is what's
         // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
 
-        const pageSize = 20;
+        console.log(`getNotifications(${subscriptionId}, ${offset})`)
+        const pageSize = 2000;
         return db.notifications
             .orderBy("time") // Sort by time first
             .filter(n => n.subscriptionId === subscriptionId)

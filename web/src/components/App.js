@@ -92,6 +92,7 @@ const Root = () => {
 const Main = (props) => {
     return (
         <Box
+            id="main"
             component="main"
             sx={{
                 display: 'flex',

@@ -22,8 +22,8 @@ import subscriptionManager from "../app/SubscriptionManager";
 const ActionBar = (props) => {
     const location = useLocation();
     let title = "ntfy";
-    if (props.selectedSubscription) {
-        title = topicShortUrl(props.selectedSubscription.baseUrl, props.selectedSubscription.topic);
+    if (props.selected) {
+        title = topicShortUrl(props.selected.baseUrl, props.selected.topic);
     } else if (location.pathname === "/settings") {
         title = "Settings";
     }
@@ -50,8 +50,8 @@ const ActionBar = (props) => {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>
-                {props.selectedSubscription && <SettingsIcon
-                    subscription={props.selectedSubscription}
+                {props.selected && <SettingsIcon
+                    subscription={props.selected}
                     onUnsubscribe={props.onUnsubscribe}
                 />}
             </Toolbar>

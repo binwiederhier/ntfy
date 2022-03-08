@@ -12,16 +12,12 @@ import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
 import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
-import poller from "../app/Poller";
-import pruner from "../app/Pruner";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {BrowserRouter, Route, Routes, useLocation, useNavigate} from "react-router-dom";
-import {subscriptionRoute} from "../app/utils";
+import {BrowserRouter, Route, Routes, useNavigate, useParams} from "react-router-dom";
+import {expandUrl, subscriptionRoute} from "../app/utils";
 
 // TODO support unsubscribed routes
-// TODO add "home" route that is selected when nothing else fits
-// TODO new notification indicator
 // TODO "copy url" toast
 // TODO "copy link url" button
 // TODO races when two tabs are open
@@ -32,42 +28,78 @@ const App = () => {
         <BrowserRouter>
             <ThemeProvider theme={theme}>
                 <CssBaseline/>
-                <Root/>
+                <Content/>
             </ThemeProvider>
         </BrowserRouter>
     );
 }
 
-const Root = () => {
+const Content = () => {
+    const subscriptions = useLiveQuery(() => subscriptionManager.all());
+    // const context = { subscriptions };
+    return (
+        <Routes>
+            <Route path="settings" element={<PrefLayout subscriptions={subscriptions}/>} />
+            <Route path="settings" element={<PrefLayout subscriptions={subscriptions}/>} />
+            <Route path="/" element={<AllSubscriptions subscriptions={subscriptions}/>} />
+            <Route path=":baseUrl/:topic" element={<SingleSubscription subscriptions={subscriptions}/>} />
+            <Route path=":topic" element={<SingleSubscription subscriptions={subscriptions}/>} />
+        </Routes>
+    )
+};
+
+const AllSubscriptions = (props) => {
+    return (
+        <Layout subscriptions={props.subscriptions}>
+            <Notifications mode="all" subscriptions={props.subscriptions}/>
+        </Layout>
+    );
+}
+
+const SingleSubscription = (props) => {
+    const params = useParams();
+    const [selected] = (props.subscriptions || []).filter(s => {
+        return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
+            || (window.location.origin === s.baseUrl && params.topic === s.topic)
+    });
+    return (
+        <Layout subscriptions={props.subscriptions} selected={selected}>
+            <Notifications mode="one" subscription={selected}/>
+        </Layout>
+    );
+}
+
+const PrefLayout = (props) => {
+    return (
+        <Layout subscriptions={props.subscriptions}>
+            <Preferences/>
+        </Layout>
+    );
+}
+
+const Layout = (props) => {
+    const subscriptions = props.subscriptions; // May be null/undefined
+    const selected = props.selected; // May be null/undefined
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
-    const location = useLocation();
     const users = useLiveQuery(() => userManager.all());
-    const subscriptions = useLiveQuery(() => subscriptionManager.all());
-    const selectedSubscription = findSelected(location, subscriptions);
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
 
     useConnectionListeners();
 
-    useEffect(() => {
-        connectionManager.refresh(subscriptions, users);
-    }, [subscriptions, users]); // Dangle!
-
-    useEffect(() => {
-        document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy web` : "ntfy web";
-    }, [newNotificationsCount]);
+    useEffect(() => connectionManager.refresh(subscriptions, users), [subscriptions, users]);
+    useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>
             <ActionBar
-                subscriptions={subscriptions}
-                selectedSubscription={selectedSubscription}
+                selected={selected}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
             <Navigation
                 subscriptions={subscriptions}
-                selectedSubscription={selectedSubscription}
+                selectedSubscription={selected}
                 notificationsGranted={notificationsGranted}
                 mobileDrawerOpen={mobileDrawerOpen}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
@@ -75,12 +107,7 @@ const Root = () => {
             />
             <Main>
                 <Toolbar/>
-                <Routes>
-                    <Route path="settings" element={<Preferences />} />
-                    <Route path="/" element={<Notifications mode="all" subscriptions={subscriptions} />} />
-                    <Route path=":baseUrl/:topic" element={<Notifications mode="one" subscription={selectedSubscription}/>} />
-                    <Route path=":topic" element={<Notifications mode="one" subscription={selectedSubscription}/>} />
-                </Routes>
+                {props.children}
             </Main>
         </Box>
     );
@@ -107,32 +134,6 @@ const Main = (props) => {
     );
 };
 
-const findSelected = (location, subscriptions) => {
-    if (!subscriptions || !location)  {
-        return null;
-    }
-    const [subscription] = subscriptions.filter(s => location.pathname === subscriptionRoute(s));
-    return subscription;
-
-    /*
-    if (location.pathname === "/" || location.pathname === "/settings") {
-        return null;
-    }
-    if (!subscription) {
-        const [, topic] = location.pathname.split("/");
-        const subscription = {
-            id: topicUrl(window.location.origin, topic),
-            baseUrl: window.location.origin,
-            topic: topic,
-            last: ""
-        }
-        subscriptionManager.save(subscription);
-        return subscription;
-    }
-
-     */
-};
-
 const useConnectionListeners = () => {
     const navigate = useNavigate();
     useEffect(() => {
@@ -154,5 +155,9 @@ const useConnectionListeners = () => {
     // eslint-disable-next-line
     []);
 };
+
+const updateTitle = (newNotificationsCount) => {
+    document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy web` : "ntfy web";
+}
 
 export default App;

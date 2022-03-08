@@ -18,11 +18,11 @@ import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {ChatBubble} from "@mui/icons-material";
+import {ChatBubble, NotificationsOffOutlined} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 
-const navWidth = 240;
+const navWidth = 280;
 
 const Navigation = (props) => {
     const navigationList = <NavList {...props}/>;
@@ -159,6 +159,8 @@ const SubscriptionItem = (props) => {
         <ListItemButton onClick={handleClick} selected={props.selected}>
             <ListItemIcon>{icon}</ListItemIcon>
             <ListItemText primary={label}/>
+            {subscription.mutedUntil > 0 &&
+                <ListItemIcon edge="end"><NotificationsOffOutlined /></ListItemIcon>}
         </ListItemButton>
     );
 };

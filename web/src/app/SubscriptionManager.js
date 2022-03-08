@@ -23,6 +23,7 @@ class SubscriptionManager {
             baseUrl: baseUrl,
             topic: topic,
             ephemeral: ephemeral,
+            mutedUntil: 0,
             last: null
         };
         await db.subscriptions.put(subscription);
@@ -106,6 +107,12 @@ class SubscriptionManager {
         await db.notifications
             .where({subscriptionId: subscriptionId, new: 1})
             .modify({new: 0});
+    }
+
+    async setMutedUntil(subscriptionId, mutedUntil) {
+        await db.subscriptions.update(subscriptionId, {
+            mutedUntil: mutedUntil
+        });
     }
 
     async pruneNotifications(thresholdTimestamp) {

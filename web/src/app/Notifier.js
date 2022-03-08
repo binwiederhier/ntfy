@@ -22,7 +22,7 @@ class Notifier {
         if (notification.click) {
             n.onclick = (e) => openUrl(notification.click);
         } else {
-            n.onclick = onClickFallback;
+            n.onclick = () => onClickFallback(subscription);
         }
 
         // Play sound
@@ -51,6 +51,9 @@ class Notifier {
     }
 
     async shouldNotify(subscription, notification) {
+        if (subscription.mutedUntil === 1) {
+            return false;
+        }
         const priority = (notification.priority) ? notification.priority : 3;
         const minPriority = await prefs.minPriority();
         if (priority < minPriority) {

@@ -16,6 +16,8 @@ import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import api from "../app/Api";
 import subscriptionManager from "../app/SubscriptionManager";
 
@@ -50,24 +52,31 @@ const ActionBar = (props) => {
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>
-                {props.selected && <SettingsIcon
-                    subscription={props.selected}
-                    onUnsubscribe={props.onUnsubscribe}
-                />}
+                {props.selected &&
+                    <SettingsIcons
+                        subscription={props.selected}
+                        onUnsubscribe={props.onUnsubscribe}
+                    />}
             </Toolbar>
         </AppBar>
     );
 };
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
-const SettingsIcon = (props) => {
+const SettingsIcons = (props) => {
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
+    const subscription = props.subscription;
 
-    const handleToggle = () => {
+    const handleToggleOpen = () => {
         setOpen((prevOpen) => !prevOpen);
     };
+
+    const handleToggleMute = async () => {
+        const mutedUntil = (subscription.mutedUntil) ? 0 : 1; // Make this a timestamp in the future
+        await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
+    }
 
     const handleClose = (event) => {
         if (anchorRef.current && anchorRef.current.contains(event.target)) {
@@ -122,14 +131,10 @@ const SettingsIcon = (props) => {
 
     return (
         <>
-            <IconButton
-                color="inherit"
-                size="large"
-                edge="end"
-                ref={anchorRef}
-                id="composition-button"
-                onClick={handleToggle}
-            >
+            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} sx={{marginRight: 0}}>
+                {subscription.mutedUntil ? <NotificationsOffIcon/> : <NotificationsIcon/>}
+            </IconButton>
+            <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen}>
                 <MoreVertIcon/>
             </IconButton>
             <Popper
@@ -143,10 +148,7 @@ const SettingsIcon = (props) => {
                 {({TransitionProps, placement}) => (
                     <Grow
                         {...TransitionProps}
-                        style={{
-                            transformOrigin:
-                                placement === 'bottom-start' ? 'left top' : 'left bottom',
-                        }}
+                        style={{transformOrigin: placement === 'bottom-start' ? 'left top' : 'left bottom'}}
                     >
                         <Paper>
                             <ClickAwayListener onClickAway={handleClose}>

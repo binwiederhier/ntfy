@@ -47,7 +47,6 @@ const Root = () => {
     const selectedSubscription = findSelected(location, subscriptions);
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
 
-    useWorkers();
     useConnectionListeners();
 
     useEffect(() => {
@@ -66,16 +65,14 @@ const Root = () => {
                 selectedSubscription={selectedSubscription}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
-            <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
-                <Navigation
-                    subscriptions={subscriptions}
-                    selectedSubscription={selectedSubscription}
-                    notificationsGranted={notificationsGranted}
-                    requestNotificationPermission={() => notifier.maybeRequestPermission(granted => setNotificationsGranted(granted))}
-                    mobileDrawerOpen={mobileDrawerOpen}
-                    onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-                />
-            </Box>
+            <Navigation
+                subscriptions={subscriptions}
+                selectedSubscription={selectedSubscription}
+                notificationsGranted={notificationsGranted}
+                mobileDrawerOpen={mobileDrawerOpen}
+                onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+                onNotificationGranted={setNotificationsGranted}
+            />
             <Main>
                 <Toolbar/>
                 <Routes>
@@ -134,14 +131,6 @@ const findSelected = (location, subscriptions) => {
     }
 
      */
-};
-
-
-const useWorkers = () => {
-    useEffect(() => {
-        poller.startWorker();
-        pruner.startWorker();
-    }, []);
 };
 
 const useConnectionListeners = () => {

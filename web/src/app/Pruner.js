@@ -13,6 +13,7 @@ class Pruner {
         if (this.timer !== null) {
             return;
         }
+        console.log(`[Pruner] Starting worker`);
         this.timer = setInterval(() => this.prune(), intervalMillis);
         setTimeout(() => this.prune(), delayMillis);
     }
@@ -34,4 +35,6 @@ class Pruner {
 }
 
 const pruner = new Pruner();
+pruner.startWorker();
+
 export default pruner;

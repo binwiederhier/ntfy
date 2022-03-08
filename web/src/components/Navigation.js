@@ -19,13 +19,15 @@ import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
 import {ChatBubble} from "@mui/icons-material";
+import Box from "@mui/material/Box";
+import notifier from "../app/Notifier";
 
 const navWidth = 240;
 
 const Navigation = (props) => {
     const navigationList = <NavList {...props}/>;
     return (
-        <>
+        <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
             {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
             <Drawer
                 variant="temporary"
@@ -50,7 +52,7 @@ const Navigation = (props) => {
             >
                 {navigationList}
             </Drawer>
-        </>
+        </Box>
     );
 };
 Navigation.width = navWidth;
@@ -70,8 +72,12 @@ const NavList = (props) => {
         console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
         handleSubscribeReset();
         navigate(subscriptionRoute(subscription));
-        props.requestNotificationPermission();
+        handleRequestNotificationPermission();
     }
+
+    const handleRequestNotificationPermission = () => {
+       notifier.maybeRequestPermission(granted => props.onNotificationGranted(granted))
+    };
 
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showGrantPermissionsBox = props.subscriptions?.length > 0 && !props.notificationsGranted;
@@ -80,7 +86,7 @@ const NavList = (props) => {
         <>
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
             <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
-                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={props.requestNotificationPermission}/>}
+                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
                     <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>

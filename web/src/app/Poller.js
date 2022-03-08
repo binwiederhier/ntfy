@@ -1,7 +1,7 @@
 import api from "./Api";
 import subscriptionManager from "./SubscriptionManager";
 
-const delayMillis = 3000; // 3 seconds
+const delayMillis = 8000; // 8 seconds
 const intervalMillis = 300000; // 5 minutes
 
 class Poller {
@@ -13,6 +13,7 @@ class Poller {
         if (this.timer !== null) {
             return;
         }
+        console.log(`[Poller] Starting worker`);
         this.timer = setInterval(() => this.pollAll(), intervalMillis);
         setTimeout(() => this.pollAll(), delayMillis);
     }
@@ -55,4 +56,6 @@ class Poller {
 }
 
 const poller = new Poller();
+poller.startWorker();
+
 export default poller;

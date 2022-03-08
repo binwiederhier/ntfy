@@ -54,17 +54,14 @@ const NotificationList = (props) => {
     const pageSize = 20;
     const notifications = props.notifications;
     const [maxCount, setMaxCount] = useState(pageSize);
+    const count = Math.min(notifications.length, maxCount);
 
-    // Reset state when the list identifier changes, i.e when we switch between subscriptions
     useEffect(() => {
         return () => {
             setMaxCount(pageSize);
             document.getElementById("main").scrollTo(0, 0);
         }
     }, [props.id]);
-
-    const count = Math.min(notifications.length, maxCount);
-    console.log(`xxx id=${props.id} scrollMax=${maxCount} count=${count} len=${notifications.length}`)
 
     return (
         <InfiniteScroll

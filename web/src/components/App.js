@@ -16,8 +16,8 @@ import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
 import {BrowserRouter, Outlet, Route, Routes, useNavigate, useOutletContext, useParams} from "react-router-dom";
 import {expandSecureUrl, expandUrl, subscriptionRoute, topicUrl} from "../app/utils";
+import poller from "../app/Poller";
 
-// TODO support unsubscribed routes
 // TODO "copy url" toast
 // TODO "copy link url" button
 // TODO races when two tabs are open
@@ -48,19 +48,7 @@ const AllSubscriptions = () => {
 
 const SingleSubscription = () => {
     const { subscriptions, selected } = useOutletContext();
-    const [missingAdded, setMissingAdded] = useState(false);
-    const params = useParams();
-    useEffect(() => {
-        const loaded = subscriptions !== null && subscriptions !== undefined;
-        const missing = loaded && params.topic && !selected && !missingAdded;
-        if (missing) {
-            setMissingAdded(true);
-            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
-            console.log(`[App] Adding ephemeral subscription for ${topicUrl(baseUrl, params.topic)}`);
-            // subscriptionManager.add(baseUrl, params.topic, true); // Dangle!
-        }
-    }, [params, subscriptions, selected, missingAdded]);
-
+    useAutoSubscribe(subscriptions, selected);
     return <Notifications mode="one" subscription={selected}/>;
 };
 
@@ -145,6 +133,25 @@ const useConnectionListeners = () => {
     // We have to disable dep checking for "navigate". This is fine, it never changes.
     // eslint-disable-next-line
     []);
+};
+
+const useAutoSubscribe = (subscriptions, selected) => {
+    const [autoSubscribed, setAutoSubscribed] = useState(false);
+    const params = useParams();
+
+    useEffect(() => {
+        const loaded = subscriptions !== null && subscriptions !== undefined;
+        const eligible = loaded && params.topic && !selected && !autoSubscribed;
+        if (eligible) {
+            setAutoSubscribed(true);
+            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
+            console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
+            (async () => {
+                const subscription = await subscriptionManager.add(baseUrl, params.topic, true);
+                poller.pollInBackground(subscription); // Dangle!
+            })();
+        }
+    }, [params, subscriptions, selected, autoSubscribed]);
 };
 
 const updateTitle = (newNotificationsCount) => {

@@ -75,12 +75,12 @@ const Sound = () => {
                 <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
                     <Select value={sound} onChange={handleChange}>
                         <MenuItem value={"none"}>No sound</MenuItem>
-                        <MenuItem value={"mixkit-correct-answer-tone"}>Ding</MenuItem>
+                        <MenuItem value={"ding"}>Ding</MenuItem>
                         <MenuItem value={"juntos"}>Juntos</MenuItem>
                         <MenuItem value={"pristine"}>Pristine</MenuItem>
-                        <MenuItem value={"mixkit-software-interface-start"}>Dadum</MenuItem>
-                        <MenuItem value={"mixkit-message-pop-alert"}>Pop</MenuItem>
-                        <MenuItem value={"mixkit-long-pop"}>Pop swoosh</MenuItem>
+                        <MenuItem value={"dadum"}>Dadum</MenuItem>
+                        <MenuItem value={"pop"}>Pop</MenuItem>
+                        <MenuItem value={"pop-swoosh"}>Pop swoosh</MenuItem>
                         <MenuItem value={"beep"}>Beep</MenuItem>
                     </Select>
                 </FormControl>

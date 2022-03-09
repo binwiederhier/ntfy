@@ -1,4 +1,11 @@
 import {rawEmojis} from "./emojis";
+import beep from "../sounds/beep.mp3";
+import juntos from "../sounds/juntos.mp3";
+import pristine from "../sounds/pristine.mp3";
+import ding from "../sounds/ding.mp3";
+import dadum from "../sounds/dadum.mp3";
+import pop from "../sounds/pop.mp3";
+import popSwoosh from "../sounds/pop-swoosh.mp3";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
@@ -33,7 +40,6 @@ const toEmojis = (tags) => {
     if (!tags) return [];
     else return tags.filter(tag => tag in emojis).map(tag => emojis[tag]);
 }
-
 
 export const formatTitleWithDefault = (m, fallback) => {
     if (m.title) {
@@ -123,8 +129,18 @@ export const subscriptionRoute = (subscription) => {
     return `/${subscription.topic}`;
 }
 
+export const sounds = {
+    "beep": beep,
+    "juntos": juntos,
+    "pristine": pristine,
+    "ding": ding,
+    "dadum": dadum,
+    "pop": pop,
+    "pop-swoosh": popSwoosh
+};
+
 export const playSound = async (sound) => {
-    const audio = new Audio(`/static/sounds/${sound}.mp3`);
+    const audio = new Audio(sounds[sound]);
     return audio.play();
 };
 

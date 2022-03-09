@@ -7,7 +7,7 @@ class Prefs {
 
     async sound() {
         const sound = await db.prefs.get('sound');
-        return (sound) ? sound.value : "mixkit-correct-answer-tone";
+        return (sound) ? sound.value : "ding";
     }
 
     async setMinPriority(minPriority) {

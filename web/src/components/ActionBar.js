@@ -20,6 +20,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import api from "../app/Api";
 import subscriptionManager from "../app/SubscriptionManager";
+import logo from "../img/ntfy.svg"
 
 const ActionBar = (props) => {
     const location = useLocation();
@@ -44,7 +45,7 @@ const ActionBar = (props) => {
                 >
                     <MenuIcon />
                 </IconButton>
-                <Box component="img" src="/static/img/ntfy.svg" sx={{
+                <Box component="img" src={logo} sx={{
                     display: { xs: 'none', sm: 'block' },
                     marginRight: '10px',
                     height: '28px'
@@ -152,11 +153,7 @@ const SettingsIcons = (props) => {
                     >
                         <Paper>
                             <ClickAwayListener onClickAway={handleClose}>
-                                <MenuList
-                                    autoFocusItem={open}
-                                    id="composition-menu"
-                                    onKeyDown={handleListKeyDown}
-                                >
+                                <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
                                     <MenuItem onClick={handleSendTestMessage}>Send test notification</MenuItem>
                                     <MenuItem onClick={handleClearAll}>Clear all notifications</MenuItem>
                                     <MenuItem onClick={handleUnsubscribe}>Unsubscribe</MenuItem>

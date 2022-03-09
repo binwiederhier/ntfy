@@ -1,6 +1,7 @@
 import {formatMessage, formatTitleWithDefault, openUrl, playSound, topicShortUrl} from "./utils";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
+import logo from "../img/ntfy.png";
 
 class Notifier {
     async notify(subscriptionId, notification, onClickFallback) {
@@ -17,7 +18,7 @@ class Notifier {
         console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
         const n = new Notification(title, {
             body: message,
-            icon: '/static/img/favicon.png'
+            icon: logo
         });
         if (notification.click) {
             n.onclick = (e) => openUrl(notification.click);
@@ -32,7 +33,6 @@ class Notifier {
                 await playSound(sound);
             } catch (e) {
                 console.log(`[Notifier, ${shortUrl}] Error playing audio`, e);
-                // FIXME show no sound allowed popup
             }
         }
     }

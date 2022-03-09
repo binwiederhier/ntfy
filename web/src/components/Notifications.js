@@ -21,6 +21,16 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
 import InfiniteScroll from "react-infinite-scroll-component";
+import fileApp from "../img/file-app.svg";
+import fileAudio from "../img/file-audio.svg";
+import fileDocument from "../img/file-document.svg";
+import fileImage from "../img/file-image.svg";
+import fileVideo from "../img/file-video.svg";
+import priority1 from "../img/priority-1.svg";
+import priority2 from "../img/priority-2.svg";
+import priority4 from "../img/priority-4.svg";
+import priority5 from "../img/priority-5.svg";
+import logoOutline from "../img/ntfy-outline.svg";
 
 const Notifications = (props) => {
     if (props.mode === "all") {
@@ -113,7 +123,7 @@ const NotificationItem = (props) => {
                     {date}
                     {[1,2,4,5].includes(notification.priority) &&
                         <img
-                            src={`/static/img/priority-${notification.priority}.svg`}
+                            src={priorityFiles[notification.priority]}
                             alt={`Priority ${notification.priority}`}
                             style={{ verticalAlign: 'bottom' }}
                         />}
@@ -138,6 +148,13 @@ const NotificationItem = (props) => {
         </Card>
     );
 }
+
+const priorityFiles = {
+    1: priority1,
+    2: priority2,
+    4: priority4,
+    5: priority5
+};
 
 const Attachment = (props) => {
     const attachment = props.attachment;
@@ -218,7 +235,7 @@ const Image = (props) => {
         <>
             <Box
                 component="img"
-                src={`${props.attachment.url}`}
+                src={props.attachment.url}
                 loading="lazy"
                 onClick={() => setOpen(true)}
                 sx={{
@@ -239,7 +256,7 @@ const Image = (props) => {
                 <Fade in={open}>
                     <Box
                         component="img"
-                        src={`${props.attachment.url}`}
+                        src={props.attachment.url}
                         loading="lazy"
                         sx={{
                             maxWidth: 1,
@@ -261,22 +278,22 @@ const Icon = (props) => {
     const type = props.type;
     let imageFile;
     if (!type) {
-        imageFile = 'file-document.svg';
+        imageFile = fileDocument;
     } else if (type.startsWith('image/')) {
-        imageFile = 'file-image.svg';
+        imageFile = fileImage;
     } else if (type.startsWith('video/')) {
-        imageFile = 'file-video.svg';
+        imageFile = fileVideo;
     } else if (type.startsWith('audio/')) {
-        imageFile = 'file-audio.svg';
+        imageFile = fileAudio;
     } else if (type === "application/vnd.android.package-archive") {
-        imageFile = 'file-app.svg';
+        imageFile = fileApp;
     } else {
-        imageFile = 'file-document.svg';
+        imageFile = fileDocument;
     }
     return (
         <Box
             component="img"
-            src={`/static/img/${imageFile}`}
+            src={imageFile}
             loading="lazy"
             sx={{
                 width: '28px',
@@ -291,7 +308,7 @@ const NoNotifications = (props) => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No notifications"/><br />
+                <img src={logoOutline} height="64" width="64" alt="No notifications"/><br />
                 You haven't received any notifications for this topic yet.
             </Typography>
             <Paragraph>
@@ -317,7 +334,7 @@ const NoNotificationsWithoutSubscription = (props) => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No notifications"/><br />
+                <img src={logoOutline} height="64" width="64" alt="No notifications"/><br />
                 You haven't received any notifications.
             </Typography>
             <Paragraph>
@@ -342,7 +359,7 @@ const NoSubscriptions = () => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src="/static/img/ntfy-outline.svg" height="64" width="64" alt="No topics"/><br />
+                <img src={logoOutline} height="64" width="64" alt="No topics"/><br />
                 It looks like you don't have any subscriptions yet.
             </Typography>
             <Paragraph>

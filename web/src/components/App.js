@@ -136,14 +136,17 @@ const useConnectionListeners = () => {
 };
 
 const useAutoSubscribe = (subscriptions, selected) => {
-    const [autoSubscribed, setAutoSubscribed] = useState(false);
+    const [hasRun, setHasRun] = useState(false);
     const params = useParams();
 
     useEffect(() => {
         const loaded = subscriptions !== null && subscriptions !== undefined;
-        const eligible = loaded && params.topic && !selected && !autoSubscribed;
+        if (!loaded || hasRun) {
+            return;
+        }
+        setHasRun(true);
+        const eligible = params.topic && !selected;
         if (eligible) {
-            setAutoSubscribed(true);
             const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
             console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
             (async () => {
@@ -151,7 +154,7 @@ const useAutoSubscribe = (subscriptions, selected) => {
                 poller.pollInBackground(subscription); // Dangle!
             })();
         }
-    }, [params, subscriptions, selected, autoSubscribed]);
+    }, [params, subscriptions, selected, hasRun]);
 };
 
 const updateTitle = (newNotificationsCount) => {

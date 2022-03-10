@@ -82,13 +82,15 @@ const NavList = (props) => {
     };
 
     const showSubscriptionsList = props.subscriptions?.length > 0;
-    const showGrantPermissionsBox = props.subscriptions?.length > 0 && !props.notificationsGranted;
+    const showNotificationNotSupportedBox = !notifier.supported();
+    const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
 
     return (
         <>
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
-            <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
-                {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
+            <List component="nav" sx={{ paddingTop: (showNotificationGrantBox || showNotificationNotSupportedBox) ? '0' : '' }}>
+                {showNotificationNotSupportedBox && <NotificationNotSupportedAlert/>}
+                {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
                     <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>
@@ -167,7 +169,7 @@ const SubscriptionItem = (props) => {
     );
 };
 
-const PermissionAlert = (props) => {
+const NotificationGrantAlert = (props) => {
     return (
         <>
             <Alert severity="warning" sx={{paddingTop: 2}}>
@@ -183,6 +185,20 @@ const PermissionAlert = (props) => {
                 >
                     Grant now
                 </Button>
+            </Alert>
+            <Divider/>
+        </>
+    );
+};
+
+const NotificationNotSupportedAlert = () => {
+    return (
+        <>
+            <Alert severity="warning" sx={{paddingTop: 2}}>
+                <AlertTitle>Notifications not supported</AlertTitle>
+                <Typography gutterBottom>
+                    Notifications are not supported in your browser.
+                </Typography>
             </Alert>
             <Divider/>
         </>

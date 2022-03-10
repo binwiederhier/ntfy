@@ -5,6 +5,9 @@ import logo from "../img/ntfy.png";
 
 class Notifier {
     async notify(subscriptionId, notification, onClickFallback) {
+        if (!this.supported()) {
+            return;
+        }
         const subscription = await subscriptionManager.get(subscriptionId);
         const shouldNotify = await this.shouldNotify(subscription, notification);
         if (!shouldNotify) {
@@ -38,10 +41,14 @@ class Notifier {
     }
 
     granted() {
-        return Notification.permission === 'granted';
+        return this.supported() && Notification.permission === 'granted';
     }
 
     maybeRequestPermission(cb) {
+        if (!this.supported()) {
+            cb(false);
+            return;
+        }
         if (!this.granted()) {
             Notification.requestPermission().then((permission) => {
                 const granted = permission === 'granted';
@@ -60,6 +67,10 @@ class Notifier {
             return false;
         }
         return true;
+    }
+
+    supported() {
+        return 'Notification' in window;
     }
 }
 

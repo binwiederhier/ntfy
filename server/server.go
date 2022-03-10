@@ -340,6 +340,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, r *http.Request) error {
 		appRoot = "/app"
 	}
 	disallowedTopicsStr := `"` + strings.Join(disallowedTopics, `", "`) + `"`
+	w.Header().Set("Content-Type", "application/json")
 	_, err := io.WriteString(w, fmt.Sprintf(`// Generated server configuration
 var config = { 
   appRoot: "%s",

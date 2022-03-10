@@ -7,6 +7,7 @@ import dadum from "../sounds/dadum.mp3";
 import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
+import {Base64} from 'js-base64';
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
@@ -96,14 +97,11 @@ export const basicAuth = (username, password) => {
 }
 
 export const encodeBase64 = (s) => {
-    return new Buffer(s).toString('base64');
+    return Base64.encode(s);
 }
 
 export const encodeBase64Url = (s) => {
-    return encodeBase64(s)
-        .replaceAll('+', '-')
-        .replaceAll('/', '_')
-        .replaceAll('=', '');
+    return Base64.encodeURI(s);
 }
 
 // https://jameshfisher.com/2017/10/30/web-cryptography-api-hello-world/

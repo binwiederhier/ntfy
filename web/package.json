@@ -15,6 +15,7 @@
     "@mui/material": "latest",
     "dexie": "^3.2.1",
     "dexie-react-hooks": "^1.1.1",
+    "js-base64": "^3.7.2",
     "react": "latest",
     "react-dom": "latest",
     "react-infinite-scroll-component": "^6.1.0",

@@ -20,7 +20,6 @@ import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useConnectionListeners} from "./hooks";
 
-// TODO iPhone blank screen
 // TODO better "send test message" (a la android app)
 // TODO docs
 // TODO screenshot on homepage

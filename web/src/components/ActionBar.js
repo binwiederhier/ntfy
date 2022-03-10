@@ -21,7 +21,7 @@ import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import api from "../app/Api";
 import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
-import logo from "../img/ntfy.svg"
+import logo from "../img/ntfy.svg";
 
 const ActionBar = (props) => {
     const location = useLocation();

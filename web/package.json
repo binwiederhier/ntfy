@@ -9,7 +9,8 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@emotion/styled": "latest",
+    "@emotion/react": "^11.8.2",
+    "@emotion/styled": "^11.8.1",
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "latest",
     "dexie": "^3.2.1",
@@ -18,7 +19,10 @@
     "react-dom": "latest",
     "react-infinite-scroll-component": "^6.1.0",
     "react-router-dom": "^6.2.2",
-    "react-scripts": "^3.0.1"
+    "react-scripts": "^5.0.0",
+    "stacktrace-gps": "^3.0.4",
+    "stacktrace-js": "^2.0.2",
+    "svgo": "^2.8.0"
   },
   "browserslist": {
     "production": [

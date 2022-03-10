@@ -31,21 +31,21 @@ import {useAutoSubscribe, useConnectionListeners} from "./hooks";
 
 const App = () => {
     return (
-        <ErrorBoundary>
-            <BrowserRouter>
-                <ThemeProvider theme={theme}>
-                    <CssBaseline/>
+        <BrowserRouter>
+            <ThemeProvider theme={theme}>
+                <CssBaseline/>
+                <ErrorBoundary>
                     <Routes>
                         <Route element={<Layout/>}>
-                            <Route path={routes.root} element={<AllSubscriptions/>} />
-                            <Route path={routes.settings} element={<Preferences/>} />
-                            <Route path={routes.subscription} element={<SingleSubscription/>} />
-                            <Route path={routes.subscriptionExternal} element={<SingleSubscription/>} />
+                            <Route path={routes.root} element={<AllSubscriptions/>}/>
+                            <Route path={routes.settings} element={<Preferences/>}/>
+                            <Route path={routes.subscription} element={<SingleSubscription/>}/>
+                            <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>
                         </Route>
                     </Routes>
-                </ThemeProvider>
-            </BrowserRouter>
-        </ErrorBoundary>
+                </ErrorBoundary>
+            </ThemeProvider>
+        </BrowserRouter>
     );
 }
 

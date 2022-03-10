@@ -49,7 +49,9 @@ docs: docs-deps
 # Web app
 
 web-deps:
-	cd web && npm install
+	cd web \
+		&& npm install \
+		&& node_modules/svgo/bin/svgo src/img/*.svg
 
 web-build:
 	cd web \
@@ -59,11 +61,7 @@ web-build:
 		&& mv build ../server/site \
 		&& rm \
 			../server/site/config.js \
-			../server/site/precache* \
-			../server/site/service-worker.js \
-			../server/site/asset-manifest.json \
-			../server/site/static/js/*.js.map \
-			../server/site/static/js/*.js.LICENSE.txt
+			../server/site/asset-manifest.json
 
 web: web-deps web-build
 

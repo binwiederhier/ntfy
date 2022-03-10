@@ -14,13 +14,15 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, Badge, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import {subscriptionRoute, topicShortUrl, topicUrl} from "../app/utils";
+import {topicShortUrl, topicUrl} from "../app/utils";
+import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
 import {ChatBubble, NotificationsOffOutlined} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
+import config from "../app/config";
 
 const navWidth = 280;
 
@@ -71,7 +73,7 @@ const NavList = (props) => {
     const handleSubscribeSubmit = (subscription) => {
         console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
         handleSubscribeReset();
-        navigate(subscriptionRoute(subscription));
+        navigate(routes.forSubscription(subscription));
         handleRequestNotificationPermission();
     }
 
@@ -88,14 +90,14 @@ const NavList = (props) => {
             <List component="nav" sx={{ paddingTop: (showGrantPermissionsBox) ? '0' : '' }}>
                 {showGrantPermissionsBox && <PermissionAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
-                    <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
+                    <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>
                         <ListItemText primary="All notifications"/>
                     </ListItemButton>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader>Subscribed topics</ListSubheader>
-                        <ListItemButton onClick={() => navigate("/")} selected={location.pathname === "/"}>
+                        <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
                             <ListItemIcon><ChatBubble/></ListItemIcon>
                             <ListItemText primary="All notifications"/>
                         </ListItemButton>
@@ -105,7 +107,7 @@ const NavList = (props) => {
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
-                <ListItemButton onClick={() => navigate("/settings")} selected={location.pathname === "/settings"}>
+                <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary="Settings"/>
                 </ListItemButton>
@@ -152,7 +154,7 @@ const SubscriptionItem = (props) => {
         ? subscription.topic
         : topicShortUrl(subscription.baseUrl, subscription.topic);
     const handleClick = async () => {
-        navigate(subscriptionRoute(subscription));
+        navigate(routes.forSubscription(subscription));
         await subscriptionManager.markNotificationsRead(subscription.id);
     };
     return (

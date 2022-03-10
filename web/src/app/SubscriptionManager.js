@@ -17,12 +17,11 @@ class SubscriptionManager {
         return await db.subscriptions.get(subscriptionId)
     }
 
-    async add(baseUrl, topic, ephemeral) {
+    async add(baseUrl, topic) {
         const subscription = {
             id: topicUrl(baseUrl, topic),
             baseUrl: baseUrl,
             topic: topic,
-            ephemeral: ephemeral,
             mutedUntil: 0,
             last: null
         };

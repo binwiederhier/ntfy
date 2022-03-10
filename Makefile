@@ -58,6 +58,7 @@ web-build:
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \
 		&& rm \
+			../server/site/config.js \
 			../server/site/precache* \
 			../server/site/service-worker.js \
 			../server/site/asset-manifest.json \

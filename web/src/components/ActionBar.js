@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {useEffect, useRef, useState} from "react";
 import Box from "@mui/material/Box";
-import {subscriptionRoute, topicShortUrl} from "../app/utils";
+import {topicShortUrl} from "../app/utils";
 import {useLocation, useNavigate} from "react-router-dom";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -19,6 +19,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import api from "../app/Api";
+import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg"
 
@@ -98,9 +99,9 @@ const SettingsIcons = (props) => {
         await subscriptionManager.remove(props.subscription.id);
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {
-            navigate(subscriptionRoute(newSelected));
+            navigate(routes.forSubscription(newSelected));
         } else {
-            navigate("/");
+            navigate(routes.root);
         }
     };
 

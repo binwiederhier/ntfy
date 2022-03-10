@@ -14,10 +14,16 @@ import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {BrowserRouter, Outlet, Route, Routes, useNavigate, useOutletContext, useParams} from "react-router-dom";
-import {expandSecureUrl, expandUrl, subscriptionRoute, topicUrl} from "../app/utils";
-import poller from "../app/Poller";
+import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from "react-router-dom";
+import {expandUrl} from "../app/utils";
+import ErrorBoundary from "./ErrorBoundary";
+import routes from "./routes";
+import {useAutoSubscribe, useConnectionListeners} from "./hooks";
 
+// TODO iPhone blank screen
+// TODO better "send test message" (a la android app)
+// TODO docs
+// TODO screenshot on homepage
 // TODO "copy url" toast
 // TODO "copy link url" button
 // TODO races when two tabs are open
@@ -25,19 +31,21 @@ import poller from "../app/Poller";
 
 const App = () => {
     return (
-        <BrowserRouter>
-            <ThemeProvider theme={theme}>
-                <CssBaseline/>
-                <Routes>
-                    <Route element={<Layout/>}>
-                        <Route path="/" element={<AllSubscriptions/>} />
-                        <Route path="settings" element={<Preferences/>} />
-                        <Route path=":topic" element={<SingleSubscription/>} />
-                        <Route path=":baseUrl/:topic" element={<SingleSubscription/>} />
-                    </Route>
-                </Routes>
-            </ThemeProvider>
-        </BrowserRouter>
+        <ErrorBoundary>
+            <BrowserRouter>
+                <ThemeProvider theme={theme}>
+                    <CssBaseline/>
+                    <Routes>
+                        <Route element={<Layout/>}>
+                            <Route path={routes.root} element={<AllSubscriptions/>} />
+                            <Route path={routes.settings} element={<Preferences/>} />
+                            <Route path={routes.subscription} element={<SingleSubscription/>} />
+                            <Route path={routes.subscriptionExternal} element={<SingleSubscription/>} />
+                        </Route>
+                    </Routes>
+                </ThemeProvider>
+            </BrowserRouter>
+        </ErrorBoundary>
     );
 }
 
@@ -65,7 +73,6 @@ const Layout = () => {
     });
 
     useConnectionListeners();
-
     useEffect(() => connectionManager.refresh(subscriptions, users), [subscriptions, users]);
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
@@ -113,52 +120,8 @@ const Main = (props) => {
     );
 };
 
-const useConnectionListeners = () => {
-    const navigate = useNavigate();
-    useEffect(() => {
-        const handleNotification = async (subscriptionId, notification) => {
-            const added = await subscriptionManager.addNotification(subscriptionId, notification);
-            if (added) {
-                const defaultClickAction = (subscription) => navigate(subscriptionRoute(subscription));
-                await notifier.notify(subscriptionId, notification, defaultClickAction)
-            }
-        };
-        connectionManager.registerStateListener(subscriptionManager.updateState);
-        connectionManager.registerNotificationListener(handleNotification);
-        return () => {
-            connectionManager.resetStateListener();
-            connectionManager.resetNotificationListener();
-        }
-    },
-    // We have to disable dep checking for "navigate". This is fine, it never changes.
-    // eslint-disable-next-line
-    []);
-};
-
-const useAutoSubscribe = (subscriptions, selected) => {
-    const [hasRun, setHasRun] = useState(false);
-    const params = useParams();
-
-    useEffect(() => {
-        const loaded = subscriptions !== null && subscriptions !== undefined;
-        if (!loaded || hasRun) {
-            return;
-        }
-        setHasRun(true);
-        const eligible = params.topic && !selected;
-        if (eligible) {
-            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
-            console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
-            (async () => {
-                const subscription = await subscriptionManager.add(baseUrl, params.topic, true);
-                poller.pollInBackground(subscription); // Dangle!
-            })();
-        }
-    }, [params, subscriptions, selected, hasRun]);
-};
-
 const updateTitle = (newNotificationsCount) => {
-    document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy web` : "ntfy web";
+    document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy` : "ntfy";
 }
 
 export default App;

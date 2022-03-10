@@ -65,6 +65,7 @@ var (
 	authPathRegex     = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex  = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/(publish|send|trigger)$`)
 
+	webConfigPath    = "/config.js"
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -266,6 +267,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.handleEmpty(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
+		return s.handleWebConfig(w, r)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.handleStatic(w, r)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
@@ -328,6 +331,20 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 
 func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {
 	_, err := io.WriteString(w, exampleSource)
+	return err
+}
+
+func (s *Server) handleWebConfig(w http.ResponseWriter, r *http.Request) error {
+	appRoot := "/"
+	if !s.config.WebRootIsApp {
+		appRoot = "/app"
+	}
+	disallowedTopicsStr := `"` + strings.Join(disallowedTopics, `", "`) + `"`
+	_, err := io.WriteString(w, fmt.Sprintf(`// Generated server configuration
+var config = { 
+  appRoot: "%s",
+  disallowedTopics: [%s]
+};`, appRoot, disallowedTopicsStr))
 	return err
 }
 

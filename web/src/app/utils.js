@@ -6,6 +6,7 @@ import ding from "../sounds/ding.mp3";
 import dadum from "../sounds/dadum.mp3";
 import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
+import config from "./config";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`
@@ -25,7 +26,14 @@ export const validUrl = (url) => {
 }
 
 export const validTopic = (topic) => {
+    if (disallowedTopic(topic)) {
+        return false;
+    }
     return topic.match(/^([-_a-zA-Z0-9]{1,64})$/); // Regex must match Go & Android app!
+}
+
+export const disallowedTopic = (topic) => {
+    return config.disallowedTopics.includes(topic);
 }
 
 // Format emojis (see emoji.js)
@@ -121,13 +129,6 @@ export const formatBytes = (bytes, decimals = 2) => {
 export const openUrl = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
 };
-
-export const subscriptionRoute = (subscription) => {
-    if (subscription.baseUrl !== window.location.origin) {
-        return `/${shortUrl(subscription.baseUrl)}/${subscription.topic}`;
-    }
-    return `/${subscription.topic}`;
-}
 
 export const sounds = {
     "beep": beep,

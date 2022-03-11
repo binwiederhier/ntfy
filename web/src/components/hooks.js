@@ -66,6 +66,10 @@ export const useAutoSubscribe = (subscriptions, selected) => {
     }, [params, subscriptions, selected, hasRun]);
 };
 
+/**
+ * Migrate the 'topics' item in localStorage to the subscriptionManager. This is only done once to migrate away
+ * from the old web UI.
+ */
 export const useLocalStorageMigration = () => {
     const [hasRun, setHasRun] = useState(false);
     useEffect(() => {

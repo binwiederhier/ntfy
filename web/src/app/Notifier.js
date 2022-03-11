@@ -3,6 +3,10 @@ import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 import logo from "../img/ntfy.png";
 
+/**
+ * The notifier is responsible for displaying desktop notifications. Note that not all modern browsers
+ * support this; most importantly, all iOS browsers do not support window.Notification.
+ */
 class Notifier {
     async notify(subscriptionId, notification, onClickFallback) {
         if (!this.supported()) {

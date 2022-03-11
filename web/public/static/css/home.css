@@ -265,29 +265,6 @@ figcaption {
     text-decoration: underline;
 }
 
-/* Subscribe box */
-
-button {
-    background: #3a9784;
-    border: none;
-    border-radius: 3px;
-    padding: 3px 5px;
-    color: white;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #317f6f;
-    padding: 5px;
-}
-
-ul {
-    padding-left: 1em;
-    list-style-type: circle;
-    padding-bottom: 0;
-    margin: 0;
-}
-
 li {
     padding: 4px 0;
     margin: 4px 0;

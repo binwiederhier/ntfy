@@ -1,12 +1,4 @@
 
-/**
- * Hello, dear curious visitor. I am not a web-guy, so please don't judge my horrible JS code.
- * In fact, please do tell me about all the things I did wrong and that I could improve. I've been trying
- * to read up on modern JS, but it's just a little much.
- *
- * Feel free to open tickets at https://github.com/binwiederhier/ntfy/issues. Thank you!
- */
-
 /* All the things */
 
 let currentUrl = window.location.hostname;

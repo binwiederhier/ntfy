@@ -2,6 +2,12 @@ import {basicAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 
 const retryBackoffSeconds = [5, 10, 15, 20, 30];
 
+/**
+ * A connection contains a single WebSocket connection for one topic. It handles its connection
+ * status itself, including reconnect attempts and backoff.
+ *
+ * Incoming messages and state changes are forwarded via listeners.
+ */
 class Connection {
     constructor(connectionId, subscriptionId, baseUrl, topic, user, since, onNotification, onStateChanged) {
         this.connectionId = connectionId;

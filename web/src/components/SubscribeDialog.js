@@ -85,7 +85,7 @@ const SubscribePage = (props) => {
             const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
             return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
         } else {
-            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(window.location.origin, topic)); // FIXME
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(window.location.origin, topic));
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();

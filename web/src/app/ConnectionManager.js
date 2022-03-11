@@ -1,6 +1,12 @@
 import Connection from "./Connection";
 import {sha256} from "./utils";
 
+/**
+ * The connection manager keeps track of active connections (WebSocket connections, see Connection).
+ *
+ * Its refresh() method reconciles state changes with the target state by closing/opening connections
+ * as required. This is done pretty much exactly the same way as in the Android app.
+ */
 class ConnectionManager {
     constructor() {
         this.connections = new Map(); // ConnectionId -> Connection (hash, see below)

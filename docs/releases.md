@@ -2,6 +2,16 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v1.17.0
+Released Mar 11, 2022
+
+**Features & bug fixes:**
+
+* Replace [web app](https://ntfy.sh/app) with a React/MUI-based web app from the 21st century (#111)
+* Web UI broken with auth (#132, thanks for reporting @arminus)
+* Send static web resources as `Content-Encoding: gzip`, i.e. docs and web app (no ticket)
+* Add support for auth via `?auth=...` query param, used by WebSocket in web app (no ticket) 
+
 ## ntfy server v1.16.0
 Released Feb 27, 2022
 

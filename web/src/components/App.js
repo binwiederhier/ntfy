@@ -20,9 +20,6 @@ import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useConnectionListeners} from "./hooks";
 
-// TODO link lighlighting
-// TODO "copy url" toast
-// TODO "copy link url" button
 // TODO add drag and drop
 // TODO races when two tabs are open
 // TODO investigate service workers

@@ -1,5 +1,16 @@
 import Container from "@mui/material/Container";
-import {ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Modal, Stack} from "@mui/material";
+import {
+    ButtonBase,
+    CardActions,
+    CardContent,
+    CircularProgress,
+    Fade,
+    Link,
+    Modal,
+    Snackbar,
+    Stack,
+    Tooltip
+} from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
@@ -9,7 +20,7 @@ import {
     formatMessage,
     formatShortDateTime,
     formatTitle,
-    openUrl,
+    openUrl, shortUrl,
     topicShortUrl,
     unmatchedTags
 } from "../app/utils";
@@ -66,6 +77,7 @@ const SingleSubscription = (props) => {
 const NotificationList = (props) => {
     const pageSize = 20;
     const notifications = props.notifications;
+    const [snackOpen, setSnackOpen] = useState(false);
     const [maxCount, setMaxCount] = useState(pageSize);
     const count = Math.min(notifications.length, maxCount);
 
@@ -81,7 +93,7 @@ const NotificationList = (props) => {
             dataLength={count}
             next={() => setMaxCount(prev => prev + pageSize)}
             hasMore={count < notifications.length}
-            loader={<h1>aa</h1>}
+            loader={<>Loading ...</>}
             scrollThreshold={0.7}
             scrollableTarget="main"
         >
@@ -91,7 +103,14 @@ const NotificationList = (props) => {
                         <NotificationItem
                             key={notification.id}
                             notification={notification}
+                            onShowSnack={() => setSnackOpen(true)}
                         />)}
+                    <Snackbar
+                        open={snackOpen}
+                        autoHideDuration={3000}
+                        onClose={() => setSnackOpen(false)}
+                        message="Copied to clipboard"
+                    />
                 </Stack>
             </Container>
         </InfiniteScroll>
@@ -109,6 +128,10 @@ const NotificationItem = (props) => {
         console.log(`[Notifications] Deleting notification ${notification.id} from ${subscriptionId}`);
         await subscriptionManager.deleteNotification(notification.id)
     }
+    const handleCopy = (s) => {
+        navigator.clipboard.writeText(s);
+        props.onShowSnack();
+    };
     const expired = attachment && attachment.expires && attachment.expires < Date.now()/1000;
     const showAttachmentActions = attachment && !expired;
     const showClickAction = notification.click;
@@ -133,21 +156,47 @@ const NotificationItem = (props) => {
                         </svg>}
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{formatMessage(notification)}</Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{autolink(formatMessage(notification))}</Typography>
                 {attachment && <Attachment attachment={attachment}/>}
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
             </CardContent>
             {showActions &&
                 <CardActions sx={{paddingTop: 0}}>
                     {showAttachmentActions && <>
-                        <Button onClick={() => navigator.clipboard.writeText(attachment.url)}>Copy URL</Button>
-                        <Button onClick={() => openUrl(attachment.url)}>Open attachment</Button>
+                        <Tooltip title="Copy attachment URL to clipboard">
+                            <Button onClick={() => handleCopy(attachment.url)}>Copy URL</Button>
+                        </Tooltip>
+                        <Tooltip title={`Go to ${attachment.url}`}>
+                            <Button onClick={() => openUrl(attachment.url)}>Open attachment</Button>
+                        </Tooltip>
                     </>}
-                    {showClickAction && <Button onClick={() => openUrl(notification.click)}>Open link</Button>}
+                    {showClickAction && <>
+                        <Tooltip title="Copy link URL to clipboard">
+                            <Button onClick={() => handleCopy(notification.click)}>Copy link</Button>
+                        </Tooltip>
+                        <Tooltip title={`Go to ${notification.click}`}>
+                            <Button onClick={() => openUrl(notification.click)}>Open link</Button>
+                        </Tooltip>
+                    </>}
                 </CardActions>}
         </Card>
     );
 }
+
+/**
+ * Replace links with <Link/> components; this is a combination of the genius function
+ * in [1] and the regex in [2].
+ *
+ * [1] https://github.com/facebook/react/issues/3386#issuecomment-78605760
+ * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
+ */
+const autolink = (s) => {
+    const parts = s.split(/(\bhttps?:\/\/[\-A-Z0-9+\u0026\u2019@#\/%?=()~_|!:,.;]*[\-A-Z0-9+\u0026@#\/%=~()_|]\b)/gi);
+    for (let i = 1; i < parts.length; i += 2) {
+        parts[i] = <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">{shortUrl(parts[i])}</Link>;
+    }
+    return <>{parts}</>;
+};
 
 const priorityFiles = {
     1: priority1,

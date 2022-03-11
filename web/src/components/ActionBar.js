@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {useEffect, useRef, useState} from "react";
 import Box from "@mui/material/Box";
-import {topicShortUrl} from "../app/utils";
+import {formatShortDateTime, shuffle, topicShortUrl} from "../app/utils";
 import {useLocation, useNavigate} from "react-router-dom";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -108,8 +108,31 @@ const SettingsIcons = (props) => {
     const handleSendTestMessage = () => {
         const baseUrl = props.subscription.baseUrl;
         const topic = props.subscription.topic;
-        api.publish(baseUrl, topic,
-            `This is a test notification sent by the ntfy Web UI at ${new Date().toString()}.`); // FIXME result ignored
+        const tags = shuffle([
+            "grinning", "octopus", "upside_down_face", "palm_tree", "maple_leaf", "apple", "skull", "warning", "jack_o_lantern",
+            "de-server-1", "backups", "cron-script", "script-error", "phils-automation", "mouse", "go-rocks", "hi-ben"])
+                .slice(0, Math.round(Math.random() * 4));
+        const priority = shuffle([1, 2, 3, 4, 5])[0];
+        const title = shuffle([
+            "",
+            "",
+            "", // Higher chance of no title
+            "Oh my, another test message?",
+            "Titles are optional, did you know that?",
+            "ntfy is open source, and will always be free. Cool, right?",
+            "I don't really like apples",
+            "My favorite TV show is The Wire. You should watch it!"
+        ])[0];
+        const message = shuffle([
+            `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(Date.now())} right now. Is that early or late?`,
+            `So I heard you like ntfy? If that's true, go to GitHub and star it, or to the Play store and rate it. Thanks! Oh yeah, this is a test notification.`,
+            `It's almost like you want to hear what I have to say. I'm not even a machine. I'm just a sentence that Phil typed on a random Thursday.`,
+            `Alright then, it's ${formatShortDateTime(Date.now())} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
+            `There are nine million bicycles in Beijing That's a fact; It's a thing we can't deny. I wonder if that's true ...`,
+            `I'm really excited that you're trying out ntfy. Did you know that there are a few public topics, such as ntfy.sh/stats and ntfy.sh/annoucements.`,
+            `It's interesting to hear what people use ntfy for. I've heard people talk about using it for so many cool things. What do you use it for?`
+        ])[0];
+        api.publish(baseUrl, topic, message, title, priority, tags);
         setOpen(false);
     }
 

@@ -104,6 +104,17 @@ export const encodeBase64Url = (s) => {
     return Base64.encodeURI(s);
 }
 
+export const shuffle = (arr) => {
+    let j, x;
+    for (let index = arr.length - 1; index > 0; index--) {
+        j = Math.floor(Math.random() * (index + 1));
+        x = arr[index];
+        arr[index] = arr[j];
+        arr[j] = x;
+    }
+    return arr;
+}
+
 // https://jameshfisher.com/2017/10/30/web-cryptography-api-hello-world/
 export const sha256 = async (s) => {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder("utf-8").encode(s));

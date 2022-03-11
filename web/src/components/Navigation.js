@@ -14,7 +14,7 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, Badge, CircularProgress, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import {topicShortUrl, topicUrl} from "../app/utils";
+import {openUrl, topicShortUrl, topicUrl} from "../app/utils";
 import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -23,6 +23,7 @@ import {ChatBubble, NotificationsOffOutlined} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
+import ArticleIcon from '@mui/icons-material/Article';
 
 const navWidth = 280;
 
@@ -112,6 +113,10 @@ const NavList = (props) => {
                 <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary="Settings"/>
+                </ListItemButton>
+                <ListItemButton onClick={() => openUrl("/docs")}>
+                    <ListItemIcon><ArticleIcon/></ListItemIcon>
+                    <ListItemText primary="Documentation"/>
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                     <ListItemIcon><AddIcon/></ListItemIcon>

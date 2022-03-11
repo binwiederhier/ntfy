@@ -23,7 +23,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="ntfy.sh" />
-    <meta property="og:title" content="ntfy.sh | Send push notifications to your phone or desktop via PUT/POST" />
+    <meta property="og:title" content="ntfy.sh | Push notifications to your phone or desktop via PUT/POST" />
     <meta property="og:description" content="ntfy is a simple HTTP-based pub-sub notification service. It allows you to send desktop notifications via scripts from any computer, entirely without signup or cost. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy." />
     <meta property="og:image" content="/static/img/ntfy.png" />
     <meta property="og:url" content="https://ntfy.sh" />
@@ -38,9 +38,9 @@
         <img id="logo" src="static/img/ntfy.png" alt="logo"/>
         <div id="name">ntfy</div>
         <ol>
-            <li><a href="docs/">Getting started</a></li>
             <li><a href="app">Web app</a></li>
             <li><a href="docs/subscribe/phone/">Android/iOS</a></li>
+            <li><a href="docs/">Docs</a></li>
             <li><a href="docs/publish/">API</a></li>
             <li><a href="https://github.com/binwiederhier/ntfy">GitHub</a></li>
         </ol>
@@ -122,16 +122,21 @@
 
     <h3 id="subscribe-web" class="anchor">Subscribe via web app</h3>
     <p>
-        Subscribe to topics here and receive messages as <b>desktop notification</b>. Topics are not password-protected,
-        so choose a name that's not easy to guess.
+        Subscribe to topics in the <a href="app">web app</a> and receive messages as <b>desktop notification</b>.
+        It is available at <b><a href="app"><span class="ntfyUrl">ntfy.sh</span>/app</a></b>.
     </p>
+    <figure>
+        <a href="app"><img src="static/img/screenshot-web-detail.png" width="100%"/></a>
+        <figcaption>ntfy web app, available at <a href="app"><span class="ntfyUrl">ntfy.sh</span>/app</a></figcaption>
+    </figure>
 
     <h3 id="subscribe-api" class="anchor">Subscribe using the API</h3>
     <p>
         There's a super simple API that you can use to integrate your own app. You can consume
         a <a href="docs/subscribe/api/#subscribe-as-json-stream">JSON stream</a>,
-        an <a href="docs/subscribe/api/#subscribe-as-sse-stream">SSE/EventSource stream</a> (useful for web apps),
-        as well as a <a href="docs/subscribe/api/#subscribe-as-raw-stream">plain text stream</a>.
+        an <a href="docs/subscribe/api/#subscribe-as-sse-stream">SSE/EventSource stream</a>,
+        a <a href="docs/subscribe/api/#subscribe-as-raw-stream">plain text stream</a>,
+        or <a href="docs/subscribe/api/#websockets">via WebSockets</a>.
     </p>
     <p class="smallMarginBottom">
         Here's an example for JSON. The <b>connection stays open</b>, so you can retrieve messages as they come in:

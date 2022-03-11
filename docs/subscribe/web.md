@@ -6,9 +6,9 @@ keep a connection open and listen for incoming notifications.
 To learn how to send messages, check out the [publishing page](../publish.md).
 
 <div id="web-screenshots" class="screenshots">
-    <a href="../../static/img/web-subscribe.png"><img src="../../static/img/web-subscribe.png"/></a>
-    <a href="../../static/img/web-notification.png"><img src="../../static/img/web-notification.png"/></a>
     <a href="../../static/img/web-detail.png"><img src="../../static/img/web-detail.png"/></a> 
+    <a href="../../static/img/web-notification.png"><img src="../../static/img/web-notification.png"/></a>
+    <a href="../../static/img/web-subscribe.png"><img src="../../static/img/web-subscribe.png"/></a>
 </div>
 
 To keep receiving desktop notifications from ntfy, you need to keep the website open. What I do, and what I highly recommend,

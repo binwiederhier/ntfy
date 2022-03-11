@@ -351,12 +351,12 @@ var config = {
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
 	r.URL.Path = webSiteDir + r.URL.Path
-	http.FileServer(http.FS(webFsCached)).ServeHTTP(w, r)
+	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
 	return nil
 }
 
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
-	http.FileServer(http.FS(docsStaticCached)).ServeHTTP(w, r)
+	util.Gzip(http.FileServer(http.FS(docsStaticCached))).ServeHTTP(w, r)
 	return nil
 }
 

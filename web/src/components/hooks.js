@@ -78,9 +78,7 @@ export const useLocalStorageMigration = () => {
         }
         const topicsStr = localStorage.getItem("topics");
         if (topicsStr) {
-            const topics = topicsStr
-                .split(",")
-                .filter(topic => topic !== "");
+            const topics = JSON.parse(topicsStr).filter(topic => topic !== "");
             if (topics.length > 0) {
                 (async () => {
                     for (const topic of topics) {

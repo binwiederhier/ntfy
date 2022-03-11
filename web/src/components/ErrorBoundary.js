@@ -6,32 +6,46 @@ import Button from "@mui/material/Button";
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { error: null, info: null, stack: null };
+        this.state = {
+            error: false,
+            originalStack: null,
+            niceStack: null
+        };
     }
 
     componentDidCatch(error, info) {
-        this.setState({ error, info });
         console.error("[ErrorBoundary] Error caught", error, info);
+
+        // Immediately render original stack trace
+        const prettierOriginalStack = info.componentStack
+            .trim()
+            .split("\n")
+            .map(line => `  at ${line}`)
+            .join("\n");
+        this.setState({
+            error: true,
+            originalStack: `${error.toString()}\n${prettierOriginalStack}`
+        });
+
+        // Fetch additional info and a better stack trace
         StackTrace.fromError(error).then(stack => {
             console.error("[ErrorBoundary] Stacktrace fetched", stack);
-            const stackStr = stack.map( el => {
-                return `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})\n`;
-            })
-            this.setState({ stack: stackStr })
+            const niceStack = `${error.toString()}\n` + stack.map( el => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`).join("\n");
+            this.setState({ niceStack });
         });
     }
 
     copyStack() {
         let stack = "";
-        if (this.state.stack) {
-            stack += `Stack trace:\n${this.state.error}\n${this.state.stack}\n\n`;
+        if (this.state.niceStack) {
+            stack += `${this.state.niceStack}\n\n`;
         }
-        stack += `Original stack trace:\n${this.state.error}\n${this.state.info.componentStack}\n\n`;
+        stack += `${this.state.originalStack}\n`;
         navigator.clipboard.writeText(stack);
     }
 
     render() {
-        if (this.state.info) {
+        if (this.state.error) {
             return (
                 <div style={{margin: '20px'}}>
                     <h2>Oh no, ntfy crashed 😮</h2>
@@ -44,21 +58,10 @@ class ErrorBoundary extends React.Component {
                         <Button variant="outlined" onClick={() => this.copyStack()}>Copy stack trace</Button>
                     </p>
                     <h3>Stack trace</h3>
-                    {this.state.stack
-                        ?
-                            <pre>
-                                {this.state.error && this.state.error.toString()}{"\n"}
-                                {this.state.stack}
-                            </pre>
-                        :
-                            <>
-                                <CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> Gather more info ...
-                            </>
-                    }
-                    <pre>
-                        {this.state.error && this.state.error.toString()}
-                        {this.state.info.componentStack}
-                    </pre>
+                    {this.state.niceStack
+                        ? <pre>{this.state.niceStack}</pre>
+                        : <><CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> Gather more info ...</>}
+                    <pre>{this.state.originalStack}</pre>
                 </div>
             );
         }

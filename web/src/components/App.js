@@ -6,7 +6,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
 import Notifications from "./Notifications";
 import theme from "./theme";
-import connectionManager from "../app/ConnectionManager";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
@@ -18,7 +17,7 @@ import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from 
 import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {useAutoSubscribe, useConnectionListeners} from "./hooks";
+import {useAutoSubscribe, useConnectionListeners, useLocalStorageMigration} from "./hooks";
 
 // TODO add drag and drop
 // TODO races when two tabs are open
@@ -67,8 +66,8 @@ const Layout = () => {
             || (window.location.origin === s.baseUrl && params.topic === s.topic)
     });
 
-    useConnectionListeners();
-    useEffect(() => connectionManager.refresh(subscriptions, users), [subscriptions, users]);
+    useConnectionListeners(subscriptions, users);
+    useLocalStorageMigration();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
     return (

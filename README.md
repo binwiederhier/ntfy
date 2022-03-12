@@ -18,11 +18,11 @@ I run a free version of it at **[ntfy.sh](https://ntfy.sh)**, and there's an [op
 too.
 
 <p>
-  <img src="server/static/img/screenshot-curl.png" height="180">
-  <img src="server/static/img/screenshot-web-detail.png" height="180">
-  <img src="server/static/img/screenshot-phone-main.jpg" height="180">
-  <img src="server/static/img/screenshot-phone-detail.jpg" height="180">
-  <img src="server/static/img/screenshot-phone-notification.jpg" height="180">
+  <img src="web/public/static/img/screenshot-curl.png" height="180">
+  <img src="web/public/static/img/screenshot-web-detail.png" height="180">
+  <img src="web/public/static/img/screenshot-phone-main.jpg" height="180">
+  <img src="web/public/static/img/screenshot-phone-detail.jpg" height="180">
+  <img src="web/public/static/img/screenshot-phone-notification.jpg" height="180">
 </p>
 
 ## **[Documentation](https://ntfy.sh/docs/)**

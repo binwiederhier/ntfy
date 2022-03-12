@@ -2,6 +2,13 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v1.17.1
+Released XXXXXXXXXXXXXXXXXXXXXXXXx
+
+**Bug fixes:**
+
+* Replace `crypto.subtle` with `hashCode` to errors with Brave/FF-Windows (#157, thanks for reporting @arminus)
+
 ## ntfy server v1.17.0
 Released Mar 11, 2022
 

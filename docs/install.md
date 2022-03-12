@@ -26,21 +26,21 @@ deb/rpm packages.
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_x86_64.tar.gz
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_x86_64.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
     sudo ./ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_armv7.tar.gz
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_armv7.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
     sudo ./ntfy serve
     ```
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_arm64.tar.gz
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_arm64.tar.gz
     sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
     sudo ./ntfy serve
     ```
@@ -88,7 +88,7 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_amd64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_amd64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -96,7 +96,7 @@ Manually installing the .deb file:
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_armv7.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_armv7.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -104,7 +104,7 @@ Manually installing the .deb file:
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_arm64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_arm64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -114,21 +114,21 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_amd64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_amd64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_armv7.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_armv7.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "arm64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.0/ntfy_1.17.0_linux_arm64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.17.1/ntfy_1.17.1_linux_arm64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```

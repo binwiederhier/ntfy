@@ -115,10 +115,15 @@ export const shuffle = (arr) => {
     return arr;
 }
 
-// https://jameshfisher.com/2017/10/30/web-cryptography-api-hello-world/
-export const sha256 = async (s) => {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder("utf-8").encode(s));
-    return Array.prototype.map.call(new Uint8Array(buf), x=>(('00'+x.toString(16)).slice(-2))).join('');
+/** Non-cryptographic hash function, see https://stackoverflow.com/a/8831937/1440785 */
+export const hashCode = async (s) => {
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+        const char = s.charCodeAt(i);
+        hash = ((hash<<5)-hash)+char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash;
 }
 
 export const formatShortDateTime = (timestamp) => {

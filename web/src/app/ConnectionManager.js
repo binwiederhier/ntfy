@@ -1,5 +1,5 @@
 import Connection from "./Connection";
-import {sha256} from "./utils";
+import {hashCode} from "./utils";
 
 /**
  * The connection manager keeps track of active connections (WebSocket connections, see Connection).
@@ -108,10 +108,9 @@ class ConnectionManager {
 }
 
 const makeConnectionId = async (subscription, user) => {
-    const hash = (user)
-        ? await sha256(`${subscription.id}|${user.username}|${user.password}`)
-        : await sha256(`${subscription.id}`);
-    return hash.substring(0, 10);
+    return (user)
+        ? hashCode(`${subscription.id}|${user.username}|${user.password}`)
+        : hashCode(`${subscription.id}`);
 }
 
 const connectionManager = new ConnectionManager();

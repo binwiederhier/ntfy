@@ -3,7 +3,7 @@ Binaries for all releases can be found on the GitHub releases pages for the [ntf
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## ntfy server v1.17.1
-Released XXXXXXXXXXXXXXXXXXXXXXXXx
+Released Mar 12, 2022
 
 **Bug fixes:**
 

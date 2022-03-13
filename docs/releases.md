@@ -2,6 +2,13 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy Android app v1.10.0
+Released XXXXXXXXXXXXXXX
+
+**Features:**
+
+* Support for UnifiedPush 2.0 specification (bytes messages, #130)
+
 ## ntfy server v1.17.1
 Released Mar 12, 2022
 

@@ -130,19 +130,21 @@ notification popups:
 
 Here's a list of extras you can access. Most likely, you'll want to filter for `topic` and react on `message`:
 
-| Extra name | Type | Example | Description |
-|---|---|---|---|
-| `id` | *string* | `bP8dMjO8ig` | Randomly chosen message identifier (likely not very useful for task automation) |
-| `base_url` | *string* | `https://ntfy.sh` | Root URL of the ntfy server this message came from |
-| `topic` ❤️ | *string* | `mytopic` | Topic name; **you'll likely want to filter for a specific topic** |
-| `muted` | *bool* | `true` | Indicates whether the subscription was muted in the app |
-| `muted_str` | *string (`true` or `false`)* | `true` | Same as `muted`, but as string `true` or `false` |
-| `time` | *int* | `1635528741` | Message date time, as Unix time stamp |
-| `title` | *string* | `Some title` | Message [title](../publish.md#message-title); may be empty if not set |
-| `message` ❤️ | *string* | `Some message` | Message body; **this is likely what you're interested in** |
-| `tags` | *string* | `tag1,tag2,..` | Comma-separated list of [tags](../publish.md#tags-emojis) |
-| `tags_map` | *string* | `0=tag1,1=tag2,..` | Map of tags to make it easier to map first, second, ... tag |
-| `priority` | *int (between 1-5)* | `4` | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+| Extra name      | Type                         | Example            | Description                                                                        |
+|-----------------|------------------------------|--------------------|------------------------------------------------------------------------------------|
+| `id`            | *String*                     | `bP8dMjO8ig`       | Randomly chosen message identifier (likely not very useful for task automation)    |
+| `base_url`      | *String*                     | `https://ntfy.sh`  | Root URL of the ntfy server this message came from                                 |
+| `topic` ❤️      | *String*                     | `mytopic`          | Topic name; **you'll likely want to filter for a specific topic**                  |
+| `muted`         | *Boolean*                    | `true`             | Indicates whether the subscription was muted in the app                            |
+| `muted_str`     | *String (`true` or `false`)* | `true`             | Same as `muted`, but as string `true` or `false`                                   |
+| `time`          | *Int*                        | `1635528741`       | Message date time, as Unix time stamp                                              |
+| `title`         | *String*                     | `Some title`       | Message [title](../publish.md#message-title); may be empty if not set              |
+| `message` ❤️    | *String*                     | `Some message`     | Message body; **this is likely what you're interested in**                         |
+| `message_bytes` | *ByteArray*                  | `(binary data)`    | Message body as binary data                                                        |
+| `encoding`️     | *String*                     | -                  | Message encoding (empty or "base64")                                               |
+| `tags`          | *String*                     | `tag1,tag2,..`     | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
+| `tags_map`      | *String*                     | `0=tag1,1=tag2,..` | Map of tags to make it easier to map first, second, ... tag                        |
+| `priority`      | *Int (between 1-5)*          | `4`                | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
 
 #### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
@@ -164,14 +166,14 @@ Here's what that looks like:
 
 The following intent extras are supported when for the intent with the `io.heckel.ntfy.SEND_MESSAGE` action:
 
-| Extra name | Required | Type | Example | Description |
-|---|---|---|---|---|
-| `base_url` | - | *string* | `https://ntfy.sh` | Root URL of the ntfy server this message came from, defaults to `https://ntfy.sh` |
-| `topic` ❤️ | ✔ | *string* | `mytopic` | Topic name; **you must set this** |
-| `title` | - | *string* | `Some title` | Message [title](../publish.md#message-title); may be empty if not set |
-| `message` ❤️ | ✔ | *string* | `Some message` | Message body; **you must set this** |
-| `tags` | - | *string* | `tag1,tag2,..` | Comma-separated list of [tags](../publish.md#tags-emojis) |
-| `priority` | - | *string or int (between 1-5)* | `4` | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+| Extra name   | Required | Type                          | Example           | Description                                                                        |
+|--------------|----------|-------------------------------|-------------------|------------------------------------------------------------------------------------|
+| `base_url`   | -        | *String*                      | `https://ntfy.sh` | Root URL of the ntfy server this message came from, defaults to `https://ntfy.sh`  |
+| `topic` ❤️   | ✔        | *String*                      | `mytopic`         | Topic name; **you must set this**                                                  |
+| `title`      | -        | *String*                      | `Some title`      | Message [title](../publish.md#message-title); may be empty if not set              |
+| `message` ❤️ | ✔        | *String*                      | `Some message`    | Message body; **you must set this**                                                |
+| `tags`       | -        | *String*                      | `tag1,tag2,..`    | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
+| `priority`   | -        | *String or Int (between 1-5)* | `4`               | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
 
 ## iPhone/iOS
 I almost feel devious for putting the *Download on the App Store* button on this page. Currently, there is no iOS app

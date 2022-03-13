@@ -1,4 +1,4 @@
-![ntfy](server/static/img/ntfy.png)
+![ntfy](web/public/static/img/ntfy.png)
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)

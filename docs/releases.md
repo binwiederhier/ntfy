@@ -9,6 +9,10 @@ Released XXXXXXXXXXXXXXX
 
 * Support for UnifiedPush 2.0 specification (bytes messages, #130)
 
+**Bug fixes:**
+
+* Display locale-specific times, with AM/PM or 24h format (#140, thanks @hl2guide for reporting)
+
 ## ntfy server v1.17.1
 Released Mar 12, 2022
 

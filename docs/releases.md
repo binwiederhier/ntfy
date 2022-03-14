@@ -2,12 +2,24 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v1.18.0
+Released XXXXXXXXXXXXXXX
+
+**Bug fixes:**
+
+* rpm: do not overwrite server.yaml on package upgrade (#166, thanks @waclaw66 for reporting)
+
+**Deprecations:**
+
+* Removed the ability to run server as `ntfy serve` as per [deprecation](https://ntfy.sh/docs/deprecations)
+
 ## ntfy Android app v1.10.0
 Released XXXXXXXXXXXXXXX
 
 **Features:**
 
 * Support for UnifiedPush 2.0 specification (bytes messages, #130)
+* Export/import settings and subscriptions (#115, thanks @cmeis for reporting)
 
 **Bug fixes:**
 

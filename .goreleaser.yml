@@ -59,12 +59,12 @@ nfpms:
     contents:
       - src: server/server.yml
         dst: /etc/ntfy/server.yml
-        type: config
+        type: "config|noreplace"
       - src: server/ntfy.service
         dst: /lib/systemd/system/ntfy.service
       - src: client/client.yml
         dst: /etc/ntfy/client.yml
-        type: config
+        type: "config|noreplace"
       - src: client/ntfy-client.service
         dst: /lib/systemd/system/ntfy-client.service
       - dst: /var/cache/ntfy

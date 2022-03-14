@@ -30,9 +30,6 @@ func New() *cli.App {
 		Reader:                 os.Stdin,
 		Writer:                 os.Stdout,
 		ErrWriter:              os.Stderr,
-		Action:                 execMainApp,
-		Before:                 initConfigFileInputSource("config", flagsServe), // DEPRECATED, see deprecation notice
-		Flags:                  flagsServe,                                      // DEPRECATED, see deprecation notice
 		Commands: []*cli.Command{
 			// Server commands
 			cmdServe,
@@ -44,12 +41,6 @@ func New() *cli.App {
 			cmdSubscribe,
 		},
 	}
-}
-
-func execMainApp(c *cli.Context) error {
-	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mDeprecation notice: Please run the server using 'ntfy serve'; see 'ntfy -h' for help.\x1b[0m")
-	fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mThis way of running the server will be removed March 2022. See https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
-	return execServe(c)
 }
 
 // initConfigFileInputSource is like altsrc.InitInputSourceWithContext and altsrc.NewYamlSourceFromFlagFunc, but checks

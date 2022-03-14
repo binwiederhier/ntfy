@@ -4,7 +4,13 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 
 ## Active deprecations
 
-### Android app: Using `since=<timestamp>` instead of `since=<id>` 
+### Android app: WebSockets will become the default connection protocol  
+> since 2022-03-13
+
+In future versions of the Android app, instant delivery connections and connections to self-hosted servers will
+be using the WebSockets protocol. This potentially requires [configuration changes in your proxy](https://ntfy.sh/docs/config/#nginxapache2caddy).
+
+### Android app: Using `since=<timestamp>` instead of `since=<id>`
 > since 2022-02-27
 
 In about 3 months, the Android app will start using `since=<id>` instead of `since=<timestamp>`, which means that it will
@@ -12,8 +18,10 @@ not work with servers older than v1.16.0 anymore. This is to simplify handling o
 
 The `since=<timestamp>` endpoint will continue to work. This is merely a notice that the Android app behavior will change.
 
+## Previous deprecations
+
 ### Running server via `ntfy` (instead of `ntfy serve`)
-> since 2021-12-17
+> deprecated 2021-12-17, behavior changed with v1.10.0
 
 As more commands are added to the `ntfy` CLI tool, using just `ntfy` to run the server is not practical
 anymore. Please use `ntfy serve` instead. This also applies to Docker images, as they can also execute more than

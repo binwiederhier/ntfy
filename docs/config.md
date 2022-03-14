@@ -399,8 +399,10 @@ HTTP challenge. I've found [this guide](https://nandovieira.com/using-lets-encry
 be incredibly helpful.
 
 ### nginx/Apache2/caddy
-For your convenience, here's a working config that'll help configure things behind a proxy. In this 
-example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
+For your convenience, here's a working config that'll help configure things behind a proxy. Be sure to **enable WebSockets**
+by forwarding the `Connection` and `Upgrade` headers accordingly. 
+
+In this example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
 
 === "nginx (/etc/nginx/sites-*/ntfy)"

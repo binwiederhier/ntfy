@@ -16,6 +16,27 @@ rsync -a root@laptop /backups/laptop \
   || curl -H tags:warning -H prio:high -d "Laptop backup failed" ntfy.sh/backups
 ```
 
+## Low disk space alerts
+Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but 
+effective. 
+
+``` bash 
+#!/bin/bash
+
+mingigs=10
+avail=$(df | awk '$6 == "/" && $4 < '$mingigs' * 1024*1024 { print $4/1024/1024 }')
+topicurl=https://ntfy.sh/mytopic
+
+if [ -n "$avail" ]; then
+  curl \
+    -d "Only $avail GB available on the root disk. Better clean that up." \
+    -H "Title: Low disk space alert on $(hostname)" \
+    -H "Priority: high" \
+    -H "Tags: warning,cd" \
+    $topicurl
+fi
+```
+
 ## Server-sent messages in your web app
 Just as you can [subscribe to topics in the Web UI](subscribe/web.md), you can use ntfy in your own
 web application. Check out the <a href="/example.html">live example</a> or just look the source of this page.
@@ -92,4 +113,14 @@ services:
 Or, if you only want to send notifications using shoutrrr:
 ```
 shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
+```
+
+## Random cronjobs
+Alright, here's one for the history books. I desperately want the `github.com/ntfy` organization, but all my tickets with
+GitHub have been hopeless. In case it ever becomes available, I want to know immediately.
+
+``` cron
+# Check github/ntfy user
+*/6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
+~           
 ```

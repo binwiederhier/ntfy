@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.11
 	github.com/olebedev/when v0.0.0-20211212231525-59bd4edcf9d6
 	github.com/stretchr/testify v1.7.0
+	github.com/tidwall/gjson v1.14.0
 	github.com/urfave/cli/v2 v2.3.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
@@ -38,6 +39,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d // indirect
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect

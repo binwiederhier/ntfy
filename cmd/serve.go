@@ -34,6 +34,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "app", Usage: "sets web root to landing page (home) or web app (app)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-size-limit", Aliases: []string{"M"}, EnvVars: []string{"NTFY_MESSAGE_SIZE_LIMIT"}, DefaultText: "4K", Usage: "size limit of messages before they are treated as attachments (e.g. 4K, 64K)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
@@ -95,6 +96,7 @@ func execServe(c *cli.Context) error {
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
 	webRoot := c.String("web-root")
+	messageSizeLimitStr := c.String("message-size-limit")
 	smtpSenderAddr := c.String("smtp-sender-addr")
 	smtpSenderUser := c.String("smtp-sender-user")
 	smtpSenderPass := c.String("smtp-sender-pass")
@@ -171,6 +173,12 @@ func execServe(c *cli.Context) error {
 	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
 		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
+	messageSizeLimit, err := parseSize(messageSizeLimitStr, server.DefaultMessageLengthLimit)
+	if err != nil {
+		return err
+	} else if messageSizeLimit > server.MaxMessageLengthLimit {
+		return fmt.Errorf("config option message-size-limit must be lower than %d", server.MaxMessageLengthLimit)
+	}
 
 	// Resolve hosts
 	visitorRequestLimitExemptIPs := make([]string, 0)
@@ -206,6 +214,7 @@ func execServe(c *cli.Context) error {
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.WebRootIsApp = webRootIsApp
+	conf.MessageLimit = int(messageSizeLimit)
 	conf.SMTPSenderAddr = smtpSenderAddr
 	conf.SMTPSenderUser = smtpSenderUser
 	conf.SMTPSenderPass = smtpSenderPass

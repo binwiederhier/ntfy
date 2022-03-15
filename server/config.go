@@ -21,7 +21,8 @@ const (
 // - total topic limit: max number of topics overall
 // - various attachment limits
 const (
-	DefaultMessageLengthLimit       = 4096 // Bytes
+	DefaultMessageLengthLimit       = 4096             // Bytes
+	MaxMessageLengthLimit           = 16 * 1024 * 1024 // 16 MB, sanity size
 	DefaultTotalTopicLimit          = 15000
 	DefaultAttachmentTotalSizeLimit = int64(5 * 1024 * 1024 * 1024) // 5 GB
 	DefaultAttachmentFileSizeLimit  = int64(15 * 1024 * 1024)       // 15 MB

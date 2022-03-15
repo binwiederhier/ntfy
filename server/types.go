@@ -42,6 +42,18 @@ type attachment struct {
 	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
+// publishMessage is used as input when publishing as JSON
+type publishMessage struct {
+	Topic    string `json:"topic"`
+	Title    string `json:"title"`
+	Message  string `json:"message"`
+	Priority string `json:"priority"`
+	Tags     string `json:"tags"`
+	Click    string `json:"click"`
+	Attach   string `json:"attach"`
+	Filename string `json:"filename"`
+}
+
 // messageEncoder is a function that knows how to encode a message
 type messageEncoder func(msg *message) (string, error)
 

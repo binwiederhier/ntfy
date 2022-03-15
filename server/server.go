@@ -263,6 +263,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
+		return s.limitRequests(s.fromMessageJSON(s.authWrite(s.handlePublish)))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
 		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
@@ -1088,6 +1090,47 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests
+		}
+		return next(w, r, v)
+	}
+}
+
+func (s *Server) fromMessageJSON(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		body, err := util.Peak(r.Body, s.config.MessageLimit)
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		var m publishMessage
+		if err := json.NewDecoder(body).Decode(&m); err != nil {
+			return err
+		}
+		if !topicRegex.MatchString(m.Topic) {
+			return errors.New("invalid message")
+		}
+		if m.Message == "" {
+			m.Message = emptyMessageBody
+		}
+		r.URL.Path = "/" + m.Topic
+		r.Body = io.NopCloser(strings.NewReader(m.Message))
+		if m.Title != "" {
+			r.Header.Set("X-Title", m.Title)
+		}
+		if m.Priority != "" {
+			r.Header.Set("X-Priority", m.Priority)
+		}
+		if m.Tags != "" {
+			r.Header.Set("X-Tags", m.Tags)
+		}
+		if m.Attach != "" {
+			r.Header.Set("X-Attach", m.Attach)
+		}
+		if m.Filename != "" {
+			r.Header.Set("X-Filename", m.Filename)
+		}
+		if m.Click != "" {
+			r.Header.Set("X-Click", m.Click)
 		}
 		return next(w, r, v)
 	}

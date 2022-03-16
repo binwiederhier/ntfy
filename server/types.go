@@ -44,14 +44,14 @@ type attachment struct {
 
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
-	Topic    string `json:"topic"`
-	Title    string `json:"title"`
-	Message  string `json:"message"`
-	Priority string `json:"priority"`
-	Tags     string `json:"tags"`
-	Click    string `json:"click"`
-	Attach   string `json:"attach"`
-	Filename string `json:"filename"`
+	Topic    string   `json:"topic"`
+	Title    string   `json:"title"`
+	Message  string   `json:"message"`
+	Priority int      `json:"priority"`
+	Tags     []string `json:"tags"`
+	Click    string   `json:"click"`
+	Attach   string   `json:"attach"`
+	Filename string   `json:"filename"`
 }
 
 // messageEncoder is a function that knows how to encode a message

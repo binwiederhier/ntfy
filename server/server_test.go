@@ -862,6 +862,31 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	require.Equal(t, "this is a unifiedpush text message", m.Message)
 }
 
+func TestServer_PublishAsJSON(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
+		`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4}`
+	response := request(t, s, "PUT", "/", body, nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "mytopic", m.Topic)
+	require.Equal(t, "A message", m.Message)
+	require.Equal(t, "a title\nwith lines", m.Title)
+	require.Equal(t, []string{"tag1", "tag 2"}, m.Tags)
+	require.Equal(t, "http://google.com", m.Attachment.URL)
+	require.Equal(t, "google.pdf", m.Attachment.Name)
+	require.Equal(t, "http://ntfy.sh", m.Click)
+	require.Equal(t, 4, m.Priority)
+}
+
+func TestServer_PublishAsJSON_Invalid(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic",INVALID`
+	response := request(t, s, "PUT", "/", body, nil)
+	require.Equal(t, 400, response.Code)
+}
+
 func TestServer_PublishAttachment(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 	s := newTestServer(t, newTestConfig(t))

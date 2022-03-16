@@ -263,8 +263,6 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.handleHome(w, r)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
-		return s.limitRequests(s.fromMessageJSON(s.authWrite(s.handlePublish)))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
 		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
@@ -279,6 +277,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.handleOptions(w, r)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
+		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
@@ -1095,7 +1095,9 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 	}
 }
 
-func (s *Server) fromMessageJSON(next handleFunc) handleFunc {
+// transformBodyJSON peaks the request body, reads the JSON, and converts it to headers
+// before passing it on to the next handler. This is meant to be used in combination with handlePublish.
+func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		body, err := util.Peak(r.Body, s.config.MessageLimit)
 		if err != nil {
@@ -1104,10 +1106,10 @@ func (s *Server) fromMessageJSON(next handleFunc) handleFunc {
 		defer r.Body.Close()
 		var m publishMessage
 		if err := json.NewDecoder(body).Decode(&m); err != nil {
-			return err
+			return errHTTPBadRequestJSONInvalid
 		}
 		if !topicRegex.MatchString(m.Topic) {
-			return errors.New("invalid message")
+			return errHTTPBadRequestTopicInvalid
 		}
 		if m.Message == "" {
 			m.Message = emptyMessageBody
@@ -1117,11 +1119,11 @@ func (s *Server) fromMessageJSON(next handleFunc) handleFunc {
 		if m.Title != "" {
 			r.Header.Set("X-Title", m.Title)
 		}
-		if m.Priority != "" {
-			r.Header.Set("X-Priority", m.Priority)
+		if m.Priority != 0 {
+			r.Header.Set("X-Priority", fmt.Sprintf("%d", m.Priority))
 		}
-		if m.Tags != "" {
-			r.Header.Set("X-Tags", m.Tags)
+		if m.Tags != nil && len(m.Tags) > 0 {
+			r.Header.Set("X-Tags", strings.Join(m.Tags, ","))
 		}
 		if m.Attach != "" {
 			r.Header.Set("X-Attach", m.Attach)

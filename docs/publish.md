@@ -499,7 +499,7 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
 </td>
 </tr></table>
 
-## Webhooks (Send via GET) 
+## Webhooks (publish via GET) 
 In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
 a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
 like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
@@ -591,6 +591,141 @@ Here's an example with a custom message, tags and a priority:
     ``` php-inline
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
+
+## Publish as JSON
+For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)), 
+adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message 
+as JSON in the request body.
+
+To publish as JSON, simple PUT/POST the JSON object directly to the ntfy root URL. The message format is described below
+the example.
+
+!!! info
+    To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
+    POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect). 
+
+Here's an example using all supported parameters. The `topic` parameter is the only required one:
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+      }'
+    ```
+
+=== "HTTP"
+    ``` http
+    POST / HTTP/1.1
+    Host: ntfy.sh
+
+    {
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh', {
+        method: 'POST',
+        body: JSON.stringify({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        })
+    })
+    ```
+
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // or even just use req.Header.Set() like in the other examples, but for the 
+    // sake of the example, this is easier.
+    
+    body := `{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        })
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "mytopic",
+                "message": "Disk space is low at 5.1 GB",
+                "title": "Low disk space alert",
+                "tags": ["warning","cd"],
+                "priority": 4,
+                "attach": "https://filesrv.lan/space.jpg",
+                "filename": "diskspace.jpg",
+                "click": "https://homecamera.lan/xasds1h2xsSsa/"
+            ])
+        ]
+    ]));
+    ```
+
+The JSON message format closely mirrors the format of the message you can consume when you [subscribe via the API](subscribe/api.md) 
+(see [JSON message format](subscribe/api.md#json-message-format) for details), but is not exactly identical. Here's an overview of
+all the supported fields:
+
+| Field      | Required | Type                             | Example                        | Description                                                           |
+|------------|----------|----------------------------------|--------------------------------|-----------------------------------------------------------------------|
+| `topic`    | ✔️       | *string*                         | `topic1`                       | Target topic name                                                     |
+| `message`  | -        | *string*                         | `Some message`                 | Message body; set to `triggered` if empty or not passed               |
+| `title`    | -        | *string*                         | `Some title`                   | Message [title](#message-title)                                       |
+| `tags`     | -        | *string array*                   | `["tag1","tag2"]`              | List of [tags](#tags-emojis) that may or not map to emojis            |
+| `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                            | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
+| `click`    | -        | *URL*                            | `https://example.com`          | Website opened when notification is [clicked](#click-action)          |
+| `attach`   | -        | *URL*                            | `https://example.com/file.jpg` | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `filename` | -        | *string*                         | `file.jpg`                     | File name of the attachment                                           |
+
 
 ## Click action
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
@@ -756,7 +891,13 @@ This could be a Dropbox link, a file from social media, or any other publicly av
 externally hosted, the expiration or size limits from above do not apply here.
 
 To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
-to specify the attachment URL. It can be any type of file. Here's an example showing how to attach an APK file:
+to specify the attachment URL. It can be any type of file. 
+
+ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a 
+filename `flower.jpg`). To override this filename, you may send the `X-Filename` header or query parameter (or any of its
+aliases `Filename`, `File` or `f`).
+
+Here's an example showing how to attach an APK file:
 
 === "Command line (curl)"
     ```

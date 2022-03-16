@@ -5,25 +5,28 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## ntfy server v1.18.0
 Released XXXXXXXXXXXXXXX
 
+**Features:**
+
+* Publish messages as JSON ([#133](https://github.com/binwiederhier/ntfy/issues/133), thanks [@cmeis](https://github.com/cmeis) for reporting)
+
 **Bug fixes:**
 
-* rpm: do not overwrite server.yaml on package upgrade (#166, thanks @waclaw66 for reporting)
+* rpm: do not overwrite server.yaml on package upgrade ([#166](https://github.com/binwiederhier/ntfy/issues/166), thanks [@waclaw66](https://github.com/waclaw66) for reporting)
 
 **Deprecations:**
 
 * Removed the ability to run server as `ntfy serve` as per [deprecation](https://ntfy.sh/docs/deprecations)
 
-## ntfy Android app v1.10.0
-Released XXXXXXXXXXXXXXX
+## ntfy Android app v1.10.0 (UNRELEASED)
 
 **Features:**
 
-* Support for UnifiedPush 2.0 specification (bytes messages, #130)
-* Export/import settings and subscriptions (#115, thanks @cmeis for reporting)
+* Support for UnifiedPush 2.0 specification (bytes messages, [#130](https://github.com/binwiederhier/ntfy/issues/130))
+* Export/import settings and subscriptions ([#115](https://github.com/binwiederhier/ntfy/issues/115), thanks [@cmeis](https://github.com/cmeis) for reporting)
 
 **Bug fixes:**
 
-* Display locale-specific times, with AM/PM or 24h format (#140, thanks @hl2guide for reporting)
+* Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
 
 ## ntfy server v1.17.1
 Released Mar 12, 2022

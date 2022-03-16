@@ -19,10 +19,11 @@ func main() {
 Try 'ntfy COMMAND --help' or https://ntfy.sh/docs/ for more information.
 
 To report a bug, open an issue on GitHub: https://github.com/binwiederhier/ntfy/issues.
-If you want to chat, simply join the Discord server: https://discord.gg/cT7ECsZj9w.
+If you want to chat, simply join the Discord server (https://discord.gg/cT7ECsZj9w), or
+the Matrix room (https://matrix.to/#/#ntfy:matrix.org).
 
 ntfy %s (%s), runtime %s, built at %s
-Copyright (C) 2021 Philipp C. Heckel, licensed under Apache License 2.0 & GPLv2
+Copyright (C) 2022 Philipp C. Heckel, licensed under Apache License 2.0 & GPLv2
 `, version, commit[:7], runtime.Version(), date)
 
 	app := cmd.New()

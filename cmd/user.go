@@ -25,7 +25,6 @@ var cmdUser = &cli.Command{
 			Aliases:   []string{"a"},
 			Usage:     "Adds a new user",
 			UsageText: "ntfy user add [--role=admin|user] USERNAME",
-			Before:    inheritRootReaderFunc,
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
@@ -46,7 +45,6 @@ Examples:
 			Aliases:   []string{"del", "rm"},
 			Usage:     "Removes a user",
 			UsageText: "ntfy user remove USERNAME",
-			Before:    inheritRootReaderFunc,
 			Action:    execUserDel,
 			Description: `Remove a user from the ntfy user database.
 
@@ -59,7 +57,6 @@ Example:
 			Aliases:   []string{"chp"},
 			Usage:     "Changes a user's password",
 			UsageText: "ntfy user change-pass USERNAME",
-			Before:    inheritRootReaderFunc,
 			Action:    execUserChangePass,
 			Description: `Change the password for the given user.
 
@@ -75,7 +72,6 @@ Example:
 			Aliases:   []string{"chr"},
 			Usage:     "Changes the role of a user",
 			UsageText: "ntfy user change-role USERNAME ROLE",
-			Before:    inheritRootReaderFunc,
 			Action:    execUserChangeRole,
 			Description: `Change the role for the given user to admin or user.
 
@@ -97,7 +93,6 @@ Example:
 			Name:    "list",
 			Aliases: []string{"l"},
 			Usage:   "Shows a list of users",
-			Before:  inheritRootReaderFunc,
 			Action:  execUserList,
 			Description: `Shows a list of all configured users, including the everyone ('*') user.
 
@@ -274,15 +269,4 @@ func userCommandFlags() []cli.Flag {
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	}
-}
-
-// inheritRootReaderFunc is a workaround for a urfave/cli bug that makes subcommands not inherit the App.Reader.
-// This bug was fixed in master, but not in v2.3.0.
-func inheritRootReaderFunc(ctx *cli.Context) error {
-	for _, c := range ctx.Lineage() {
-		if c.App != nil && c.App.Reader != nil {
-			ctx.App.Reader = c.App.Reader
-		}
-	}
-	return nil
 }

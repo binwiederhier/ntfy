@@ -13,6 +13,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes:**
 
 * Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
+
+## ntfy server v1.19.0 (UNRELEASED)
+
+**Bug fixes:**
+
+* Fix install instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+
 -->
 
 ## ntfy server v1.18.0
@@ -32,7 +39,7 @@ Released Mar 16, 2022
 
 **Deprecations:**
 
-* Removed the ability to run server as `ntfy serve` as per [deprecation](deprecations.md)
+* Removed the ability to run server as `ntfy` (as opposed to `ntfy serve`) as per [deprecation](deprecations.md)
 
 ## ntfy server v1.17.1
 Released Mar 12, 2022

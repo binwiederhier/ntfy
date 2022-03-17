@@ -27,22 +27,28 @@ deb/rpm packages.
 === "x86_64/amd64"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.0/ntfy_1.18.0_linux_x86_64.tar.gz
-    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy serve
+    tar zxvf ntfy_1.18.0_linux_x86_64.tar.gz
+    sudo cp -a ntfy_1.18.0_linux_x86_64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.0_linux_x86_64/{client,server}/*.yml /etc/ntfy
+    sudo ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.0/ntfy_1.18.0_linux_armv7.tar.gz
-    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy serve
+    tar zxvf ntfy_1.18.0_linux_armv7.tar.gz
+    sudo cp -a ntfy_1.18.0_linux_armv7/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.0_linux_armv7/{client,server}/*.yml /etc/ntfy
+    sudo ntfy serve
     ```
 
 === "arm64"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.0/ntfy_1.18.0_linux_arm64.tar.gz
-    sudo tar -C /usr/bin -zxf ntfy_*.tar.gz ntfy
-    sudo ./ntfy serve
+    tar zxvf ntfy_1.18.0_linux_arm64.tar.gz
+    sudo cp -a ntfy_1.18.0_linux_arm64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.0_linux_arm64/{client,server}/*.yml /etc/ntfy
+    sudo ntfy serve
     ```
 
 ## Debian/Ubuntu repository

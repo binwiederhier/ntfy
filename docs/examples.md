@@ -124,3 +124,9 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 */6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
 ~           
 ```
+
+## Download notifications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd)
+
+It's possible to use custom scripts for all the *arr services, plus SABnzbd. Notifications for downloads, warnings, grabs etc.
+
+Some simple bash scripts to achieve this are available <a href="https://github.com/nickexyz/ntfy-shellscripts">here</a>

@@ -2,23 +2,6 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v1.18.0
-Released Mar 16, 2022
-
-**Features:**
-
-* Publish messages as JSON ([#133](https://github.com/binwiederhier/ntfy/issues/133), thanks [@cmeis](https://github.com/cmeis) for reporting)
-
-**Bug fixes:**
-
-* rpm: do not overwrite server.yaml on package upgrade ([#166](https://github.com/binwiederhier/ntfy/issues/166), thanks [@waclaw66](https://github.com/waclaw66) for reporting)
-* Typo in [ntfy.sh/announcements](https://ntfy.sh/announcements) topic ([#170](https://github.com/binwiederhier/ntfy/pull/170), thanks to [@sandebert](https://github.com/sandebert))
-* Readme image URL fixes ([#156](https://github.com/binwiederhier/ntfy/pull/156), thanks to [@ChaseCares](https://github.com/ChaseCares))
-
-**Deprecations:**
-
-* Removed the ability to run server as `ntfy serve` as per [deprecation](deprecations.md)
-
 <!--
 ## ntfy Android app v1.10.0 (UNRELEASED)
 
@@ -31,6 +14,26 @@ Released Mar 16, 2022
 
 * Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
 -->
+
+## ntfy server v1.18.0
+Released Mar 16, 2022
+
+**Features:**
+
+* [Publish messages as JSON](https://ntfy.sh/docs/publish/#publish-as-json) ([#133](https://github.com/binwiederhier/ntfy/issues/133), 
+  thanks [@cmeis](https://github.com/cmeis) for reporting, thanks to [@Joeharrison94](https://github.com/Joeharrison94) and 
+  [@Fallenbagel](https://github.com/Fallenbagel) for testing)
+
+**Bug fixes:**
+
+* rpm: do not overwrite server.yaml on package upgrade ([#166](https://github.com/binwiederhier/ntfy/issues/166), thanks [@waclaw66](https://github.com/waclaw66) for reporting)
+* Typo in [ntfy.sh/announcements](https://ntfy.sh/announcements) topic ([#170](https://github.com/binwiederhier/ntfy/pull/170), thanks to [@sandebert](https://github.com/sandebert))
+* Readme image URL fixes ([#156](https://github.com/binwiederhier/ntfy/pull/156), thanks to [@ChaseCares](https://github.com/ChaseCares))
+
+**Deprecations:**
+
+* Removed the ability to run server as `ntfy serve` as per [deprecation](deprecations.md)
+
 ## ntfy server v1.17.1
 Released Mar 12, 2022
 

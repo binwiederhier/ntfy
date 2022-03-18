@@ -36,6 +36,11 @@ Here's an example showing how to publish a simple message using a POST request:
         strings.NewReader("Backup successful 😀"))
     ```
 
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/topic -Body "Backup successful 😀" -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/mytopic", 
@@ -117,6 +122,16 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 	http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/phil_alerts"
+    $headers = @{ Title="Unauthorized access detected"
+                  Priority="urgent"
+                  Tags="warning,skull" }
+    $body = "Remote access to phils-laptop detected. Act right away."              
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+    
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/phil_alerts",
@@ -191,6 +206,14 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/controversial"
+    $headers = @{ Title="Dogs are better than cats" }
+    $body = "Oh my ..."
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/controversial",
@@ -222,13 +245,13 @@ notification sounds and vibration patterns on your phone to map to these priorit
 
 The following priorities exist:
 
-| Priority | Icon | ID | Name | Description |
-|---|---|---|---|---|
-| Max priority | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. |
-| High priority | ![min priority](static/img/priority-4.svg) | `4` | `high` | Long vibration burst, default notification sound with a pop-over notification. |
-| **Default priority** | *(none)* | `3` | `default` | Short default vibration and sound. Default notification behavior. |
-| Low priority | ![min priority](static/img/priority-2.svg) |`2` | `low` | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
-| Min priority | ![min priority](static/img/priority-1.svg) | `1` | `min` | No vibration or sound. The notification will be under the fold in "Other notifications". |
+| Priority             | Icon                                       | ID  | Name           | Description                                                                                            |
+|----------------------|--------------------------------------------|-----|----------------|--------------------------------------------------------------------------------------------------------|
+| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification.                 |
+| High priority        | ![min priority](static/img/priority-4.svg) | `4` | `high`         | Long vibration burst, default notification sound with a pop-over notification.                         |
+| **Default priority** | *(none)*                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
+| Low priority         | ![min priority](static/img/priority-2.svg) | `2` | `low`          | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
+| Min priority         | ![min priority](static/img/priority-1.svg) | `1` | `min`          | No vibration or sound. The notification will be under the fold in "Other notifications".               |
 
 You can set the priority with the header `X-Priority` (or any of its aliases: `Priority`, `prio`, or `p`).
 
@@ -271,6 +294,14 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/phil_alerts"
+    $headers = @{ Priority="5" }
+    $body = "An urgent message"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+    
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/phil_alerts",
@@ -382,6 +413,14 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/backups"
+    $headers = @{ Tags="warning,mailsrv13,daily-backup" }
+    $body = "Backup of mailsrv13 failed"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/backups",
@@ -464,6 +503,14 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/hello"
+    $headers = @{ At="tomorrow, 10am" }
+    $body = "Good morning"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+    
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/hello",
@@ -538,6 +585,11 @@ For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhoo
     http.Get("https://ntfy.sh/mywebhook/trigger")
     ```
 
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/trigger"
+    ```    
+
 === "Python"
     ``` python
     requests.get("https://ntfy.sh/mywebhook/trigger")
@@ -580,6 +632,11 @@ Here's an example with a custom message, tags and a priority:
 === "Go"
     ``` go
     http.Get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
     ```
 
 === "Python"
@@ -673,6 +730,22 @@ Here's an example using all supported parameters. The `topic` parameter is the o
     }`
     req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
     http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh"
+    $body = @{
+            "topic"="powershell"
+            "title"="Low disk space alert"
+            "message"="Disk space is low at 5.1 GB"
+            "priority"=4
+            "attach"="https://filesrv.lan/space.jpg"
+            "filename"="diskspace.jpg"
+            "tags"=@("warning","cd")
+            "click"= "https://homecamera.lan/xasds1h2xsSsa/"
+          } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
@@ -772,6 +845,14 @@ Here's an example that will open Reddit when the notification is clicked:
     req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
     req.Header.Set("Click", "https://www.reddit.com/message/messages")
     http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/reddit_alerts"
+    $headers = @{ Click="https://www.reddit.com/message/messages" }
+    $body = "New messages on Reddit"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
@@ -936,6 +1017,13 @@ Here's an example showing how to attach an APK file:
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/mydownloads"
+    $headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.put("https://ntfy.sh/mydownloads",
@@ -1023,6 +1111,17 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     req.Header.Set("Tags", "warning,skull,backup-host,ssh-login")
     req.Header.Set("Priority", "high")
     http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/alerts"
+    $headers = @{ Title"="Low disk space alert"
+                  Priority="high"
+                  Tags="warning,skull,backup-host,ssh-login")
+                  Email="phil@example.com" }
+    $body = "Unknown login from 5.31.23.83 to backups.example.com"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -UseBasicParsing
     ```
 
 === "Python"
@@ -1135,6 +1234,14 @@ Here's a simple example:
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.example.com/mysecrets"
+    $headers = @{ Authorization="Basic cGhpbDpteXBhc3M=" }
+    $body = "Look ma, with auth"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.post("https://ntfy.example.com/mysecrets",
@@ -1210,6 +1317,14 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     http.DefaultClient.Do(req)
     ```
 
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/mytopic"
+    $headers = @{ Cache="no" }
+    $body = "This message won't be stored server-side"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    ```
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/mytopic",
@@ -1280,6 +1395,14 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be forwarded to FCM"))
     req.Header.Set("Firebase", "no")
     http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/mytopic"
+    $headers = @{ Firebase="no" }
+    $body = "This message won't be forwarded to FCM"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
     ```
 
 === "Python"

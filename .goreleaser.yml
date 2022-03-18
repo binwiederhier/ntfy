@@ -4,7 +4,7 @@ before:
     - go mod tidy
 builds:
   -
-    id: ntfy
+    id: ntfy_amd64
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3

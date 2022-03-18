@@ -22,8 +22,7 @@
     "react-router-dom": "^6.2.2",
     "react-scripts": "^5.0.0",
     "stacktrace-gps": "^3.0.4",
-    "stacktrace-js": "^2.0.2",
-    "svgo": "^2.8.0"
+    "stacktrace-js": "^2.0.2"
   },
   "browserslist": {
     "production": [

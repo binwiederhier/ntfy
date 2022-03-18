@@ -16,9 +16,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.19.0 (UNRELEASED)
 
-**Bug fixes:**
+**Bug fixes &amp; documentation:**
 
 * Fix install instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+* Additional examples (thanks to [@nickexyz](https://github.com/nickexyz))
 
 -->
 

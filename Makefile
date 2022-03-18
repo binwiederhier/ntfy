@@ -3,9 +3,33 @@ VERSION := $(shell git describe --tag)
 .PHONY:
 
 help:
-	@echo "Typical commands:"
+	@echo "Typical commands (more see below):"
+	@echo "  make build                   - Build web app, documentation and server/client (sloowwww)"
+	@echo "  make server-amd64            - Build server/client binary (amd64, no web app or docs)"
+	@echo "  make install-amd64           - Install ntfy binary to /usr/bin/ntfy (amd64)"
+	@echo "  make web                     - Build the web app"
+	@echo "  make docs                    - Build the documentation"
 	@echo "  make check                   - Run all tests, vetting/formatting checks and linters"
-	@echo "  make build-snapshot install  - Build latest and install to local system"
+	@echo
+	@echo "Build everything:"
+	@echo "  make build                   - Build web app, documentation and server/client"
+	@echo "  make clean                   - Clean build/dist folders"
+	@echo
+	@echo "Build server & client (not release version):"
+	@echo "  make server                  - Build server & client (all architectures)"
+	@echo "  make server-amd64            - Build server & client (amd64 only)"
+	@echo "  make server-armv7            - Build server & client (armv7 only)"
+	@echo "  make server-arm64            - Build server & client (arm64 only)"
+	@echo
+	@echo "Build web app:"
+	@echo "  make web                     - Build the web app"
+	@echo "  make web-deps                - Install web app dependencies (npm install the universe)"
+	@echo "  make web-build               - Actually build the web app"
+	@echo
+	@echo "Build documentation:"
+	@echo "  make docs                    - Build the documentation"
+	@echo "  make docs-deps               - Install Python dependencies (pip3 install)"
+	@echo "  make docs-build              - Actually build the documentation"
 	@echo
 	@echo "Test/check:"
 	@echo "  make test                    - Run tests"
@@ -21,33 +45,30 @@ help:
 	@echo "  make lint                    - Run 'golint'"
 	@echo "  make staticcheck             - Run 'staticcheck'"
 	@echo
-	@echo "Build main client/server:"
-	@echo "  make build                   - Build (using goreleaser, requires clean repo)"
-	@echo "  make build-snapshot          - Build snapshot (using goreleaser, dirty repo)"
-	@echo "  make build-simple            - Quick & dirty build (using go build, without goreleaser)"
-	@echo "  make clean                   - Clean build folder"
-	@echo
-	@echo "Build web app:"
-	@echo "  make web                     - Build the web app"
-	@echo "  make web-deps                - Install web app dependencies (npm install the universe)"
-	@echo "  make web-build               - Actually build the web app"
-	@echo
-	@echo "Build documentation:"
-	@echo "  make docs                     - Build the documentation"
-	@echo "  make docs-deps                - Install Python dependencies (pip3 install)"
-	@echo "  make docs-build               - Actually build the documentation"
-	@echo
-	@echo "Releasing (requires goreleaser):"
+	@echo "Releasing:"
 	@echo "  make release                 - Create a release"
 	@echo "  make release-snapshot        - Create a test release"
 	@echo
 	@echo "Install locally (requires sudo):"
-	@echo "  make install                 - Copy binary from dist/ to /usr/bin"
-	@echo "  make install-deb             - Install .deb from dist/"
-	@echo "  make install-lint            - Install golint"
+	@echo "  make install-amd64           - Copy amd64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-armv7           - Copy armv7 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-arm64           - Copy arm64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-deb-amd64       - Install .deb from dist/ (amd64 only)"
+	@echo "  make install-deb-armv7       - Install .deb from dist/ (armv7 only)"
+	@echo "  make install-deb-arm64       - Install .deb from dist/ (arm64 only)"
+
+
+# Building everything
+
+clean: .PHONY
+	rm -rf dist build server/docs server/site
+
+build: web docs server
 
 
 # Documentation
+
+docs: docs-deps docs-build
 
 docs-deps: .PHONY
 	pip3 install -r requirements.txt
@@ -55,15 +76,14 @@ docs-deps: .PHONY
 docs-build: .PHONY
 	mkdocs build
 
-docs: docs-deps docs-build
-
 
 # Web app
 
+web: web-deps web-build
+
 web-deps:
-	cd web \
-		&& npm install \
-		&& node_modules/svgo/bin/svgo src/img/*.svg
+	cd web && npm install
+	# If this fails for .svg files, optimizes them with svgo
 
 web-build:
 	cd web \
@@ -75,7 +95,37 @@ web-build:
 			../server/site/config.js \
 			../server/site/asset-manifest.json
 
-web: web-deps web-build
+
+# Main server/client build
+
+server: server-deps
+	goreleaser build --snapshot --rm-dist --debug
+
+server-amd64: server-deps-static-sites
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_amd64
+
+server-armv7: server-deps-static-sites server-deps-gcc-armv7
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_armv7
+
+server-arm64: server-deps-static-sites server-deps-gcc-arm64
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_arm64
+
+server-deps: server-deps-static-sites server-deps-all server-deps-gcc
+
+server-deps-gcc: server-deps-gcc-armv7 server-deps-gcc-arm64
+
+server-deps-static-sites:
+	mkdir -p server/docs server/site
+	touch server/docs/index.html server/site/app.html
+
+server-deps-all:
+	which upx || { echo "ERROR: upx not installed. On Ubuntu, run: apt install upx"; exit 1; }
+
+server-deps-gcc-armv7:
+	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
+
+server-deps-gcc-arm64:
+	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
 
 # Test/check targets
@@ -126,34 +176,15 @@ staticcheck: .PHONY
 	rm -rf build/staticcheck
 
 
-# Building targets
-
-build-deps: docs web
-	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/v7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
-	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
-
-build: build-deps
-	goreleaser build --rm-dist --debug
-
-build-snapshot: build-deps
-	goreleaser build --snapshot --rm-dist --debug
-
-build-simple: .PHONY
-	mkdir -p dist/ntfy_linux_amd64 server/docs server/site
-	touch server/docs/index.html
-	touch server/site/app.html
-	export CGO_ENABLED=1
-	go build \
-		-o dist/ntfy_linux_amd64/ntfy \
-		-tags sqlite_omit_load_extension,osusergo,netgo \
-		-ldflags \
-		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
-
-clean: .PHONY
-	rm -rf dist build server/docs server/site
-
-
 # Releasing targets
+
+release: release-deps
+	goreleaser release --rm-dist --debug
+
+release-snapshot: release-deps
+	goreleaser release --snapshot --skip-publish --rm-dist --debug
+
+release-deps: clean server-deps release-check-tags docs web check
 
 release-check-tags:
 	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))
@@ -161,29 +192,35 @@ release-check-tags:
 	 	echo "ERROR: Must update docs/install.md with latest tag first.";\
 	 	exit 1;\
 	fi
-	if grep -q XXXXX docs/releases.md; then\
-		echo "ERROR: Must update docs/releases.md, found XXXXX.";\
-		exit 1;\
-	fi
 	if ! grep -q $(LATEST_TAG) docs/releases.md; then\
 		echo "ERROR: Must update docs/releases.mdwith latest tag first.";\
 		exit 1;\
 	fi
 
-release: build-deps release-check-tags check
-	goreleaser release --rm-dist --debug
-
-release-snapshot: build-deps
-	goreleaser release --snapshot --skip-publish --rm-dist --debug
-
 
 # Installing targets
 
-install:
-	sudo rm -f /usr/bin/ntfy
-	sudo cp -a dist/ntfy_linux_amd64/ntfy /usr/bin/ntfy
+install-amd64: remove-binary
+	sudo cp -a dist/ntfy_amd64_linux_amd64/ntfy /usr/bin/ntfy
 
-install-deb:
+install-armv7: remove-binary
+	sudo cp -a dist/ntfy_armv7_linux_armv7/ntfy /usr/bin/ntfy
+
+install-arm64: remove-binary
+	sudo cp -a dist/ntfy_arm64_linux_arm64/ntfy /usr/bin/ntfy
+
+remove-binary:
+	sudo rm -f /usr/bin/ntfy
+
+install-amd64-deb: purge-package
+	sudo dpkg -i dist/ntfy_*_linux_amd64.deb
+
+install-armv7-deb: purge-package
+	sudo dpkg -i dist/ntfy_*_linux_armv7.deb
+
+install-arm64-deb: purge-package
+	sudo dpkg -i dist/ntfy_*_linux_arm64.deb
+
+purge-package:
 	sudo systemctl stop ntfy || true
 	sudo apt-get purge ntfy || true
-	sudo dpkg -i dist/ntfy_*_linux_amd64.deb

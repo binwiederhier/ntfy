@@ -8,6 +8,10 @@
     width: unset !important;
 }
 
+.md-sidebar {
+    width: 12.5rem !important;
+}
+
 .md-typeset h4 {
     font-weight: 500 !important;
     margin: 0 !important;

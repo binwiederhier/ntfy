@@ -1,6 +1,7 @@
 before:
   hooks:
     - go mod download
+    - go mod tidy
 builds:
   -
     id: ntfy
@@ -12,6 +13,9 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [amd64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
   -
     id: ntfy_armv7
     binary: ntfy
@@ -24,6 +28,9 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [7]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
   -
     id: ntfy_arm64
     binary: ntfy
@@ -35,6 +42,9 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [arm64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
 nfpms:
   -
     package_name: ntfy
@@ -47,12 +57,26 @@ nfpms:
       - rpm
     bindir: /usr/bin
     contents:
-      - src: config/config.yml
-        dst: /etc/ntfy/config.yml
-        type: config
-      - src: config/ntfy.service
+      - src: server/server.yml
+        dst: /etc/ntfy/server.yml
+        type: "config|noreplace"
+      - src: server/ntfy.service
         dst: /lib/systemd/system/ntfy.service
+      - src: client/client.yml
+        dst: /etc/ntfy/client.yml
+        type: "config|noreplace"
+      - src: client/ntfy-client.service
+        dst: /lib/systemd/system/ntfy-client.service
+      - dst: /var/cache/ntfy
+        type: dir
+      - dst: /var/cache/ntfy/attachments
+        type: dir
+      - dst: /var/lib/ntfy
+        type: dir
+      - dst: /usr/share/ntfy/logo.png
+        src: web/public/static/img/ntfy.png
     scripts:
+      preinstall: "scripts/preinst.sh"
       postinstall: "scripts/postinst.sh"
       preremove: "scripts/prerm.sh"
       postremove: "scripts/postrm.sh"
@@ -62,8 +86,10 @@ archives:
     files:
       - LICENSE
       - README.md
-      - config/config.yml
-      - config/ntfy.service
+      - server/server.yml
+      - server/ntfy.service
+      - client/client.yml
+      - client/ntfy-client.service
     replacements:
       386: i386
       amd64: x86_64
@@ -89,6 +115,7 @@ dockers:
       - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
     use: buildx
     dockerfile: Dockerfile
+    goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
   - image_templates:

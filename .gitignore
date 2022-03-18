@@ -1,5 +1,9 @@
 dist/
+build/
 .idea/
-site/
 server/docs/
+server/site/
+tools/fbsend/fbsend
+playground/
 *.iml
+node_modules/

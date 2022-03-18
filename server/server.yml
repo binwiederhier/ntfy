@@ -1,0 +1,164 @@
+# ntfy server config file
+
+# Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
+# This setting is currently only used by the attachments and e-mail sending feature (outgoing mail only).
+#
+# base-url:
+
+# Listen address for the HTTP & HTTPS web server. If "listen-https" is set, you must also
+# set "key-file" and "cert-file". Format: [<ip>]:<port>, e.g. "1.2.3.4:8080".
+#
+# To listen on all interfaces, you may omit the IP address, e.g. ":443".
+# To disable HTTP, set "listen-http" to "-".
+#
+# listen-http: ":80"
+# listen-https:
+
+# Listen on a Unix socket, e.g. /var/lib/ntfy/ntfy.sock
+# This can be useful to avoid port issues on local systems, and to simplify permissions.
+#
+# listen-unix: <socket-path>
+
+# Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
+#
+# key-file: <filename>
+# cert-file: <filename>
+
+# If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app.
+# This is optional and only required to save battery when using the Android app.
+#
+# firebase-key-file: <filename>
+
+# If set, messages are cached in a local SQLite database instead of only in-memory. This
+# allows for service restarts without losing messages in support of the since= parameter.
+#
+# The "cache-duration" parameter defines the duration for which messages will be buffered
+# before they are deleted. This is required to support the "since=..." and "poll=1" parameter.
+# To disable the cache entirely (on-disk/in-memory), set "cache-duration" to 0.
+# The cache file is created automatically, provided that the correct permissions are set.
+#
+# Debian/RPM package users:
+#   Use /var/cache/ntfy/cache.db as cache file to avoid permission issues. The package
+#   creates this folder for you.
+#
+# Check your permissions:
+#   If you are running ntfy with systemd, make sure this cache file is owned by the
+#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#
+# cache-file: <filename>
+# cache-duration: "12h"
+
+# If set, access to the ntfy server and API can be controlled on a granular level using
+# the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.
+#
+# - auth-file is the SQLite user/access database; it is created automatically if it doesn't already exist
+# - auth-default-access defines the default/fallback access if no access control entry is found; it can be
+#   set to "read-write" (default), "read-only", "write-only" or "deny-all".
+#
+# Debian/RPM package users:
+#   Use /var/lib/ntfy/user.db as user database to avoid permission issues. The package
+#   creates this folder for you.
+#
+# Check your permissions:
+#   If you are running ntfy with systemd, make sure this user database file is owned by the
+#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#
+# auth-file: <filename>
+# auth-default-access: "read-write"
+
+# If set, the X-Forwarded-For header is used to determine the visitor IP address
+# instead of the remote address of the connection.
+#
+# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
+#          as if they are one.
+#
+# behind-proxy: false
+
+# If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
+# are "attachment-cache-dir" and "base-url".
+#
+# - attachment-cache-dir is the cache directory for attached files
+# - attachment-total-size-limit is the limit of the on-disk attachment cache directory (total size)
+# - attachment-file-size-limit is the per-file attachment size limit (e.g. 300k, 2M, 100M)
+# - attachment-expiry-duration is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h)
+#
+# attachment-cache-dir:
+# attachment-total-size-limit: "5G"
+# attachment-file-size-limit: "15M"
+# attachment-expiry-duration: "3h"
+
+# If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
+# messages will additionally be sent out as e-mail using an external SMTP server. As of today, only
+# SMTP servers with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
+# below (visitor-email-limit-burst & visitor-email-limit-burst).
+#
+# - smtp-sender-addr is the hostname:port of the SMTP server
+# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user
+# - smtp-sender-from is the e-mail address of the sender
+#
+# smtp-sender-addr:
+# smtp-sender-user:
+# smtp-sender-pass:
+# smtp-sender-from:
+
+# If enabled, ntfy will launch a lightweight SMTP server for incoming messages. Once configured, users can send
+# emails to a topic e-mail address to publish messages to a topic.
+#
+# - smtp-server-listen defines the IP address and port the SMTP server will listen on, e.g. :25 or 1.2.3.4:25
+# - smtp-server-domain is the e-mail domain, e.g. ntfy.sh
+# - smtp-server-addr-prefix is an optional prefix for the e-mail addresses to prevent spam. If set to "ntfy-",
+#   for instance, only e-mails to ntfy-$topic@ntfy.sh will be accepted. If this is not set, all emails to
+#   $topic@ntfy.sh will be accepted (which may obviously be a spam problem).
+#
+# smtp-server-listen:
+# smtp-server-domain:
+# smtp-server-addr-prefix:
+
+# Interval in which keepalive messages are sent to the client. This is to prevent
+# intermediaries closing the connection for inactivity.
+#
+# Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.
+#
+# keepalive-interval: "45s"
+
+# Interval in which the manager prunes old messages, deletes topics
+# and prints the stats.
+#
+# manager-interval: "1m"
+
+# Defines if the root route (/) is pointing to the landing page (as on ntfy.sh) or the
+# web app. If you self-host, you don't want to change this. Can be "app" (default) or "home".
+#
+# web-root: app
+
+# Rate limiting: Total number of topics before the server rejects new topics.
+#
+# global-topic-limit: 15000
+
+# Rate limiting: Number of subscriptions per visitor (IP address)
+#
+# visitor-subscription-limit: 30
+
+# Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
+# - visitor-request-limit-burst is the initial bucket of requests each visitor has
+# - visitor-request-limit-replenish is the rate at which the bucket is refilled
+# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames and IPs to be
+#   exempt from request rate limiting; hostnames are resolved at the time the server is started
+#
+# visitor-request-limit-burst: 60
+# visitor-request-limit-replenish: "5s"
+# visitor-request-limit-exempt-hosts: ""
+
+# Rate limiting: Allowed emails per visitor:
+# - visitor-email-limit-burst is the initial bucket of emails each visitor has
+# - visitor-email-limit-replenish is the rate at which the bucket is refilled
+#
+# visitor-email-limit-burst: 16
+# visitor-email-limit-replenish: "1h"
+
+# Rate limiting: Attachment size and bandwidth limits per visitor:
+# - visitor-attachment-total-size-limit is the total storage limit used for attachments per visitor
+# - visitor-attachment-daily-bandwidth-limit is the total daily attachment download/upload traffic limit per visitor
+#
+# visitor-attachment-total-size-limit: "100M"
+# visitor-attachment-daily-bandwidth-limit: "500M"

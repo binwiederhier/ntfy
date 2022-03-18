@@ -1,0 +1,40 @@
+# ntfy client config file
+
+# Base URL used to expand short topic names in the "ntfy publish" and "ntfy subscribe" commands.
+# If you self-host a ntfy server, you'll likely want to change this.
+#
+# default-host: https://ntfy.sh
+
+# Subscriptions to topics and their actions. This option is primarily used by the systemd service,
+# or if you cann "ntfy subscribe --from-config" directly.
+#
+# Example:
+#     subscribe:
+#       - topic: mytopic
+#         command: /usr/local/bin/mytopic-triggered.sh
+#       - topic: myserver.com/anothertopic
+#         command: 'echo "$message"'
+#         if:
+#             priority: high,urgent
+#       - topic: secret
+#         command: 'notify-send "$m"'
+#         user: phill
+#         password: mypass
+#
+# Variables:
+#     Variable        Aliases               Description
+#     --------------- --------------------- -----------------------------------
+#     $NTFY_ID        $id                   Unique message ID
+#     $NTFY_TIME      $time                 Unix timestamp of the message delivery
+#     $NTFY_TOPIC     $topic                Topic name
+#     $NTFY_MESSAGE   $message, $m          Message body
+#     $NTFY_TITLE     $title, $t            Message title
+#     $NTFY_PRIORITY  $priority, $prio, $p  Message priority (1=min, 5=max)
+#     $NTFY_TAGS      $tags, $tag, $ta      Message tags (comma separated list)
+#     $NTFY_RAW       $raw                  Raw JSON message
+#
+# Filters ('if:'):
+#     You can filter 'message', 'title', 'priority' (comma-separated list, logical OR)
+#     and 'tags' (comma-separated list, logical AND). See https://ntfy.sh/docs/subscribe/api/#filter-messages.
+#
+# subscribe:

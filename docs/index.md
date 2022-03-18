@@ -22,12 +22,18 @@ For this guide, we'll just use `mytopic` as our topic name:
 That's it. After you tap "Subscribe", the app is listening for new messages on that topic.
 
 ## Step 2: Send a message
-Now let's [send a message](publish.md) to our topic. It's easy in every language, since we're just using HTTP PUT or POST. The message
-is in the request body. Here's an example showing how to publish a simple message using a POST request:
+Now let's [send a message](publish.md) to our topic. It's easy in every language, since we're just using HTTP PUT/POST,
+or with the [ntfy CLI](install.md). The message is in the request body. Here's an example showing how to publish a 
+simple message using a POST request:
 
 === "Command line (curl)"
     ```
     curl -d "Backup successful 😀" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish mytopic "Backup successful 😀"
     ```
 
 === "HTTP"
@@ -52,6 +58,12 @@ is in the request body. Here's an example showing how to publish a simple messag
        strings.NewReader("Backup successful 😀"))
     ```
 
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic",
+        data="Backup successful 😀".encode(encoding='utf-8'))
+    ```
+
 === "PHP"
     ``` php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
@@ -66,7 +78,7 @@ is in the request body. Here's an example showing how to publish a simple messag
 This will create a notification that looks like this:
 
 <figure markdown>
-  ![basic notification](static/img/basic-notification.png){ width=500 }
+  ![basic notification](static/img/android-screenshot-basic-notification.png){ width=500 }
   <figcaption>Android notification</figcaption>
 </figure>
 
@@ -76,7 +88,7 @@ That's it. You're all set. Go play and read the rest of the docs. I highly recom
 Here's another video showing the entire process:
 
 <figure>
-  <video controls muted autoplay loop width="650" src="static/img/overview.mp4"></video>
+  <video controls muted autoplay loop width="650" src="static/img/android-video-overview.mp4"></video>
   <figcaption>Sending push notifications to your Android phone</figcaption>
 </figure>
 

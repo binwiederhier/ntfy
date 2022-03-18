@@ -1,0 +1,280 @@
+/* general styling */
+
+html, body {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 1.1em;
+    color: #444;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    /* prevent scrollbar from repositioning website:
+     * https://www.w3docs.com/snippets/css/how-to-prevent-scrollbar-from-repositioning-web-page.html */
+    overflow-y: scroll;
+}
+
+a, a:visited {
+    color: #3a9784;
+}
+
+a:hover {
+    text-decoration: none;
+    color: #317f6f;
+}
+
+h1 {
+    margin-top: 35px;
+    margin-bottom: 30px;
+    font-size: 2.5em;
+    word-wrap: break-word; /* For very long topics */
+    padding-right: 40px; /* For the X on the detail page */
+    font-weight: 300;
+    color: #666;
+}
+
+h2 {
+    margin-top: 30px;
+    margin-bottom: 5px;
+    font-size: 1.8em;
+    font-weight: 300;
+    color: #333;
+}
+
+h3 {
+    margin-top: 25px;
+    margin-bottom: 5px;
+    font-size: 1.3em;
+    font-weight: 300;
+    color: #333;
+}
+
+p {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    line-height: 160%;
+    font-weight: 400;
+}
+
+p.smallMarginBottom {
+    margin-bottom: 10px;
+}
+
+b {
+    font-weight: 500;
+}
+
+tt {
+    background: #eee;
+    padding: 2px 7px;
+    border-radius: 3px;
+}
+
+code {
+    display: block;
+    background: #eee;
+    font-family: monospace;
+    padding: 20px;
+    border-radius: 3px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+/* Main page */
+
+#main {
+    max-width: 900px;
+    margin: 0 auto 50px auto;
+    padding: 0 10px;
+}
+
+#error {
+    color: darkred;
+    font-style: italic;
+}
+
+#ironicCenterTagDontFreakOut {
+    color: #666;
+}
+
+/* Anchors */
+
+.anchor .anchorLink {
+    color: #ccc;
+    text-decoration: none;
+    padding: 0 5px;
+    visibility: hidden;
+}
+
+.anchor:hover .anchorLink {
+    visibility: visible;
+}
+
+.anchor .anchorLink:hover {
+    color: #3a9784;
+    visibility: visible;
+}
+
+/* Figures */
+
+figure {
+    text-align: center;
+}
+
+figure img, figure video {
+    filter: drop-shadow(3px 3px 3px #ccc);
+    border-radius: 7px;
+    max-width: 100%;
+}
+
+figure video {
+    width: 100%;
+    max-height: 450px;
+}
+
+figcaption {
+    text-align: center;
+    font-style: italic;
+    padding-top: 10px;
+}
+
+/* Screenshots */
+
+#screenshots {
+    text-align: center;
+}
+
+#screenshots img {
+    height: 190px;
+    margin: 3px;
+    border-radius: 5px;
+    filter: drop-shadow(2px 2px 2px #ddd);
+}
+
+#screenshots .nowrap {
+    white-space: nowrap;
+}
+
+/* Lightbox; thanks to https://yossiabramov.com/blog/vanilla-js-lightbox */
+
+.lightbox {
+    opacity: 0;
+    visibility: hidden;
+    position: fixed;
+    left:0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease-in;
+}
+
+.lightbox.show {
+    background-color: rgba(0,0,0, 0.75);
+    opacity: 1;
+    visibility: visible;
+    z-index: 1000;
+}
+
+.lightbox img {
+    max-width: 90%;
+    max-height: 90%;
+    filter: drop-shadow(5px 5px 10px #222);
+    border-radius: 5px;
+}
+
+.lightbox .close-lightbox {
+    cursor: pointer;
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    width: 20px;
+    height: 20px;
+}
+
+.lightbox .close-lightbox::after,
+.lightbox .close-lightbox::before {
+    content: '';
+    width: 3px;
+    height: 20px;
+    background-color: #ddd;
+    position: absolute;
+    border-radius: 5px;
+    transform: rotate(45deg);
+}
+
+.lightbox .close-lightbox::before {
+    transform: rotate(-45deg);
+}
+
+.lightbox .close-lightbox:hover::after,
+.lightbox .close-lightbox:hover::before {
+    background-color: #fff;
+}
+
+/* Header */
+
+#header {
+    background: #3a9784;
+    height: 130px;
+}
+
+#header #headerBox {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 10px;
+}
+
+#header #logo {
+    margin-top: 23px;
+    float: left;
+}
+
+#header #name {
+    float: left;
+    color: white;
+    font-size: 2.6em;
+    font-weight: 300;
+    margin: 35px 0 0 20px;
+}
+
+#header ol {
+    list-style-type: none;
+    float: right;
+    margin-top: 80px;
+}
+
+#header ol li {
+    display: inline-block;
+    margin: 0 10px;
+    font-weight: 400;
+}
+
+#header ol li a, nav ol li a:visited {
+    color: white;
+    text-decoration: none;
+}
+
+#header ol li a:hover {
+    text-decoration: underline;
+}
+
+li {
+    padding: 4px 0;
+    margin: 4px 0;
+    font-size: 0.9em;
+}
+
+
+/* Hide top menu SMALL SCREEN */
+@media only screen and (max-width: 780px) {
+    #header ol {
+        display: none;
+    }
+}

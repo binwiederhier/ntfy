@@ -38,7 +38,7 @@ Here's an example showing how to publish a simple message using a POST request:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/topic -Body "Backup Successful 😀" -UseBasicParsing
+    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/topic -Body "Backup successful 😀" -UseBasicParsing
     ```
 
 === "Python"
@@ -126,7 +126,7 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ``` powershell
     $uri = "https://ntfy.sh/phil_alerts"
     $headers = @{ Title="Unauthorized access detected"
-                  Priority="Urgent"
+                  Priority="urgent"
                   Tags="warning,skull" }
     $body = "Remote access to phils-laptop detected. Act right away."              
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
@@ -245,13 +245,13 @@ notification sounds and vibration patterns on your phone to map to these priorit
 
 The following priorities exist:
 
-| Priority | Icon | ID | Name | Description |
-|---|---|---|---|---|
-| Max priority | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. |
-| High priority | ![min priority](static/img/priority-4.svg) | `4` | `high` | Long vibration burst, default notification sound with a pop-over notification. |
-| **Default priority** | *(none)* | `3` | `default` | Short default vibration and sound. Default notification behavior. |
-| Low priority | ![min priority](static/img/priority-2.svg) |`2` | `low` | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
-| Min priority | ![min priority](static/img/priority-1.svg) | `1` | `min` | No vibration or sound. The notification will be under the fold in "Other notifications". |
+| Priority             | Icon                                       | ID  | Name           | Description                                                                                            |
+|----------------------|--------------------------------------------|-----|----------------|--------------------------------------------------------------------------------------------------------|
+| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification.                 |
+| High priority        | ![min priority](static/img/priority-4.svg) | `4` | `high`         | Long vibration burst, default notification sound with a pop-over notification.                         |
+| **Default priority** | *(none)*                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
+| Low priority         | ![min priority](static/img/priority-2.svg) | `2` | `low`          | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
+| Min priority         | ![min priority](static/img/priority-1.svg) | `1` | `min`          | No vibration or sound. The notification will be under the fold in "Other notifications".               |
 
 You can set the priority with the header `X-Priority` (or any of its aliases: `Priority`, `prio`, or `p`).
 
@@ -297,7 +297,7 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/phil_alerts"
-    $headers = @{ Priority="Urgent" }
+    $headers = @{ Priority="5" }
     $body = "An urgent message"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
@@ -1117,13 +1117,13 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ``` powershell
     $uri = "https://ntfy.sh/alerts"
     $headers = @{ Title"="Low disk space alert"
-                  Priority=4
+                  Priority="high"
                   Tags="warning,skull,backup-host,ssh-login")
                   Email="phil@example.com" }
     $body = "Unknown login from 5.31.23.83 to backups.example.com"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -UseBasicParsing
     ```
-    
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/alerts",
@@ -1237,8 +1237,7 @@ Here's a simple example:
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.example.com/mysecrets"
-    $basicAuthValue = "Basic [user:pass-bese64encoded]"
-    $headers = @{ Authorization=$basicAuthValue }
+    $headers = @{ Authorization="Basic cGhpbDpteXBhc3M=" }
     $body = "Look ma, with auth"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
     ```
@@ -1405,7 +1404,7 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     $body = "This message won't be forwarded to FCM"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
     ```
-    
+
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/mytopic",

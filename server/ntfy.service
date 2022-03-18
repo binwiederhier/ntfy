@@ -1,0 +1,14 @@
+[Unit]
+Description=ntfy server
+After=network.target
+
+[Service]
+User=ntfy
+Group=ntfy
+ExecStart=/usr/bin/ntfy serve
+Restart=on-failure
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target

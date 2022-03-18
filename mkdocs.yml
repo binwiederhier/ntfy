@@ -1,11 +1,11 @@
 site_dir: server/docs
 site_name: ntfy
 site_url: https://ntfy.sh
-site_description: simple HTTP-based pub-sub
+site_description: Send push notifications to your phone via PUT/POST
 copyright: Made with ❤️ by Philipp C. Heckel
 repo_name: binwiederhier/ntfy
 repo_url: https://github.com/binwiederhier/ntfy
-edit_uri: edit/main/docs/
+edit_uri: blob/main/docs/
 
 theme:
   name: material
@@ -17,23 +17,20 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"  # Light mode
       scheme: default
-      primary: teal
       toggle:
         icon: material/lightbulb-outline
-        name: Switch to light mode
+        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"  # Dark mode
       scheme: slate
-      primary: teal
       accent: indigo
       toggle:
         icon: material/lightbulb
-        name: Switch to dark mode
+        name: Switch to light mode
   features:
     - search.suggest
     - search.highlight
     - search.share
     - navigation.sections
-    # - navigation.instant
     - toc.integrate
     - content.tabs.link
 extra:
@@ -77,6 +74,7 @@ nav:
 - "Subscribing":
   - "From your phone": subscribe/phone.md
   - "From the Web UI": subscribe/web.md
+  - "From the CLI": subscribe/cli.md
   - "Using the API": subscribe/api.md
 - "Self-hosting":
   - "Installation": install.md
@@ -84,6 +82,8 @@ nav:
 - "Other things":
   - "FAQs": faq.md
   - "Examples": examples.md
+  - "Release notes": releases.md
+  - "Deprecation notices": deprecations.md
   - "Emojis 🥳 🎉": emojis.md
   - "Development": develop.md
   - "Privacy policy": privacy.md

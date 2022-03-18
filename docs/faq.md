@@ -17,7 +17,7 @@ subscribed to a topic.
 ## Will you know what topics exist, can you spy on me?
 If you don't trust me or your messages are sensitive, run your own server. It's <a href="https://github.com/binwiederhier/ntfy">open source</a>.
 That said, the logs do not contain any topic names or other details about you.
-Messages are cached for the duration configured in `config.yml` (12h by default) to facilitate service restarts, message polling and to overcome
+Messages are cached for the duration configured in `server.yml` (12h by default) to facilitate service restarts, message polling and to overcome
 client network disruptions.
 
 ## Can I self-host it?
@@ -33,10 +33,11 @@ If you do not care for Firebase, I suggest you install the [F-Droid version](htt
 of the app and [self-host your own ntfy server](install.md).
 
 ## How much battery does the Android app use?
-If you use the ntfy.sh server and you don't use the [instant delivery](subscribe/phone.md#instant-delivery) feature, 
+If you use the ntfy.sh server, and you don't use the [instant delivery](subscribe/phone.md#instant-delivery) feature, 
 the Android app uses no additional battery, since Firebase Cloud Messaging (FCM) is used. If you use your own server, 
-or you use *instant delivery*, the app has to maintain a constant connection to the server, which consumes about 4% of
-battery in 17h of use (on my phone). I use it, and it makes no difference to me.
+or you use *instant delivery*, the app has to maintain a constant connection to the server, which consumes about 0-1% of
+battery in 17h of use (on my phone). There has been a ton of testing and improvement around this. I think it's pretty 
+decent now.
 
 ## What is instant delivery?
 [Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the

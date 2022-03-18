@@ -1,4 +1,3 @@
-GO=$(shell which go)
 VERSION := $(shell git describe --tag)
 
 .PHONY:
@@ -38,25 +37,54 @@ help:
 	@echo "  make install-lint                - Install golint"
 
 
+# Documentation
+
+docs-deps: .PHONY
+	pip3 install -r requirements.txt
+
+docs: docs-deps
+	mkdocs build
+
+
+# Web app
+
+web-deps:
+	cd web \
+		&& npm install \
+		&& node_modules/svgo/bin/svgo src/img/*.svg
+
+web-build:
+	cd web \
+		&& npm run build \
+		&& mv build/index.html build/app.html \
+		&& rm -rf ../server/site \
+		&& mv build ../server/site \
+		&& rm \
+			../server/site/config.js \
+			../server/site/asset-manifest.json
+
+web: web-deps web-build
+
+
 # Test/check targets
 
 check: test fmt-check vet lint staticcheck
 
 test: .PHONY
-	$(GO) test ./...
+	go test -v $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 race: .PHONY
-	$(GO) test -race ./...
+	go test -race $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	$(GO) test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -func build/coverage/coverage.txt
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:
 	mkdir -p build/coverage
-	$(GO) test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -html build/coverage/coverage.txt
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go tool cover -html build/coverage/coverage.txt
 
 coverage-upload:
 	cd build/coverage && (curl -s https://codecov.io/bash | bash)
@@ -65,33 +93,30 @@ coverage-upload:
 # Lint/formatting targets
 
 fmt:
-	$(GO) fmt ./...
+	gofmt -s -w .
 
 fmt-check:
 	test -z $(shell gofmt -l .)
 
 vet:
-	$(GO) vet ./...
+	go vet ./...
 
 lint:
-	which golint || $(GO) get -u golang.org/x/lint/golint
-	$(GO) list ./... | grep -v /vendor/ | xargs -L1 golint -set_exit_status
+	which golint || go install golang.org/x/lint/golint@latest
+	go list ./... | grep -v /vendor/ | xargs -L1 golint -set_exit_status
 
 staticcheck: .PHONY
 	rm -rf build/staticcheck
-	which staticcheck || go get honnef.co/go/tools/cmd/staticcheck
+	which staticcheck || go install honnef.co/go/tools/cmd/staticcheck@latest
 	mkdir -p build/staticcheck
-	ln -s "$(GO)" build/staticcheck/go
+	ln -s "go" build/staticcheck/go
 	PATH="$(PWD)/build/staticcheck:$(PATH)" staticcheck ./...
 	rm -rf build/staticcheck
 
 
 # Building targets
 
-docs: .PHONY
-	mkdocs build
-
-build-deps: docs
+build-deps: docs web
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/v7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
@@ -102,21 +127,38 @@ build-snapshot: build-deps
 	goreleaser build --snapshot --rm-dist --debug
 
 build-simple: clean
-	mkdir -p dist/ntfy_linux_amd64
+	mkdir -p dist/ntfy_linux_amd64 server/docs server/site
+	touch server/docs/index.html
+	touch server/site/app.html
 	export CGO_ENABLED=1
-	$(GO) build \
+	go build \
 		-o dist/ntfy_linux_amd64/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
 		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
 
 clean: .PHONY
-	rm -rf dist build
+	rm -rf dist build server/docs server/site
 
 
 # Releasing targets
 
-release: build-deps
+release-check-tags:
+	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))
+	if ! grep -q $(LATEST_TAG) docs/install.md; then\
+	 	echo "ERROR: Must update docs/install.md with latest tag first.";\
+	 	exit 1;\
+	fi
+	if grep -q XXXXX docs/releases.md; then\
+		echo "ERROR: Must update docs/releases.md, found XXXXX.";\
+		exit 1;\
+	fi
+	if ! grep -q $(LATEST_TAG) docs/releases.md; then\
+		echo "ERROR: Must update docs/releases.mdwith latest tag first.";\
+		exit 1;\
+	fi
+
+release: build-deps release-check-tags check
 	goreleaser release --rm-dist --debug
 
 release-snapshot: build-deps
@@ -132,4 +174,4 @@ install:
 install-deb:
 	sudo systemctl stop ntfy || true
 	sudo apt-get purge ntfy || true
-	sudo dpkg -i dist/*.deb
+	sudo dpkg -i dist/ntfy_*_linux_amd64.deb

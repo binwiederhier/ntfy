@@ -1,0 +1,40 @@
+{
+  "name": "ntfy",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.8.2",
+    "@emotion/styled": "^11.8.1",
+    "@mui/icons-material": "^5.4.2",
+    "@mui/material": "latest",
+    "dexie": "^3.2.1",
+    "dexie-react-hooks": "^1.1.1",
+    "js-base64": "^3.7.2",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-infinite-scroll-component": "^6.1.0",
+    "react-router-dom": "^6.2.2",
+    "react-scripts": "^5.0.0",
+    "stacktrace-gps": "^3.0.4",
+    "stacktrace-js": "^2.0.2",
+    "svgo": "^2.8.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

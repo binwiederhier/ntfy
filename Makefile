@@ -193,7 +193,7 @@ release-check-tags:
 	 	exit 1;\
 	fi
 	if ! grep -q $(LATEST_TAG) docs/releases.md; then\
-		echo "ERROR: Must update docs/releases.mdwith latest tag first.";\
+		echo "ERROR: Must update docs/releases.md with latest tag first.";\
 		exit 1;\
 	fi
 

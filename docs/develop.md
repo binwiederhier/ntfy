@@ -127,7 +127,7 @@ you can simply run `make build`:
 $ make build
 ...
 # This builds web app, docs, and the ntfy binary (for amd64, armv7 and arm64). 
-# This will be SLOW (1+ minutes on my laptop). Maybe look at the other make targets?
+# This will be SLOW (5+ minutes on my laptop on the first run). Maybe look at the other make targets?
 ```
 
 You'll see all the outputs in the `dist/` folder afterwards:
@@ -178,20 +178,27 @@ $ make server-amd64 install-amd64
 $ ntfy serve
 ```
 
-During development of the main app, you can also just use `go run main.go` (as long as you run `make server-deps-static-sites`
-at least once), otherwise you'll see this:
+**During development of the main app, you can also just use `go run main.go`**, as long as you run 
+`make server-deps-static-sites`at least once and `CGO_ENABLED=1`:
 
 ``` shell
-# Error because docs/web folder is missing
-$ go run main.go serve
-server/server.go:85:13: pattern docs: no matching files found
-
-# Works!
+$ export CGO_ENABLED=1
 $ make server-deps-static-sites
 $ go run main.go serve
 2022/03/18 08:43:55 Listening on :2586[http]
-
+...
 ```
+
+If you don't run `server-deps-static-sites`, you may see an error *`pattern ...: no matching files found`*:
+```
+$ go run main.go serve
+server/server.go:85:13: pattern docs: no matching files found
+```
+
+This is because we use `go:embed` to embed the documentation and web app, so the Go code expects files to be
+present at `server/docs` and `server/site`. If they are not, you'll see the above error. The `server-deps-static-sites`
+target creates dummy files that ensures that you'll be able to build.
+
 
 ### Build the web app
 The sources for the web app live in `web/`. As long as you have `npm` installed (see above), building the web app 

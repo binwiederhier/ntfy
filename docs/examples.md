@@ -134,6 +134,7 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
 
 <details>
 <summary>Example: Send a message</summary>
+
 ```
 [
   {
@@ -207,10 +208,12 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
   }
 ]
 ```
+
 </details>
 
 <details>
 <summary>Example: Send a picture</summary>
+
 ```
 [
   {
@@ -306,6 +309,7 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
   }
 ]
 ```
+
 </details>
 
 ## Gatus service health check

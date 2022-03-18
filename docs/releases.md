@@ -16,10 +16,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.19.0 (UNRELEASED)
 
-**Bug fixes &amp; documentation:**
+**Documentation:**
 
-* Fix install instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
-* Additional examples (thanks to [@nickexyz](https://github.com/nickexyz))
+* Overhaul of [developer documentation](https://ntfy.sh/docs/develop/)
+* PowerShell examples for [publish documentation](https://ntfy.sh/docs/publish/) ([#138](https://github.com/binwiederhier/ntfy/issues/138), thanks to [@Joeharrison94](https://github.com/Joeharrison94))
+* Additional examples for [NodeRED, Gatus, Sonarr, Radarr, ...](https://ntfy.sh/docs/examples/) (thanks to [@nickexyz](https://github.com/nickexyz))
+* Fixes in developer instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
 
 -->
 

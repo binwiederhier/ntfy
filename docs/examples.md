@@ -126,31 +126,186 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 ```
 
 ## Download notifications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd)
-
 It's possible to use custom scripts for all the *arr services, plus SABnzbd. Notifications for downloads, warnings, grabs etc.
-
-Some simple bash scripts to achieve this are available <a href="https://github.com/nickexyz/ntfy-shellscripts">here</a>
+Some simple bash scripts to achieve this are kindly provided in [nickexyz's repository](https://github.com/nickexyz/ntfy-shellscripts). 
 
 ## Node-RED
+You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:
 
-You can use the HTTP request node to send messages with <a href="https://nodered.org">Node-RED</a>, some examples:
-
-Send a message:
 <details>
-  <summary>Flow example</summary>
-
-  ```
-[{"id":"8f09d37dd5773f88","type":"http request","z":"ff3ad4e1.d3415","name":"ntfy","method":"POST","ret":"txt", "paytoqs":"ignore","url":"https://example.com/topic","tls":"","persist":false,"proxy":"","authType":"","senderr":false,"credentials":{},"x":1410,"y":740,"wires":[[]]},{"id":"2603f296b25fe351","type":"function","z":"ff3ad4e1.d3415","name":"data","func":"msg.payload = \"Something happened\";\nmsg.headers = {};\nmsg.headers['tags'] = 'house';\nmsg.headers['X-Title'] = 'Home Assistant';\n\nreturn msg;","outputs":1,"noerr":0,"initialize":"","finalize":"","libs":[],"x":1290,"y":740,"wires":[["8f09d37dd5773f88"]]},{"id":"d2351ed0720a239f","type":"inject","z":"ff3ad4e1.d3415","name":"Manual start","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":"20","topic":"","payload":"","payloadType":"date","x":1150,"y":740,"wires":[["2603f296b25fe351"]]}]
-  ```
+<summary>Example: Send a message</summary>
+```
+[
+  {
+    "id": "8f09d37dd5773f88",
+    "type": "http request",
+    "z": "ff3ad4e1.d3415",
+    "name": "ntfy",
+    "method": "POST",
+    "ret": "txt",
+    "paytoqs": "ignore",
+    "url": "https://example.com/topic",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "authType": "",
+    "senderr": false,
+    "credentials": {},
+    "x": 1410,
+    "y": 740,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "2603f296b25fe351",
+    "type": "function",
+    "z": "ff3ad4e1.d3415",
+    "name": "data",
+    "func": "msg.payload = \"Something happened\";\nmsg.headers = {};\nmsg.headers['tags'] = 'house';\nmsg.headers['X-Title'] = 'Home Assistant';\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1290,
+    "y": 740,
+    "wires": [
+      [
+        "8f09d37dd5773f88"
+      ]
+    ]
+  },
+  {
+    "id": "d2351ed0720a239f",
+    "type": "inject",
+    "z": "ff3ad4e1.d3415",
+    "name": "Manual start",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": "20",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 1150,
+    "y": 740,
+    "wires": [
+      [
+        "2603f296b25fe351"
+      ]
+    ]
+  }
+]
+```
 </details>
 
-Send a picture:
 <details>
-  <summary>Flow example</summary>
-
-  ```
-[{"id":"726d0d75d6c0f70e","type":"http request","z":"ff3ad4e1.d3415","name":"Download jpeg","method":"GET","ret":"bin","paytoqs":"ignore","url":"https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png","tls":"","persist":false,"proxy":"","authType":"","senderr":false,"credentials":{},"x":1320,"y":780,"wires":[["730dbbc9dbf1ed8a"]]},{"id":"730dbbc9dbf1ed8a","type":"function","z":"ff3ad4e1.d3415","name":"data","func":"msg.payload = msg.payload;\nmsg.headers = {};\nmsg.headers['tags'] = 'house';\nmsg.headers['X-Title'] = 'Home Assistant - Picture';\n\nreturn msg;","outputs":1,"noerr":0,"initialize":"","finalize":"","libs":[],"x":1470,"y":780,"wires":[["592f424b37f76f5c"]]},{"id":"592f424b37f76f5c","type":"http request","z":"ff3ad4e1.d3415","name":"ntfy","method":"PUT","ret":"bin","paytoqs":"ignore","url":"https://example.com/topic","tls":"","persist":false,"proxy":"","authType":"","senderr":false,"x":1590,"y":780,"wires":[[]]},{"id":"8aa06dda3c902f6a","type":"inject","z":"ff3ad4e1.d3415","name":"Manual start","props":[{"p":"payload"},{"p":"topic","vt":"str"}],"repeat":"","crontab":"","once":false,"onceDelay":"20","topic":"","payload":"","payloadType":"date","x":1150,"y":780,"wires":[["726d0d75d6c0f70e"]]}]
-  ```
+<summary>Example: Send a picture</summary>
+```
+[
+  {
+    "id": "726d0d75d6c0f70e",
+    "type": "http request",
+    "z": "ff3ad4e1.d3415",
+    "name": "Download jpeg",
+    "method": "GET",
+    "ret": "bin",
+    "paytoqs": "ignore",
+    "url": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "authType": "",
+    "senderr": false,
+    "credentials": {},
+    "x": 1320,
+    "y": 780,
+    "wires": [
+      [
+        "730dbbc9dbf1ed8a"
+      ]
+    ]
+  },
+  {
+    "id": "730dbbc9dbf1ed8a",
+    "type": "function",
+    "z": "ff3ad4e1.d3415",
+    "name": "data",
+    "func": "msg.payload = msg.payload;\nmsg.headers = {};\nmsg.headers['tags'] = 'house';\nmsg.headers['X-Title'] = 'Home Assistant - Picture';\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1470,
+    "y": 780,
+    "wires": [
+      [
+        "592f424b37f76f5c"
+      ]
+    ]
+  },
+  {
+    "id": "592f424b37f76f5c",
+    "type": "http request",
+    "z": "ff3ad4e1.d3415",
+    "name": "ntfy",
+    "method": "PUT",
+    "ret": "bin",
+    "paytoqs": "ignore",
+    "url": "https://example.com/topic",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "authType": "",
+    "senderr": false,
+    "x": 1590,
+    "y": 780,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "8aa06dda3c902f6a",
+    "type": "inject",
+    "z": "ff3ad4e1.d3415",
+    "name": "Manual start",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": "20",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 1150,
+    "y": 780,
+    "wires": [
+      [
+        "726d0d75d6c0f70e"
+      ]
+    ]
+  }
+]
+```
 </details>
 
 ## Gatus service health check
@@ -159,7 +314,7 @@ An example for a custom alert with <a href="https://github.com/TwiN/gatus">Gatus
 ```
 alerting:
   custom:
-    url: "https://example.com"
+    url: "https://ntfy.sh"
     method: "POST"
     body: |
       {

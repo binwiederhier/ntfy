@@ -1,14 +1,14 @@
-# Building
+# Development
+Hurray 🥳 🎉, you are interested in writing code for ntfy! **That's awesome.** 😎
 
-!!! info
-    These instructions are pretty rough. My apologies for that. Please help improve them my letting me 
-    know in a [GitHub issue](https://github.com/binwiederhier/ntfy/issues).
+I tried my very best to write up detailed instructions, but if at any point in time you run into issues, don't 
+hesitate to **contact me on [Discord](https://discord.gg/cT7ECsZj9w) or [Matrix](https://matrix.to/#/#ntfy:matrix.org)**.
 
 ## ntfy server
 The ntfy server source code is available [on GitHub](https://github.com/binwiederhier/ntfy). The codebase for the
 server consists of three components:
 
-* **The main server and API** is written in [Go](https://go.dev/) (so you'll need Go). Its main entrypoint is at 
+* **The main server/client** is written in [Go](https://go.dev/) (so you'll need Go). Its main entrypoint is at 
   [main.go](https://github.com/binwiederhier/ntfy/blob/main/main.go), and the meat you're likely interested in is 
   in [server.go](https://github.com/binwiederhier/ntfy/blob/main/server/server.go). Notably, the server uses a 
   [SQLite](https://sqlite.org) library called [go-sqlite3](https://github.com/mattn/go-sqlite3), which requires 
@@ -18,7 +18,7 @@ server consists of three components:
   build the docs.
 * **The web app** is written in [React](https://reactjs.org/), using [MUI](https://mui.com/). It uses [Create React App](https://create-react-app.dev/)
   to build the production build. If you want to modify the web app, you need [nodejs](https://nodejs.org/en/) (for `npm`) 
-  to install all the 100,000 dependencies (*sigh*).
+  and install all the 100,000 dependencies (*sigh*).
 
 All of these components are built and then **baked into one binary**. 
 
@@ -54,10 +54,11 @@ the generated output is copied to `server/site` (web app and landing page) and `
 * [nodejs](https://nodejs.org/en/) (for `npm`, only to build the web app)
 
 ### Install dependencies
-These steps assume Ubuntu. Steps may vary on different Linux distributions.
+These steps **assume Ubuntu**. Steps may vary on different Linux distributions.
 
 First, install [Go](https://go.dev/) (see [official instructions](https://go.dev/doc/install)):
 ``` shell
+wget https://go.dev/dl/go1.18.linux-amd64.tar.gz
 rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
 go version   # verifies that it worked
@@ -73,7 +74,7 @@ Install [nodejs](https://nodejs.org/en/) (see [official instructions](https://no
 ``` shell
 curl -fsSL https://deb.nodesource.com/setup_17.x | sudo -E bash -
 sudo apt-get install -y nodejs
-npm   # verifies that it worked
+npm -v   # verifies that it worked
 ```
 
 Then install a few other things required:
@@ -84,7 +85,8 @@ sudo apt install \
     gcc-arm-linux-gnueabi \
     gcc-aarch64-linux-gnu \
     python3-pip \
-    upx
+    upx \
+    git
 ```
 
 ### Check out code
@@ -155,10 +157,11 @@ $ make release-snapshot
 
 During development, you may want to be more picky and build only certain things. Here are a few examples.
 
-### Building ntfy binary
+### Build the ntfy binary
 To build only the `ntfy` binary **without the web app or documentation**, use the `make server-...` targets:
 
 ``` shell
+$ make
 Build server & client (not release version):
   make server                  - Build server & client (all architectures)
   make server-amd64            - Build server & client (amd64 only)
@@ -190,17 +193,41 @@ $ go run main.go serve
 
 ```
 
-### Building the web app
+### Build the web app
+The sources for the web app live in `web/`. As long as you have `npm` installed (see above), building the web app 
+is really simple. Just type `make web` and you're in business:
 
-### Building the docs
+``` shell
+$ make web
+...
+```
+
+This will build the web app using Create React App and then **copy the production build to the `server/site` folder**, so 
+that when you `make server` (or `make server-amd64`, ...), you will have the web app included in the `ntfy` binary.
+
+If you're developing on the web app, it's best to just `cd web` and run `npm start` manually. This will open your browser
+at `http://127.0.0.1:3000` with the web app, and as you edit the source files, they will be recompiled and the browser 
+will automatically refresh:
+
+``` shell
+$ cd web
+$ npm start
+```
+
+### Build the docs
+The sources for the docs live in `docs/`. Similarly to the web app, you can simply run `make docs` to build the 
+documentation. As long as you have `mkdocs` installed (see above), this should work fine:
+
+``` shell
+$ make docs
+...
+```
+
+If you are changing the documentation, you should be running `mkdocs serve` directly. This will build the documentation, 
+serve the files at `http://127.0.0.1:8000/`, and rebuild every time you save the source files: 
 
 ```
-pip3 install -r requirements.txt
-mkdocs build
-```
-
-```
-mkdocs serve
+$ mkdocs serve
 INFO     -  Building documentation...
 INFO     -  Cleaning site directory
 INFO     -  Documentation built in 5.53 seconds
@@ -209,56 +236,45 @@ INFO     -  [16:28:14] Serving on http://127.0.0.1:8000/
 
 Then you can navigate to http://127.0.0.1:8000/ and whenever you change a markdown file in your text editor it'll automatically update.
 
-
-### 
-
-XXXXXXXXXXXXXXXXXXXXx
-
-
-### Quick &amp; dirty (amd64 only)
-To quickly build on amd64, you can use `make build-simple`:
-
-```
-make build-simple
-```
-
-That'll generate a statically linked binary in `dist/ntfy_linux_amd64/ntfy`. This binary will **not include the docs
-or the web app**. To include that
-
-For all other platforms (including Docker), and for production or other snapshot builds, you should use the amazingly 
-awesome [GoReleaser](https://goreleaser.com/) make targets:
-
-```
-Build:
-  make build                       - Build
-  make build-snapshot              - Build snapshot
-  make build-simple                - Build (using go build, without goreleaser)
-  make clean                       - Clean build folder
-
-Releasing (requires goreleaser):
-  make release                     - Create a release
-  make release-snapshot            - Create a test release
-```
-
-There are currently no platform-specific make targets, so they will build for all platforms (which may take a while).
-
 ## Android app
 The ntfy Android app source code is available [on GitHub](https://github.com/binwiederhier/ntfy-android).
 The Android app has two flavors:
 
-* **Google Play:** The `play` flavor includes Firebase (FCM) and requires a Firebase account
+* **Google Play:** The `play` flavor includes [Firebase (FCM)](https://firebase.google.com/) and requires a Firebase account
 * **F-Droid:** The `fdroid` flavor does not include Firebase or Google dependencies
 
+### Navigating the code
+* [main/](https://github.com/binwiederhier/ntfy-android/tree/main/app/src/main) - Main Android app source code
+* [play/](https://github.com/binwiederhier/ntfy-android/tree/main/app/src/play) - Google Play / Firebase specific code
+* [fdroid/](https://github.com/binwiederhier/ntfy-android/tree/main/app/src/fdroid) - F-Droid Firebase stubs
+* [build.gradle](https://github.com/binwiederhier/ntfy-android/blob/main/app/build.gradle) - Main build file
+
+### IDE/Environment
+You should download [Android Studio](https://developer.android.com/studio) (or [IntelliJ IDEA](https://www.jetbrains.com/idea/) 
+with the relevant Android plugins). Everything else will just be a pain for you. Do yourself a favor. 😀 
+
+### Check out the code
 First check out the repository:
 
-```
-git clone git@github.com:binwiederhier/ntfy-android.git   # or: https://github.com/binwiederhier/ntfy-android.git
-cd ntfy-android
-```
+=== "via HTTPS"
+    ``` shell
+    git clone https://github.com/binwiederhier/ntfy-android.git
+    cd ntfy-android
+    ```
+
+=== "via SSH"
+    ``` shell
+    git clone git@github.com:binwiederhier/ntfy-android.git
+    cd ntfy-android
+    ```
 
 Then either follow the steps for building with or without Firebase.
 
-### Building without Firebase (F-Droid flavor)
+### Build F-Droid flavor (no FCM)
+!!! info
+    I do build the ntfy Android app using IntelliJ IDEA (Android Studio), so I don't know if these Gradle commands will
+    work without issues. Please give me feedback if it does/doesn't work for you.
+
 Without Firebase, you may want to still change the default `app_base_url` in [strings.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/strings.xml)
 if you're self-hosting the server. Then run:
 ```
@@ -269,8 +285,13 @@ if you're self-hosting the server. Then run:
 ./gradlew bundleFdroidRelease
 ```
 
-### Building with Firebase (FCM, Google Play flavor)
+### Build Play flavor (FCM)
+!!! info
+    I do build the ntfy Android app using IntelliJ IDEA (Android Studio), so I don't know if these Gradle commands will
+    work without issues. Please give me feedback if it does/doesn't work for you.
+
 To build your own version with Firebase, you must:
+
 * Create a Firebase/FCM account
 * Place your account file at `app/google-services.json`
 * And change `app_base_url` in [strings.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/strings.xml)

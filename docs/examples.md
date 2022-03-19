@@ -133,8 +133,6 @@ Some simple bash scripts to achieve this are kindly provided in [nickexyz's repo
 You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:
 
 Example: Send a message
-
-![Node red message flow](static/img/nodered-message.png)
 <details>
 <summary>Expand</summary>
 
@@ -222,9 +220,10 @@ Example: Send a message
 
 </details>
 
-Example: Send a picture
+![Node red message flow](static/img/nodered-message.png)
 
-![Node red picture flow](static/img/nodered-picture.png)
+
+Example: Send a picture
 <details>
 <summary>Expand</summary>
 
@@ -339,6 +338,8 @@ Example: Send a picture
 ```
 
 </details>
+
+![Node red picture flow](static/img/nodered-picture.png)
 
 ## Gatus service health check
 

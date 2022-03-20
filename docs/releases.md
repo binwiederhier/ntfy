@@ -9,6 +9,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Support for UnifiedPush 2.0 specification (bytes messages, [#130](https://github.com/binwiederhier/ntfy/issues/130))
 * Export/import settings and subscriptions ([#115](https://github.com/binwiederhier/ntfy/issues/115), thanks [@cmeis](https://github.com/cmeis) for reporting)
+* Open "Click" link when tapping notification ([#110](https://github.com/binwiederhier/ntfy/issues/110), thanks [@cmeis](https://github.com/cmeis) for reporting)
 * JSON stream deprecation banner ([#164](https://github.com/binwiederhier/ntfy/issues/164))
 
 **Bug fixes:**

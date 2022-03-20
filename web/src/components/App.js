@@ -18,6 +18,18 @@ import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useConnectionListeners, useLocalStorageMigration} from "./hooks";
+import {Backdrop, ListItemIcon, ListItemText, Menu} from "@mui/material";
+import Paper from "@mui/material/Paper";
+import IconButton from "@mui/material/IconButton";
+import {MoreVert} from "@mui/icons-material";
+import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
+import MenuItem from "@mui/material/MenuItem";
+import TextField from "@mui/material/TextField";
+import SendIcon from "@mui/icons-material/Send";
+import priority1 from "../img/priority-1.svg";
+import priority2 from "../img/priority-2.svg";
+import priority4 from "../img/priority-4.svg";
+import priority5 from "../img/priority-5.svg";
 
 // TODO add drag and drop
 // TODO races when two tabs are open
@@ -73,6 +85,7 @@ const Layout = () => {
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>
+            <DropZone/>
             <ActionBar
                 selected={selected}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
@@ -89,6 +102,7 @@ const Layout = () => {
                 <Toolbar/>
                 <Outlet context={{ subscriptions, selected }}/>
             </Main>
+            <Sender/>
         </Box>
     );
 }
@@ -111,6 +125,122 @@ const Main = (props) => {
         >
             {props.children}
         </Box>
+    );
+};
+
+const priorityFiles = {
+    1: priority1,
+    2: priority2,
+    4: priority4,
+    5: priority5
+};
+
+const Sender = (props) => {
+    const [priority, setPriority] = useState(5);
+    const [priorityAnchorEl, setPriorityAnchorEl] = React.useState(null);
+    const priorityMenuOpen = Boolean(priorityAnchorEl);
+
+    const handlePriorityClick = (p) => {
+        setPriority(p);
+        setPriorityAnchorEl(null);
+    };
+
+    return (
+        <Paper
+            elevation={3}
+            sx={{
+                display: "flex",
+                position: 'fixed',
+                bottom: 0,
+                right: 0,
+                padding: 2,
+                width: `calc(100% - ${Navigation.width}px)`,
+                backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
+            }}
+        >
+            <IconButton color="inherit" size="large" edge="start">
+                <MoreVert/>
+            </IconButton>
+            <IconButton color="inherit" size="large" edge="start">
+                <InsertEmoticonIcon/>
+            </IconButton>
+            <IconButton color="inherit" size="large" edge="start" onClick={(ev) => setPriorityAnchorEl(ev.currentTarget)}>
+                <img src={priorityFiles[priority]}/>
+            </IconButton>
+            <Menu
+                anchorEl={priorityAnchorEl}
+                open={priorityMenuOpen}
+                onClose={() => setPriorityAnchorEl(null)}
+            >
+                {[5,4,2,1].map(p => <MenuItem onClick={() => handlePriorityClick(p)}>
+                    <ListItemIcon><img src={priorityFiles[p]}/></ListItemIcon>
+                    <ListItemText>Priority {p}</ListItemText>
+                </MenuItem>)}
+            </Menu>
+            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
+                <TextField
+                    autoFocus
+                    margin="dense"
+                    placeholder="Message"
+                    type="text"
+                    fullWidth
+                    variant="standard"
+                    multiline
+                />
+                <div style={{display: "flex", width: "100%"}}>
+                    <TextField
+                        margin="dense"
+                        placeholder="Title"
+                        type="text"
+                        fullWidth
+                        variant="standard"
+                    />
+                </div>
+            </div>
+            <IconButton color="inherit" size="large" edge="end">
+                <SendIcon/>
+            </IconButton>
+        </Paper>
+    );
+};
+
+const DropZone = (props) => {
+    const [showDropZone, setShowDropZone] = useState(false);
+
+    useEffect(() => {
+        window.addEventListener('dragenter', () => setShowDropZone(true));
+    }, []);
+
+    const allowSubmit = () => true;
+
+    const allowDrag = (e) => {
+        if (allowSubmit()) {
+            e.dataTransfer.dropEffect = 'copy';
+            e.preventDefault();
+        }
+    };
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setShowDropZone(false);
+        console.log(e.dataTransfer.files[0]);
+    };
+
+    if (!showDropZone) {
+        return null;
+    }
+
+    return (
+        <Backdrop
+            sx={{ color: '#fff', zIndex: 3500 }}
+            open={showDropZone}
+            onClick={() => setShowDropZone(false)}
+            onDragEnter={allowDrag}
+            onDragOver={allowDrag}
+            onDragLeave={() => setShowDropZone(false)}
+            onDrop={handleDrop}
+        >
+
+        </Backdrop>
     );
 };
 

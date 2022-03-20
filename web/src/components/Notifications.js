@@ -20,7 +20,8 @@ import {
     formatMessage,
     formatShortDateTime,
     formatTitle,
-    openUrl, shortUrl,
+    openUrl,
+    shortUrl,
     topicShortUrl,
     unmatchedTags
 } from "../app/utils";

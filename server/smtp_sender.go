@@ -108,7 +108,7 @@ func toEmojis(tags []string) (emojisOut []string, tagsOut []string, err error) {
 nextTag:
 	for _, t := range tags { // TODO Super inefficient; we should just create a .json file with a map
 		for _, e := range emojis {
-			if util.InStringList(e.Aliases, t) {
+			if util.Contains(e.Aliases, t) {
 				emojisOut = append(emojisOut, e.Emoji)
 				continue nextTag
 			}

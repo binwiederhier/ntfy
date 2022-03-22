@@ -136,9 +136,9 @@ func execServe(c *cli.Context) error {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		return errors.New("if set, base-url must start with http:// or https://")
-	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
+	} else if !util.Contains([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
-	} else if !util.InStringList([]string{"app", "home"}, webRoot) {
+	} else if !util.Contains([]string{"app", "home"}, webRoot) {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	}
 

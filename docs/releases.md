@@ -4,7 +4,21 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
-## ntfy server v1.19.0 (UNRELEASED)
+## ntfy Android app v1.11.0 (UNRELEASED)
+
+**Features:**
+
+* Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
+
+Bugs:
+
+* IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+
+-->
+
+## ntfy server v1.18.1
+Released Mar 21, 2022   
+_This release ships no features or bug fixes. It's merely a documentation update._
 
 **Documentation:**
 
@@ -12,14 +26,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * PowerShell examples for [publish documentation](https://ntfy.sh/docs/publish/) ([#138](https://github.com/binwiederhier/ntfy/issues/138), thanks to [@Joeharrison94](https://github.com/Joeharrison94))
 * Additional examples for [NodeRED, Gatus, Sonarr, Radarr, ...](https://ntfy.sh/docs/examples/) (thanks to [@nickexyz](https://github.com/nickexyz))
 * Fixes in developer instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
-
-## ntfy Android app v1.11.0 (UNRELEASED)
-
-**Features:**
-
-* Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
-
--->
 
 ## ntfy Android app v1.10.0
 Released Mar 21, 2022

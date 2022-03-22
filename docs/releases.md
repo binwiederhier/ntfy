@@ -9,10 +9,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
+* Regularly delete attachments for deleted notifications ([#142](https://github.com/binwiederhier/ntfy/issues/142))
 
 Bugs:
 
 * IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+
+Thanks:
+
+* Many thanks to [@cmeis](https://github.com/cmeis), [@Fallenbagel](https://github.com/Fallenbagel), [@Joeharrison94](https://github.com/Joeharrison94),
+  and [@rogeliodh](https://github.com/rogeliodh) for input on the new attachment logic, and for testing the release
 
 -->
 

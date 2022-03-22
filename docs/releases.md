@@ -3,7 +3,26 @@ Binaries for all releases can be found on the GitHub releases pages for the [ntf
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 <!--
-## ntfy Android app v1.10.0 (UNRELEASED)
+
+## ntfy server v1.19.0 (UNRELEASED)
+
+**Documentation:**
+
+* Overhaul of [developer documentation](https://ntfy.sh/docs/develop/)
+* PowerShell examples for [publish documentation](https://ntfy.sh/docs/publish/) ([#138](https://github.com/binwiederhier/ntfy/issues/138), thanks to [@Joeharrison94](https://github.com/Joeharrison94))
+* Additional examples for [NodeRED, Gatus, Sonarr, Radarr, ...](https://ntfy.sh/docs/examples/) (thanks to [@nickexyz](https://github.com/nickexyz))
+* Fixes in developer instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+
+## ntfy Android app v1.11.0 (UNRELEASED)
+
+**Features:**
+
+* Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
+
+-->
+
+## ntfy Android app v1.10.0
+Released Mar 21, 2022
 
 **Features:**
 
@@ -15,17 +34,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes:**
 
 * Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
-
-## ntfy server v1.19.0 (UNRELEASED)
-
-**Documentation:**
-
-* Overhaul of [developer documentation](https://ntfy.sh/docs/develop/)
-* PowerShell examples for [publish documentation](https://ntfy.sh/docs/publish/) ([#138](https://github.com/binwiederhier/ntfy/issues/138), thanks to [@Joeharrison94](https://github.com/Joeharrison94))
-* Additional examples for [NodeRED, Gatus, Sonarr, Radarr, ...](https://ntfy.sh/docs/examples/) (thanks to [@nickexyz](https://github.com/nickexyz))
-* Fixes in developer instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
-
--->
 
 ## ntfy server v1.18.0
 Released Mar 16, 2022

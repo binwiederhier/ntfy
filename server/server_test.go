@@ -203,6 +203,14 @@ func TestServer_PublishPriority(t *testing.T) {
 	require.Equal(t, 40007, toHTTPError(t, response.Body.String()).Code)
 }
 
+func TestServer_PublishGETOnlyOneTopic(t *testing.T) {
+	// This tests a bug that allowed publishing topics with a comma in the name (no ticket)
+
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "GET", "/mytopic,mytopic2/publish?m=hi", "", nil)
+	require.Equal(t, 404, response.Code)
+}
+
 func TestServer_PublishNoCache(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

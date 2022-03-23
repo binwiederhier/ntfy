@@ -30,7 +30,9 @@ type message struct {
 	Attachment *attachment `json:"attachment,omitempty"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
-	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
+	Encoding   string      `json:"encoding,omitempty"` // Empty for raw UTF-8, or "base64" for encoded bytes
+	Updated    int64       `json:"updated,omitempty"`  // Set if updated, unix time in seconds
+	Deleted    int64       `json:"deleted,omitempty"`  // Set if deleted, unix time in seconds
 }
 
 type attachment struct {

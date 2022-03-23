@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	randomStringCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randomStringCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" // Update updateTopicPathRegex if changed
 )
 
 var (

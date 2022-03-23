@@ -23,6 +23,7 @@ const (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			mid TEXT NOT NULL,
 			time INT NOT NULL,
+			updated INT NOT NULL,
 			topic TEXT NOT NULL,
 			message TEXT NOT NULL,
 			title TEXT NOT NULL,
@@ -43,40 +44,46 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+	updateMessageQuery           = `UPDATE messages SET updated = ?, message = ?, title = ?, priority = ?, tags = ?, click = ? WHERE topic = ? AND mid = ?`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE topic = ? AND mid = ?`
 	selectMessagesSinceTimeQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
+	`
+	selectMessageByIDQuery = `
+		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		FROM messages 
+		WHERE topic = ? AND mid = ?
 	`
 	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
@@ -232,6 +239,7 @@ func (c *messageCache) AddMessage(m *message) error {
 		insertMessageQuery,
 		m.ID,
 		m.Time,
+		m.Updated,
 		m.Topic,
 		m.Message,
 		m.Title,
@@ -246,6 +254,28 @@ func (c *messageCache) AddMessage(m *message) error {
 		attachmentOwner,
 		m.Encoding,
 		published,
+	)
+	return err
+}
+
+func (c *messageCache) UpdateMessage(m *message) error {
+	if m.Event != messageEvent {
+		return errUnexpectedMessageType
+	}
+	if c.nop {
+		return nil
+	}
+	tags := strings.Join(m.Tags, ",")
+	_, err := c.db.Exec(
+		updateMessageQuery,
+		m.Updated,
+		m.Message,
+		m.Title,
+		m.Priority,
+		tags,
+		m.Click,
+		m.Topic,
+		m.ID,
 	)
 	return err
 }
@@ -393,16 +423,31 @@ func (c *messageCache) AttachmentsExpired() ([]string, error) {
 	return ids, nil
 }
 
+func (c *messageCache) Message(topic, id string) (*message, error) {
+	rows, err := c.db.Query(selectMessageByIDQuery, topic, id)
+	if err != nil {
+		return nil, err
+	}
+	messages, err := readMessages(rows)
+	if err != nil {
+		return nil, err
+	} else if len(messages) == 0 {
+		return nil, errors.New("not found")
+	}
+	return messages[0], nil
+}
+
 func readMessages(rows *sql.Rows) ([]*message, error) {
 	defer rows.Close()
 	messages := make([]*message, 0)
 	for rows.Next() {
-		var timestamp, attachmentSize, attachmentExpires int64
+		var timestamp, updated, attachmentSize, attachmentExpires int64
 		var priority int
 		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner, encoding string
 		err := rows.Scan(
 			&id,
 			&timestamp,
+			&updated,
 			&topic,
 			&msg,
 			&title,
@@ -438,6 +483,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 		messages = append(messages, &message{
 			ID:         id,
 			Time:       timestamp,
+			Updated:    updated,
 			Event:      messageEvent,
 			Topic:      topic,
 			Message:    msg,

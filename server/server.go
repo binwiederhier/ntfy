@@ -55,9 +55,10 @@ type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 
 var (
 	// If changed, don't forget to update Android App and auth_sqlite.go
-	topicRegex             = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)               // No /!
-	topicPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)              // Regex must match JS & Android app!
-	externalTopicPathRegex = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`) // Extended topic path, for web-app, e.g. /example.com/mytopic
+	topicRegex             = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)                  // No /!
+	topicPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)                 // Regex must match JS & Android app!
+	updateTopicPathRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/[A-Za-z0-9]{12}$`) // ID length must match messageIDLength & util.randomStringCharset
+	externalTopicPathRegex = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`)    // Extended topic path, for web-app, e.g. /example.com/mytopic
 	jsonPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
 	ssePathRegex           = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
 	rawPathRegex           = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
@@ -279,7 +280,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleOptions(w, r)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
 		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && (topicPathRegex.MatchString(r.URL.Path) || updateTopicPathRegex.MatchString(r.URL.Path)) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
@@ -390,16 +391,26 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	t, err := s.topicFromPath(r.URL.Path)
+	t, messageID, err := s.topicAndMessageIDFromPath(r.URL.Path)
+	if err != nil {
+		return err
+	}
+	updated := messageID != ""
+	var m *message
+	if updated {
+		m, err = s.messageCache.Message(t.ID, messageID)
+		if err != nil {
+			return err //errors.New("message does not exist")
+		}
+		m.Updated = time.Now().Unix()
+	} else {
+		m = newDefaultMessage(t.ID, "")
+	}
+	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, v, m)
 	if err != nil {
 		return err
 	}
 	body, err := util.Peak(r.Body, s.config.MessageLimit)
-	if err != nil {
-		return err
-	}
-	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, v, m)
 	if err != nil {
 		return err
 	}
@@ -430,8 +441,14 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		}()
 	}
 	if cache {
-		if err := s.messageCache.AddMessage(m); err != nil {
-			return err
+		if updated {
+			if err := s.messageCache.UpdateMessage(m); err != nil {
+				return err
+			}
+		} else {
+			if err := s.messageCache.AddMessage(m); err != nil {
+				return err
+			}
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -447,6 +464,10 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 
 func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
+	if !cache && m.Updated != 0 {
+		return false, false, "", false, errors.New("message updates must be cached")
+	}
+	// TODO more restrictions
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
@@ -888,16 +909,20 @@ func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (s *Server) topicFromPath(path string) (*topic, error) {
+func (s *Server) topicAndMessageIDFromPath(path string) (*topic, string, error) {
 	parts := strings.Split(path, "/")
-	if len(parts) < 2 {
-		return nil, errHTTPBadRequestTopicInvalid
+	if len(parts) != 2 && len(parts) != 3 {
+		return nil, "", errHTTPBadRequestTopicInvalid
 	}
 	topics, err := s.topicsFromIDs(parts[1])
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return topics[0], nil
+	messageID := ""
+	if len(parts) == 3 && len(parts[2]) == messageIDLength {
+		messageID = parts[2]
+	}
+	return topics[0], messageID, nil
 }
 
 func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {

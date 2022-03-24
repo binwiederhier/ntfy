@@ -1,8 +1,5 @@
 # The documentation uses 'mkdocs', which is written in Python
 
-# See https://github.com/squidfunk/mkdocs-material/issues/2030
-jinja2>=2.11.1
-
 # mkdocs
 mkdocs
 mkdocs-material

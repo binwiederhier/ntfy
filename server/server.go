@@ -395,14 +395,18 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
-	updated := messageID != ""
 	var m *message
-	if updated {
+	update := messageID != ""
+	if update {
 		m, err = s.messageCache.Message(t.ID, messageID)
 		if err != nil {
-			return err //errors.New("message does not exist")
+			return errHTTPNotFoundMessageID
 		}
-		m.Updated = time.Now().Unix()
+		newUpdated := time.Now().Unix()
+		if newUpdated <= m.Updated {
+			return errHTTPTooManyRequestsUpdatingTooQuickly
+		}
+		m.Updated = newUpdated
 	} else {
 		m = newDefaultMessage(t.ID, "")
 	}
@@ -441,7 +445,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		}()
 	}
 	if cache {
-		if updated {
+		if update {
 			if err := s.messageCache.UpdateMessage(m); err != nil {
 				return err
 			}

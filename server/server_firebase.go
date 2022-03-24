@@ -72,6 +72,7 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 			data = map[string]string{
 				"id":       m.ID,
 				"time":     fmt.Sprintf("%d", m.Time),
+				"updated":  fmt.Sprintf("%d", m.Updated),
 				"event":    m.Event,
 				"topic":    m.Topic,
 				"priority": fmt.Sprintf("%d", m.Priority),

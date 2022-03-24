@@ -20,9 +20,11 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID         string      `json:"id"`    // Random message ID
-	Time       int64       `json:"time"`  // Unix time in seconds
-	Event      string      `json:"event"` // One of the above
+	ID         string      `json:"id"`                // Random message ID
+	Time       int64       `json:"time"`              // Unix time in seconds
+	Updated    int64       `json:"updated,omitempty"` // Set if updated, unix time in seconds
+	Deleted    int64       `json:"deleted,omitempty"` // Set if deleted, unix time in seconds
+	Event      string      `json:"event"`             // One of the above
 	Topic      string      `json:"topic"`
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
@@ -31,8 +33,6 @@ type message struct {
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
 	Encoding   string      `json:"encoding,omitempty"` // Empty for raw UTF-8, or "base64" for encoded bytes
-	Updated    int64       `json:"updated,omitempty"`  // Set if updated, unix time in seconds
-	Deleted    int64       `json:"deleted,omitempty"`  // Set if deleted, unix time in seconds
 }
 
 type attachment struct {

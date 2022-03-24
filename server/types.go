@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"heckel.io/ntfy/util"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -92,9 +94,29 @@ func validMessageID(s string) bool {
 	return util.ValidRandomString(s, messageIDLength)
 }
 
+func validUnixTimestamp(s string) bool {
+	_, err := toUnixTimestamp(s)
+	return err == nil
+}
+
+func toUnixTimestamp(s string) (int64, error) {
+	u, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if u < 1000000000 || u > 3000000000 { // I know. It's practical. So relax ...
+		return 0, errors.New("invalid unix date")
+	}
+	return u, nil
+}
+
 type sinceMarker struct {
 	time time.Time
 	id   string
+}
+
+func newSince(id string, timestamp int64) sinceMarker {
+	return sinceMarker{time.Unix(timestamp, 0), id}
 }
 
 func newSinceTime(timestamp int64) sinceMarker {
@@ -115,6 +137,10 @@ func (t sinceMarker) IsNone() bool {
 
 func (t sinceMarker) IsID() bool {
 	return t.id != ""
+}
+
+func (t sinceMarker) IsTime() bool {
+	return t.time.Unix() > 0
 }
 
 func (t sinceMarker) Time() time.Time {

@@ -77,6 +77,7 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 	require.Equal(t, map[string]string{
 		"id":                 m.ID,
 		"time":               fmt.Sprintf("%d", m.Time),
+		"updated":            "0",
 		"event":              "message",
 		"topic":              "mytopic",
 		"priority":           "4",

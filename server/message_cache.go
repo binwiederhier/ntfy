@@ -65,13 +65,13 @@ const (
 	selectMessagesSinceIDQuery = `
 		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
-		WHERE topic = ? AND id > ? AND published = 1 
+		WHERE topic = ? AND id >= ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, time, updated, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
-		WHERE topic = ? AND (id > ? OR published = 0)
+		WHERE topic = ? AND (id >= ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
@@ -95,7 +95,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 5
+	currentSchemaVersion          = 6
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -172,6 +172,11 @@ const (
 		DROP TABLE messages;
 		ALTER TABLE messages_new RENAME TO messages;
 		COMMIT;
+	`
+
+	// 5 -> 6
+	migrate5To6AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN updated INT NOT NULL DEFAULT (0);
 	`
 )
 
@@ -326,7 +331,15 @@ func (c *messageCache) messagesSinceID(topic string, since sinceMarker, schedule
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	messages, err := readMessages(rows)
+	if err != nil {
+		return nil, err
+	} else if len(messages) == 0 {
+		return messages, nil
+	} else if since.IsTime() && messages[0].Updated > since.Time().Unix() {
+		return messages, nil
+	}
+	return messages[1:], nil // Do not include row with ID itself
 }
 
 func (c *messageCache) MessagesDue() ([]*message, error) {
@@ -536,6 +549,8 @@ func setupCacheDB(db *sql.DB) error {
 		return migrateFrom3(db)
 	} else if schemaVersion == 4 {
 		return migrateFrom4(db)
+	} else if schemaVersion == 5 {
+		return migrateFrom5(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -606,6 +621,17 @@ func migrateFrom4(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 5); err != nil {
+		return err
+	}
+	return migrateFrom5(db)
+}
+
+func migrateFrom5(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 5 to 6")
+	if _, err := db.Exec(migrate5To6AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 6); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

@@ -390,6 +390,69 @@ func TestServer_PublishAndPollSince(t *testing.T) {
 	require.Equal(t, 40008, toHTTPError(t, response.Body.String()).Code)
 }
 
+func TestServer_PublishUpdateAndPollSince(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	// Initial PUT
+	response := request(t, s, "PUT", "/mytopic?t=atitle&tags=tag1,tag2&prio=high&click=https://google.com&attach=https://heckel.io", "test 1", nil)
+	message1 := toMessage(t, response.Body.String())
+	require.Equal(t, int64(0), message1.Updated)
+	require.Equal(t, "test 1", message1.Message)
+	require.Equal(t, "atitle", message1.Title)
+	require.Equal(t, 4, message1.Priority)
+	require.Equal(t, []string{"tag1", "tag2"}, message1.Tags)
+	require.Equal(t, "https://google.com", message1.Click)
+	require.Equal(t, "https://heckel.io", message1.Attachment.URL)
+
+	// Update
+	response = request(t, s, "PUT", "/mytopic/"+message1.ID+"?prio=low", "test 2", nil)
+	message2 := toMessage(t, response.Body.String())
+	require.Equal(t, message1.ID, message2.ID)
+	require.True(t, message2.Updated > message1.Updated)
+	require.Equal(t, "test 2", message2.Message) // Updated
+	require.Equal(t, "atitle", message2.Title)
+	require.Equal(t, 2, message2.Priority) // Updated
+	require.Equal(t, []string{"tag1", "tag2"}, message2.Tags)
+	require.Equal(t, "https://google.com", message2.Click)
+	require.Equal(t, "https://heckel.io", message2.Attachment.URL)
+
+	time.Sleep(1100 * time.Millisecond)
+
+	// Another update
+	response = request(t, s, "PUT", "/mytopic/"+message1.ID+"?title=new+title", "test 3", nil)
+	message3 := toMessage(t, response.Body.String())
+	require.True(t, message3.Updated > message2.Updated)
+	require.Equal(t, "test 3", message3.Message)  // Updated
+	require.Equal(t, "new title", message3.Title) // Updated
+
+	// Get all messages: Should be only one that was updated
+	since := "all"
+	response = request(t, s, "GET", "/mytopic/json?since="+since+"&poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, message1.ID, messages[0].ID)
+	require.Equal(t, "test 3", messages[0].Message)
+
+	// Get all messages since "message ID": Should be zero, since we know this message
+	since = message1.ID
+	response = request(t, s, "GET", "/mytopic/json?since="+since+"&poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 0, len(messages))
+
+	// Get all messages since "message ID" but with an older timestamp: Should be the latest updated message
+	since = fmt.Sprintf("%s/%d", message1.ID, message2.Updated) // We're missing an update
+	response = request(t, s, "GET", "/mytopic/json?since="+since+"&poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "test 3", messages[0].Message)
+
+	// Get all messages since "message ID" with the current timestamp: No messages expected
+	since = fmt.Sprintf("%s/%d", message3.ID, message3.Updated) // We are up-to-date
+	response = request(t, s, "GET", "/mytopic/json?since="+since+"&poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 0, len(messages))
+}
+
 func TestServer_PublishViaGET(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

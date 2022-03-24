@@ -473,8 +473,14 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	}
 	// TODO more restrictions
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
-	m.Title = readParam(r, "x-title", "title", "t")
-	m.Click = readParam(r, "x-click", "click")
+	title := readParam(r, "x-title", "title", "t")
+	if title != "" {
+		m.Title = title
+	}
+	click := readParam(r, "x-click", "click")
+	if click != "" {
+		m.Click = click
+	}
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
@@ -514,9 +520,11 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	if messageStr != "" {
 		m.Message = messageStr
 	}
-	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
+	priority, err := util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if err != nil {
 		return false, false, "", false, errHTTPBadRequestPriorityInvalid
+	} else if priority > 0 {
+		m.Priority = priority
 	}
 	tagsStr := readParam(r, "x-tags", "tags", "tag", "ta")
 	if tagsStr != "" {
@@ -893,6 +901,13 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 		return sinceAllMessages, nil
 	} else if since == "none" {
 		return sinceNoMessages, nil
+	}
+
+	// ID/timestamp
+	parts := strings.Split(since, "/")
+	if len(parts) == 2 && validMessageID(parts[0]) && validUnixTimestamp(parts[1]) {
+		t, _ := toUnixTimestamp(parts[1])
+		return newSince(parts[0], t), nil
 	}
 
 	// ID, timestamp, duration

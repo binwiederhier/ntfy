@@ -121,13 +121,16 @@ const SettingsIcons = (props) => {
             "Titles are optional, did you know that?",
             "ntfy is open source, and will always be free. Cool, right?",
             "I don't really like apples",
-            "My favorite TV show is The Wire. You should watch it!"
+            "My favorite TV show is The Wire. You should watch it!",
+            "You can attach files and URLs to messages too",
+            "You can delay messages up to 3 days"
         ])[0];
+        const nowSeconds = Math.round(Date.now()/1000);
         const message = shuffle([
-            `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(Date.now())} right now. Is that early or late?`,
+            `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(nowSeconds)} right now. Is that early or late?`,
             `So I heard you like ntfy? If that's true, go to GitHub and star it, or to the Play store and rate it. Thanks! Oh yeah, this is a test notification.`,
             `It's almost like you want to hear what I have to say. I'm not even a machine. I'm just a sentence that Phil typed on a random Thursday.`,
-            `Alright then, it's ${formatShortDateTime(Date.now())} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
+            `Alright then, it's ${formatShortDateTime(nowSeconds)} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
             `There are nine million bicycles in Beijing That's a fact; It's a thing we can't deny. I wonder if that's true ...`,
             `I'm really excited that you're trying out ntfy. Did you know that there are a few public topics, such as ntfy.sh/stats and ntfy.sh/announcements.`,
             `It's interesting to hear what people use ntfy for. I've heard people talk about using it for so many cool things. What do you use it for?`

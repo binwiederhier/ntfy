@@ -132,9 +132,9 @@ Some simple bash scripts to achieve this are kindly provided in [nickexyz's repo
 ## Node-RED
 You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:
 
-Example: Send a message
+
 <details>
-<summary>Expand</summary>
+<summary>Example: Send a message (click to expand)</summary>
 
 ```
 [
@@ -222,10 +222,8 @@ Example: Send a message
 
 ![Node red message flow](static/img/nodered-message.png)
 
-
-Example: Send a picture
 <details>
-<summary>Expand</summary>
+<summary>Example: Send a picture (click to expand)</summary>
 
 ```
 [

@@ -380,6 +380,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return errHTTPTooManyRequestsAttachmentBandwidthLimit
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	f, err := os.Open(file)
 	if err != nil {
 		return err

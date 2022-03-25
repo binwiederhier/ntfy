@@ -65,13 +65,17 @@ class SubscriptionManager {
 
     /** Adds notification, or returns false if it already exists */
     async addNotification(subscriptionId, notification) {
-        const exists = await db.notifications.get(notification.id);
-        if (exists) {
-            return false;
+        const existingNotification = await db.notifications.get(notification.id);
+        if (existingNotification) {
+            const upToDate = (existingNotification?.updated ?? 0) >= (notification.updated ?? 0);
+            if (upToDate) {
+                console.error(`[SubscriptionManager] up to date`, existingNotification, notification);
+                return false;
+            }
         }
         try {
             notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-            await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
+            await db.notifications.put({ ...notification, subscriptionId });
             await db.subscriptions.update(subscriptionId, {
                 last: notification.id
             });

@@ -34,7 +34,11 @@ too.
 [Building](https://ntfy.sh/docs/develop/)
 
 ## Contributing
-I welcome any and all contributions. Just create a PR or an issue.
+I welcome any and all contributions. Just create a PR or an issue. To contribute code, check out 
+the [build instructions](https://ntfy.sh/docs/develop/) for the server and the Android app.
+
+Or, if you'd like to help translate ntfy into your language, you can start immediately in
+[Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
 
 ## Contact me
 You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 

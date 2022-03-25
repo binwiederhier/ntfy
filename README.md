@@ -36,8 +36,7 @@ too.
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue. To contribute code, check out 
 the [build instructions](https://ntfy.sh/docs/develop/) for the server and the Android app.
-
-Or, if you'd like to help translate ntfy into your language, you can start immediately in
+Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
 
 ## Contact me

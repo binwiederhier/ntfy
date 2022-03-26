@@ -3,18 +3,47 @@ Binaries for all releases can be found on the GitHub releases pages for the [ntf
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 <!--
-## ntfy Android app v1.10.0 (UNRELEASED)
+
+## ntfy Android app v1.11.0 (UNRELEASED)
 
 **Features:**
 
-* Support for UnifiedPush 2.0 specification (bytes messages, [#130](https://github.com/binwiederhier/ntfy/issues/130))
-* Export/import settings and subscriptions ([#115](https://github.com/binwiederhier/ntfy/issues/115), thanks [@cmeis](https://github.com/cmeis) for reporting)
+* Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
+* Regularly delete attachments for deleted notifications ([#142](https://github.com/binwiederhier/ntfy/issues/142))
+* Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 
-**Bug fixes:**
+**Bugs:**
 
-* Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
+* IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
+* SQLiteConstraintException: Crash during UP registration ([#185](https://github.com/binwiederhier/ntfy/issues/185))
+* Refresh preferences screen after settings import (#183, thanks to [@cmeis](https://github.com/cmeis) for reporting)
+
+**Translations:**
+
+* Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
+* Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
+
+**Thanks:**
+
+* Many thanks to [@cmeis](https://github.com/cmeis), [@Fallenbagel](https://github.com/Fallenbagel), [@Joeharrison94](https://github.com/Joeharrison94),
+  and [@rogeliodh](https://github.com/rogeliodh) for input on the new attachment logic, and for testing the release
 
 ## ntfy server v1.19.0 (UNRELEASED)
+
+**Bugs:**
+
+* Do not allow comma in topic name in publish via GET endpoint (no ticket) 
+* Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
+
+**Documentation:**
+
+* Improved [e-mail publishing](config.md#e-mail-publishing) documentation
+
+-->
+
+## ntfy server v1.18.1
+Released Mar 21, 2022   
+_This release ships no features or bug fixes. It's merely a documentation update._
 
 **Documentation:**
 
@@ -23,7 +52,19 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Additional examples for [NodeRED, Gatus, Sonarr, Radarr, ...](https://ntfy.sh/docs/examples/) (thanks to [@nickexyz](https://github.com/nickexyz))
 * Fixes in developer instructions (thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
 
--->
+## ntfy Android app v1.10.0
+Released Mar 21, 2022
+
+**Features:**
+
+* Support for UnifiedPush 2.0 specification (bytes messages, [#130](https://github.com/binwiederhier/ntfy/issues/130))
+* Export/import settings and subscriptions ([#115](https://github.com/binwiederhier/ntfy/issues/115), thanks [@cmeis](https://github.com/cmeis) for reporting)
+* Open "Click" link when tapping notification ([#110](https://github.com/binwiederhier/ntfy/issues/110), thanks [@cmeis](https://github.com/cmeis) for reporting)
+* JSON stream deprecation banner ([#164](https://github.com/binwiederhier/ntfy/issues/164))
+
+**Bug fixes:**
+
+* Display locale-specific times, with AM/PM or 24h format ([#140](https://github.com/binwiederhier/ntfy/issues/140), thanks [@hl2guide](https://github.com/hl2guide) for reporting)
 
 ## ntfy server v1.18.0
 Released Mar 16, 2022

@@ -10,7 +10,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
 * Regularly delete attachments for deleted notifications ([#142](https://github.com/binwiederhier/ntfy/issues/142))
-* Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
+* Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to 
+  [@StoyanDimitrov](https://github.com/StoyanDimitrov) for initiating things, and thanks to [@comradekingu](https://github.com/comradekingu)
+  for refining some English language strings)
 
 **Bugs:**
 
@@ -22,6 +24,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
+* Turkish (thanks to [@ersen](https://ersen.moe/))
+* Norwegian (thanks to [@comradekingu](https://github.com/comradekingu))
 
 **Thanks:**
 

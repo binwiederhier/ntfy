@@ -346,7 +346,7 @@ statuspage.io (though these days most services also support webhooks and HTTP ca
 To configure the SMTP server, you must at least set `smtp-server-listen` and `smtp-server-domain`:
 
 * `smtp-server-listen` defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`
-* `smtp-server-domain` is the e-mail domain, e.g. `ntfy.sh`
+* `smtp-server-domain` is the e-mail domain, e.g. `ntfy.sh` (must be identical to MX record, see below)
 * `smtp-server-addr-prefix` is an optional prefix for the e-mail addresses to prevent spam. If set to `ntfy-`, for instance,
   only e-mails to `ntfy-$topic@ntfy.sh` will be accepted. If this is not set, all emails to `$topic@ntfy.sh` will be
   accepted (which may obviously be a spam problem).
@@ -368,6 +368,42 @@ configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
   ![DNS records for incoming mail](static/img/screenshot-email-publishing-dns.png){ width=600 }
   <figcaption>DNS records for incoming mail</figcaption>
 </figure>
+
+You can check if everything is working correctly by sending an email as raw SMTP via `nc`. Create a text file, e.g. 
+`email.txt`
+
+```
+EHLO example.com
+MAIL FROM: phil@example.com
+RCPT TO: ntfy-mytopic@ntfy.sh
+DATA
+Subject: Email for you
+Content-Type: text/plain; charset="UTF-8"
+
+Hello from 🇩🇪
+.
+```
+
+And then send the mail via `nc` like this. If you see any lines starting with `451`, those are errors from the 
+ntfy server. Read them carefully.
+
+```
+$ cat email.txt | nc -N ntfy.sh 25
+220 ntfy.sh ESMTP Service Ready
+250-Hello example.com
+...
+250 2.0.0 Roger, accepting mail from <phil@example.com>
+250 2.0.0 I'll make sure <ntfy-mytopic@ntfy.sh> gets this
+```
+
+As for the DNS setup, be sure to verify that `dig MX` and `dig A` are returning results similar to this:
+
+```
+$ dig MX ntfy.sh +short 
+10 mx1.ntfy.sh.
+$ dig A mx1.ntfy.sh +short 
+3.139.215.220
+```
 
 ## Behind a proxy (TLS, etc.)
 !!! warning

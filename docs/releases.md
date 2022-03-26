@@ -10,12 +10,18 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
 * Regularly delete attachments for deleted notifications ([#142](https://github.com/binwiederhier/ntfy/issues/142))
+* Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 
 **Bugs:**
 
 * IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
 * SQLiteConstraintException: Crash during UP registration ([#185](https://github.com/binwiederhier/ntfy/issues/185))
 * Refresh preferences screen after settings import (#183, thanks to [@cmeis](https://github.com/cmeis) for reporting)
+
+**Translations:**
+
+* Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
+* Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 
 **Thanks:**
 
@@ -27,6 +33,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * Do not allow comma in topic name in publish via GET endpoint (no ticket) 
+* Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
+
+**Documentation:**
+
+* Improved [e-mail publishing](config.md#e-mail-publishing) documentation
 
 -->
 

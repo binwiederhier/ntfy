@@ -158,15 +158,12 @@ const Sender = (props) => {
                 backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
             }}
         >
-            <IconButton color="inherit" size="large" edge="start">
+            {false && <IconButton color="inherit" size="large" edge="start">
                 <MoreVert/>
-            </IconButton>
-            <IconButton color="inherit" size="large" edge="start">
-                <InsertEmoticonIcon/>
-            </IconButton>
-            <IconButton color="inherit" size="large" edge="start" onClick={(ev) => setPriorityAnchorEl(ev.currentTarget)}>
+            </IconButton>}
+            {false && <IconButton color="inherit" size="large" edge="start" onClick={(ev) => setPriorityAnchorEl(ev.currentTarget)}>
                 <img src={priorityFiles[priority]}/>
-            </IconButton>
+            </IconButton>}
             <Menu
                 anchorEl={priorityAnchorEl}
                 open={priorityMenuOpen}
@@ -177,26 +174,15 @@ const Sender = (props) => {
                     <ListItemText>Priority {p}</ListItemText>
                 </MenuItem>)}
             </Menu>
-            <div style={{display: "flex", flexDirection: "column", width: "100%"}}>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    placeholder="Message"
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    multiline
-                />
-                <div style={{display: "flex", width: "100%"}}>
-                    <TextField
-                        margin="dense"
-                        placeholder="Title"
-                        type="text"
-                        fullWidth
-                        variant="standard"
-                    />
-                </div>
-            </div>
+            <TextField
+                autoFocus
+                margin="dense"
+                placeholder="Message"
+                type="text"
+                fullWidth
+                variant="standard"
+                multiline
+            />
             <IconButton color="inherit" size="large" edge="end">
                 <SendIcon/>
             </IconButton>

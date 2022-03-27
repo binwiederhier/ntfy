@@ -14,7 +14,7 @@ import {useLiveQuery} from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
 import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from "react-router-dom";
-import {expandUrl} from "../app/utils";
+import {expandUrl, topicUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useConnectionListeners, useLocalStorageMigration} from "./hooks";
@@ -22,7 +22,6 @@ import {Backdrop, ListItemIcon, ListItemText, Menu} from "@mui/material";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import {MoreVert} from "@mui/icons-material";
-import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
@@ -30,6 +29,8 @@ import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
+import api from "../app/Api";
+import SendDialog from "./SendDialog";
 
 // TODO add drag and drop
 // TODO races when two tabs are open
@@ -102,7 +103,7 @@ const Layout = () => {
                 <Toolbar/>
                 <Outlet context={{ subscriptions, selected }}/>
             </Main>
-            <Sender/>
+            <Sender selected={selected}/>
         </Box>
     );
 }
@@ -128,23 +129,17 @@ const Main = (props) => {
     );
 };
 
-const priorityFiles = {
-    1: priority1,
-    2: priority2,
-    4: priority4,
-    5: priority5
-};
-
 const Sender = (props) => {
-    const [priority, setPriority] = useState(5);
-    const [priorityAnchorEl, setPriorityAnchorEl] = React.useState(null);
-    const priorityMenuOpen = Boolean(priorityAnchorEl);
-
-    const handlePriorityClick = (p) => {
-        setPriority(p);
-        setPriorityAnchorEl(null);
+    const [message, setMessage] = useState("");
+    const [sendDialogOpen, setSendDialogOpen] = useState(false);
+    const subscription = props.selected;
+    const handleSendClick = () => {
+        api.publish(subscription.baseUrl, subscription.topic, message);
+        setMessage("");
     };
-
+    if (!props.selected) {
+        return null;
+    }
     return (
         <Paper
             elevation={3}
@@ -158,22 +153,9 @@ const Sender = (props) => {
                 backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
             }}
         >
-            {false && <IconButton color="inherit" size="large" edge="start">
+            <IconButton color="inherit" size="large" edge="start" onClick={() => setSendDialogOpen(true)}>
                 <MoreVert/>
-            </IconButton>}
-            {false && <IconButton color="inherit" size="large" edge="start" onClick={(ev) => setPriorityAnchorEl(ev.currentTarget)}>
-                <img src={priorityFiles[priority]}/>
-            </IconButton>}
-            <Menu
-                anchorEl={priorityAnchorEl}
-                open={priorityMenuOpen}
-                onClose={() => setPriorityAnchorEl(null)}
-            >
-                {[5,4,2,1].map(p => <MenuItem onClick={() => handlePriorityClick(p)}>
-                    <ListItemIcon><img src={priorityFiles[p]}/></ListItemIcon>
-                    <ListItemText>Priority {p}</ListItemText>
-                </MenuItem>)}
-            </Menu>
+            </IconButton>
             <TextField
                 autoFocus
                 margin="dense"
@@ -181,11 +163,24 @@ const Sender = (props) => {
                 type="text"
                 fullWidth
                 variant="standard"
-                multiline
+                value={message}
+                onChange={ev => setMessage(ev.target.value)}
+                onKeyPress={(ev) => {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        handleSendClick();
+                    }
+                }}
             />
-            <IconButton color="inherit" size="large" edge="end">
+            <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick}>
                 <SendIcon/>
             </IconButton>
+            <SendDialog
+                open={sendDialogOpen}
+                onCancel={() => setSendDialogOpen(false)}
+                topicUrl={topicUrl(subscription.baseUrl, subscription.topic)}
+                message={message}
+            />
         </Paper>
     );
 };

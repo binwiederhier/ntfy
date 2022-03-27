@@ -26,23 +26,18 @@ class Api {
         return messages;
     }
 
-    async publish(baseUrl, topic, message, title, priority, tags) {
+    async publish(baseUrl, topic, message, options) {
         const user = await userManager.get(baseUrl);
-        const url = topicUrl(baseUrl, topic);
-        console.log(`[Api] Publishing message to ${url}`);
+        console.log(`[Api] Publishing message to ${topicUrl(baseUrl, topic)}`);
         const headers = {};
-        if (title) {
-            headers["X-Title"] = title;
-        }
-        if (priority !== 3) {
-            headers["X-Priority"] = `${priority}`;
-        }
-        if (tags.length > 0) {
-            headers["X-Tags"] = tags.join(",");
-        }
-        await fetch(url, {
+        const body = {
+            topic: topic,
+            message: message,
+            ...options
+        };
+        await fetch(baseUrl, {
             method: 'PUT',
-            body: message,
+            body: JSON.stringify(body),
             headers: maybeWithBasicAuth(headers, user)
         });
     }

@@ -120,13 +120,12 @@ const NotificationList = (props) => {
 
 const NotificationItem = (props) => {
     const notification = props.notification;
-    const subscriptionId = notification.subscriptionId;
     const attachment = notification.attachment;
     const date = formatShortDateTime(notification.time);
     const otherTags = unmatchedTags(notification.tags);
     const tags = (otherTags.length > 0) ? otherTags.join(', ') : null;
     const handleDelete = async () => {
-        console.log(`[Notifications] Deleting notification ${notification.id} from ${subscriptionId}`);
+        console.log(`[Notifications] Deleting notification ${notification.id}`);
         await subscriptionManager.deleteNotification(notification.id)
     }
     const handleCopy = (s) => {

@@ -26,6 +26,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 * Norwegian (thanks to [@comradekingu](https://github.com/comradekingu))
+* German (thanks to [@cmeis](https://github.com/cmeis))
 
 **Thanks:**
 
@@ -38,6 +39,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Do not allow comma in topic name in publish via GET endpoint (no ticket) 
 * Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
+* Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186)) 
 
 **Documentation:**
 

@@ -6,6 +6,7 @@ import notifier from "../app/Notifier";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
+import pruner from "../app/Pruner";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -67,29 +68,13 @@ export const useAutoSubscribe = (subscriptions, selected) => {
 };
 
 /**
- * Migrate the 'topics' item in localStorage to the subscriptionManager. This is only done once to migrate away
- * from the old web UI.
+ * Start the poller and the pruner. This is done in a side effect as opposed to just in Pruner.js
+ * and Poller.js, because side effect imports are not a thing in JS, and "Optimize imports" cleans
+ * up "unused" imports. See https://github.com/binwiederhier/ntfy/issues/186.
  */
-export const useLocalStorageMigration = () => {
-    const [hasRun, setHasRun] = useState(false);
+export const useBackgroundProcesses = () => {
     useEffect(() => {
-        if (hasRun) {
-            return;
-        }
-        const topicsStr = localStorage.getItem("topics");
-        if (topicsStr) {
-            const topics = JSON.parse(topicsStr).filter(topic => topic !== "");
-            if (topics.length > 0) {
-                (async () => {
-                    for (const topic of topics) {
-                        const baseUrl = window.location.origin;
-                        const subscription = await subscriptionManager.add(baseUrl, topic);
-                        poller.pollInBackground(subscription); // Dangle!
-                    }
-                    localStorage.removeItem("topics");
-                })();
-            }
-        }
-        setHasRun(true);
+        poller.startWorker();
+        pruner.startWorker();
     }, []);
 }

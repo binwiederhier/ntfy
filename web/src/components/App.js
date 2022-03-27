@@ -17,7 +17,7 @@ import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from 
 import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {useAutoSubscribe, useConnectionListeners, useLocalStorageMigration} from "./hooks";
+import {useAutoSubscribe, useConnectionListeners, useBackgroundProcesses} from "./hooks";
 
 // TODO add drag and drop
 // TODO races when two tabs are open
@@ -67,7 +67,7 @@ const Layout = () => {
     });
 
     useConnectionListeners(subscriptions, users);
-    useLocalStorageMigration();
+    useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
     return (

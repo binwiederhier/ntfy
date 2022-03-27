@@ -1,7 +1,7 @@
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 
-const delayMillis = 15000; // 15 seconds
+const delayMillis = 25000; // 25 seconds
 const intervalMillis = 1800000; // 30 minutes
 
 class Pruner {
@@ -35,6 +35,4 @@ class Pruner {
 }
 
 const pruner = new Pruner();
-pruner.startWorker();
-
 export default pruner;

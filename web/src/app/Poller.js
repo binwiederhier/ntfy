@@ -56,6 +56,4 @@ class Poller {
 }
 
 const poller = new Poller();
-poller.startWorker();
-
 export default poller;

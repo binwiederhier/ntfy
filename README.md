@@ -39,6 +39,10 @@ the [build instructions](https://ntfy.sh/docs/develop/) for the server and the A
 Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
 
+<a href="https://hosted.weblate.org/engage/ntfy/">
+<img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
+</a>
+
 ## Contact me
 You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 
 (bridged from Discord), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues), or find more contact information

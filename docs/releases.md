@@ -11,8 +11,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Download attachments to cache folder ([#181](https://github.com/binwiederhier/ntfy/issues/181))
 * Regularly delete attachments for deleted notifications ([#142](https://github.com/binwiederhier/ntfy/issues/142))
 * Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to 
-  [@StoyanDimitrov](https://github.com/StoyanDimitrov) for initiating things, and thanks to [@comradekingu](https://github.com/comradekingu)
-  for refining some English language strings)
+  [@StoyanDimitrov](https://github.com/StoyanDimitrov) for initiating things)
 
 **Bugs:**
 
@@ -22,10 +21,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Translations:**
 
+* English language improvements (thanks to [@comradekingu](https://github.com/comradekingu))
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 * Norwegian (thanks to [@comradekingu](https://github.com/comradekingu))
+* German (thanks to [@cmeis](https://github.com/cmeis))
+* Chinese (thanks to [@poi](https://hosted.weblate.org/user/poi))
+* Dutch (thanks to [@diony](https://hosted.weblate.org/user/diony))
 
 **Thanks:**
 
@@ -38,6 +41,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Do not allow comma in topic name in publish via GET endpoint (no ticket) 
 * Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
+* Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186)) 
 
 **Documentation:**
 

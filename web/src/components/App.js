@@ -17,18 +17,13 @@ import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from 
 import {expandUrl, topicUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {useAutoSubscribe, useConnectionListeners, useLocalStorageMigration} from "./hooks";
-import {Backdrop, ListItemIcon, ListItemText, Menu} from "@mui/material";
+import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
+import {Backdrop} from "@mui/material";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import {MoreVert} from "@mui/icons-material";
-import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
-import priority1 from "../img/priority-1.svg";
-import priority2 from "../img/priority-2.svg";
-import priority4 from "../img/priority-4.svg";
-import priority5 from "../img/priority-5.svg";
 import api from "../app/Api";
 import SendDialog from "./SendDialog";
 
@@ -80,7 +75,7 @@ const Layout = () => {
     });
 
     useConnectionListeners(subscriptions, users);
-    useLocalStorageMigration();
+    useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
     return (

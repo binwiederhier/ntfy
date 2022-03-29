@@ -26,6 +26,7 @@ import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
 import api from "../app/Api";
 import SendDialog from "./SendDialog";
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 // TODO add drag and drop
 // TODO races when two tabs are open
@@ -149,7 +150,7 @@ const Sender = (props) => {
             }}
         >
             <IconButton color="inherit" size="large" edge="start" onClick={() => setSendDialogOpen(true)}>
-                <MoreVert/>
+                <KeyboardArrowUpIcon/>
             </IconButton>
             <TextField
                 autoFocus

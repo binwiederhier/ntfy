@@ -15,6 +15,7 @@ import Box from "@mui/material/Box";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
+import DialogFooter from "./DialogFooter";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -185,29 +186,6 @@ const LoginPage = (props) => {
                 <Button onClick={handleLogin}>Login</Button>
             </DialogFooter>
         </>
-    );
-};
-
-const DialogFooter = (props) => {
-    return (
-        <Box sx={{
-            display: 'flex',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            paddingLeft: '24px',
-            paddingTop: '8px 24px',
-            paddingBottom: '8px 24px',
-        }}>
-            <DialogContentText sx={{
-                margin: '0px',
-                paddingTop: '8px',
-            }}>
-                {props.status}
-            </DialogContentText>
-            <DialogActions>
-                {props.children}
-            </DialogActions>
-        </Box>
     );
 };
 

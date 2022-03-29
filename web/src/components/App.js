@@ -127,15 +127,24 @@ const Main = (props) => {
 
 const Sender = (props) => {
     const [message, setMessage] = useState("");
+    const [sendDialogKey, setSendDialogKey] = useState(0);
     const [sendDialogOpen, setSendDialogOpen] = useState(false);
     const subscription = props.selected;
+
     const handleSendClick = () => {
-        api.publish(subscription.baseUrl, subscription.topic, message);
+        api.publish(subscription.baseUrl, subscription.topic, message); // FIXME
         setMessage("");
     };
+
+    const handleSendDialogClose = () => {
+        setSendDialogOpen(false);
+        setSendDialogKey(prev => prev+1);
+    };
+
     if (!props.selected) {
         return null;
     }
+
     return (
         <Paper
             elevation={3}
@@ -172,8 +181,9 @@ const Sender = (props) => {
                 <SendIcon/>
             </IconButton>
             <SendDialog
+                key={`sendDialog${sendDialogKey}`} // Resets dialog when canceled/closed
                 open={sendDialogOpen}
-                onCancel={() => setSendDialogOpen(false)}
+                onClose={handleSendDialogClose}
                 topicUrl={topicUrl(subscription.baseUrl, subscription.topic)}
                 message={message}
             />

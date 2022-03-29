@@ -43,6 +43,7 @@ import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
+import Icon from "./Icon";
 
 const Notifications = (props) => {
     if (props.mode === "all") {
@@ -320,35 +321,6 @@ const Image = (props) => {
                 </Fade>
             </Modal>
         </>
-    );
-}
-
-const Icon = (props) => {
-    const type = props.type;
-    let imageFile;
-    if (!type) {
-        imageFile = fileDocument;
-    } else if (type.startsWith('image/')) {
-        imageFile = fileImage;
-    } else if (type.startsWith('video/')) {
-        imageFile = fileVideo;
-    } else if (type.startsWith('audio/')) {
-        imageFile = fileAudio;
-    } else if (type === "application/vnd.android.package-archive") {
-        imageFile = fileApp;
-    } else {
-        imageFile = fileDocument;
-    }
-    return (
-        <Box
-            component="img"
-            src={imageFile}
-            loading="lazy"
-            sx={{
-                width: '28px',
-                height: '28px'
-            }}
-        />
     );
 }
 

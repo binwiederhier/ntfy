@@ -1,18 +1,8 @@
 import * as React from 'react';
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 import {NotificationItem} from "./Notifications";
 import theme from "./theme";
-import {
-    Chip,
-    FormControl,
-    InputAdornment, InputLabel,
-    Link,
-    ListItemIcon,
-    ListItemText,
-    Select,
-    Tooltip,
-    useMediaQuery
-} from "@mui/material";
+import {Chip, FormControl, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
 import TextField from "@mui/material/TextField";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
@@ -22,13 +12,17 @@ import priority5 from "../img/priority-5.svg";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
+import {formatBytes, shortUrl, splitNoEmpty, splitTopicUrl, validTopicUrl} from "../app/utils";
+import Box from "@mui/material/Box";
+import Icon from "./Icon";
+import DialogFooter from "./DialogFooter";
+import api from "../app/Api";
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState(props.topicUrl);
@@ -38,6 +32,7 @@ const SendDialog = (props) => {
     const [priority, setPriority] = useState(3);
     const [clickUrl, setClickUrl] = useState("");
     const [attachUrl, setAttachUrl] = useState("");
+    const [attachFile, setAttachFile] = useState(null);
     const [filename, setFilename] = useState("");
     const [email, setEmail] = useState("");
     const [delay, setDelay] = useState("");
@@ -49,20 +44,62 @@ const SendDialog = (props) => {
     const [showEmail, setShowEmail] = useState(false);
     const [showDelay, setShowDelay] = useState(false);
 
+    const attachFileInput = useRef();
+    const [errorText, setErrorText] = useState("");
+
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const sendButtonEnabled = (() => {
+        if (!validTopicUrl(topicUrl)) {
+            return false;
+        }
         return true;
     })();
     const handleSubmit = async () => {
-        props.onSubmit({
-            baseUrl: "xx",
-            username: username,
-            password: password
-        })
+        const { baseUrl, topic } = splitTopicUrl(topicUrl);
+        const options = {};
+        if (title.trim()) {
+            options["title"] = title.trim();
+        }
+        if (tags.trim()) {
+            options["tags"] = splitNoEmpty(tags, ",");
+        }
+        if (priority && priority !== 3) {
+            options["priority"] = priority;
+        }
+        if (clickUrl.trim()) {
+            options["click"] = clickUrl.trim();
+        }
+        if (attachUrl.trim()) {
+            options["attach"] = attachUrl.trim();
+        }
+        if (filename.trim()) {
+            options["filename"] = filename.trim();
+        }
+        if (email.trim()) {
+            options["email"] = email.trim();
+        }
+        if (delay.trim()) {
+            options["delay"] = delay.trim();
+        }
+        try {
+            const response = await api.publish(baseUrl, topic, message, options);
+            console.log(response);
+            props.onClose();
+        } catch (e) {
+            setErrorText(e);
+        }
+    };
+    const handleAttachFileClick = () => {
+        attachFileInput.current.click();
+    };
+    const handleAttachFileChanged = (ev) => {
+        setAttachFile(ev.target.files[0]);
+        console.log(ev.target.files[0]);
+        console.log(URL.createObjectURL(ev.target.files[0]));
     };
     return (
         <Dialog maxWidth="md" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-            <DialogTitle>Publish notification</DialogTitle>
+            <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
             <DialogContent>
                 {showTopicUrl &&
                     <ClosableRow onClose={() => {
@@ -173,15 +210,29 @@ const SendDialog = (props) => {
                     />
                     </ClosableRow>
                 }
-                {showAttachUrl && <TextField
-                    margin="dense"
-                    label="Attachment URL"
-                    value={attachUrl}
-                    onChange={ev => setAttachUrl(ev.target.value)}
-                    type="url"
-                    variant="standard"
-                    fullWidth
-                />}
+                {showAttachUrl &&
+                    <ClosableRow onClose={() => {
+                        setAttachUrl("");
+                        setShowAttachUrl(false);
+                    }}>
+                        <TextField
+                            margin="dense"
+                            label="Attachment URL"
+                            value={attachUrl}
+                            onChange={ev => setAttachUrl(ev.target.value)}
+                            type="url"
+                            variant="standard"
+                            fullWidth
+                        />
+                    </ClosableRow>
+                }
+                <input
+                    type="file"
+                    ref={attachFileInput}
+                    onChange={handleAttachFileChanged}
+                    style={{ display: 'none' }}
+                />
+                {attachFile && <AttachmentBox file={attachFile}/>}
                 {(showAttachFile || showAttachUrl) && <TextField
                     margin="dense"
                     label="Attachment Filename"
@@ -215,7 +266,7 @@ const SendDialog = (props) => {
                     {!showClickUrl && <Chip clickable label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1}}/>}
                     {!showEmail && <Chip clickable label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1}}/>}
                     {!showAttachUrl && <Chip clickable label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1}}/>}
-                    {!showAttachFile && <Chip clickable label="Attach local file" onClick={() => setShowAttachFile(true)} sx={{marginRight: 1}}/>}
+                    {!showAttachFile && <Chip clickable label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1}}/>}
                     {!showDelay && <Chip clickable label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1}}/>}
                     {!showTopicUrl && <Chip clickable label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1}}/>}
                 </div>
@@ -224,10 +275,10 @@ const SendDialog = (props) => {
                     refer to the <Link href="/docs">documentation</Link>.
                 </Typography>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.onCancel}>Cancel</Button>
+            <DialogFooter status={errorText}>
+                <Button onClick={props.onClose}>Cancel</Button>
                 <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
-            </DialogActions>
+            </DialogFooter>
         </Dialog>
     );
 };
@@ -244,32 +295,43 @@ const ClosableRow = (props) => {
     return (
         <Row>
             {props.children}
-            <DialogIconButton onClick={props.onClose}><Close/></DialogIconButton>
+            <DialogIconButton onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
         </Row>
     );
 };
 
-const PrioritySelect = () => {
-    return (
-        <Tooltip title="Message priority">
-            <IconButton color="inherit" size="large" sx={{height: "45px", marginTop: "15px"}} onClick={() => setSendDialogOpen(true)}>
-                <img src={priority3}/>
-            </IconButton>
-        </Tooltip>
-    );
-};
-
 const DialogIconButton = (props) => {
+    const sx = props.sx || {};
     return (
         <IconButton
             color="inherit"
             size="large"
             edge="start"
-            sx={{height: "45px", marginTop: "17px", marginLeft: "6px"}}
+            sx={{height: "45px", marginTop: "17px", ...sx}}
             onClick={props.onClick}
         >
             {props.children}
         </IconButton>
+    );
+};
+
+const AttachmentBox = (props) => {
+    const file = props.file;
+    const maybeInfoText = formatBytes(file.size);
+    return (
+        <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            marginTop: 2,
+            padding: 1,
+            borderRadius: '4px',
+        }}>
+            <Icon type={file.type}/>
+            <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
+                <b>{file.name}</b>
+                {maybeInfoText}
+            </Typography>
+        </Box>
     );
 };
 

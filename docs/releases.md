@@ -29,6 +29,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
 * Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
+* Portuguese (Brazil, thanks to [@LW](https://hosted.weblate.org/user/LW/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 

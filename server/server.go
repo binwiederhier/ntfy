@@ -1135,6 +1135,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Click != "" {
 			r.Header.Set("X-Click", m.Click)
 		}
+		if m.Email != "" {
+			r.Header.Set("X-Email", m.Email)
+		}
+		if m.Delay != "" {
+			r.Header.Set("X-Delay", m.Delay)
+		}
 		return next(w, r, v)
 	}
 }

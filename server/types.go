@@ -52,6 +52,8 @@ type publishMessage struct {
 	Click    string   `json:"click"`
 	Attach   string   `json:"attach"`
 	Filename string   `json:"filename"`
+	Email    string   `json:"email"`
+	Delay    string   `json:"delay"`
 }
 
 // messageEncoder is a function that knows how to encode a message

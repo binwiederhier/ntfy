@@ -661,7 +661,8 @@ the example.
     To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
     POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect). 
 
-Here's an example using all supported parameters. The `topic` parameter is the only required one:
+Here's an example using most supported parameters. Check the table below for a complete list. The `topic` parameter 
+is the only required one:
 
 === "Command line (curl)"
     ```
@@ -798,7 +799,8 @@ all the supported fields:
 | `click`    | -        | *URL*                            | `https://example.com`          | Website opened when notification is [clicked](#click-action)          |
 | `attach`   | -        | *URL*                            | `https://example.com/file.jpg` | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
 | `filename` | -        | *string*                         | `file.jpg`                     | File name of the attachment                                           |
-
+| `delay`    | -        | *string*                         | `30min`, `9am`                 | Timestamp or duration for delayed delivery                            |
+| `email`    | -        | *e-mail address*                 | `phil@example.com`             | E-mail address for e-mail notifications                               |
 
 ## Click action
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 

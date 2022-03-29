@@ -45,6 +45,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Do not allow comma in topic name in publish via GET endpoint (no ticket) 
 * Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
 * Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186)) 
+* Added missing params `delay` and `email` to publish as JSON body (no ticket)
 
 **Documentation:**
 

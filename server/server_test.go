@@ -873,7 +873,8 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
-		`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4}`
+		`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4,` +
+		`"delay":"30min"}`
 	response := request(t, s, "PUT", "/", body, nil)
 	require.Equal(t, 200, response.Code)
 
@@ -886,6 +887,22 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "google.pdf", m.Attachment.Name)
 	require.Equal(t, "http://ntfy.sh", m.Click)
 	require.Equal(t, 4, m.Priority)
+	require.True(t, m.Time > time.Now().Unix()+29*60)
+	require.True(t, m.Time < time.Now().Unix()+31*60)
+}
+
+func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
+	mailer := &testMailer{}
+	s := newTestServer(t, newTestConfig(t))
+	s.mailer = mailer
+	body := `{"topic":"mytopic","message":"A message","email":"phil@example.com"}`
+	response := request(t, s, "PUT", "/", body, nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "mytopic", m.Topic)
+	require.Equal(t, "A message", m.Message)
+	require.Equal(t, 1, mailer.count)
 }
 
 func TestServer_PublishAsJSON_Invalid(t *testing.T) {

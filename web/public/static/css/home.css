@@ -16,7 +16,7 @@ html {
 }
 
 a, a:visited {
-    color: #3a9784;
+    color: #338574;
 }
 
 a:hover {
@@ -114,7 +114,7 @@ code {
 }
 
 .anchor .anchorLink:hover {
-    color: #3a9784;
+    color: #338574;
     visibility: visible;
 }
 
@@ -221,7 +221,7 @@ figcaption {
 /* Header */
 
 #header {
-    background: #3a9784;
+    background: #338574;
     height: 130px;
 }
 

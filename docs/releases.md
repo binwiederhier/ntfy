@@ -23,12 +23,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * English language improvements (thanks to [@comradekingu](https://github.com/comradekingu))
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
+* Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony))
+* Chinese (*incomplete*, thanks to [@poi](https://hosted.weblate.org/user/poi))
+* French (*incomplete*, thanks to [@Kusoneko](https://kusoneko.moe/))
+* German (thanks to [@cmeis](https://github.com/cmeis))
+* Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
+* Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
-* Norwegian (thanks to [@comradekingu](https://github.com/comradekingu))
-* German (thanks to [@cmeis](https://github.com/cmeis))
-* Chinese (thanks to [@poi](https://hosted.weblate.org/user/poi))
-* Dutch (thanks to [@diony](https://hosted.weblate.org/user/diony))
 
 **Thanks:**
 

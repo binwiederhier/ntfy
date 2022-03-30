@@ -23,6 +23,7 @@ import Box from "@mui/material/Box";
 import Icon from "./Icon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
+import Divider from "@mui/material/Divider";
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState(props.topicUrl);
@@ -40,11 +41,12 @@ const SendDialog = (props) => {
     const [showTopicUrl, setShowTopicUrl] = useState(props.topicUrl === "");
     const [showClickUrl, setShowClickUrl] = useState(false);
     const [showAttachUrl, setShowAttachUrl] = useState(false);
-    const [showAttachFile, setShowAttachFile] = useState(false);
     const [showEmail, setShowEmail] = useState(false);
     const [showDelay, setShowDelay] = useState(false);
 
+    const showAttachFile = !!attachFile && !showAttachUrl;
     const attachFileInput = useRef();
+
     const [errorText, setErrorText] = useState("");
 
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -93,7 +95,9 @@ const SendDialog = (props) => {
         attachFileInput.current.click();
     };
     const handleAttachFileChanged = (ev) => {
-        setAttachFile(ev.target.files[0]);
+        const file = ev.target.files[0];
+        setAttachFile(file);
+        setFilename(file.name);
         console.log(ev.target.files[0]);
         console.log(URL.createObjectURL(ev.target.files[0]));
     };
@@ -165,7 +169,7 @@ const SendDialog = (props) => {
                             value={priority}
                             onChange={(ev) => setPriority(ev.target.value)}
                         >
-                            {[1,2,3,4,5].map(priority =>
+                            {[5,4,3,2,1].map(priority =>
                                 <MenuItem value={priority}>
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
                                         <img src={priorities[priority].file} style={{marginRight: "8px"}}/>
@@ -232,8 +236,13 @@ const SendDialog = (props) => {
                     onChange={handleAttachFileChanged}
                     style={{ display: 'none' }}
                 />
-                {attachFile && <AttachmentBox file={attachFile}/>}
-                {(showAttachFile || showAttachUrl) && <TextField
+                {showAttachFile && <AttachmentBox
+                    file={attachFile}
+                    filename={filename}
+                    onChangeFilename={(f) => setFilename(f)}
+                    onClose={() => setAttachFile(null)}
+                />}
+                {showAttachUrl && <TextField
                     margin="dense"
                     label="Attachment Filename"
                     value={filename}
@@ -265,8 +274,8 @@ const SendDialog = (props) => {
                 <div>
                     {!showClickUrl && <Chip clickable label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1}}/>}
                     {!showEmail && <Chip clickable label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1}}/>}
-                    {!showAttachUrl && <Chip clickable label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1}}/>}
-                    {!showAttachFile && <Chip clickable label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1}}/>}
+                    {!showAttachUrl && !showAttachFile && <Chip clickable label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1}}/>}
+                    {!showAttachFile && !showAttachUrl && <Chip clickable label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1}}/>}
                     {!showDelay && <Chip clickable label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1}}/>}
                     {!showTopicUrl && <Chip clickable label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1}}/>}
                 </div>
@@ -318,20 +327,43 @@ const DialogIconButton = (props) => {
 const AttachmentBox = (props) => {
     const file = props.file;
     const maybeInfoText = formatBytes(file.size);
+    const [editFilename, setEditFilename] = useState(false);
     return (
-        <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            marginTop: 2,
-            padding: 1,
-            borderRadius: '4px',
-        }}>
-            <Icon type={file.type}/>
-            <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
-                <b>{file.name}</b>
-                {maybeInfoText}
+        <>
+            <Divider/>
+            <Typography variant="body1" sx={{marginTop: 2}}>
+                Attached file:
             </Typography>
-        </Box>
+            <TextField
+                margin="dense"
+                label="Attachment Filename"
+                type="text"
+                variant="standard"
+                value={props.filename}
+                onChange={ev => props.onChangeFilename(ev.target.value)}
+                fullWidth
+            />
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                marginTop: 1,
+                padding: 1,
+                borderRadius: '4px',
+            }}>
+                <Icon type={file.type}/>
+                <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
+                    {editFilename
+                        ? <TextField value={props.filename}/>
+                        : <b>{props.filename}</b>
+                    }
+                    <IconButton size="small" onClick={() => setEditFilename(true)}><Close/></IconButton>
+                    <br/>
+                    {maybeInfoText}
+                </Typography>
+                <DialogIconButton onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
+            </Box>
+            <Divider/>
+        </>
     );
 };
 

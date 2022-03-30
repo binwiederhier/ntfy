@@ -24,7 +24,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * English language improvements (thanks to [@comradekingu](https://github.com/comradekingu))
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
 * Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony))
-* Chinese (*incomplete*, thanks to [@poi](https://hosted.weblate.org/user/poi))
+* Chinese/Simplified (thanks to [@poi](https://hosted.weblate.org/user/poi) and [@PeterCxy](https://hosted.weblate.org/user/PeterCxy))
 * French (*incomplete*, thanks to [@Kusoneko](https://kusoneko.moe/))
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
@@ -42,6 +42,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bugs:**
 
+* Do not pack binary with `upx` for armv7/arm64 due to `illegal instruction` errors ([#191](https://github.com/binwiederhier/ntfy/issues/191), thanks to [@iexos](https://github.com/iexos)) 
 * Do not allow comma in topic name in publish via GET endpoint (no ticket) 
 * Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
 * Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186)) 

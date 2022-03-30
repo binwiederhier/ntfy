@@ -26,28 +26,28 @@ deb/rpm packages.
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_x86_64.tar.gz
-    tar zxvf ntfy_1.18.1_linux_x86_64.tar.gz
-    sudo cp -a ntfy_1.18.1_linux_x86_64/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.1_linux_x86_64/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_x86_64.tar.gz
+    tar zxvf ntfy_1.19.0_linux_x86_64.tar.gz
+    sudo cp -a ntfy_1.19.0_linux_x86_64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.19.0_linux_x86_64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_armv7.tar.gz
-    tar zxvf ntfy_1.18.1_linux_armv7.tar.gz
-    sudo cp -a ntfy_1.18.1_linux_armv7/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.1_linux_armv7/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_armv7.tar.gz
+    tar zxvf ntfy_1.19.0_linux_armv7.tar.gz
+    sudo cp -a ntfy_1.19.0_linux_armv7/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.19.0_linux_armv7/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_arm64.tar.gz
-    tar zxvf ntfy_1.18.1_linux_arm64.tar.gz
-    sudo cp -a ntfy_1.18.1_linux_arm64/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_1.18.1_linux_arm64/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_arm64.tar.gz
+    tar zxvf ntfy_1.19.0_linux_arm64.tar.gz
+    sudo cp -a ntfy_1.19.0_linux_arm64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_1.19.0_linux_arm64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
@@ -94,7 +94,7 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_amd64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_amd64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -102,7 +102,7 @@ Manually installing the .deb file:
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_armv7.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_armv7.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -110,7 +110,7 @@ Manually installing the .deb file:
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_arm64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_arm64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -120,21 +120,21 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_amd64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_amd64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_armv7.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_armv7.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "arm64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.18.1/ntfy_1.18.1_linux_arm64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v1.19.0/ntfy_1.19.0_linux_arm64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
@@ -194,13 +194,3 @@ COPY server.yml /etc/ntfy/server.yml
 ENTRYPOINT ["ntfy", "serve"]
 ```
 This image can be pushed to a container registry and shipped independently. All that's needed when running it is mapping ntfy's port to a host port.
-
-## Go
-To install via Go, simply run:
-```bash
-go install heckel.io/ntfy@latest
-```
-
-!!! info
-    Please [let me know](https://github.com/binwiederhier/ntfy/issues) if there are any issues with this installation
-    method. The SQLite bindings require CGO and it works for me, but I have the feeling it may not work for everyone.

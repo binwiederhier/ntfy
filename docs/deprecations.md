@@ -10,6 +10,10 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 In future versions of the Android app, instant delivery connections and connections to self-hosted servers will
 be using the WebSockets protocol. This potentially requires [configuration changes in your proxy](https://ntfy.sh/docs/config/#nginxapache2caddy).
 
+Due to [reports of varying battery consumption](https://github.com/binwiederhier/ntfy/issues/190) (which entirely 
+seems to depend on the phone), JSON HTTP stream support will not be removed. Instead, I'll just flip the default to 
+WebSocket in June.
+
 ### Android app: Using `since=<timestamp>` instead of `since=<id>`
 > Active since 2022-02-27, behavior will change in **May 2022**
 

@@ -714,6 +714,12 @@ func (t *testMailer) Send(from, to string, m *message) error {
 	return nil
 }
 
+func (t *testMailer) Count() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.count
+}
+
 func TestServer_PublishTooRequests_Defaults(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	for i := 0; i < 60; i++ {
@@ -902,7 +908,7 @@ func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, "mytopic", m.Topic)
 	require.Equal(t, "A message", m.Message)
-	require.Equal(t, 1, mailer.count)
+	require.Equal(t, 1, mailer.Count())
 }
 
 func TestServer_PublishAsJSON_Invalid(t *testing.T) {

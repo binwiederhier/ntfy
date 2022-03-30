@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {NotificationItem} from "./Notifications";
 import theme from "./theme";
 import {Chip, FormControl, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
@@ -24,6 +24,8 @@ import Icon from "./Icon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import Divider from "@mui/material/Divider";
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState(props.topicUrl);
@@ -326,43 +328,59 @@ const DialogIconButton = (props) => {
 
 const AttachmentBox = (props) => {
     const file = props.file;
-    const maybeInfoText = formatBytes(file.size);
-    const [editFilename, setEditFilename] = useState(false);
+    const invisibleFilenameRef = useRef();
+    const minFilenameWidth = 140;
+    const [filenameWidth, setFilenameWidth] = useState(minFilenameWidth);
+    const handleFilenameChange = (ev) => {
+        props.onChangeFilename(ev.target.value);
+    };
+    const determineFilenameWidth = () => {
+        const boundingRect = invisibleFilenameRef?.current?.getBoundingClientRect();
+        if (!boundingRect) {
+            return minFilenameWidth;
+        }
+        return (boundingRect.width >= minFilenameWidth) ? Math.round(boundingRect.width) : minFilenameWidth;
+    };
+    useEffect(() => {
+        setFilenameWidth(determineFilenameWidth() + 5);
+    }, [props.filename]);
     return (
         <>
-            <Divider/>
+            <Typography
+                ref={invisibleFilenameRef}
+                component="span"
+                variant="body2" // Same as text field below!
+                sx={{position: "absolute", left: "-100%"}}
+            >
+                {props.filename}
+            </Typography>
             <Typography variant="body1" sx={{marginTop: 2}}>
                 Attached file:
             </Typography>
-            <TextField
-                margin="dense"
-                label="Attachment Filename"
-                type="text"
-                variant="standard"
-                value={props.filename}
-                onChange={ev => props.onChangeFilename(ev.target.value)}
-                fullWidth
-            />
             <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                marginTop: 1,
-                padding: 1,
+                padding: 0.5,
                 borderRadius: '4px',
             }}>
                 <Icon type={file.type}/>
                 <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
-                    {editFilename
-                        ? <TextField value={props.filename}/>
-                        : <b>{props.filename}</b>
-                    }
-                    <IconButton size="small" onClick={() => setEditFilename(true)}><Close/></IconButton>
+                    <TextField
+                        margin="dense"
+                        placeholder="Attachment filename"
+                        value={props.filename}
+                        onChange={handleFilenameChange}
+                        type="text"
+                        variant="standard"
+                        sx={{ width: `${filenameWidth}px`, borderBottom: "none" }}
+                        InputProps={{ style: { fontSize: theme.typography.body2.fontSize } }}
+                        inputProps={{ style: { paddingBottom: 0, paddingTop: 0 } }}
+                    />
                     <br/>
-                    {maybeInfoText}
+                    {formatBytes(file.size)}
                 </Typography>
                 <DialogIconButton onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
             </Box>
-            <Divider/>
         </>
     );
 };

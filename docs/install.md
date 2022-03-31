@@ -188,7 +188,7 @@ docker run \
 ```
 
 Using docker-compose:
-```
+```yaml
 version: "2.1"
 
 services:

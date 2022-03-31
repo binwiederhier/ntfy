@@ -37,6 +37,7 @@ const SendDialog = (props) => {
     const [attachUrl, setAttachUrl] = useState("");
     const [attachFile, setAttachFile] = useState(null);
     const [filename, setFilename] = useState("");
+    const [filenameEdited, setFilenameEdited] = useState(false);
     const [email, setEmail] = useState("");
     const [delay, setDelay] = useState("");
 
@@ -205,30 +206,60 @@ const SendDialog = (props) => {
                         setShowEmail(false);
                     }}>
                         <TextField
-                        margin="dense"
-                        label="Email"
-                        placeholder="Address to forward the message to, e.g. phil@example.com"
-                        value={email}
-                        onChange={ev => setEmail(ev.target.value)}
-                        type="email"
-                        variant="standard"
-                        fullWidth
-                    />
+                            margin="dense"
+                            label="Email"
+                            placeholder="Address to forward the message to, e.g. phil@example.com"
+                            value={email}
+                            onChange={ev => setEmail(ev.target.value)}
+                            type="email"
+                            variant="standard"
+                            fullWidth
+                        />
                     </ClosableRow>
                 }
                 {showAttachUrl &&
                     <ClosableRow onClose={() => {
                         setAttachUrl("");
+                        setFilename("");
+                        setFilenameEdited(false);
                         setShowAttachUrl(false);
                     }}>
                         <TextField
                             margin="dense"
                             label="Attachment URL"
+                            placeholder="Attach file by URL, e.g. https://f-droid.org/F-Droid.apk"
                             value={attachUrl}
-                            onChange={ev => setAttachUrl(ev.target.value)}
+                            onChange={ev => {
+                                const url = ev.target.value;
+                                setAttachUrl(url);
+                                if (!filenameEdited) {
+                                    try {
+                                        const u = new URL(url);
+                                        const parts = u.pathname.split("/");
+                                        if (parts.length > 0) {
+                                            setFilename(parts[parts.length-1]);
+                                        }
+                                    } catch (e) {
+                                        // Do nothing
+                                    }
+                                }
+                            }}
                             type="url"
                             variant="standard"
-                            fullWidth
+                            sx={{flexGrow: 5, marginRight: 1}}
+                        />
+                        <TextField
+                            margin="dense"
+                            label="Filename"
+                            placeholder="Attachment filename"
+                            value={filename}
+                            onChange={ev => {
+                                setFilename(ev.target.value);
+                                setFilenameEdited(true);
+                            }}
+                            type="text"
+                            variant="standard"
+                            sx={{flexGrow: 1}}
                         />
                     </ClosableRow>
                 }
@@ -242,16 +273,10 @@ const SendDialog = (props) => {
                     file={attachFile}
                     filename={filename}
                     onChangeFilename={(f) => setFilename(f)}
-                    onClose={() => setAttachFile(null)}
-                />}
-                {showAttachUrl && <TextField
-                    margin="dense"
-                    label="Attachment Filename"
-                    value={filename}
-                    onChange={ev => setFilename(ev.target.value)}
-                    type="text"
-                    variant="standard"
-                    fullWidth
+                    onClose={() => {
+                        setAttachFile(null);
+                        setFilename("");
+                    }}
                 />}
                 {showDelay &&
                     <ClosableRow onClose={() => {
@@ -328,32 +353,8 @@ const DialogIconButton = (props) => {
 
 const AttachmentBox = (props) => {
     const file = props.file;
-    const invisibleFilenameRef = useRef();
-    const minFilenameWidth = 140;
-    const [filenameWidth, setFilenameWidth] = useState(minFilenameWidth);
-    const handleFilenameChange = (ev) => {
-        props.onChangeFilename(ev.target.value);
-    };
-    const determineFilenameWidth = () => {
-        const boundingRect = invisibleFilenameRef?.current?.getBoundingClientRect();
-        if (!boundingRect) {
-            return minFilenameWidth;
-        }
-        return (boundingRect.width >= minFilenameWidth) ? Math.round(boundingRect.width) : minFilenameWidth;
-    };
-    useEffect(() => {
-        setFilenameWidth(determineFilenameWidth() + 5);
-    }, [props.filename]);
     return (
         <>
-            <Typography
-                ref={invisibleFilenameRef}
-                component="span"
-                variant="body2" // Same as text field below!
-                sx={{position: "absolute", left: "-100%"}}
-            >
-                {props.filename}
-            </Typography>
             <Typography variant="body1" sx={{marginTop: 2}}>
                 Attached file:
             </Typography>
@@ -365,16 +366,11 @@ const AttachmentBox = (props) => {
             }}>
                 <Icon type={file.type}/>
                 <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
-                    <TextField
-                        margin="dense"
-                        placeholder="Attachment filename"
+                    <ExpandingTextField
+                        minWidth={140}
+                        variant="body2"
                         value={props.filename}
-                        onChange={handleFilenameChange}
-                        type="text"
-                        variant="standard"
-                        sx={{ width: `${filenameWidth}px`, borderBottom: "none" }}
-                        InputProps={{ style: { fontSize: theme.typography.body2.fontSize } }}
-                        inputProps={{ style: { paddingBottom: 0, paddingTop: 0 } }}
+                        onChange={(ev) => props.onChangeFilename(ev.target.value)}
                     />
                     <br/>
                     {formatBytes(file.size)}
@@ -383,6 +379,44 @@ const AttachmentBox = (props) => {
             </Box>
         </>
     );
+};
+
+const ExpandingTextField = (props) => {
+    const invisibleFieldRef = useRef();
+    const [textWidth, setTextWidth] = useState(props.minWidth);
+    const determineTextWidth = () => {
+        const boundingRect = invisibleFieldRef?.current?.getBoundingClientRect();
+        if (!boundingRect) {
+            return props.minWidth;
+        }
+        return (boundingRect.width >= props.minWidth) ? Math.round(boundingRect.width) : props.minWidth;
+    };
+    useEffect(() => {
+        setTextWidth(determineTextWidth() + 5);
+    }, [props.value]);
+    return (
+        <>
+            <Typography
+                ref={invisibleFieldRef}
+                component="span"
+                variant={props.variant}
+                sx={{position: "absolute", left: "-100%"}}
+            >
+                {props.value}
+            </Typography>
+            <TextField
+                margin="dense"
+                placeholder="Attachment filename"
+                value={props.value}
+                onChange={props.onChange}
+                type="text"
+                variant="standard"
+                sx={{ width: `${textWidth}px`, borderBottom: "none" }}
+                InputProps={{ style: { fontSize: theme.typography[props.variant].fontSize } }}
+                inputProps={{ style: { paddingBottom: 0, paddingTop: 0 } }}
+            />
+        </>
+    )
 };
 
 const priorities = {

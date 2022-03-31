@@ -28,9 +28,8 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [7]
-    hooks:
-      post:
-        - upx "{{ .Path }}" # apt install upx
+    # No "upx", since it causes random core dumps, see
+    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
     id: ntfy_arm64
     binary: ntfy
@@ -42,9 +41,8 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [arm64]
-    hooks:
-      post:
-        - upx "{{ .Path }}" # apt install upx
+    # No "upx", since it causes random core dumps, see
+    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
 nfpms:
   -
     package_name: ntfy

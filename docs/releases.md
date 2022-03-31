@@ -18,18 +18,19 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
 * SQLiteConstraintException: Crash during UP registration ([#185](https://github.com/binwiederhier/ntfy/issues/185))
 * Refresh preferences screen after settings import (#183, thanks to [@cmeis](https://github.com/cmeis) for reporting)
+* Add priority strings to strings.xml to make it translatable (#192, thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 
 **Translations:**
 
 * English language improvements (thanks to [@comradekingu](https://github.com/comradekingu))
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
+* Chinese/Simplified (thanks to [@poi](https://hosted.weblate.org/user/poi) and [@PeterCxy](https://hosted.weblate.org/user/PeterCxy))
 * Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony))
-* Chinese (*incomplete*, thanks to [@poi](https://hosted.weblate.org/user/poi))
 * French (*incomplete*, thanks to [@Kusoneko](https://kusoneko.moe/))
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
 * Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
-* Portuguese (Brazil, thanks to [@LW](https://hosted.weblate.org/user/LW/))
+* Portuguese/Brazil (thanks to [@LW](https://hosted.weblate.org/user/LW/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 
@@ -38,20 +39,22 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Many thanks to [@cmeis](https://github.com/cmeis), [@Fallenbagel](https://github.com/Fallenbagel), [@Joeharrison94](https://github.com/Joeharrison94),
   and [@rogeliodh](https://github.com/rogeliodh) for input on the new attachment logic, and for testing the release
 
-## ntfy server v1.19.0 (UNRELEASED)
+-->
+
+## ntfy server v1.19.0
+Released Mar 30, 2022
 
 **Bugs:**
 
-* Do not allow comma in topic name in publish via GET endpoint (no ticket) 
+* Do not pack binary with `upx` for armv7/arm64 due to `illegal instruction` errors ([#191](https://github.com/binwiederhier/ntfy/issues/191), thanks to [@iexos](https://github.com/iexos))
+* Do not allow comma in topic name in publish via GET endpoint (no ticket)
 * Add "Access-Control-Allow-Origin: *" for attachments (no ticket, thanks to @FrameXX)
-* Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186)) 
+* Make pruning run again in web app ([#186](https://github.com/binwiederhier/ntfy/issues/186))
 * Added missing params `delay` and `email` to publish as JSON body (no ticket)
 
 **Documentation:**
 
 * Improved [e-mail publishing](config.md#e-mail-publishing) documentation
-
--->
 
 ## ntfy server v1.18.1
 Released Mar 21, 2022   

@@ -152,7 +152,6 @@ cd ntfysh-bin
 makepkg -si
 ```
 
-
 ## Docker
 The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for amd64, armv7 and arm64. It should be pretty
 straight forward to use.

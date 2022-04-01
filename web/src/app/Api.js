@@ -1,4 +1,6 @@
 import {
+    basicAuth,
+    encodeBase64,
     fetchLinesIterator,
     maybeWithBasicAuth,
     topicShortUrl,
@@ -40,6 +42,43 @@ class Api {
             body: JSON.stringify(body),
             headers: maybeWithBasicAuth(headers, user)
         });
+    }
+
+    publishXHR(baseUrl, topic, body, headers, onProgress) {
+        const url = topicUrl(baseUrl, topic);
+        const xhr = new XMLHttpRequest();
+
+        console.log(`[Api] Publishing message to ${url}`);
+        const send = new Promise(function (resolve, reject) {
+            xhr.open("PUT", url);
+            xhr.addEventListener('readystatechange', (ev) => {
+                if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
+                    console.log(`[Api] Publish successful`, ev);
+                    resolve(xhr.response);
+                } else if (xhr.readyState === 4) {
+                    console.log(`[Api] Publish failed (1)`, ev);
+                    xhr.abort();
+                    reject(ev);
+                }
+            })
+            xhr.onerror = (ev) => {
+                console.log(`[Api] Publish failed (2)`, ev);
+                reject(ev);
+            };
+            xhr.upload.addEventListener("progress", onProgress);
+            if (body.type) {
+                xhr.overrideMimeType(body.type);
+            }
+            for (const [key, value] of Object.entries(headers)) {
+                xhr.setRequestHeader(key, value);
+            }
+            xhr.send(body);
+        });
+        send.abort = () => {
+            console.log(`[Api] Publish aborted by user`);
+            xhr.abort();
+        }
+        return send;
     }
 
     async auth(baseUrl, topic, user) {

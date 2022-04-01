@@ -18,7 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {formatBytes, shortUrl, splitNoEmpty, splitTopicUrl, validTopicUrl} from "../app/utils";
+import {basicAuth, formatBytes, shortUrl, splitNoEmpty, splitTopicUrl, validTopicUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import Icon from "./Icon";
 import DialogFooter from "./DialogFooter";
@@ -26,6 +26,7 @@ import api from "../app/Api";
 import Divider from "@mui/material/Divider";
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
+import userManager from "../app/UserManager";
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState(props.topicUrl);
@@ -50,7 +51,9 @@ const SendDialog = (props) => {
     const showAttachFile = !!attachFile && !showAttachUrl;
     const attachFileInput = useRef();
 
-    const [errorText, setErrorText] = useState("");
+    const [sendRequest, setSendRequest] = useState(null);
+    const [statusText, setStatusText] = useState("");
+    const disabled = !!sendRequest;
 
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const sendButtonEnabled = (() => {
@@ -61,38 +64,59 @@ const SendDialog = (props) => {
     })();
     const handleSubmit = async () => {
         const { baseUrl, topic } = splitTopicUrl(topicUrl);
-        const options = {};
+        const headers = {};
         if (title.trim()) {
-            options["title"] = title.trim();
+            headers["X-Title"] = title.trim();
         }
         if (tags.trim()) {
-            options["tags"] = splitNoEmpty(tags, ",");
+            headers["X-Tags"] = tags.trim();
         }
         if (priority && priority !== 3) {
-            options["priority"] = priority;
+            headers["X-Priority"] = priority.toString();
         }
         if (clickUrl.trim()) {
-            options["click"] = clickUrl.trim();
+            headers["X-Click"] = clickUrl.trim();
         }
         if (attachUrl.trim()) {
-            options["attach"] = attachUrl.trim();
+            headers["X-Attach"] = attachUrl.trim();
         }
         if (filename.trim()) {
-            options["filename"] = filename.trim();
+            headers["X-Filename"] = filename.trim();
         }
         if (email.trim()) {
-            options["email"] = email.trim();
+            headers["X-Email"] = email.trim();
         }
         if (delay.trim()) {
-            options["delay"] = delay.trim();
+            headers["X-Delay"] = delay.trim();
         }
+        if (attachFile && message.trim()) {
+            headers["X-Message"] = message.replaceAll("\n", "\\n").trim();
+        }
+        const body = (attachFile) ? attachFile : message;
         try {
-            const response = await api.publish(baseUrl, topic, message, options);
-            console.log(response);
-            props.onClose();
+            const user = await userManager.get(baseUrl);
+            if (user) {
+                headers["Authorization"] = basicAuth(user.username, user.password);
+            }
+            const progressFn = (ev) => {
+                console.log(ev);
+                if (ev.loaded > 0 && ev.total > 0) {
+                    const percent = Math.round(ev.loaded * 100.0 / ev.total);
+                    setStatusText(`Uploading ${formatBytes(ev.loaded)}/${formatBytes(ev.total)} (${percent}%) ...`);
+                } else {
+                    setStatusText(`Uploading ...`);
+                }
+            };
+            const request = api.publishXHR(baseUrl, topic, body, headers, progressFn);
+            setSendRequest(request);
+            await request;
+            setStatusText("Message published");
+            //props.onClose();
         } catch (e) {
-            setErrorText(e);
+            console.log("error", e);
+            setStatusText("An error occurred");
         }
+        setSendRequest(null);
     };
     const handleAttachFileClick = () => {
         attachFileInput.current.click();
@@ -109,7 +133,7 @@ const SendDialog = (props) => {
             <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
             <DialogContent>
                 {showTopicUrl &&
-                    <ClosableRow onClose={() => {
+                    <ClosableRow disabled={disabled} onClose={() => {
                         setTopicUrl(props.topicUrl);
                         setShowTopicUrl(false);
                     }}>
@@ -118,6 +142,7 @@ const SendDialog = (props) => {
                             label="Topic URL"
                             value={topicUrl}
                             onChange={ev => setTopicUrl(ev.target.value)}
+                            disabled={disabled}
                             type="text"
                             variant="standard"
                             fullWidth
@@ -130,6 +155,7 @@ const SendDialog = (props) => {
                     label="Title"
                     value={title}
                     onChange={ev => setTitle(ev.target.value)}
+                    disabled={disabled}
                     type="text"
                     fullWidth
                     variant="standard"
@@ -141,6 +167,7 @@ const SendDialog = (props) => {
                     placeholder="Type the main message body here."
                     value={message}
                     onChange={ev => setMessage(ev.target.value)}
+                    disabled={disabled}
                     type="text"
                     variant="standard"
                     rows={5}
@@ -149,13 +176,14 @@ const SendDialog = (props) => {
                     multiline
                 />
                 <div style={{display: 'flex'}}>
-                    <DialogIconButton onClick={() => null}><InsertEmoticonIcon/></DialogIconButton>
+                    <DialogIconButton disabled={disabled} onClick={() => null}><InsertEmoticonIcon/></DialogIconButton>
                     <TextField
                         margin="dense"
                         label="Tags"
                         placeholder="Comma-separated list of tags, e.g. warning, srv1-backup"
                         value={tags}
                         onChange={ev => setTags(ev.target.value)}
+                        disabled={disabled}
                         type="text"
                         variant="standard"
                         sx={{flexGrow: 1, marginRight: 1}}
@@ -171,6 +199,7 @@ const SendDialog = (props) => {
                             margin="dense"
                             value={priority}
                             onChange={(ev) => setPriority(ev.target.value)}
+                            disabled={disabled}
                         >
                             {[5,4,3,2,1].map(priority =>
                                 <MenuItem value={priority}>
@@ -184,7 +213,7 @@ const SendDialog = (props) => {
                     </FormControl>
                 </div>
                 {showClickUrl &&
-                    <ClosableRow onClose={() => {
+                    <ClosableRow disabled={disabled} onClose={() => {
                         setClickUrl("");
                         setShowClickUrl(false);
                     }}>
@@ -194,6 +223,7 @@ const SendDialog = (props) => {
                             placeholder="URL that is opened when notification is clicked"
                             value={clickUrl}
                             onChange={ev => setClickUrl(ev.target.value)}
+                            disabled={disabled}
                             type="url"
                             fullWidth
                             variant="standard"
@@ -201,7 +231,7 @@ const SendDialog = (props) => {
                     </ClosableRow>
                 }
                 {showEmail &&
-                    <ClosableRow onClose={() => {
+                    <ClosableRow disabled={disabled} onClose={() => {
                         setEmail("");
                         setShowEmail(false);
                     }}>
@@ -211,6 +241,7 @@ const SendDialog = (props) => {
                             placeholder="Address to forward the message to, e.g. phil@example.com"
                             value={email}
                             onChange={ev => setEmail(ev.target.value)}
+                            disabled={disabled}
                             type="email"
                             variant="standard"
                             fullWidth
@@ -218,7 +249,7 @@ const SendDialog = (props) => {
                     </ClosableRow>
                 }
                 {showAttachUrl &&
-                    <ClosableRow onClose={() => {
+                    <ClosableRow disabled={disabled} onClose={() => {
                         setAttachUrl("");
                         setFilename("");
                         setFilenameEdited(false);
@@ -244,6 +275,7 @@ const SendDialog = (props) => {
                                     }
                                 }
                             }}
+                            disabled={disabled}
                             type="url"
                             variant="standard"
                             sx={{flexGrow: 5, marginRight: 1}}
@@ -257,6 +289,7 @@ const SendDialog = (props) => {
                                 setFilename(ev.target.value);
                                 setFilenameEdited(true);
                             }}
+                            disabled={disabled}
                             type="text"
                             variant="standard"
                             sx={{flexGrow: 1}}
@@ -272,6 +305,7 @@ const SendDialog = (props) => {
                 {showAttachFile && <AttachmentBox
                     file={attachFile}
                     filename={filename}
+                    disabled={disabled}
                     onChangeFilename={(f) => setFilename(f)}
                     onClose={() => {
                         setAttachFile(null);
@@ -279,7 +313,7 @@ const SendDialog = (props) => {
                     }}
                 />}
                 {showDelay &&
-                    <ClosableRow onClose={() => {
+                    <ClosableRow disabled={disabled} onClose={() => {
                         setDelay("");
                         setShowDelay(false);
                     }}>
@@ -289,6 +323,7 @@ const SendDialog = (props) => {
                             placeholder="Unix timestamp, duration or English natural language"
                             value={delay}
                             onChange={ev => setDelay(ev.target.value)}
+                            disabled={disabled}
                             type="text"
                             variant="standard"
                             fullWidth
@@ -299,21 +334,26 @@ const SendDialog = (props) => {
                     Other features:
                 </Typography>
                 <div>
-                    {!showClickUrl && <Chip clickable label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1}}/>}
-                    {!showEmail && <Chip clickable label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1}}/>}
-                    {!showAttachUrl && !showAttachFile && <Chip clickable label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1}}/>}
-                    {!showAttachFile && !showAttachUrl && <Chip clickable label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1}}/>}
-                    {!showDelay && <Chip clickable label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1}}/>}
-                    {!showTopicUrl && <Chip clickable label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1}}/>}
+                    {!showClickUrl && <Chip clickable disabled={disabled} label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    {!showEmail && <Chip clickable disabled={disabled} label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    {!showDelay && <Chip clickable disabled={disabled} label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    {!showTopicUrl && <Chip clickable disabled={disabled} label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                 </div>
-                <Typography variant="body1" sx={{marginTop: 2, marginBottom: 1}}>
+                <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
                     For examples and a detailed description of all send features, please
                     refer to the <Link href="/docs">documentation</Link>.
                 </Typography>
             </DialogContent>
-            <DialogFooter status={errorText}>
-                <Button onClick={props.onClose}>Cancel</Button>
-                <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
+            <DialogFooter status={statusText}>
+                {sendRequest && <Button onClick={() => sendRequest.abort()}>Cancel sending</Button>}
+                {!sendRequest &&
+                    <>
+                        <Button onClick={props.onClose}>Cancel</Button>
+                        <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
+                    </>
+                }
             </DialogFooter>
         </Dialog>
     );
@@ -331,7 +371,7 @@ const ClosableRow = (props) => {
     return (
         <Row>
             {props.children}
-            <DialogIconButton onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
+            <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
         </Row>
     );
 };
@@ -345,6 +385,7 @@ const DialogIconButton = (props) => {
             edge="start"
             sx={{height: "45px", marginTop: "17px", ...sx}}
             onClick={props.onClick}
+            disabled={props.disabled}
         >
             {props.children}
         </IconButton>
@@ -371,11 +412,12 @@ const AttachmentBox = (props) => {
                         variant="body2"
                         value={props.filename}
                         onChange={(ev) => props.onChangeFilename(ev.target.value)}
+                        disabled={props.disabled}
                     />
                     <br/>
                     {formatBytes(file.size)}
                 </Typography>
-                <DialogIconButton onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
+                <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
             </Box>
         </>
     );
@@ -414,6 +456,7 @@ const ExpandingTextField = (props) => {
                 sx={{ width: `${textWidth}px`, borderBottom: "none" }}
                 InputProps={{ style: { fontSize: theme.typography[props.variant].fontSize } }}
                 inputProps={{ style: { paddingBottom: 0, paddingTop: 0 } }}
+                disabled={props.disabled}
             />
         </>
     )

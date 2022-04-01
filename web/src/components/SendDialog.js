@@ -2,7 +2,7 @@ import * as React from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {NotificationItem} from "./Notifications";
 import theme from "./theme";
-import {Chip, FormControl, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
+import {Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
 import TextField from "@mui/material/TextField";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
@@ -18,14 +18,11 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {basicAuth, formatBytes, shortUrl, splitNoEmpty, splitTopicUrl, validTopicUrl} from "../app/utils";
+import {basicAuth, formatBytes, shortUrl, splitTopicUrl, validTopicUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import Icon from "./Icon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
-import Divider from "@mui/material/Divider";
-import EditIcon from '@mui/icons-material/Edit';
-import CheckIcon from '@mui/icons-material/Check';
 import userManager from "../app/UserManager";
 
 const SendDialog = (props) => {
@@ -41,6 +38,7 @@ const SendDialog = (props) => {
     const [filenameEdited, setFilenameEdited] = useState(false);
     const [email, setEmail] = useState("");
     const [delay, setDelay] = useState("");
+    const [publishAnother, setPublishAnother] = useState(false);
 
     const [showTopicUrl, setShowTopicUrl] = useState(props.topicUrl === "");
     const [showClickUrl, setShowClickUrl] = useState(false);
@@ -110,8 +108,11 @@ const SendDialog = (props) => {
             const request = api.publishXHR(baseUrl, topic, body, headers, progressFn);
             setSendRequest(request);
             await request;
-            setStatusText("Message published");
-            //props.onClose();
+            if (!publishAnother) {
+                props.onClose();
+            } else {
+                setStatusText("Message published");
+            }
         } catch (e) {
             console.log("error", e);
             setStatusText("An error occurred");
@@ -350,6 +351,12 @@ const SendDialog = (props) => {
                 {sendRequest && <Button onClick={() => sendRequest.abort()}>Cancel sending</Button>}
                 {!sendRequest &&
                     <>
+                        <FormControlLabel
+                            label="Publish another"
+                            sx={{marginRight: 2}}
+                            control={
+                                <Checkbox size="small" checked={publishAnother} onChange={(ev) => setPublishAnother(ev.target.checked)} />
+                            } />
                         <Button onClick={props.onClose}>Cancel</Button>
                         <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
                     </>

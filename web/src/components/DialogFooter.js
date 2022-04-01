@@ -15,7 +15,7 @@ const DialogFooter = (props) => {
         }}>
             <DialogContentText sx={{
                 margin: '0px',
-                paddingTop: '8px',
+                paddingTop: '12px',
             }}>
                 {props.status}
             </DialogContentText>

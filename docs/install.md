@@ -152,7 +152,6 @@ cd ntfysh-bin
 makepkg -si
 ```
 
-
 ## Docker
 The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for amd64, armv7 and arm64. It should be pretty
 straight forward to use.
@@ -185,6 +184,24 @@ docker run \
   -it \
   binwiederhier/ntfy \
   serve
+```
+
+Using docker-compose:
+```yaml
+version: "2.1"
+
+services:
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    command:
+      - serve
+    volumes:
+      - /var/cache/ntfy:/var/cache/ntfy
+      - /etc/ntfy:/etc/ntfy
+    ports:
+      - 80:80
+    restart: unless-stopped
 ```
 
 Alternatively, you may wish to build a customized Docker image that can be run with fewer command-line arguments and without delivering the configuration file separately.

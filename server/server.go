@@ -395,6 +395,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
+	return errHTTPEntityTooLargeAttachmentTooLarge
 	body, err := util.Peak(r.Body, s.config.MessageLimit)
 	if err != nil {
 		return err
@@ -590,7 +591,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
 		if err == nil && (contentLength > remainingVisitorAttachmentSize || contentLength > s.config.AttachmentFileSizeLimit) {
-			return errHTTPBadRequestAttachmentTooLarge
+			return errHTTPEntityTooLargeAttachmentTooLarge
 		}
 	}
 	if m.Attachment == nil {
@@ -609,7 +610,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(remainingVisitorAttachmentSize))
 	if err == util.ErrLimitReached {
-		return errHTTPBadRequestAttachmentTooLarge
+		return errHTTPEntityTooLargeAttachmentTooLarge
 	} else if err != nil {
 		return err
 	}

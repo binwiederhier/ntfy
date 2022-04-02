@@ -82,7 +82,6 @@ const Layout = () => {
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>
-            <DropZone/>
             <ActionBar
                 selected={selected}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
@@ -99,7 +98,7 @@ const Layout = () => {
                 <Toolbar/>
                 <Outlet context={{ subscriptions, selected }}/>
             </Main>
-            <Sender selected={selected}/>
+            <Messaging selected={selected}/>
         </Box>
     );
 }
@@ -125,78 +124,27 @@ const Main = (props) => {
     );
 };
 
-const Sender = (props) => {
+const Messaging = (props) => {
     const [message, setMessage] = useState("");
-    const [sendDialogKey, setSendDialogKey] = useState(0);
-    const [sendDialogOpen, setSendDialogOpen] = useState(false);
-    const subscription = props.selected;
-
-    const handleSendClick = () => {
-        api.publish(subscription.baseUrl, subscription.topic, message); // FIXME
-        setMessage("");
-    };
-
-    const handleSendDialogClose = () => {
-        setSendDialogOpen(false);
-        setSendDialogKey(prev => prev+1);
-    };
-
-    if (!props.selected) {
-        return null;
-    }
-
-    return (
-        <Paper
-            elevation={3}
-            sx={{
-                display: "flex",
-                position: 'fixed',
-                bottom: 0,
-                right: 0,
-                padding: 2,
-                width: `calc(100% - ${Navigation.width}px)`,
-                backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
-            }}
-        >
-            <IconButton color="inherit" size="large" edge="start" onClick={() => setSendDialogOpen(true)}>
-                <KeyboardArrowUpIcon/>
-            </IconButton>
-            <TextField
-                autoFocus
-                margin="dense"
-                placeholder="Message"
-                type="text"
-                fullWidth
-                variant="standard"
-                value={message}
-                onChange={ev => setMessage(ev.target.value)}
-                onKeyPress={(ev) => {
-                    if (ev.key === 'Enter') {
-                        ev.preventDefault();
-                        handleSendClick();
-                    }
-                }}
-            />
-            <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick}>
-                <SendIcon/>
-            </IconButton>
-            <SendDialog
-                key={`sendDialog${sendDialogKey}`} // Resets dialog when canceled/closed
-                open={sendDialogOpen}
-                onClose={handleSendDialogClose}
-                topicUrl={topicUrl(subscription.baseUrl, subscription.topic)}
-                message={message}
-            />
-        </Paper>
-    );
-};
-
-const DropZone = (props) => {
+    const [dialogKey, setDialogKey] = useState(0);
+    const [showDialog, setShowDialog] = useState(false);
     const [showDropZone, setShowDropZone] = useState(false);
 
+    const subscription = props.selected;
+    const selectedTopicUrl = (subscription) ? topicUrl(subscription.baseUrl, subscription.topic) : "";
+
     useEffect(() => {
-        window.addEventListener('dragenter', () => setShowDropZone(true));
+        window.addEventListener('dragenter', () => {
+            setShowDialog(true);
+            setShowDropZone(true);
+        });
     }, []);
+
+    const handleSendDialogClose = () => {
+        setShowDialog(false);
+        setShowDropZone(false);
+        setDialogKey(prev => prev+1);
+    };
 
     const allowSubmit = () => true;
 
@@ -212,22 +160,68 @@ const DropZone = (props) => {
         console.log(e.dataTransfer.files[0]);
     };
 
-    if (!showDropZone) {
-        return null;
-    }
-
     return (
-        <Backdrop
-            sx={{ color: '#fff', zIndex: 3500 }}
-            open={showDropZone}
-            onClick={() => setShowDropZone(false)}
-            onDragEnter={allowDrag}
-            onDragOver={allowDrag}
-            onDragLeave={() => setShowDropZone(false)}
-            onDrop={handleDrop}
-        >
+        <>
+            {subscription && <MessageBar
+                subscription={subscription}
+                message={message}
+                onMessageChange={setMessage}
+                onOpenDialogClick={() => setShowDialog(true)}
+            />}
+            <SendDialog
+                key={`sendDialog${dialogKey}`} // Resets dialog when canceled/closed
+                open={showDialog}
+                dropZone={showDropZone}
+                onClose={handleSendDialogClose}
+                topicUrl={selectedTopicUrl}
+                message={message}
+            />
+        </>
+    );
+}
 
-        </Backdrop>
+const MessageBar = (props) => {
+    const subscription = props.subscription;
+    const handleSendClick = () => {
+        api.publish(subscription.baseUrl, subscription.topic, props.message); // FIXME
+        props.onMessageChange("");
+    };
+    return (
+        <Paper
+            elevation={3}
+            sx={{
+                display: "flex",
+                position: 'fixed',
+                bottom: 0,
+                right: 0,
+                padding: 2,
+                width: `calc(100% - ${Navigation.width}px)`,
+                backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
+            }}
+        >
+            <IconButton color="inherit" size="large" edge="start" onClick={props.onOpenDialogClick}>
+                <KeyboardArrowUpIcon/>
+            </IconButton>
+            <TextField
+                autoFocus
+                margin="dense"
+                placeholder="Message"
+                type="text"
+                fullWidth
+                variant="standard"
+                value={props.message}
+                onChange={ev => props.onMessageChange(ev.target.value)}
+                onKeyPress={(ev) => {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        handleSendClick();
+                    }
+                }}
+            />
+            <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick}>
+                <SendIcon/>
+            </IconButton>
+        </Paper>
     );
 };
 

@@ -52,19 +52,16 @@ class Api {
         const send = new Promise(function (resolve, reject) {
             xhr.open("PUT", url);
             xhr.addEventListener('readystatechange', (ev) => {
+                console.log("read change", xhr.readyState, xhr.status, xhr.responseText, xhr)
                 if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
-                    console.log(`[Api] Publish successful`, ev);
+                    console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
                     resolve(xhr.response);
                 } else if (xhr.readyState === 4) {
-                    console.log(`[Api] Publish failed (1)`, ev);
+                    console.log(`[Api] Publish failed`, xhr.status, xhr.responseText, xhr);
                     xhr.abort();
                     reject(ev);
                 }
             })
-            xhr.onerror = (ev) => {
-                console.log(`[Api] Publish failed (2)`, ev);
-                reject(ev);
-            };
             xhr.upload.addEventListener("progress", onProgress);
             if (body.type) {
                 xhr.overrideMimeType(body.type);

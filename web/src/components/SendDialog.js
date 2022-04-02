@@ -40,7 +40,7 @@ const SendDialog = (props) => {
     const [delay, setDelay] = useState("");
     const [publishAnother, setPublishAnother] = useState(false);
 
-    const [showTopicUrl, setShowTopicUrl] = useState(props.topicUrl === "");
+    const [showTopicUrl, setShowTopicUrl] = useState(props.topicUrl === ""); // FIXME
     const [showClickUrl, setShowClickUrl] = useState(false);
     const [showAttachUrl, setShowAttachUrl] = useState(false);
     const [showEmail, setShowEmail] = useState(false);
@@ -49,17 +49,21 @@ const SendDialog = (props) => {
     const showAttachFile = !!attachFile && !showAttachUrl;
     const attachFileInput = useRef();
 
-    const [sendRequest, setSendRequest] = useState(null);
+    const [activeRequest, setActiveRequest] = useState(null);
     const [statusText, setStatusText] = useState("");
-    const disabled = !!sendRequest;
+    const disabled = !!activeRequest;
+
+    const dropZone = props.dropZone;
 
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const sendButtonEnabled = (() => {
         if (!validTopicUrl(topicUrl)) {
             return false;
         }
         return true;
     })();
+
     const handleSubmit = async () => {
         const { baseUrl, topic } = splitTopicUrl(topicUrl);
         const headers = {};
@@ -106,7 +110,7 @@ const SendDialog = (props) => {
                 }
             };
             const request = api.publishXHR(baseUrl, topic, body, headers, progressFn);
-            setSendRequest(request);
+            setActiveRequest(request);
             await request;
             if (!publishAnother) {
                 props.onClose();
@@ -117,11 +121,13 @@ const SendDialog = (props) => {
             console.log("error", e);
             setStatusText("An error occurred");
         }
-        setSendRequest(null);
+        setActiveRequest(null);
     };
+
     const handleAttachFileClick = () => {
         attachFileInput.current.click();
     };
+
     const handleAttachFileChanged = (ev) => {
         const file = ev.target.files[0];
         setAttachFile(file);
@@ -129,10 +135,57 @@ const SendDialog = (props) => {
         console.log(ev.target.files[0]);
         console.log(URL.createObjectURL(ev.target.files[0]));
     };
+
+    const handleDrop = (ev) => {
+        ev.preventDefault();
+        const file = ev.dataTransfer.files[0];
+        setAttachFile(file);
+        setFilename(file.name);
+    };
+
+    const allowDrag = (ev) => {
+        if (true /* allowSubmit */) {
+            ev.dataTransfer.dropEffect = 'copy';
+            ev.preventDefault();
+        }
+    };
+
     return (
         <Dialog maxWidth="md" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
             <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
             <DialogContent>
+                {dropZone &&
+                    <Box sx={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 10000,
+                        backgroundColor: "#ffffffbb"
+                    }}>
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                border: '3px dashed #ccc',
+                                borderRadius: '5px',
+                                left: "40px",
+                                top: "40px",
+                                right: "40px",
+                                bottom: "40px",
+                                zIndex: 10001,
+                                display: 'flex',
+                                justifyContent: "center",
+                                alignItems: "center",
+                            }}
+                            onDrop={handleDrop}
+                            onDragEnter={allowDrag}
+                            onDragOver={allowDrag}
+                        >
+                            <Typography variant="h5">Drop file here</Typography>
+                        </Box>
+                    </Box>
+                }
                 {showTopicUrl &&
                     <ClosableRow disabled={disabled} onClose={() => {
                         setTopicUrl(props.topicUrl);
@@ -203,7 +256,7 @@ const SendDialog = (props) => {
                             disabled={disabled}
                         >
                             {[5,4,3,2,1].map(priority =>
-                                <MenuItem value={priority}>
+                                <MenuItem key={`priorityMenuItem${priority}`} value={priority}>
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
                                         <img src={priorities[priority].file} style={{marginRight: "8px"}}/>
                                         <div>{priorities[priority].label}</div>
@@ -348,8 +401,8 @@ const SendDialog = (props) => {
                 </Typography>
             </DialogContent>
             <DialogFooter status={statusText}>
-                {sendRequest && <Button onClick={() => sendRequest.abort()}>Cancel sending</Button>}
-                {!sendRequest &&
+                {activeRequest && <Button onClick={() => activeRequest.abort()}>Cancel sending</Button>}
+                {!activeRequest &&
                     <>
                         <FormControlLabel
                             label="Publish another"

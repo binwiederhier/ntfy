@@ -26,9 +26,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov)) 
 * Chinese/Simplified (thanks to [@poi](https://hosted.weblate.org/user/poi) and [@PeterCxy](https://hosted.weblate.org/user/PeterCxy))
 * Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony))
-* French (*incomplete*, thanks to [@Kusoneko](https://kusoneko.moe/))
+* French (thanks to [@Kusoneko](https://kusoneko.moe/) and [@mlcsthor](https://hosted.weblate.org/user/mlcsthor/))
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
+* Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
 * Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
 * Portuguese/Brazil (thanks to [@LW](https://hosted.weblate.org/user/LW/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
@@ -38,7 +39,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Many thanks to [@cmeis](https://github.com/cmeis), [@Fallenbagel](https://github.com/Fallenbagel), [@Joeharrison94](https://github.com/Joeharrison94),
   and [@rogeliodh](https://github.com/rogeliodh) for input on the new attachment logic, and for testing the release
-
 
 ## ntfy server v1.20.0 (UNRELEASED)
 

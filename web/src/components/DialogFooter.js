@@ -10,16 +10,16 @@ const DialogFooter = (props) => {
             flexDirection: 'row',
             justifyContent: 'space-between',
             paddingLeft: '24px',
-            paddingTop: '8px 24px',
-            paddingBottom: '8px 24px',
+            paddingBottom: '8px',
         }}>
-            <DialogContentText sx={{
+            <DialogContentText component="div" sx={{
                 margin: '0px',
                 paddingTop: '12px',
+                paddingBottom: '4px'
             }}>
                 {props.status}
             </DialogContentText>
-            <DialogActions>
+            <DialogActions sx={{paddingRight: 2}}>
                 {props.children}
             </DialogActions>
         </Box>

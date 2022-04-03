@@ -18,10 +18,8 @@ import {expandUrl, topicUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
-import {Backdrop} from "@mui/material";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
-import {MoreVert} from "@mui/icons-material";
 import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
 import api from "../app/Api";
@@ -127,32 +125,34 @@ const Main = (props) => {
 const Messaging = (props) => {
     const [message, setMessage] = useState("");
     const [dialogKey, setDialogKey] = useState(0);
+    const [dialogOpenMode, setDialogOpenMode] = useState("");
     const [showDialog, setShowDialog] = useState(false);
     const [showDropZone, setShowDropZone] = useState(false);
 
     const subscription = props.selected;
     const selectedTopicUrl = (subscription) ? topicUrl(subscription.baseUrl, subscription.topic) : "";
 
+    const handleWindowDragEnter = () => {
+        setDialogOpenMode(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG); // Only update if not already open
+        setShowDialog(true);
+        setShowDropZone(true);
+    };
+
     useEffect(() => {
-        window.addEventListener('dragenter', () => {
-            setShowDialog(true);
-            setShowDropZone(true);
-        });
+        window.addEventListener('dragenter', handleWindowDragEnter);
     }, []);
+
+    const handleOpenDialogClick = () => {
+        setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT);
+        setShowDialog(true);
+        setShowDropZone(false);
+    };
 
     const handleSendDialogClose = () => {
         setShowDialog(false);
         setShowDropZone(false);
+        setDialogOpenMode("");
         setDialogKey(prev => prev+1);
-    };
-
-    const allowSubmit = () => true;
-
-    const allowDrag = (e) => {
-        if (allowSubmit()) {
-            e.dataTransfer.dropEffect = 'copy';
-            e.preventDefault();
-        }
     };
 
     return (
@@ -161,16 +161,18 @@ const Messaging = (props) => {
                 subscription={subscription}
                 message={message}
                 onMessageChange={setMessage}
-                onOpenDialogClick={() => setShowDialog(true)}
+                onOpenDialogClick={handleOpenDialogClick}
             />}
             <SendDialog
                 key={`sendDialog${dialogKey}`} // Resets dialog when canceled/closed
-                open={showDialog}
-                dropZone={showDropZone}
-                onClose={handleSendDialogClose}
-                onDrop={() => setShowDropZone(false)}
                 topicUrl={selectedTopicUrl}
                 message={message}
+                open={showDialog}
+                openMode={dialogOpenMode}
+                dropZone={showDropZone}
+                onClose={handleSendDialogClose}
+                onHideDropZone={() => setShowDropZone(false)}
+                onResetOpenMode={() => setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT)}
             />
         </>
     );

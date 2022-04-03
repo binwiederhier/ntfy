@@ -27,7 +27,7 @@ import userManager from "../app/UserManager";
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState("");
-    const [message, setMessage] = useState(props.message || "");
+    const [message, setMessage] = useState("");
     const [title, setTitle] = useState("");
     const [tags, setTags] = useState("");
     const [priority, setPriority] = useState(3);
@@ -51,7 +51,7 @@ const SendDialog = (props) => {
     const [attachFileError, setAttachFileError] = useState("");
 
     const [activeRequest, setActiveRequest] = useState(null);
-    const [statusText, setStatusText] = useState("");
+    const [status, setStatus] = useState("");
     const disabled = !!activeRequest;
 
     const [sendButtonEnabled, setSendButtonEnabled] = useState(true);
@@ -65,8 +65,13 @@ const SendDialog = (props) => {
     }, [props.topicUrl]);
 
     useEffect(() => {
-        setSendButtonEnabled(validTopicUrl(topicUrl) && !attachFileError);
+        const valid = validTopicUrl(topicUrl) && !attachFileError;
+        setSendButtonEnabled(valid);
     }, [topicUrl, attachFileError]);
+
+    useEffect(() => {
+        setMessage(props.message);
+    }, [props.message]);
 
     const handleSubmit = async () => {
         const { baseUrl, topic } = splitTopicUrl(topicUrl);
@@ -105,12 +110,11 @@ const SendDialog = (props) => {
                 headers["Authorization"] = basicAuth(user.username, user.password);
             }
             const progressFn = (ev) => {
-                console.log(ev);
                 if (ev.loaded > 0 && ev.total > 0) {
                     const percent = Math.round(ev.loaded * 100.0 / ev.total);
-                    setStatusText(`Uploading ${formatBytes(ev.loaded)}/${formatBytes(ev.total)} (${percent}%) ...`);
+                    setStatus(`Uploading ${formatBytes(ev.loaded)}/${formatBytes(ev.total)} (${percent}%) ...`);
                 } else {
-                    setStatusText(`Uploading ...`);
+                    setStatus(`Uploading ...`);
                 }
             };
             const request = api.publishXHR(baseUrl, topic, body, headers, progressFn);
@@ -119,13 +123,13 @@ const SendDialog = (props) => {
             if (!publishAnother) {
                 props.onClose();
             } else {
-                setStatusText("Message published");
+                setStatus("Message published");
+                setActiveRequest(null);
             }
         } catch (e) {
-            console.log("error", e);
-            setStatusText("An error occurred");
+            setStatus(<Typography sx={{color: 'error.main', maxWidth: "400px"}}>{e}</Typography>);
+            setActiveRequest(null);
         }
-        setActiveRequest(null);
     };
 
     const checkAttachmentLimits = async (file) => {
@@ -133,17 +137,17 @@ const SendDialog = (props) => {
             const { baseUrl } = splitTopicUrl(topicUrl);
             const stats = await api.userStats(baseUrl);
             console.log(`[SendDialog] Visitor attachment limits`, stats);
-
             const fileSizeLimit = stats.attachmentFileSizeLimit ?? 0;
-            if (fileSizeLimit > 0 && file.size > fileSizeLimit) {
-                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} limit`);
-            }
-
             const remainingBytes = stats.visitorAttachmentBytesRemaining ?? 0;
-            if (remainingBytes > 0 && file.size > remainingBytes) {
+            const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
+            const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
+            if (fileSizeLimitReached && quotaReached) {
+                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit, quota reached: ${formatBytes(remainingBytes)} remaining`);
+            } else if (fileSizeLimitReached) {
+                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit`);
+            } else if (quotaReached) {
                 return setAttachFileError(`quota reached, only ${formatBytes(remainingBytes)} remaining`);
             }
-
             setAttachFileError("");
         } catch (e) {
             console.log(`[SendDialog] Retrieving attachment limits failed`, e);
@@ -161,291 +165,272 @@ const SendDialog = (props) => {
 
     const handleAttachFileDrop = async (ev) => {
         ev.preventDefault();
-        props.onDrop();
+        props.onHideDropZone();
         await updateAttachFile(ev.dataTransfer.files[0]);
     };
 
     const updateAttachFile = async (file) => {
         setAttachFile(file);
         setFilename(file.name);
+        props.onResetOpenMode();
         await checkAttachmentLimits(file);
     };
 
-    const allowDrag = (ev) => {
-        if (true /* allowSubmit */) {
-            ev.dataTransfer.dropEffect = 'copy';
-            ev.preventDefault();
+    const handleAttachFileDragLeave = () => {
+        // When the dialog was opened by dragging a file in, close it. If it was open
+        // before, keep it open.
+
+        console.log(`open mode ${props.openMode}`);
+        if (props.openMode === SendDialog.OPEN_MODE_DRAG) {
+            props.onClose();
+        } else {
+            props.onHideDropZone();
         }
     };
 
     return (
-        <Dialog maxWidth="md" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-            <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
-            <DialogContent>
-                {dropZone &&
-                    <Box sx={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 10000,
-                        backgroundColor: "#ffffffbb"
-                    }}>
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                border: '3px dashed #ccc',
-                                borderRadius: '5px',
-                                left: "40px",
-                                top: "40px",
-                                right: "40px",
-                                bottom: "40px",
-                                zIndex: 10001,
-                                display: 'flex',
-                                justifyContent: "center",
-                                alignItems: "center",
-                            }}
-                            onDrop={handleAttachFileDrop}
-                            onDragEnter={allowDrag}
-                            onDragOver={allowDrag}
-                        >
-                            <Typography variant="h5">Drop file here</Typography>
-                        </Box>
-                    </Box>
-                }
-                {showTopicUrl &&
-                    <ClosableRow disabled={disabled} onClose={() => {
-                        setTopicUrl(props.topicUrl);
-                        setShowTopicUrl(false);
-                    }}>
-                        <TextField
-                            margin="dense"
-                            label="Topic URL"
-                            value={topicUrl}
-                            onChange={ev => setTopicUrl(ev.target.value)}
-                            disabled={disabled}
-                            type="text"
-                            variant="standard"
-                            fullWidth
-                            required
-                        />
-                    </ClosableRow>
-                }
-                <TextField
-                    margin="dense"
-                    label="Title"
-                    value={title}
-                    onChange={ev => setTitle(ev.target.value)}
-                    disabled={disabled}
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    placeholder="Notification title, e.g. Disk space alert"
-                />
-                <TextField
-                    margin="dense"
-                    label="Message"
-                    placeholder="Type the main message body here."
-                    value={message}
-                    onChange={ev => setMessage(ev.target.value)}
-                    disabled={disabled}
-                    type="text"
-                    variant="standard"
-                    rows={5}
-                    fullWidth
-                    autoFocus
-                    multiline
-                />
-                <div style={{display: 'flex'}}>
-                    <DialogIconButton disabled={disabled} onClick={() => null}><InsertEmoticonIcon/></DialogIconButton>
+        <>
+            {dropZone && <DropArea
+                onDrop={handleAttachFileDrop}
+                onDragLeave={handleAttachFileDragLeave}/>
+            }
+            <Dialog maxWidth="md" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
+                <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
+                <DialogContent>
+                    {dropZone && <DropBox/>}
+                    {showTopicUrl &&
+                        <ClosableRow disabled={disabled} onClose={() => {
+                            setTopicUrl(props.topicUrl);
+                            setShowTopicUrl(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label="Topic URL"
+                                value={topicUrl}
+                                onChange={ev => setTopicUrl(ev.target.value)}
+                                disabled={disabled}
+                                type="text"
+                                variant="standard"
+                                fullWidth
+                                required
+                            />
+                        </ClosableRow>
+                    }
                     <TextField
                         margin="dense"
-                        label="Tags"
-                        placeholder="Comma-separated list of tags, e.g. warning, srv1-backup"
-                        value={tags}
-                        onChange={ev => setTags(ev.target.value)}
+                        label="Title"
+                        value={title}
+                        onChange={ev => setTitle(ev.target.value)}
+                        disabled={disabled}
+                        type="text"
+                        fullWidth
+                        variant="standard"
+                        placeholder="Notification title, e.g. Disk space alert"
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Message"
+                        placeholder="Type the main message body here."
+                        value={message}
+                        onChange={ev => setMessage(ev.target.value)}
                         disabled={disabled}
                         type="text"
                         variant="standard"
-                        sx={{flexGrow: 1, marginRight: 1}}
+                        rows={5}
+                        fullWidth
+                        autoFocus
+                        multiline
                     />
-                    <FormControl
-                        variant="standard"
-                        margin="dense"
-                        sx={{minWidth: 120, maxWidth: 200, flexGrow: 1}}
-                    >
-                        <InputLabel/>
-                        <Select
-                            label="Priority"
+                    <div style={{display: 'flex'}}>
+                        <DialogIconButton disabled={disabled} onClick={() => null}><InsertEmoticonIcon/></DialogIconButton>
+                        <TextField
                             margin="dense"
-                            value={priority}
-                            onChange={(ev) => setPriority(ev.target.value)}
+                            label="Tags"
+                            placeholder="Comma-separated list of tags, e.g. warning, srv1-backup"
+                            value={tags}
+                            onChange={ev => setTags(ev.target.value)}
                             disabled={disabled}
+                            type="text"
+                            variant="standard"
+                            sx={{flexGrow: 1, marginRight: 1}}
+                        />
+                        <FormControl
+                            variant="standard"
+                            margin="dense"
+                            sx={{minWidth: 120, maxWidth: 200, flexGrow: 1}}
                         >
-                            {[5,4,3,2,1].map(priority =>
-                                <MenuItem key={`priorityMenuItem${priority}`} value={priority}>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        <img src={priorities[priority].file} style={{marginRight: "8px"}}/>
-                                        <div>{priorities[priority].label}</div>
-                                    </div>
-                                </MenuItem>
-                            )}
-                        </Select>
-                    </FormControl>
-                </div>
-                {showClickUrl &&
-                    <ClosableRow disabled={disabled} onClose={() => {
-                        setClickUrl("");
-                        setShowClickUrl(false);
-                    }}>
-                        <TextField
-                            margin="dense"
-                            label="Click URL"
-                            placeholder="URL that is opened when notification is clicked"
-                            value={clickUrl}
-                            onChange={ev => setClickUrl(ev.target.value)}
-                            disabled={disabled}
-                            type="url"
-                            fullWidth
-                            variant="standard"
-                        />
-                    </ClosableRow>
-                }
-                {showEmail &&
-                    <ClosableRow disabled={disabled} onClose={() => {
-                        setEmail("");
-                        setShowEmail(false);
-                    }}>
-                        <TextField
-                            margin="dense"
-                            label="Email"
-                            placeholder="Address to forward the message to, e.g. phil@example.com"
-                            value={email}
-                            onChange={ev => setEmail(ev.target.value)}
-                            disabled={disabled}
-                            type="email"
-                            variant="standard"
-                            fullWidth
-                        />
-                    </ClosableRow>
-                }
-                {showAttachUrl &&
-                    <ClosableRow disabled={disabled} onClose={() => {
-                        setAttachUrl("");
-                        setFilename("");
-                        setFilenameEdited(false);
-                        setShowAttachUrl(false);
-                    }}>
-                        <TextField
-                            margin="dense"
-                            label="Attachment URL"
-                            placeholder="Attach file by URL, e.g. https://f-droid.org/F-Droid.apk"
-                            value={attachUrl}
-                            onChange={ev => {
-                                const url = ev.target.value;
-                                setAttachUrl(url);
-                                if (!filenameEdited) {
-                                    try {
-                                        const u = new URL(url);
-                                        const parts = u.pathname.split("/");
-                                        if (parts.length > 0) {
-                                            setFilename(parts[parts.length-1]);
+                            <InputLabel/>
+                            <Select
+                                label="Priority"
+                                margin="dense"
+                                value={priority}
+                                onChange={(ev) => setPriority(ev.target.value)}
+                                disabled={disabled}
+                            >
+                                {[5,4,3,2,1].map(priority =>
+                                    <MenuItem key={`priorityMenuItem${priority}`} value={priority}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <img src={priorities[priority].file} style={{marginRight: "8px"}}/>
+                                            <div>{priorities[priority].label}</div>
+                                        </div>
+                                    </MenuItem>
+                                )}
+                            </Select>
+                        </FormControl>
+                    </div>
+                    {showClickUrl &&
+                        <ClosableRow disabled={disabled} onClose={() => {
+                            setClickUrl("");
+                            setShowClickUrl(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label="Click URL"
+                                placeholder="URL that is opened when notification is clicked"
+                                value={clickUrl}
+                                onChange={ev => setClickUrl(ev.target.value)}
+                                disabled={disabled}
+                                type="url"
+                                fullWidth
+                                variant="standard"
+                            />
+                        </ClosableRow>
+                    }
+                    {showEmail &&
+                        <ClosableRow disabled={disabled} onClose={() => {
+                            setEmail("");
+                            setShowEmail(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label="Email"
+                                placeholder="Address to forward the message to, e.g. phil@example.com"
+                                value={email}
+                                onChange={ev => setEmail(ev.target.value)}
+                                disabled={disabled}
+                                type="email"
+                                variant="standard"
+                                fullWidth
+                            />
+                        </ClosableRow>
+                    }
+                    {showAttachUrl &&
+                        <ClosableRow disabled={disabled} onClose={() => {
+                            setAttachUrl("");
+                            setFilename("");
+                            setFilenameEdited(false);
+                            setShowAttachUrl(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label="Attachment URL"
+                                placeholder="Attach file by URL, e.g. https://f-droid.org/F-Droid.apk"
+                                value={attachUrl}
+                                onChange={ev => {
+                                    const url = ev.target.value;
+                                    setAttachUrl(url);
+                                    if (!filenameEdited) {
+                                        try {
+                                            const u = new URL(url);
+                                            const parts = u.pathname.split("/");
+                                            if (parts.length > 0) {
+                                                setFilename(parts[parts.length-1]);
+                                            }
+                                        } catch (e) {
+                                            // Do nothing
                                         }
-                                    } catch (e) {
-                                        // Do nothing
                                     }
-                                }
-                            }}
-                            disabled={disabled}
-                            type="url"
-                            variant="standard"
-                            sx={{flexGrow: 5, marginRight: 1}}
-                        />
-                        <TextField
-                            margin="dense"
-                            label="Filename"
-                            placeholder="Attachment filename"
-                            value={filename}
-                            onChange={ev => {
-                                setFilename(ev.target.value);
-                                setFilenameEdited(true);
-                            }}
-                            disabled={disabled}
-                            type="text"
-                            variant="standard"
-                            sx={{flexGrow: 1}}
-                        />
-                    </ClosableRow>
-                }
-                <input
-                    type="file"
-                    ref={attachFileInput}
-                    onChange={handleAttachFileChanged}
-                    style={{ display: 'none' }}
-                />
-                {showAttachFile && <AttachmentBox
-                    file={attachFile}
-                    filename={filename}
-                    disabled={disabled}
-                    error={attachFileError}
-                    onChangeFilename={(f) => setFilename(f)}
-                    onClose={() => {
-                        setAttachFile(null);
-                        setAttachFileError("");
-                        setFilename("");
-                    }}
-                />}
-                {showDelay &&
-                    <ClosableRow disabled={disabled} onClose={() => {
-                        setDelay("");
-                        setShowDelay(false);
-                    }}>
-                        <TextField
-                            margin="dense"
-                            label="Delay"
-                            placeholder="Unix timestamp, duration or English natural language"
-                            value={delay}
-                            onChange={ev => setDelay(ev.target.value)}
-                            disabled={disabled}
-                            type="text"
-                            variant="standard"
-                            fullWidth
-                        />
-                    </ClosableRow>
-                }
-                <Typography variant="body1" sx={{marginTop: 2, marginBottom: 1}}>
-                    Other features:
-                </Typography>
-                <div>
-                    {!showClickUrl && <Chip clickable disabled={disabled} label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                    {!showEmail && <Chip clickable disabled={disabled} label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                    {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                    {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
-                    {!showDelay && <Chip clickable disabled={disabled} label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                    {!showTopicUrl && <Chip clickable disabled={disabled} label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                </div>
-                <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
-                    For examples and a detailed description of all send features, please
-                    refer to the <Link href="/docs">documentation</Link>.
-                </Typography>
-            </DialogContent>
-            <DialogFooter status={statusText}>
-                {activeRequest && <Button onClick={() => activeRequest.abort()}>Cancel sending</Button>}
-                {!activeRequest &&
-                    <>
-                        <FormControlLabel
-                            label="Publish another"
-                            sx={{marginRight: 2}}
-                            control={
-                                <Checkbox size="small" checked={publishAnother} onChange={(ev) => setPublishAnother(ev.target.checked)} />
-                            } />
-                        <Button onClick={props.onClose}>Cancel</Button>
-                        <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
-                    </>
-                }
-            </DialogFooter>
-        </Dialog>
+                                }}
+                                disabled={disabled}
+                                type="url"
+                                variant="standard"
+                                sx={{flexGrow: 5, marginRight: 1}}
+                            />
+                            <TextField
+                                margin="dense"
+                                label="Filename"
+                                placeholder="Attachment filename"
+                                value={filename}
+                                onChange={ev => {
+                                    setFilename(ev.target.value);
+                                    setFilenameEdited(true);
+                                }}
+                                disabled={disabled}
+                                type="text"
+                                variant="standard"
+                                sx={{flexGrow: 1}}
+                            />
+                        </ClosableRow>
+                    }
+                    <input
+                        type="file"
+                        ref={attachFileInput}
+                        onChange={handleAttachFileChanged}
+                        style={{ display: 'none' }}
+                    />
+                    {showAttachFile && <AttachmentBox
+                        file={attachFile}
+                        filename={filename}
+                        disabled={disabled}
+                        error={attachFileError}
+                        onChangeFilename={(f) => setFilename(f)}
+                        onClose={() => {
+                            setAttachFile(null);
+                            setAttachFileError("");
+                            setFilename("");
+                        }}
+                    />}
+                    {showDelay &&
+                        <ClosableRow disabled={disabled} onClose={() => {
+                            setDelay("");
+                            setShowDelay(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label="Delay"
+                                placeholder="Delay delivery, e.g. 1649029748, 30m, or tomorrow, 9am"
+                                value={delay}
+                                onChange={ev => setDelay(ev.target.value)}
+                                disabled={disabled}
+                                type="text"
+                                variant="standard"
+                                fullWidth
+                            />
+                        </ClosableRow>
+                    }
+                    <Typography variant="body1" sx={{marginTop: 2, marginBottom: 1}}>
+                        Other features:
+                    </Typography>
+                    <div>
+                        {!showClickUrl && <Chip clickable disabled={disabled} label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showEmail && <Chip clickable disabled={disabled} label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showDelay && <Chip clickable disabled={disabled} label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showTopicUrl && <Chip clickable disabled={disabled} label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                    </div>
+                    <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
+                        For examples and a detailed description of all send features, please
+                        refer to the <Link href="/docs" target="_blank">documentation</Link>.
+                    </Typography>
+                </DialogContent>
+                <DialogFooter status={status}>
+                    {activeRequest && <Button onClick={() => activeRequest.abort()}>Cancel sending</Button>}
+                    {!activeRequest &&
+                        <>
+                            <FormControlLabel
+                                label="Publish another"
+                                sx={{marginRight: 2}}
+                                control={
+                                    <Checkbox size="small" checked={publishAnother} onChange={(ev) => setPublishAnother(ev.target.checked)} />
+                                } />
+                            <Button onClick={props.onClose}>Cancel</Button>
+                            <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
+                        </>
+                    }
+                </DialogFooter>
+            </Dialog>
+        </>
     );
 };
 
@@ -539,7 +524,7 @@ const ExpandingTextField = (props) => {
                 ref={invisibleFieldRef}
                 component="span"
                 variant={props.variant}
-                sx={{position: "absolute", left: "-100%"}}
+                sx={{position: "absolute", left: "-200%"}}
             >
                 {props.value}
             </Typography>
@@ -559,12 +544,74 @@ const ExpandingTextField = (props) => {
     )
 };
 
+const DropArea = (props) => {
+    const allowDrag = (ev) => {
+        // This is where we could disallow certain files to be dragged in.
+        // For now we allow all files.
+
+        ev.dataTransfer.dropEffect = 'copy';
+        ev.preventDefault();
+    };
+
+    return (
+        <Box
+            sx={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 10002,
+            }}
+            onDrop={props.onDrop}
+            onDragEnter={allowDrag}
+            onDragOver={allowDrag}
+            onDragLeave={props.onDragLeave}
+        />
+    );
+};
+
+const DropBox = () => {
+    return (
+        <Box sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000,
+            backgroundColor: "#ffffffbb"
+        }}>
+            <Box
+                sx={{
+                    position: 'absolute',
+                    border: '3px dashed #ccc',
+                    borderRadius: '5px',
+                    left: "40px",
+                    top: "40px",
+                    right: "40px",
+                    bottom: "40px",
+                    zIndex: 10001,
+                    display: 'flex',
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                <Typography variant="h5">Drop file here</Typography>
+            </Box>
+        </Box>
+    );
+}
+
 const priorities = {
-    1: { label: "Minimum priority", file: priority1 },
+    1: { label: "Min. priority", file: priority1 },
     2: { label: "Low priority", file: priority2 },
     3: { label: "Default priority", file: priority3 },
     4: { label: "High priority", file: priority4 },
-    5: { label: "Maximum priority", file: priority5 }
+    5: { label: "Max. priority", file: priority5 }
 };
+
+SendDialog.OPEN_MODE_DEFAULT = "default";
+SendDialog.OPEN_MODE_DRAG = "drag";
 
 export default SendDialog;

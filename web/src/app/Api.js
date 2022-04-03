@@ -52,14 +52,22 @@ class Api {
         const send = new Promise(function (resolve, reject) {
             xhr.open("PUT", url);
             xhr.addEventListener('readystatechange', (ev) => {
-                console.log("read change", xhr.readyState, xhr.status, xhr.responseText, xhr)
                 if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
                     console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
                     resolve(xhr.response);
                 } else if (xhr.readyState === 4) {
-                    console.log(`[Api] Publish failed`, xhr.status, xhr.responseText, xhr);
+                    console.log(`[Api] Publish failed (HTTP ${xhr.status})`, xhr.responseText);
+                    let errorText;
+                    try {
+                        const error = JSON.parse(xhr.responseText);
+                        if (error.code && error.error) {
+                            errorText = `Error ${error.code}: ${error.error}`;
+                        }
+                    } catch (e) {
+                        // Nothing
+                    }
                     xhr.abort();
-                    reject(ev);
+                    reject(errorText ?? "An error occurred");
                 }
             })
             xhr.upload.addEventListener("progress", onProgress);

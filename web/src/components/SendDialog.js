@@ -26,7 +26,7 @@ import api from "../app/Api";
 import userManager from "../app/UserManager";
 
 const SendDialog = (props) => {
-    const [topicUrl, setTopicUrl] = useState(props.topicUrl);
+    const [topicUrl, setTopicUrl] = useState("");
     const [message, setMessage] = useState(props.message || "");
     const [title, setTitle] = useState("");
     const [tags, setTags] = useState("");
@@ -40,7 +40,7 @@ const SendDialog = (props) => {
     const [delay, setDelay] = useState("");
     const [publishAnother, setPublishAnother] = useState(false);
 
-    const [showTopicUrl, setShowTopicUrl] = useState(props.topicUrl === ""); // FIXME
+    const [showTopicUrl, setShowTopicUrl] = useState("");
     const [showClickUrl, setShowClickUrl] = useState(false);
     const [showAttachUrl, setShowAttachUrl] = useState(false);
     const [showEmail, setShowEmail] = useState(false);
@@ -48,21 +48,25 @@ const SendDialog = (props) => {
 
     const showAttachFile = !!attachFile && !showAttachUrl;
     const attachFileInput = useRef();
+    const [attachFileError, setAttachFileError] = useState("");
 
     const [activeRequest, setActiveRequest] = useState(null);
     const [statusText, setStatusText] = useState("");
     const disabled = !!activeRequest;
 
-    const dropZone = props.dropZone;
+    const [sendButtonEnabled, setSendButtonEnabled] = useState(true);
 
+    const dropZone = props.dropZone;
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
-    const sendButtonEnabled = (() => {
-        if (!validTopicUrl(topicUrl)) {
-            return false;
-        }
-        return true;
-    })();
+    useEffect(() => {
+        setTopicUrl(props.topicUrl);
+        setShowTopicUrl(props.topicUrl === "")
+    }, [props.topicUrl]);
+
+    useEffect(() => {
+        setSendButtonEnabled(validTopicUrl(topicUrl) && !attachFileError);
+    }, [topicUrl, attachFileError]);
 
     const handleSubmit = async () => {
         const { baseUrl, topic } = splitTopicUrl(topicUrl);
@@ -124,23 +128,47 @@ const SendDialog = (props) => {
         setActiveRequest(null);
     };
 
+    const checkAttachmentLimits = async (file) => {
+        try {
+            const { baseUrl } = splitTopicUrl(topicUrl);
+            const stats = await api.userStats(baseUrl);
+            console.log(`[SendDialog] Visitor attachment limits`, stats);
+
+            const fileSizeLimit = stats.attachmentFileSizeLimit ?? 0;
+            if (fileSizeLimit > 0 && file.size > fileSizeLimit) {
+                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} limit`);
+            }
+
+            const remainingBytes = stats.visitorAttachmentBytesRemaining ?? 0;
+            if (remainingBytes > 0 && file.size > remainingBytes) {
+                return setAttachFileError(`quota reached, only ${formatBytes(remainingBytes)} remaining`);
+            }
+
+            setAttachFileError("");
+        } catch (e) {
+            console.log(`[SendDialog] Retrieving attachment limits failed`, e);
+            setAttachFileError(""); // Reset error (rely on server-side checking)
+        }
+    };
+
     const handleAttachFileClick = () => {
         attachFileInput.current.click();
     };
 
-    const handleAttachFileChanged = (ev) => {
-        const file = ev.target.files[0];
-        setAttachFile(file);
-        setFilename(file.name);
-        console.log(ev.target.files[0]);
-        console.log(URL.createObjectURL(ev.target.files[0]));
+    const handleAttachFileChanged = async (ev) => {
+        await updateAttachFile(ev.target.files[0]);
     };
 
-    const handleDrop = (ev) => {
+    const handleAttachFileDrop = async (ev) => {
         ev.preventDefault();
-        const file = ev.dataTransfer.files[0];
+        props.onDrop();
+        await updateAttachFile(ev.dataTransfer.files[0]);
+    };
+
+    const updateAttachFile = async (file) => {
         setAttachFile(file);
         setFilename(file.name);
+        await checkAttachmentLimits(file);
     };
 
     const allowDrag = (ev) => {
@@ -178,7 +206,7 @@ const SendDialog = (props) => {
                                 justifyContent: "center",
                                 alignItems: "center",
                             }}
-                            onDrop={handleDrop}
+                            onDrop={handleAttachFileDrop}
                             onDragEnter={allowDrag}
                             onDragOver={allowDrag}
                         >
@@ -360,9 +388,11 @@ const SendDialog = (props) => {
                     file={attachFile}
                     filename={filename}
                     disabled={disabled}
+                    error={attachFileError}
                     onChangeFilename={(f) => setFilename(f)}
                     onClose={() => {
                         setAttachFile(null);
+                        setAttachFileError("");
                         setFilename("");
                     }}
                 />}
@@ -466,7 +496,7 @@ const AttachmentBox = (props) => {
                 borderRadius: '4px',
             }}>
                 <Icon type={file.type}/>
-                <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
+                <Box sx={{ marginLeft: 1, textAlign: 'left' }}>
                     <ExpandingTextField
                         minWidth={140}
                         variant="body2"
@@ -475,8 +505,15 @@ const AttachmentBox = (props) => {
                         disabled={props.disabled}
                     />
                     <br/>
-                    {formatBytes(file.size)}
-                </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                        {formatBytes(file.size)}
+                        {props.error &&
+                            <Typography component="span" sx={{ color: 'error.main' }}>
+                                {" "}({props.error})
+                            </Typography>
+                        }
+                    </Typography>
+                </Box>
                 <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
             </Box>
         </>

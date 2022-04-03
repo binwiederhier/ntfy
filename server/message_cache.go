@@ -355,7 +355,7 @@ func (c *messageCache) Prune(olderThan time.Time) error {
 	return err
 }
 
-func (c *messageCache) AttachmentsSize(owner string) (int64, error) {
+func (c *messageCache) AttachmentBytesUsed(owner string) (int64, error) {
 	rows, err := c.db.Query(selectAttachmentsSizeQuery, owner, time.Now().Unix())
 	if err != nil {
 		return 0, err

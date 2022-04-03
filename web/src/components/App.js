@@ -154,11 +154,6 @@ const Messaging = (props) => {
             e.preventDefault();
         }
     };
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setShowDropZone(false);
-        console.log(e.dataTransfer.files[0]);
-    };
 
     return (
         <>
@@ -173,6 +168,7 @@ const Messaging = (props) => {
                 open={showDialog}
                 dropZone={showDropZone}
                 onClose={handleSendDialogClose}
+                onDrop={() => setShowDropZone(false)}
                 topicUrl={selectedTopicUrl}
                 message={message}
             />

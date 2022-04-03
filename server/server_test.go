@@ -938,7 +938,7 @@ func TestServer_PublishAttachment(t *testing.T) {
 	require.Equal(t, content, response.Body.String())
 
 	// Slightly unrelated cross-test: make sure we add an owner for internal attachments
-	size, err := s.messageCache.AttachmentsSize("9.9.9.9") // See request()
+	size, err := s.messageCache.AttachmentBytesUsed("9.9.9.9") // See request()
 	require.Nil(t, err)
 	require.Equal(t, int64(5000), size)
 }
@@ -967,7 +967,7 @@ func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
 	require.Equal(t, content, response.Body.String())
 
 	// Slightly unrelated cross-test: make sure we add an owner for internal attachments
-	size, err := s.messageCache.AttachmentsSize("1.2.3.4")
+	size, err := s.messageCache.AttachmentBytesUsed("1.2.3.4")
 	require.Nil(t, err)
 	require.Equal(t, int64(21), size)
 }
@@ -987,7 +987,7 @@ func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
 	require.Equal(t, "", msg.Attachment.Owner)
 
 	// Slightly unrelated cross-test: make sure we don't add an owner for external attachments
-	size, err := s.messageCache.AttachmentsSize("127.0.0.1")
+	size, err := s.messageCache.AttachmentBytesUsed("127.0.0.1")
 	require.Nil(t, err)
 	require.Equal(t, int64(0), size)
 }

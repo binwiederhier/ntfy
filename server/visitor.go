@@ -22,6 +22,7 @@ var (
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
 	config        *Config
+	messageCache  *messageCache
 	ip            string
 	requests      *rate.Limiter
 	emails        *rate.Limiter
@@ -31,9 +32,17 @@ type visitor struct {
 	mu            sync.Mutex
 }
 
-func newVisitor(conf *Config, ip string) *visitor {
+type visitorStats struct {
+	AttachmentFileSizeLimit         int64 `json:"attachmentFileSizeLimit"`
+	VisitorAttachmentBytesTotal     int64 `json:"visitorAttachmentBytesTotal"`
+	VisitorAttachmentBytesUsed      int64 `json:"visitorAttachmentBytesUsed"`
+	VisitorAttachmentBytesRemaining int64 `json:"visitorAttachmentBytesRemaining"`
+}
+
+func newVisitor(conf *Config, messageCache *messageCache, ip string) *visitor {
 	return &visitor{
 		config:        conf,
+		messageCache:  messageCache,
 		ip:            ip,
 		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
 		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
@@ -90,4 +99,21 @@ func (v *visitor) Stale() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return time.Since(v.seen) > visitorExpungeAfter
+}
+
+func (v *visitor) Stats() (*visitorStats, error) {
+	attachmentsBytesUsed, err := v.messageCache.AttachmentBytesUsed(v.ip)
+	if err != nil {
+		return nil, err
+	}
+	attachmentsBytesRemaining := v.config.VisitorAttachmentTotalSizeLimit - attachmentsBytesUsed
+	if attachmentsBytesRemaining < 0 {
+		attachmentsBytesRemaining = 0
+	}
+	return &visitorStats{
+		AttachmentFileSizeLimit:         v.config.AttachmentFileSizeLimit,
+		VisitorAttachmentBytesTotal:     v.config.VisitorAttachmentTotalSizeLimit,
+		VisitorAttachmentBytesUsed:      attachmentsBytesUsed,
+		VisitorAttachmentBytesRemaining: attachmentsBytesRemaining,
+	}, nil
 }

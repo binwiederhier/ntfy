@@ -7,7 +7,7 @@ import {
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince
+    topicUrlJsonPollWithSince, userStatsUrl
 } from "./utils";
 import userManager from "./UserManager";
 
@@ -92,6 +92,16 @@ class Api {
             return false;
         }
         throw new Error(`Unexpected server response ${response.status}`);
+    }
+
+    async userStats(baseUrl) {
+        const url = userStatsUrl(baseUrl);
+        console.log(`[Api] Fetching user stats ${url}`);
+        const response = await fetch(url);
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        return response.json();
     }
 }
 

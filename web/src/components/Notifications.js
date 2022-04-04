@@ -33,17 +33,12 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
 import InfiniteScroll from "react-infinite-scroll-component";
-import fileApp from "../img/file-app.svg";
-import fileAudio from "../img/file-audio.svg";
-import fileDocument from "../img/file-document.svg";
-import fileImage from "../img/file-image.svg";
-import fileVideo from "../img/file-video.svg";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
-import Icon from "./Icon";
+import AttachmentIcon from "./AttachmentIcon";
 
 const Notifications = (props) => {
     if (props.mode === "all") {
@@ -240,7 +235,7 @@ const Attachment = (props) => {
                     padding: 1,
                     borderRadius: '4px',
             }}>
-                <Icon type={attachment.type}/>
+                <AttachmentIcon type={attachment.type}/>
                 <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
                     <b>{attachment.name}</b>
                     {maybeInfoText}
@@ -269,7 +264,7 @@ const Attachment = (props) => {
                         }
                 }}
             >
-                <Icon type={attachment.type}/>
+                <AttachmentIcon type={attachment.type}/>
                 <Typography variant="body2" sx={{ marginLeft: 1, textAlign: 'left', color: 'text.primary' }}>
                     <b>{attachment.name}</b>
                     {maybeInfoText}

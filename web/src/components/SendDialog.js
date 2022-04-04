@@ -20,7 +20,7 @@ import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import {basicAuth, formatBytes, shortUrl, splitTopicUrl, validTopicUrl} from "../app/utils";
 import Box from "@mui/material/Box";
-import Icon from "./Icon";
+import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import userManager from "../app/UserManager";
@@ -483,7 +483,7 @@ const AttachmentBox = (props) => {
                 padding: 0.5,
                 borderRadius: '4px',
             }}>
-                <Icon type={file.type}/>
+                <AttachmentIcon type={file.type}/>
                 <Box sx={{ marginLeft: 1, textAlign: 'left' }}>
                     <ExpandingTextField
                         minWidth={140}

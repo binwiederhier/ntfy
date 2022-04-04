@@ -6,7 +6,7 @@ import fileVideo from "../img/file-video.svg";
 import fileAudio from "../img/file-audio.svg";
 import fileApp from "../img/file-app.svg";
 
-const Icon = (props) => {
+const AttachmentIcon = (props) => {
     const type = props.type;
     let imageFile;
     if (!type) {
@@ -35,4 +35,4 @@ const Icon = (props) => {
     );
 }
 
-export default Icon;
+export default AttachmentIcon;

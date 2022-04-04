@@ -50,6 +50,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Added docker-compose example to [install instructions](install.md#docker) ([#194](https://github.com/binwiederhier/ntfy/pull/194), thanks to [@RasHas](https://github.com/RasHas))
 
+**Integrations:**
+
+* [Apprise](https://github.com/caronc/apprise) has added integration into ntfy ([#99](https://github.com/binwiederhier/ntfy/issues/99), [apprise#524](https://github.com/caronc/apprise/pull/524), 
+  thanks to [@particledecay](https://github.com/particledecay) and [@caronc](https://github.com/caronc) for their
+  fantastic work)
+
 -->
 
 ## ntfy server v1.19.0

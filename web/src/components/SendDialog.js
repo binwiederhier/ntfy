@@ -213,11 +213,11 @@ const SendDialog = (props) => {
                 onDragLeave={handleAttachFileDragLeave}/>
             }
             <Dialog maxWidth="md" open={open} onClose={props.onCancel} fullScreen={fullScreen}>
-                <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
+                <DialogTitle>{topicUrl ? `Publish to ${shortUrl(topicUrl)}` : "Publish message"}</DialogTitle>
                 <DialogContent>
                     {dropZone && <DropBox/>}
                     {showTopicUrl &&
-                        <ClosableRow disabled={disabled} onClose={() => {
+                        <ClosableRow closable={!!props.topicUrl} disabled={disabled} onClose={() => {
                             setTopicUrl(props.topicUrl);
                             setShowTopicUrl(false);
                         }}>
@@ -468,10 +468,11 @@ const Row = (props) => {
 };
 
 const ClosableRow = (props) => {
+    const closable = (props.hasOwnProperty("closable")) ? props.closable : true;
     return (
         <Row>
             {props.children}
-            <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
+            {closable && <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>}
         </Row>
     );
 };

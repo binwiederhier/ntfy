@@ -3,7 +3,6 @@ import {useState} from 'react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -11,7 +10,6 @@ import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/mate
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
-import Box from "@mui/material/Box";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";

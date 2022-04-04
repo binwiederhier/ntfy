@@ -19,7 +19,7 @@ import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {ChatBubble, NotificationsOffOutlined} from "@mui/icons-material";
+import {ChatBubble, NotificationsOffOutlined, Send} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -119,8 +119,12 @@ const NavList = (props) => {
                     <ListItemText primary="Documentation"/>
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+                    <ListItemIcon><Send/></ListItemIcon>
+                    <ListItemText primary="Publish message"/>
+                </ListItemButton>
+                <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                     <ListItemIcon><AddIcon/></ListItemIcon>
-                    <ListItemText primary="Add subscription"/>
+                    <ListItemText primary="Subscribe to topic"/>
                 </ListItemButton>
             </List>
             <SubscribeDialog

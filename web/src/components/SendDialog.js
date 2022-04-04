@@ -24,6 +24,7 @@ import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import userManager from "../app/UserManager";
+import EmojiPicker from "./EmojiPicker";
 
 const SendDialog = (props) => {
     const [topicUrl, setTopicUrl] = useState("");
@@ -53,6 +54,8 @@ const SendDialog = (props) => {
     const [activeRequest, setActiveRequest] = useState(null);
     const [status, setStatus] = useState("");
     const disabled = !!activeRequest;
+
+    const [emojiPickerAnchorEl, setEmojiPickerAnchorEl] = useState(null);
 
     const [dropZone, setDropZone] = useState(false);
     const [sendButtonEnabled, setSendButtonEnabled] = useState(true);
@@ -191,6 +194,18 @@ const SendDialog = (props) => {
         }
     };
 
+    const handleEmojiClick = (ev) => {
+        setEmojiPickerAnchorEl(ev.currentTarget);
+    };
+
+    const handleEmojiPick = (emoji) => {
+        setTags(tags => (tags.trim()) ? `${tags.trim()}, ${emoji}` : emoji);
+    };
+
+    const handleEmojiClose = () => {
+        setEmojiPickerAnchorEl(null);
+    };
+
     return (
         <>
             {dropZone && <DropArea
@@ -245,7 +260,14 @@ const SendDialog = (props) => {
                         multiline
                     />
                     <div style={{display: 'flex'}}>
-                        <DialogIconButton disabled={disabled} onClick={() => null}><InsertEmoticonIcon/></DialogIconButton>
+                        <EmojiPicker
+                            anchorEl={emojiPickerAnchorEl}
+                            onEmojiPick={handleEmojiPick}
+                            onClose={handleEmojiClose}
+                        />
+                        <DialogIconButton disabled={disabled} onClick={handleEmojiClick}>
+                            <InsertEmoticonIcon/>
+                        </DialogIconButton>
                         <TextField
                             margin="dense"
                             label="Tags"

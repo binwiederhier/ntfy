@@ -15,10 +15,6 @@ var ErrLimitReached = errors.New("limit reached")
 type Limiter interface {
 	// Allow adds n to the limiters internal value, or returns ErrLimitReached if the limit has been reached
 	Allow(n int64) error
-
-	// Remaining returns the remaining count until the limit is reached; may return -1 if the implementation
-	// does not support this operation.
-	Remaining() int64
 }
 
 // FixedLimiter is a helper that allows adding values up to a well-defined limit. Once the limit is reached
@@ -46,13 +42,6 @@ func (l *FixedLimiter) Allow(n int64) error {
 	}
 	l.value += n
 	return nil
-}
-
-// Remaining  returns the remaining count until the limit is reached
-func (l *FixedLimiter) Remaining() int64 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.limit - l.value
 }
 
 // RateLimiter is a Limiter that wraps a rate.Limiter, allowing a floating time-based limit.
@@ -83,11 +72,6 @@ func (l *RateLimiter) Allow(n int64) error {
 		return ErrLimitReached
 	}
 	return nil
-}
-
-// Remaining is not implemented for RateLimiter. It always returns -1.
-func (l *RateLimiter) Remaining() int64 {
-	return -1
 }
 
 // LimitWriter implements an io.Writer that will pass through all Write calls to the underlying

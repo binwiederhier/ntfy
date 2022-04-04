@@ -51,6 +51,13 @@ class Api {
         console.log(`[Api] Publishing message to ${url}`);
         const send = new Promise(function (resolve, reject) {
             xhr.open("PUT", url);
+            if (body.type) {
+                xhr.overrideMimeType(body.type);
+            }
+            for (const [key, value] of Object.entries(headers)) {
+                xhr.setRequestHeader(key, value);
+            }
+            xhr.upload.addEventListener("progress", onProgress);
             xhr.addEventListener('readystatechange', (ev) => {
                 if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
                     console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
@@ -70,13 +77,6 @@ class Api {
                     reject(errorText ?? "An error occurred");
                 }
             })
-            xhr.upload.addEventListener("progress", onProgress);
-            if (body.type) {
-                xhr.overrideMimeType(body.type);
-            }
-            for (const [key, value] of Object.entries(headers)) {
-                xhr.setRequestHeader(key, value);
-            }
             xhr.send(body);
         });
         send.abort = () => {

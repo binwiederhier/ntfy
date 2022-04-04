@@ -1024,9 +1024,9 @@ func TestServer_PublishAttachmentTooLargeContentLength(t *testing.T) {
 		"Content-Length": "20000000",
 	})
 	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 400, response.Code)
-	require.Equal(t, 400, err.HTTPCode)
-	require.Equal(t, 40012, err.Code)
+	require.Equal(t, 413, response.Code)
+	require.Equal(t, 413, err.HTTPCode)
+	require.Equal(t, 41301, err.Code)
 }
 
 func TestServer_PublishAttachmentTooLargeBodyAttachmentFileSizeLimit(t *testing.T) {
@@ -1036,9 +1036,9 @@ func TestServer_PublishAttachmentTooLargeBodyAttachmentFileSizeLimit(t *testing.
 	s := newTestServer(t, c)
 	response := request(t, s, "PUT", "/mytopic", content, nil)
 	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 400, response.Code)
-	require.Equal(t, 400, err.HTTPCode)
-	require.Equal(t, 40012, err.Code)
+	require.Equal(t, 413, response.Code)
+	require.Equal(t, 413, err.HTTPCode)
+	require.Equal(t, 41301, err.Code)
 }
 
 func TestServer_PublishAttachmentExpiryBeforeDelivery(t *testing.T) {
@@ -1068,9 +1068,9 @@ func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *
 	content := util.RandomString(5001) // 5000+5001 > , see below
 	response = request(t, s, "PUT", "/mytopic", content, nil)
 	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 400, response.Code)
-	require.Equal(t, 400, err.HTTPCode)
-	require.Equal(t, 40012, err.Code)
+	require.Equal(t, 413, response.Code)
+	require.Equal(t, 413, err.HTTPCode)
+	require.Equal(t, 41301, err.Code)
 }
 
 func TestServer_PublishAttachmentAndPrune(t *testing.T) {
@@ -1144,8 +1144,32 @@ func TestServer_PublishAttachmentBandwidthLimitUploadOnly(t *testing.T) {
 	// And a failed one
 	response := request(t, s, "PUT", "/mytopic", content, nil)
 	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 400, response.Code)
-	require.Equal(t, 40012, err.Code)
+	require.Equal(t, 413, response.Code)
+	require.Equal(t, 41301, err.Code)
+}
+
+func TestServer_PublishAttachmentUserStats(t *testing.T) {
+	content := util.RandomString(4999) // > 4096
+
+	c := newTestConfig(t)
+	c.AttachmentFileSizeLimit = 5000
+	c.VisitorAttachmentTotalSizeLimit = 6000
+	s := newTestServer(t, c)
+
+	// Upload one attachment
+	response := request(t, s, "PUT", "/mytopic", content, nil)
+	msg := toMessage(t, response.Body.String())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+
+	// User stats
+	response = request(t, s, "GET", "/user/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	var stats visitorStats
+	require.Nil(t, json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&stats))
+	require.Equal(t, int64(5000), stats.AttachmentFileSizeLimit)
+	require.Equal(t, int64(6000), stats.VisitorAttachmentBytesTotal)
+	require.Equal(t, int64(4999), stats.VisitorAttachmentBytesUsed)
+	require.Equal(t, int64(1001), stats.VisitorAttachmentBytesRemaining)
 }
 
 func newTestConfig(t *testing.T) *Config {

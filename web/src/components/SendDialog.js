@@ -54,10 +54,18 @@ const SendDialog = (props) => {
     const [status, setStatus] = useState("");
     const disabled = !!activeRequest;
 
+    const [dropZone, setDropZone] = useState(false);
     const [sendButtonEnabled, setSendButtonEnabled] = useState(true);
 
-    const dropZone = props.dropZone;
+    const open = !!props.openMode;
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
+    useEffect(() => {
+        window.addEventListener('dragenter', () => {
+            props.onDragEnter();
+            setDropZone(true);
+        });
+    }, []);
 
     useEffect(() => {
         setTopicUrl(props.topicUrl);
@@ -165,7 +173,7 @@ const SendDialog = (props) => {
 
     const handleAttachFileDrop = async (ev) => {
         ev.preventDefault();
-        props.onHideDropZone();
+        setDropZone(false);
         await updateAttachFile(ev.dataTransfer.files[0]);
     };
 
@@ -177,14 +185,9 @@ const SendDialog = (props) => {
     };
 
     const handleAttachFileDragLeave = () => {
-        // When the dialog was opened by dragging a file in, close it. If it was open
-        // before, keep it open.
-
-        console.log(`open mode ${props.openMode}`);
+        setDropZone(false);
         if (props.openMode === SendDialog.OPEN_MODE_DRAG) {
-            props.onClose();
-        } else {
-            props.onHideDropZone();
+            props.onClose(); // Only close dialog if it was not open before dragging file in
         }
     };
 
@@ -194,7 +197,7 @@ const SendDialog = (props) => {
                 onDrop={handleAttachFileDrop}
                 onDragLeave={handleAttachFileDragLeave}/>
             }
-            <Dialog maxWidth="md" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
+            <Dialog maxWidth="md" open={open} onClose={props.onCancel} fullScreen={fullScreen}>
                 <DialogTitle>Publish to {shortUrl(topicUrl)}</DialogTitle>
                 <DialogContent>
                     {dropZone && <DropBox/>}

@@ -126,25 +126,15 @@ const Messaging = (props) => {
     const [message, setMessage] = useState("");
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpenMode, setDialogOpenMode] = useState("");
-    const [showDropZone, setShowDropZone] = useState(false);
 
     const subscription = props.selected;
     const selectedTopicUrl = (subscription) ? topicUrl(subscription.baseUrl, subscription.topic) : "";
 
-    useEffect(() => {
-        window.addEventListener('dragenter', () => {
-            setDialogOpenMode(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG); // Only update if not already open
-            setShowDropZone(true);
-        });
-    }, []);
-
     const handleOpenDialogClick = () => {
         setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT);
-        setShowDropZone(false);
     };
 
     const handleSendDialogClose = () => {
-        setShowDropZone(false);
         setDialogOpenMode("");
         setDialogKey(prev => prev+1);
     };
@@ -159,13 +149,11 @@ const Messaging = (props) => {
             />}
             <SendDialog
                 key={`sendDialog${dialogKey}`} // Resets dialog when canceled/closed
+                openMode={dialogOpenMode}
                 topicUrl={selectedTopicUrl}
                 message={message}
-                open={!!dialogOpenMode}
-                openMode={dialogOpenMode}
-                dropZone={showDropZone}
                 onClose={handleSendDialogClose}
-                onHideDropZone={() => setShowDropZone(false)}
+                onDragEnter={() => setDialogOpenMode(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG)} // Only update if not already open
                 onResetOpenMode={() => setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT)}
             />
         </>

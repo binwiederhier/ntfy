@@ -150,11 +150,11 @@ const SendDialog = (props) => {
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
             const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
             if (fileSizeLimitReached && quotaReached) {
-                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit, quota reached: ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit, and quota reached, ${formatBytes(remainingBytes)} remaining`);
             } else if (fileSizeLimitReached) {
                 return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit`);
             } else if (quotaReached) {
-                return setAttachFileError(`quota reached, only ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(`quota reached, ${formatBytes(remainingBytes)} remaining`);
             }
             setAttachFileError("");
         } catch (e) {

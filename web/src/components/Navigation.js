@@ -118,7 +118,7 @@ const NavList = (props) => {
                     <ListItemIcon><ArticleIcon/></ListItemIcon>
                     <ListItemText primary="Documentation"/>
                 </ListItemButton>
-                <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+                <ListItemButton onClick={() => props.onPublishMessageClick()}>
                     <ListItemIcon><Send/></ListItemIcon>
                     <ListItemText primary="Publish message"/>
                 </ListItemButton>

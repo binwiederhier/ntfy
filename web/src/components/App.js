@@ -65,6 +65,7 @@ const Layout = () => {
     const params = useParams();
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
+    const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
@@ -91,12 +92,17 @@ const Layout = () => {
                 mobileDrawerOpen={mobileDrawerOpen}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
                 onNotificationGranted={setNotificationsGranted}
+                onPublishMessageClick={() => setSendDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT)}
             />
             <Main>
                 <Toolbar/>
                 <Outlet context={{ subscriptions, selected }}/>
             </Main>
-            <Messaging selected={selected}/>
+            <Messaging
+                selected={selected}
+                dialogOpenMode={sendDialogOpenMode}
+                onDialogOpenModeChange={setSendDialogOpenMode}
+            />
         </Box>
     );
 }
@@ -125,17 +131,17 @@ const Main = (props) => {
 const Messaging = (props) => {
     const [message, setMessage] = useState("");
     const [dialogKey, setDialogKey] = useState(0);
-    const [dialogOpenMode, setDialogOpenMode] = useState("");
 
+    const dialogOpenMode = props.dialogOpenMode;
     const subscription = props.selected;
     const selectedTopicUrl = (subscription) ? topicUrl(subscription.baseUrl, subscription.topic) : "";
 
     const handleOpenDialogClick = () => {
-        setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT);
+        props.onDialogOpenModeChange(SendDialog.OPEN_MODE_DEFAULT);
     };
 
     const handleSendDialogClose = () => {
-        setDialogOpenMode("");
+        props.onDialogOpenModeChange("");
         setDialogKey(prev => prev+1);
     };
 
@@ -153,8 +159,8 @@ const Messaging = (props) => {
                 topicUrl={selectedTopicUrl}
                 message={message}
                 onClose={handleSendDialogClose}
-                onDragEnter={() => setDialogOpenMode(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG)} // Only update if not already open
-                onResetOpenMode={() => setDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT)}
+                onDragEnter={() => props.onDialogOpenModeChange(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG)} // Only update if not already open
+                onResetOpenMode={() => props.onDialogOpenModeChange(SendDialog.OPEN_MODE_DEFAULT)}
             />
         </>
     );

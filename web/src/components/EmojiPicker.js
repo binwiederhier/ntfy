@@ -9,12 +9,23 @@ import {InputAdornment} from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import {Close} from "@mui/icons-material";
 
+// Create emoji list by category; filter emojis that are not supported by Desktop Chrome
 const emojisByCategory = {};
+const isDesktopChrome = /Chrome/.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent);
+const maxSupportedVersionForDesktopChrome = 11;
 rawEmojis.forEach(emoji => {
     if (!emojisByCategory[emoji.category]) {
         emojisByCategory[emoji.category] = [];
     }
-    emojisByCategory[emoji.category].push(emoji);
+    try {
+        const unicodeVersion = parseFloat(emoji.unicode_version);
+        const supportedEmoji = unicodeVersion <= maxSupportedVersionForDesktopChrome || !isDesktopChrome;
+        if (supportedEmoji) {
+            emojisByCategory[emoji.category].push(emoji);
+        }
+    } catch (e) {
+        // Nothing. Ignore.
+    }
 });
 
 const EmojiPicker = (props) => {

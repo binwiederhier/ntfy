@@ -44,6 +44,19 @@ class Api {
         });
     }
 
+    /**
+     * Publishes to a topic using XMLHttpRequest (XHR), and returns a Promise with the active request.
+     * Unfortunately, fetch() does not support a progress hook, which is why XHR has to be used.
+     *
+     * Firefox XHR bug:
+     *    Firefox has a bug(?), which returns 0 and "" for all fields of the XHR response in the case of an error,
+     *    so we cannot determine the exact error. It also sometimes complains about CORS violations, even when the
+     *    correct headers are clearly set. It's quite the odd behavior.
+     *
+     *  There is an example, and the bug report here:
+     *  - https://bugzilla.mozilla.org/show_bug.cgi?id=1733755
+     *  - https://gist.github.com/binwiederhier/627f146d1959799be207ad8c17a8f345
+     */
     publishXHR(baseUrl, topic, body, headers, onProgress) {
         const url = topicUrl(baseUrl, topic);
         const xhr = new XMLHttpRequest();
@@ -63,6 +76,7 @@ class Api {
                     console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
                     resolve(xhr.response);
                 } else if (xhr.readyState === 4) {
+                    // Firefox bug; see description above!
                     console.log(`[Api] Publish failed (HTTP ${xhr.status})`, xhr.responseText);
                     let errorText;
                     try {
@@ -109,7 +123,9 @@ class Api {
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        return response.json();
+        const stats = response.json();
+        console.log(`[Api] Stats`, stats);
+        return stats;
     }
 }
 

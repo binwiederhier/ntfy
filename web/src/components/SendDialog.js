@@ -147,17 +147,16 @@ const SendDialog = (props) => {
         try {
             const { baseUrl } = splitTopicUrl(topicUrl);
             const stats = await api.userStats(baseUrl);
-            console.log(`[SendDialog] Visitor attachment limits`, stats);
             const fileSizeLimit = stats.attachmentFileSizeLimit ?? 0;
             const remainingBytes = stats.visitorAttachmentBytesRemaining ?? 0;
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
             const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
             if (fileSizeLimitReached && quotaReached) {
-                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit, and quota reached, ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit and quota, ${formatBytes(remainingBytes)} remaining`);
             } else if (fileSizeLimitReached) {
                 return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit`);
             } else if (quotaReached) {
-                return setAttachFileError(`quota reached, ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(`exceeds quota, ${formatBytes(remainingBytes)} remaining`);
             }
             setAttachFileError("");
         } catch (e) {

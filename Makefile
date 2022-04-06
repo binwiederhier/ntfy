@@ -18,6 +18,7 @@ help:
 	@echo "Build server & client (not release version):"
 	@echo "  make server                  - Build server & client (all architectures)"
 	@echo "  make server-amd64            - Build server & client (amd64 only)"
+	@echo "  make server-armv6            - Build server & client (armv6 only)"
 	@echo "  make server-armv7            - Build server & client (armv7 only)"
 	@echo "  make server-arm64            - Build server & client (arm64 only)"
 	@echo
@@ -51,6 +52,7 @@ help:
 	@echo
 	@echo "Install locally (requires sudo):"
 	@echo "  make install-amd64           - Copy amd64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-armv6           - Copy armv6 binary from dist/ to /usr/bin/ntfy"
 	@echo "  make install-armv7           - Copy armv7 binary from dist/ to /usr/bin/ntfy"
 	@echo "  make install-arm64           - Copy arm64 binary from dist/ to /usr/bin/ntfy"
 	@echo "  make install-deb-amd64       - Install .deb from dist/ (amd64 only)"
@@ -104,7 +106,10 @@ server: server-deps
 server-amd64: server-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_amd64
 
-server-armv7: server-deps-static-sites server-deps-gcc-armv7
+server-armv6: server-deps-static-sites server-deps-gcc-armv6-armv7
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_armv6
+
+server-armv7: server-deps-static-sites server-deps-gcc-armv6-armv7
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_armv7
 
 server-arm64: server-deps-static-sites server-deps-gcc-arm64
@@ -112,7 +117,7 @@ server-arm64: server-deps-static-sites server-deps-gcc-arm64
 
 server-deps: server-deps-static-sites server-deps-all server-deps-gcc
 
-server-deps-gcc: server-deps-gcc-armv7 server-deps-gcc-arm64
+server-deps-gcc: server-deps-gcc-armv6-armv7 server-deps-gcc-arm64
 
 server-deps-static-sites:
 	mkdir -p server/docs server/site
@@ -121,8 +126,8 @@ server-deps-static-sites:
 server-deps-all:
 	which upx || { echo "ERROR: upx not installed. On Ubuntu, run: apt install upx"; exit 1; }
 
-server-deps-gcc-armv7:
-	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
+server-deps-gcc-armv6-armv7:
+	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
 
 server-deps-gcc-arm64:
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
@@ -202,6 +207,9 @@ release-check-tags:
 
 install-amd64: remove-binary
 	sudo cp -a dist/ntfy_amd64_linux_amd64/ntfy /usr/bin/ntfy
+
+install-armv6: remove-binary
+	sudo cp -a dist/ntfy_armv6_linux_armv6/ntfy /usr/bin/ntfy
 
 install-armv7: remove-binary
 	sudo cp -a dist/ntfy_armv7_linux_armv7/ntfy /usr/bin/ntfy

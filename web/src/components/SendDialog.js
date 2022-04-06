@@ -18,7 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {basicAuth, formatBytes, topicShortUrl, topicUrl, validTopicUrl} from "../app/utils";
+import {basicAuth, formatBytes, topicShortUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
@@ -80,7 +80,7 @@ const SendDialog = (props) => {
     }, [props.baseUrl, props.topic]);
 
     useEffect(() => {
-        const valid = validTopicUrl(topicUrl(baseUrl, topic)) && !attachFileError;
+        const valid = validUrl(baseUrl) && validTopic(topic) && !attachFileError;
         setSendButtonEnabled(valid);
     }, [baseUrl, topic, attachFileError]);
 

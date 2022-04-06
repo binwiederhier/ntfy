@@ -23,26 +23,8 @@ export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
 
-export const splitTopicUrl = (url) => {
-    if (!validTopicUrl(url)) {
-        throw new Error("Invalid topic URL");
-    }
-    const parts = url.split("/");
-    if (parts.length < 2) {
-        throw new Error("Invalid topic URL");
-    }
-    return {
-        baseUrl: parts.slice(0, parts.length-1).join("/"),
-        topic: parts[parts.length-1]
-    };
-};
-
 export const validUrl = (url) => {
     return url.match(/^https?:\/\//);
-}
-
-export const validTopicUrl = (url) => {
-    return url.match(/^https?:\/\/.+\/.*[^/]/); // At least one other slash
 }
 
 export const validTopic = (topic) => {

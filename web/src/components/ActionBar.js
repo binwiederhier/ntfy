@@ -105,7 +105,7 @@ const SettingsIcons = (props) => {
         }
     };
 
-    const handleSendTestMessage = () => {
+    const handleSendTestMessage = async () => {
         const baseUrl = props.subscription.baseUrl;
         const topic = props.subscription.topic;
         const tags = shuffle([
@@ -135,11 +135,15 @@ const SettingsIcons = (props) => {
             `I'm really excited that you're trying out ntfy. Did you know that there are a few public topics, such as ntfy.sh/stats and ntfy.sh/announcements.`,
             `It's interesting to hear what people use ntfy for. I've heard people talk about using it for so many cool things. What do you use it for?`
         ])[0];
-        api.publish(baseUrl, topic, message, {
-            title: title,
-            priority: priority,
-            tags: tags
-        });
+        try {
+            await api.publish(baseUrl, topic, message, {
+                title: title,
+                priority: priority,
+                tags: tags
+            });
+        } catch (e) {
+            console.log(`[ActionBar] Error publishing message`, e);
+        }
         setOpen(false);
     }
 

@@ -57,7 +57,7 @@ const AllSubscriptions = (props) => {
     } else if (notifications.length === 0) {
         return <NoNotificationsWithoutSubscription subscriptions={subscriptions}/>;
     }
-    return <NotificationList key="all" notifications={notifications}/>;
+    return <NotificationList key="all" notifications={notifications} messageBar={false}/>;
 }
 
 const SingleSubscription = (props) => {
@@ -68,7 +68,7 @@ const SingleSubscription = (props) => {
     } else if (notifications.length === 0) {
         return <NoNotifications subscription={subscription}/>;
     }
-    return <NotificationList id={subscription.id} notifications={notifications}/>;
+    return <NotificationList id={subscription.id} notifications={notifications} messageBar={true}/>;
 }
 
 const NotificationList = (props) => {
@@ -94,7 +94,13 @@ const NotificationList = (props) => {
             scrollThreshold={0.7}
             scrollableTarget="main"
         >
-            <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
+            <Container
+                maxWidth="md"
+                sx={{
+                    marginTop: 3,
+                    marginBottom: (props.messageBar) ? "100px" : 3 // Hack to avoid hiding notifications behind the message bar
+                }}
+            >
                 <Stack spacing={3}>
                     {notifications.slice(0, count).map(notification =>
                         <NotificationItem

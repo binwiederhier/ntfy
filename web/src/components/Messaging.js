@@ -10,6 +10,7 @@ import api from "../app/Api";
 import SendDialog from "./SendDialog";
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import EmojiPicker from "./EmojiPicker";
+import {Portal, Snackbar} from "@mui/material";
 
 const Messaging = (props) => {
     const [message, setMessage] = useState("");
@@ -51,8 +52,14 @@ const Messaging = (props) => {
 
 const MessageBar = (props) => {
     const subscription = props.subscription;
-    const handleSendClick = () => {
-        api.publish(subscription.baseUrl, subscription.topic, props.message); // FIXME
+    const [snackOpen, setSnackOpen] = useState(false);
+    const handleSendClick = async () => {
+        try {
+            await api.publish(subscription.baseUrl, subscription.topic, props.message);
+        } catch (e) {
+            console.log(`[MessageBar] Error publishing message`, e);
+            setSnackOpen(true);
+        }
         props.onMessageChange("");
     };
     return (
@@ -64,7 +71,7 @@ const MessageBar = (props) => {
                 bottom: 0,
                 right: 0,
                 padding: 2,
-                width: `calc(100% - ${Navigation.width}px)`,
+                width: { xs: "100%", sm: `calc(100% - ${Navigation.width}px)` },
                 backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
             }}
         >
@@ -90,6 +97,14 @@ const MessageBar = (props) => {
             <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick}>
                 <SendIcon/>
             </IconButton>
+            <Portal>
+                <Snackbar
+                    open={snackOpen}
+                    autoHideDuration={3000}
+                    onClose={() => setSnackOpen(false)}
+                    message="Error publishing message"
+                />
+            </Portal>
         </Paper>
     );
 };

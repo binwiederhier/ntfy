@@ -37,11 +37,15 @@ class Api {
             message: message,
             ...options
         };
-        await fetch(baseUrl, {
+        const response = await fetch(baseUrl, {
             method: 'PUT',
             body: JSON.stringify(body),
             headers: maybeWithBasicAuth(headers, user)
         });
+        if (response.status < 200 || response.status > 299) {
+            throw new Error(`Unexpected response: ${response.status}`);
+        }
+        return response;
     }
 
     /**

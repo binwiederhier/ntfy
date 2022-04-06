@@ -9,7 +9,6 @@ import SendIcon from "@mui/icons-material/Send";
 import api from "../app/Api";
 import SendDialog from "./SendDialog";
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import EmojiPicker from "./EmojiPicker";
 import {Portal, Snackbar} from "@mui/material";
 
 const Messaging = (props) => {
@@ -18,7 +17,6 @@ const Messaging = (props) => {
 
     const dialogOpenMode = props.dialogOpenMode;
     const subscription = props.selected;
-    const selectedTopicUrl = (subscription) ? topicUrl(subscription.baseUrl, subscription.topic) : "";
 
     const handleOpenDialogClick = () => {
         props.onDialogOpenModeChange(SendDialog.OPEN_MODE_DEFAULT);
@@ -40,7 +38,8 @@ const Messaging = (props) => {
             <SendDialog
                 key={`sendDialog${dialogKey}`} // Resets dialog when canceled/closed
                 openMode={dialogOpenMode}
-                topicUrl={selectedTopicUrl}
+                baseUrl={subscription?.baseUrl ?? window.location.origin}
+                topic={subscription?.topic ?? ""}
                 message={message}
                 onClose={handleSendDialogClose}
                 onDragEnter={() => props.onDialogOpenModeChange(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG)} // Only update if not already open

@@ -127,7 +127,7 @@ class Api {
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        const stats = response.json();
+        const stats = await response.json();
         console.log(`[Api] Stats`, stats);
         return stats;
     }

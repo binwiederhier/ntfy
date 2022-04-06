@@ -18,7 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {basicAuth, formatBytes, shortUrl, splitTopicUrl, validTopicUrl} from "../app/utils";
+import {basicAuth, formatBytes, topicShortUrl, topicUrl, validTopicUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
@@ -27,8 +27,10 @@ import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
 
 const SendDialog = (props) => {
-    const [topicUrl, setTopicUrl] = useState("");
+    const [baseUrl, setBaseUrl] = useState("");
+    const [topic, setTopic] = useState("");
     const [message, setMessage] = useState("");
+    const [messageFocused, setMessageFocused] = useState(true);
     const [title, setTitle] = useState("");
     const [tags, setTags] = useState("");
     const [priority, setPriority] = useState(3);
@@ -71,21 +73,22 @@ const SendDialog = (props) => {
     }, []);
 
     useEffect(() => {
-        setTopicUrl(props.topicUrl);
-        setShowTopicUrl(props.topicUrl === "")
-    }, [props.topicUrl]);
+        setBaseUrl(props.baseUrl);
+        setTopic(props.topic);
+        setShowTopicUrl(!props.baseUrl || !props.topic);
+        setMessageFocused(!!props.topic); // Focus message only if topic is set
+    }, [props.baseUrl, props.topic]);
 
     useEffect(() => {
-        const valid = validTopicUrl(topicUrl) && !attachFileError;
+        const valid = validTopicUrl(topicUrl(baseUrl, topic)) && !attachFileError;
         setSendButtonEnabled(valid);
-    }, [topicUrl, attachFileError]);
+    }, [baseUrl, topic, attachFileError]);
 
     useEffect(() => {
         setMessage(props.message);
     }, [props.message]);
 
     const handleSubmit = async () => {
-        const { baseUrl, topic } = splitTopicUrl(topicUrl);
         const headers = {};
         if (title.trim()) {
             headers["X-Title"] = title.trim();
@@ -145,7 +148,6 @@ const SendDialog = (props) => {
 
     const checkAttachmentLimits = async (file) => {
         try {
-            const { baseUrl } = splitTopicUrl(topicUrl);
             const stats = await api.userStats(baseUrl);
             const fileSizeLimit = stats.attachmentFileSizeLimit ?? 0;
             const remainingBytes = stats.visitorAttachmentBytesRemaining ?? 0;
@@ -212,24 +214,37 @@ const SendDialog = (props) => {
                 onDragLeave={handleAttachFileDragLeave}/>
             }
             <Dialog maxWidth="md" open={open} onClose={props.onCancel} fullScreen={fullScreen}>
-                <DialogTitle>{topicUrl ? `Publish to ${shortUrl(topicUrl)}` : "Publish message"}</DialogTitle>
+                <DialogTitle>{(baseUrl && topic) ? `Publish to ${topicShortUrl(baseUrl, topic)}` : "Publish message"}</DialogTitle>
                 <DialogContent>
                     {dropZone && <DropBox/>}
                     {showTopicUrl &&
-                        <ClosableRow closable={!!props.topicUrl} disabled={disabled} onClose={() => {
-                            setTopicUrl(props.topicUrl);
+                        <ClosableRow closable={!!props.baseUrl && !!props.topic} disabled={disabled} onClose={() => {
+                            setBaseUrl(props.baseUrl);
+                            setTopic(props.topic);
                             setShowTopicUrl(false);
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Topic URL"
-                                value={topicUrl}
-                                onChange={ev => setTopicUrl(ev.target.value)}
+                                label="Server URL"
+                                placeholder="Server URL, e.g. https://example.com"
+                                value={baseUrl}
+                                onChange={ev => setBaseUrl(ev.target.value)}
+                                disabled={disabled}
+                                type="url"
+                                variant="standard"
+                                sx={{flexGrow: 1, marginRight: 1}}
+                            />
+                            <TextField
+                                margin="dense"
+                                label="Topic"
+                                placeholder="Topic name, e.g. phil_alerts"
+                                value={topic}
+                                onChange={ev => setTopic(ev.target.value)}
                                 disabled={disabled}
                                 type="text"
                                 variant="standard"
-                                fullWidth
-                                required
+                                autoFocus={!messageFocused}
+                                sx={{flexGrow: 1}}
                             />
                         </ClosableRow>
                     }
@@ -254,8 +269,8 @@ const SendDialog = (props) => {
                         type="text"
                         variant="standard"
                         rows={5}
+                        autoFocus={messageFocused}
                         fullWidth
-                        autoFocus
                         multiline
                     />
                     <div style={{display: 'flex'}}>

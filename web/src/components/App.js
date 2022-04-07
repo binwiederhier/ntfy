@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Suspense } from "react";
 import {useEffect, useState} from 'react';
 import Box from '@mui/material/Box';
 import {ThemeProvider} from '@mui/material/styles';
@@ -20,29 +21,38 @@ import routes from "./routes";
 import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
 import SendDialog from "./SendDialog";
 import Messaging from "./Messaging";
+import "./i18n"; // Translations!
 
 // TODO races when two tabs are open
 // TODO investigate service workers
 
 const App = () => {
     return (
-        <BrowserRouter>
-            <ThemeProvider theme={theme}>
-                <CssBaseline/>
-                <ErrorBoundary>
-                    <Routes>
-                        <Route element={<Layout/>}>
-                            <Route path={routes.root} element={<AllSubscriptions/>}/>
-                            <Route path={routes.settings} element={<Preferences/>}/>
-                            <Route path={routes.subscription} element={<SingleSubscription/>}/>
-                            <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>
-                        </Route>
-                    </Routes>
-                </ErrorBoundary>
-            </ThemeProvider>
-        </BrowserRouter>
+        <Suspense fallback={<Loader />}>
+            <BrowserRouter>
+                <ThemeProvider theme={theme}>
+                    <CssBaseline/>
+                    <ErrorBoundary>
+                        <Routes>
+                            <Route element={<Layout/>}>
+                                <Route path={routes.root} element={<AllSubscriptions/>}/>
+                                <Route path={routes.settings} element={<Preferences/>}/>
+                                <Route path={routes.subscription} element={<SingleSubscription/>}/>
+                                <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>
+                            </Route>
+                        </Routes>
+                    </ErrorBoundary>
+                </ThemeProvider>
+            </BrowserRouter>
+        </Suspense>
     );
 }
+
+const Loader = () => (
+    <div>
+        <div>loading...</div>
+    </div>
+);
 
 const AllSubscriptions = () => {
     const { subscriptions } = useOutletContext();

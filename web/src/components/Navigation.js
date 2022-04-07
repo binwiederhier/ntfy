@@ -24,6 +24,7 @@ import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
 import ArticleIcon from '@mui/icons-material/Article';
+import {useTranslation} from "react-i18next";
 
 const navWidth = 280;
 
@@ -61,6 +62,7 @@ const Navigation = (props) => {
 Navigation.width = navWidth;
 
 const NavList = (props) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
@@ -124,7 +126,7 @@ const NavList = (props) => {
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                     <ListItemIcon><AddIcon/></ListItemIcon>
-                    <ListItemText primary="Subscribe to topic"/>
+                    <ListItemText primary={t("nav_button_subscribe")}/>
                 </ListItemButton>
             </List>
             <SubscribeDialog

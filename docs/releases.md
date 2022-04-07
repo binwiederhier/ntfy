@@ -40,7 +40,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Many thanks to [@cmeis](https://github.com/cmeis), [@Fallenbagel](https://github.com/Fallenbagel), [@Joeharrison94](https://github.com/Joeharrison94),
   and [@rogeliodh](https://github.com/rogeliodh) for input on the new attachment logic, and for testing the release
 
-## ntfy server v1.20.0 (UNRELEASED)
+-->
+
+## ntfy server v1.20.0
+Released Apr 6, 2022
+
+**Features:**:
+
+* Added message bar and publish dialog ([#196](https://github.com/binwiederhier/ntfy/issues/196)) 
 
 **Bugs:**
 
@@ -52,11 +59,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Integrations:**
 
-* [Apprise](https://github.com/caronc/apprise) has added integration into ntfy ([#99](https://github.com/binwiederhier/ntfy/issues/99), [apprise#524](https://github.com/caronc/apprise/pull/524), 
-  thanks to [@particledecay](https://github.com/particledecay) and [@caronc](https://github.com/caronc) for their
-  fantastic work)
-
--->
+* [Apprise](https://github.com/caronc/apprise) has added integration into ntfy ([#99](https://github.com/binwiederhier/ntfy/issues/99), [apprise#524](https://github.com/caronc/apprise/pull/524),
+  thanks to [@particledecay](https://github.com/particledecay) and [@caronc](https://github.com/caronc) for their fantastic work)
 
 ## ntfy server v1.19.0
 Released Mar 30, 2022

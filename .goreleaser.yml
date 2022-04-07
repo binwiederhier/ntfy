@@ -17,6 +17,20 @@ builds:
       post:
         - upx "{{ .Path }}" # apt install upx
   -
+    id: ntfy_armv6
+    binary: ntfy
+    env:
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
+    tags: [sqlite_omit_load_extension,osusergo,netgo]
+    ldflags:
+      - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [linux]
+    goarch: [arm]
+    goarm: [6]
+    # No "upx", since it causes random core dumps, see
+    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
+  -
     id: ntfy_armv7
     binary: ntfy
     env:

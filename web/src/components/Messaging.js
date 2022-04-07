@@ -80,7 +80,7 @@ const MessageBar = (props) => {
             <TextField
                 autoFocus
                 margin="dense"
-                placeholder="Message"
+                placeholder="Type a message here"
                 type="text"
                 fullWidth
                 variant="standard"

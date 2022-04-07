@@ -18,7 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {basicAuth, formatBytes, topicShortUrl, validTopic, validUrl} from "../app/utils";
+import {basicAuth, formatBytes, maybeWithBasicAuth, topicShortUrl, topicUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
@@ -89,40 +89,38 @@ const SendDialog = (props) => {
     }, [props.message]);
 
     const handleSubmit = async () => {
-        const headers = {};
+        const url = new URL(topicUrl(baseUrl, topic));
         if (title.trim()) {
-            headers["X-Title"] = title.trim();
+            url.searchParams.append("title", title.trim());
         }
         if (tags.trim()) {
-            headers["X-Tags"] = tags.trim();
+            url.searchParams.append("tags", tags.trim());
         }
         if (priority && priority !== 3) {
-            headers["X-Priority"] = priority.toString();
+            url.searchParams.append("priority", priority.toString());
         }
         if (clickUrl.trim()) {
-            headers["X-Click"] = clickUrl.trim();
+            url.searchParams.append("click", clickUrl.trim());
         }
         if (attachUrl.trim()) {
-            headers["X-Attach"] = attachUrl.trim();
+            url.searchParams.append("attach", attachUrl.trim());
         }
         if (filename.trim()) {
-            headers["X-Filename"] = filename.trim();
+            url.searchParams.append("filename", filename.trim());
         }
         if (email.trim()) {
-            headers["X-Email"] = email.trim();
+            url.searchParams.append("email", email.trim());
         }
         if (delay.trim()) {
-            headers["X-Delay"] = delay.trim();
+            url.searchParams.append("delay", delay.trim());
         }
         if (attachFile && message.trim()) {
-            headers["X-Message"] = message.replaceAll("\n", "\\n").trim();
+            url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());
         }
         const body = (attachFile) ? attachFile : message;
         try {
             const user = await userManager.get(baseUrl);
-            if (user) {
-                headers["Authorization"] = basicAuth(user.username, user.password);
-            }
+            const headers = maybeWithBasicAuth({}, user);
             const progressFn = (ev) => {
                 if (ev.loaded > 0 && ev.total > 0) {
                     const percent = Math.round(ev.loaded * 100.0 / ev.total);
@@ -131,7 +129,7 @@ const SendDialog = (props) => {
                     setStatus(`Uploading ...`);
                 }
             };
-            const request = api.publishXHR(baseUrl, topic, body, headers, progressFn);
+            const request = api.publishXHR(url, body, headers, progressFn);
             setActiveRequest(request);
             await request;
             if (!publishAnother) {
@@ -262,7 +260,7 @@ const SendDialog = (props) => {
                     <TextField
                         margin="dense"
                         label="Message"
-                        placeholder="Type the main message body here."
+                        placeholder="Type a message here"
                         value={message}
                         onChange={ev => setMessage(ev.target.value)}
                         disabled={disabled}

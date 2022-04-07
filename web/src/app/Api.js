@@ -61,11 +61,9 @@ class Api {
      *  - https://bugzilla.mozilla.org/show_bug.cgi?id=1733755
      *  - https://gist.github.com/binwiederhier/627f146d1959799be207ad8c17a8f345
      */
-    publishXHR(baseUrl, topic, body, headers, onProgress) {
-        const url = topicUrl(baseUrl, topic);
-        const xhr = new XMLHttpRequest();
-
+    publishXHR(url, body, headers, onProgress) {
         console.log(`[Api] Publishing message to ${url}`);
+        const xhr = new XMLHttpRequest();
         const send = new Promise(function (resolve, reject) {
             xhr.open("PUT", url);
             if (body.type) {

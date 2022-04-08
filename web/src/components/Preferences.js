@@ -390,7 +390,7 @@ const Language = () => {
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={i18n.language} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
                     <MenuItem value="en">English</MenuItem>
-                    <MenuItem value="de">Deutsch</MenuItem>
+                    <MenuItem value="bg">Български</MenuItem>
                 </Select>
             </FormControl>
         </Pref>

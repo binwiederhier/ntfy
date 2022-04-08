@@ -15,6 +15,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Web app: English language strings fixes ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 
+**Translations (web app):**
+
+* Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
+
 -->
 
 ## ntfy Android app v1.11.0

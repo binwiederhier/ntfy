@@ -22,6 +22,7 @@ import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "
 import SendDialog from "./SendDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
+import {Backdrop, CircularProgress} from "@mui/material";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -47,12 +48,6 @@ const App = () => {
         </Suspense>
     );
 }
-
-const Loader = () => (
-    <div>
-        <div>loading...</div>
-    </div>
-);
 
 const AllSubscriptions = () => {
     const { subscriptions } = useOutletContext();
@@ -131,6 +126,18 @@ const Main = (props) => {
         </Box>
     );
 };
+
+const Loader = () => (
+    <Backdrop
+        open={true}
+        sx={{
+            zIndex: 100000,
+            backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
+        }}
+    >
+        <CircularProgress color="success" disableShrink />
+    </Backdrop>
+);
 
 const updateTitle = (newNotificationsCount) => {
     document.title = (newNotificationsCount > 0) ? `(${newNotificationsCount}) ntfy` : "ntfy";

@@ -3,10 +3,13 @@ import Backend from 'i18next-http-backend';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
 
-// init i18next
-// for all options read: https://www.i18next.com/overview/configuration-options
-// learn more: https://github.com/i18next/i18next-browser-languageDetector
-// learn more: https://github.com/i18next/i18next-http-backend
+// Translations using i18next
+// - Options: https://www.i18next.com/overview/configuration-options
+// - Browser Language Detector: https://github.com/i18next/i18next-browser-languageDetector
+// - HTTP Backend (load files via fetch): https://github.com/i18next/i18next-http-backend
+//
+// See example project here:
+// https://github.com/i18next/react-i18next/tree/master/example/react
 
 i18n
     .use(Backend)

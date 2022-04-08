@@ -33,6 +33,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 import {playSound} from "../app/utils";
+import {useTranslation} from "react-i18next";
 
 const Preferences = () => {
     return (
@@ -40,6 +41,7 @@ const Preferences = () => {
             <Stack spacing={3}>
                 <Notifications/>
                 <Users/>
+                <Appearance/>
             </Stack>
         </Container>
     );
@@ -59,7 +61,6 @@ const Notifications = () => {
         </Card>
     );
 };
-
 
 const Sound = () => {
     const sound = useLiveQuery(async () => prefs.sound());
@@ -360,6 +361,33 @@ const UserDialog = (props) => {
             </DialogActions>
         </Dialog>
     );
+};
+
+const Appearance = () => {
+    return (
+        <Card sx={{p: 3}}>
+            <Typography variant="h5">
+                Appearance
+            </Typography>
+            <PrefGroup>
+                <Language/>
+            </PrefGroup>
+        </Card>
+    );
+};
+
+const Language = () => {
+    const { t, i18n } = useTranslation();
+    return (
+        <Pref title="Language">
+            <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+                <Select value={i18n.language} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
+                    <MenuItem value="en">English</MenuItem>
+                    <MenuItem value="de">Deutsch</MenuItem>
+                </Select>
+            </FormControl>
+        </Pref>
+    )
 };
 
 export default Preferences;

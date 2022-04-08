@@ -74,7 +74,7 @@
     "publish_dialog_priority_low": "Нисък приоритет",
     "publish_dialog_attachment_limits_quota_reached": "надвишава ограничението, оставащи {{remainingBytes}}",
     "publish_dialog_priority_high": "Висок приоритет",
-    "publish_dialog_priority_default": "Подразбиран приоритет",
+    "publish_dialog_priority_default": "Подразбиран",
     "publish_dialog_title_placeholder": "Заглавие на известието, напр. Предупреждение за диска",
     "publish_dialog_tags_label": "Етикети",
     "publish_dialog_email_label": "Адрес на електронна поща",

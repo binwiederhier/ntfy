@@ -6,10 +6,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.21.0 (UNRELEASED)
 
-**Features:**:
+**Features:**
 
 * Added ARMv6 build ([#200](https://github.com/binwiederhier/ntfy/issues/200), thanks to [@jcrubioa](https://github.com/jcrubioa) for reporting)
 * Web app internationalization support ([#189](https://github.com/binwiederhier/ntfy/issues/189))
+
+**Bugs:**
+
+* Web app: English language strings fixes ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 
 -->
 

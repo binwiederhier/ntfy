@@ -13,5 +13,8 @@
     "nav_button_settings": "Ajustes",
     "nav_button_subscribe": "Suscribirse al tópico",
     "nav_button_documentation": "Documentación",
-    "nav_button_publish_message": "Publicar notificación"
+    "nav_button_publish_message": "Publicar notificación",
+    "notifications_copied_to_clipboard": "Copiado al portapapeles",
+    "alert_not_supported_title": "Notificaciones no soportadas",
+    "alert_not_supported_description": "Las notificaciones no están soportadas por tu navegador."
 }

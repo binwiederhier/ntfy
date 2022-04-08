@@ -25,7 +25,7 @@
     "notifications_click_copy_url_title": "Link-URL in Zwischenablage kopieren",
     "publish_dialog_priority_low": "Niedrige Priorität",
     "publish_dialog_message_label": "Nachricht",
-    "action_bar_unsubscribe": "Abmelden",
+    "action_bar_unsubscribe": "Von Thema abmelden",
     "notifications_copied_to_clipboard": "In Zwischenablage kopiert",
     "notifications_loading": "Benachrichtigungen werden geladen …",
     "notifications_attachment_open_title": "Gehe zu {{url}}",

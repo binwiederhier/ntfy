@@ -1,3 +1,12 @@
 {
-    "nav_button_subscribe": "Konuya abone ol"
+    "nav_button_subscribe": "Konuya abone ol",
+    "nav_button_settings": "Ayarlar",
+    "action_bar_send_test_notification": "Test bildirimi gönder",
+    "message_bar_type_message": "Buraya bir mesaj yazın",
+    "action_bar_clear_notifications": "Tüm bildirimleri temizle",
+    "action_bar_unsubscribe": "Abonelikten çık",
+    "action_bar_settings": "Ayarlar",
+    "message_bar_error_publishing": "Bildirim yayınlanırken hata oluştu",
+    "nav_topics_title": "Abone olunan konular",
+    "nav_button_all_notifications": "Tüm bildirimler"
 }

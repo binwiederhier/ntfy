@@ -108,7 +108,7 @@
     "publish_dialog_checkbox_publish_another": "Weitere Nachricht senden",
     "publish_dialog_attached_file_title": "Dateianhang:",
     "emoji_picker_search_placeholder": "Emoji suchen",
-    "subscribe_dialog_subscribe_description": "Themen sind evtl. nicht kennwort-geschützt, also wähle einen schwer zu erratenden Namen. Nach dem Abonnieren kannst Du Benachrichtigungen POSTen/PUTen.",
+    "subscribe_dialog_subscribe_description": "Themen sind evtl. nicht kennwort-geschützt, also wähle einen schwer zu erratenden Namen. Nach dem Abonnieren kannst Du Benachrichtigungen per POST/PUT senden.",
     "subscribe_dialog_subscribe_use_another_label": "Anderen Server verwenden",
     "subscribe_dialog_subscribe_button_cancel": "Abbrechen",
     "subscribe_dialog_subscribe_button_subscribe": "Abonnieren",

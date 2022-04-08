@@ -101,7 +101,7 @@
     "publish_dialog_title_placeholder": "Bildirim başlığı, örn. Disk alanı uyarısı",
     "publish_dialog_message_placeholder": "Buraya bir mesaj yazın",
     "publish_dialog_tags_label": "Etiketler",
-    "publish_dialog_delay_placeholder": "Teslimat gecikmesi, örn. 1649029748, 30m veya tomorrow, 9am",
+    "publish_dialog_delay_placeholder": "Teslimat gecikmesi, örn. {{unixTimestamp}}, {{relativeTime}} veya \"{{naturalLanguage}}\"",
     "publish_dialog_chip_attach_file_label": "Yerel dosya ekle",
     "publish_dialog_chip_delay_label": "Teslimat gecikmesi",
     "publish_dialog_chip_topic_label": "Konuyu değiştir",

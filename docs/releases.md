@@ -18,6 +18,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Translations (web app):**
 
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
+* German (thanks to [@cmeis](https://github.com/cmeis))
+* Turkish (thanks to [@ersen](https://ersen.moe/))
 
 -->
 

@@ -70,7 +70,7 @@
   "publish_dialog_filename_label": "Filename",
   "publish_dialog_filename_placeholder": "Attachment filename",
   "publish_dialog_delay_label": "Delay",
-  "publish_dialog_delay_placeholder": "Delay delivery, e.g. 1649029748, 30m, or tomorrow, 9am",
+  "publish_dialog_delay_placeholder": "Delay delivery, e.g. {{unixTimestamp}}, {{relativeTime}}, or \"{{naturalLanguage}}\" (English only)",
   "publish_dialog_other_features": "Other features:",
   "publish_dialog_chip_click_label": "Click URL",
   "publish_dialog_chip_email_label": "Forward to email",

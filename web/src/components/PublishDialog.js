@@ -310,7 +310,7 @@ const PublishDialog = (props) => {
                         <FormControl
                             variant="standard"
                             margin="dense"
-                            sx={{minWidth: 120, maxWidth: 200, flexGrow: 1}}
+                            sx={{minWidth: 170, maxWidth: 300, flexGrow: 1}}
                         >
                             <InputLabel/>
                             <Select
@@ -441,7 +441,11 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_delay_label")}
-                                placeholder={t("publish_dialog_delay_placeholder")}
+                                placeholder={t("publish_dialog_delay_placeholder", {
+                                    unixTimestamp: "1649029748",
+                                    relativeTime: "30m",
+                                    naturalLanguage: "tomorrow, 9am"
+                                })}
                                 value={delay}
                                 onChange={ev => setDelay(ev.target.value)}
                                 disabled={disabled}

@@ -97,14 +97,14 @@ const NavList = (props) => {
                 {!showSubscriptionsList &&
                     <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>
-                        <ListItemText primary="All notifications"/>
+                        <ListItemText primary={t("nav_button_all_notifications")}/>
                     </ListItemButton>}
                 {showSubscriptionsList &&
                     <>
-                        <ListSubheader>Subscribed topics</ListSubheader>
+                        <ListSubheader>{t("nav_topics_title")}</ListSubheader>
                         <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
                             <ListItemIcon><ChatBubble/></ListItemIcon>
-                            <ListItemText primary="All notifications"/>
+                            <ListItemText primary={t("nav_button_all_notifications")}/>
                         </ListItemButton>
                         <SubscriptionList
                             subscriptions={props.subscriptions}
@@ -114,15 +114,15 @@ const NavList = (props) => {
                     </>}
                 <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
-                    <ListItemText primary="Settings"/>
+                    <ListItemText primary={t("nav_button_settings")}/>
                 </ListItemButton>
                 <ListItemButton onClick={() => openUrl("/docs")}>
                     <ListItemIcon><ArticleIcon/></ListItemIcon>
-                    <ListItemText primary="Documentation"/>
+                    <ListItemText primary={t("nav_button_documentation")}/>
                 </ListItemButton>
                 <ListItemButton onClick={() => props.onPublishMessageClick()}>
                     <ListItemIcon><Send/></ListItemIcon>
-                    <ListItemText primary="Publish message"/>
+                    <ListItemText primary={t("nav_button_publish_message")}/>
                 </ListItemButton>
                 <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
                     <ListItemIcon><AddIcon/></ListItemIcon>
@@ -181,20 +181,19 @@ const SubscriptionItem = (props) => {
 };
 
 const NotificationGrantAlert = (props) => {
+    const { t } = useTranslation();
     return (
         <>
             <Alert severity="warning" sx={{paddingTop: 2}}>
-                <AlertTitle>Notifications are disabled</AlertTitle>
-                <Typography gutterBottom>
-                    Grant your browser permission to display desktop notifications.
-                </Typography>
+                <AlertTitle>{t("alert_grant_title")}</AlertTitle>
+                <Typography gutterBottom>{t("alert_grant_description")}</Typography>
                 <Button
                     sx={{float: 'right'}}
                     color="inherit"
                     size="small"
                     onClick={props.onRequestPermissionClick}
                 >
-                    Grant now
+                    {t("alert_grant_button")}
                 </Button>
             </Alert>
             <Divider/>
@@ -203,13 +202,12 @@ const NotificationGrantAlert = (props) => {
 };
 
 const NotificationNotSupportedAlert = () => {
+    const { t } = useTranslation();
     return (
         <>
             <Alert severity="warning" sx={{paddingTop: 2}}>
-                <AlertTitle>Notifications not supported</AlertTitle>
-                <Typography gutterBottom>
-                    Notifications are not supported in your browser.
-                </Typography>
+                <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+                <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
             </Alert>
             <Divider/>
         </>

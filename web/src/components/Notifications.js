@@ -39,6 +39,7 @@ import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
+import {Trans, useTranslation} from "react-i18next";
 
 const Notifications = (props) => {
     if (props.mode === "all") {
@@ -72,6 +73,7 @@ const SingleSubscription = (props) => {
 }
 
 const NotificationList = (props) => {
+    const { t } = useTranslation();
     const pageSize = 20;
     const notifications = props.notifications;
     const [snackOpen, setSnackOpen] = useState(false);
@@ -112,7 +114,7 @@ const NotificationList = (props) => {
                         open={snackOpen}
                         autoHideDuration={3000}
                         onClose={() => setSnackOpen(false)}
-                        message="Copied to clipboard"
+                        message={t("notifications_copied_to_clipboard")}
                     />
                 </Stack>
             </Container>
@@ -121,6 +123,7 @@ const NotificationList = (props) => {
 }
 
 const NotificationItem = (props) => {
+    const { t } = useTranslation();
     const notification = props.notification;
     const attachment = notification.attachment;
     const date = formatShortDateTime(notification.time);
@@ -160,24 +163,24 @@ const NotificationItem = (props) => {
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{autolink(formatMessage(notification))}</Typography>
                 {attachment && <Attachment attachment={attachment}/>}
-                {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">Tags: {tags}</Typography>}
+                {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">{t("notifications_tags")}: {tags}</Typography>}
             </CardContent>
             {showActions &&
                 <CardActions sx={{paddingTop: 0}}>
                     {showAttachmentActions && <>
-                        <Tooltip title="Copy attachment URL to clipboard">
-                            <Button onClick={() => handleCopy(attachment.url)}>Copy URL</Button>
+                        <Tooltip title={t("notifications_attachment_copy_url_title")}>
+                            <Button onClick={() => handleCopy(attachment.url)}>{t("notifications_attachment_copy_url_button")}</Button>
                         </Tooltip>
-                        <Tooltip title={`Go to ${attachment.url}`}>
-                            <Button onClick={() => openUrl(attachment.url)}>Open attachment</Button>
+                        <Tooltip title={t("notifications_attachment_open_title", { url: attachment.url })}>
+                            <Button onClick={() => openUrl(attachment.url)}>{t("notifications_attachment_open_button")}</Button>
                         </Tooltip>
                     </>}
                     {showClickAction && <>
-                        <Tooltip title="Copy link URL to clipboard">
-                            <Button onClick={() => handleCopy(notification.click)}>Copy link</Button>
+                        <Tooltip title={t("notifications_click_copy_url_title")}>
+                            <Button onClick={() => handleCopy(notification.click)}>{t("notifications_click_copy_url_button")}</Button>
                         </Tooltip>
-                        <Tooltip title={`Go to ${notification.click}`}>
-                            <Button onClick={() => openUrl(notification.click)}>Open link</Button>
+                        <Tooltip title={t("notifications_click_open_title", { url: notification.click })}>
+                            <Button onClick={() => openUrl(notification.click)}>{t("notifications_click_open_button")}</Button>
                         </Tooltip>
                     </>}
                 </CardActions>}
@@ -208,6 +211,7 @@ const priorityFiles = {
 };
 
 const Attachment = (props) => {
+    const { t } = useTranslation();
     const attachment = props.attachment;
     const expired = attachment.expires && attachment.expires < Date.now()/1000;
     const expires = attachment.expires && attachment.expires > Date.now()/1000;
@@ -224,10 +228,10 @@ const Attachment = (props) => {
         infos.push(formatBytes(attachment.size));
     }
     if (expires) {
-        infos.push(`link expires ${formatShortDateTime(attachment.expires)}`);
+        infos.push(t("notifications_attachment_link_expires", { date: formatShortDateTime(attachment.expires) }));
     }
     if (expired) {
-        infos.push(`download link expired`);
+        infos.push(t("notifications_attachment_link_expired"));
     }
     const maybeInfoText = (infos.length > 0) ? <><br/>{infos.join(", ")}</> : null;
 
@@ -326,82 +330,93 @@ const Image = (props) => {
 }
 
 const NoNotifications = (props) => {
+    const { t } = useTranslation();
     const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64" alt="No notifications"/><br />
-                You haven't received any notifications for this topic yet.
+                <img src={logoOutline} height="64" width="64"/><br />
+                {t("notifications_none_for_topic_title")}
             </Typography>
             <Paragraph>
-                To send notifications to this topic, simply PUT or POST to the topic URL.
+                {t("notifications_none_for_topic_description")}
             </Paragraph>
             <Paragraph>
-                Example:<br/>
+                {t("notifications_example")}:<br/>
                 <tt>
                     $ curl -d "Hi" {shortUrl}
                 </tt>
             </Paragraph>
             <Paragraph>
-                For more detailed instructions, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
-                {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
+                <ForMoreDetails/>
             </Paragraph>
         </VerticallyCenteredContainer>
     );
 };
 
 const NoNotificationsWithoutSubscription = (props) => {
+    const { t } = useTranslation();
     const subscription = props.subscriptions[0];
     const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64" alt="No notifications"/><br />
-                You haven't received any notifications.
+                <img src={logoOutline} height="64" width="64"/><br />
+                {t("notifications_none_for_any_title")}
             </Typography>
             <Paragraph>
-                To send notifications to a topic, simply PUT or POST to the topic URL. Here's
-                an example using one of your topics.
+                {t("notifications_none_for_any_description")}
             </Paragraph>
             <Paragraph>
-                Example:<br/>
+                {t("notifications_example")}:<br/>
                 <tt>
                     $ curl -d "Hi" {shortUrl}
                 </tt>
             </Paragraph>
             <Paragraph>
-                For more detailed instructions, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
-                {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
+                <ForMoreDetails/>
             </Paragraph>
         </VerticallyCenteredContainer>
     );
 };
 
 const NoSubscriptions = () => {
+    const { t } = useTranslation();
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64" alt="No topics"/><br />
-                It looks like you don't have any subscriptions yet.
+                <img src={logoOutline} height="64" width="64"/><br />
+                {t("notifications_no_subscriptions_title")}
             </Typography>
             <Paragraph>
-                Click the "Add subscription" link to create or subscribe to a topic. After that, you can send messages
-                via PUT or POST and you'll receive notifications here.
+                {t("notifications_no_subscriptions_description")}
             </Paragraph>
             <Paragraph>
-                For more information, check out the <Link href="https://ntfy.sh" target="_blank" rel="noopener">website</Link> or
-                {" "}<Link href="https://ntfy.sh/docs" target="_blank" rel="noopener">documentation</Link>.
+                <ForMoreDetails/>
             </Paragraph>
         </VerticallyCenteredContainer>
     );
 };
 
+const ForMoreDetails = () => {
+    return (
+        <Trans
+            i18nKey="notifications_more_details"
+            components={{
+                websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener"/>,
+                docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener"/>
+            }}
+        />
+    );
+};
+
 const Loading = () => {
+    const { t } = useTranslation();
     return (
         <VerticallyCenteredContainer>
             <Typography variant="h5" color="text.secondary" align="center" sx={{ paddingBottom: 1 }}>
                 <CircularProgress disableShrink sx={{marginBottom: 1}}/><br />
-                Loading notifications ...
+                {t("notifications_loading")}
             </Typography>
         </VerticallyCenteredContainer>
     );

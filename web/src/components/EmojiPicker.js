@@ -9,6 +9,7 @@ import IconButton from "@mui/material/IconButton";
 import {Close} from "@mui/icons-material";
 import Popper from "@mui/material/Popper";
 import {splitNoEmpty} from "../app/utils";
+import {useTranslation} from "react-i18next";
 
 // Create emoji list by category and create a search base (string with all search words)
 //
@@ -36,6 +37,7 @@ rawEmojis.forEach(emoji => {
 });
 
 const EmojiPicker = (props) => {
+    const { t } = useTranslation();
     const open = Boolean(props.anchorEl);
     const [search, setSearch] = useState("");
     const searchRef = useRef(null);
@@ -71,7 +73,7 @@ const EmojiPicker = (props) => {
                                 inputRef={searchRef}
                                 margin="dense"
                                 size="small"
-                                placeholder="Search emoji"
+                                placeholder={t("emoji_picker_search_placeholder")}
                                 value={search}
                                 onChange={ev => setSearch(ev.target.value)}
                                 type="text"

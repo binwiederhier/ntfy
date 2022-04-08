@@ -1,3 +1,8 @@
 {
+  "nav_topics_title": "Abonnierte Themen",
+  "nav_button_all_notifications": "Alle Benachrichtigungen",
+  "nav_button_settings": "Einstellungen",
+  "nav_button_documentation": "Dokumentation",
+  "nav_button_publish_message": "Nachricht senden",
   "nav_button_subscribe": "Thema abonnieren"
 }

@@ -1,1 +1,24 @@
-{}
+{
+    "nav_topics_title": "Thèmes souscrits",
+    "action_bar_settings": "Paramètres",
+    "action_bar_send_test_notification": "Envoyer une notification de test",
+    "action_bar_clear_notifications": "Effacer toutes les notifications",
+    "action_bar_unsubscribe": "Se désabonner",
+    "message_bar_type_message": "Tapez un message ici",
+    "notifications_attachment_open_button": "Ouvrir la pièce jointe",
+    "notifications_attachment_link_expires": "le lien expire {{date}}",
+    "message_bar_error_publishing": "Notification d'erreur de publication",
+    "nav_button_all_notifications": "Toutes les notifications",
+    "nav_button_settings": "Paramètres",
+    "nav_button_documentation": "Documentation",
+    "alert_not_supported_description": "Les notifications ne sont pas prises en charge par votre navigateur.",
+    "notifications_attachment_copy_url_title": "Copier l'URL de la pièce jointe dans le presse-papiers",
+    "notifications_attachment_open_title": "Aller à {{url}}",
+    "notifications_attachment_link_expired": "lien de téléchargement expiré",
+    "nav_button_publish_message": "Publier la notification",
+    "notifications_copied_to_clipboard": "Copié dans le presse-papiers",
+    "alert_not_supported_title": "Notifications non prises en charge",
+    "notifications_tags": "Étiquettes",
+    "notifications_attachment_copy_url_button": "Copier l'URL",
+    "notifications_click_copy_url_title": "Copier l'URL du lien dans le presse-papiers"
+}

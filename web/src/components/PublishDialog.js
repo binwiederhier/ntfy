@@ -25,8 +25,10 @@ import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
+import {Trans, useTranslation} from "react-i18next";
 
-const SendDialog = (props) => {
+const PublishDialog = (props) => {
+    const { t } = useTranslation();
     const [baseUrl, setBaseUrl] = useState("");
     const [topic, setTopic] = useState("");
     const [message, setMessage] = useState("");
@@ -123,10 +125,13 @@ const SendDialog = (props) => {
             const headers = maybeWithBasicAuth({}, user);
             const progressFn = (ev) => {
                 if (ev.loaded > 0 && ev.total > 0) {
-                    const percent = Math.round(ev.loaded * 100.0 / ev.total);
-                    setStatus(`Uploading ${formatBytes(ev.loaded)}/${formatBytes(ev.total)} (${percent}%) ...`);
+                    setStatus(t("publish_dialog_progress_uploading_detail", {
+                        loaded: formatBytes(ev.loaded),
+                        total: formatBytes(ev.total),
+                        percent: Math.round(ev.loaded * 100.0 / ev.total)
+                    }));
                 } else {
-                    setStatus(`Uploading ...`);
+                    setStatus(t("publish_dialog_progress_uploading"));
                 }
             };
             const request = api.publishXHR(url, body, headers, progressFn);
@@ -135,7 +140,7 @@ const SendDialog = (props) => {
             if (!publishAnother) {
                 props.onClose();
             } else {
-                setStatus("Message published");
+                setStatus(t("publish_dialog_message_published"));
                 setActiveRequest(null);
             }
         } catch (e) {
@@ -152,11 +157,14 @@ const SendDialog = (props) => {
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
             const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
             if (fileSizeLimitReached && quotaReached) {
-                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit and quota, ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(t("publish_dialog_attachment_limits_file_and_quota_reached", {
+                    fileSizeLimit: formatBytes(fileSizeLimit),
+                    remainingBytes: formatBytes(remainingBytes)
+                }));
             } else if (fileSizeLimitReached) {
-                return setAttachFileError(`exceeds ${formatBytes(fileSizeLimit)} file limit`);
+                return setAttachFileError(t("publish_dialog_attachment_limits_file_reached", { fileSizeLimit: formatBytes(fileSizeLimit) }));
             } else if (quotaReached) {
-                return setAttachFileError(`exceeds quota, ${formatBytes(remainingBytes)} remaining`);
+                return setAttachFileError(t("publish_dialog_attachment_limits_quota_reached", { remainingBytes: formatBytes(remainingBytes) }));
             }
             setAttachFileError("");
         } catch (e) {
@@ -188,7 +196,7 @@ const SendDialog = (props) => {
 
     const handleAttachFileDragLeave = () => {
         setDropZone(false);
-        if (props.openMode === SendDialog.OPEN_MODE_DRAG) {
+        if (props.openMode === PublishDialog.OPEN_MODE_DRAG) {
             props.onClose(); // Only close dialog if it was not open before dragging file in
         }
     };
@@ -205,6 +213,14 @@ const SendDialog = (props) => {
         setEmojiPickerAnchorEl(null);
     };
 
+    const priorities = {
+        1: { label: t("publish_dialog_priority_min"), file: priority1 },
+        2: { label: t("publish_dialog_priority_low"), file: priority2 },
+        3: { label: t("publish_dialog_priority_default"), file: priority3 },
+        4: { label: t("publish_dialog_priority_high"), file: priority4 },
+        5: { label: t("publish_dialog_priority_max"), file: priority5 }
+    };
+
     return (
         <>
             {dropZone && <DropArea
@@ -212,7 +228,7 @@ const SendDialog = (props) => {
                 onDragLeave={handleAttachFileDragLeave}/>
             }
             <Dialog maxWidth="md" open={open} onClose={props.onCancel} fullScreen={fullScreen}>
-                <DialogTitle>{(baseUrl && topic) ? `Publish to ${topicShortUrl(baseUrl, topic)}` : "Publish message"}</DialogTitle>
+                <DialogTitle>{(baseUrl && topic) ? t("publish_dialog_title_topic", { topic: topicShortUrl(baseUrl, topic) }) : t("publish_dialog_title_no_topic")}</DialogTitle>
                 <DialogContent>
                     {dropZone && <DropBox/>}
                     {showTopicUrl &&
@@ -223,8 +239,8 @@ const SendDialog = (props) => {
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Server URL"
-                                placeholder="Server URL, e.g. https://example.com"
+                                label={t("publish_dialog_base_url_label")}
+                                placeholder={t("publish_dialog_base_url_placeholder")}
                                 value={baseUrl}
                                 onChange={ev => setBaseUrl(ev.target.value)}
                                 disabled={disabled}
@@ -234,8 +250,8 @@ const SendDialog = (props) => {
                             />
                             <TextField
                                 margin="dense"
-                                label="Topic"
-                                placeholder="Topic name, e.g. phil_alerts"
+                                label={t("publish_dialog_topic_label")}
+                                placeholder={t("publish_dialog_topic_placeholder")}
                                 value={topic}
                                 onChange={ev => setTopic(ev.target.value)}
                                 disabled={disabled}
@@ -248,19 +264,19 @@ const SendDialog = (props) => {
                     }
                     <TextField
                         margin="dense"
-                        label="Title"
+                        label={t("publish_dialog_title_label")}
+                        placeholder={t("publish_dialog_title_placeholder")}
                         value={title}
                         onChange={ev => setTitle(ev.target.value)}
                         disabled={disabled}
                         type="text"
                         fullWidth
                         variant="standard"
-                        placeholder="Notification title, e.g. Disk space alert"
                     />
                     <TextField
                         margin="dense"
-                        label="Message"
-                        placeholder="Type a message here"
+                        label={t("publish_dialog_message_label")}
+                        placeholder={t("publish_dialog_message_placeholder")}
                         value={message}
                         onChange={ev => setMessage(ev.target.value)}
                         disabled={disabled}
@@ -282,8 +298,8 @@ const SendDialog = (props) => {
                         </DialogIconButton>
                         <TextField
                             margin="dense"
-                            label="Tags"
-                            placeholder="Comma-separated list of tags, e.g. warning, srv1-backup"
+                            label={t("publish_dialog_tags_label")}
+                            placeholder={t("publish_dialog_tags_placeholder")}
                             value={tags}
                             onChange={ev => setTags(ev.target.value)}
                             disabled={disabled}
@@ -298,7 +314,7 @@ const SendDialog = (props) => {
                         >
                             <InputLabel/>
                             <Select
-                                label="Priority"
+                                label={t("publish_dialog_priority_label")}
                                 margin="dense"
                                 value={priority}
                                 onChange={(ev) => setPriority(ev.target.value)}
@@ -322,8 +338,8 @@ const SendDialog = (props) => {
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Click URL"
-                                placeholder="URL that is opened when notification is clicked"
+                                label={t("publish_dialog_click_label")}
+                                placeholder={t("publish_dialog_click_placeholder")}
                                 value={clickUrl}
                                 onChange={ev => setClickUrl(ev.target.value)}
                                 disabled={disabled}
@@ -340,8 +356,8 @@ const SendDialog = (props) => {
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Email"
-                                placeholder="Address to forward the message to, e.g. phil@example.com"
+                                label={t("publish_dialog_email_label")}
+                                placeholder={t("publish_dialog_email_placeholder")}
                                 value={email}
                                 onChange={ev => setEmail(ev.target.value)}
                                 disabled={disabled}
@@ -360,8 +376,8 @@ const SendDialog = (props) => {
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Attachment URL"
-                                placeholder="Attach file by URL, e.g. https://f-droid.org/F-Droid.apk"
+                                label={t("publish_dialog_attach_label")}
+                                placeholder={t("publish_dialog_attach_placeholder")}
                                 value={attachUrl}
                                 onChange={ev => {
                                     const url = ev.target.value;
@@ -385,8 +401,8 @@ const SendDialog = (props) => {
                             />
                             <TextField
                                 margin="dense"
-                                label="Filename"
-                                placeholder="Attachment filename"
+                                label={t("publish_dialog_filename_label")}
+                                placeholder={t("publish_dialog_filename_placeholder")}
                                 value={filename}
                                 onChange={ev => {
                                     setFilename(ev.target.value);
@@ -424,8 +440,8 @@ const SendDialog = (props) => {
                         }}>
                             <TextField
                                 margin="dense"
-                                label="Delay"
-                                placeholder="Delay delivery, e.g. 1649029748, 30m, or tomorrow, 9am"
+                                label={t("publish_dialog_delay_label")}
+                                placeholder={t("publish_dialog_delay_placeholder")}
                                 value={delay}
                                 onChange={ev => setDelay(ev.target.value)}
                                 disabled={disabled}
@@ -436,33 +452,37 @@ const SendDialog = (props) => {
                         </ClosableRow>
                     }
                     <Typography variant="body1" sx={{marginTop: 2, marginBottom: 1}}>
-                        Other features:
+                        {t("publish_dialog_other_features")}
                     </Typography>
                     <div>
-                        {!showClickUrl && <Chip clickable disabled={disabled} label="Click URL" onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showEmail && <Chip clickable disabled={disabled} label="Forward to email" onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label="Attach file by URL" onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label="Attach local file" onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showDelay && <Chip clickable disabled={disabled} label="Delay delivery" onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showTopicUrl && <Chip clickable disabled={disabled} label="Change topic" onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showClickUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_click_label")} onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showEmail && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_email_label")} onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_url_label")} onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_file_label")} onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showDelay && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_delay_label")} onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showTopicUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_topic_label")} onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                     </div>
                     <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
-                        For examples and a detailed description of all send features, please
-                        refer to the <Link href="/docs" target="_blank">documentation</Link>.
+                        <Trans
+                            i18nKey="publish_dialog_details_examples_description"
+                            components={{
+                                docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener"/>
+                            }}
+                        />
                     </Typography>
                 </DialogContent>
                 <DialogFooter status={status}>
-                    {activeRequest && <Button onClick={() => activeRequest.abort()}>Cancel sending</Button>}
+                    {activeRequest && <Button onClick={() => activeRequest.abort()}>{t("publish_dialog_button_cancel_sending")}</Button>}
                     {!activeRequest &&
                         <>
                             <FormControlLabel
-                                label="Publish another"
+                                label={t("publish_dialog_checkbox_publish_another")}
                                 sx={{marginRight: 2}}
                                 control={
                                     <Checkbox size="small" checked={publishAnother} onChange={(ev) => setPublishAnother(ev.target.checked)} />
                                 } />
-                            <Button onClick={props.onClose}>Cancel</Button>
-                            <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>Send</Button>
+                            <Button onClick={props.onClose}>{t("publish_dialog_button_cancel")}</Button>
+                            <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>{t("publish_dialog_button_send")}</Button>
                         </>
                     }
                 </DialogFooter>
@@ -506,11 +526,12 @@ const DialogIconButton = (props) => {
 };
 
 const AttachmentBox = (props) => {
+    const { t } = useTranslation();
     const file = props.file;
     return (
         <>
             <Typography variant="body1" sx={{marginTop: 2}}>
-                Attached file:
+                {t("publish_dialog_attached_file_title")}
             </Typography>
             <Box sx={{
                 display: 'flex',
@@ -523,6 +544,7 @@ const AttachmentBox = (props) => {
                     <ExpandingTextField
                         minWidth={140}
                         variant="body2"
+                        placeholder={t("publish_dialog_attached_file_filename_placeholder")}
                         value={props.filename}
                         onChange={(ev) => props.onChangeFilename(ev.target.value)}
                         disabled={props.disabled}
@@ -568,7 +590,7 @@ const ExpandingTextField = (props) => {
             </Typography>
             <TextField
                 margin="dense"
-                placeholder="Attachment filename"
+                placeholder={props.placeholder}
                 value={props.value}
                 onChange={props.onChange}
                 type="text"
@@ -610,6 +632,7 @@ const DropArea = (props) => {
 };
 
 const DropBox = () => {
+    const { t } = useTranslation();
     return (
         <Box sx={{
             position: 'absolute',
@@ -635,21 +658,13 @@ const DropBox = () => {
                     alignItems: "center",
                 }}
             >
-                <Typography variant="h5">Drop file here</Typography>
+                <Typography variant="h5">{t("publish_dialog_drop_file_here")}</Typography>
             </Box>
         </Box>
     );
 }
 
-const priorities = {
-    1: { label: "Min. priority", file: priority1 },
-    2: { label: "Low priority", file: priority2 },
-    3: { label: "Default priority", file: priority3 },
-    4: { label: "High priority", file: priority4 },
-    5: { label: "Max. priority", file: priority5 }
-};
+PublishDialog.OPEN_MODE_DEFAULT = "default";
+PublishDialog.OPEN_MODE_DRAG = "drag";
 
-SendDialog.OPEN_MODE_DEFAULT = "default";
-SendDialog.OPEN_MODE_DRAG = "drag";
-
-export default SendDialog;
+export default PublishDialog;

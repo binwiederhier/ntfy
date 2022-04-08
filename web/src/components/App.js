@@ -19,7 +19,7 @@ import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
-import SendDialog from "./SendDialog";
+import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
 import {Backdrop, CircularProgress} from "@mui/material";
@@ -91,7 +91,7 @@ const Layout = () => {
                 mobileDrawerOpen={mobileDrawerOpen}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
                 onNotificationGranted={setNotificationsGranted}
-                onPublishMessageClick={() => setSendDialogOpenMode(SendDialog.OPEN_MODE_DEFAULT)}
+                onPublishMessageClick={() => setSendDialogOpenMode(PublishDialog.OPEN_MODE_DEFAULT)}
             />
             <Main>
                 <Toolbar/>

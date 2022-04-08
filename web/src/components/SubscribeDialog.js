@@ -14,6 +14,7 @@ import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
+import {useTranslation} from "react-i18next";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -51,6 +52,7 @@ const SubscribeDialog = (props) => {
 };
 
 const SubscribePage = (props) => {
+    const { t } = useTranslation();
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
     const baseUrl = (anotherServerVisible) ? props.baseUrl : window.location.origin;
@@ -60,12 +62,12 @@ const SubscribePage = (props) => {
         .filter(s => s !== window.location.origin);
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
-        const username = (user) ? user.username : "anonymous";
+        const username = (user) ? user.username : t("subscribe_dialog_error_user_anonymous");
         const success = await api.auth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
             if (user) {
-                setErrorText(`User ${username} not authorized`);
+                setErrorText(t("subscribe_dialog_error_user_not_authorized", { username: username }));
                 return;
             } else {
                 props.onNeedsLogin();
@@ -90,17 +92,16 @@ const SubscribePage = (props) => {
     })();
     return (
         <>
-            <DialogTitle>Subscribe to topic</DialogTitle>
+            <DialogTitle>{t("subscribe_dialog_subscribe_title")}</DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    Topics may not be password-protected, so choose a name that's not easy to guess.
-                    Once subscribed, you can PUT/POST notifications.
+                    {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
                 <TextField
                     autoFocus
                     margin="dense"
                     id="topic"
-                    placeholder="Topic name, e.g. phil_alerts"
+                    placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
                     inputProps={{ maxLength: 64 }}
                     value={props.topic}
                     onChange={ev => props.setTopic(ev.target.value)}
@@ -111,7 +112,7 @@ const SubscribePage = (props) => {
                 <FormControlLabel
                     sx={{pt: 1}}
                     control={<Checkbox onChange={handleUseAnotherChanged}/>}
-                    label="Use another server" />
+                    label={t("subscribe_dialog_subscribe_use_another_label")} />
                 {anotherServerVisible && <Autocomplete
                     freeSolo
                     options={existingBaseUrls}
@@ -124,14 +125,15 @@ const SubscribePage = (props) => {
                 />}
             </DialogContent>
             <DialogFooter status={errorText}>
-                <Button onClick={props.onCancel}>Cancel</Button>
-                <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>Subscribe</Button>
+                <Button onClick={props.onCancel}>{t("subscribe_dialog_subscribe_button_cancel")}</Button>
+                <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>{t("subscribe_dialog_subscribe_button_subscribe")}</Button>
             </DialogFooter>
         </>
     );
 };
 
 const LoginPage = (props) => {
+    const { t } = useTranslation();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
@@ -142,7 +144,7 @@ const LoginPage = (props) => {
         const success = await api.auth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
-            setErrorText(`User ${username} not authorized`);
+            setErrorText(t("subscribe_dialog_error_user_not_authorized", { username: username }));
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
@@ -151,17 +153,16 @@ const LoginPage = (props) => {
     };
     return (
         <>
-            <DialogTitle>Login required</DialogTitle>
+            <DialogTitle>{t("subscribe_dialog_login_title")}</DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    This topic is password-protected. Please enter username and
-                    password to subscribe.
+                    {t("subscribe_dialog_login_description")}
                 </DialogContentText>
                 <TextField
                     autoFocus
                     margin="dense"
                     id="username"
-                    label="Username, e.g. phil"
+                    label={t("subscribe_dialog_login_username_label")}
                     value={username}
                     onChange={ev => setUsername(ev.target.value)}
                     type="text"
@@ -171,7 +172,7 @@ const LoginPage = (props) => {
                 <TextField
                     margin="dense"
                     id="password"
-                    label="Password"
+                    label={t("subscribe_dialog_login_password_label")}
                     type="password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value)}
@@ -180,8 +181,8 @@ const LoginPage = (props) => {
                 />
             </DialogContent>
             <DialogFooter status={errorText}>
-                <Button onClick={props.onBack}>Back</Button>
-                <Button onClick={handleLogin}>Login</Button>
+                <Button onClick={props.onBack}>{t("subscribe_dialog_login_button_back")}</Button>
+                <Button onClick={handleLogin}>{t("subscribe_dialog_login_button_login")}</Button>
             </DialogFooter>
         </>
     );

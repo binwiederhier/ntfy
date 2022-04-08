@@ -22,14 +22,16 @@ import api from "../app/Api";
 import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
+import {useTranslation} from "react-i18next";
 
 const ActionBar = (props) => {
+    const { t } = useTranslation();
     const location = useLocation();
     let title = "ntfy";
     if (props.selected) {
         title = topicShortUrl(props.selected.baseUrl, props.selected.topic);
     } else if (location.pathname === "/settings") {
-        title = "Settings";
+        title = t("action_bar_settings");
     }
     return (
         <AppBar position="fixed" sx={{
@@ -66,6 +68,7 @@ const ActionBar = (props) => {
 
 // Originally from https://mui.com/components/menus/#MenuListComposition.js
 const SettingsIcons = (props) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
@@ -189,9 +192,9 @@ const SettingsIcons = (props) => {
                         <Paper>
                             <ClickAwayListener onClickAway={handleClose}>
                                 <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
-                                    <MenuItem onClick={handleSendTestMessage}>Send test notification</MenuItem>
-                                    <MenuItem onClick={handleClearAll}>Clear all notifications</MenuItem>
-                                    <MenuItem onClick={handleUnsubscribe}>Unsubscribe</MenuItem>
+                                    <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
+                                    <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
+                                    <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
                                 </MenuList>
                             </ClickAwayListener>
                         </Paper>

@@ -71,7 +71,7 @@ class Connection {
                 this.onStateChanged(this.subscriptionId, ConnectionState.Connecting);
             }
         };
-        this.ws.onerror = (event) => {
+        this.ws.onerrgoogle.ccor = (event) => {
             console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Error occurred: ${event}`, event);
         };
     }

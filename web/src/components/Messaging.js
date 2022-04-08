@@ -1,15 +1,15 @@
 import * as React from 'react';
 import {useState} from 'react';
 import Navigation from "./Navigation";
-import {topicUrl} from "../app/utils";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
 import api from "../app/Api";
-import SendDialog from "./SendDialog";
+import PublishDialog from "./PublishDialog";
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import {Portal, Snackbar} from "@mui/material";
+import {useTranslation} from "react-i18next";
 
 const Messaging = (props) => {
     const [message, setMessage] = useState("");
@@ -19,10 +19,10 @@ const Messaging = (props) => {
     const subscription = props.selected;
 
     const handleOpenDialogClick = () => {
-        props.onDialogOpenModeChange(SendDialog.OPEN_MODE_DEFAULT);
+        props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT);
     };
 
-    const handleSendDialogClose = () => {
+    const handleDialogClose = () => {
         props.onDialogOpenModeChange("");
         setDialogKey(prev => prev+1);
     };
@@ -35,21 +35,22 @@ const Messaging = (props) => {
                 onMessageChange={setMessage}
                 onOpenDialogClick={handleOpenDialogClick}
             />}
-            <SendDialog
-                key={`sendDialog${dialogKey}`} // Resets dialog when canceled/closed
+            <PublishDialog
+                key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
                 openMode={dialogOpenMode}
                 baseUrl={subscription?.baseUrl ?? window.location.origin}
                 topic={subscription?.topic ?? ""}
                 message={message}
-                onClose={handleSendDialogClose}
-                onDragEnter={() => props.onDialogOpenModeChange(prev => (prev) ? prev : SendDialog.OPEN_MODE_DRAG)} // Only update if not already open
-                onResetOpenMode={() => props.onDialogOpenModeChange(SendDialog.OPEN_MODE_DEFAULT)}
+                onClose={handleDialogClose}
+                onDragEnter={() => props.onDialogOpenModeChange(prev => (prev) ? prev : PublishDialog.OPEN_MODE_DRAG)} // Only update if not already open
+                onResetOpenMode={() => props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)}
             />
         </>
     );
 }
 
 const MessageBar = (props) => {
+    const { t } = useTranslation();
     const subscription = props.subscription;
     const [snackOpen, setSnackOpen] = useState(false);
     const handleSendClick = async () => {
@@ -80,7 +81,7 @@ const MessageBar = (props) => {
             <TextField
                 autoFocus
                 margin="dense"
-                placeholder="Type a message here"
+                placeholder={t("message_bar_type_message")}
                 type="text"
                 fullWidth
                 variant="standard"
@@ -101,7 +102,7 @@ const MessageBar = (props) => {
                     open={snackOpen}
                     autoHideDuration={3000}
                     onClose={() => setSnackOpen(false)}
-                    message="Error publishing message"
+                    message={t("message_bar_error_publishing")}
                 />
             </Portal>
         </Paper>

@@ -13,4 +13,5 @@ const routes = {
         return `/${subscription.topic}`;
     }
 };
+
 export default routes;

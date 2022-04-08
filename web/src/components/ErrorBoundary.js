@@ -1,9 +1,10 @@
 import * as React from "react";
 import StackTrace from "stacktrace-js";
-import {CircularProgress} from "@mui/material";
+import {CircularProgress, Link} from "@mui/material";
 import Button from "@mui/material/Button";
+import {Trans, withTranslation} from "react-i18next";
 
-class ErrorBoundary extends React.Component {
+class ErrorBoundaryImpl extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
@@ -45,22 +46,28 @@ class ErrorBoundary extends React.Component {
     }
 
     render() {
+        const { t } = this.props;
         if (this.state.error) {
             return (
                 <div style={{margin: '20px'}}>
-                    <h2>Oh no, ntfy crashed 😮</h2>
+                    <h2>{t("error_boundary_title")} 😮</h2>
                     <p>
-                        This should obviously not happen. Very sorry about this.<br/>
-                        If you have a minute, please <a href="https://github.com/binwiederhier/ntfy/issues">report this on GitHub</a>, or let us
-                        know via <a href="https://discord.gg/cT7ECsZj9w">Discord</a> or <a href="https://matrix.to/#/#ntfy:matrix.org">Matrix</a>.
+                        <Trans
+                            i18nKey="error_boundary_description"
+                            components={{
+                                githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues"/>,
+                                discordLink: <Link href="https://discord.gg/cT7ECsZj9w"/>,
+                                matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org"/>
+                            }}
+                        />
                     </p>
                     <p>
-                        <Button variant="outlined" onClick={() => this.copyStack()}>Copy stack trace</Button>
+                        <Button variant="outlined" onClick={() => this.copyStack()}>{t("error_boundary_button_copy_stack_trace")}</Button>
                     </p>
-                    <h3>Stack trace</h3>
+                    <h3>{t("error_boundary_stack_trace")}</h3>
                     {this.state.niceStack
                         ? <pre>{this.state.niceStack}</pre>
-                        : <><CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> Gather more info ...</>}
+                        : <><CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> {t("error_boundary_gathering_info")}</>}
                     <pre>{this.state.originalStack}</pre>
                 </div>
             );
@@ -69,4 +76,5 @@ class ErrorBoundary extends React.Component {
     }
 }
 
+const ErrorBoundary = withTranslation()(ErrorBoundaryImpl); // Adds props.t
 export default ErrorBoundary;

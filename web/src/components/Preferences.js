@@ -48,10 +48,11 @@ const Preferences = () => {
 };
 
 const Notifications = () => {
+    const { t } = useTranslation();
     return (
         <Card sx={{p: 3}}>
             <Typography variant="h5">
-                Notifications
+                {t("prefs_notifications_title")}
             </Typography>
             <PrefGroup>
                 <Sound/>
@@ -63,6 +64,7 @@ const Notifications = () => {
 };
 
 const Sound = () => {
+    const { t } = useTranslation();
     const sound = useLiveQuery(async () => prefs.sound());
     const handleChange = async (ev) => {
         await prefs.setSound(ev.target.value);
@@ -71,11 +73,11 @@ const Sound = () => {
         return null; // While loading
     }
     return (
-        <Pref title="Notification sound">
+        <Pref title={t("prefs_notifications_sound_title")}>
             <div style={{ display: 'flex', width: '100%' }}>
                 <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
                     <Select value={sound} onChange={handleChange}>
-                        <MenuItem value={"none"}>No sound</MenuItem>
+                        <MenuItem value={"none"}>{t("prefs_notifications_sound_no_sound")}</MenuItem>
                         <MenuItem value={"ding"}>Ding</MenuItem>
                         <MenuItem value={"juntos"}>Juntos</MenuItem>
                         <MenuItem value={"pristine"}>Pristine</MenuItem>
@@ -94,6 +96,7 @@ const Sound = () => {
 };
 
 const MinPriority = () => {
+    const { t } = useTranslation();
     const minPriority = useLiveQuery(async () => prefs.minPriority());
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
@@ -102,14 +105,14 @@ const MinPriority = () => {
         return null; // While loading
     }
     return (
-        <Pref title="Minimum priority">
+        <Pref title={t("prefs_notifications_min_priority_title")}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={minPriority} onChange={handleChange}>
-                    <MenuItem value={1}>Any priority</MenuItem>
-                    <MenuItem value={2}>Low priority and higher</MenuItem>
-                    <MenuItem value={3}>Default priority and higher</MenuItem>
-                    <MenuItem value={4}>High priority and higher</MenuItem>
-                    <MenuItem value={5}>Only max priority</MenuItem>
+                    <MenuItem value={1}>{t("prefs_notifications_min_priority_any")}</MenuItem>
+                    <MenuItem value={2}>{t("prefs_notifications_min_priority_low_and_higher")}</MenuItem>
+                    <MenuItem value={3}>{t("prefs_notifications_min_priority_default_and_higher")}</MenuItem>
+                    <MenuItem value={4}>{t("prefs_notifications_min_priority_high_and_higher")}</MenuItem>
+                    <MenuItem value={5}>{t("prefs_notifications_min_priority_max_only")}</MenuItem>
                 </Select>
             </FormControl>
         </Pref>
@@ -117,6 +120,7 @@ const MinPriority = () => {
 };
 
 const DeleteAfter = () => {
+    const { t } = useTranslation();
     const deleteAfter = useLiveQuery(async () => prefs.deleteAfter());
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
@@ -125,14 +129,14 @@ const DeleteAfter = () => {
         return null; // While loading
     }
     return (
-        <Pref title="Delete notifications">
+        <Pref title={t("prefs_notifications_delete_after_title")}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={deleteAfter} onChange={handleChange}>
-                    <MenuItem value={0}>Never</MenuItem>
-                    <MenuItem value={10800}>After three hours</MenuItem>
-                    <MenuItem value={86400}>After one day</MenuItem>
-                    <MenuItem value={604800}>After one week</MenuItem>
-                    <MenuItem value={2592000}>After one month</MenuItem>
+                    <MenuItem value={0}>{t("prefs_notifications_delete_after_never")}</MenuItem>
+                    <MenuItem value={10800}>{t("prefs_notifications_delete_after_three_hours")}</MenuItem>
+                    <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
+                    <MenuItem value={604800}>{t("prefs_notifications_delete_after_one_week")}</MenuItem>
+                    <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
                 </Select>
             </FormControl>
         </Pref>
@@ -176,6 +180,7 @@ const Pref = (props) => {
 };
 
 const Users = () => {
+    const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const users = useLiveQuery(() => userManager.all());
@@ -199,16 +204,15 @@ const Users = () => {
         <Card sx={{ padding: 1 }}>
             <CardContent>
                 <Typography variant="h5">
-                    Manage users
+                    {t("prefs_users_title")}
                 </Typography>
                 <Paragraph>
-                    Add/remove users for your protected topics here. Please note that username and password are
-                    stored in the browser's local storage.
+                    {t("prefs_users_description")}
                 </Paragraph>
                 {users?.length > 0 && <UserTable users={users}/>}
             </CardContent>
             <CardActions>
-                <Button onClick={handleAddClick}>Add user</Button>
+                <Button onClick={handleAddClick}>{t("prefs_users_add_button")}</Button>
                 <UserDialog
                     key={`userAddDialog${dialogKey}`}
                     open={dialogOpen}
@@ -223,6 +227,7 @@ const Users = () => {
 };
 
 const UserTable = (props) => {
+    const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogUser, setDialogUser] = useState(null);
@@ -255,8 +260,8 @@ const UserTable = (props) => {
         <Table size="small">
             <TableHead>
                 <TableRow>
-                    <TableCell>User</TableCell>
-                    <TableCell>Service URL</TableCell>
+                    <TableCell>{t("prefs_users_table_user_header")}</TableCell>
+                    <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
                     <TableCell/>
                 </TableRow>
             </TableHead>
@@ -292,6 +297,7 @@ const UserTable = (props) => {
 };
 
 const UserDialog = (props) => {
+    const { t } = useTranslation();
     const [baseUrl, setBaseUrl] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -320,13 +326,13 @@ const UserDialog = (props) => {
     }, [editMode, props.user]);
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-            <DialogTitle>{editMode ? "Edit user" : "Add user"}</DialogTitle>
+            <DialogTitle>{editMode ? t("prefs_users_dialog_title_edit") : t("prefs_users_dialog_title_add")}</DialogTitle>
             <DialogContent>
                 {!editMode && <TextField
                     autoFocus
                     margin="dense"
                     id="baseUrl"
-                    label="Service URL, e.g. https://ntfy.sh"
+                    label={t("prefs_users_dialog_base_url_label")}
                     value={baseUrl}
                     onChange={ev => setBaseUrl(ev.target.value)}
                     type="url"
@@ -337,7 +343,7 @@ const UserDialog = (props) => {
                     autoFocus={editMode}
                     margin="dense"
                     id="username"
-                    label="Username, e.g. phil"
+                    label={t("prefs_users_dialog_username_label")}
                     value={username}
                     onChange={ev => setUsername(ev.target.value)}
                     type="text"
@@ -347,7 +353,7 @@ const UserDialog = (props) => {
                 <TextField
                     margin="dense"
                     id="password"
-                    label="Password"
+                    label={t("prefs_users_dialog_password_label")}
                     type="password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value)}
@@ -356,18 +362,19 @@ const UserDialog = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onCancel}>Cancel</Button>
-                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? "Save" : "Add"}</Button>
+                <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>
+                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? t("prefs_users_dialog_button_save") : t("prefs_users_dialog_button_add")}</Button>
             </DialogActions>
         </Dialog>
     );
 };
 
 const Appearance = () => {
+    const { t } = useTranslation();
     return (
         <Card sx={{p: 3}}>
             <Typography variant="h5">
-                Appearance
+                {t("prefs_appearance_title")}
             </Typography>
             <PrefGroup>
                 <Language/>
@@ -379,7 +386,7 @@ const Appearance = () => {
 const Language = () => {
     const { t, i18n } = useTranslation();
     return (
-        <Pref title="Language">
+        <Pref title={t("prefs_appearance_language_title")}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={i18n.language} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
                     <MenuItem value="en">English</MenuItem>

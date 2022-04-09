@@ -20,6 +20,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 * German (thanks to [@cmeis](https://github.com/cmeis))
+* Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
+* Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 
 -->
@@ -51,6 +53,7 @@ Released Apr 7, 2022
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
 * Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
+* Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
 * Portuguese/Brazil (thanks to [@LW](https://hosted.weblate.org/user/LW/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))

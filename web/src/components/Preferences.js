@@ -32,7 +32,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
-import {playSound} from "../app/utils";
+import {playSound, shuffle} from "../app/utils";
 import {useTranslation} from "react-i18next";
 
 const Preferences = () => {
@@ -40,8 +40,8 @@ const Preferences = () => {
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Notifications/>
-                <Users/>
                 <Appearance/>
+                <Users/>
             </Stack>
         </Container>
     );
@@ -385,13 +385,21 @@ const Appearance = () => {
 
 const Language = () => {
     const { t, i18n } = useTranslation();
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇧🇬", "🇩🇪", "🇮🇩", "🇯🇵", "🇹🇷"]).slice(0, 3);
+    const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
+
+    // Remember: Flags are not languages. Don't put flags next to the language in the list.
+    // Languages names from: https://www.omniglot.com/language/names.htm
+    
     return (
-        <Pref title={t("prefs_appearance_language_title")}>
+        <Pref title={title}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={i18n.language} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
                     <MenuItem value="en">English</MenuItem>
-                    <MenuItem value="de">Deutsch</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
+                    <MenuItem value="de">Deutsch</MenuItem>
+                    <MenuItem value="id">Bahasa Indonesia</MenuItem>
+                    <MenuItem value="ja">日本語</MenuItem>
                     <MenuItem value="tr">Türkçe</MenuItem>
                 </Select>
             </FormControl>

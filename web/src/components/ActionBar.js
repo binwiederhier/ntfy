@@ -23,6 +23,7 @@ import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
 import {useTranslation} from "react-i18next";
+import {Portal, Snackbar} from "@mui/material";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();
@@ -71,6 +72,7 @@ const SettingsIcons = (props) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
+    const [snackOpen, setSnackOpen] = useState(false);
     const anchorRef = useRef(null);
     const subscription = props.subscription;
 
@@ -146,6 +148,7 @@ const SettingsIcons = (props) => {
             });
         } catch (e) {
             console.log(`[ActionBar] Error publishing message`, e);
+            setSnackOpen(true);
         }
         setOpen(false);
     }
@@ -201,6 +204,14 @@ const SettingsIcons = (props) => {
                     </Grow>
                 )}
             </Popper>
+            <Portal>
+                <Snackbar
+                    open={snackOpen}
+                    autoHideDuration={3000}
+                    onClose={() => setSnackOpen(false)}
+                    message={t("message_bar_error_publishing")}
+                />
+            </Portal>
         </>
     );
 };

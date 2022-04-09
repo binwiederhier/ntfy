@@ -14,6 +14,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * Web app: English language strings fixes ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
+* Web app: Show error message snackbar when sending test notification fails ([#205](https://github.com/binwiederhier/ntfy/issues/205), thanks to [@cmeis](https://github.com/cmeis))
 
 **Translations (web app):**
 

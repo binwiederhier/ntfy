@@ -390,7 +390,7 @@ const Language = () => {
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
     // Languages names from: https://www.omniglot.com/language/names.htm
-    
+
     return (
         <Pref title={title}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>

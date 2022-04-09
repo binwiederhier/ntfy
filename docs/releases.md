@@ -4,6 +4,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
+## ntfy Android app v1.12.0 (UNRELEASED)
+
+**Features:**
+
+* [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
+  thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
+
+**Additional translations:**
+
+* Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
+
 ## ntfy server v1.21.0 (UNRELEASED)
 
 **Features:**
@@ -53,7 +64,6 @@ Released Apr 7, 2022
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Italian (thanks to [@theTranslator](https://hosted.weblate.org/user/theTranslator/))
 * Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
-* Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Norwegian (*incomplete*, thanks to [@comradekingu](https://github.com/comradekingu))
 * Portuguese/Brazil (thanks to [@LW](https://hosted.weblate.org/user/LW/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))

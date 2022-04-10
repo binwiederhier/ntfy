@@ -121,7 +121,7 @@
     "subscribe_dialog_login_button_login": "Вход",
     "subscribe_dialog_error_user_not_authorized": "Потребителят {{username}} няма достъп",
     "prefs_appearance_title": "Външен вид",
-    "publish_dialog_delay_placeholder": "Забавяне на изпращането, {{unixTimestamp}}, {{relativeTime}} или \"{{naturalLanguage}}\"",
+    "publish_dialog_delay_placeholder": "Забавяне на изпращането, {{unixTimestamp}}, {{relativeTime}} или „{{naturalLanguage}}“ (на английски)",
     "prefs_notifications_delete_after_one_week": "След една седмица",
     "prefs_users_title": "Управление на потребители",
     "prefs_users_table_base_url_header": "Адрес на услугата",

@@ -32,8 +32,13 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
-import {playSound, shuffle} from "../app/utils";
+import {playSound, shuffle, sounds, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
+import priority1 from "../img/priority-1.svg";
+import priority2 from "../img/priority-2.svg";
+import priority3 from "../img/priority-3.svg";
+import priority4 from "../img/priority-4.svg";
+import priority5 from "../img/priority-5.svg";
 
 const Preferences = () => {
     return (
@@ -51,7 +56,7 @@ const Notifications = () => {
     const { t } = useTranslation();
     return (
         <Card sx={{p: 3}}>
-            <Typography variant="h5">
+            <Typography variant="h5" sx={{marginBottom: 2}}>
                 {t("prefs_notifications_title")}
             </Typography>
             <PrefGroup>
@@ -72,19 +77,19 @@ const Sound = () => {
     if (!sound) {
         return null; // While loading
     }
+    let description;
+    if (sound === "none") {
+        description = t("prefs_notifications_sound_description_none");
+    } else {
+        description = t("prefs_notifications_sound_description_some", { sound: sounds[sound].label });
+    }
     return (
-        <Pref title={t("prefs_notifications_sound_title")}>
+        <Pref title={t("prefs_notifications_sound_title")} description={description}>
             <div style={{ display: 'flex', width: '100%' }}>
                 <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
                     <Select value={sound} onChange={handleChange}>
                         <MenuItem value={"none"}>{t("prefs_notifications_sound_no_sound")}</MenuItem>
-                        <MenuItem value={"ding"}>Ding</MenuItem>
-                        <MenuItem value={"juntos"}>Juntos</MenuItem>
-                        <MenuItem value={"pristine"}>Pristine</MenuItem>
-                        <MenuItem value={"dadum"}>Dadum</MenuItem>
-                        <MenuItem value={"pop"}>Pop</MenuItem>
-                        <MenuItem value={"pop-swoosh"}>Pop swoosh</MenuItem>
-                        <MenuItem value={"beep"}>Beep</MenuItem>
+                        {Object.entries(sounds).map(s => <MenuItem key={s[0]} value={s[0]}>{s[1].label}</MenuItem>)}
                     </Select>
                 </FormControl>
                 <IconButton onClick={() => playSound(sound)} disabled={sound === "none"}>
@@ -104,8 +109,26 @@ const MinPriority = () => {
     if (!minPriority) {
         return null; // While loading
     }
+    const priorities = {
+        1: t("priority_min"),
+        2: t("priority_low"),
+        3: t("priority_default"),
+        4: t("priority_high"),
+        5: t("priority_max")
+    }
+    let description;
+    if (minPriority === 1) {
+        description = t("prefs_notifications_min_priority_description_any");
+    } else if (minPriority === 5) {
+        description = t("prefs_notifications_min_priority_description_max");
+    } else {
+        description = t("prefs_notifications_min_priority_description_x_or_higher", {
+            number: minPriority,
+            name: priorities[minPriority]
+        });
+    }
     return (
-        <Pref title={t("prefs_notifications_min_priority_title")}>
+        <Pref title={t("prefs_notifications_min_priority_title")} description={description}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={minPriority} onChange={handleChange}>
                     <MenuItem value={1}>{t("prefs_notifications_min_priority_any")}</MenuItem>
@@ -125,11 +148,20 @@ const DeleteAfter = () => {
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
     }
-    if (!deleteAfter) {
+    if (deleteAfter === null || deleteAfter === undefined) { // !deleteAfter will not work with "0"
         return null; // While loading
     }
+    const description = (() => {
+        switch (deleteAfter) {
+            case 0: return t("prefs_notifications_delete_after_never_description");
+            case 10800: return t("prefs_notifications_delete_after_three_hours_description");
+            case 86400: return t("prefs_notifications_delete_after_one_day_description");
+            case 604800: return t("prefs_notifications_delete_after_one_week_description");
+            case 2592000: return t("prefs_notifications_delete_after_one_month_description");
+        }
+    })();
     return (
-        <Pref title={t("prefs_notifications_delete_after_title")}>
+        <Pref title={t("prefs_notifications_delete_after_title")} description={description}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={deleteAfter} onChange={handleChange}>
                     <MenuItem value={0}>{t("prefs_notifications_delete_after_never")}</MenuItem>
@@ -145,10 +177,7 @@ const DeleteAfter = () => {
 
 const PrefGroup = (props) => {
     return (
-        <div style={{
-            display: 'flex',
-            flexWrap: 'wrap'
-        }}>
+        <div>
             {props.children}
         </div>
     )
@@ -156,26 +185,31 @@ const PrefGroup = (props) => {
 
 const Pref = (props) => {
     return (
-        <>
+        <div style={{
+            display: "flex",
+            flexDirection: "row",
+            marginTop: "10px",
+            marginBottom: "20px",
+        }}>
             <div style={{
-                flex: '1 0 30%',
-                display: 'inline-flex',
+                flex: '1 0 40%',
+                display: 'flex',
                 flexDirection: 'column',
-                minHeight: '60px',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                paddingRight: '30px'
             }}>
-                <b>{props.title}</b>
+                <div><b>{props.title}</b></div>
+                {props.description && <div><em>{props.description}</em></div>}
             </div>
             <div style={{
-                flex: '1 0 calc(70% - 50px)',
-                display: 'inline-flex',
+                flex: '1 0 calc(60% - 50px)',
+                display: 'flex',
                 flexDirection: 'column',
-                minHeight: '60px',
                 justifyContent: 'center'
             }}>
                 {props.children}
             </div>
-        </>
+        </div>
     );
 };
 
@@ -202,8 +236,8 @@ const Users = () => {
     };
     return (
         <Card sx={{ padding: 1 }}>
-            <CardContent>
-                <Typography variant="h5">
+            <CardContent sx={{ paddingBottom: 1 }}>
+                <Typography variant="h5" sx={{marginBottom: 2}}>
                     {t("prefs_users_title")}
                 </Typography>
                 <Paragraph>
@@ -260,7 +294,7 @@ const UserTable = (props) => {
         <Table size="small">
             <TableHead>
                 <TableRow>
-                    <TableCell>{t("prefs_users_table_user_header")}</TableCell>
+                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
                     <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
                     <TableCell/>
                 </TableRow>
@@ -271,7 +305,7 @@ const UserTable = (props) => {
                         key={user.baseUrl}
                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                     >
-                        <TableCell component="th" scope="row">{user.username}</TableCell>
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}}>{user.username}</TableCell>
                         <TableCell>{user.baseUrl}</TableCell>
                         <TableCell align="right">
                             <IconButton onClick={() => handleEditClick(user)}>
@@ -307,8 +341,12 @@ const UserDialog = (props) => {
         if (editMode) {
             return username.length > 0 && password.length > 0;
         }
+        const baseUrlValid = validUrl(baseUrl);
         const baseUrlExists = props.users?.map(user => user.baseUrl).includes(baseUrl);
-        return !baseUrlExists && username.length > 0 && password.length > 0;
+        return baseUrlValid
+            && !baseUrlExists
+            && username.length > 0
+            && password.length > 0;
     })();
     const handleSubmit = async () => {
         props.onSubmit({
@@ -373,7 +411,7 @@ const Appearance = () => {
     const { t } = useTranslation();
     return (
         <Card sx={{p: 3}}>
-            <Typography variant="h5">
+            <Typography variant="h5" sx={{marginBottom: 2}}>
                 {t("prefs_appearance_title")}
             </Typography>
             <PrefGroup>

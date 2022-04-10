@@ -24,7 +24,7 @@ export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
 
 export const validUrl = (url) => {
-    return url.match(/^https?:\/\//);
+    return url.match(/^https?:\/\/.+/);
 }
 
 export const validTopic = (topic) => {
@@ -153,17 +153,38 @@ export const openUrl = (url) => {
 };
 
 export const sounds = {
-    "beep": beep,
-    "juntos": juntos,
-    "pristine": pristine,
-    "ding": ding,
-    "dadum": dadum,
-    "pop": pop,
-    "pop-swoosh": popSwoosh
+    "ding": {
+        file: ding,
+        label: "Ding"
+    },
+    "juntos": {
+        file: juntos,
+        label: "Juntos"
+    },
+    "pristine": {
+        file: pristine,
+        label: "Pristine"
+    },
+    "dadum": {
+        file: dadum,
+        label: "Dadum"
+    },
+    "pop": {
+        file: pop,
+        label: "Pop"
+    },
+    "pop-swoosh": {
+        file: popSwoosh,
+        label: "Pop swoosh"
+    },
+    "beep": {
+        file: beep,
+        label: "Beep"
+    }
 };
 
-export const playSound = async (sound) => {
-    const audio = new Audio(sounds[sound]);
+export const playSound = async (id) => {
+    const audio = new Audio(sounds[id].file);
     return audio.play();
 };
 

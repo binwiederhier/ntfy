@@ -389,7 +389,9 @@ const NoSubscriptions = () => {
                 {t("notifications_no_subscriptions_title")}
             </Typography>
             <Paragraph>
-                {t("notifications_no_subscriptions_description")}
+                {t("notifications_no_subscriptions_description", {
+                    linktext: t("nav_button_subscribe")
+                })}
             </Paragraph>
             <Paragraph>
                 <ForMoreDetails/>

@@ -34,6 +34,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
+* Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 
 -->

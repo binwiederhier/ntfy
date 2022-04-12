@@ -428,6 +428,7 @@ const Language = () => {
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
     // Languages names from: https://www.omniglot.com/language/names.htm
+    // Better: Sidebar in Wikipedia: https://en.wikipedia.org/wiki/Bokm%C3%A5l
 
     return (
         <Pref title={title}>
@@ -439,6 +440,7 @@ const Language = () => {
                     <MenuItem value="de">Deutsch</MenuItem>
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="ja">日本語</MenuItem>
+                    <MenuItem value="nb_NO">Norsk bokmål</MenuItem>
                     <MenuItem value="tr">Türkçe</MenuItem>
                 </Select>
             </FormControl>

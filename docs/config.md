@@ -528,6 +528,11 @@ or the root domain:
         
         # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
+
+        # WebSockets support
+        RewriteCond %{HTTP:Upgrade} websocket [NC]
+        RewriteCond %{HTTP:Connection} upgrade [NC]
+        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
         # it to work with curl without the annoying https:// prefix 
@@ -552,6 +557,11 @@ or the root domain:
         
         # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
+
+        # WebSockets support
+        RewriteCond %{HTTP:Upgrade} websocket [NC]
+        RewriteCond %{HTTP:Connection} upgrade [NC]
+        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
         # it to work with curl without the annoying https:// prefix 

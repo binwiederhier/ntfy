@@ -80,6 +80,35 @@ notifications. Firebase is overall pretty bad at delivering messages in time, bu
 The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in the Google Play flavor of the app.
 It won't use Firebase for any self-hosted servers, and not at all in the the F-Droid flavor.
 
+## Share to topic
+You can share files to a topic using Android's "Share" feature. This works in almost any app that supports sharing files
+or text, and it's useful for sending yourself links, files or other things. The feature remembers a few of the last topics
+you shared content to and lists them at the bottom.
+
+The feature is pretty self-explanatory, and one picture says more than a thousand words. So here are two pictures:
+
+<div id="share-to-topic-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-share-1.jpg"><img src="../../static/img/android-screenshot-share-1.jpg"/></a>
+    <a href="../../static/img/android-screenshot-share-2.jpg"><img src="../../static/img/android-screenshot-share-2.jpg"/></a>
+</div>
+
+## ntfy:// links
+The ntfy Android app supports deep linking directly to topics. This is useful when integrating with [automation apps](#automation-apps)
+such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm),
+or to simply directly link to a topic from a mobile website. 
+
+!!! info
+    Android deep linking of http/https links is very brittle and limited, which is why something like `https://<host>/<topic>/subscribe` is 
+    **not possible**, and instead `ntfy://` links have to be used. More details in [issue #20](https://github.com/binwiederhier/ntfy/issues/20).
+
+**Supported link formats:**
+
+| Link format                                                                   | Example                                   | Description                                                                                                                                                                                         |
+|-------------------------------------------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| <span style="white-space: nowrap">`ntfy://<host>/<topic>`</span>              | `ntfy://ntfy.sh/mytopic`                  | Directly opens the Android app detail view for the given topic and server. Subscribes to the topic if not already subscribed. This is equivalent to the web view `https://ntfy.sh/mytopic` (HTTPS!) |
+| <span style="white-space: nowrap">`ntfy://<host>/<topic>?secure=false`</span> | `ntfy://example.com/mytopic?secure=false` | Same as above, except that this will use HTTP instead of HTTPS as topic URL. This is equivalent to the web view `http://example.com/mytopic` (HTTP!)                                                |
+
+
 ## Integrations
 
 ### UnifiedPush

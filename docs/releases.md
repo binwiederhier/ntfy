@@ -8,6 +8,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Support for ntfy:// deep links ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks to [@Copephobia](https://github.com/Copephobia) for reporting)
 * [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
 

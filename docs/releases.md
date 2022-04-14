@@ -12,6 +12,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
 
+**Bugs:**
+
+* Validate URLs when changing default server and server in user management ([#193](https://github.com/binwiederhier/ntfy/issues/193), 
+  thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
+* Error in sending test notification in different languages ([#209](https://github.com/binwiederhier/ntfy/issues/209), 
+  thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
+
 **Additional translations:**
 
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))

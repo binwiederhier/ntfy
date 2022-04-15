@@ -31,7 +31,7 @@ If those screenshots are still not enough, here's a video:
 </figure>
 
 ## Message priority
-When you [publish messages](../publish.md#message-priority) to a topic, you can define a priority. This priority defines
+When you [publish messages](../publish.md#message-priority) to a topic, you can **define a priority**. This priority defines
 how urgently Android will notify you about the notification, and whether they make a sound and/or vibrate.
 
 By default, messages with default priority or higher (>= 3) will vibrate and make a sound. Messages with high or urgent
@@ -42,11 +42,19 @@ priority (>= 4) will also show as pop-over, like so:
   <figcaption>High and urgent notifications show as pop-over</figcaption>
 </figure>
 
-You can change these settings in Android by long-pressing on the app, and tapping "Notifications". You can then configure
-the settings (and custom sounds or vibration) for each of the priorities:
+You can change these settings in Android by long-pressing on the app, and tapping "Notifications", or from the "Settings"
+menu under "Channel settings". There is one notification channel for each priority:
 
 <figure markdown>
-  ![notification settings](../static/img/android-notification-settings.png){ width=500 }
+  ![notification settings](../static/img/android-screenshot-notification-settings.png){ width=500 }
+  <figcaption>Per-priority channels</figcaption>
+</figure>
+
+Per notification channel, you can configure a **channel-specific sound**, whether to **override the Do Not Disturb (DND)**
+setting, and other settings such as popover or notification dot:
+
+<figure markdown>
+  ![channel details](../static/img/android-screenshot-notification-details.jpg){ width=500 }
   <figcaption>Per-priority sound/vibration settings</figcaption>
 </figure>
 
@@ -107,7 +115,6 @@ or to simply directly link to a topic from a mobile website.
 |-------------------------------------------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | <span style="white-space: nowrap">`ntfy://<host>/<topic>`</span>              | `ntfy://ntfy.sh/mytopic`                  | Directly opens the Android app detail view for the given topic and server. Subscribes to the topic if not already subscribed. This is equivalent to the web view `https://ntfy.sh/mytopic` (HTTPS!) |
 | <span style="white-space: nowrap">`ntfy://<host>/<topic>?secure=false`</span> | `ntfy://example.com/mytopic?secure=false` | Same as above, except that this will use HTTP instead of HTTPS as topic URL. This is equivalent to the web view `http://example.com/mytopic` (HTTP!)                                                |
-
 
 ## Integrations
 

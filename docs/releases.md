@@ -11,6 +11,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Support for ntfy:// deep links ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks to [@Copephobia](https://github.com/Copephobia) for reporting)
 * [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
+* Channel settings option to configure DND override, sounds, etc. ([#91](https://github.com/binwiederhier/ntfy/issues/91))
 
 **Bugs:**
 
@@ -18,10 +19,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
 * Error in sending test notification in different languages ([#209](https://github.com/binwiederhier/ntfy/issues/209), 
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
+* "[x] Instant delivery in doze mode" checkbox does not work properly ([#211](https://github.com/binwiederhier/ntfy/issues/211))
 
 **Additional translations:**
 
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
+* Russian (*incomplete*, thanks to [@flamey](https://hosted.weblate.org/user/flamey/))
 
 ## ntfy server v1.21.0 (UNRELEASED)
 
@@ -41,8 +44,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Bulgarian (thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 * German (thanks to [@cmeis](https://github.com/cmeis))
 * Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
-* Norwegian Bokmål (thanks to [@comradekingu](https://github.com/comradekingu))
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
+* Norwegian Bokmål (thanks to [@comradekingu](https://github.com/comradekingu))
+* Russian (*incomplete*, thanks to [@flamey](https://hosted.weblate.org/user/flamey/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 

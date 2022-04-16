@@ -27,6 +27,7 @@ type message struct {
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
 	Click      string      `json:"click,omitempty"`
+	Actions    []action    `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
@@ -42,6 +43,12 @@ type attachment struct {
 	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
+type action struct {
+	Action string `json:"action"`
+	Label  string `json:"label"`
+	URL    string `json:"URL,omitempty"`
+}
+
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
 	Topic    string   `json:"topic"`
@@ -50,6 +57,7 @@ type publishMessage struct {
 	Priority int      `json:"priority"`
 	Tags     []string `json:"tags"`
 	Click    string   `json:"click"`
+	Actions  []action `json:"actions"`
 	Attach   string   `json:"attach"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`

@@ -535,6 +535,14 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		}
 		m.Time = delay.Unix()
 	}
+	actionsStr := readParam(r, "x-actions", "actions", "action")
+	if actionsStr != "" {
+		actions := make([]action, 0)
+		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
+			return false, false, "", false, errHTTPBadRequestDelayNoCache // FIXME error
+		}
+		m.Actions = actions
+	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {
 		firebase = false
@@ -1149,6 +1157,13 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Click != "" {
 			r.Header.Set("X-Click", m.Click)
+		}
+		if len(m.Actions) > 0 {
+			actionsStr, err := json.Marshal(m.Actions)
+			if err != nil {
+				return errHTTPBadRequestJSONInvalid
+			}
+			r.Header.Set("X-Actions", string(actionsStr))
 		}
 		if m.Email != "" {
 			r.Header.Set("X-Email", m.Email)

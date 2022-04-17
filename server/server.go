@@ -541,6 +541,9 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
 			return false, false, "", false, errHTTPBadRequestDelayNoCache // FIXME error
 		}
+		for i := range actions {
+			actions[i].ID = util.RandomString(10) // FIXME
+		}
 		m.Actions = actions
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!

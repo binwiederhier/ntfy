@@ -44,9 +44,13 @@ type attachment struct {
 }
 
 type action struct {
-	Action string `json:"action"`
-	Label  string `json:"label"`
-	URL    string `json:"url,omitempty"`
+	ID      string            `json:"id"`
+	Action  string            `json:"action"`
+	Label   string            `json:"label"`
+	URL     string            `json:"url,omitempty"`     // used in "view" and "http"
+	Method  string            `json:"method,omitempty"`  // used in "http"
+	Headers map[string]string `json:"headers,omitempty"` // used in "http"
+	Body    string            `json:"body,omitempty"`    // used in "http"
 }
 
 // publishMessage is used as input when publishing as JSON

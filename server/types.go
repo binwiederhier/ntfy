@@ -46,7 +46,7 @@ type attachment struct {
 type action struct {
 	Action string `json:"action"`
 	Label  string `json:"label"`
-	URL    string `json:"URL,omitempty"`
+	URL    string `json:"url,omitempty"`
 }
 
 // publishMessage is used as input when publishing as JSON

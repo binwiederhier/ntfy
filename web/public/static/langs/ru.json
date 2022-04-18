@@ -148,5 +148,7 @@
     "error_boundary_title": "О нет, Ntfy сломался",
     "error_boundary_button_copy_stack_trace": "Копирование трассировки стека",
     "error_boundary_stack_trace": "Трассировка стека",
-    "error_boundary_gathering_info": "Соберите больше информации …"
+    "error_boundary_gathering_info": "Соберите больше информации …",
+    "publish_dialog_drop_file_here": "Перетащите файл юда",
+    "prefs_notifications_min_priority_high_and_higher": "Высокий приоритет и выше"
 }

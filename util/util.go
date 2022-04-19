@@ -77,6 +77,16 @@ func SplitNoEmpty(s string, sep string) []string {
 	return res
 }
 
+// SplitKV splits a string into a key/value pair using a separator, and trimming space. If the separator
+// is not found, key is empty.
+func SplitKV(s string, sep string) (key string, value string) {
+	kv := strings.SplitN(strings.TrimSpace(s), sep, 2)
+	if len(kv) == 2 {
+		return strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
+	}
+	return "", strings.TrimSpace(kv[0])
+}
+
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!

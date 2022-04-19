@@ -93,6 +93,7 @@ const (
 	emptyMessageBody         = "triggered"               // Used if message body is empty
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
+	actionIDLength           = 10
 )
 
 // WebSocket constants
@@ -537,14 +538,10 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
-		actions := make([]action, 0)
-		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
-			return false, false, "", false, errHTTPBadRequestDelayNoCache // FIXME error
+		m.Actions, err = parseActions(actionsStr)
+		if err != nil {
+			return false, false, "", false, errHTTPBadRequestActionJSONInvalid
 		}
-		for i := range actions {
-			actions[i].ID = util.RandomString(10) // FIXME
-		}
-		m.Actions = actions
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {

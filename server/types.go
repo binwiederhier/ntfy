@@ -27,12 +27,14 @@ type message struct {
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
 	Click      string      `json:"click,omitempty"`
-	Actions    []action    `json:"actions,omitempty"`
+	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
 }
+
+// FIXME persist actions
 
 type attachment struct {
 	Name    string `json:"name"`
@@ -46,11 +48,12 @@ type attachment struct {
 type action struct {
 	ID      string            `json:"id"`
 	Action  string            `json:"action"`
-	Label   string            `json:"label"`
-	URL     string            `json:"url,omitempty"`     // used in "view" and "http"
-	Method  string            `json:"method,omitempty"`  // used in "http"
-	Headers map[string]string `json:"headers,omitempty"` // used in "http"
-	Body    string            `json:"body,omitempty"`    // used in "http"
+	Label   string            `json:"label"`             // "view", "broadcast", or "http"
+	URL     string            `json:"url,omitempty"`     // used in "view" and "http" actions
+	Method  string            `json:"method,omitempty"`  // used in "http" action, default is POST (!)
+	Headers map[string]string `json:"headers,omitempty"` // used in "http" action
+	Body    string            `json:"body,omitempty"`    // used in "http" action
+	Extras  map[string]string `json:"extras,omitempty"`  // used in "broadcast" action
 }
 
 // publishMessage is used as input when publishing as JSON

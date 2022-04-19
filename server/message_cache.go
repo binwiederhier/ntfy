@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
@@ -29,6 +30,7 @@ const (
 			priority INT NOT NULL,
 			tags TEXT NOT NULL,
 			click TEXT NOT NULL,
+			actions TEXT NOT NULL,
 			attachment_name TEXT NOT NULL,
 			attachment_type TEXT NOT NULL,
 			attachment_size INT NOT NULL,
@@ -43,37 +45,37 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE topic = ? AND mid = ?`
 	selectMessagesSinceTimeQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
@@ -228,6 +230,14 @@ func (c *messageCache) AddMessage(m *message) error {
 		attachmentURL = m.Attachment.URL
 		attachmentOwner = m.Attachment.Owner
 	}
+	var actionsStr string
+	if len(m.Actions) > 0 {
+		actionsBytes, err := json.Marshal(m.Actions)
+		if err != nil {
+			return err
+		}
+		actionsStr = string(actionsBytes)
+	}
 	_, err := c.db.Exec(
 		insertMessageQuery,
 		m.ID,
@@ -238,6 +248,7 @@ func (c *messageCache) AddMessage(m *message) error {
 		m.Priority,
 		tags,
 		m.Click,
+		actionsStr,
 		attachmentName,
 		attachmentType,
 		attachmentSize,
@@ -399,7 +410,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, click, attachmentName, attachmentType, attachmentURL, attachmentOwner, encoding string
+		var id, topic, msg, title, tagsStr, click, actionsStr, attachmentName, attachmentType, attachmentURL, attachmentOwner, encoding string
 		err := rows.Scan(
 			&id,
 			&timestamp,
@@ -409,6 +420,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			&priority,
 			&tagsStr,
 			&click,
+			&actionsStr,
 			&attachmentName,
 			&attachmentType,
 			&attachmentSize,
@@ -423,6 +435,12 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 		var tags []string
 		if tagsStr != "" {
 			tags = strings.Split(tagsStr, ",")
+		}
+		var actions []*action
+		if actionsStr != "" {
+			if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
+				return nil, err
+			}
 		}
 		var att *attachment
 		if attachmentName != "" && attachmentURL != "" {
@@ -445,6 +463,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Priority:   priority,
 			Tags:       tags,
 			Click:      click,
+			Actions:    actions,
 			Attachment: att,
 			Encoding:   encoding,
 		})

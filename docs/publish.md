@@ -877,6 +877,102 @@ Here's an example that will open Reddit when the notification is clicked:
     ]));
     ```
 
+## User actions
+
+
+=== "`view` action"
+    ``` json
+    { 
+      "action": "view", 
+      "label": "Open bing.com", 
+      "url": "https://bing.com"
+    }
+    ```
+
+=== "`broadcast` action"
+    ``` json
+    { 
+      "action": "broadcast", 
+      "label": "Send broadcast", 
+      "intent": "io.heckel.ntfy.USER_ACTION",
+      "extras": {
+        "param": "this is a param",
+        "anotherparam": "this is another one"
+      }
+    }
+    ```
+
+=== "`http` action"
+    ``` json
+    { 
+      "action": "http", 
+      "label": "Take picture", 
+      "method": "POST",
+      "url": "https://homecam.lan/capture",
+      "headers": {
+        "Authorization": "..."
+      },
+      "body": "this is a message"
+    }
+    ```
+
+Examples:
+
+=== "Open a website"
+    ``` json
+    { 
+      "action": "view", 
+      "label": "Open bing.com", 
+      "url": "https://bing.com"
+    }
+    ```
+
+=== "Open location in Google Maps"
+    ``` json
+    { 
+      "action": "view", 
+      "label": "Show map", 
+      "url": "geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+California"
+    }
+    ```
+
+=== "Open a ntfy topic (deep link)"
+    ``` json
+    {
+      "action": "view",
+      "label": "Show stats",
+      "url": "ntfy://ntfy.sh/stats"
+    }
+    ```
+
+=== "Send broadcast"
+    ``` json
+    {
+      "action": "broadcast",
+      "label": "Send broadcast",
+      "intent": "my.custom.intent",
+      "extras": {
+        "message": "whats up, hello"
+      }
+    }  
+    ```
+
+=== "Send a ntfy message"
+    ``` json
+    { 
+      "action": "http", 
+      "label": "Send message", 
+      "method": "POST",
+      "url": "http://ntfy.example.com/mytopic",
+      "headers": {
+        "Title": "another message",
+        "Tags": "tag1, tag2"
+      },
+      "body": "this is a message"
+    }
+    ```
+
+
 ## Attachments
 You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
 onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.

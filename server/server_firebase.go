@@ -81,6 +81,13 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				"message":  m.Message,
 				"encoding": m.Encoding,
 			}
+			if len(m.Actions) > 0 {
+				actions, err := json.Marshal(m.Actions)
+				if err != nil {
+					return nil, err
+				}
+				data["actions"] = string(actions)
+			}
 			if m.Attachment != nil {
 				data["attachment_name"] = m.Attachment.Name
 				data["attachment_type"] = m.Attachment.Type

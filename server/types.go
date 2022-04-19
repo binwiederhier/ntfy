@@ -53,6 +53,7 @@ type action struct {
 	Method  string            `json:"method,omitempty"`  // used in "http" action, default is POST (!)
 	Headers map[string]string `json:"headers,omitempty"` // used in "http" action
 	Body    string            `json:"body,omitempty"`    // used in "http" action
+	Intent  string            `json:"intent,omitempty"`  // used in "broadcast" action
 	Extras  map[string]string `json:"extras,omitempty"`  // used in "broadcast" action
 }
 

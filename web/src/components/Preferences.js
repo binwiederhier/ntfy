@@ -423,7 +423,7 @@ const Appearance = () => {
 
 const Language = () => {
     const { t, i18n } = useTranslation();
-    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇧🇬", "🇩🇪", "🇮🇩", "🇯🇵", "🇹🇷"]).slice(0, 3);
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇧🇬", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
@@ -441,6 +441,7 @@ const Language = () => {
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="ja">日本語</MenuItem>
                     <MenuItem value="nb_NO">Norsk bokmål</MenuItem>
+                    <MenuItem value="ru">Русский</MenuItem>
                     <MenuItem value="tr">Türkçe</MenuItem>
                 </Select>
             </FormControl>

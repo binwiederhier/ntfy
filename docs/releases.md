@@ -24,7 +24,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional translations:**
 
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
-* Russian (*incomplete*, thanks to [@flamey](https://hosted.weblate.org/user/flamey/))
+* Russian (thanks to [@flamey](https://hosted.weblate.org/user/flamey/) and [@ilya.mikheev.coder](https://hosted.weblate.org/user/ilya.mikheev.coder/))
 
 ## ntfy server v1.21.0 (UNRELEASED)
 
@@ -46,7 +46,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Indonesian (thanks to [@linerly](https://hosted.weblate.org/user/linerly/))
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Norwegian Bokmål (thanks to [@comradekingu](https://github.com/comradekingu))
-* Russian (*incomplete*, thanks to [@flamey](https://hosted.weblate.org/user/flamey/))
+* Russian (thanks to [@flamey](https://hosted.weblate.org/user/flamey/) and [@ilya.mikheev.coder](https://hosted.weblate.org/user/ilya.mikheev.coder/))
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 

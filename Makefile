@@ -206,7 +206,7 @@ release-check-tags:
 # Installing targets
 
 install-amd64: remove-binary
-	sudo cp -a dist/ntfy_amd64_linux_amd64/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
 
 install-armv6: remove-binary
 	sudo cp -a dist/ntfy_armv6_linux_armv6/ntfy /usr/bin/ntfy

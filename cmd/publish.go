@@ -26,6 +26,7 @@ var cmdPublish = &cli.Command{
 		&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, EnvVars: []string{"NTFY_TAGS"}, Usage: "comma separated list of tags and emojis"},
 		&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, EnvVars: []string{"NTFY_DELAY"}, Usage: "delay/schedule message"},
 		&cli.StringFlag{Name: "click", Aliases: []string{"U"}, EnvVars: []string{"NTFY_CLICK"}, Usage: "URL to open when notification is clicked"},
+		&cli.StringFlag{Name: "actions", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ACTIONS"}, Usage: "actions JSON array or simple definition"},
 		&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
 		&cli.StringFlag{Name: "filename", Aliases: []string{"name", "n"}, EnvVars: []string{"NTFY_FILENAME"}, Usage: "filename for the attachment"},
 		&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
@@ -72,6 +73,7 @@ func execPublish(c *cli.Context) error {
 	tags := c.String("tags")
 	delay := c.String("delay")
 	click := c.String("click")
+	actions := c.String("actions")
 	attach := c.String("attach")
 	filename := c.String("filename")
 	file := c.String("file")
@@ -111,6 +113,9 @@ func execPublish(c *cli.Context) error {
 	}
 	if click != "" {
 		options = append(options, client.WithClick(click))
+	}
+	if actions != "" {
+		options = append(options, client.WithActions(strings.ReplaceAll(actions, "\n", " ")))
 	}
 	if attach != "" {
 		options = append(options, client.WithAttach(attach))

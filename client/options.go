@@ -56,6 +56,12 @@ func WithClick(url string) PublishOption {
 	return WithHeader("X-Click", url)
 }
 
+// WithActions adds custom user actions to the notification. The value can be either a JSON array or the
+// simple format definition. See https://ntfy.sh/docs/publish/#action-buttons for details.
+func WithActions(value string) PublishOption {
+	return WithHeader("X-Actions", value)
+}
+
 // WithAttach sets a URL that will be used by the client to download an attachment
 func WithAttach(attach string) PublishOption {
 	return WithHeader("X-Attach", attach)

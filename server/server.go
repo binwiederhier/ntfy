@@ -93,7 +93,6 @@ const (
 	emptyMessageBody         = "triggered"               // Used if message body is empty
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
-	actionIDLength           = 10
 )
 
 // WebSocket constants

@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+const (
+	actionIDLength = 10
+	actionsMax     = 3
+)
+
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
 	value := strings.ToLower(readParam(r, names...))
 	if value == "" {
@@ -63,12 +68,15 @@ func parseActions(s string) (actions []*action, err error) {
 	}
 
 	// Validate
+	if len(actions) > actionsMax {
+		return nil, fmt.Errorf("too many actions, only %d allowed", actionsMax)
+	}
 	for _, action := range actions {
 		if !util.InStringList([]string{"view", "broadcast", "http"}, action.Action) {
 			return nil, fmt.Errorf("cannot parse actions: action '%s' unknown", action.Action)
 		} else if action.Label == "" {
 			return nil, fmt.Errorf("cannot parse actions: label must be set")
-		} else if util.InStringList([]string{"view", "http"}, action.Action) && action.URL != "" {
+		} else if util.InStringList([]string{"view", "http"}, action.Action) && action.URL == "" {
 			return nil, fmt.Errorf("parameter 'url' is required for action '%s'", action.Action)
 		}
 	}
@@ -99,8 +107,8 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 				newAction.Action = value
 			} else if key == "" && i == 1 {
 				newAction.Label = value
-			} else if key == "" && i == 2 {
-				newAction.URL = value // This works, because both "http" and "view" need a URL
+			} else if key == "" && util.InStringList([]string{"view", "http"}, newAction.Action) && i == 2 {
+				newAction.URL = value
 			} else if key != "" {
 				switch strings.ToLower(key) {
 				case "action":

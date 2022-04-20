@@ -341,7 +341,7 @@ Here's an **excerpt of emojis** I've found very useful in alert messages:
 <table class="remove-md-box"><tr>
 <td>
     <table><thead><tr><th>Tag</th><th>Emoji</th></tr></thead><tbody>
-    <tr><td><code>+1</code></td><td>👍️</td></tr>
+    <tr><td><code>+1</code></td><td>👍</td></tr>
     <tr><td><code>partying_face</code></td><td>🥳</td></tr>
     <tr><td><code>tada</code></td><td>🎉</td></tr>
     <tr><td><code>heavy_check_mark</code></td><td>✔️</td></tr>
@@ -789,96 +789,198 @@ The JSON message format closely mirrors the format of the message you can consum
 (see [JSON message format](subscribe/api.md#json-message-format) for details), but is not exactly identical. Here's an overview of
 all the supported fields:
 
-| Field      | Required | Type                             | Example                        | Description                                                           |
-|------------|----------|----------------------------------|--------------------------------|-----------------------------------------------------------------------|
-| `topic`    | ✔️       | *string*                         | `topic1`                       | Target topic name                                                     |
-| `message`  | -        | *string*                         | `Some message`                 | Message body; set to `triggered` if empty or not passed               |
-| `title`    | -        | *string*                         | `Some title`                   | Message [title](#message-title)                                       |
-| `tags`     | -        | *string array*                   | `["tag1","tag2"]`              | List of [tags](#tags-emojis) that may or not map to emojis            |
-| `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                            | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
-| `click`    | -        | *URL*                            | `https://example.com`          | Website opened when notification is [clicked](#click-action)          |
-| `attach`   | -        | *URL*                            | `https://example.com/file.jpg` | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
-| `filename` | -        | *string*                         | `file.jpg`                     | File name of the attachment                                           |
-| `delay`    | -        | *string*                         | `30min`, `9am`                 | Timestamp or duration for delayed delivery                            |
-| `email`    | -        | *e-mail address*                 | `phil@example.com`             | E-mail address for e-mail notifications                               |
+| Field      | Required | Type                             | Example                               | Description                                                           |
+|------------|----------|----------------------------------|---------------------------------------|-----------------------------------------------------------------------|
+| `topic`    | ✔️       | *string*                         | `topic1`                              | Target topic name                                                     |
+| `message`  | -        | *string*                         | `Some message`                        | Message body; set to `triggered` if empty or not passed               |
+| `title`    | -        | *string*                         | `Some title`                          | Message [title](#message-title)                                       |
+| `tags`     | -        | *string array*                   | `["tag1","tag2"]`                     | List of [tags](#tags-emojis) that may or not map to emojis            |
+| `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                   | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
+| `actions`  | -        | *JSON array*                     | *(see [user actions](#user-actions))* | Custom [user action buttons](#user-actions) for notifications         |
+| `click`    | -        | *URL*                            | `https://example.com`                 | Website opened when notification is [clicked](#click-action)          |
+| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`        | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `filename` | -        | *string*                         | `file.jpg`                            | File name of the attachment                                           |
+| `delay`    | -        | *string*                         | `30min`, `9am`                        | Timestamp or duration for delayed delivery                            |
+| `email`    | -        | *e-mail address*                 | `phil@example.com`                    | E-mail address for e-mail notifications                               |
 
-## Click action
-You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
-to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
-the web browser (or the app) and open the website.
+## User actions
+You can add action buttons to notifications to allow yourself to react to a notification directly. This is incredibly
+useful and has countless applications. As of today, the following actions are supported:
 
-Here's an example that will open Reddit when the notification is clicked:
+* [`view`](#open-websiteapp): Opens a website or app when the action button is tapped
+* [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
+  when the action button is tapped
+* [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
+
+Here's an example of what that a notification with actions can look like:
+
+<figure markdown>
+  ![notification with actions](static/img/notification-with-tags.png){ width=500 }
+  <figcaption>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</figcaption>
+</figure>
 
 === "Command line (curl)"
     ```
-    curl \
-        -d "New messages on Reddit" \
-        -H "Click: https://www.reddit.com/message/messages" \
-        ntfy.sh/reddit_alerts
-    ```
-
-=== "ntfy CLI"
-    ```
-    ntfy publish \
-        --click="https://www.reddit.com/message/messages" \
-        reddit_alerts "New messages on Reddit"
+    curl ntfy.sh \
+      -d '{
+        "topic": "myhome",
+        "message": "You seem to have left the house. Want to turn down the A/C?",
+        "actions": [
+          {
+            "action": "view",
+            "label": "Open portal",
+            "url": "https://home.nest.com/"
+          },
+          {
+            "action": "http",
+            "label": "Turn down",
+            "method": "POST",
+            "url": "https://developer-api.nest.com/devices/thermostats/XZA124D",
+            "headers": {
+              "Authorization": "Bearer ...",
+              "Content-Type": "application/json"
+            },
+            "body": "{\"target_temperature_f\": 65}"
+          },
+          { 
+            "action": "broadcast", 
+            "label": "Enter deep sleep 💤",
+            "extras": {
+              "command": "deepsleep"
+            }
+          }
+        ]
+      }'
     ```
 
 === "HTTP"
     ``` http
-    POST /reddit_alerts HTTP/1.1
+    POST / HTTP/1.1
     Host: ntfy.sh
-    Click: https://www.reddit.com/message/messages 
 
-    New messages on Reddit
+    {
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+    }
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/reddit_alerts', {
+    fetch('https://ntfy.sh', {
         method: 'POST',
-        body: 'New messages on Reddit',
-        headers: { 'Click': 'https://www.reddit.com/message/messages' }
+        body: JSON.stringify({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        })
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
-    req.Header.Set("Click", "https://www.reddit.com/message/messages")
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // or even just use req.Header.Set() like in the other examples, but for the 
+    // sake of the example, this is easier.
+    
+    body := `{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/reddit_alerts"
-    $headers = @{ Click="https://www.reddit.com/message/messages" }
-    $body = "New messages on Reddit"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $uri = "https://ntfy.sh"
+    $body = @{
+            "topic"="powershell"
+            "title"="Low disk space alert"
+            "message"="Disk space is low at 5.1 GB"
+            "priority"=4
+            "attach"="https://filesrv.lan/space.jpg"
+            "filename"="diskspace.jpg"
+            "tags"=@("warning","cd")
+            "click"= "https://homecamera.lan/xasds1h2xsSsa/"
+          } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
     ``` python
-    requests.post("https://ntfy.sh/reddit_alerts",
-        data="New messages on Reddit",
-        headers={ "Click": "https://www.reddit.com/message/messages" })
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        })
+    )
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
-            'header' =>
-                "Content-Type: text/plain\r\n" .
-                "Click: https://www.reddit.com/message/messages",
-            'content' => 'New messages on Reddit'
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "mytopic",
+                "message": "Disk space is low at 5.1 GB",
+                "title": "Low disk space alert",
+                "tags": ["warning","cd"],
+                "priority": 4,
+                "attach": "https://filesrv.lan/space.jpg",
+                "filename": "diskspace.jpg",
+                "click": "https://homecamera.lan/xasds1h2xsSsa/"
+            ])
         ]
     ]));
     ```
 
-## User actions
 
+| Field    | Required | Type                       | Example         | Description                                    |
+|----------|----------|----------------------------|-----------------|------------------------------------------------|
+| `action` | ✔️       | *view, broadcast, or http* | `view`          | Action type                                    |
+| `label`  | ✔️        | *string*                   | `Turn on light` | Label of the action button in the notification |
+
+
+
+### Open website/app
+The `view` action opens a website or app when the action button is tapped, e.g. a browser, a Google Maps location, or
+even a deep link into Twitter or a show ntfy topic.
+
+### Send Android broadcast
+The `broadcast` action sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
+when the action button is tapped. This allows integration into automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
+or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), which basically means
+you can do everything your phone is capable of. Examples include taking pictures, launching/killing apps, change device
+settings, write/read files, etc.
+
+### Send HTTP request
+The `http` action sends a HTTP POST/GET/PUT request when the action button is tapped. You can use this to trigger REST APIs
+for whatever systems you have, e.g. opening the garage door, or turning on/off lights.
 
 === "`view` action"
     ``` json
@@ -972,6 +1074,80 @@ Examples:
     }
     ```
 
+## Click action
+You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
+to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
+the web browser (or the app) and open the website.
+
+Here's an example that will open Reddit when the notification is clicked:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "New messages on Reddit" \
+        -H "Click: https://www.reddit.com/message/messages" \
+        ntfy.sh/reddit_alerts
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --click="https://www.reddit.com/message/messages" \
+        reddit_alerts "New messages on Reddit"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /reddit_alerts HTTP/1.1
+    Host: ntfy.sh
+    Click: https://www.reddit.com/message/messages 
+
+    New messages on Reddit
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/reddit_alerts', {
+        method: 'POST',
+        body: 'New messages on Reddit',
+        headers: { 'Click': 'https://www.reddit.com/message/messages' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
+    req.Header.Set("Click", "https://www.reddit.com/message/messages")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/reddit_alerts"
+    $headers = @{ Click="https://www.reddit.com/message/messages" }
+    $body = "New messages on Reddit"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/reddit_alerts",
+        data="New messages on Reddit",
+        headers={ "Click": "https://www.reddit.com/message/messages" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Click: https://www.reddit.com/message/messages",
+            'content' => 'New messages on Reddit'
+        ]
+    ]));
+    ```
 
 ## Attachments
 You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
@@ -1575,6 +1751,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |
 | `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
 | `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
+| `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#user-actions)                                   |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |

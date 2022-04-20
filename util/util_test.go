@@ -152,3 +152,17 @@ func TestParseSize_FailureInvalid(t *testing.T) {
 		t.Fatalf("expected error, but got none")
 	}
 }
+
+func TestSplitKV(t *testing.T) {
+	key, value := SplitKV(" key = value ", "=")
+	require.Equal(t, "key", key)
+	require.Equal(t, "value", value)
+
+	key, value = SplitKV(" value ", "=")
+	require.Equal(t, "", key)
+	require.Equal(t, "value", value)
+
+	key, value = SplitKV("mykey=value=with=separator ", "=")
+	require.Equal(t, "mykey", key)
+	require.Equal(t, "value=with=separator", value)
+}

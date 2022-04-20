@@ -46,6 +46,7 @@ func readQueryParam(r *http.Request, names ...string) string {
 }
 
 func parseActions(s string) (actions []*action, err error) {
+	// Parse JSON or simple format
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "[") {
 		actions, err = parseActionsFromJSON(s)
@@ -55,14 +56,23 @@ func parseActions(s string) (actions []*action, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Add ID field
 	for i := range actions {
 		actions[i].ID = util.RandomString(actionIDLength)
-		if !util.InStringList([]string{"view", "broadcast", "http"}, actions[i].Action) {
-			return nil, fmt.Errorf("cannot parse actions: action '%s' unknown", actions[i].Action)
-		} else if actions[i].Label == "" {
+	}
+
+	// Validate
+	for _, action := range actions {
+		if !util.InStringList([]string{"view", "broadcast", "http"}, action.Action) {
+			return nil, fmt.Errorf("cannot parse actions: action '%s' unknown", action.Action)
+		} else if action.Label == "" {
 			return nil, fmt.Errorf("cannot parse actions: label must be set")
+		} else if util.InStringList([]string{"view", "http"}, action.Action) && action.URL != "" {
+			return nil, fmt.Errorf("parameter 'url' is required for action '%s'", action.Action)
 		}
 	}
+
 	return actions, nil
 }
 

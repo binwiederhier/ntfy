@@ -805,15 +805,14 @@ all the supported fields:
 
 ## Action buttons
 You can add action buttons to notifications to allow yourself to react to a notification directly. This is incredibly
-useful and has countless applications. As of today, the following actions are supported:
+useful and has countless applications.
+
+As of today, the following actions are supported:
 
 * [`view`](#open-websiteapp): Opens a website or app when the action button is tapped
 * [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
   when the action button is tapped
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
-
-To define the user actions, you can either pass the `actions` field as part of the JSON body (if you're 
-[publishing via JSON](#publish-as-json)), or use the `X-Actions` header (or any of its aliases: `Actions`, `Action`).
 
 Here's an example of what that a notification with actions can look like:
 
@@ -822,8 +821,11 @@ Here's an example of what that a notification with actions can look like:
   <figcaption>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</figcaption>
 </figure>
 
+To define the user actions, you can either pass the `actions` field as part of the JSON body (if you're 
+[publishing via JSON](#publish-as-json)), or use the `X-Actions` header (or any of its aliases: `Actions`, `Action`).
+
 Using the `X-Actions` header and the **simple format** (details see below), you can create the above notification like 
-this. This format is much easier to write, but less powerful:
+this. This format is much **easier to write, but less powerful**:
 
 === "Command line (curl)"
     ```
@@ -897,6 +899,38 @@ this. This format is much easier to write, but less powerful:
         ]
     ]));
     ```
+
+The `X-Actions` header (including above-mentioned aliases) supports the following formats:
+
+=== "Simple format (long)"
+    ```
+    X-Actions: action=<action>, label=<label>, param1=..., param2=..., ...
+    ```
+    Simple format examples:
+    ```
+    X-Actions: action=view, label=Play video, url=https://www.youtube.com/watch?v=EmL3lS0-Sr8
+    X-Actions: action=broadcast, label=Turn of flashlight, extras.cmd=flashlight-on
+    X-Actions: action=http, label=Change temperature, url=https://api.nest.com/device/XZ1D2, body=target_temp_f=65
+    ```
+
+=== "Simple format (short)"
+    ```
+    Actions: <action>, <label>, param1=..., param2=..., ...
+    ```
+
+An `action` is either [`view`](#open-websiteapp), [`broadcast`](#send-android-broadcast), or [`http`](#send-http-request),
+and the `label` defines the button text. The other parameters depend on the action itself. Please refer to this table
+for all available parameters:
+
+| Field     | Required | Type                           | Example               | Applies to action | Description                                                  |
+|-----------|----------|--------------------------------|-----------------------|-------------------|--------------------------------------------------------------|
+| `action`  | ✔️       | *view, broadcast, or http*     | `view`                | *all actions*     | Action type                                                  |
+| `label`   | ✔️       | *string*                       | `Turn on light`       | *all actions*     | Label of the action button in the notification               |
+| `url`     | -️       | *URL*                          | `https://example.com` | `view`, `http`    | URL to open or send a HTTP request to                        |
+| `method`  | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
+| `headers` | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
+| `method`  | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
+
 
 Alternatively, you can define actions as **JSON array** (details see below), and pass them as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
@@ -1093,25 +1127,7 @@ Alternatively, you can define actions as **JSON array** (details see below), and
     ]));
     ```
 
-**Simple format syntax:**
-
-Generally, the `X-Actions` header is formatted like this:
-```
-Actions: <action>, <label>, <params, ...>
-```
-or:
-```
-Actions: action=<action>, label=<label>, param1=..., param2=..., ...
-```
-
-An `action` is either [`view`](#open-websiteapp), [`broadcast`](#send-android-broadcast), or [`http`](#send-http-request),
-and the `label` defines the button text. The other parameters depend on the action itself.
-
-| Field    | Required | Type                       | Example         | Description                                    |
-|----------|----------|----------------------------|-----------------|------------------------------------------------|
-| `action` | ✔️       | *view, broadcast, or http* | `view`          | Action type                                    |
-| `label`  | ✔️        | *string*                   | `Turn on light` | Label of the action button in the notification |
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
 
 
 ### Open website/app

@@ -90,7 +90,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 5
+	currentSchemaVersion          = 6
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -167,6 +167,11 @@ const (
 		DROP TABLE messages;
 		ALTER TABLE messages_new RENAME TO messages;
 		COMMIT;
+	`
+
+	// 5 -> 6
+	migrate5To6AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN actions TEXT NOT NULL DEFAULT('');
 	`
 )
 
@@ -509,6 +514,8 @@ func setupCacheDB(db *sql.DB) error {
 		return migrateFrom3(db)
 	} else if schemaVersion == 4 {
 		return migrateFrom4(db)
+	} else if schemaVersion == 5 {
+		return migrateFrom5(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -579,6 +586,17 @@ func migrateFrom4(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 5); err != nil {
+		return err
+	}
+	return migrateFrom5(db)
+}
+
+func migrateFrom5(db *sql.DB) error {
+	log.Print("Migrating cache database schema: from 5 to 6")
+	if _, err := db.Exec(migrate5To6AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 6); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

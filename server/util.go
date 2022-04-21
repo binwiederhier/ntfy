@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
@@ -96,7 +95,10 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 	actions := make([]*action, 0)
 	rawActions := util.SplitNoEmpty(s, ";")
 	for _, rawAction := range rawActions {
-		newAction := &action{}
+		newAction := &action{
+			Headers: make(map[string]string),
+			Extras:  make(map[string]string),
+		}
 		parts := util.SplitNoEmpty(rawAction, ",")
 		if len(parts) < 3 {
 			return nil, fmt.Errorf("cannot parse action: action requires at least keys 'action', 'label' and one parameter: %s", rawAction)
@@ -109,6 +111,10 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 				newAction.Label = value
 			} else if key == "" && util.InStringList([]string{"view", "http"}, newAction.Action) && i == 2 {
 				newAction.URL = value
+			} else if strings.HasPrefix(key, "headers.") {
+				newAction.Headers[strings.TrimPrefix(key, "headers.")] = value
+			} else if strings.HasPrefix(key, "extras.") {
+				newAction.Extras[strings.TrimPrefix(key, "extras.")] = value
 			} else if key != "" {
 				switch strings.ToLower(key) {
 				case "action":
@@ -122,10 +128,10 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 				case "body":
 					newAction.Body = value
 				default:
-					return nil, errors.Errorf("cannot parse action: key '%s' not supported, please use JSON format instead", part)
+					return nil, fmt.Errorf("cannot parse action: key '%s' not supported, please use JSON format instead", part)
 				}
 			} else {
-				return nil, errors.Errorf("cannot parse action: unknown phrase '%s'", part)
+				return nil, fmt.Errorf("cannot parse action: unknown phrase '%s'", part)
 			}
 		}
 		actions = append(actions, newAction)

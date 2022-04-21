@@ -61,4 +61,22 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, "https://door.lan/open", actions[0].URL)
 	require.Equal(t, "PUT", actions[0].Method)
 	require.Equal(t, "this is a body", actions[0].Body)
+
+	actions, err = parseActions("action=broadcast, label=Do a thing, extras.command=some command, extras.some_param=a parameter")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "broadcast", actions[0].Action)
+	require.Equal(t, "Do a thing", actions[0].Label)
+	require.Equal(t, 2, len(actions[0].Extras))
+	require.Equal(t, "some command", actions[0].Extras["command"])
+	require.Equal(t, "a parameter", actions[0].Extras["some_param"])
+
+	actions, err = parseActions("action=http, label=Send request, url=http://example.com, method=GET, headers.Content-Type=application/json, headers.Authorization=Basic sdasffsf")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "http", actions[0].Action)
+	require.Equal(t, "Send request", actions[0].Label)
+	require.Equal(t, 2, len(actions[0].Headers))
+	require.Equal(t, "application/json", actions[0].Headers["Content-Type"])
+	require.Equal(t, "Basic sdasffsf", actions[0].Headers["Authorization"])
 }

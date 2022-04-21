@@ -821,11 +821,13 @@ Here's an example of what that a notification with actions can look like:
   <figcaption>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</figcaption>
 </figure>
 
-To define the user actions, you can either pass the `actions` field as part of the JSON body (if you're 
-[publishing via JSON](#publish-as-json)), or use the `X-Actions` header (or any of its aliases: `Actions`, `Action`).
+You can set up to three user actions in your notifications, using either of the following methods:
 
-Using the `X-Actions` header and the **simple format** (details see below), you can create the above notification like 
-this. This format is much **easier to write, but less powerful**:
+* In the `X-Actions` header, using the **simple format**
+* As a **JSON array** in the `actions` key, when [publishing as JSON](#publish-as-json) 
+
+Using the `X-Actions` header (or any of its aliases: `Actions`, `Action`) and the **simple format** (details see below), you 
+can create the above notification like this. 
 
 === "Command line (curl)"
     ```
@@ -899,40 +901,29 @@ this. This format is much **easier to write, but less powerful**:
         ]
     ]));
     ```
-
-The `X-Actions` header (including above-mentioned aliases) supports the following formats:
+ 
+Here's the generic definition of the simple format: 
 
 === "Simple format (long)"
     ```
-    X-Actions: action=<action>, label=<label>, param1=..., param2=..., ...
-    ```
-    Simple format examples:
-    ```
-    X-Actions: action=view, label=Play video, url=https://www.youtube.com/watch?v=EmL3lS0-Sr8
-    X-Actions: action=broadcast, label=Turn of flashlight, extras.cmd=flashlight-on
-    X-Actions: action=http, label=Change temperature, url=https://api.nest.com/device/XZ1D2, body=target_temp_f=65
+    action=<action1>, label=<label1>, paramN=...[; action=<action2>, label=<label2>, ...]
     ```
 
 === "Simple format (short)"
     ```
-    Actions: <action>, <label>, param1=..., param2=..., ...
+    <action1>, <label1>, paramN=...[; <action2>, <label2>, ...]
     ```
 
-An `action` is either [`view`](#open-websiteapp), [`broadcast`](#send-android-broadcast), or [`http`](#send-http-request),
-and the `label` defines the button text. The other parameters depend on the action itself. Please refer to this table
-for all available parameters:
+`action=` and `label=` are optional in all actions, and `url=` is optional in the `view` and `http` action.
 
-| Field     | Required | Type                           | Example               | Applies to action | Description                                                  |
-|-----------|----------|--------------------------------|-----------------------|-------------------|--------------------------------------------------------------|
-| `action`  | ✔️       | *view, broadcast, or http*     | `view`                | *all actions*     | Action type                                                  |
-| `label`   | ✔️       | *string*                       | `Turn on light`       | *all actions*     | Label of the action button in the notification               |
-| `url`     | -️       | *URL*                          | `https://example.com` | `view`, `http`    | URL to open or send a HTTP request to                        |
-| `method`  | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
-| `headers` | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
-| `method`  | -️       | *HTTP method (GET, POST, ...)* | `GET`                 | `http`            | HTTP method to use for HTTP request (**default is `POST`**!) |
+Simple format examples:
 
+```
+http, Change temp, https://api.nest.com/XZ1D2, body=target_temp=65
+action=view, label=Open site, url=https://ntfy.sh; action=broadcast, label=Turn off, extras.cmd=turn-off
+```
 
-Alternatively, you can define actions as **JSON array** (details see below), and pass them as part of the JSON body 
+Alternatively, the same actions can be defined as **JSON array** (details see below), if the notification is defined as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
 
 === "Command line (curl)"
@@ -1127,15 +1118,241 @@ Alternatively, you can define actions as **JSON array** (details see below), and
     ]));
     ```
 
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-
-
 ### Open website/app
 The `view` action opens a website or app when the action button is tapped, e.g. a browser, a Google Maps location, or
 even a deep link into Twitter or a show ntfy topic.
 
-XXXXXXXXXXXXXXXXXXx
+Examples:
 
+* `http://` or `https://` will open your browser (or an app if it registered for a URL)
+* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
+* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
+* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+* ...
+
+Here's an example using the simple format:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "You left the house. Turn down the A/C?" \
+        -H "Actions: view, Open portal, https://home.nest.com/" \
+    ntfy.sh/myhome
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions="view, Open portal, https://home.nest.com/" \
+        myhome \
+        "You left the house. Turn down the A/C?"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /myhome HTTP/1.1
+    Host: ntfy.sh
+    Actions: view, Open portal, https://home.nest.com/
+
+    You left the house. Turn down the A/C?
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/myhome', {
+        method: 'POST',
+        body: 'You left the house. Turn down the A/C?',
+        headers: { 
+            'Actions': 'view, Open portal, https://home.nest.com/' 
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("You left the house. Turn down the A/C?"))
+    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/myhome"
+    $headers = @{ Actions="view, Open portal, https://home.nest.com/" }
+    $body = "You left the house. Turn down the A/C?"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/myhome",
+        data="You left the house. Turn down the A/C?",
+        headers={ "Actions": "view, Open portal, https://home.nest.com/" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Actions: view, Open portal, https://home.nest.com/",
+            'content' => 'You left the house. Turn down the A/C?'
+        ]
+    ]));
+    ```
+
+And the same example using [JSON publishing](#publish-as-json):
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "myhome",
+        "message": "You left the house. Turn down the A/C?",
+        "actions": [
+          {
+            "action": "view",
+            "label": "Open portal",
+            "url": "https://home.nest.com/"
+          }
+        ]
+      }'
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions '[
+            {
+                "action": "view",
+                "label": "Open portal",
+                "url": "https://home.nest.com/"
+            }
+        ]' \
+        myhome \
+        "You left the house. Turn down the A/C?"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST / HTTP/1.1
+    Host: ntfy.sh
+
+    {
+        "topic": "myhome",
+        "message": "You left the house. Turn down the A/C?",
+        "actions": [
+          {
+            "action": "view",
+            "label": "Open portal",
+            "url": "https://home.nest.com/"
+          }
+        ]
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh', {
+        method: 'POST',
+        body: JSON.stringify({
+            topic: "myhome",
+            message": "You left the house. Turn down the A/C?",
+            actions: [
+                {
+                    action: "view",
+                    label: "Open portal",
+                    url: "https://home.nest.com/"
+                }
+            ]
+        })
+    })
+    ```
+
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // but for the sake of the example, this is easier.
+    
+    body := `{
+        "topic": "myhome",
+        "message": "You left the house. Turn down the A/C?",
+        "actions": [
+          {
+            "action": "view",
+            "label": "Open portal",
+            "url": "https://home.nest.com/"
+          }
+        ]
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh"
+    $body = @{
+        "topic"="myhome"
+        "message"="You left the house. Turn down the A/C?"
+        "actions"=@(
+            @{
+                "action"="view"
+                "label"="Open portal"
+                "url"="https://home.nest.com/"
+            }
+        )
+    } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "myhome",
+            "message": "You left the house. Turn down the A/C?",
+            "actions": [
+                {
+                    "action": "view",
+                    "label": "Open portal",
+                    "url": "https://home.nest.com/"
+                }
+            ]
+        })
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "myhome",
+                "message": "You left the house. Turn down the A/C?",
+                "actions": [
+                    [
+                        "action": "view",
+                        "label": "Open portal",
+                        "url": "https://home.nest.com/"
+                    ]
+                ]
+            ])
+        ]
+    ]));
+    ```
+
+The `view` action supports the following fields:
+
+| Field    | Required | Type     | Example               | Description                                    |
+|----------|----------|----------|-----------------------|------------------------------------------------|
+| `action` | ✔️       | *string* | `view`                | Action type (**must be `view`**)               |
+| `label`  | ✔️       | *string* | `Turn on light`       | Label of the action button in the notification |
+| `url`    | ✔️       | *URL*    | `https://example.com` | URL to open when action is tapped              |
 
 ### Send Android broadcast
 The `broadcast` action sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
@@ -1144,106 +1361,509 @@ or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.
 you can do everything your phone is capable of. Examples include taking pictures, launching/killing apps, change device
 settings, write/read files, etc.
 
-XXXXXXXXXXXXXXxx
+Here's an example using the simple format:
 
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "Your wife requested you send a picture of yourself." \
+        -H "Actions: broadcast, Take picture, extras.cmd=pic, extras.camera=front" \
+    ntfy.sh/wifey
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions="broadcast, Take picture, extras.cmd=pic, extras.camera=front" \
+        wifey \
+        "Your wife requested you send a picture of yourself."
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /wifey HTTP/1.1
+    Host: ntfy.sh
+    Actions: broadcast, Take picture, extras.cmd=pic, extras.camera=front
+
+    Your wife requested you send a picture of yourself.
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/wifey', {
+        method: 'POST',
+        body: 'Your wife requested you send a picture of yourself.',
+        headers: { 
+            'Actions': 'broadcast, Take picture, extras.cmd=pic, extras.camera=front' 
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/wifey", strings.NewReader("Your wife requested you send a picture of yourself."))
+    req.Header.Set("Actions", "broadcast, Take picture, extras.cmd=pic, extras.camera=front")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/wifey"
+    $headers = @{ Actions="broadcast, Take picture, extras.cmd=pic, extras.camera=front" }
+    $body = "Your wife requested you send a picture of yourself."
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/wifey",
+        data="Your wife requested you send a picture of yourself.",
+        headers={ "Actions": "broadcast, Take picture, extras.cmd=pic, extras.camera=front" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/wifey', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Actions: broadcast, Take picture, extras.cmd=pic, extras.camera=front",
+            'content' => 'Your wife requested you send a picture of yourself.'
+        ]
+    ]));
+    ```
+
+And the same example using [JSON publishing](#publish-as-json):
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "wifey",
+        "message": "Your wife requested you send a picture of yourself.",
+        "actions": [
+          {
+            "action": "broadcast",
+            "label": "Take picture",
+            "extras": {
+                "cmd": "pic",
+                "camera": "front"
+            }
+          }
+        ]
+      }'
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions '[
+            {
+                "action": "broadcast",
+                "label": "Take picture",
+                "extras": {
+                    "cmd": "pic",
+                    "camera": "front"
+                }
+            }
+        ]' \
+        wifey \
+        "Your wife requested you send a picture of yourself."
+    ```
+
+=== "HTTP"
+    ``` http
+    POST / HTTP/1.1
+    Host: ntfy.sh
+
+    {
+        "topic": "wifey",
+        "message": "Your wife requested you send a picture of yourself.",
+        "actions": [
+          {
+            "action": "broadcast",
+            "label": "Take picture",
+            "extras": {
+                "cmd": "pic",
+                "camera": "front"
+            }
+          }
+        ]
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh', {
+        method: 'POST',
+        body: JSON.stringify({
+            topic: "wifey",
+            message": "Your wife requested you send a picture of yourself.",
+            actions: [
+                {
+                    "action": "broadcast",
+                    "label": "Take picture",
+                    "extras": {
+                        "cmd": "pic",
+                        "camera": "front"
+                    }
+                }
+            ]
+        })
+    })
+    ```
+
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // but for the sake of the example, this is easier.
+    
+    body := `{
+        "topic": "wifey",
+        "message": "Your wife requested you send a picture of yourself.",
+        "actions": [
+          {
+            "action": "broadcast",
+            "label": "Take picture",
+            "extras": {
+                "cmd": "pic",
+                "camera": "front"
+            }
+          }
+        ]
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh"
+    $body = @{
+        "topic"="wifey"
+        "message"="Your wife requested you send a picture of yourself."
+        "actions"=@(
+            @{
+                "action"="broadcast"
+                "label"="Take picture"
+                "extras"=@{
+                    "cmd"="pic"
+                    "camera"="front"
+                }
+            }
+        )
+    } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "wifey",
+            "message": "Your wife requested you send a picture of yourself.",
+            "actions": [
+                {
+                    "action": "broadcast",
+                    "label": "Take picture",
+                    "extras": {
+                        "cmd": "pic",
+                        "camera": "front"
+                    }
+                }
+            ]
+        })
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "wifey",
+                "message": "Your wife requested you send a picture of yourself.",
+                "actions": [
+                    [
+                    "action": "broadcast",
+                    "label": "Take picture",
+                    "extras": [
+                        "cmd": "pic",
+                        "camera": "front"
+                    ]
+                ]
+            ])
+        ]
+    ]));
+    ```
+
+The `broadcast` action supports the following fields:
+
+| Field    | Required | Type             | Example                 | Description                                                                                                                                                                            |
+|----------|----------|------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `action` | ✔️       | *string*         | `broadcast`             | Action type (**must be `broadcast`**)                                                                                                                                                  |
+| `label`  | ✔️       | *string*         | `Turn on light`         | Label of the action button in the notification                                                                                                                                         |
+| `intent` | -️       | *string*         | `com.example.AN_INTENT` | Android intent name, **default is `io.heckel.ntfy.USER_ACTION`**                                                                                                                       |
+| `extras` | -️       | *map of strings* | *see above*             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
 
 ### Send HTTP request
 The `http` action sends a HTTP POST/GET/PUT request when the action button is tapped. You can use this to trigger REST APIs
 for whatever systems you have, e.g. opening the garage door, or turning on/off lights.
 
-XXXXXXXXXXXXXXXXXXXXx
+Here's an example using the simple format:
 
-=== "`view` action"
-    ``` json
-    { 
-      "action": "view", 
-      "label": "Open bing.com", 
-      "url": "https://bing.com"
-    }
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "Garage door has been open for 15 minutes. Close it?" \
+        -H "Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." \
+        ntfy.sh/myhome
     ```
 
-=== "`broadcast` action"
-    ``` json
-    { 
-      "action": "broadcast", 
-      "label": "Send broadcast", 
-      "intent": "io.heckel.ntfy.USER_ACTION",
-      "extras": {
-        "param": "this is a param",
-        "anotherparam": "this is another one"
-      }
-    }
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions="http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." \
+        myhome \
+        "Garage door has been open for 15 minutes. Close it?"
     ```
 
-=== "`http` action"
-    ``` json
-    { 
-      "action": "http", 
-      "label": "Take picture", 
-      "method": "POST",
-      "url": "https://homecam.lan/capture",
-      "headers": {
-        "Authorization": "..."
-      },
-      "body": "this is a message"
-    }
+=== "HTTP"
+    ``` http
+    POST /myhome HTTP/1.1
+    Host: ntfy.sh
+    Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..
+
+    Garage door has been open for 15 minutes. Close it?
     ```
 
-Examples:
-
-=== "Open a website"
-    ``` json
-    { 
-      "action": "view", 
-      "label": "Open bing.com", 
-      "url": "https://bing.com"
-    }
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/myhome', {
+        method: 'POST',
+        body: 'Garage door has been open for 15 minutes. Close it?',
+        headers: { 
+            'Actions': 'http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..' 
+        }
+    })
     ```
 
-=== "Open location in Google Maps"
-    ``` json
-    { 
-      "action": "view", 
-      "label": "Show map", 
-      "url": "geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+California"
-    }
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Garage door has been open for 15 minutes. Close it?"))
+    req.Header.Set("Actions", "http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..")
+    http.DefaultClient.Do(req)
     ```
 
-=== "Open a ntfy topic (deep link)"
-    ``` json
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/myhome"
+    $headers = @{ Actions="http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." }
+    $body = "Garage door has been open for 15 minutes. Close it?"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/myhome",
+        data="Garage door has been open for 15 minutes. Close it?",
+        headers={ "Actions": "http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..",
+            'content' => 'Garage door has been open for 15 minutes. Close it?'
+        ]
+    ]));
+    ```
+
+And the same example using [JSON publishing](#publish-as-json):
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "myhome",
+        "message": "Garage door has been open for 15 minutes. Close it?",
+        "actions": [
+          {
+            "action": "http",
+            "label": "Close door",
+            "url": "https://mygarage.lan/close",
+            "headers": {
+                "Authorization": "Bearer zAzsx1sk.."
+            }
+          }
+        ]
+      }'
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --actions '[
+            {
+              "action": "http",
+              "label": "Close door",
+              "url": "https://mygarage.lan/close",
+              "headers": {
+                "Authorization": "Bearer zAzsx1sk.."
+              }
+            }
+        ]' \
+        myhome \
+        "Garage door has been open for 15 minutes. Close it?"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST / HTTP/1.1
+    Host: ntfy.sh
+
     {
-      "action": "view",
-      "label": "Show stats",
-      "url": "ntfy://ntfy.sh/stats"
+        "topic": "myhome",
+        "message": "Garage door has been open for 15 minutes. Close it?",
+        "actions": [
+          {
+            "action": "http",
+            "label": "Close door",
+            "url": "https://mygarage.lan/close",
+            "headers": {
+              "Authorization": "Bearer zAzsx1sk.."
+            }
+          }
+        ]
     }
     ```
 
-=== "Send broadcast"
-    ``` json
-    {
-      "action": "broadcast",
-      "label": "Send broadcast",
-      "intent": "my.custom.intent",
-      "extras": {
-        "message": "whats up, hello"
-      }
-    }  
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh', {
+        method: 'POST',
+        body: JSON.stringify({
+            topic: "myhome",
+            message": "Garage door has been open for 15 minutes. Close it?",
+            actions: [
+              {
+                "action": "http",
+                "label": "Close door",
+                "url": "https://mygarage.lan/close",
+                "headers": {
+                  "Authorization": "Bearer zAzsx1sk.."
+                }
+              }
+            ]
+        })
+    })
     ```
 
-=== "Send a ntfy message"
-    ``` json
-    { 
-      "action": "http", 
-      "label": "Send message", 
-      "method": "POST",
-      "url": "http://ntfy.example.com/mytopic",
-      "headers": {
-        "Title": "another message",
-        "Tags": "tag1, tag2"
-      },
-      "body": "this is a message"
-    }
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // but for the sake of the example, this is easier.
+    
+    body := `{
+        "topic": "myhome",
+        "message": "Garage door has been open for 15 minutes. Close it?",
+        "actions": [
+          {
+            "action": "http",
+            "label": "Close door",
+            "url": "https://mygarage.lan/close",
+            "headers": {
+              "Authorization": "Bearer zAzsx1sk.."
+            }
+          }
+        ]
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
     ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh"
+    $body = @{
+        "topic"="myhome"
+        "message"="Garage door has been open for 15 minutes. Close it?"
+        "actions"=@(
+            @{
+                "action"="http",
+                "label"="Close door"
+                "url"="https://mygarage.lan/close"
+                "headers"=@{
+                  "Authorization"="Bearer zAzsx1sk.."
+                }
+            }
+          }
+        )
+    } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "myhome",
+            "message": "Garage door has been open for 15 minutes. Close it?",
+            "actions": [
+                {
+                  "action": "http",
+                  "label": "Close door",
+                  "url": "https://mygarage.lan/close",
+                  "headers": {
+                    "Authorization": "Bearer zAzsx1sk.."
+                  }
+                }
+            ]
+        })
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "myhome",
+                "message": "Garage door has been open for 15 minutes. Close it?",
+                "actions": [
+                    [
+                        "action": "http",
+                        "label": "Close door",
+                        "url": "https://mygarage.lan/close",
+                        "headers": [
+                            "Authorization": "Bearer zAzsx1sk.."
+                         ]
+                    ]
+                ]
+            ])
+        ]
+    ]));
+    ```
+
+The `http` action supports the following fields:
+
+| Field     | Required | Type               | Example                   | Description                                                                                                                                             |
+|-----------|----------|--------------------|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `action`  | ✔️       | *string*           | `http`                    | Action type (**must be `http`**)                                                                                                                        |
+| `label`   | ✔️       | *string*           | `Open garage door`        | Label of the action button in the notification                                                                                                          |
+| `url`     | ✔️       | *string*           | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
+| `method`  | -️       | *GET/POST/PUT/...* | `GET`                     | HTTP method to use for request, **default is POST (!)**                                                                                                 |
+| `headers` | -️       | *map of strings*   | *see above*               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
+| `method`  | -️       | *string*           | `some body, somebody?`    | HTTP body                                                                                                                                               |
 
 ## Click action
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
@@ -1257,9 +1877,9 @@ by another app, the responsible app may open.
 Examples:
 
 * `http://` or `https://` will open your browser (or an app if it registered for a URL)
-* `mailto:` links will open your mail app
-* `geo:` links will open Google Maps (or your maps application)
-* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links))
+* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
+* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
+* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
 * ...
 
 Here's an example that will open Reddit when the notification is clicked:

@@ -805,7 +805,10 @@ all the supported fields:
 
 ## Action buttons
 You can add action buttons to notifications to allow yourself to react to a notification directly. This is incredibly
-useful and has countless applications.
+useful and has countless applications. 
+
+You can control your home appliances (open/close garage door, change temperature on thermostat, ...), react to common 
+monitoring alerts (clear logs when disk is full, ...), and many other things. The sky is the limit.
 
 As of today, the following actions are supported:
 
@@ -821,13 +824,31 @@ Here's an example of what that a notification with actions can look like:
   <figcaption>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</figcaption>
 </figure>
 
-You can set up to three user actions in your notifications, using either of the following methods:
+### Defining actions
+You can define **up to three user actions** in your notifications, using either of the following methods:
 
-* In the `X-Actions` header, using the **simple format**
-* As a **JSON array** in the `actions` key, when [publishing as JSON](#publish-as-json) 
+* In the [`X-Actions` header](#using-a-header), using a simple comma-separated format
+* As a [JSON array](#using-a-json-array) in the `actions` key, when [publishing as JSON](#publish-as-json) 
 
-Using the `X-Actions` header (or any of its aliases: `Actions`, `Action`) and the **simple format** (details see below), you 
-can create the above notification like this. 
+#### Using a header
+To define actions using the `X-Actions` header (or any of its aliases: `Actions`, `Action`), use the following format:
+
+=== "Header format (long)"
+    ```
+    action=<action1>, label=<label1>, paramN=... [; action=<action2>, label=<label2>, ...]
+    ```
+
+=== "Header format (short)"
+    ```
+    <action1>, <label1>, paramN=... [; <action2>, <label2>, ...]
+    ```
+
+The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and `http` action.
+The format has **some limitations**: You cannot use `,` or `;` in any of the values, and depending on your language/library, UTF-8
+characters may not work. Use the [JSON array format](#using-a-json-array) instead to overcome these limitations.
+
+As an example, here's how you can create the above notification using this format. Refer to the [`view` action](#open-websiteapp) and 
+[`http` action](#send-http-request) section for details on the specific actions:
 
 === "Command line (curl)"
     ```
@@ -842,7 +863,7 @@ can create the above notification like this.
     ```
     ntfy publish \
         --actions="view, Open portal, https://home.nest.com/; \
-                  http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
+                   http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
         myhome \
         "You left the house. Turn down the A/C?"
     ```
@@ -902,28 +923,8 @@ can create the above notification like this.
     ]));
     ```
  
-Here's the generic definition of the simple format: 
-
-=== "Simple format (long)"
-    ```
-    action=<action1>, label=<label1>, paramN=...[; action=<action2>, label=<label2>, ...]
-    ```
-
-=== "Simple format (short)"
-    ```
-    <action1>, <label1>, paramN=...[; <action2>, <label2>, ...]
-    ```
-
-`action=` and `label=` are optional in all actions, and `url=` is optional in the `view` and `http` action.
-
-Simple format examples:
-
-```
-http, Change temp, https://api.nest.com/XZ1D2, body=target_temp=65
-action=view, label=Open site, url=https://ntfy.sh; action=broadcast, label=Turn off, extras.cmd=turn-off
-```
-
-Alternatively, the same actions can be defined as **JSON array** (details see below), if the notification is defined as part of the JSON body 
+#### Using a JSON array
+Alternatively, the same actions can be defined as **JSON array** , if the notification is defined as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
 
 === "Command line (curl)"
@@ -1118,9 +1119,14 @@ Alternatively, the same actions can be defined as **JSON array** (details see be
     ]));
     ```
 
+The required/optional fields for each action depend on the type of the action itself. Please refer to 
+[`view` action](#open-websiteapp), [`broadcasst` action](#send-android-broadcast), and [`http` action](#send-http-request) 
+for details.
+
 ### Open website/app
-The `view` action opens a website or app when the action button is tapped, e.g. a browser, a Google Maps location, or
-even a deep link into Twitter or a show ntfy topic.
+The `view` action **opens a website or app when the action button is tapped**, e.g. a browser, a Google Maps location, or
+even a deep link into Twitter or a show ntfy topic. How exactly the action is handled depends on how Android and your 
+desktop browser treat the links. Normally it'll just a link in the browser. 
 
 Examples:
 
@@ -1130,7 +1136,7 @@ Examples:
 * `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
 * ...
 
-Here's an example using the simple format:
+Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
     ```
@@ -1355,13 +1361,16 @@ The `view` action supports the following fields:
 | `url`    | ✔️       | *URL*    | `https://example.com` | URL to open when action is tapped              |
 
 ### Send Android broadcast
-The `broadcast` action sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
-when the action button is tapped. This allows integration into automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
+The `broadcast` action **sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
+when the action button is tapped**. This allows integration into automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), which basically means
 you can do everything your phone is capable of. Examples include taking pictures, launching/killing apps, change device
 settings, write/read files, etc.
 
-Here's an example using the simple format:
+By default, the intent **`io.heckel.ntfy.USER_ACTION`** is broadcast, though this can be changed with the `intent` parameter (see below).
+To send extras, use the `extras` parameter. Currently, **only string extras are supported**.
+
+Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
     ```
@@ -1610,10 +1619,13 @@ The `broadcast` action supports the following fields:
 | `extras` | -️       | *map of strings* | *see above*             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
 
 ### Send HTTP request
-The `http` action sends a HTTP POST/GET/PUT request when the action button is tapped. You can use this to trigger REST APIs
+The `http` action **sends a HTTP request when the action button is tapped**. You can use this to trigger REST APIs
 for whatever systems you have, e.g. opening the garage door, or turning on/off lights.
 
-Here's an example using the simple format:
+By default, this action sends a **POST request** (not GET!), though this can be changed with the `method` parameter.
+The only required parameter is `url`. Headers can be passed along using the `headers` parameter.  
+
+Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
     ```

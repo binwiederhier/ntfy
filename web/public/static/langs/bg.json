@@ -56,7 +56,7 @@
     "notifications_attachment_copy_url_button": "Копиране на адреса",
     "notifications_attachment_open_button": "Отваряне на прикачения файл",
     "notifications_attachment_link_expires": "препратката изтича на {{date}}",
-    "notifications_click_open_title": "Към {{url}}",
+    "notifications_actions_open_url_title": "Към {{url}}",
     "notifications_click_copy_url_button": "Копиране на препратка",
     "notifications_click_open_button": "Отваряне",
     "notifications_click_copy_url_title": "Копира препратката в междинната памет",

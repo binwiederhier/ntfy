@@ -24,7 +24,7 @@
     "notifications_click_copy_url_button": "Copier le lien",
     "notifications_click_open_button": "Ouvrir le lien",
     "notifications_none_for_topic_title": "Vous n'avez pas encore reçu de notifications pour ce sujet.",
-    "notifications_click_open_title": "Aller à {{url}}",
+    "notifications_actions_open_url_title": "Aller à {{url}}",
     "notifications_example": "Exemple",
     "notifications_loading": "Chargement des notifications…",
     "publish_dialog_progress_uploading": "Téléversement…",

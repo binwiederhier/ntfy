@@ -105,6 +105,18 @@ export const encodeBase64Url = (s) => {
     return Base64.encodeURI(s);
 }
 
+export const maybeAppendActionErrors = (message, notification) => {
+    const actionErrors = (notification.actions ?? [])
+        .map(action => action.error)
+        .filter(action => !!action)
+        .join("\n")
+    if (actionErrors.length === 0) {
+        return message;
+    } else {
+        return `${message}\n\n${actionErrors}`;
+    }
+}
+
 export const shuffle = (arr) => {
     let j, x;
     for (let index = arr.length - 1; index > 0; index--) {

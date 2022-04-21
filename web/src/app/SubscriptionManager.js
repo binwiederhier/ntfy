@@ -92,6 +92,19 @@ class SubscriptionManager {
         });
     }
 
+    async updateNotification(notification) {
+        const exists = await db.notifications.get(notification.id);
+        if (!exists) {
+            return false;
+        }
+        try {
+            await db.notifications.put({ ...notification });
+        } catch (e) {
+            console.error(`[SubscriptionManager] Error updating notification`, e);
+        }
+        return true;
+    }
+
     async deleteNotification(notificationId) {
         await db.notifications.delete(notificationId);
     }

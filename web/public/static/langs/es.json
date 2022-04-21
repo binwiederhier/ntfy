@@ -26,7 +26,7 @@
     "notifications_attachment_link_expired": "el enlace de descarga ha expirado",
     "notifications_click_copy_url_title": "Copiar la URL del enlace en el portapapeles",
     "notifications_click_copy_url_button": "Copiar enlace",
-    "notifications_click_open_title": "Ir a {{url}}",
+    "notifications_actions_open_url_title": "Ir a {{url}}",
     "notifications_click_open_button": "Abrir enlace",
     "notifications_none_for_topic_title": "Aún no has recibido ninguna notificación en este tópico.",
     "notifications_none_for_topic_description": "Para enviar notificaciones a este tópico, simplemente realice un PUT o POST a la URL del tópico.",

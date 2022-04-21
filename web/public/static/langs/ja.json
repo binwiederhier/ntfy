@@ -40,7 +40,7 @@
     "notifications_attachment_copy_url_button": "URLをコピー",
     "notifications_attachment_open_title": "{{url}} に移動",
     "notifications_attachment_link_expired": "ダウンロードリンクは失効しました",
-    "notifications_click_open_title": "{{url}} に移動",
+    "notifications_actions_open_url_title": "{{url}} に移動",
     "notifications_attachment_copy_url_title": "添付URLをクリップボードにコピー",
     "notifications_attachment_open_button": "添付ファイルを開く",
     "notifications_click_copy_url_title": "リンクURLをクリップボードにコピー",

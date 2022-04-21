@@ -29,7 +29,7 @@
     "notifications_attachment_open_button": "Buka lampiran",
     "notifications_attachment_link_expires": "tautan kadaluwarsa {{date}}",
     "notifications_attachment_link_expired": "tautan unduhan kadaluwarsa",
-    "notifications_click_open_title": "Pergi ke {{url}}",
+    "notifications_actions_open_url_title": "Pergi ke {{url}}",
     "notifications_click_open_button": "Buka tautan",
     "publish_dialog_topic_placeholder": "Nama topik, mis. pemberitahuan_andi",
     "nav_button_publish_message": "Publikasikan notifikasi",

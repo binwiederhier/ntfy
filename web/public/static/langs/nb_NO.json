@@ -18,7 +18,7 @@
     "notifications_attachment_open_title": "Gå til {{url}}",
     "notifications_attachment_link_expires": "lenken utløper {{date}}",
     "notifications_click_copy_url_title": "Kopier lenke-nettadresse til utklippstavlen",
-    "notifications_click_open_title": "Gå til {{url}}",
+    "notifications_actions_open_url_title": "Gå til {{url}}",
     "notifications_tags": "Etiketter",
     "notifications_attachment_link_expired": "nedlastingslenken har utløpt",
     "notifications_none_for_any_title": "Du har ikke mottatt noen merknader.",

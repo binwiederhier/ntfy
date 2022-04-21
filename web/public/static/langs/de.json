@@ -48,7 +48,7 @@
     "notifications_attachment_open_button": "Anhang öffnen",
     "notifications_attachment_link_expired": "Download-Link ist abgelaufen",
     "notifications_click_copy_url_button": "Link kopieren",
-    "notifications_click_open_title": "Gehe zu {{url}}",
+    "notifications_actions_open_url_title": "Gehe zu {{url}}",
     "publish_dialog_other_features": "Andere Optionen:",
     "notifications_none_for_topic_description": "Um Benachrichtigungen an dieses Thema zu senden, PUTe/POSTe an die Themen-URL.",
     "notifications_no_subscriptions_title": "Anscheinend hast Du noch keine Themen abonniert.",

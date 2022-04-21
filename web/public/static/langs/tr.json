@@ -71,7 +71,7 @@
     "notifications_none_for_any_title": "Herhangi bir bildirim almadınız.",
     "notifications_attachment_link_expired": "indirme bağlantısının süresi doldu",
     "notifications_click_copy_url_button": "Bağlantıyı kopyala",
-    "notifications_click_open_title": "{{url}} adresine git",
+    "notifications_actions_open_url_title": "{{url}} adresine git",
     "notifications_click_open_button": "Bağlantıyı aç",
     "notifications_no_subscriptions_description": "Bir konu oluşturmak veya bir konuya abone olmak için \"{{linktext}}\" bağlantısına tıklayın. Bundan sonra PUT veya POST yoluyla mesaj gönderebilirsiniz ve buradan bildirimler alırsınız.",
     "notifications_example": "Örnek",

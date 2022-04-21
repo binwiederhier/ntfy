@@ -59,7 +59,7 @@
     "notifications_none_for_any_title": "Вы ещё не получали никаких уведомлений.",
     "alert_grant_title": "Уведомления отключены",
     "notifications_attachment_copy_url_title": "Скопировать URL-адрес вложения",
-    "notifications_click_open_title": "Перейти на {{url}}",
+    "notifications_actions_open_url_title": "Перейти на {{url}}",
     "notifications_tags": "Тэги",
     "notifications_attachment_link_expires": "срок действия ссылки истекает {{date}}",
     "notifications_click_copy_url_title": "Скопировать URL-адрес ссылки",

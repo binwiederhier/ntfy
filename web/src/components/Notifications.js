@@ -19,7 +19,7 @@ import {
     formatBytes,
     formatMessage,
     formatShortDateTime,
-    formatTitle,
+    formatTitle, maybeAppendActionErrors,
     openUrl,
     shortUrl,
     topicShortUrl,
@@ -138,9 +138,10 @@ const NotificationItem = (props) => {
         props.onShowSnack();
     };
     const expired = attachment && attachment.expires && attachment.expires < Date.now()/1000;
-    const showAttachmentActions = attachment && !expired;
-    const showClickAction = notification.click;
-    const showActions = showAttachmentActions || showClickAction;
+    const hasAttachmentActions = attachment && !expired;
+    const hasClickAction = notification.click;
+    const hasUserActions = notification.actions && notification.actions.length > 0;
+    const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
     return (
         <Card sx={{ minWidth: 275, padding: 1 }}>
             <CardContent>
@@ -161,13 +162,15 @@ const NotificationItem = (props) => {
                         </svg>}
                 </Typography>
                 {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>{autolink(formatMessage(notification))}</Typography>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                    {autolink(maybeAppendActionErrors(formatMessage(notification), notification))}
+                </Typography>
                 {attachment && <Attachment attachment={attachment}/>}
                 {tags && <Typography sx={{ fontSize: 14 }} color="text.secondary">{t("notifications_tags")}: {tags}</Typography>}
             </CardContent>
             {showActions &&
                 <CardActions sx={{paddingTop: 0}}>
-                    {showAttachmentActions && <>
+                    {hasAttachmentActions && <>
                         <Tooltip title={t("notifications_attachment_copy_url_title")}>
                             <Button onClick={() => handleCopy(attachment.url)}>{t("notifications_attachment_copy_url_button")}</Button>
                         </Tooltip>
@@ -175,14 +178,15 @@ const NotificationItem = (props) => {
                             <Button onClick={() => openUrl(attachment.url)}>{t("notifications_attachment_open_button")}</Button>
                         </Tooltip>
                     </>}
-                    {showClickAction && <>
+                    {hasClickAction && <>
                         <Tooltip title={t("notifications_click_copy_url_title")}>
                             <Button onClick={() => handleCopy(notification.click)}>{t("notifications_click_copy_url_button")}</Button>
                         </Tooltip>
-                        <Tooltip title={t("notifications_click_open_title", { url: notification.click })}>
+                        <Tooltip title={t("notifications_actions_open_url_title", { url: notification.click })}>
                             <Button onClick={() => openUrl(notification.click)}>{t("notifications_click_open_button")}</Button>
                         </Tooltip>
                     </>}
+                    {hasUserActions && <UserActions notification={notification}/>}
                 </CardActions>}
         </Card>
     );
@@ -328,6 +332,83 @@ const Image = (props) => {
         </>
     );
 }
+
+const UserActions = (props) => {
+    return (
+        <>{props.notification.actions.map(action =>
+            <UserAction key={action.id} notification={props.notification} action={action}/>)}</>
+    );
+};
+
+const UserAction = (props) => {
+    const { t } = useTranslation();
+    const notification = props.notification;
+    const action = props.action;
+    if (action.action === "broadcast") {
+        return (
+            <Tooltip title={t("notifications_actions_not_supported")}>
+                <span><Button disabled>{action.label}</Button></span>
+            </Tooltip>
+        );
+    } else if (action.action === "view") {
+        return (
+            <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
+                <Button onClick={() => openUrl(action.url)}>{action.label}</Button>
+            </Tooltip>
+        );
+    } else if (action.action === "http") {
+        const method = action.method ?? "POST";
+        const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
+        return (
+            <Tooltip title={t("notifications_actions_http_request_title", { method: method, url: action.url })}>
+                <Button onClick={() => performHttpAction(notification, action)}>{label}</Button>
+            </Tooltip>
+        );
+    }
+    return null; // Others
+};
+
+const performHttpAction = async (notification, action) => {
+    console.log(`[Notifications] Performing HTTP user action`, action);
+    try {
+        updateActionStatus(notification, action, ACTION_PROGRESS_ONGOING, null);
+        const response = await fetch(action.url, {
+            method: action.method ?? "POST",
+            headers: action.headers ?? {},
+            body: action.body ?? ""
+        });
+        console.log(`[Notifications] HTTP user action response`, response);
+        const success = response.status >= 200 && response.status <= 299;
+        if (success) {
+            updateActionStatus(notification, action, ACTION_PROGRESS_SUCCESS, null);
+        } else {
+            updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: Unexpected response HTTP ${response.status}`);
+        }
+    } catch (e) {
+        console.log(`[Notifications] HTTP action failed`, e);
+        updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: ${e} Check developer console for details.`);
+    }
+};
+
+const updateActionStatus = (notification, action, progress, error) => {
+    notification.actions = notification.actions.map(a => {
+        if (a.id !== action.id) {
+            return a;
+        }
+        return { ...a, progress: progress, error: error };
+    });
+    subscriptionManager.updateNotification(notification);
+}
+
+const ACTION_PROGRESS_ONGOING = 1;
+const ACTION_PROGRESS_SUCCESS = 2;
+const ACTION_PROGRESS_FAILED = 3;
+
+const ACTION_LABEL_SUFFIX = {
+    [ACTION_PROGRESS_ONGOING]: " …",
+    [ACTION_PROGRESS_SUCCESS]: " ✔",
+    [ACTION_PROGRESS_FAILED]: " ❌"
+};
 
 const NoNotifications = (props) => {
     const { t } = useTranslation();

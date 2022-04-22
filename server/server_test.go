@@ -876,6 +876,26 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	require.Equal(t, "this is a unifiedpush text message", m.Message)
 }
 
+func TestServer_PublishActions_AndPoll(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{
+		"Actions": "view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65",
+	})
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, 2, len(m.Actions))
+	require.Equal(t, "view", m.Actions[0].Action)
+	require.Equal(t, "Open portal", m.Actions[0].Label)
+	require.Equal(t, "https://home.nest.com/", m.Actions[0].URL)
+	require.Equal(t, "http", m.Actions[1].Action)
+	require.Equal(t, "Turn down", m.Actions[1].Label)
+	require.Equal(t, "https://api.nest.com/device/XZ1D2", m.Actions[1].URL)
+	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
+}
+
 func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
@@ -909,6 +929,41 @@ func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
 	require.Equal(t, "mytopic", m.Topic)
 	require.Equal(t, "A message", m.Message)
 	require.Equal(t, 1, mailer.Count())
+}
+
+func TestServer_PublishAsJSON_WithActions(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{
+		"topic":"mytopic",
+		"message":"A message",
+		"actions": [
+			  {
+				"action": "view",
+				"label": "Open portal",
+				"url": "https://home.nest.com/"
+			  },
+			  {
+				"action": "http",
+				"label": "Turn down",
+				"url": "https://api.nest.com/device/XZ1D2",
+				"body": "target_temp_f=65"
+			  }
+		]
+	}`
+	response := request(t, s, "POST", "/", body, nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "mytopic", m.Topic)
+	require.Equal(t, "A message", m.Message)
+	require.Equal(t, 2, len(m.Actions))
+	require.Equal(t, "view", m.Actions[0].Action)
+	require.Equal(t, "Open portal", m.Actions[0].Label)
+	require.Equal(t, "https://home.nest.com/", m.Actions[0].URL)
+	require.Equal(t, "http", m.Actions[1].Action)
+	require.Equal(t, "Turn down", m.Actions[1].Label)
+	require.Equal(t, "https://api.nest.com/device/XZ1D2", m.Actions[1].URL)
+	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
 }
 
 func TestServer_PublishAsJSON_Invalid(t *testing.T) {

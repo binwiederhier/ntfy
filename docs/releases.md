@@ -8,7 +8,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Support for ntfy:// deep links ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks to [@Copephobia](https://github.com/Copephobia) for reporting)
+* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134), 
+  thanks to [@mrherman](https://github.com/mrherman) for reporting) 
+* Support for [ntfy:// deep links](https://ntfy.sh/docs/subscribe/phone/#ntfy-links) ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks 
+  to [@Copephobia](https://github.com/Copephobia) for reporting)
 * [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
 * Channel settings option to configure DND override, sounds, etc. ([#91](https://github.com/binwiederhier/ntfy/issues/91))
@@ -26,10 +29,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Russian (thanks to [@flamey](https://hosted.weblate.org/user/flamey/) and [@ilya.mikheev.coder](https://hosted.weblate.org/user/ilya.mikheev.coder/))
 
+**Thanks for testing:**
+
+Thanks to [@RasHas](https://github.com/RasHas) (aka @Shard), [@Fallenbagel](https://github.com/Fallenbagel), [@cmeis](https://github.com/cmeis),
+@poblabs, and everyone I forgot for testing.
+
 ## ntfy server v1.21.0 (UNRELEASED)
 
 **Features:**
 
+* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134), 
+  thanks to [@mrherman](https://github.com/mrherman) for reporting) 
 * Added ARMv6 build ([#200](https://github.com/binwiederhier/ntfy/issues/200), thanks to [@jcrubioa](https://github.com/jcrubioa) for reporting)
 * Web app internationalization support ([#189](https://github.com/binwiederhier/ntfy/issues/189))
 

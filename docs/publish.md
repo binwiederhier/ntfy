@@ -820,8 +820,8 @@ As of today, the following actions are supported:
 Here's an example of what that a notification with actions can look like:
 
 <figure markdown>
-  ![notification with actions](static/img/notification-with-tags.png){ width=500 }
-  <figcaption>XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</figcaption>
+  ![notification with actions](static/img/android-screenshot-notification-actions.png){ width=500 }
+  <figcaption>Notification with two user actions</figcaption>
 </figure>
 
 ### Defining actions

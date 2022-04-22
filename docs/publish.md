@@ -924,7 +924,7 @@ As an example, here's how you can create the above notification using this forma
     ```
  
 #### Using a JSON array
-Alternatively, the same actions can be defined as **JSON array** , if the notification is defined as part of the JSON body 
+Alternatively, the same actions can be defined as **JSON array**, if the notification is defined as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
 
 === "Command line (curl)"
@@ -1126,7 +1126,7 @@ for details.
 ### Open website/app
 The `view` action **opens a website or app when the action button is tapped**, e.g. a browser, a Google Maps location, or
 even a deep link into Twitter or a show ntfy topic. How exactly the action is handled depends on how Android and your 
-desktop browser treat the links. Normally it'll just a link in the browser. 
+desktop browser treat the links. Normally it'll just open a link in the browser. 
 
 Examples:
 
@@ -1134,6 +1134,7 @@ Examples:
 * `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
 * `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
 * `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
 * ...
 
 Here's an example using the [`X-Actions` header](#using-a-header):
@@ -1141,59 +1142,59 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 === "Command line (curl)"
     ```
     curl \
-        -d "You left the house. Turn down the A/C?" \
-        -H "Actions: view, Open portal, https://home.nest.com/" \
+        -d "Somebody retweetet your tweet." \
+        -H "Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" \
     ntfy.sh/myhome
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --actions="view, Open portal, https://home.nest.com/" \
+        --actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" \
         myhome \
-        "You left the house. Turn down the A/C?"
+        "Somebody retweetet your tweet."
     ```
 
 === "HTTP"
     ``` http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Actions: view, Open portal, https://home.nest.com/
+    Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392
 
-    You left the house. Turn down the A/C?
+    Somebody retweetet your tweet.
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/myhome', {
         method: 'POST',
-        body: 'You left the house. Turn down the A/C?',
+        body: 'Somebody retweetet your tweet.',
         headers: { 
-            'Actions': 'view, Open portal, https://home.nest.com/' 
+            'Actions': 'view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392' 
         }
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("You left the house. Turn down the A/C?"))
-    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/")
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Somebody retweetet your tweet."))
+    req.Header.Set("Actions", "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open portal, https://home.nest.com/" }
-    $body = "You left the house. Turn down the A/C?"
+    $headers = @{ Actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" }
+    $body = "Somebody retweetet your tweet."
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/myhome",
-        data="You left the house. Turn down the A/C?",
-        headers={ "Actions": "view, Open portal, https://home.nest.com/" })
+        data="Somebody retweetet your tweet.",
+        headers={ "Actions": "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" })
     ```
 
 === "PHP"
@@ -1203,8 +1204,8 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: view, Open portal, https://home.nest.com/",
-            'content' => 'You left the house. Turn down the A/C?'
+                "Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392",
+            'content' => 'Somebody retweetet your tweet.'
         ]
     ]));
     ```
@@ -1216,12 +1217,12 @@ And the same example using [JSON publishing](#publish-as-json):
     curl ntfy.sh \
       -d '{
         "topic": "myhome",
-        "message": "You left the house. Turn down the A/C?",
+        "message": "Somebody retweetet your tweet.",
         "actions": [
           {
             "action": "view",
-            "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "label": "Open Twitter",
+            "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
           }
         ]
       }'
@@ -1233,12 +1234,12 @@ And the same example using [JSON publishing](#publish-as-json):
         --actions '[
             {
                 "action": "view",
-                "label": "Open portal",
-                "url": "https://home.nest.com/"
+                "label": "Open Twitter",
+                "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
             }
         ]' \
         myhome \
-        "You left the house. Turn down the A/C?"
+        "Somebody retweetet your tweet."
     ```
 
 === "HTTP"
@@ -1248,12 +1249,12 @@ And the same example using [JSON publishing](#publish-as-json):
 
     {
         "topic": "myhome",
-        "message": "You left the house. Turn down the A/C?",
+        "message": "Somebody retweetet your tweet.",
         "actions": [
           {
             "action": "view",
-            "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "label": "Open Twitter",
+            "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
           }
         ]
     }
@@ -1265,12 +1266,12 @@ And the same example using [JSON publishing](#publish-as-json):
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "You left the house. Turn down the A/C?",
+            message": "Somebody retweetet your tweet.",
             actions: [
                 {
                     action: "view",
-                    label: "Open portal",
-                    url: "https://home.nest.com/"
+                    label: "Open Twitter",
+                    url: "https://twitter.com/binwiederhier/status/1467633927951163392"
                 }
             ]
         })
@@ -1284,12 +1285,12 @@ And the same example using [JSON publishing](#publish-as-json):
     
     body := `{
         "topic": "myhome",
-        "message": "You left the house. Turn down the A/C?",
+        "message": "Somebody retweetet your tweet.",
         "actions": [
           {
             "action": "view",
-            "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "label": "Open Twitter",
+            "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
           }
         ]
     }`
@@ -1302,12 +1303,12 @@ And the same example using [JSON publishing](#publish-as-json):
     $uri = "https://ntfy.sh"
     $body = @{
         "topic"="myhome"
-        "message"="You left the house. Turn down the A/C?"
+        "message"="Somebody retweetet your tweet."
         "actions"=@(
             @{
                 "action"="view"
-                "label"="Open portal"
-                "url"="https://home.nest.com/"
+                "label"="Open Twitter"
+                "url"="https://twitter.com/binwiederhier/status/1467633927951163392"
             }
         )
     } | ConvertTo-Json
@@ -1319,12 +1320,12 @@ And the same example using [JSON publishing](#publish-as-json):
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "myhome",
-            "message": "You left the house. Turn down the A/C?",
+            "message": "Somebody retweetet your tweet.",
             "actions": [
                 {
                     "action": "view",
-                    "label": "Open portal",
-                    "url": "https://home.nest.com/"
+                    "label": "Open Twitter",
+                    "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
                 }
             ]
         })
@@ -1339,12 +1340,12 @@ And the same example using [JSON publishing](#publish-as-json):
             'header' => "Content-Type: application/json",
             'content' => json_encode([
                 "topic": "myhome",
-                "message": "You left the house. Turn down the A/C?",
+                "message": "Somebody retweetet your tweet.",
                 "actions": [
                     [
                         "action": "view",
-                        "label": "Open portal",
-                        "url": "https://home.nest.com/"
+                        "label": "Open Twitter",
+                        "url": "https://twitter.com/binwiederhier/status/1467633927951163392"
                     ]
                 ]
             ])
@@ -1631,14 +1632,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
     curl \
         -d "Garage door has been open for 15 minutes. Close it?" \
-        -H "Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." \
+        -H "Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
         ntfy.sh/myhome
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --actions="http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." \
+        --actions="http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
         myhome \
         "Garage door has been open for 15 minutes. Close it?"
     ```
@@ -1647,7 +1648,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ``` http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..
+    Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={"action": "close"}
 
     Garage door has been open for 15 minutes. Close it?
     ```
@@ -1658,7 +1659,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
         method: 'POST',
         body: 'Garage door has been open for 15 minutes. Close it?',
         headers: { 
-            'Actions': 'http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..' 
+            'Actions': 'http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}' 
         }
     })
     ```
@@ -1666,14 +1667,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Garage door has been open for 15 minutes. Close it?"))
-    req.Header.Set("Actions", "http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..")
+    req.Header.Set("Actions", "http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." }
+    $headers = @{ Actions="http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" }
     $body = "Garage door has been open for 15 minutes. Close it?"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
@@ -1682,7 +1683,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ``` python
     requests.post("https://ntfy.sh/myhome",
         data="Garage door has been open for 15 minutes. Close it?",
-        headers={ "Actions": "http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk.." })
+        headers={ "Actions": "http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" })
     ```
 
 === "PHP"
@@ -1692,7 +1693,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: http, Cloor door, https://mygarage.lan/close, headers.Authorization=Bearer zAzsx1sk..",
+                "Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
             'content' => 'Garage door has been open for 15 minutes. Close it?'
         ]
     ]));
@@ -1710,10 +1711,12 @@ And the same example using [JSON publishing](#publish-as-json):
           {
             "action": "http",
             "label": "Close door",
-            "url": "https://mygarage.lan/close",
+            "url": "https://api.mygarage.lan/",
+            "method": "PUT",
             "headers": {
                 "Authorization": "Bearer zAzsx1sk.."
-            }
+            },
+            "body": "{\"action\": \"close\"}"
           }
         ]
       }'
@@ -1726,10 +1729,12 @@ And the same example using [JSON publishing](#publish-as-json):
             {
               "action": "http",
               "label": "Close door",
-              "url": "https://mygarage.lan/close",
+              "url": "https://api.mygarage.lan/",
+              "method": "PUT",
               "headers": {
                 "Authorization": "Bearer zAzsx1sk.."
-              }
+              },
+              "body": "{\"action\": \"close\"}"
             }
         ]' \
         myhome \
@@ -1748,10 +1753,12 @@ And the same example using [JSON publishing](#publish-as-json):
           {
             "action": "http",
             "label": "Close door",
-            "url": "https://mygarage.lan/close",
+            "url": "https://api.mygarage.lan/",
+            "method": "PUT",
             "headers": {
               "Authorization": "Bearer zAzsx1sk.."
-            }
+            },
+            "body": "{\"action\": \"close\"}"
           }
         ]
     }
@@ -1768,10 +1775,12 @@ And the same example using [JSON publishing](#publish-as-json):
               {
                 "action": "http",
                 "label": "Close door",
-                "url": "https://mygarage.lan/close",
+                "url": "https://api.mygarage.lan/",
+                "method": "PUT",
                 "headers": {
                   "Authorization": "Bearer zAzsx1sk.."
-                }
+                },
+                "body": "{\"action\": \"close\"}"
               }
             ]
         })
@@ -1790,10 +1799,12 @@ And the same example using [JSON publishing](#publish-as-json):
           {
             "action": "http",
             "label": "Close door",
-            "url": "https://mygarage.lan/close",
+            "method": "PUT",
+            "url": "https://api.mygarage.lan/",
             "headers": {
               "Authorization": "Bearer zAzsx1sk.."
-            }
+            },
+            "body": "{\"action\": \"close\"}"
           }
         ]
     }`
@@ -1811,10 +1822,12 @@ And the same example using [JSON publishing](#publish-as-json):
             @{
                 "action"="http",
                 "label"="Close door"
-                "url"="https://mygarage.lan/close"
+                "url"="https://api.mygarage.lan/"
+                "method"="PUT"
                 "headers"=@{
                   "Authorization"="Bearer zAzsx1sk.."
                 }
+                "body"="{\"action\": \"close\"}"
             }
           }
         )
@@ -1832,10 +1845,12 @@ And the same example using [JSON publishing](#publish-as-json):
                 {
                   "action": "http",
                   "label": "Close door",
-                  "url": "https://mygarage.lan/close",
+                  "url": "https://api.mygarage.lan/",
+                  "method": "PUT",
                   "headers": {
                     "Authorization": "Bearer zAzsx1sk.."
-                  }
+                  },
+                  "body": "{\"action\": \"close\"}"
                 }
             ]
         })
@@ -1855,10 +1870,12 @@ And the same example using [JSON publishing](#publish-as-json):
                     [
                         "action": "http",
                         "label": "Close door",
-                        "url": "https://mygarage.lan/close",
+                        "url": "https://api.mygarage.lan/",
+                        "method": "PUT",
                         "headers": [
                             "Authorization": "Bearer zAzsx1sk.."
-                         ]
+                         ],
+                        "body": "{\"action\": \"close\"}"
                     ]
                 ]
             ])
@@ -1875,7 +1892,7 @@ The `http` action supports the following fields:
 | `url`     | ✔️       | *string*           | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
 | `method`  | -️       | *GET/POST/PUT/...* | `GET`                     | HTTP method to use for request, **default is POST (!)**                                                                                                 |
 | `headers` | -️       | *map of strings*   | *see above*               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
-| `method`  | -️       | *string*           | `some body, somebody?`    | HTTP body                                                                                                                                               |
+| `body`    | -️       | *string*           | `some body, somebody?`    | HTTP body                                                                                                                                               |
 
 ## Click action
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
@@ -1892,6 +1909,7 @@ Examples:
 * `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
 * `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
 * `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
 * ...
 
 Here's an example that will open Reddit when the notification is clicked:

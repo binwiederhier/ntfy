@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
@@ -61,22 +60,26 @@ func parseActions(s string) (actions []*action, err error) {
 		return nil, err
 	}
 
-	// Add ID field
+	// Add ID field, ensure correct uppercase/lowercase
 	for i := range actions {
 		actions[i].ID = util.RandomString(actionIDLength)
+		actions[i].Action = strings.ToLower(actions[i].Action)
+		actions[i].Method = strings.ToUpper(actions[i].Method)
 	}
 
 	// Validate
 	if len(actions) > actionsMax {
-		return nil, fmt.Errorf("too many actions, only %d allowed", actionsMax)
+		return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "only %d actions allowed", actionsMax)
 	}
 	for _, action := range actions {
 		if !util.InStringList([]string{"view", "broadcast", "http"}, action.Action) {
-			return nil, fmt.Errorf("cannot parse actions: action '%s' unknown", action.Action)
+			return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "action '%s' unknown", action.Action)
 		} else if action.Label == "" {
-			return nil, fmt.Errorf("cannot parse actions: label must be set")
+			return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "parameter 'label' is required")
 		} else if util.InStringList([]string{"view", "http"}, action.Action) && action.URL == "" {
-			return nil, fmt.Errorf("parameter 'url' is required for action '%s'", action.Action)
+			return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "parameter 'url' is required for action '%s'", action.Action)
+		} else if action.Action == "http" && util.InStringList([]string{"GET", "HEAD"}, action.Method) && action.Body != "" {
+			return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "parameter 'body' cannot be set if method is %s", action.Method)
 		}
 	}
 
@@ -101,7 +104,7 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 		}
 		parts := util.SplitNoEmpty(rawAction, ",")
 		if len(parts) < 3 {
-			return nil, fmt.Errorf("cannot parse action: action requires at least keys 'action', 'label' and one parameter: %s", rawAction)
+			return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "action requires at least keys 'action', 'label' and one parameter: %s", rawAction)
 		}
 		for i, part := range parts {
 			key, value := util.SplitKV(part, "=")
@@ -131,10 +134,10 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 				case "body":
 					newAction.Body = value
 				default:
-					return nil, fmt.Errorf("cannot parse action: key '%s' not supported, please use JSON format instead", part)
+					return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "key '%s' unknown", key)
 				}
 			} else {
-				return nil, fmt.Errorf("cannot parse action: unknown phrase '%s'", part)
+				return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "unknown term '%s'", part)
 			}
 		}
 		actions = append(actions, newAction)

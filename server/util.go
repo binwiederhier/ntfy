@@ -121,6 +121,9 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 					newAction.Action = value
 				case "label":
 					newAction.Label = value
+				case "clear":
+					lvalue := strings.ToLower(value)
+					newAction.Clear = lvalue == "true" || lvalue == "yes" || lvalue == "1"
 				case "url":
 					newAction.URL = value
 				case "method":

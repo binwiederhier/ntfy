@@ -675,7 +675,8 @@ is the only required one:
         "priority": 4,
         "attach": "https://filesrv.lan/space.jpg",
         "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
       }'
     ```
 
@@ -692,7 +693,8 @@ is the only required one:
         "priority": 4,
         "attach": "https://filesrv.lan/space.jpg",
         "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
     }
     ```
 
@@ -708,7 +710,8 @@ is the only required one:
             "priority": 4,
             "attach": "https://filesrv.lan/space.jpg",
             "filename": "diskspace.jpg",
-            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+            "click": "https://homecamera.lan/xasds1h2xsSsa/",
+            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
         })
     })
     ```
@@ -727,7 +730,8 @@ is the only required one:
         "priority": 4,
         "attach": "https://filesrv.lan/space.jpg",
         "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/"
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
     }`
     req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
     http.DefaultClient.Do(req)
@@ -745,6 +749,7 @@ is the only required one:
             "filename"="diskspace.jpg"
             "tags"=@("warning","cd")
             "click"= "https://homecamera.lan/xasds1h2xsSsa/"
+            "actions"=@[@{ "action"="view", "label"="Admin panel", "url"="https://filesrv.lan/admin" }]
           } | ConvertTo-Json
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
@@ -760,7 +765,8 @@ is the only required one:
             "priority": 4,
             "attach": "https://filesrv.lan/space.jpg",
             "filename": "diskspace.jpg",
-            "click": "https://homecamera.lan/xasds1h2xsSsa/"
+            "click": "https://homecamera.lan/xasds1h2xsSsa/",
+            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
         })
     )
     ```
@@ -779,7 +785,8 @@ is the only required one:
                 "priority": 4,
                 "attach": "https://filesrv.lan/space.jpg",
                 "filename": "diskspace.jpg",
-                "click": "https://homecamera.lan/xasds1h2xsSsa/"
+                "click": "https://homecamera.lan/xasds1h2xsSsa/",
+                "actions": [["action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" ]]
             ])
         ]
     ]));
@@ -796,7 +803,7 @@ all the supported fields:
 | `title`    | -        | *string*                         | `Some title`                              | Message [title](#message-title)                                       |
 | `tags`     | -        | *string array*                   | `["tag1","tag2"]`                         | List of [tags](#tags-emojis) that may or not map to emojis            |
 | `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
-| `actions`  | -        | *JSON array*                     | *(see [actiom buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
+| `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
 | `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
@@ -854,7 +861,7 @@ As an example, here's how you can create the above notification using this forma
     ```
     curl \
         -d "You left the house. Turn down the A/C?" \
-        -H "Actions: view, Open portal, https://home.nest.com/; \
+        -H "Actions: view, Open portal, https://home.nest.com/, clear=true; \
                      http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
     ntfy.sh/myhome
     ```
@@ -862,7 +869,7 @@ As an example, here's how you can create the above notification using this forma
 === "ntfy CLI"
     ```
     ntfy publish \
-        --actions="view, Open portal, https://home.nest.com/; \
+        --actions="view, Open portal, https://home.nest.com/, clear=true; \
                    http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
         myhome \
         "You left the house. Turn down the A/C?"
@@ -872,7 +879,7 @@ As an example, here's how you can create the above notification using this forma
     ``` http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Actions: view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65
+    Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65
 
     You left the house. Turn down the A/C?
     ```
@@ -883,7 +890,7 @@ As an example, here's how you can create the above notification using this forma
         method: 'POST',
         body: 'You left the house. Turn down the A/C?',
         headers: { 
-            'Actions': 'view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65' 
+            'Actions': 'view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65' 
         }
     })
     ```
@@ -891,14 +898,14 @@ As an example, here's how you can create the above notification using this forma
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("You left the house. Turn down the A/C?"))
-    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65")
+    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" }
+    $headers = @{ Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" }
     $body = "You left the house. Turn down the A/C?"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
@@ -907,7 +914,7 @@ As an example, here's how you can create the above notification using this forma
     ``` python
     requests.post("https://ntfy.sh/myhome",
         data="You left the house. Turn down the A/C?",
-        headers={ "Actions": "view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" })
+        headers={ "Actions": "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" })
     ```
 
 === "PHP"
@@ -917,7 +924,7 @@ As an example, here's how you can create the above notification using this forma
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: view, Open portal, https://home.nest.com/; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65",
+                "Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65",
             'content' => 'You left the house. Turn down the A/C?'
         ]
     ]));
@@ -937,7 +944,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "view",
             "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "url": "https://home.nest.com/",
+            "clear": true
           },
           {
             "action": "http",
@@ -956,7 +964,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
             {
                 "action": "view",
                 "label": "Open portal",
-                "url": "https://home.nest.com/"
+                "url": "https://home.nest.com/",
+                "clear": true
             },
             {
                 "action": "http",
@@ -981,7 +990,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "view",
             "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "url": "https://home.nest.com/",
+            "clear": true
           },
           {
             "action": "http",
@@ -1004,7 +1014,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                 {
                     action: "view",
                     label: "Open portal",
-                    url: "https://home.nest.com/"
+                    url: "https://home.nest.com/",
+                    clear: true
                 },
                 {
                     action: "http",
@@ -1029,7 +1040,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "view",
             "label": "Open portal",
-            "url": "https://home.nest.com/"
+            "url": "https://home.nest.com/",
+            "clear": true
           },
           {
             "action": "http",
@@ -1054,6 +1066,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                 "action"="view"
                 "label"="Open portal"
                 "url"="https://home.nest.com/"
+                "clear"=true
             },
             @{
                 "action"="http",
@@ -1076,7 +1089,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                 {
                     "action": "view",
                     "label": "Open portal",
-                    "url": "https://home.nest.com/"
+                    "url": "https://home.nest.com/",
+                    "clear": true
                 },
                 {
                     "action": "http",
@@ -1102,7 +1116,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                     [
                         "action": "view",
                         "label": "Open portal",
-                        "url": "https://home.nest.com/"
+                        "url": "https://home.nest.com/",
+                        "clear": true
                     ],
                     [
                         "action": "http",
@@ -1355,11 +1370,12 @@ And the same example using [JSON publishing](#publish-as-json):
 
 The `view` action supports the following fields:
 
-| Field    | Required | Type     | Example               | Description                                    |
-|----------|----------|----------|-----------------------|------------------------------------------------|
-| `action` | ✔️       | *string* | `view`                | Action type (**must be `view`**)               |
-| `label`  | ✔️       | *string* | `Turn on light`       | Label of the action button in the notification |
-| `url`    | ✔️       | *URL*    | `https://example.com` | URL to open when action is tapped              |
+| Field    | Required | Type      | Default | Example               | Description                                      |
+|----------|----------|-----------|---------|-----------------------|--------------------------------------------------|
+| `action` | ✔️       | *string*  | -       | `view`                | Action type (**must be `view`**)                 |
+| `label`  | ✔️       | *string*  | -       | `Turn on light`       | Label of the action button in the notification   |
+| `url`    | ✔️       | *URL*     | -       | `https://example.com` | URL to open when action is tapped                |
+| `clear`  | -️       | *boolean* | `false` | `true`                | Clear notification after action button is tapped |
 
 ### Send Android broadcast
 The `broadcast` action **sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
@@ -1368,8 +1384,13 @@ or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.
 you can do everything your phone is capable of. Examples include taking pictures, launching/killing apps, change device
 settings, write/read files, etc.
 
-By default, the intent **`io.heckel.ntfy.USER_ACTION`** is broadcast, though this can be changed with the `intent` parameter (see below).
+By default, the intent action **`io.heckel.ntfy.USER_ACTION`** is broadcast, though this can be changed with the `intent` parameter (see below).
 To send extras, use the `extras` parameter. Currently, **only string extras are supported**.
+
+!!! info
+    If you have no idea what this is, check out the [automation apps](subscribe/phone.md#automation-apps) section, which shows
+    how to integrate Tasker and MacroDroid **with screenshots**. The action button integration is identical, except that
+    you have to use **the intent action `io.heckel.ntfy.USER_ACTION`** instead.
 
 Here's an example using the [`X-Actions` header](#using-a-header):
 
@@ -1612,12 +1633,13 @@ And the same example using [JSON publishing](#publish-as-json):
 
 The `broadcast` action supports the following fields:
 
-| Field    | Required | Type             | Example                 | Description                                                                                                                                                                            |
-|----------|----------|------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `action` | ✔️       | *string*         | `broadcast`             | Action type (**must be `broadcast`**)                                                                                                                                                  |
-| `label`  | ✔️       | *string*         | `Turn on light`         | Label of the action button in the notification                                                                                                                                         |
-| `intent` | -️       | *string*         | `com.example.AN_INTENT` | Android intent name, **default is `io.heckel.ntfy.USER_ACTION`**                                                                                                                       |
-| `extras` | -️       | *map of strings* | *see above*             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
+| Field    | Required | Type             | Default                      | Example                 | Description                                                                                                                                                                            |
+|----------|----------|------------------|------------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `action` | ✔️       | *string*         | -                            | `broadcast`             | Action type (**must be `broadcast`**)                                                                                                                                                  |
+| `label`  | ✔️       | *string*         | -                            | `Turn on light`         | Label of the action button in the notification                                                                                                                                         |
+| `intent` | -️       | *string*         | `io.heckel.ntfy.USER_ACTION` | `com.example.AN_INTENT` | Android intent name, **default is `io.heckel.ntfy.USER_ACTION`**                                                                                                                       |
+| `extras` | -️       | *map of strings* | -                            | *see above*             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
+| `clear`  | -️       | *boolean*        | `false`                      | `true`                  | Clear notification after action button is tapped                                                                                                                                       |
 
 ### Send HTTP request
 The `http` action **sends a HTTP request when the action button is tapped**. You can use this to trigger REST APIs
@@ -1885,14 +1907,15 @@ And the same example using [JSON publishing](#publish-as-json):
 
 The `http` action supports the following fields:
 
-| Field     | Required | Type               | Example                   | Description                                                                                                                                             |
-|-----------|----------|--------------------|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `action`  | ✔️       | *string*           | `http`                    | Action type (**must be `http`**)                                                                                                                        |
-| `label`   | ✔️       | *string*           | `Open garage door`        | Label of the action button in the notification                                                                                                          |
-| `url`     | ✔️       | *string*           | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
-| `method`  | -️       | *GET/POST/PUT/...* | `GET`                     | HTTP method to use for request, **default is POST (!)**                                                                                                 |
-| `headers` | -️       | *map of strings*   | *see above*               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
-| `body`    | -️       | *string*           | `some body, somebody?`    | HTTP body                                                                                                                                               |
+| Field     | Required | Type               | Default   | Example                   | Description                                                                                                                                             |
+|-----------|----------|--------------------|-----------|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `action`  | ✔️       | *string*           | -         | `http`                    | Action type (**must be `http`**)                                                                                                                        |
+| `label`   | ✔️       | *string*           | -         | `Open garage door`        | Label of the action button in the notification                                                                                                          |
+| `url`     | ✔️       | *string*           | -         | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
+| `method`  | -️       | *GET/POST/PUT/...* | `POST` ⚠️ | `GET`                     | HTTP method to use for request, **default is POST** ⚠️                                                                                                  |
+| `headers` | -️       | *map of strings*   | -         | *see above*               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
+| `body`    | -️       | *string*           | *empty*   | `some body, somebody?`    | HTTP body                                                                                                                                               |
+| `clear`   | -️       | *boolean*          | `false`   | `true`                    | Clear notification after HTTP request succeeds. If the request fails, the notification is not cleared.                                                  |
 
 ## Click action
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 

@@ -45,8 +45,9 @@ type attachment struct {
 
 type action struct {
 	ID      string            `json:"id"`
-	Action  string            `json:"action"`
-	Label   string            `json:"label"`             // "view", "broadcast", or "http"
+	Action  string            `json:"action"`            // "view", "broadcast", or "http"
+	Label   string            `json:"label"`             // action button label
+	Clear   bool              `json:"clear"`             // clear notification after successful execution
 	URL     string            `json:"url,omitempty"`     // used in "view" and "http" actions
 	Method  string            `json:"method,omitempty"`  // used in "http" action, default is POST (!)
 	Headers map[string]string `json:"headers,omitempty"` // used in "http" action

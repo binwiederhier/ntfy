@@ -23,6 +23,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Error in sending test notification in different languages ([#209](https://github.com/binwiederhier/ntfy/issues/209), 
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
 * "[x] Instant delivery in doze mode" checkbox does not work properly ([#211](https://github.com/binwiederhier/ntfy/issues/211))
+* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to 
+  [@cmeis](https://github.com/cmeis) for reporting)
 
 **Additional translations:**
 
@@ -31,7 +33,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Thanks for testing:**
 
-Thanks to [@RasHas](https://github.com/RasHas) (aka @Shard), [@Fallenbagel](https://github.com/Fallenbagel), [@cmeis](https://github.com/cmeis),
+Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@Fallenbagel](https://github.com/Fallenbagel), [@cmeis](https://github.com/cmeis),
 @poblabs, and everyone I forgot for testing.
 
 ## ntfy server v1.21.0 (UNRELEASED)
@@ -48,6 +50,8 @@ Thanks to [@RasHas](https://github.com/RasHas) (aka @Shard), [@Fallenbagel](http
 * Web app: English language strings fixes, additional descriptions for settings ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 * Web app: Show error message snackbar when sending test notification fails ([#205](https://github.com/binwiederhier/ntfy/issues/205), thanks to [@cmeis](https://github.com/cmeis))
 * Web app: basic URL validation in user management ([#204](https://github.com/binwiederhier/ntfy/issues/204), thanks to [@cmeis](https://github.com/cmeis))
+* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to 
+  [@cmeis](https://github.com/cmeis) for reporting)
 
 **Translations (web app):**
 
@@ -108,11 +112,11 @@ Released Apr 6, 2022
 
 **Bugs:**
 
-* Added `EXPOSE 80/tcp` to Dockerfile to support auto-discovery in [Traefik](https://traefik.io/) ([#195](https://github.com/binwiederhier/ntfy/issues/195), thanks to [@RasHas](https://github.com/RasHas))
+* Added `EXPOSE 80/tcp` to Dockerfile to support auto-discovery in [Traefik](https://traefik.io/) ([#195](https://github.com/binwiederhier/ntfy/issues/195), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d))
 
 **Documentation:**
 
-* Added docker-compose example to [install instructions](install.md#docker) ([#194](https://github.com/binwiederhier/ntfy/pull/194), thanks to [@RasHas](https://github.com/RasHas))
+* Added docker-compose example to [install instructions](install.md#docker) ([#194](https://github.com/binwiederhier/ntfy/pull/194), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d))
 
 **Integrations:**
 

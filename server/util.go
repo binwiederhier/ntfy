@@ -126,6 +126,9 @@ func parseActionsFromSimple(s string) ([]*action, error) {
 					newAction.Label = value
 				case "clear":
 					lvalue := strings.ToLower(value)
+					if !util.InStringList([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
+						return nil, wrapErrHTTP(errHTTPBadRequestActionsInvalid, "'clear=%s' not allowed", value)
+					}
 					newAction.Clear = lvalue == "true" || lvalue == "yes" || lvalue == "1"
 				case "url":
 					newAction.URL = value

@@ -25,6 +25,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * "[x] Instant delivery in doze mode" checkbox does not work properly ([#211](https://github.com/binwiederhier/ntfy/issues/211))
 * Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to 
   [@cmeis](https://github.com/cmeis) for reporting)
+* Action "view" with "clear=true" does not work on some phones ([#220](https://github.com/binwiederhier/ntfy/issues/220), thanks to 
+  [@cmeis](https://github.com/cmeis) for reporting)
 
 **Additional translations:**
 
@@ -33,7 +35,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Thanks for testing:**
 
-Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@Fallenbagel](https://github.com/Fallenbagel), [@cmeis](https://github.com/cmeis),
+Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](https://github.com/cmeis),
 @poblabs, and everyone I forgot for testing.
 
 ## ntfy server v1.21.0 (UNRELEASED)

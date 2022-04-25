@@ -56,6 +56,7 @@ help:
 	@echo "  make install-armv7           - Copy armv7 binary from dist/ to /usr/bin/ntfy"
 	@echo "  make install-arm64           - Copy arm64 binary from dist/ to /usr/bin/ntfy"
 	@echo "  make install-deb-amd64       - Install .deb from dist/ (amd64 only)"
+	@echo "  make install-deb-armv6       - Install .deb from dist/ (armv6 only)"
 	@echo "  make install-deb-armv7       - Install .deb from dist/ (armv7 only)"
 	@echo "  make install-deb-arm64       - Install .deb from dist/ (arm64 only)"
 
@@ -207,10 +208,10 @@ install-amd64: remove-binary
 	sudo cp -a dist/ntfy_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
 
 install-armv6: remove-binary
-	sudo cp -a dist/ntfy_armv6_linux_armv6/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_armv6_linux_arm_6/ntfy /usr/bin/ntfy
 
 install-armv7: remove-binary
-	sudo cp -a dist/ntfy_armv7_linux_armv7/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_armv7_linux_arm_7/ntfy /usr/bin/ntfy
 
 install-arm64: remove-binary
 	sudo cp -a dist/ntfy_arm64_linux_arm64/ntfy /usr/bin/ntfy
@@ -220,6 +221,9 @@ remove-binary:
 
 install-amd64-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_amd64.deb
+
+install-armv6-deb: purge-package
+	sudo dpkg -i dist/ntfy_*_linux_armv6.deb
 
 install-armv7-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_armv7.deb

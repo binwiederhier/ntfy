@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/olebedev/when v0.0.0-20211212231525-59bd4edcf9d6
 	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.4.8
+	github.com/urfave/cli/v2 v2.4.7
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c

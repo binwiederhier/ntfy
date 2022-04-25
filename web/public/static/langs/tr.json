@@ -150,5 +150,7 @@
     "priority_default": "öntanımlı",
     "prefs_notifications_min_priority_description_max": "Öncelik 5 (en fazla) ise bildirimleri göster",
     "prefs_notifications_delete_after_never_description": "Bildirimler asla otomatik olarak silinmez",
-    "priority_high": "yüksek"
+    "priority_high": "yüksek",
+    "notifications_actions_not_supported": "Eylem, web uygulamasında desteklenmiyor",
+    "notifications_actions_http_request_title": "{{url}} adresine HTTP {{method}} gönder"
 }

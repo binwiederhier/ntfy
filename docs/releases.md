@@ -43,7 +43,7 @@ Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](http
 -->
 
 
-## ntfy server v1.21.0
+## ntfy server v1.21.1
 Released Apr 24, 2022
 
 **Features:**

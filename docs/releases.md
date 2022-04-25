@@ -40,21 +40,25 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](https://github.com/cmeis),
 @poblabs, and everyone I forgot for testing.
 
-## ntfy server v1.21.0 (UNRELEASED)
+-->
+
+
+## ntfy server v1.21.0
+Released Apr 24, 2022
 
 **Features:**
 
-* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134), 
-  thanks to [@mrherman](https://github.com/mrherman) for reporting) 
+* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134),
+  thanks to [@mrherman](https://github.com/mrherman) for reporting)
 * Added ARMv6 build ([#200](https://github.com/binwiederhier/ntfy/issues/200), thanks to [@jcrubioa](https://github.com/jcrubioa) for reporting)
-* Web app internationalization support ([#189](https://github.com/binwiederhier/ntfy/issues/189))
+* Web app internationalization support 🇧🇬 🇩🇪 🇺🇸 🌎 ([#189](https://github.com/binwiederhier/ntfy/issues/189))
 
 **Bugs:**
 
 * Web app: English language strings fixes, additional descriptions for settings ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 * Web app: Show error message snackbar when sending test notification fails ([#205](https://github.com/binwiederhier/ntfy/issues/205), thanks to [@cmeis](https://github.com/cmeis))
 * Web app: basic URL validation in user management ([#204](https://github.com/binwiederhier/ntfy/issues/204), thanks to [@cmeis](https://github.com/cmeis))
-* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to 
+* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to
   [@cmeis](https://github.com/cmeis) for reporting)
 
 **Translations (web app):**
@@ -68,7 +72,17 @@ Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](http
 * Spanish (thanks to [@rogeliodh](https://github.com/rogeliodh))
 * Turkish (thanks to [@ersen](https://ersen.moe/))
 
--->
+**Integrations:**
+
+[Apprise](https://github.com/caronc/apprise) support was fully released in [v0.9.8.2](https://github.com/caronc/apprise/releases/tag/v0.9.8.2)
+of Apprise. Thanks to [@particledecay](https://github.com/particledecay) and [@caronc](https://github.com/caronc) for their fantastic work. 
+You can try it yourself like this:
+
+```
+pip3 install apprise
+apprise -b "Hi there" ntfys://mytopic
+```
+
 
 ## ntfy Android app v1.11.0
 Released Apr 7, 2022

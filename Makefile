@@ -183,13 +183,11 @@ staticcheck: .PHONY
 
 # Releasing targets
 
-release: release-deps
+release: clean server-deps release-check-tags docs web check
 	goreleaser release --rm-dist --debug
 
-release-snapshot: release-deps
+release-snapshot: clean server-deps docs web check
 	goreleaser release --snapshot --skip-publish --rm-dist --debug
-
-release-deps: clean server-deps release-check-tags docs web check
 
 release-check-tags:
 	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))

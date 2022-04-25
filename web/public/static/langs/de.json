@@ -150,5 +150,7 @@
     "prefs_notifications_delete_after_three_hours_description": "Benachrichtigungen werden nach drei Stunden automatisch gelöscht",
     "prefs_notifications_delete_after_one_day_description": "Benachrichtigungen werden nach einem Tag automatisch gelöscht",
     "prefs_notifications_delete_after_one_week_description": "Benachrichtigungen werden nach einer Woche automatisch gelöscht",
-    "priority_min": "min"
+    "priority_min": "min",
+    "notifications_actions_not_supported": "Diese Aktion wird in der Web-App nicht unterstützt",
+    "notifications_actions_http_request_title": "Sende HTTP {{method}} an {{url}}"
 }

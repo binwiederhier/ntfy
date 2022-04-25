@@ -27,6 +27,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
   [@cmeis](https://github.com/cmeis) for reporting)
 * Action "view" with "clear=true" does not work on some phones ([#220](https://github.com/binwiederhier/ntfy/issues/220), thanks to 
   [@cmeis](https://github.com/cmeis) for reporting)
+* Do not group foreground service notification with others ([#219](https://github.com/binwiederhier/ntfy/issues/219), thanks to 
+  [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)
 
 **Additional translations:**
 

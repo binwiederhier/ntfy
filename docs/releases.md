@@ -2,36 +2,43 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-<!--
+## ntfy Android app v1.12.0
+Released Apr 25, 2022
 
-## ntfy Android app v1.12.0 (UNRELEASED)
+The main feature in this Android release is [Action Buttons](https://ntfy.sh/docs/publish/#action-buttons), a feature
+that allows users to add actions to the notifications. Actions can be to view a website or app, send a broadcast, or
+send a HTTP request. 
+
+We also added support for [ntfy:// deep links](https://ntfy.sh/docs/subscribe/phone/#ntfy-links), added three more 
+languages and fixed a ton of bugs. 
 
 **Features:**
 
-* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134), 
-  thanks to [@mrherman](https://github.com/mrherman) for reporting) 
-* Support for [ntfy:// deep links](https://ntfy.sh/docs/subscribe/phone/#ntfy-links) ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks 
+* Custom notification [action buttons](https://ntfy.sh/docs/publish/#action-buttons) ([#134](https://github.com/binwiederhier/ntfy/issues/134),
+  thanks to [@mrherman](https://github.com/mrherman) for reporting)
+* Support for [ntfy:// deep links](https://ntfy.sh/docs/subscribe/phone/#ntfy-links) ([#20](https://github.com/binwiederhier/ntfy/issues/20), thanks
   to [@Copephobia](https://github.com/Copephobia) for reporting)
 * [Fastlane metadata](https://hosted.weblate.org/projects/ntfy/android-fastlane/) can now be translated too ([#198](https://github.com/binwiederhier/ntfy/issues/198),
-  thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting) 
+  thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
 * Channel settings option to configure DND override, sounds, etc. ([#91](https://github.com/binwiederhier/ntfy/issues/91))
 
 **Bugs:**
 
-* Validate URLs when changing default server and server in user management ([#193](https://github.com/binwiederhier/ntfy/issues/193), 
+* Validate URLs when changing default server and server in user management ([#193](https://github.com/binwiederhier/ntfy/issues/193),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
-* Error in sending test notification in different languages ([#209](https://github.com/binwiederhier/ntfy/issues/209), 
+* Error in sending test notification in different languages ([#209](https://github.com/binwiederhier/ntfy/issues/209),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
 * "[x] Instant delivery in doze mode" checkbox does not work properly ([#211](https://github.com/binwiederhier/ntfy/issues/211))
-* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to 
+* Disallow "http" GET/HEAD actions with body ([#221](https://github.com/binwiederhier/ntfy/issues/221), thanks to
   [@cmeis](https://github.com/cmeis) for reporting)
-* Action "view" with "clear=true" does not work on some phones ([#220](https://github.com/binwiederhier/ntfy/issues/220), thanks to 
+* Action "view" with "clear=true" does not work on some phones ([#220](https://github.com/binwiederhier/ntfy/issues/220), thanks to
   [@cmeis](https://github.com/cmeis) for reporting)
-* Do not group foreground service notification with others ([#219](https://github.com/binwiederhier/ntfy/issues/219), thanks to 
+* Do not group foreground service notification with others ([#219](https://github.com/binwiederhier/ntfy/issues/219), thanks to
   [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)
 
 **Additional translations:**
 
+* Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Russian (thanks to [@flamey](https://hosted.weblate.org/user/flamey/) and [@ilya.mikheev.coder](https://hosted.weblate.org/user/ilya.mikheev.coder/))
 
@@ -40,11 +47,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](https://github.com/cmeis),
 @poblabs, and everyone I forgot for testing.
 
--->
-
-
 ## ntfy server v1.21.2
 Released Apr 24, 2022
+
+In this release, the web app got translation support and was translated into 9 languages already 🇧🇬 🇩🇪 🇺🇸 🌎. 
+It also re-adds support for ARMv6, and adds server-side support for Action Buttons. [Action Buttons](https://ntfy.sh/docs/publish/#action-buttons)
+is a feature that will be released in the Android app soon. It allows users to add actions to the notifications. 
+Limited support is available in the web app.
 
 **Features:**
 

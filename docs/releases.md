@@ -43,7 +43,7 @@ Thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) (aka @Shard), [@cmeis](http
 -->
 
 
-## ntfy server v1.21.1
+## ntfy server v1.21.2
 Released Apr 24, 2022
 
 **Features:**
@@ -82,7 +82,6 @@ You can try it yourself like this (detailed usage in the [Apprise wiki](https://
 pip3 install apprise
 apprise -b "Hi there" ntfys://mytopic
 ```
-
 
 ## ntfy Android app v1.11.0
 Released Apr 7, 2022

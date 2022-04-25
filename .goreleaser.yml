@@ -138,14 +138,24 @@ dockers:
     goarm: 7
     build_flag_templates:
       - "--platform=linux/arm/v7"
+  - image_templates:
+      - &armv6_image "binwiederhier/ntfy:{{ .Tag }}-armv6"
+    use: buildx
+    dockerfile: Dockerfile
+    goarch: arm
+    goarm: 6
+    build_flag_templates:
+      - "--platform=linux/arm/v6"
 docker_manifests:
   - name_template: "binwiederhier/ntfy:latest"
     image_templates:
       - *amd64_image
       - *arm64v8_image
       - *armv7_image
+      - *armv6_image
   - name_template: "binwiederhier/ntfy:{{ .Tag }}"
     image_templates:
       - *amd64_image
       - *arm64v8_image
       - *armv7_image
+      - *armv6_image

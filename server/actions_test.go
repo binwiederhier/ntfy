@@ -67,7 +67,7 @@ func TestParseActions(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(actions))
 	require.Equal(t, "http", actions[0].Action)
-	require.Equal(t, `Look ma, \"quotes\"; and semicolons`, actions[0].Label)
+	require.Equal(t, `Look ma, "quotes"; and semicolons`, actions[0].Label)
 	require.Equal(t, `http://example.com`, actions[0].URL)
 
 	// Single quotes
@@ -75,7 +75,7 @@ func TestParseActions(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(actions))
 	require.Equal(t, "http", actions[0].Action)
-	require.Equal(t, `"quotes" and \'single quotes\'`, actions[0].Label)
+	require.Equal(t, `"quotes" and 'single quotes'`, actions[0].Label)
 	require.Equal(t, `http://example.com`, actions[0].URL)
 
 	// Single quotes (JSON)

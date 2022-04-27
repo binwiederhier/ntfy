@@ -251,7 +251,7 @@ func (p *actionParser) parseQuotedValue(quote rune) (value string, last bool, er
 			err = fmt.Errorf("unexpected end of input, quote started at position %d", start)
 			return
 		} else if r == quote && prev != '\\' {
-			value = p.input[start:p.pos]
+			value = strings.ReplaceAll(p.input[start:p.pos], "\\"+string(quote), string(quote)) // \" -> "
 			p.pos += w
 
 			// Advance until section end (after "," or ";")

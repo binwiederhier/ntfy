@@ -150,5 +150,7 @@
     "priority_default": "predeterminada",
     "prefs_notifications_delete_after_one_day_description": "Las notificaciones se eliminan automáticamente después de un día",
     "prefs_notifications_delete_after_one_week_description": "Las notificaciones se eliminan automáticamente después de una semana",
-    "priority_low": "baja"
+    "priority_low": "baja",
+    "notifications_actions_not_supported": "Acción no soportada en la aplicación web",
+    "notifications_actions_http_request_title": "Enviar HTTP {{method}} a {{url}}"
 }

@@ -61,7 +61,7 @@ func parseActions(s string) (actions []*action, err error) {
 	}
 	for _, action := range actions {
 		if !util.InStringList(actionsAll, action.Action) {
-			return nil, fmt.Errorf("action '%s' unknown", action.Action)
+			return nil, fmt.Errorf("parameter 'action' cannot be '%s', valid values are 'view', 'broadcast' and 'http'", action.Action)
 		} else if action.Label == "" {
 			return nil, fmt.Errorf("parameter 'label' is required")
 		} else if util.InStringList(actionsWithURL, action.Action) && action.URL == "" {
@@ -78,7 +78,7 @@ func parseActions(s string) (actions []*action, err error) {
 func parseActionsFromJSON(s string) ([]*action, error) {
 	actions := make([]*action, 0)
 	if err := json.Unmarshal([]byte(s), &actions); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("JSON error: %w", err)
 	}
 	return actions, nil
 }
@@ -102,7 +102,7 @@ func parseActionsFromJSON(s string) ([]*action, error) {
 //   https://blog.gopheracademy.com/advent-2014/parsers-lexers/
 func parseActionsFromSimple(s string) ([]*action, error) {
 	if !utf8.ValidString(s) {
-		return nil, errors.New("invalid string")
+		return nil, errors.New("invalid utf-8 string")
 	}
 	parser := &actionParser{
 		pos:   0,
@@ -177,7 +177,7 @@ func populateAction(newAction *action, section int, key, value string) error {
 		case "clear":
 			lvalue := strings.ToLower(value)
 			if !util.InStringList([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
-				return fmt.Errorf("'clear=%s' not allowed", value)
+				return fmt.Errorf("parameter 'clear' cannot be '%s', only boolean values are allowed (true/yes/1/false/no/0)", value)
 			}
 			newAction.Clear = lvalue == "true" || lvalue == "yes" || lvalue == "1"
 		case "url":

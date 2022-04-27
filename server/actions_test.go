@@ -112,15 +112,17 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, `http://google.com`, actions[0].URL)
 
 	// Multiple actions, awkward spacing
-	actions, err = parseActions(`http , 'Make love, not war 💙🫤' , https://ntfy.sh ; view, " yo ", https://x.org`)
+	actions, err = parseActions(`http , 'Make love, not war 💙🫤' , https://ntfy.sh ; view, " yo ", https://x.org, clear=true`)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(actions))
 	require.Equal(t, "http", actions[0].Action)
 	require.Equal(t, `Make love, not war 💙🫤`, actions[0].Label)
 	require.Equal(t, `https://ntfy.sh`, actions[0].URL)
+	require.Equal(t, false, actions[0].Clear)
 	require.Equal(t, "view", actions[1].Action)
 	require.Equal(t, " yo ", actions[1].Label)
 	require.Equal(t, `https://x.org`, actions[1].URL)
+	require.Equal(t, true, actions[1].Clear)
 
 	// Invalid syntax
 	_, err = parseActions(`label="Out of order!" x, action="http", url=http://example.com`)
@@ -136,7 +138,7 @@ func TestParseActions(t *testing.T) {
 	require.EqualError(t, err, "term 'what is this anyway' unknown")
 
 	_, err = parseActions(`fdsfdsf`)
-	require.EqualError(t, err, "action 'fdsfdsf' unknown")
+	require.EqualError(t, err, "parameter 'action' cannot be 'fdsfdsf', valid values are 'view', 'broadcast' and 'http'")
 
 	_, err = parseActions(`aaa=a, "bbb, 'ccc, ddd, eee "`)
 	require.EqualError(t, err, "key 'aaa' unknown")
@@ -152,4 +154,23 @@ func TestParseActions(t *testing.T) {
 
 	_, err = parseActions(`''";,;"`)
 	require.EqualError(t, err, "unexpected character '\"' at position 2")
+
+	_, err = parseActions(`action=http, label=a label, body=somebody`)
+	require.EqualError(t, err, "parameter 'url' is required for action 'http'")
+
+	_, err = parseActions(`action=http, label=a label, url=http://ntfy.sh, method=HEAD, body=somebody`)
+	require.EqualError(t, err, "parameter 'body' cannot be set if method is HEAD")
+
+	_, err = parseActions(`[ invalid json ]`)
+	require.EqualError(t, err, "JSON error: invalid character 'i' looking for beginning of value")
+
+	_, err = parseActions(`[ { "some": "object" } ]`)
+	require.EqualError(t, err, "parameter 'action' cannot be '', valid values are 'view', 'broadcast' and 'http'")
+
+	_, err = parseActions("\x00\x01\xFFx\xFE")
+	require.EqualError(t, err, "invalid utf-8 string")
+
+	_, err = parseActions(`http, label, http://x.org, clear=x`)
+	require.EqualError(t, err, "parameter 'clear' cannot be 'x', only boolean values are allowed (true/yes/1/false/no/0)")
+
 }

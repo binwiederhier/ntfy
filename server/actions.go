@@ -118,8 +118,6 @@ func (p *actionParser) Parse() ([]*action, error) {
 		a, err := p.parseAction()
 		if err != nil {
 			return nil, err
-		} else if a == nil {
-			return actions, err
 		}
 		actions = append(actions, a)
 	}

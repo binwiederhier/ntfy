@@ -2,6 +2,22 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+<!--
+
+## ntfy Android app v1.13.0 (UNRELEASED)
+
+Bugs:
+* Accurate naming of "mute notifications" from "pause notifications" ([#224](https://github.com/binwiederhier/ntfy/issues/224), 
+  thanks to [@shadow00](https://github.com/shadow00) for reporting)
+
+## ntfy server v1.22.0 (UNRELEASED)
+
+**Features:**
+
+* Better parsing of the user actions, allowing quotes (no ticket)
+
+-->
+
 ## ntfy Android app v1.12.0
 Released Apr 25, 2022
 

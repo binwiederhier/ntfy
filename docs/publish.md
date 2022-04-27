@@ -850,27 +850,32 @@ To define actions using the `X-Actions` header (or any of its aliases: `Actions`
     <action1>, <label1>, paramN=... [; <action2>, <label2>, ...]
     ```
 
-The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and `http` action.
-The format has **some limitations**: You cannot use `,` or `;` in any of the values, and depending on your language/library, UTF-8
-characters may not work. Use the [JSON array format](#using-a-json-array) instead to overcome these limitations.
+Multiple actions are separated by a semicolon (`;`), and key/value pairs are separated by commas (`,`). Values may be 
+quoted with double quotes (`"`) or single quotes (`'`) if the value itself contains commas or semicolons. 
+
+The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and 
+`http` action. The only limitation of this format is that depending on your language/library, UTF-8 characters may not 
+work. If they don't, use the [JSON array format](#using-a-json-array) instead.
 
 As an example, here's how you can create the above notification using this format. Refer to the [`view` action](#open-websiteapp) and 
 [`http` action](#send-http-request) section for details on the specific actions:
 
 === "Command line (curl)"
     ```
+    body='{"temperature": 65}'
     curl \
         -d "You left the house. Turn down the A/C?" \
         -H "Actions: view, Open portal, https://home.nest.com/, clear=true; \
-                     http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
-    ntfy.sh/myhome
+                     http, Turn down, https://api.nest.com/, body='$body'" \
+        ntfy.sh/myhome
     ```
 
 === "ntfy CLI"
     ```
+    body='{"temperature": 65}'
     ntfy publish \
         --actions="view, Open portal, https://home.nest.com/, clear=true; \
-                   http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" \
+                   http, Turn down, https://api.nest.com/, body='$body'" \
         myhome \
         "You left the house. Turn down the A/C?"
     ```
@@ -879,7 +884,7 @@ As an example, here's how you can create the above notification using this forma
     ``` http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65
+    Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{"temperature": 65}'
 
     You left the house. Turn down the A/C?
     ```
@@ -890,7 +895,7 @@ As an example, here's how you can create the above notification using this forma
         method: 'POST',
         body: 'You left the house. Turn down the A/C?',
         headers: { 
-            'Actions': 'view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65' 
+            'Actions': 'view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body=\'{"temperature": 65}\'' 
         }
     })
     ```
@@ -898,14 +903,14 @@ As an example, here's how you can create the above notification using this forma
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("You left the house. Turn down the A/C?"))
-    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65")
+    req.Header.Set("Actions", "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" }
+    $headers = @{ Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'" }
     $body = "You left the house. Turn down the A/C?"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
@@ -914,7 +919,7 @@ As an example, here's how you can create the above notification using this forma
     ``` python
     requests.post("https://ntfy.sh/myhome",
         data="You left the house. Turn down the A/C?",
-        headers={ "Actions": "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65" })
+        headers={ "Actions": "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'" })
     ```
 
 === "PHP"
@@ -924,7 +929,7 @@ As an example, here's how you can create the above notification using this forma
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/device/XZ1D2, body=target_temp_f=65",
+                "Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'",
             'content' => 'You left the house. Turn down the A/C?'
         ]
     ]));
@@ -950,8 +955,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "http",
             "label": "Turn down",
-            "url": "https://api.nest.com/device/XZ1D2",
-            "body": "target_temp_f=65"
+            "url": "https://api.nest.com/",
+            "body": "{\"temperature\": 65}"
           }
         ]
       }'
@@ -970,8 +975,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
             {
                 "action": "http",
                 "label": "Turn down",
-                "url": "https://api.nest.com/device/XZ1D2",
-                "body": "target_temp_f=65"
+                "url": "https://api.nest.com/",
+                "body": "{\"temperature\": 65}"
             }
         ]' \
         myhome \
@@ -996,8 +1001,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "http",
             "label": "Turn down",
-            "url": "https://api.nest.com/device/XZ1D2",
-            "body": "target_temp_f=65"
+            "url": "https://api.nest.com/",
+            "body": "{\"temperature\": 65}"
           }
         ]
     }
@@ -1020,8 +1025,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                 {
                     action: "http",
                     label: "Turn down",
-                    url: "https://api.nest.com/device/XZ1D2",
-                    body: "target_temp_f=65"
+                    url: "https://api.nest.com/",
+                    body: "{\"temperature\": 65}"
                 }
             ]
         })
@@ -1046,8 +1051,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
           {
             "action": "http",
             "label": "Turn down",
-            "url": "https://api.nest.com/device/XZ1D2",
-            "body": "target_temp_f=65"
+            "url": "https://api.nest.com/",
+            "body": "{\"temperature\": 65}"
           }
         ]
     }`
@@ -1071,8 +1076,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
             @{
                 "action"="http",
                 "label"="Turn down"
-                "url"="https://api.nest.com/device/XZ1D2"
-                "body"="target_temp_f=65"
+                "url"="https://api.nest.com/"
+                "body"="{\"temperature\": 65}"
             }
         )
     } | ConvertTo-Json
@@ -1095,8 +1100,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                 {
                     "action": "http",
                     "label": "Turn down",
-                    "url": "https://api.nest.com/device/XZ1D2",
-                    "body": "target_temp_f=65"
+                    "url": "https://api.nest.com/",
+                    "body": "{\"temperature\": 65}"
                 }
             ]
         })
@@ -1122,11 +1127,11 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
                     [
                         "action": "http",
                         "label": "Turn down",
-                        "url": "https://api.nest.com/device/XZ1D2",
+                        "url": "https://api.nest.com/",
                         "headers": [
                             "Authorization": "Bearer ..."
                         ],
-                        "body": "target_temp_f=65"
+                        "body": "{\"temperature\": 65}"
                     ]
                 ]
             ])

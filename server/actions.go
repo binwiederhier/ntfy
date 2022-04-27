@@ -134,7 +134,6 @@ func (p *actionParser) parseAction() (*action, error) {
 	section := 0
 	for {
 		key, value, last, err := p.parseSection()
-		fmt.Printf("--> key=%s, value=%s, last=%t, err=%#v\n", key, value, last, err)
 		if err != nil {
 			return nil, err
 		}
@@ -226,14 +225,15 @@ func (p *actionParser) parseKey() string {
 }
 
 // parseValue reads the input until EOF, "," or ";" and returns the value string. Unlike parseQuotedValue,
-// this function does not support "," or ";" in the value itself.
+// this function does not support "," or ";" in the value itself, and spaces in the beginning and end of the
+// string are trimmed.
 func (p *actionParser) parseValue() (value string, last bool) {
 	start := p.pos
 	for {
 		r, w := p.peek()
 		if isSectionEnd(r) {
 			last = isLastSection(r)
-			value = p.input[start:p.pos]
+			value = strings.TrimSpace(p.input[start:p.pos])
 			p.pos += w
 			return
 		}

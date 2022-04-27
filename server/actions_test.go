@@ -78,6 +78,15 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, `"quotes" and \'single quotes\'`, actions[0].Label)
 	require.Equal(t, `http://example.com`, actions[0].URL)
 
+	// Single quotes (JSON)
+	actions, err = parseActions(`action=http, Post it, url=http://example.com, body='{"temperature": 65}'`)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "http", actions[0].Action)
+	require.Equal(t, "Post it", actions[0].Label)
+	require.Equal(t, `http://example.com`, actions[0].URL)
+	require.Equal(t, `{"temperature": 65}`, actions[0].Body)
+
 	// Out of order
 	actions, err = parseActions(`label="Out of order!" , action="http", url=http://example.com`)
 	require.Nil(t, err)
@@ -102,25 +111,45 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, `Кохайтеся а не воюйте, 💙🫤`, actions[0].Label)
 	require.Equal(t, `http://google.com`, actions[0].URL)
 
+	// Multiple actions, awkward spacing
+	actions, err = parseActions(`http , 'Make love, not war 💙🫤' , https://ntfy.sh ; view, " yo ", https://x.org`)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(actions))
+	require.Equal(t, "http", actions[0].Action)
+	require.Equal(t, `Make love, not war 💙🫤`, actions[0].Label)
+	require.Equal(t, `https://ntfy.sh`, actions[0].URL)
+	require.Equal(t, "view", actions[1].Action)
+	require.Equal(t, " yo ", actions[1].Label)
+	require.Equal(t, `https://x.org`, actions[1].URL)
+
 	// Invalid syntax
-	actions, err = parseActions(`label="Out of order!" x, action="http", url=http://example.com`)
+	_, err = parseActions(`label="Out of order!" x, action="http", url=http://example.com`)
 	require.EqualError(t, err, "unexpected character 'x' at position 22")
 
-	actions, err = parseActions(`label="", action="http", url=http://example.com`)
+	_, err = parseActions(`label="", action="http", url=http://example.com`)
 	require.EqualError(t, err, "parameter 'label' is required")
 
-	actions, err = parseActions(`label=, action="http", url=http://example.com`)
+	_, err = parseActions(`label=, action="http", url=http://example.com`)
 	require.EqualError(t, err, "parameter 'label' is required")
 
-	actions, err = parseActions(`label="xx", action="http", url=http://example.com, what is this anyway`)
+	_, err = parseActions(`label="xx", action="http", url=http://example.com, what is this anyway`)
 	require.EqualError(t, err, "term 'what is this anyway' unknown")
 
-	actions, err = parseActions(`fdsfdsf`)
+	_, err = parseActions(`fdsfdsf`)
 	require.EqualError(t, err, "action 'fdsfdsf' unknown")
 
-	actions, err = parseActions(`aaa=a, "bbb, 'ccc, ddd, eee "`)
+	_, err = parseActions(`aaa=a, "bbb, 'ccc, ddd, eee "`)
 	require.EqualError(t, err, "key 'aaa' unknown")
 
-	actions, err = parseActions(`action=http, label="omg the end quote is missing`)
+	_, err = parseActions(`action=http, label="omg the end quote is missing`)
 	require.EqualError(t, err, "unexpected end of input, quote started at position 20")
+
+	_, err = parseActions(`;;;;`)
+	require.EqualError(t, err, "only 3 actions allowed")
+
+	_, err = parseActions(`,,,,,,;;`)
+	require.EqualError(t, err, "term '' unknown")
+
+	_, err = parseActions(`''";,;"`)
+	require.EqualError(t, err, "unexpected character '\"' at position 2")
 }

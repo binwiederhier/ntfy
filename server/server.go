@@ -539,7 +539,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	if actionsStr != "" {
 		m.Actions, err = parseActions(actionsStr)
 		if err != nil {
-			return false, false, "", false, err // wrapped errHTTPBadRequestActionsInvalid
+			return false, false, "", false, wrapErrHTTP(errHTTPBadRequestActionsInvalid, err.Error())
 		}
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!

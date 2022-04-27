@@ -56,6 +56,13 @@ type action struct {
 	Extras  map[string]string `json:"extras,omitempty"`  // used in "broadcast" action
 }
 
+func newAction() *action {
+	return &action{
+		Headers: make(map[string]string),
+		Extras:  make(map[string]string),
+	}
+}
+
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
 	Topic    string   `json:"topic"`

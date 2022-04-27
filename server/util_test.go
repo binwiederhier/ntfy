@@ -79,4 +79,31 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, 2, len(actions[0].Headers))
 	require.Equal(t, "application/json", actions[0].Headers["Content-Type"])
 	require.Equal(t, "Basic sdasffsf", actions[0].Headers["Authorization"])
+
+	actions, err = parseActions(`action=http, "Look ma, \"quotes\"; and semicolons", url=http://example.com`)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "http", actions[0].Action)
+	require.Equal(t, `Look ma, \"quotes\"; and semicolons`, actions[0].Label)
+	require.Equal(t, `http://example.com`, actions[0].URL)
+
+	actions, err = parseActions(`label="Out of order!" , action="http", url=http://example.com`)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "http", actions[0].Action)
+	require.Equal(t, `Out of order!`, actions[0].Label)
+	require.Equal(t, `http://example.com`, actions[0].URL)
+
+	actions, err = parseActions(`label="Out of order!" x, action="http", url=http://example.com`)
+	require.EqualError(t, err, "unexpected character 'x' at position 22")
+
+	actions, err = parseActions(`label="", action="http", url=http://example.com`)
+	require.EqualError(t, err, "invalid request: actions invalid, parameter 'label' is required")
+
+	actions, err = parseActions(`label=, action="http", url=http://example.com`)
+	require.EqualError(t, err, "invalid request: actions invalid, parameter 'label' is required")
+
+	actions, err = parseActions(`label="xx", action="http", url=http://example.com, what is this anyway`)
+	require.EqualError(t, err, "invalid request: actions invalid, term 'what is this anyway' unknown")
+
 }

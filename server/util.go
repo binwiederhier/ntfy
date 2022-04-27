@@ -54,7 +54,7 @@ func parseActions(s string) (actions []*action, err error) {
 	if strings.HasPrefix(s, "[") {
 		actions, err = parseActionsFromJSON(s)
 	} else {
-		actions, err = parseActionsFromSimple(s)
+		actions, err = parseActionsFromSimpleNew(s)
 	}
 	if err != nil {
 		return nil, err

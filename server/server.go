@@ -739,7 +739,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if r.Header.Get("Upgrade") != "websocket" {
+	if strings.ToLower(r.Header.Get("Upgrade")) != "websocket" {
 		return errHTTPBadRequestWebSocketsUpgradeHeaderMissing
 	}
 	if err := v.SubscriptionAllowed(); err != nil {

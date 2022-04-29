@@ -519,24 +519,27 @@ or the root domain:
     ```
     <VirtualHost *:80>
         ServerName ntfy.sh
-        
-        SetEnv proxy-nokeepalive 1
-        SetEnv proxy-sendchunked 1
-        
+
+        # Proxy connections to ntfy (requires "a2enmod proxy")
         ProxyPass / http://127.0.0.1:2586/
         ProxyPassReverse / http://127.0.0.1:2586/
-        
+
+        SetEnv proxy-nokeepalive 1
+        SetEnv proxy-sendchunked 1
+
         # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
 
-        # WebSockets support
+        # Enable mod_rewrite (requires "a2enmod rewrite")
+        RewriteEngine on
+
+        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
         RewriteCond %{HTTP:Upgrade} websocket [NC]
         RewriteCond %{HTTP:Connection} upgrade [NC]
         RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
         # it to work with curl without the annoying https:// prefix 
-        RewriteEngine on
         RewriteCond %{REQUEST_METHOD} GET
         RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
     </VirtualHost>
@@ -548,26 +551,24 @@ or the root domain:
         SSLCertificateFile /etc/letsencrypt/live/ntfy.sh/fullchain.pem
         SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
         Include /etc/letsencrypt/options-ssl-apache.conf
-        
-        SetEnv proxy-nokeepalive 1
-        SetEnv proxy-sendchunked 1
-        
+
+        # Proxy connections to ntfy (requires "a2enmod proxy")
         ProxyPass / http://127.0.0.1:2586/
         ProxyPassReverse / http://127.0.0.1:2586/
-        
+
+        SetEnv proxy-nokeepalive 1
+        SetEnv proxy-sendchunked 1
+
         # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
 
-        # WebSockets support
+        # Enable mod_rewrite (requires "a2enmod rewrite")
+        RewriteEngine on
+
+        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
         RewriteCond %{HTTP:Upgrade} websocket [NC]
         RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
-        
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix 
-        RewriteEngine on
-        RewriteCond %{REQUEST_METHOD} GET
-        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L] 
     </VirtualHost>
     ```
 

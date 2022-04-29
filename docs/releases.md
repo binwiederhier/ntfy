@@ -6,15 +6,29 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy Android app v1.13.0 (UNRELEASED)
 
-Bugs:
-* Accurate naming of "mute notifications" from "pause notifications" ([#224](https://github.com/binwiederhier/ntfy/issues/224), 
-  thanks to [@shadow00](https://github.com/shadow00) for reporting)
+**Features:**
+
+* Cards in notification detail view ([#175](https://github.com/binwiederhier/ntfy/issues/224), thanks to [@cmeis](https://github.com/cmeis) for reporting)
+
+**Bugs:**
+
+* Accurate naming of "mute notifications" from "pause notifications" ([#224](https://github.com/binwiederhier/ntfy/issues/224), thanks to [@shadow00](https://github.com/shadow00) for reporting)
+* Make messages with links selectable ([#226](https://github.com/binwiederhier/ntfy/issues/226), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
+
+**Thanks for testing:**
+
+Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and 
+to [@Joeharrison94](https://github.com/Joeharrison94) for the input. 
 
 ## ntfy server v1.22.0 (UNRELEASED)
 
 **Features:**
 
 * Better parsing of the user actions, allowing quotes (no ticket)
+
+**Bugs:**
+
+* `Upgrade` header check is now case in-sensitive ([#228](https://github.com/binwiederhier/ntfy/issues/228), thanks to [@wunter8](https://github.com/wunter8) for finding it)
 
 -->
 

@@ -150,5 +150,7 @@
     "prefs_notifications_delete_after_never_description": "Notifikasi tidak pernah dihapus secara otomatis",
     "prefs_notifications_delete_after_one_day_description": "Notifikasi dihapus secara otomatis setelah satu hari",
     "priority_default": "bawaan",
-    "priority_min": "min"
+    "priority_min": "min",
+    "notifications_actions_not_supported": "Tindakan tidak didukung di aplikasi web",
+    "notifications_actions_http_request_title": "Kirim {{method}} HTTP ke {{url}}"
 }

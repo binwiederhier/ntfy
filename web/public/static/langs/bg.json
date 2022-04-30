@@ -150,5 +150,7 @@
     "prefs_notifications_min_priority_description_max": "Показват се известията с приоритет 5 (най-висок)",
     "prefs_notifications_delete_after_one_month_description": "Известията се премахват автоматично след един месец",
     "prefs_notifications_min_priority_description_any": "Показват се всички известия, независимо от приоритета им",
-    "prefs_notifications_min_priority_description_x_or_higher": "Показват се известията с приоритет {{number}} ({{name}}) или по-висок"
+    "prefs_notifications_min_priority_description_x_or_higher": "Показват се известията с приоритет {{number}} ({{name}}) или по-висок",
+    "notifications_actions_http_request_title": "Изпращане на HTTP {{method}} до {{url}}",
+    "notifications_actions_not_supported": "Действието не се поддържа от приложението за уеб"
 }

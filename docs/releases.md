@@ -31,6 +31,10 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 * `Upgrade` header check is now case in-sensitive ([#228](https://github.com/binwiederhier/ntfy/issues/228), thanks to [@wunter8](https://github.com/wunter8) for finding it)
 * Made web app sounds quieter ([#222](https://github.com/binwiederhier/ntfy/issues/222))
 
+**Additional translations:**
+
+* Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))
+
 **Thanks for testing:**
 
 Thanks to [@wunter8](https://github.com/wunter8) for testing.

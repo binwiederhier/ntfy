@@ -423,8 +423,9 @@ const Appearance = () => {
 
 const Language = () => {
     const { t, i18n } = useTranslation();
-    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇧🇬", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇧🇬", "🇨🇿", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
+    const lang = i18n.language ?? "en";
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
     // Languages names from: https://www.omniglot.com/language/names.htm
@@ -433,10 +434,11 @@ const Language = () => {
     return (
         <Pref title={title}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-                <Select value={i18n.language} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
+                <Select value={lang} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
                     <MenuItem value="en">English</MenuItem>
                     <MenuItem value="es">Español</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
+                    <MenuItem value="cs">Čeština</MenuItem>
                     <MenuItem value="de">Deutsch</MenuItem>
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="ja">日本語</MenuItem>

@@ -30,6 +30,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 
 * `Upgrade` header check is now case in-sensitive ([#228](https://github.com/binwiederhier/ntfy/issues/228), thanks to [@wunter8](https://github.com/wunter8) for finding it)
 * Made web app sounds quieter ([#222](https://github.com/binwiederhier/ntfy/issues/222))
+* Add "private browsing"-specific error message for Firefox/Safari ([#208](https://github.com/binwiederhier/ntfy/issues/208), thanks to [@julianfoad](https://github.com/julianfoad) for reporting) 
 
 **Additional translations:**
 

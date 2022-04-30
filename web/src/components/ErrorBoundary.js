@@ -10,13 +10,28 @@ class ErrorBoundaryImpl extends React.Component {
         this.state = {
             error: false,
             originalStack: null,
-            niceStack: null
+            niceStack: null,
+            unsupportedIndexedDB: false
         };
     }
 
     componentDidCatch(error, info) {
         console.error("[ErrorBoundary] Error caught", error, info);
 
+        // Special case for unsupported IndexedDB in Private Browsing mode (Firefox, Safari), see
+        // - https://github.com/dexie/Dexie.js/issues/312
+        // - https://bugzilla.mozilla.org/show_bug.cgi?id=781982
+        const isUnsupportedIndexedDB = error?.name === "InvalidStateError" ||
+            (error?.name === "DatabaseClosedError" && error?.message?.indexOf("InvalidStateError") !== -1);
+
+        if (isUnsupportedIndexedDB) {
+            this.handleUnsupportedIndexedDB();
+        } else {
+            this.handleError(error, info);
+        }
+    }
+
+    handleError(error, info) {
         // Immediately render original stack trace
         const prettierOriginalStack = info.componentStack
             .trim()
@@ -36,6 +51,13 @@ class ErrorBoundaryImpl extends React.Component {
         });
     }
 
+    handleUnsupportedIndexedDB() {
+        this.setState({
+            error: true,
+            unsupportedIndexedDB: true
+        });
+    }
+
     copyStack() {
         let stack = "";
         if (this.state.niceStack) {
@@ -46,33 +68,60 @@ class ErrorBoundaryImpl extends React.Component {
     }
 
     render() {
-        const { t } = this.props;
         if (this.state.error) {
-            return (
-                <div style={{margin: '20px'}}>
-                    <h2>{t("error_boundary_title")} 😮</h2>
-                    <p>
-                        <Trans
-                            i18nKey="error_boundary_description"
-                            components={{
-                                githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues"/>,
-                                discordLink: <Link href="https://discord.gg/cT7ECsZj9w"/>,
-                                matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org"/>
-                            }}
-                        />
-                    </p>
-                    <p>
-                        <Button variant="outlined" onClick={() => this.copyStack()}>{t("error_boundary_button_copy_stack_trace")}</Button>
-                    </p>
-                    <h3>{t("error_boundary_stack_trace")}</h3>
-                    {this.state.niceStack
-                        ? <pre>{this.state.niceStack}</pre>
-                        : <><CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> {t("error_boundary_gathering_info")}</>}
-                    <pre>{this.state.originalStack}</pre>
-                </div>
-            );
+            if (this.state.unsupportedIndexedDB) {
+                return this.renderUnsupportedIndexedDB();
+            } else {
+                return this.renderError();
+            }
         }
         return this.props.children;
+    }
+
+    renderUnsupportedIndexedDB() {
+        const { t } = this.props;
+        return (
+            <div style={{margin: '20px'}}>
+                <h2>{t("error_boundary_unsupported_indexeddb_title")} 😮</h2>
+                <p style={{maxWidth: "600px"}}>
+                    <Trans
+                        i18nKey="error_boundary_unsupported_indexeddb_description"
+                        components={{
+                            githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues/208"/>,
+                            discordLink: <Link href="https://discord.gg/cT7ECsZj9w"/>,
+                            matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org"/>
+                        }}
+                    />
+                </p>
+            </div>
+        );
+    }
+
+    renderError() {
+        const { t } = this.props;
+        return (
+            <div style={{margin: '20px'}}>
+                <h2>{t("error_boundary_title")} 😮</h2>
+                <p>
+                    <Trans
+                        i18nKey="error_boundary_description"
+                        components={{
+                            githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues"/>,
+                            discordLink: <Link href="https://discord.gg/cT7ECsZj9w"/>,
+                            matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org"/>
+                        }}
+                    />
+                </p>
+                <p>
+                    <Button variant="outlined" onClick={() => this.copyStack()}>{t("error_boundary_button_copy_stack_trace")}</Button>
+                </p>
+                <h3>{t("error_boundary_stack_trace")}</h3>
+                {this.state.niceStack
+                    ? <pre>{this.state.niceStack}</pre>
+                    : <><CircularProgress size="20px" sx={{verticalAlign: "text-bottom"}}/> {t("error_boundary_gathering_info")}</>}
+                <pre>{this.state.originalStack}</pre>
+            </div>
+        );
     }
 }
 

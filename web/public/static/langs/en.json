@@ -152,5 +152,7 @@
   "error_boundary_description": "This should obviously not happen. Very sorry about this.<br/>If you have a minute, please <githubLink>report this on GitHub</githubLink>, or let us know via <discordLink>Discord</discordLink> or <matrixLink>Matrix</matrixLink>.",
   "error_boundary_button_copy_stack_trace": "Copy stack trace",
   "error_boundary_stack_trace": "Stack trace",
-  "error_boundary_gathering_info": "Gather more info …"
+  "error_boundary_gathering_info": "Gather more info …",
+  "error_boundary_unsupported_indexeddb_title": "Private browsing not supported",
+  "error_boundary_unsupported_indexeddb_description": "The ntfy web app needs IndexedDB to function, and your browser does not support IndexedDB in private browsing mode.<br/><br/>While this is unfortunate, it also doesn't really make a lot of sense to use the ntfy web app in private browsing mode anyway, because everything is stored in the browser storage. You can read more about it <githubLink>in this GitHub issue</githubLink>, or talk to us on <discordLink>Discord</discordLink> or <matrixLink>Matrix</matrixLink>."
 }

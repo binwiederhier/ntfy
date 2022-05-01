@@ -423,7 +423,7 @@ const Appearance = () => {
 
 const Language = () => {
     const { t, i18n } = useTranslation();
-    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇧🇬", "🇨🇿", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
     const lang = i18n.language ?? "en";
 
@@ -436,10 +436,11 @@ const Language = () => {
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={lang} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
                     <MenuItem value="en">English</MenuItem>
-                    <MenuItem value="es">Español</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
                     <MenuItem value="cs">Čeština</MenuItem>
                     <MenuItem value="de">Deutsch</MenuItem>
+                    <MenuItem value="es">Español</MenuItem>
+                    <MenuItem value="fr">Français</MenuItem>
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="ja">日本語</MenuItem>
                     <MenuItem value="nb_NO">Norsk bokmål</MenuItem>

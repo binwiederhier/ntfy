@@ -35,6 +35,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 **Additional translations:**
 
 * Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))
+* French (thanks to [@nathanaelhoun](https://hosted.weblate.org/user/nathanaelhoun/))
 
 **Thanks for testing:**
 
@@ -79,6 +80,7 @@ languages and fixed a ton of bugs.
 **Additional translations:**
 
 * Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))
+* French (thanks to [@nathanaelhoun](https://hosted.weblate.org/user/nathanaelhoun/))
 * Japanese (thanks to [@shak](https://hosted.weblate.org/user/shak/))
 * Russian (thanks to [@flamey](https://hosted.weblate.org/user/flamey/) and [@ilya.mikheev.coder](https://hosted.weblate.org/user/ilya.mikheev.coder/))
 

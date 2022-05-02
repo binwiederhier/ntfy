@@ -75,13 +75,15 @@ const MessageBar = (props) => {
                 backgroundColor: (theme) => theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.grey[900]
             }}
         >
-            <IconButton color="inherit" size="large" edge="start" onClick={props.onOpenDialogClick}>
+            <IconButton color="inherit" size="large" edge="start" onClick={props.onOpenDialogClick} aria-label={t("message_bar_show_dialog")}>
                 <KeyboardArrowUpIcon/>
             </IconButton>
             <TextField
                 autoFocus
                 margin="dense"
                 placeholder={t("message_bar_type_message")}
+                aria-label={t("message_bar_type_message")}
+                role="textbox" 
                 type="text"
                 fullWidth
                 variant="standard"
@@ -94,7 +96,7 @@ const MessageBar = (props) => {
                     }
                 }}
             />
-            <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick}>
+            <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick} aria-label={t("message_bar_publish")}>
                 <SendIcon/>
             </IconButton>
             <Portal>

@@ -31,10 +31,15 @@ const navWidth = 280;
 const Navigation = (props) => {
     const navigationList = <NavList {...props}/>;
     return (
-        <Box component="nav" sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}>
+        <Box
+            component="nav"
+            role="navigation" 
+            sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}
+        >
             {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
             <Drawer
                 variant="temporary"
+                role="menubar" 
                 open={props.mobileDrawerOpen}
                 onClose={props.onMobileDrawerToggle}
                 ModalProps={{ keepMounted: true }} // Better open performance on mobile.
@@ -49,6 +54,7 @@ const Navigation = (props) => {
             <Drawer
                 open
                 variant="permanent"
+                role="menubar" 
                 sx={{
                     display: { xs: 'none', sm: 'block' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: navWidth },

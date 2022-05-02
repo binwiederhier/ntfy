@@ -73,6 +73,8 @@ const EmojiPicker = (props) => {
                                 inputRef={searchRef}
                                 margin="dense"
                                 size="small"
+                                role="searchbox" 
+                                aria-label={t("emoji_picker_search_placeholder")}
                                 placeholder={t("emoji_picker_search_placeholder")}
                                 value={search}
                                 onChange={ev => setSearch(ev.target.value)}
@@ -83,7 +85,9 @@ const EmojiPicker = (props) => {
                                 InputProps={{
                                     endAdornment:
                                         <InputAdornment position="end" sx={{ display: (search) ? '' : 'none' }}>
-                                            <IconButton size="small" onClick={handleSearchClear} edge="end"><Close/></IconButton>
+                                            <IconButton size="small" onClick={handleSearchClear} edge="end" aria-label={t("emoji_picker_search_clear")}>
+                                                <Close/>
+                                            </IconButton>
                                         </InputAdornment>
                                 }}
                             />
@@ -130,10 +134,12 @@ const Category = (props) => {
 const Emoji = (props) => {
     const emoji = props.emoji;
     const matches = emojiMatches(emoji, props.search);
+    const title = `${emoji.description} (${emoji.aliases[0]})`;
     return (
         <EmojiDiv
             onClick={props.onClick}
-            title={`${emoji.description} (${emoji.aliases[0]})`}
+            title={title}
+            aria-label={title}
             style={{ display: (matches) ? '' : 'none' }}
         >
             {props.emoji.emoji}

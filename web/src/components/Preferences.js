@@ -34,11 +34,6 @@ import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 import {playSound, shuffle, sounds, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
-import priority1 from "../img/priority-1.svg";
-import priority2 from "../img/priority-2.svg";
-import priority3 from "../img/priority-3.svg";
-import priority4 from "../img/priority-4.svg";
-import priority5 from "../img/priority-5.svg";
 
 const Preferences = () => {
     return (
@@ -55,7 +50,7 @@ const Preferences = () => {
 const Notifications = () => {
     const { t } = useTranslation();
     return (
-        <Card sx={{p: 3}}>
+        <Card sx={{p: 3}} aria-label={t("prefs_notifications_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
                 {t("prefs_notifications_title")}
             </Typography>
@@ -70,6 +65,7 @@ const Notifications = () => {
 
 const Sound = () => {
     const { t } = useTranslation();
+    const labelId = "prefSound";
     const sound = useLiveQuery(async () => prefs.sound());
     const handleChange = async (ev) => {
         await prefs.setSound(ev.target.value);
@@ -84,15 +80,15 @@ const Sound = () => {
         description = t("prefs_notifications_sound_description_some", { sound: sounds[sound].label });
     }
     return (
-        <Pref title={t("prefs_notifications_sound_title")} description={description}>
+        <Pref labelId={labelId} title={t("prefs_notifications_sound_title")} description={description}>
             <div style={{ display: 'flex', width: '100%' }}>
                 <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
-                    <Select value={sound} onChange={handleChange}>
+                    <Select value={sound} onChange={handleChange} aria-labelledby={labelId}>
                         <MenuItem value={"none"}>{t("prefs_notifications_sound_no_sound")}</MenuItem>
                         {Object.entries(sounds).map(s => <MenuItem key={s[0]} value={s[0]}>{s[1].label}</MenuItem>)}
                     </Select>
                 </FormControl>
-                <IconButton onClick={() => playSound(sound)} disabled={sound === "none"}>
+                <IconButton onClick={() => playSound(sound)} disabled={sound === "none"} aria-label={t("prefs_notifications_sound_play")}>
                     <PlayArrowIcon />
                 </IconButton>
             </div>
@@ -102,6 +98,7 @@ const Sound = () => {
 
 const MinPriority = () => {
     const { t } = useTranslation();
+    const labelId = "prefMinPriority";
     const minPriority = useLiveQuery(async () => prefs.minPriority());
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
@@ -128,9 +125,9 @@ const MinPriority = () => {
         });
     }
     return (
-        <Pref title={t("prefs_notifications_min_priority_title")} description={description}>
+        <Pref labelId={labelId} title={t("prefs_notifications_min_priority_title")} description={description}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-                <Select value={minPriority} onChange={handleChange}>
+                <Select value={minPriority} onChange={handleChange} aria-labelledby={labelId}>
                     <MenuItem value={1}>{t("prefs_notifications_min_priority_any")}</MenuItem>
                     <MenuItem value={2}>{t("prefs_notifications_min_priority_low_and_higher")}</MenuItem>
                     <MenuItem value={3}>{t("prefs_notifications_min_priority_default_and_higher")}</MenuItem>
@@ -144,6 +141,7 @@ const MinPriority = () => {
 
 const DeleteAfter = () => {
     const { t } = useTranslation();
+    const labelId = "prefDeleteAfter";
     const deleteAfter = useLiveQuery(async () => prefs.deleteAfter());
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
@@ -161,9 +159,9 @@ const DeleteAfter = () => {
         }
     })();
     return (
-        <Pref title={t("prefs_notifications_delete_after_title")} description={description}>
+        <Pref labelId={labelId} title={t("prefs_notifications_delete_after_title")} description={description}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-                <Select value={deleteAfter} onChange={handleChange}>
+                <Select value={deleteAfter} onChange={handleChange} aria-labelledby={labelId}>
                     <MenuItem value={0}>{t("prefs_notifications_delete_after_never")}</MenuItem>
                     <MenuItem value={10800}>{t("prefs_notifications_delete_after_three_hours")}</MenuItem>
                     <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
@@ -177,7 +175,7 @@ const DeleteAfter = () => {
 
 const PrefGroup = (props) => {
     return (
-        <div>
+        <div role="table">
             {props.children}
         </div>
     )
@@ -185,28 +183,39 @@ const PrefGroup = (props) => {
 
 const Pref = (props) => {
     return (
-        <div style={{
-            display: "flex",
-            flexDirection: "row",
-            marginTop: "10px",
-            marginBottom: "20px",
-        }}>
-            <div style={{
-                flex: '1 0 40%',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                paddingRight: '30px'
-            }}>
+        <div
+            role="row"
+            style={{
+                display: "flex",
+                flexDirection: "row",
+                marginTop: "10px",
+                marginBottom: "20px",
+            }}
+        >
+            <div
+                role="cell"
+                id={props.labelId}
+                aria-label={props.title}
+                style={{
+                    flex: '1 0 40%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    paddingRight: '30px'
+                }}
+            >
                 <div><b>{props.title}</b></div>
                 {props.description && <div><em>{props.description}</em></div>}
             </div>
-            <div style={{
-                flex: '1 0 calc(60% - 50px)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center'
-            }}>
+            <div
+                role="cell"
+                style={{
+                    flex: '1 0 calc(60% - 50px)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
+                }}
+            >
                 {props.children}
             </div>
         </div>
@@ -235,7 +244,7 @@ const Users = () => {
         }
     };
     return (
-        <Card sx={{ padding: 1 }}>
+        <Card sx={{ padding: 1 }} aria-label={t("prefs_users_title")}>
             <CardContent sx={{ paddingBottom: 1 }}>
                 <Typography variant="h5" sx={{marginBottom: 2}}>
                     {t("prefs_users_title")}
@@ -291,7 +300,7 @@ const UserTable = (props) => {
         }
     };
     return (
-        <Table size="small">
+        <Table size="small" aria-label={t("prefs_users_table")}>
             <TableHead>
                 <TableRow>
                     <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
@@ -305,13 +314,13 @@ const UserTable = (props) => {
                         key={user.baseUrl}
                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                     >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}}>{user.username}</TableCell>
-                        <TableCell>{user.baseUrl}</TableCell>
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
+                        <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
                         <TableCell align="right">
-                            <IconButton onClick={() => handleEditClick(user)}>
+                            <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
                                 <EditIcon/>
                             </IconButton>
-                            <IconButton onClick={() => handleDeleteClick(user)}>
+                            <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
                                 <CloseIcon />
                             </IconButton>
                         </TableCell>
@@ -371,6 +380,7 @@ const UserDialog = (props) => {
                     margin="dense"
                     id="baseUrl"
                     label={t("prefs_users_dialog_base_url_label")}
+                    aria-label={t("prefs_users_dialog_base_url_label")}
                     value={baseUrl}
                     onChange={ev => setBaseUrl(ev.target.value)}
                     type="url"
@@ -382,6 +392,7 @@ const UserDialog = (props) => {
                     margin="dense"
                     id="username"
                     label={t("prefs_users_dialog_username_label")}
+                    aria-label={t("prefs_users_dialog_username_label")}
                     value={username}
                     onChange={ev => setUsername(ev.target.value)}
                     type="text"
@@ -392,6 +403,7 @@ const UserDialog = (props) => {
                     margin="dense"
                     id="password"
                     label={t("prefs_users_dialog_password_label")}
+                    aria-label={t("prefs_users_dialog_password_label")}
                     type="password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value)}
@@ -410,7 +422,7 @@ const UserDialog = (props) => {
 const Appearance = () => {
     const { t } = useTranslation();
     return (
-        <Card sx={{p: 3}}>
+        <Card sx={{p: 3}} aria-label={t("prefs_appearance_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
                 {t("prefs_appearance_title")}
             </Typography>
@@ -423,6 +435,7 @@ const Appearance = () => {
 
 const Language = () => {
     const { t, i18n } = useTranslation();
+    const labelId = "prefLanguage";
     const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
     const lang = i18n.language ?? "en";
@@ -432,9 +445,9 @@ const Language = () => {
     // Better: Sidebar in Wikipedia: https://en.wikipedia.org/wiki/Bokm%C3%A5l
 
     return (
-        <Pref title={title}>
+        <Pref labelId={labelId} title={title}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-                <Select value={lang} onChange={(ev) => i18n.changeLanguage(ev.target.value)}>
+                <Select value={lang} onChange={(ev) => i18n.changeLanguage(ev.target.value)} aria-labelledby={labelId}>
                     <MenuItem value="en">English</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
                     <MenuItem value="cs">Čeština</MenuItem>

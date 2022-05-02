@@ -44,16 +44,22 @@ const ActionBar = (props) => {
                 <IconButton
                     color="inherit"
                     edge="start"
+                    aria-label={t("action_bar_show_menu")}
                     onClick={props.onMobileDrawerToggle}
                     sx={{ mr: 2, display: { sm: 'none' } }}
                 >
                     <MenuIcon />
                 </IconButton>
-                <Box component="img" src={logo} sx={{
-                    display: { xs: 'none', sm: 'block' },
-                    marginRight: '10px',
-                    height: '28px'
-                }}/>
+                <Box
+                    component="img"
+                    src={logo}
+                    alt={t("action_bar_logo_alt")}
+                    sx={{
+                        display: { xs: 'none', sm: 'block' },
+                        marginRight: '10px',
+                        height: '28px'
+                    }}
+                />
                 <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
                     {title}
                 </Typography>
@@ -173,10 +179,10 @@ const SettingsIcons = (props) => {
 
     return (
         <>
-            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} sx={{marginRight: 0}}>
+            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} sx={{marginRight: 0}} aria-label={t("action_bar_toggle_mute")}>
                 {subscription.mutedUntil ? <NotificationsOffIcon/> : <NotificationsIcon/>}
             </IconButton>
-            <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen}>
+            <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} aria-label={t("action_bar_toggle_action_menu")}>
                 <MoreVertIcon/>
             </IconButton>
             <Popper

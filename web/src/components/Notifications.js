@@ -98,6 +98,8 @@ const NotificationList = (props) => {
         >
             <Container
                 maxWidth="md"
+                role="list" 
+                aria-label={t("notifications_list")}
                 sx={{
                     marginTop: 3,
                     marginBottom: (props.messageBar) ? "100px" : 3 // Hack to avoid hiding notifications behind the message bar
@@ -143,9 +145,9 @@ const NotificationItem = (props) => {
     const hasUserActions = notification.actions && notification.actions.length > 0;
     const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
     return (
-        <Card sx={{ minWidth: 275, padding: 1 }}>
+        <Card sx={{ minWidth: 275, padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
             <CardContent>
-                <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }}>
+                <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
                     <CloseIcon />
                 </IconButton>
                 <Typography sx={{ fontSize: 14 }} color="text.secondary">
@@ -153,15 +155,15 @@ const NotificationItem = (props) => {
                     {[1,2,4,5].includes(notification.priority) &&
                         <img
                             src={priorityFiles[notification.priority]}
-                            alt={`Priority ${notification.priority}`}
+                            alt={t("notifications_priority_x", { priority: notification.priority})}
                             style={{ verticalAlign: 'bottom' }}
                         />}
                     {notification.new === 1 &&
-                        <svg style={{ width: '8px', height: '8px', marginLeft: '4px' }} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <svg style={{ width: '8px', height: '8px', marginLeft: '4px' }} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-label={t("notifications_new_indicator")}>
                             <circle cx="50" cy="50" r="50" fill="#338574"/>
                         </svg>}
                 </Typography>
-                {notification.title && <Typography variant="h5" component="div">{formatTitle(notification)}</Typography>}
+                {notification.title && <Typography variant="h5" component="div" role="rowheader">{formatTitle(notification)}</Typography>}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
                     {autolink(maybeAppendActionErrors(formatMessage(notification), notification))}
                 </Typography>
@@ -289,6 +291,7 @@ const Attachment = (props) => {
 };
 
 const Image = (props) => {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     return (
         <>
@@ -296,6 +299,7 @@ const Image = (props) => {
                 component="img"
                 src={props.attachment.url}
                 loading="lazy"
+                alt={t("notifications_attachment_image")}
                 onClick={() => setOpen(true)}
                 sx={{
                     marginTop: 2,
@@ -316,6 +320,7 @@ const Image = (props) => {
                     <Box
                         component="img"
                         src={props.attachment.url}
+                        alt={t("notifications_attachment_image")}
                         loading="lazy"
                         sx={{
                             maxWidth: 1,
@@ -347,13 +352,16 @@ const UserAction = (props) => {
     if (action.action === "broadcast") {
         return (
             <Tooltip title={t("notifications_actions_not_supported")}>
-                <span><Button disabled>{action.label}</Button></span>
+                <span><Button disabled aria-label={t("notifications_actions_not_supported")}>{action.label}</Button></span>
             </Tooltip>
         );
     } else if (action.action === "view") {
         return (
             <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
-                <Button onClick={() => openUrl(action.url)}>{action.label}</Button>
+                <Button
+                    onClick={() => openUrl(action.url)}
+                    aria-label={t("notifications_actions_open_url_title", { url: action.url })}
+                >{action.label}</Button>
             </Tooltip>
         );
     } else if (action.action === "http") {
@@ -361,7 +369,10 @@ const UserAction = (props) => {
         const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
         return (
             <Tooltip title={t("notifications_actions_http_request_title", { method: method, url: action.url })}>
-                <Button onClick={() => performHttpAction(notification, action)}>{label}</Button>
+                <Button
+                    onClick={() => performHttpAction(notification, action)}
+                    aria-label={t("notifications_actions_http_request_title", { method: method, url: action.url })}
+                >{label}</Button>
             </Tooltip>
         );
     }
@@ -416,7 +427,7 @@ const NoNotifications = (props) => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64"/><br />
+                <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")}/><br />
                 {t("notifications_none_for_topic_title")}
             </Typography>
             <Paragraph>
@@ -442,7 +453,7 @@ const NoNotificationsWithoutSubscription = (props) => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64"/><br />
+                <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")}/><br />
                 {t("notifications_none_for_any_title")}
             </Typography>
             <Paragraph>
@@ -466,7 +477,7 @@ const NoSubscriptions = () => {
     return (
         <VerticallyCenteredContainer maxWidth="xs">
             <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-                <img src={logoOutline} height="64" width="64"/><br />
+                <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")}/><br />
                 {t("notifications_no_subscriptions_title")}
             </Typography>
             <Paragraph>

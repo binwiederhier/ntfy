@@ -240,6 +240,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_base_url_label")}
+                                aria-label={t("publish_dialog_base_url_label")}
                                 placeholder={t("publish_dialog_base_url_placeholder")}
                                 value={baseUrl}
                                 onChange={ev => setBaseUrl(ev.target.value)}
@@ -251,6 +252,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_topic_label")}
+                                aria-label={t("publish_dialog_topic_label")}
                                 placeholder={t("publish_dialog_topic_placeholder")}
                                 value={topic}
                                 onChange={ev => setTopic(ev.target.value)}
@@ -265,6 +267,7 @@ const PublishDialog = (props) => {
                     <TextField
                         margin="dense"
                         label={t("publish_dialog_title_label")}
+                        aria-label={t("publish_dialog_title_label")}
                         placeholder={t("publish_dialog_title_placeholder")}
                         value={title}
                         onChange={ev => setTitle(ev.target.value)}
@@ -276,6 +279,7 @@ const PublishDialog = (props) => {
                     <TextField
                         margin="dense"
                         label={t("publish_dialog_message_label")}
+                        aria-label={t("publish_dialog_message_label")}
                         placeholder={t("publish_dialog_message_placeholder")}
                         value={message}
                         onChange={ev => setMessage(ev.target.value)}
@@ -293,12 +297,13 @@ const PublishDialog = (props) => {
                             onEmojiPick={handleEmojiPick}
                             onClose={handleEmojiClose}
                         />
-                        <DialogIconButton disabled={disabled} onClick={handleEmojiClick}>
+                        <DialogIconButton disabled={disabled} onClick={handleEmojiClick} aria-label={t("publish_dialog_emoji_picker_show")}>
                             <InsertEmoticonIcon/>
                         </DialogIconButton>
                         <TextField
                             margin="dense"
                             label={t("publish_dialog_tags_label")}
+                            aria-label={t("publish_dialog_tags_label")}
                             placeholder={t("publish_dialog_tags_placeholder")}
                             value={tags}
                             onChange={ev => setTags(ev.target.value)}
@@ -315,15 +320,16 @@ const PublishDialog = (props) => {
                             <InputLabel/>
                             <Select
                                 label={t("publish_dialog_priority_label")}
+                                aria-label={t("publish_dialog_priority_label")}
                                 margin="dense"
                                 value={priority}
                                 onChange={(ev) => setPriority(ev.target.value)}
                                 disabled={disabled}
                             >
                                 {[5,4,3,2,1].map(priority =>
-                                    <MenuItem key={`priorityMenuItem${priority}`} value={priority}>
+                                    <MenuItem key={`priorityMenuItem${priority}`} value={priority} aria-label={t("notifications_priority_x", { priority: priority })}>
                                         <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            <img src={priorities[priority].file} style={{marginRight: "8px"}}/>
+                                            <img src={priorities[priority].file} style={{marginRight: "8px"}} alt={t("notifications_priority_x", { priority: priority })}/>
                                             <div>{priorities[priority].label}</div>
                                         </div>
                                     </MenuItem>
@@ -339,6 +345,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_click_label")}
+                                aria-label={t("publish_dialog_click_label")}
                                 placeholder={t("publish_dialog_click_placeholder")}
                                 value={clickUrl}
                                 onChange={ev => setClickUrl(ev.target.value)}
@@ -357,6 +364,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_email_label")}
+                                aria-label={t("publish_dialog_email_label")}
                                 placeholder={t("publish_dialog_email_placeholder")}
                                 value={email}
                                 onChange={ev => setEmail(ev.target.value)}
@@ -377,6 +385,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_attach_label")}
+                                aria-label={t("publish_dialog_attach_label")}
                                 placeholder={t("publish_dialog_attach_placeholder")}
                                 value={attachUrl}
                                 onChange={ev => {
@@ -402,6 +411,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_filename_label")}
+                                aria-label={t("publish_dialog_filename_label")}
                                 placeholder={t("publish_dialog_filename_placeholder")}
                                 value={filename}
                                 onChange={ev => {
@@ -441,6 +451,7 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_delay_label")}
+                                aria-label={t("publish_dialog_delay_label")}
                                 placeholder={t("publish_dialog_delay_placeholder", {
                                     unixTimestamp: "1649029748",
                                     relativeTime: "30m",
@@ -459,12 +470,12 @@ const PublishDialog = (props) => {
                         {t("publish_dialog_other_features")}
                     </Typography>
                     <div>
-                        {!showClickUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_click_label")} onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showEmail && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_email_label")} onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_url_label")} onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_file_label")} onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showDelay && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_delay_label")} onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showTopicUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_topic_label")} onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showClickUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_click_label")} aria-label={t("publish_dialog_chip_click_label")} onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showEmail && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_email_label")} aria-label={t("publish_dialog_chip_email_label")} onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_url_label")} aria-label={t("publish_dialog_chip_attach_url_label")} onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_file_label")} aria-label={t("publish_dialog_chip_attach_file_label")} onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showDelay && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_delay_label")} aria-label={t("publish_dialog_chip_delay_label")} onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showTopicUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_topic_label")} aria-label={t("publish_dialog_chip_topic_label")} onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                     </div>
                     <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
                         <Trans
@@ -483,7 +494,13 @@ const PublishDialog = (props) => {
                                 label={t("publish_dialog_checkbox_publish_another")}
                                 sx={{marginRight: 2}}
                                 control={
-                                    <Checkbox size="small" checked={publishAnother} onChange={(ev) => setPublishAnother(ev.target.checked)} />
+                                    <Checkbox
+                                        size="small"
+                                        checked={publishAnother}
+                                        onChange={(ev) => setPublishAnother(ev.target.checked)}
+                                        inputProps={{
+                                            "aria-label": t("publish_dialog_checkbox_publish_another")
+                                        }} />
                                 } />
                             <Button onClick={props.onClose}>{t("publish_dialog_button_cancel")}</Button>
                             <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>{t("publish_dialog_button_send")}</Button>
@@ -497,7 +514,7 @@ const PublishDialog = (props) => {
 
 const Row = (props) => {
     return (
-        <div style={{display: 'flex'}}>
+        <div style={{display: 'flex'}} role="row">
             {props.children}
         </div>
     );

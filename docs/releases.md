@@ -14,6 +14,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Accurate naming of "mute notifications" from "pause notifications" ([#224](https://github.com/binwiederhier/ntfy/issues/224), thanks to [@shadow00](https://github.com/shadow00) for reporting)
 * Make messages with links selectable ([#226](https://github.com/binwiederhier/ntfy/issues/226), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
+* Restoring topics or settings from backup doesn't work ([#223](https://github.com/binwiederhier/ntfy/issues/223), thanks to [@shadow00](https://github.com/shadow00) for reporting)
+* Fix app icon on old Android versions ([#128](https://github.com/binwiederhier/ntfy/issues/128), thanks to [@shadow00](https://github.com/shadow00) for reporting)
 
 **Thanks for testing:**
 

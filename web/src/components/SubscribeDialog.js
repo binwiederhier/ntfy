@@ -102,16 +102,26 @@ const SubscribePage = (props) => {
                     margin="dense"
                     id="topic"
                     placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
-                    inputProps={{ maxLength: 64 }}
                     value={props.topic}
                     onChange={ev => props.setTopic(ev.target.value)}
                     type="text"
                     fullWidth
                     variant="standard"
+                    inputProps={{
+                        maxLength: 64,
+                        "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
+                    }}
                 />
                 <FormControlLabel
                     sx={{pt: 1}}
-                    control={<Checkbox onChange={handleUseAnotherChanged}/>}
+                    control={
+                        <Checkbox
+                            onChange={handleUseAnotherChanged}
+                            inputProps={{
+                                "aria-label": t("subscribe_dialog_subscribe_use_another_label")
+                            }}
+                        />
+                    }
                     label={t("subscribe_dialog_subscribe_use_another_label")} />
                 {anotherServerVisible && <Autocomplete
                     freeSolo
@@ -120,7 +130,12 @@ const SubscribePage = (props) => {
                     inputValue={props.baseUrl}
                     onInputChange={(ev, newVal) => props.setBaseUrl(newVal)}
                     renderInput={ (params) =>
-                        <TextField {...params} placeholder={window.location.origin} variant="standard"/>
+                        <TextField
+                            {...params}
+                            placeholder={window.location.origin}
+                            variant="standard"
+                            aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                        />
                     }
                 />}
             </DialogContent>
@@ -168,6 +183,9 @@ const LoginPage = (props) => {
                     type="text"
                     fullWidth
                     variant="standard"
+                    inputProps={{
+                        "aria-label": t("subscribe_dialog_login_username_label")
+                    }}
                 />
                 <TextField
                     margin="dense"
@@ -178,6 +196,9 @@ const LoginPage = (props) => {
                     onChange={ev => setPassword(ev.target.value)}
                     fullWidth
                     variant="standard"
+                    inputProps={{
+                        "aria-label": t("subscribe_dialog_login_password_label")
+                    }}
                 />
             </DialogContent>
             <DialogFooter status={errorText}>

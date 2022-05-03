@@ -240,7 +240,6 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_base_url_label")}
-                                aria-label={t("publish_dialog_base_url_label")}
                                 placeholder={t("publish_dialog_base_url_placeholder")}
                                 value={baseUrl}
                                 onChange={ev => setBaseUrl(ev.target.value)}
@@ -248,11 +247,13 @@ const PublishDialog = (props) => {
                                 type="url"
                                 variant="standard"
                                 sx={{flexGrow: 1, marginRight: 1}}
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_base_url_label")
+                                }}
                             />
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_topic_label")}
-                                aria-label={t("publish_dialog_topic_label")}
                                 placeholder={t("publish_dialog_topic_placeholder")}
                                 value={topic}
                                 onChange={ev => setTopic(ev.target.value)}
@@ -261,13 +262,15 @@ const PublishDialog = (props) => {
                                 variant="standard"
                                 autoFocus={!messageFocused}
                                 sx={{flexGrow: 1}}
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_topic_label")
+                                }}
                             />
                         </ClosableRow>
                     }
                     <TextField
                         margin="dense"
                         label={t("publish_dialog_title_label")}
-                        aria-label={t("publish_dialog_title_label")}
                         placeholder={t("publish_dialog_title_placeholder")}
                         value={title}
                         onChange={ev => setTitle(ev.target.value)}
@@ -275,11 +278,13 @@ const PublishDialog = (props) => {
                         type="text"
                         fullWidth
                         variant="standard"
+                        inputProps={{
+                            "aria-label": t("publish_dialog_title_label")
+                        }}
                     />
                     <TextField
                         margin="dense"
                         label={t("publish_dialog_message_label")}
-                        aria-label={t("publish_dialog_message_label")}
                         placeholder={t("publish_dialog_message_placeholder")}
                         value={message}
                         onChange={ev => setMessage(ev.target.value)}
@@ -290,6 +295,9 @@ const PublishDialog = (props) => {
                         autoFocus={messageFocused}
                         fullWidth
                         multiline
+                        inputProps={{
+                            "aria-label": t("publish_dialog_message_label")
+                        }}
                     />
                     <div style={{display: 'flex'}}>
                         <EmojiPicker
@@ -303,7 +311,6 @@ const PublishDialog = (props) => {
                         <TextField
                             margin="dense"
                             label={t("publish_dialog_tags_label")}
-                            aria-label={t("publish_dialog_tags_label")}
                             placeholder={t("publish_dialog_tags_placeholder")}
                             value={tags}
                             onChange={ev => setTags(ev.target.value)}
@@ -311,6 +318,9 @@ const PublishDialog = (props) => {
                             type="text"
                             variant="standard"
                             sx={{flexGrow: 1, marginRight: 1}}
+                            inputProps={{
+                                "aria-label": t("publish_dialog_tags_label")
+                            }}
                         />
                         <FormControl
                             variant="standard"
@@ -320,11 +330,13 @@ const PublishDialog = (props) => {
                             <InputLabel/>
                             <Select
                                 label={t("publish_dialog_priority_label")}
-                                aria-label={t("publish_dialog_priority_label")}
                                 margin="dense"
                                 value={priority}
                                 onChange={(ev) => setPriority(ev.target.value)}
                                 disabled={disabled}
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_priority_label")
+                                }}
                             >
                                 {[5,4,3,2,1].map(priority =>
                                     <MenuItem key={`priorityMenuItem${priority}`} value={priority} aria-label={t("notifications_priority_x", { priority: priority })}>
@@ -345,7 +357,6 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_click_label")}
-                                aria-label={t("publish_dialog_click_label")}
                                 placeholder={t("publish_dialog_click_placeholder")}
                                 value={clickUrl}
                                 onChange={ev => setClickUrl(ev.target.value)}
@@ -353,6 +364,9 @@ const PublishDialog = (props) => {
                                 type="url"
                                 fullWidth
                                 variant="standard"
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_click_label")
+                                }}
                             />
                         </ClosableRow>
                     }
@@ -364,7 +378,6 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_email_label")}
-                                aria-label={t("publish_dialog_email_label")}
                                 placeholder={t("publish_dialog_email_placeholder")}
                                 value={email}
                                 onChange={ev => setEmail(ev.target.value)}
@@ -372,6 +385,9 @@ const PublishDialog = (props) => {
                                 type="email"
                                 variant="standard"
                                 fullWidth
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_email_label")
+                                }}
                             />
                         </ClosableRow>
                     }
@@ -385,7 +401,6 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_attach_label")}
-                                aria-label={t("publish_dialog_attach_label")}
                                 placeholder={t("publish_dialog_attach_placeholder")}
                                 value={attachUrl}
                                 onChange={ev => {
@@ -407,11 +422,13 @@ const PublishDialog = (props) => {
                                 type="url"
                                 variant="standard"
                                 sx={{flexGrow: 5, marginRight: 1}}
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_attach_label")
+                                }}
                             />
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_filename_label")}
-                                aria-label={t("publish_dialog_filename_label")}
                                 placeholder={t("publish_dialog_filename_placeholder")}
                                 value={filename}
                                 onChange={ev => {
@@ -422,6 +439,9 @@ const PublishDialog = (props) => {
                                 type="text"
                                 variant="standard"
                                 sx={{flexGrow: 1}}
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_filename_label")
+                                }}
                             />
                         </ClosableRow>
                     }
@@ -430,6 +450,7 @@ const PublishDialog = (props) => {
                         ref={attachFileInput}
                         onChange={handleAttachFileChanged}
                         style={{ display: 'none' }}
+                        aria-hidden={true}
                     />
                     {showAttachFile && <AttachmentBox
                         file={attachFile}
@@ -451,7 +472,6 @@ const PublishDialog = (props) => {
                             <TextField
                                 margin="dense"
                                 label={t("publish_dialog_delay_label")}
-                                aria-label={t("publish_dialog_delay_label")}
                                 placeholder={t("publish_dialog_delay_placeholder", {
                                     unixTimestamp: "1649029748",
                                     relativeTime: "30m",
@@ -463,6 +483,9 @@ const PublishDialog = (props) => {
                                 type="text"
                                 variant="standard"
                                 fullWidth
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_delay_label")
+                                }}
                             />
                         </ClosableRow>
                     }
@@ -579,7 +602,7 @@ const AttachmentBox = (props) => {
                     <Typography variant="body2" sx={{ color: 'text.primary' }}>
                         {formatBytes(file.size)}
                         {props.error &&
-                            <Typography component="span" sx={{ color: 'error.main' }}>
+                            <Typography component="span" sx={{ color: 'error.main' }} aria-live="polite">
                                 {" "}({props.error})
                             </Typography>
                         }
@@ -619,7 +642,6 @@ const ExpandingTextField = (props) => {
             </Typography>
             <TextField
                 margin="dense"
-                aria-label={props.placeholder}
                 placeholder={props.placeholder}
                 value={props.value}
                 onChange={props.onChange}
@@ -627,7 +649,10 @@ const ExpandingTextField = (props) => {
                 variant="standard"
                 sx={{ width: `${textWidth}px`, borderBottom: "none" }}
                 InputProps={{ style: { fontSize: theme.typography[props.variant].fontSize } }}
-                inputProps={{ style: { paddingBottom: 0, paddingTop: 0 } }}
+                inputProps={{
+                    style: { paddingBottom: 0, paddingTop: 0 },
+                    "aria-label": props.placeholder
+                }}
                 disabled={props.disabled}
             />
         </>

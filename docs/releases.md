@@ -27,6 +27,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 **Features:**
 
 * Better parsing of the user actions, allowing quotes (no ticket)
+* Make web app more accessible ([#217](https://github.com/binwiederhier/ntfy/issues/217))
 
 **Bugs:**
 

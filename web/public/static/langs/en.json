@@ -118,6 +118,7 @@
   "subscribe_dialog_subscribe_description": "Topics may not be password-protected, so choose a name that's not easy to guess. Once subscribed, you can PUT/POST notifications.",
   "subscribe_dialog_subscribe_topic_placeholder": "Topic name, e.g. phil_alerts",
   "subscribe_dialog_subscribe_use_another_label": "Use another server",
+  "subscribe_dialog_subscribe_base_url_label": "Service URL",
   "subscribe_dialog_subscribe_button_cancel": "Cancel",
   "subscribe_dialog_subscribe_button_subscribe": "Subscribe",
   "subscribe_dialog_login_title": "Login required",

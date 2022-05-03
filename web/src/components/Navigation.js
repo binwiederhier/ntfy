@@ -33,13 +33,13 @@ const Navigation = (props) => {
     return (
         <Box
             component="nav"
-            role="navigation" 
+            role="navigation"
             sx={{width: {sm: Navigation.width}, flexShrink: {sm: 0}}}
         >
             {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
             <Drawer
                 variant="temporary"
-                role="menubar" 
+                role="menubar"
                 open={props.mobileDrawerOpen}
                 onClose={props.onMobileDrawerToggle}
                 ModalProps={{ keepMounted: true }} // Better open performance on mobile.
@@ -54,7 +54,7 @@ const Navigation = (props) => {
             <Drawer
                 open
                 variant="permanent"
-                role="menubar" 
+                role="menubar"
                 sx={{
                     display: { xs: 'none', sm: 'block' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: navWidth },
@@ -163,6 +163,7 @@ const SubscriptionList = (props) => {
 }
 
 const SubscriptionItem = (props) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const subscription = props.subscription;
     const iconBadge = (subscription.new <= 99) ? subscription.new : "99+";
@@ -172,16 +173,19 @@ const SubscriptionItem = (props) => {
     const label = (subscription.baseUrl === window.location.origin)
         ? subscription.topic
         : topicShortUrl(subscription.baseUrl, subscription.topic);
+    const ariaLabel = (subscription.state === ConnectionState.Connecting)
+        ? `${label} (${t("nav_button_connecting")})`
+        : label;
     const handleClick = async () => {
         navigate(routes.forSubscription(subscription));
         await subscriptionManager.markNotificationsRead(subscription.id);
     };
     return (
-        <ListItemButton onClick={handleClick} selected={props.selected}>
+        <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
             <ListItemIcon>{icon}</ListItemIcon>
             <ListItemText primary={label}/>
             {subscription.mutedUntil > 0 &&
-                <ListItemIcon edge="end"><NotificationsOffOutlined /></ListItemIcon>}
+                <ListItemIcon edge="end" aria-label={t("nav_button_muted")}><NotificationsOffOutlined /></ListItemIcon>}
         </ListItemButton>
     );
 };

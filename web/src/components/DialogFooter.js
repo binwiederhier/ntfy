@@ -12,11 +12,15 @@ const DialogFooter = (props) => {
             paddingLeft: '24px',
             paddingBottom: '8px',
         }}>
-            <DialogContentText component="div" sx={{
-                margin: '0px',
-                paddingTop: '12px',
-                paddingBottom: '4px'
-            }}>
+            <DialogContentText
+                component="div"
+                aria-live="polite"
+                sx={{
+                    margin: '0px',
+                    paddingTop: '12px',
+                    paddingBottom: '4px'
+                }}
+            >
                 {props.status}
             </DialogContentText>
             <DialogActions sx={{paddingRight: 2}}>

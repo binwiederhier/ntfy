@@ -232,7 +232,7 @@ const PublishDialog = (props) => {
                 <DialogContent>
                     {dropZone && <DropBox/>}
                     {showTopicUrl &&
-                        <ClosableRow closable={!!props.baseUrl && !!props.topic} disabled={disabled} onClose={() => {
+                        <ClosableRow closable={!!props.baseUrl && !!props.topic} disabled={disabled} closeLabel={t("publish_dialog_topic_reset")} onClose={() => {
                             setBaseUrl(props.baseUrl);
                             setTopic(props.topic);
                             setShowTopicUrl(false);
@@ -338,7 +338,7 @@ const PublishDialog = (props) => {
                         </FormControl>
                     </div>
                     {showClickUrl &&
-                        <ClosableRow disabled={disabled} onClose={() => {
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_click_reset")} onClose={() => {
                             setClickUrl("");
                             setShowClickUrl(false);
                         }}>
@@ -357,7 +357,7 @@ const PublishDialog = (props) => {
                         </ClosableRow>
                     }
                     {showEmail &&
-                        <ClosableRow disabled={disabled} onClose={() => {
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_email_reset")} onClose={() => {
                             setEmail("");
                             setShowEmail(false);
                         }}>
@@ -376,7 +376,7 @@ const PublishDialog = (props) => {
                         </ClosableRow>
                     }
                     {showAttachUrl &&
-                        <ClosableRow disabled={disabled} onClose={() => {
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_attach_reset")} onClose={() => {
                             setAttachUrl("");
                             setFilename("");
                             setFilenameEdited(false);
@@ -444,7 +444,7 @@ const PublishDialog = (props) => {
                         }}
                     />}
                     {showDelay &&
-                        <ClosableRow disabled={disabled} onClose={() => {
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_delay_reset")} onClose={() => {
                             setDelay("");
                             setShowDelay(false);
                         }}>
@@ -525,7 +525,11 @@ const ClosableRow = (props) => {
     return (
         <Row>
             {props.children}
-            {closable && <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>}
+            {closable &&
+                <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}} aria-label={props.closeLabel}>
+                    <Close/>
+                </DialogIconButton>
+            }
         </Row>
     );
 };
@@ -540,6 +544,7 @@ const DialogIconButton = (props) => {
             sx={{height: "45px", marginTop: "17px", ...sx}}
             onClick={props.onClick}
             disabled={props.disabled}
+            aria-label={props["aria-label"]}
         >
             {props.children}
         </IconButton>
@@ -580,7 +585,9 @@ const AttachmentBox = (props) => {
                         }
                     </Typography>
                 </Box>
-                <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}}><Close/></DialogIconButton>
+                <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{marginLeft: "6px"}} aria-label={t("publish_dialog_attached_file_remove")}>
+                    <Close/>
+                </DialogIconButton>
             </Box>
         </>
     );
@@ -605,12 +612,14 @@ const ExpandingTextField = (props) => {
                 ref={invisibleFieldRef}
                 component="span"
                 variant={props.variant}
+                aria-hidden={true}
                 sx={{position: "absolute", left: "-200%"}}
             >
                 {props.value}
             </Typography>
             <TextField
                 margin="dense"
+                aria-label={props.placeholder}
                 placeholder={props.placeholder}
                 value={props.value}
                 onChange={props.onChange}

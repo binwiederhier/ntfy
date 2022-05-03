@@ -73,8 +73,6 @@ const EmojiPicker = (props) => {
                                 inputRef={searchRef}
                                 margin="dense"
                                 size="small"
-                                role="searchbox" 
-                                aria-label={t("emoji_picker_search_placeholder")}
                                 placeholder={t("emoji_picker_search_placeholder")}
                                 value={search}
                                 onChange={ev => setSearch(ev.target.value)}
@@ -82,6 +80,10 @@ const EmojiPicker = (props) => {
                                 variant="standard"
                                 fullWidth
                                 sx={{ marginTop: 0, marginBottom: "12px", paddingRight: 2 }}
+                                inputProps={{
+                                    role: "searchbox",
+                                    "aria-label": t("emoji_picker_search_placeholder")
+                                }}
                                 InputProps={{
                                     endAdornment:
                                         <InputAdornment position="end" sx={{ display: (search) ? '' : 'none' }}>

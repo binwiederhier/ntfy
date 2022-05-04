@@ -37,6 +37,10 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 * Made web app sounds quieter ([#222](https://github.com/binwiederhier/ntfy/issues/222))
 * Add "private browsing"-specific error message for Firefox/Safari ([#208](https://github.com/binwiederhier/ntfy/issues/208), thanks to [@julianfoad](https://github.com/julianfoad) for reporting) 
 
+**Documentation:**
+
+* Improved caddy configuration (no ticket, thanks to @Stnby)
+
 **Additional translations:**
 
 * Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))

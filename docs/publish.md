@@ -220,8 +220,8 @@ Until further notice." \
     ```
 
 <figure markdown>
-  ![priority notification](static/img/multiline-notification.png){ width=500 }
-  <figcaption>Urgent multiline notification with tags and title</figcaption>
+  ![priority notification](static/img/complete-notification.png){ width=500 }
+  <figcaption>Detailed notification with title, priority, tags, on click, attachment link with custom file name, delayed delivery, multiline message and an action button</figcaption>
 </figure>
 
 ## Message title

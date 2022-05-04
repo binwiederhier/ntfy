@@ -163,6 +163,27 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
+A multiline message works too:
+
+=== "Bash"
+    ```
+    #!/bin/bash
+   curl \
+      -X PUT \
+      -H "Title: Unauthorized access detected" \
+      -H "Priority: urgent" \
+      -H "Tags: warning,skull" \
+      -d "Remote access detected to phils-laptop detected.
+Act right away.
+Or don't" \
+      ntfy.sh/phil_alerts
+    ```
+
+<figure markdown>
+  ![priority notification](static/img/multiline-notification.png){ width=500 }
+  <figcaption>Urgent multiline notification with tags and title</figcaption>
+</figure>
+
 ## Message title
 The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`). To override the title, 
 you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).

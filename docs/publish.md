@@ -163,20 +163,25 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
-A multiline message works too:
+A detailed example:
 
 === "Bash"
     ```
     #!/bin/bash
-   curl \
+      curl \
       -X PUT \
-      -H "Title: Unauthorized access detected" \
-      -H "Priority: urgent" \
-      -H "Tags: warning,skull" \
-      -d "Remote access detected to phils-laptop detected.
-Act right away.
-Or don't" \
-      ntfy.sh/phil_alerts
+      -H "X-Title: Nearby roadworks" \
+      -H "X-Priority: low" \
+      -H "X-Tags: loudspeaker" \
+      -H "X-Click: https://dictionary.cambridge.org/dictionary/english/roadworks" \
+      -H "X-Attach: https://ntfy.sh/docs/static/img/ntfy.png" \
+      -H "X-Filename: logo" \
+      -H "X-Delay: 15s" \
+      -H "Actions: view, View Map, https://www.google.com/maps/place/48%C2%B051'33.2%22N+2%C2%B017'41.0%22E/@48.8592175%2C2.2925253%2C17z, clear=true;" \
+      -d "Planned closures with high impact to commuters.
+6am - 9:30am.
+Until further notice." \
+      ntfy.sh/commuter_alerts
     ```
 
 === "ntfy CLI"

@@ -179,6 +179,41 @@ Or don't" \
       ntfy.sh/phil_alerts
     ```
 
+=== "ntfy CLI"
+    ```
+    // TODO
+    ```
+
+=== "HTTP"
+    ``` http
+    // TODO
+    ```
+    
+=== "JavaScript"
+    ``` javascript
+    // TODO
+    ```
+
+=== "Go"
+    ``` go
+    // TODO
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    // TODO
+    ```
+
+=== "Python"
+    ``` python
+    // TODO
+    ```
+
+=== "PHP"
+    ``` php-inline
+    // TODO
+    ```
+
 <figure markdown>
   ![priority notification](static/img/multiline-notification.png){ width=500 }
   <figcaption>Urgent multiline notification with tags and title</figcaption>

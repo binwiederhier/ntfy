@@ -223,20 +223,20 @@ Doggies have been known to ring the doorbell."
 	    'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
 	    'Email': 'phil@example.com'
         },
-        body: 'There's someone at the door. 🐶
+        body: `There's someone at the door. 🐶
    
 Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell.',
+Doggies have been known to ring the doorbell.`,
     })
     ```
 
 === "Go"
     ``` go
 	req, _ := http.NewRequest("POST", "https://ntfy.sh/mydoorbell",
-		strings.NewReader("There's someone at the door. 🐶
+		strings.NewReader(`There's someone at the door. 🐶
    
 Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell."))
+Doggies have been known to ring the doorbell.`))
 	req.Header.Set("Title", "New visitor")
 	req.Header.Set("Click", "https://home.nest.com/")
 	req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
@@ -253,26 +253,28 @@ Doggies have been known to ring the doorbell."))
                   Attach="https://nest.com/view/yAxkasd.jpg"
 		  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
 		  Email="phil@example.com"}
-    $body = "There's someone at the door. 🐶
+    $body = @'
+There's someone at the door. 🐶
    
 Please check if it's a good boy or a hooman.
-Doggies have been known to ring the doorbell."              
+Doggies have been known to ring the doorbell.
+'
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/mydoorbell",
-        data="There's someone at the door. 🐶
-   
+        data="""There's someone at the door. 🐶
+
 Please check if it's a good boy or a hooman.
-Doggies have been known to ring the doorbell.",
+Doggies have been known to ring the doorbell.""".encode('utf-8'),
         headers={
             "Title": "New visitor",
             "Click": "https://home.nest.com/",
             "Attach": "https://nest.com/view/yAxkasd.jpg",
-	    "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true",
-	    "Email": "phil@example.com"
+            "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true",
+            "Email": "phil@example.com"
         })
     ```
 

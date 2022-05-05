@@ -163,25 +163,21 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
-A detailed example:
+You can also do multi-line messages. Here's an example using a click action, a user action, with an external image attachment and forwarded via email:
 
 === "Bash"
     ```
     #!/bin/bash
-      curl \
-      -X PUT \
-      -H "X-Title: Nearby roadworks" \
-      -H "X-Priority: low" \
-      -H "X-Tags: loudspeaker" \
-      -H "X-Click: https://dictionary.cambridge.org/dictionary/english/roadworks" \
-      -H "X-Attach: https://ntfy.sh/docs/static/img/ntfy.png" \
-      -H "X-Filename: logo" \
-      -H "X-Delay: 15s" \
-      -H "Actions: view, View Map, https://www.google.com/maps/place/48%C2%B051'33.2%22N+2%C2%B017'41.0%22E/@48.8592175%2C2.2925253%2C17z, clear=true;" \
-      -d "Planned closures with high impact to commuters.
-6am - 9:30am.
-Until further notice." \
-      ntfy.sh/commuter_alerts
+   curl \
+  -H "Click: https://home.nest.com/" \
+  -H "Attach: https://nest.com/view/yAxkasd.jpg" \
+  -H "Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
+  -H "Email: phil@example.com" \
+  -d "There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman. 
+Doggies have been known to ring the doorbell." \
+      ntfy.sh/mydoorbell
     ```
 
 === "ntfy CLI"
@@ -220,7 +216,7 @@ Until further notice." \
     ```
 
 <figure markdown>
-  ![priority notification](static/img/complete-notification.png){ width=500 }
+  ![priority notification](static/img/complete-notification.jpg){ width=500 }
   <figcaption>Detailed notification with title, priority, tags, on click, attachment link with custom file name, delayed delivery, multiline message and an action button</figcaption>
 </figure>
 

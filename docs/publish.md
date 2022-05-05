@@ -166,14 +166,14 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 You can also do multi-line messages. Here's an example using a click action, a user action, with an external image attachment and forwarded via email:
 
 === "Bash"
-    ```
-    #!/bin/bash
-   curl \
-  -H "Click: https://home.nest.com/" \
-  -H "Attach: https://nest.com/view/yAxkasd.jpg" \
-  -H "Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
-  -H "Email: phil@example.com" \
-  -d "There's someone at the door. 🐶
+    ``` sh
+    curl \
+      -H "Title: New visitor" \
+      -H "Click: https://home.nest.com/" \
+      -H "Attach: https://nest.com/view/yAxkasd.jpg" \
+      -H "Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
+      -H "Email: phil@example.com" \
+      -d "There's someone at the door. 🐶
    
 Please check if it's a good boy or a hooman. 
 Doggies have been known to ring the doorbell." \
@@ -182,42 +182,119 @@ Doggies have been known to ring the doorbell." \
 
 === "ntfy CLI"
     ```
-    // TODO
+    ntfy publish \
+        --title="New visitor" \
+	--click="https://home.nest.com/" \
+	--attach="https://nest.com/view/yAxkasd.jpg" \
+	--actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
+	--email="phil@example.com"
+        mydoorbell \
+        "There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman. 
+Doggies have been known to ring the doorbell."
     ```
 
 === "HTTP"
     ``` http
-    // TODO
+    POST /mydoorbell HTTP/1.1
+    Host: ntfy.sh
+    Title: New visitor
+    Click: https://home.nest.com/
+    Attach: https://nest.com/view/yAxkasd.jpg
+    Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true
+    Email: phil@example.com
+    
+    There's someone at the door. 🐶
+   
+    Please check if it's a good boy or a hooman. 
+    Doggies have been known to ring the doorbell.
     ```
     
 === "JavaScript"
     ``` javascript
-    // TODO
+    fetch('https://ntfy.sh/mydoorbell', {
+        method: 'POST', // PUT works too
+	headers: {
+            'Title': 'New visitor',
+            'Click': 'https://home.nest.com/',
+            'Attach': 'https://nest.com/view/yAxkasd.jpg',
+	    'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
+	    'Email': 'phil@example.com'
+        },
+        body: 'There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman. 
+Doggies have been known to ring the doorbell.',
+    })
     ```
 
 === "Go"
     ``` go
-    // TODO
+	req, _ := http.NewRequest("POST", "https://ntfy.sh/mydoorbell",
+		strings.NewReader("There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman. 
+Doggies have been known to ring the doorbell."))
+	req.Header.Set("Title", "New visitor")
+	req.Header.Set("Click", "https://home.nest.com/")
+	req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
+	req.Header.Set("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
+	req.Header.Set("Email", "phil@example.com")
+	http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
-    // TODO
+    $uri = "https://ntfy.sh/mydoorbell"
+    $headers = @{ Title="New visitor"
+                  Click="https://home.nest.com/"
+                  Attach="https://nest.com/view/yAxkasd.jpg"
+		  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
+		  Email="phil@example.com"}
+    $body = "There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman.
+Doggies have been known to ring the doorbell."              
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
     ``` python
-    // TODO
+    requests.post("https://ntfy.sh/mydoorbell",
+        data="There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman.
+Doggies have been known to ring the doorbell.",
+        headers={
+            "Title": "New visitor",
+            "Click": "https://home.nest.com/",
+            "Attach": "https://nest.com/view/yAxkasd.jpg",
+	    "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true",
+	    "Email": "phil@example.com"
+        })
     ```
 
 === "PHP"
     ``` php-inline
-    // TODO
+    file_get_contents('https://ntfy.sh/mydoorbell', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Title: New visitor\r\n" .
+                "Click: https://home.nest.com/\r\n" .
+                "Attach: https://nest.com/view/yAxkasd.jpg" .
+		"Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true" .
+		"Email": "phil@example.com" ,
+            'content' => 'Remote access to phils-laptop detected. Act right away.'
+        ]
+    ]));
     ```
 
 <figure markdown>
   ![priority notification](static/img/complete-notification.jpg){ width=500 }
-  <figcaption>Detailed notification with title, priority, tags, on click, attachment link with custom file name, delayed delivery, multiline message and an action button</figcaption>
+  <figcaption>Notification using a click action, a user action, with an external image attachment and forwarded via email</figcaption>
 </figure>
 
 ## Message title

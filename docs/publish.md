@@ -169,7 +169,6 @@ You can also do multi-line messages. Here's an example using a click action, a u
     ``` sh
     #!/bin/bash
     curl \
-      -H "Title: New visitor" \
       -H "Click: https://home.nest.com/" \
       -H "Attach: https://nest.com/view/yAxkasd.jpg" \
       -H "Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
@@ -184,7 +183,6 @@ Doggies have been known to ring the doorbell." \
 === "ntfy CLI"
     ```
     ntfy publish \
-        --title="New visitor" \
 	--click="https://home.nest.com/" \
 	--attach="https://nest.com/view/yAxkasd.jpg" \
 	--actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
@@ -200,7 +198,6 @@ Doggies have been known to ring the doorbell."
     ``` http
     POST /mydoorbell HTTP/1.1
     Host: ntfy.sh
-    Title: New visitor
     Click: https://home.nest.com/
     Attach: https://nest.com/view/yAxkasd.jpg
     Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true
@@ -217,7 +214,6 @@ Doggies have been known to ring the doorbell."
     fetch('https://ntfy.sh/mydoorbell', {
         method: 'POST', // PUT works too
 	headers: {
-            'Title': 'New visitor',
             'Click': 'https://home.nest.com/',
             'Attach': 'https://nest.com/view/yAxkasd.jpg',
 	    'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
@@ -237,7 +233,6 @@ Doggies have been known to ring the doorbell.`,
    
 Please check if it's a good boy or a hooman. 
 Doggies have been known to ring the doorbell.`))
-	req.Header.Set("Title", "New visitor")
 	req.Header.Set("Click", "https://home.nest.com/")
 	req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
 	req.Header.Set("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
@@ -248,8 +243,7 @@ Doggies have been known to ring the doorbell.`))
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/mydoorbell"
-    $headers = @{ Title="New visitor"
-                  Click="https://home.nest.com/"
+    $headers = @{ Click="https://home.nest.com/"
                   Attach="https://nest.com/view/yAxkasd.jpg"
 		  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
 		  Email="phil@example.com"}
@@ -270,7 +264,6 @@ Doggies have been known to ring the doorbell.
 Please check if it's a good boy or a hooman.
 Doggies have been known to ring the doorbell.""".encode('utf-8'),
         headers={
-            "Title": "New visitor",
             "Click": "https://home.nest.com/",
             "Attach": "https://nest.com/view/yAxkasd.jpg",
             "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true",
@@ -285,7 +278,6 @@ Doggies have been known to ring the doorbell.""".encode('utf-8'),
             'method' => 'POST', // PUT also works
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Title: New visitor\r\n" .
                 "Click: https://home.nest.com/\r\n" .
                 "Attach: https://nest.com/view/yAxkasd.jpg\r\n" .
 		"Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true\r\n" .

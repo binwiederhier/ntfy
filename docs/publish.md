@@ -163,11 +163,11 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
   <figcaption>Urgent notification with tags and title</figcaption>
 </figure>
 
-You can also do multi-line messages. Here's an example using a click action, a user action, with an external image attachment and forwarded via email:
+You can also do multi-line messages. Here's an example using a [click action](#click-action), an [action button](#action-buttons),
+an [external image attachment](#attach-file-from-a-url) and [email publishing](#e-mail-publishing):
 
 === "Command line (curl)"
-    ``` sh
-    #!/bin/bash
+    ```
     curl \
       -H "Click: https://home.nest.com/" \
       -H "Attach: https://nest.com/view/yAxkasd.jpg" \
@@ -175,23 +175,23 @@ You can also do multi-line messages. Here's an example using a click action, a u
       -H "Email: phil@example.com" \
       -d "There's someone at the door. 🐶
    
-Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell." \
+    Please check if it's a good boy or a hooman. 
+    Doggies have been known to ring the doorbell." \
       ntfy.sh/mydoorbell
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-	--click="https://home.nest.com/" \
-	--attach="https://nest.com/view/yAxkasd.jpg" \
-	--actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
-	--email="phil@example.com"
+	    --click="https://home.nest.com/" \
+        --attach="https://nest.com/view/yAxkasd.jpg" \
+        --actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
+        --email="phil@example.com" \
         mydoorbell \
         "There's someone at the door. 🐶
    
-Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell."
+    Please check if it's a good boy or a hooman. 
+    Doggies have been known to ring the doorbell."
     ```
 
 === "HTTP"
@@ -213,16 +213,16 @@ Doggies have been known to ring the doorbell."
     ``` javascript
     fetch('https://ntfy.sh/mydoorbell', {
         method: 'POST', // PUT works too
-	headers: {
+        headers: {
             'Click': 'https://home.nest.com/',
             'Attach': 'https://nest.com/view/yAxkasd.jpg',
-	    'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
-	    'Email': 'phil@example.com'
+	        'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
+	        'Email': 'phil@example.com'
         },
         body: `There's someone at the door. 🐶
-   
-Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell.`,
+       
+    Please check if it's a good boy or a hooman. 
+    Doggies have been known to ring the doorbell.`,
     })
     ```
 
@@ -231,8 +231,8 @@ Doggies have been known to ring the doorbell.`,
 	req, _ := http.NewRequest("POST", "https://ntfy.sh/mydoorbell",
 		strings.NewReader(`There's someone at the door. 🐶
    
-Please check if it's a good boy or a hooman. 
-Doggies have been known to ring the doorbell.`))
+    Please check if it's a good boy or a hooman. 
+    Doggies have been known to ring the doorbell.`))
 	req.Header.Set("Click", "https://home.nest.com/")
 	req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
 	req.Header.Set("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
@@ -245,14 +245,14 @@ Doggies have been known to ring the doorbell.`))
     $uri = "https://ntfy.sh/mydoorbell"
     $headers = @{ Click="https://home.nest.com/"
                   Attach="https://nest.com/view/yAxkasd.jpg"
-		  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
-		  Email="phil@example.com"}
+                  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
+                  Email="phil@example.com" }
     $body = @'
-There's someone at the door. 🐶
-   
-Please check if it's a good boy or a hooman.
-Doggies have been known to ring the doorbell.
-'@
+    There's someone at the door. 🐶
+       
+    Please check if it's a good boy or a hooman.
+    Doggies have been known to ring the doorbell.
+    '@
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
@@ -261,8 +261,8 @@ Doggies have been known to ring the doorbell.
     requests.post("https://ntfy.sh/mydoorbell",
         data="""There's someone at the door. 🐶
 
-Please check if it's a good boy or a hooman.
-Doggies have been known to ring the doorbell.""".encode('utf-8'),
+    Please check if it's a good boy or a hooman.
+    Doggies have been known to ring the doorbell.""".encode('utf-8'),
         headers={
             "Click": "https://home.nest.com/",
             "Attach": "https://nest.com/view/yAxkasd.jpg",
@@ -280,18 +280,18 @@ Doggies have been known to ring the doorbell.""".encode('utf-8'),
                 "Content-Type: text/plain\r\n" .
                 "Click: https://home.nest.com/\r\n" .
                 "Attach: https://nest.com/view/yAxkasd.jpg\r\n" .
-		"Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true\r\n" .
-		"Email": "phil@example.com\r\n" ,
-            'content' => 'There's someone at the door. 🐶
+                "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true\r\n" .
+                "Email": "phil@example.com\r\n",
+            'content' => 'There\'s someone at the door. 🐶
    
-Please check if it's a good boy or a hooman.
-Doggies have been known to ring the doorbell.'
+    Please check if it\'s a good boy or a hooman.
+    Doggies have been known to ring the doorbell.'
         ]
     ]));
     ```
 
 <figure markdown>
-  ![priority notification](static/img/complete-notification.jpg){ width=500 }
+  ![priority notification](static/img/android-screenshot-notification-multiline.jpg){ width=500 }
   <figcaption>Notification using a click action, a user action, with an external image attachment and forwarded via email</figcaption>
 </figure>
 

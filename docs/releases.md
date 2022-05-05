@@ -40,6 +40,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 **Documentation:**
 
 * Improved caddy configuration (no ticket, thanks to @Stnby)
+* Additional multi-line examples on the [publish page](https://ntfy.sh/docs/publish/) ([#234](https://github.com/binwiederhier/ntfy/pull/234), thanks to [@aTable](https://github.com/aTable))
 
 **Additional translations:**
 

@@ -165,8 +165,9 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 
 You can also do multi-line messages. Here's an example using a click action, a user action, with an external image attachment and forwarded via email:
 
-=== "Bash"
+=== "Command line (curl)"
     ``` sh
+    #!/bin/bash
     curl \
       -H "Title: New visitor" \
       -H "Click: https://home.nest.com/" \
@@ -284,10 +285,13 @@ Doggies have been known to ring the doorbell.",
                 "Content-Type: text/plain\r\n" .
                 "Title: New visitor\r\n" .
                 "Click: https://home.nest.com/\r\n" .
-                "Attach: https://nest.com/view/yAxkasd.jpg" .
-		"Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true" .
-		"Email": "phil@example.com" ,
-            'content' => 'Remote access to phils-laptop detected. Act right away.'
+                "Attach: https://nest.com/view/yAxkasd.jpg\r\n" .
+		"Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true\r\n" .
+		"Email": "phil@example.com\r\n" ,
+            'content' => 'There's someone at the door. 🐶
+   
+Please check if it's a good boy or a hooman.
+Doggies have been known to ring the doorbell.'
         ]
     ]));
     ```

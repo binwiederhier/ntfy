@@ -20,6 +20,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Prevent view action from crashing the app ([#233](https://github.com/binwiederhier/ntfy/issues/233))
 * Prevent long topic names and icons from overlappng ([#240](https://github.com/binwiederhier/ntfy/issues/240), thanks to [@cmeis](https://github.com/cmeis) for reporting)
 
+**Additional translations:**
+
+* Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony/))
+
 **Thanks for testing:**
 
 Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and 

@@ -18,6 +18,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Fix app icon on old Android versions ([#128](https://github.com/binwiederhier/ntfy/issues/128), thanks to [@shadow00](https://github.com/shadow00) for reporting)
 * Fix races in UnifiedPush registration ([#230](https://github.com/binwiederhier/ntfy/issues/230), thanks to @Jakob for reporting)
 * Prevent view action from crashing the app ([#233](https://github.com/binwiederhier/ntfy/issues/233))
+* Prevent long topic names and icons from overlappng ([#240](https://github.com/binwiederhier/ntfy/issues/240), thanks to [@cmeis](https://github.com/cmeis) for reporting)
 
 **Thanks for testing:**
 

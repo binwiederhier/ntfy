@@ -1,1 +1,7 @@
-{}
+{
+    "action_bar_settings": "Instellingen",
+    "action_bar_send_test_notification": "Stuur testmelding",
+    "action_bar_clear_notifications": "Alle meldingen wissen",
+    "message_bar_type_message": "Typ hier een bericht",
+    "action_bar_unsubscribe": "Afmelden"
+}

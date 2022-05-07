@@ -2504,9 +2504,11 @@ Here's a simple example:
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.example.com/mysecrets"
-    $headers = @{ Authorization="Basic cGhpbDpteXBhc3M=" }
-    $body = "Look ma, with auth"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    $credentials = 'username:password'
+    $encodedcredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($Credentials))
+    $headers = @{Authorization="Basic $encodedcredentials"}
+    $message = "Look ma, with auth"
+    invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
     ```
 
 === "Python"

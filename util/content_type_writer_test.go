@@ -44,7 +44,7 @@ func TestSniffWriter_WriteUnknownMimeType(t *testing.T) {
 	rr := httptest.NewRecorder()
 	sw := NewContentTypeWriter(rr, "")
 	randomBytes := make([]byte, 199)
-	rand.Read(randomBytes)
+	rand.Read(randomBytes[5:]) // Start at an offset; the test kept failing randomly because it hit random magic strings
 	sw.Write(randomBytes)
 	require.Equal(t, "application/octet-stream", rr.Header().Get("Content-Type"))
 }

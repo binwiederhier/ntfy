@@ -26,6 +26,7 @@ import {
     unmatchedTags
 } from "../app/utils";
 import IconButton from "@mui/material/IconButton";
+import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import {LightboxBackdrop, Paragraph, VerticallyCenteredContainer} from "./styles";
 import {useLiveQuery} from "dexie-react-hooks";
@@ -135,6 +136,10 @@ const NotificationItem = (props) => {
         console.log(`[Notifications] Deleting notification ${notification.id}`);
         await subscriptionManager.deleteNotification(notification.id)
     }
+    const handleMarkRead = async () => {
+        console.log(`[Notifications] Marking notification ${notification.id} as read`);
+        await subscriptionManager.markNotificationRead(notification.id)
+    }
     const handleCopy = (s) => {
         navigator.clipboard.writeText(s);
         props.onShowSnack();
@@ -150,6 +155,12 @@ const NotificationItem = (props) => {
                 <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
                     <CloseIcon />
                 </IconButton>
+                {notification.new === 1 &&
+                  <Tooltip title={t("notifications_mark_read")}>
+                    <IconButton onClick={handleMarkRead} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_mark_read")}>
+                      <CheckIcon />
+                    </IconButton>
+                  </Tooltip>}
                 <Typography sx={{ fontSize: 14 }} color="text.secondary">
                     {date}
                     {[1,2,4,5].includes(notification.priority) &&

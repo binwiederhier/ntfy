@@ -115,6 +115,12 @@ class SubscriptionManager {
             .delete();
     }
 
+    async markNotificationRead(notificationId) {
+        await db.notifications
+            .where({id: notificationId, new: 1})
+            .modify({new: 0});
+    }
+
     async markNotificationsRead(subscriptionId) {
         await db.notifications
             .where({subscriptionId: subscriptionId, new: 1})

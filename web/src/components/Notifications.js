@@ -99,7 +99,7 @@ const NotificationList = (props) => {
         >
             <Container
                 maxWidth="md"
-                role="list" 
+                role="list"
                 aria-label={t("notifications_list")}
                 sx={{
                     marginTop: 3,
@@ -152,12 +152,14 @@ const NotificationItem = (props) => {
     return (
         <Card sx={{ minWidth: 275, padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
             <CardContent>
-                <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
-                    <CloseIcon />
-                </IconButton>
+                <Tooltip title={t("notifications_delete")} enterDelay={500}>
+                    <IconButton onClick={handleDelete} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
+                        <CloseIcon />
+                    </IconButton>
+                </Tooltip>
                 {notification.new === 1 &&
-                  <Tooltip title={t("notifications_mark_read")}>
-                    <IconButton onClick={handleMarkRead} sx={{ float: 'right', marginRight: -1, marginTop: -1 }} aria-label={t("notifications_mark_read")}>
+                  <Tooltip title={t("notifications_mark_read")} enterDelay={500}>
+                    <IconButton onClick={handleMarkRead} sx={{ float: 'right', marginRight: -0.5, marginTop: -1 }} aria-label={t("notifications_mark_read")}>
                       <CheckIcon />
                     </IconButton>
                   </Tooltip>}

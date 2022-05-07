@@ -8,9 +8,9 @@ import Dexie from 'dexie';
 
 const db = new Dexie('ntfy');
 
-db.version(2).stores({
+db.version(1).stores({
     subscriptions: '&id,baseUrl',
-    notifications: '&id,subscriptionId,time,new,[subscriptionId+new],[id+new]', // compound keys for query performance
+    notifications: '&id,subscriptionId,time,new,[subscriptionId+new]', // compound key for query performance
     users: '&baseUrl,username',
     prefs: '&key'
 });

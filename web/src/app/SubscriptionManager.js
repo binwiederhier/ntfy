@@ -117,7 +117,7 @@ class SubscriptionManager {
 
     async markNotificationRead(notificationId) {
         await db.notifications
-            .where({id: notificationId, new: 1})
+            .where({id: notificationId})
             .modify({new: 0});
     }
 

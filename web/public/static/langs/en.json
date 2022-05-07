@@ -27,7 +27,7 @@
   "notifications_list": "Notifications list",
   "notifications_list_item": "Notification",
   "notifications_mark_read": "Mark as read",
-  "notifications_delete": "Delete notification",
+  "notifications_delete": "Delete",
   "notifications_copied_to_clipboard": "Copied to clipboard",
   "notifications_tags": "Tags",
   "notifications_priority_x": "Priority {{priority}}",

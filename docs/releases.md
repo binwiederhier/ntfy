@@ -35,6 +35,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 
 * Better parsing of the user actions, allowing quotes (no ticket)
 * Make web app more accessible ([#217](https://github.com/binwiederhier/ntfy/issues/217))
+* Add "mark as read" icon button to notification ([#243](https://github.com/binwiederhier/ntfy/pull/243), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 

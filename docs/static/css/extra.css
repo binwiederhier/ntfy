@@ -8,8 +8,8 @@
     width: unset !important;
 }
 
-.md-sidebar {
-    width: 12.5rem !important;
+.md-header__topic:first-child {
+    font-weight: 400;
 }
 
 .md-typeset h4 {

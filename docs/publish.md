@@ -2505,10 +2505,10 @@ Here's a simple example:
     ``` powershell
     $uri = "https://ntfy.example.com/mysecrets"
     $credentials = 'username:password'
-    $encodedcredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($Credentials))
-    $headers = @{Authorization="Basic $encodedcredentials"}
+    $encodedCredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($credentials))
+    $headers = @{Authorization="Basic $encodedCredentials"}
     $message = "Look ma, with auth"
-    invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
     ```
 
 === "Python"

@@ -53,6 +53,7 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 
 * Czech (thanks to [@waclaw66](https://hosted.weblate.org/user/waclaw66/))
 * French (thanks to [@nathanaelhoun](https://hosted.weblate.org/user/nathanaelhoun/))
+* Hungarian (thanks to [@agocsdaniel](https://hosted.weblate.org/user/agocsdaniel/))
 
 **Thanks for testing:**
 

@@ -129,7 +129,7 @@
     "prefs_users_table_base_url_header": "サービスURL",
     "prefs_users_dialog_username_label": "ユーザー名, 例) phil",
     "prefs_users_dialog_password_label": "パスワード",
-    "error_boundary_title": "ああ、ntfyがクラッシュしました",
+    "error_boundary_title": "おっと、ntfyがクラッシュしました",
     "error_boundary_button_copy_stack_trace": "スタックトレースをコピー",
     "error_boundary_stack_trace": "スタックトレース",
     "error_boundary_gathering_info": "更に情報を集める…",
@@ -150,5 +150,7 @@
     "priority_default": "通常",
     "prefs_notifications_delete_after_three_hours_description": "通知は3時間後に自動的に削除されます",
     "priority_low": "低",
-    "priority_min": "最低"
+    "priority_min": "最低",
+    "notifications_actions_not_supported": "このアクションはWebアプリではサポートされていません",
+    "notifications_actions_http_request_title": "{{url}}にHTTP {{method}}を送信"
 }

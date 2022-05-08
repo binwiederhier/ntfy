@@ -29,19 +29,27 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and 
 to [@Joeharrison94](https://github.com/Joeharrison94) for the input. 
 
-## ntfy server v1.22.0 (UNRELEASED)
+-->
+
+## ntfy server v1.22.0
+Released May 7, 2022
+
+This release makes the web app more accessible to people with disabilities, and introduces a "mark as read" icon in the web app.
+It also fixes a curious bug with WebSockets and Apache and makes the notification sounds in the web app a little quieter.
+
+We've also improved the documentation a little and added translations for three more languages.
 
 **Features:**
 
-* Better parsing of the user actions, allowing quotes (no ticket)
 * Make web app more accessible ([#217](https://github.com/binwiederhier/ntfy/issues/217))
+* Better parsing of the user actions, allowing quotes (no ticket)
 * Add "mark as read" icon button to notification ([#243](https://github.com/binwiederhier/ntfy/pull/243), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 
 * `Upgrade` header check is now case in-sensitive ([#228](https://github.com/binwiederhier/ntfy/issues/228), thanks to [@wunter8](https://github.com/wunter8) for finding it)
 * Made web app sounds quieter ([#222](https://github.com/binwiederhier/ntfy/issues/222))
-* Add "private browsing"-specific error message for Firefox/Safari ([#208](https://github.com/binwiederhier/ntfy/issues/208), thanks to [@julianfoad](https://github.com/julianfoad) for reporting) 
+* Add "private browsing"-specific error message for Firefox/Safari ([#208](https://github.com/binwiederhier/ntfy/issues/208), thanks to [@julianfoad](https://github.com/julianfoad) for reporting)
 
 **Documentation:**
 
@@ -58,8 +66,6 @@ to [@Joeharrison94](https://github.com/Joeharrison94) for the input.
 **Thanks for testing:**
 
 Thanks to [@wunter8](https://github.com/wunter8) for testing.
-
--->
 
 ## ntfy Android app v1.12.0
 Released Apr 25, 2022

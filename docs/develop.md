@@ -112,8 +112,8 @@ by typing `make`:
 $ make 
 Typical commands (more see below):
   make build                   - Build web app, documentation and server/client (sloowwww)
-  make server-amd64            - Build server/client binary (amd64, no web app or docs)
-  make install-amd64           - Install ntfy binary to /usr/bin/ntfy (amd64)
+  make cli-linux-amd64         - Build server/client binary (amd64, no web app or docs)
+  make install-linux-amd64     - Install ntfy binary to /usr/bin/ntfy (amd64)
   make web                     - Build the web app
   make docs                    - Build the documentation
   make check                   - Run all tests, vetting/formatting checks and linters
@@ -158,45 +158,47 @@ $ make release-snapshot
 During development, you may want to be more picky and build only certain things. Here are a few examples.
 
 ### Build the ntfy binary
-To build only the `ntfy` binary **without the web app or documentation**, use the `make server-...` targets:
+To build only the `ntfy` binary **without the web app or documentation**, use the `make cli-...` targets:
 
 ``` shell
 $ make
 Build server & client (not release version):
-  make server                  - Build server & client (all architectures)
-  make server-amd64            - Build server & client (amd64 only)
-  make server-armv7            - Build server & client (armv7 only)
-  make server-arm64            - Build server & client (arm64 only)
+  make cli                     - Build server & client (all architectures)
+  make cli-linux-amd64         - Build server & client (Linux, amd64 only)
+  make cli-linux-armv6         - Build server & client (Linux, armv6 only)
+  make cli-linux-armv7         - Build server & client (Linux, armv7 only)
+  make cli-linux-arm64         - Build server & client (Linux, arm64 only)
+  make cli-windows-amd64       - Build client (Windows, amd64 only)
 ```
 
-So if you're on an amd64/x86_64-based machine, you may just want to run `make server-amd64` during testing. On a modern
-system, this shouldn't take longer than 5-10 seconds. I often combine it with `install-amd64` so I can run the binary
+So if you're on an amd64/x86_64-based machine, you may just want to run `make cli-linux-amd64` during testing. On a modern
+system, this shouldn't take longer than 5-10 seconds. I often combine it with `install-linux-amd64` so I can run the binary
 right away:
 
 ``` shell
-$ make server-amd64 install-amd64
+$ make cli-linux-amd64 install-linux-amd64
 $ ntfy serve
 ```
 
 **During development of the main app, you can also just use `go run main.go`**, as long as you run 
-`make server-deps-static-sites`at least once and `CGO_ENABLED=1`:
+`make cli-deps-static-sites`at least once and `CGO_ENABLED=1`:
 
 ``` shell
 $ export CGO_ENABLED=1
-$ make server-deps-static-sites
+$ make cli-deps-static-sites
 $ go run main.go serve
 2022/03/18 08:43:55 Listening on :2586[http]
 ...
 ```
 
-If you don't run `server-deps-static-sites`, you may see an error *`pattern ...: no matching files found`*:
+If you don't run `cli-deps-static-sites`, you may see an error *`pattern ...: no matching files found`*:
 ```
 $ go run main.go serve
 server/server.go:85:13: pattern docs: no matching files found
 ```
 
 This is because we use `go:embed` to embed the documentation and web app, so the Go code expects files to be
-present at `server/docs` and `server/site`. If they are not, you'll see the above error. The `server-deps-static-sites`
+present at `server/docs` and `server/site`. If they are not, you'll see the above error. The `cli-deps-static-sites`
 target creates dummy files that ensures that you'll be able to build.
 
 
@@ -210,7 +212,7 @@ $ make web
 ```
 
 This will build the web app using Create React App and then **copy the production build to the `server/site` folder**, so 
-that when you `make server` (or `make server-amd64`, ...), you will have the web app included in the `ntfy` binary.
+that when you `make cli` (or `make cli-linux-amd64`, ...), you will have the web app included in the `ntfy` binary.
 
 If you're developing on the web app, it's best to just `cd web` and run `npm start` manually. This will open your browser
 at `http://127.0.0.1:3000` with the web app, and as you edit the source files, they will be recompiled and the browser 

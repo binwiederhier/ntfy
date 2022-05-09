@@ -4,7 +4,7 @@ before:
     - go mod tidy
 builds:
   -
-    id: ntfy_amd64
+    id: ntfy_linux_amd64
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
@@ -17,7 +17,7 @@ builds:
       post:
         - upx "{{ .Path }}" # apt install upx
   -
-    id: ntfy_armv6
+    id: ntfy_linux_armv6
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
@@ -28,10 +28,9 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [6]
-    # No "upx", since it causes random core dumps, see
-    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
+    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
-    id: ntfy_armv7
+    id: ntfy_linux_armv7
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
@@ -42,10 +41,9 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [7]
-    # No "upx", since it causes random core dumps, see
-    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
+    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
-    id: ntfy_arm64
+    id: ntfy_linux_arm64
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
@@ -55,14 +53,12 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [arm64]
-    # No "upx", since it causes random core dumps, see
-    # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
+    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
     id: ntfy_windows_amd64
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
-    tags: []
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [windows]
@@ -107,6 +103,12 @@ nfpms:
       postremove: "scripts/postrm.sh"
 archives:
   -
+    id: ntfy_linux
+    builds:
+      - ntfy_linux_amd64
+      - ntfy_linux_armv6
+      - ntfy_linux_armv7
+      - ntfy_linux_arm64
     wrap_in_directory: true
     files:
       - LICENSE
@@ -116,7 +118,18 @@ archives:
       - client/client.yml
       - client/ntfy-client.service
     replacements:
-      386: i386
+      amd64: x86_64
+  -
+    id: ntfy_windows
+    builds:
+      - ntfy_windows_amd64
+    format: zip
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+      - client/client.yml
+    replacements:
       amd64: x86_64
 checksum:
   name_template: 'checksums.txt'

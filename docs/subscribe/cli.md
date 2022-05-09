@@ -123,7 +123,7 @@ which will read the `subscribe` config from the config file. Please also check o
 
 Here's an example config file that subscribes to three different topics, executing a different command for each of them:
 
-=== "~/.config/ntfy/client.yml"
+=== "~/.config/ntfy/client.yml (Linux)"
     ```yaml
     subscribe:
     - topic: echo-this
@@ -145,26 +145,27 @@ Here's an example config file that subscribes to three different topics, executi
             fi
     ```
 
-    === "%AppData%\ntfy\client.yml"
-    ```
+=== "%AppData%\ntfy\client.yml (Windows)"
+    ```yaml
     subscribe:
     - topic: echo-this
       command: 'echo Message received: %message%'
-    - topic: calc
-      command: calc
+    - topic: alerts
+      command: |
+        notifu /m "%NTFY_MESSAGE%"
+        exit 0
       if:
         priority: high,urgent
-    - topic: toastthis
-      command: |
-        notifu /p "a title: %NTFY_TITLE%" /m "%NTFY_MESSAGE%"
-        exit 0
+    - topic: calc
+      command: calc
     ```
 
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out
-* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html)
-* Messages to `calc` open the gnome calculator 😀 (*because, why not*)
+* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html) (Linux) 
+  or [notifu](https://www.paralint.com/projects/notifu/) (Windows) 
+* Messages to `calc` open the calculator 😀 (*because, why not*)
 * Messages to `print-temp` execute an inline script and print the CPU temperature (Linux version only)
 
 I hope this shows how powerful this command is. Here's a short video that demonstrates the above example:

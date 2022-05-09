@@ -5,8 +5,8 @@ VERSION := $(shell git describe --tag)
 help:
 	@echo "Typical commands (more see below):"
 	@echo "  make build                   - Build web app, documentation and server/client (sloowwww)"
-	@echo "  make server-amd64            - Build server/client binary (amd64, no web app or docs)"
-	@echo "  make install-amd64           - Install ntfy binary to /usr/bin/ntfy (amd64)"
+	@echo "  make cli-linux-amd64         - Build server/client binary (amd64, no web app or docs)"
+	@echo "  make install-linux-amd64     - Install ntfy binary to /usr/bin/ntfy (amd64)"
 	@echo "  make web                     - Build the web app"
 	@echo "  make docs                    - Build the documentation"
 	@echo "  make check                   - Run all tests, vetting/formatting checks and linters"
@@ -16,11 +16,12 @@ help:
 	@echo "  make clean                   - Clean build/dist folders"
 	@echo
 	@echo "Build server & client (not release version):"
-	@echo "  make server                  - Build server & client (all architectures)"
-	@echo "  make server-amd64            - Build server & client (amd64 only)"
-	@echo "  make server-armv6            - Build server & client (armv6 only)"
-	@echo "  make server-armv7            - Build server & client (armv7 only)"
-	@echo "  make server-arm64            - Build server & client (arm64 only)"
+	@echo "  make cli                     - Build server & client (all architectures)"
+	@echo "  make cli-linux-amd64         - Build server & client (Linux, amd64 only)"
+	@echo "  make cli-linux-armv6         - Build server & client (Linux, armv6 only)"
+	@echo "  make cli-linux-armv7         - Build server & client (Linux, armv7 only)"
+	@echo "  make cli-linux-arm64         - Build server & client (Linux, arm64 only)"
+	@echo "  make cli-windows-amd64       - Build client (Windows, amd64 only)"
 	@echo
 	@echo "Build web app:"
 	@echo "  make web                     - Build the web app"
@@ -51,14 +52,14 @@ help:
 	@echo "  make release-snapshot        - Create a test release"
 	@echo
 	@echo "Install locally (requires sudo):"
-	@echo "  make install-amd64           - Copy amd64 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-armv6           - Copy armv6 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-armv7           - Copy armv7 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-arm64           - Copy arm64 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-deb-amd64       - Install .deb from dist/ (amd64 only)"
-	@echo "  make install-deb-armv6       - Install .deb from dist/ (armv6 only)"
-	@echo "  make install-deb-armv7       - Install .deb from dist/ (armv7 only)"
-	@echo "  make install-deb-arm64       - Install .deb from dist/ (arm64 only)"
+	@echo "  make install-linux-amd64     - Copy amd64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-armv6     - Copy armv6 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-armv7     - Copy armv7 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-arm64     - Copy arm64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-deb-amd64 - Install .deb from dist/ (amd64 only)"
+	@echo "  make install-linux-deb-armv6 - Install .deb from dist/ (armv6 only)"
+	@echo "  make install-linux-deb-armv7 - Install .deb from dist/ (armv7 only)"
+	@echo "  make install-linux-deb-arm64 - Install .deb from dist/ (arm64 only)"
 
 
 # Building everything
@@ -101,36 +102,39 @@ web-build:
 
 # Main server/client build
 
-server: server-deps
+cli: cli-deps
 	goreleaser build --snapshot --rm-dist --debug
 
-server-amd64: server-deps-static-sites
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_amd64
+cli-linux-amd64: cli-deps-static-sites
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_amd64
 
-server-armv6: server-deps-static-sites server-deps-gcc-armv6-armv7
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_armv6
+cli-linux-armv6: cli-deps-static-sites cli-deps-gcc-armv6-armv7
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_armv6
 
-server-armv7: server-deps-static-sites server-deps-gcc-armv6-armv7
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_armv7
+cli-linux-armv7: cli-deps-static-sites cli-deps-gcc-armv6-armv7
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_armv7
 
-server-arm64: server-deps-static-sites server-deps-gcc-arm64
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_arm64
+cli-linux-arm64: cli-deps-static-sites cli-deps-gcc-arm64
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_arm64
 
-server-deps: server-deps-static-sites server-deps-all server-deps-gcc
+cli-windows-amd64: cli-deps-static-sites
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_windows_amd64
 
-server-deps-gcc: server-deps-gcc-armv6-armv7 server-deps-gcc-arm64
+cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 
-server-deps-static-sites:
+cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64
+
+cli-deps-static-sites:
 	mkdir -p server/docs server/site
 	touch server/docs/index.html server/site/app.html
 
-server-deps-all:
+cli-deps-all:
 	which upx || { echo "ERROR: upx not installed. On Ubuntu, run: apt install upx"; exit 1; }
 
-server-deps-gcc-armv6-armv7:
+cli-deps-gcc-armv6-armv7:
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
 
-server-deps-gcc-arm64:
+cli-deps-gcc-arm64:
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
 
@@ -184,10 +188,10 @@ staticcheck: .PHONY
 
 # Releasing targets
 
-release: clean server-deps release-check-tags docs web check
+release: clean cli-deps release-check-tags docs web check
 	goreleaser release --rm-dist --debug
 
-release-snapshot: clean server-deps docs web check
+release-snapshot: clean cli-deps docs web check
 	goreleaser release --snapshot --skip-publish --rm-dist --debug
 
 release-check-tags:
@@ -204,31 +208,31 @@ release-check-tags:
 
 # Installing targets
 
-install-amd64: remove-binary
+install-linux-amd64: remove-binary
 	sudo cp -a dist/ntfy_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
 
-install-armv6: remove-binary
+install-linux-armv6: remove-binary
 	sudo cp -a dist/ntfy_armv6_linux_arm_6/ntfy /usr/bin/ntfy
 
-install-armv7: remove-binary
+install-linux-armv7: remove-binary
 	sudo cp -a dist/ntfy_armv7_linux_arm_7/ntfy /usr/bin/ntfy
 
-install-arm64: remove-binary
+install-linux-arm64: remove-binary
 	sudo cp -a dist/ntfy_arm64_linux_arm64/ntfy /usr/bin/ntfy
 
 remove-binary:
 	sudo rm -f /usr/bin/ntfy
 
-install-amd64-deb: purge-package
+install-linux-amd64-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_amd64.deb
 
-install-armv6-deb: purge-package
+install-linux-armv6-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_armv6.deb
 
-install-armv7-deb: purge-package
+install-linux-armv7-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_armv7.deb
 
-install-arm64-deb: purge-package
+install-linux-arm64-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_arm64.deb
 
 purge-package:

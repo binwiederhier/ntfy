@@ -9,11 +9,6 @@ import (
 	"os"
 )
 
-var (
-	defaultClientRootConfigFile = "/etc/ntfy/client.yml"
-	defaultClientUserConfigFile = "~/.config/ntfy/client.yml"
-)
-
 const (
 	categoryClient = "Client commands"
 	categoryServer = "Server commands"

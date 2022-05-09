@@ -63,8 +63,7 @@ Examples:
 Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
 it has incredibly useful information: https://ntfy.sh/docs/publish/.
 
-The default config file for all client commands is /etc/ntfy/client.yml (if root user),
-or ~/.config/ntfy/client.yml for all other users.`,
+` + defaultClientConfigFileDescriptionSuffix,
 }
 
 func execPublish(c *cli.Context) error {

@@ -145,12 +145,27 @@ Here's an example config file that subscribes to three different topics, executi
             fi
     ```
 
+    === "%AppData%\ntfy\client.yml"
+    ```
+    subscribe:
+    - topic: echo-this
+      command: 'echo Message received: %message%'
+    - topic: calc
+      command: calc
+      if:
+        priority: high,urgent
+    - topic: toastthis
+      command: |
+        notifu /p "a title: %NTFY_TITLE%" /m "%NTFY_MESSAGE%"
+        exit 0
+    ```
+
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out
 * Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html)
 * Messages to `calc` open the gnome calculator 😀 (*because, why not*)
-* Messages to `print-temp` execute an inline script and print the CPU temperature
+* Messages to `print-temp` execute an inline script and print the CPU temperature (Linux version only)
 
 I hope this shows how powerful this command is. Here's a short video that demonstrates the above example:
 

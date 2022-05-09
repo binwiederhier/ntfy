@@ -6,10 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
-	"log"
 	"os"
-	"os/exec"
-	"os/user"
 	"strings"
 )
 
@@ -64,19 +61,17 @@ ntfy subscribe TOPIC COMMAND
 
   Examples:
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
-    ntfy sub topic1 /my/script.sh          # Execute script for incoming messages
+    ntfy sub topic1 myscript.sh            # Execute script for incoming messages
 
 ntfy subscribe --from-config
-  Service mode (used in ntfy-client.service). This reads the config file (/etc/ntfy/client.yml 
-  or ~/.config/ntfy/client.yml) and sets up subscriptions for every topic in the "subscribe:" 
-  block (see config file).
+  Service mode (used in ntfy-client.service). This reads the config file and sets up 
+  subscriptions for every topic in the "subscribe:" block (see config file).
 
   Examples: 
     ntfy sub --from-config                           # Read topics from config file
-    ntfy sub --config=/my/client.yml --from-config   # Read topics from alternate config file
+    ntfy sub --config=myclient.yml --from-config     # Read topics from alternate config file
 
-The default config file for all client commands is /etc/ntfy/client.yml (if root user),
-or ~/.config/ntfy/client.yml for all other users.`,
+` + defaultClientConfigFileDescriptionSuffix,
 }
 
 func execSubscribe(c *cli.Context) error {
@@ -160,8 +155,8 @@ func doPollSingle(c *cli.Context, cl *client.Client, topic, command string, opti
 }
 
 func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
-	commands := make(map[string]string) // Subscription ID -> command
-	for _, s := range conf.Subscribe {  // May be nil
+	cmds := make(map[string]string)    // Subscription ID -> command
+	for _, s := range conf.Subscribe { // May be nil
 		topicOptions := append(make([]client.SubscribeOption, 0), options...)
 		for filter, value := range s.If {
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
@@ -170,18 +165,18 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			topicOptions = append(topicOptions, client.WithBasicAuth(s.User, s.Password))
 		}
 		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
-		commands[subscriptionID] = s.Command
+		cmds[subscriptionID] = s.Command
 	}
 	if topic != "" {
 		subscriptionID := cl.Subscribe(topic, options...)
-		commands[subscriptionID] = command
+		cmds[subscriptionID] = command
 	}
 	for m := range cl.Messages {
-		command, ok := commands[m.SubscriptionID]
+		cmd, ok := cmds[m.SubscriptionID]
 		if !ok {
 			continue
 		}
-		printMessageOrRunCommand(c, m, command)
+		printMessageOrRunCommand(c, m, cmd)
 	}
 	return nil
 }
@@ -198,33 +193,6 @@ func runCommand(c *cli.Context, command string, m *client.Message) {
 	if err := runCommandInternal(c, command, m); err != nil {
 		fmt.Fprintf(c.App.ErrWriter, "Command failed: %s\n", err.Error())
 	}
-}
-
-func runCommandInternal(c *cli.Context, command string, m *client.Message) error {
-	scriptFile, err := createTmpScript(command)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(scriptFile)
-	verbose := c.Bool("verbose")
-	if verbose {
-		log.Printf("[%s] Executing: %s (for message: %s)", util.ShortTopicURL(m.TopicURL), command, m.Raw)
-	}
-	cmd := exec.Command("sh", "-c", scriptFile)
-	cmd.Stdin = c.App.Reader
-	cmd.Stdout = c.App.Writer
-	cmd.Stderr = c.App.ErrWriter
-	cmd.Env = envVars(m)
-	return cmd.Run()
-}
-
-func createTmpScript(command string) (string, error) {
-	scriptFile := fmt.Sprintf("%s/ntfy-subscribe-%s.sh.tmp", os.TempDir(), util.RandomString(10))
-	script := fmt.Sprintf("#!/bin/sh\n%s", command)
-	if err := os.WriteFile(scriptFile, []byte(script), 0700); err != nil {
-		return "", err
-	}
-	return scriptFile, nil
 }
 
 func envVars(m *client.Message) []string {
@@ -253,11 +221,7 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 	if filename != "" {
 		return client.LoadConfig(filename)
 	}
-	u, _ := user.Current()
-	configFile := defaultClientRootConfigFile
-	if u.Uid != "0" {
-		configFile = util.ExpandHome(defaultClientUserConfigFile)
-	}
+	configFile := defaultConfigFile()
 	if s, _ := os.Stat(configFile); s != nil {
 		return client.LoadConfig(configFile)
 	}

@@ -3,7 +3,6 @@ package util
 import (
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -73,14 +72,6 @@ func TestSplitNoEmpty(t *testing.T) {
 	require.Equal(t, []string{}, SplitNoEmpty(",,,", ","))
 	require.Equal(t, []string{"tag1", "tag2"}, SplitNoEmpty("tag1,tag2", ","))
 	require.Equal(t, []string{"tag1", "tag2"}, SplitNoEmpty("tag1,tag2,", ","))
-}
-
-func TestExpandHome_WithTilde(t *testing.T) {
-	require.Equal(t, os.Getenv("HOME")+"/this/is/a/path", ExpandHome("~/this/is/a/path"))
-}
-
-func TestExpandHome_NoTilde(t *testing.T) {
-	require.Equal(t, "/this/is/an/absolute/path", ExpandHome("/this/is/an/absolute/path"))
 }
 
 func TestParsePriority(t *testing.T) {

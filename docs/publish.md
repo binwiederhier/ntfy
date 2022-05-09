@@ -38,7 +38,7 @@ Here's an example showing how to publish a simple message using a POST request:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/topic -Body "Backup successful 😀" -UseBasicParsing
+    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/mytopic -Body "Backup successful" -UseBasicParsing
     ```
 
 === "Python"

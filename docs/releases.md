@@ -8,7 +8,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Cards in notification detail view ([#175](https://github.com/binwiederhier/ntfy/issues/224), thanks to [@cmeis](https://github.com/cmeis) for reporting)
+* Per-subscription settings, custom subscription icons ([#155](https://github.com/binwiederhier/ntfy/issues/155), thanks to [@mztiq](https://github.com/mztiq) for reporting)
+* Cards in notification detail view ([#175](https://github.com/binwiederhier/ntfy/issues/175), thanks to [@cmeis](https://github.com/cmeis) for reporting)
 
 **Bugs:**
 

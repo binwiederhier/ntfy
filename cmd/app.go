@@ -19,6 +19,8 @@ const (
 	categoryServer = "Server commands"
 )
 
+var commands = make([]*cli.Command, 0)
+
 // New creates a new CLI application
 func New() *cli.App {
 	return &cli.App{
@@ -30,16 +32,7 @@ func New() *cli.App {
 		Reader:                 os.Stdin,
 		Writer:                 os.Stdout,
 		ErrWriter:              os.Stderr,
-		Commands: []*cli.Command{
-			// Server commands
-			cmdServe,
-			cmdUser,
-			cmdAccess,
-
-			// Client commands
-			cmdPublish,
-			cmdSubscribe,
-		},
+		Commands:               commands,
 	}
 }
 

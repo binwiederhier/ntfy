@@ -8,6 +8,10 @@ import (
 	"heckel.io/ntfy/util"
 )
 
+func init() {
+	commands = append(commands, cmdAccess)
+}
+
 const (
 	userEveryone = "everyone"
 )

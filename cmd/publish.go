@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+func init() {
+	commands = append(commands, cmdPublish)
+}
+
 var cmdPublish = &cli.Command{
 	Name:      "publish",
 	Aliases:   []string{"pub", "send", "trigger"},

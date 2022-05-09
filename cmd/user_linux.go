@@ -11,7 +11,12 @@ import (
 	"strings"
 )
 
+func init() {
+	commands = append(commands, cmdUser)
+}
+
 var flagsUser = userCommandFlags()
+
 var cmdUser = &cli.Command{
 	Name:      "user",
 	Usage:     "Manage/show users",

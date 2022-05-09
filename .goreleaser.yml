@@ -57,6 +57,19 @@ builds:
     goarch: [arm64]
     # No "upx", since it causes random core dumps, see
     # https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
+  -
+    id: ntfy_windows_amd64
+    binary: ntfy
+    env:
+      - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
+    tags: []
+    ldflags:
+      - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [windows]
+    goarch: [amd64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
 nfpms:
   -
     package_name: ntfy

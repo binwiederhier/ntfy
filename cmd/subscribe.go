@@ -13,6 +13,10 @@ import (
 	"strings"
 )
 
+func init() {
+	commands = append(commands, cmdSubscribe)
+}
+
 var cmdSubscribe = &cli.Command{
 	Name:      "subscribe",
 	Aliases:   []string{"sub"},

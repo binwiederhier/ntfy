@@ -70,25 +70,26 @@ clean: .PHONY
 
 build: web docs server
 
+update: web-deps-update cli-deps-update docs-deps-update
+
 
 # Documentation
 
 docs: docs-deps docs-build
 
+docs-build: .PHONY
+	mkdocs build
+
 docs-deps: .PHONY
 	pip3 install -r requirements.txt
 
-docs-build: .PHONY
-	mkdocs build
+docs-deps-update: .PHONY
+	pip3 install -r requirements.txt --upgrade
 
 
 # Web app
 
 web: web-deps web-build
-
-web-deps:
-	cd web && npm install
-	# If this fails for .svg files, optimizes them with svgo
 
 web-build:
 	cd web \
@@ -100,6 +101,12 @@ web-build:
 			../server/site/config.js \
 			../server/site/asset-manifest.json
 
+web-deps:
+	cd web && npm install
+	# If this fails for .svg files, optimize them with svgo
+
+web-deps-update:
+	cd web && npm update
 
 # Main server/client build
 
@@ -141,6 +148,8 @@ cli-deps-gcc-armv6-armv7:
 cli-deps-gcc-arm64:
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
+cli-deps-update:
+	go get -u
 
 # Test/check targets
 
@@ -192,10 +201,10 @@ staticcheck: .PHONY
 
 # Releasing targets
 
-release: clean cli-deps release-check-tags docs web check
+release: clean update cli-deps release-check-tags docs web check
 	goreleaser release --rm-dist --debug
 
-release-snapshot: clean cli-deps docs web check
+release-snapshot: clean update cli-deps docs web check
 	goreleaser release --snapshot --skip-publish --rm-dist --debug
 
 release-check-tags:

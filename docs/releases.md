@@ -31,10 +31,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Dutch (*incomplete*, thanks to [@diony](https://hosted.weblate.org/user/diony/))
 
-**Thanks for testing:**
+**Thank you:**
 
 Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and 
-to [@Joeharrison94](https://github.com/Joeharrison94) for the input. 
+to [@Joeharrison94](https://github.com/Joeharrison94) for the input. And thank you very much to all the translators for catching up so quickly.
 
 -->
 

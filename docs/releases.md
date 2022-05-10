@@ -4,6 +4,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
+## ntfy server v1.23.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/))
+
 ## ntfy Android app v1.13.0 (UNRELEASED)
 
 **Features:**

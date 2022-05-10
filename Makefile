@@ -22,6 +22,7 @@ help:
 	@echo "  make cli-linux-armv7         - Build server & client (Linux, armv7 only)"
 	@echo "  make cli-linux-arm64         - Build server & client (Linux, arm64 only)"
 	@echo "  make cli-windows-amd64       - Build client (Windows, amd64 only)"
+	@echo "  make cli-darwin-amd64        - Build client (macOS, amd64 only)"
 	@echo
 	@echo "Build web app:"
 	@echo "  make web                     - Build the web app"
@@ -119,6 +120,9 @@ cli-linux-arm64: cli-deps-static-sites cli-deps-gcc-arm64
 
 cli-windows-amd64: cli-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_windows_amd64
+
+cli-darwin-amd64: cli-deps-static-sites
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_amd64
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 

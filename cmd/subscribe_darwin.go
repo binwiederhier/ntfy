@@ -4,7 +4,7 @@ const (
 	scriptExt                      = "sh"
 	scriptHeader                   = "#!/bin/sh\n"
 	clientCommandDescriptionSuffix = `The default config file for all client commands is /etc/ntfy/client.yml (if root user),
-or ~/.config/ntfy/client.yml for all other users.`
+or "~/Library/Application Support" for all other users.`
 )
 
 var (

@@ -66,6 +66,18 @@ builds:
     hooks:
       post:
         - upx "{{ .Path }}" # apt install upx
+  -
+    id: ntfy_darwin_amd64
+    binary: ntfy
+    env:
+      - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
+    ldflags:
+      - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [darwin]
+    goarch: [amd64]
+    hooks:
+      post:
+        - upx "{{ .Path }}" # apt install upx
 nfpms:
   -
     package_name: ntfy
@@ -131,6 +143,17 @@ archives:
       - client/client.yml
     replacements:
       amd64: x86_64
+  -
+    id: ntfy_darwin
+    builds:
+      - ntfy_darwin_amd64
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - README.md
+      - client/client.yml
+    replacements:
+      darwin: macOS
 checksum:
   name_template: 'checksums.txt'
 snapshot:

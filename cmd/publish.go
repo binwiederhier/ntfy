@@ -63,7 +63,7 @@ Examples:
 Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
 it has incredibly useful information: https://ntfy.sh/docs/publish/.
 
-` + defaultClientConfigFileDescriptionSuffix,
+` + clientCommandDescriptionSuffix,
 }
 
 func execPublish(c *cli.Context) error {

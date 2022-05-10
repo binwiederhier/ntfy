@@ -6,13 +6,23 @@ import (
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/util"
+	"log"
 	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
 	"strings"
 )
 
 func init() {
 	commands = append(commands, cmdSubscribe)
 }
+
+const (
+	clientRootConfigFileUnixAbsolute    = "/etc/ntfy/client.yml"
+	clientUserConfigFileUnixRelative    = "ntfy/client.yml"
+	clientUserConfigFileWindowsRelative = "ntfy\\client.yml"
+)
 
 var cmdSubscribe = &cli.Command{
 	Name:      "subscribe",
@@ -71,7 +81,7 @@ ntfy subscribe --from-config
     ntfy sub --from-config                           # Read topics from config file
     ntfy sub --config=myclient.yml --from-config     # Read topics from alternate config file
 
-` + defaultClientConfigFileDescriptionSuffix,
+` + clientCommandDescriptionSuffix,
 }
 
 func execSubscribe(c *cli.Context) error {
@@ -195,6 +205,24 @@ func runCommand(c *cli.Context, command string, m *client.Message) {
 	}
 }
 
+func runCommandInternal(c *cli.Context, script string, m *client.Message) error {
+	scriptFile := fmt.Sprintf("%s/ntfy-subscribe-%s.%s", os.TempDir(), util.RandomString(10), scriptExt)
+	if err := os.WriteFile(scriptFile, []byte(scriptHeader+script), 0700); err != nil {
+		return err
+	}
+	defer os.Remove(scriptFile)
+	verbose := c.Bool("verbose")
+	if verbose {
+		log.Printf("[%s] Executing: %s (for message: %s)", util.ShortTopicURL(m.TopicURL), script, m.Raw)
+	}
+	cmd := exec.Command(scriptLauncher[0], append(scriptLauncher[1:], scriptFile)...)
+	cmd.Stdin = c.App.Reader
+	cmd.Stdout = c.App.Writer
+	cmd.Stderr = c.App.ErrWriter
+	cmd.Env = envVars(m)
+	return cmd.Run()
+}
+
 func envVars(m *client.Message) []string {
 	env := os.Environ()
 	env = append(env, envVar(m.ID, "NTFY_ID", "id")...)
@@ -226,4 +254,19 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 		return client.LoadConfig(configFile)
 	}
 	return client.NewConfig(), nil
+}
+
+func defaultConfigFileUnix() string {
+	u, _ := user.Current()
+	configFile := clientRootConfigFileUnixAbsolute
+	if u.Uid != "0" {
+		homeDir, _ := os.UserConfigDir()
+		return filepath.Join(homeDir, clientUserConfigFileUnixRelative)
+	}
+	return configFile
+}
+
+func defaultConfigFileWindows() string {
+	homeDir, _ := os.UserConfigDir()
+	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative)
 }

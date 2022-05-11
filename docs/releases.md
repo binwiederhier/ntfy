@@ -6,6 +6,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.23.0 (UNRELEASED)
 
+**Features:**
+
+* [Windows](https://ntfy.sh/docs/install/#windows) and [macOS](https://ntfy.sh/docs/install/#macos) builds for the [ntfy CLI](https://ntfy.sh/docs/subscribe/cli/) ([#112](https://github.com/binwiederhier/ntfy/issues/112))
+
 **Additional translations:**
 
 * Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/))

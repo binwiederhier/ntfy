@@ -13,14 +13,14 @@ The ntfy server comes as a statically linked binary and is shipped as tarball, d
 We support amd64, armv7 and arm64.
 
 1. Install ntfy using one of the methods described below
-2. Then (optionally) edit `/etc/ntfy/server.yml` for the server (see [configuration](config.md) or [sample server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml))
+2. Then (optionally) edit `/etc/ntfy/server.yml` for the server (Linux only, see [configuration](config.md) or [sample server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml))
 3. Or (optionally) create/edit `~/.config/ntfy/client.yml` (or `/etc/ntfy/client.yml`, see [sample client.yml](https://github.com/binwiederhier/ntfy/blob/main/client/client.yml))
 
 To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
 To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI][subscribe/cli.md]
 for details). 
 
-## Binaries and packages
+## Linux binaries
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
 deb/rpm packages.
 
@@ -175,6 +175,37 @@ curl https://aur.archlinux.org/cgit/aur.git/snapshot/ntfysh-bin.tar.gz | tar xzv
 cd ntfysh-bin
 makepkg -si
 ```
+
+## macOS
+The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on macOS as well. 
+To install, please download the tarball, extract it and place it somewhere in your `PATH` (e.g. `/usr/local/bin/ntfy`). 
+
+If run as `root`, ntfy will look for its config at `/etc/ntfy/client.yml`. For all other users, it'll look for it at 
+`~/Library/Application Support/ntfy/client.yml` (sample included in the tarball).
+
+```bash
+curl https://github.com/binwiederhier/ntfy/releases/download/v1.22.0/ntfy_v1.22.0_macOS_all.tar.gz > ntfy_v1.22.0_macOS_all.tar.gz
+tar zxvf ntfy_v1.22.0_macOS_all.tar.gz
+sudo cp -a ntfy_v1.22.0_macOS_all/ntfy /usr/local/bin/ntfy
+mkdir ~/Library/Application\ Support/ntfy 
+cp ntfy_v1.22.0_macOS_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
+ntfy --help
+```
+
+!!! info
+    If there is a desire to install ntfy via [Homebrew](https://brew.sh/), please create a 
+    [GitHub issue](https://github.com/binwiederhier/ntfy/issues) to let me know. 
+
+## Windows
+The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on Windows as well.
+To install, please [download the latest ZIP](https://github.com/binwiederhier/ntfy/releases/download/v1.22.0/ntfy_v1.22.0-next_windows_x86_64.zip),
+extract it and place the `ntfy.exe` binary somewhere in your `%Path%`. 
+
+The default path for the client config file is at `%AppData%\ntfy\client.yml` (not created automatically, sample in the ZIP file).
+
+!!! info
+    There is currently no installer for Windows, and the binary is not signed. If this is desired, please create a
+    [GitHub issue](https://github.com/binwiederhier/ntfy/issues) to let me know.
 
 ## Docker
 The [ntfy image](https://hub.docker.com/r/binwiederhier/ntfy) is available for amd64, armv6, armv7 and arm64. It should 

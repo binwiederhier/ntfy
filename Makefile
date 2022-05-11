@@ -128,8 +128,8 @@ cli-linux-arm64: cli-deps-static-sites cli-deps-gcc-arm64
 cli-windows-amd64: cli-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_windows_amd64
 
-cli-darwin-amd64: cli-deps-static-sites
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_amd64
+cli-darwin-all: cli-deps-static-sites
+	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_all
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 
@@ -150,6 +150,7 @@ cli-deps-gcc-arm64:
 
 cli-deps-update:
 	go get -u
+	go install honnef.co/go/tools/cmd/staticcheck@latest
 
 # Test/check targets
 

@@ -145,6 +145,20 @@ Here's an example config file that subscribes to three different topics, executi
             fi
     ```
 
+
+=== "~/Library/Application Support/ntfy/client.yml (macOS)"
+    ```yaml
+    subscribe:
+      - topic: echo-this
+        command: 'echo "Message received: $message"'
+      - topic: alerts
+        command: osascript -e "display notification \"$message\""
+        if:
+          priority: high,urgent
+      - topic: calc
+        command: open -a Calculator
+    ```
+
 === "%AppData%\ntfy\client.yml (Windows)"
     ```yaml
     subscribe:
@@ -163,8 +177,8 @@ Here's an example config file that subscribes to three different topics, executi
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out
-* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html) (Linux) 
-  or [notifu](https://www.paralint.com/projects/notifu/) (Windows) 
+* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html) (Linux), 
+  [notifu](https://www.paralint.com/projects/notifu/) (Windows) or `osascript` (macOS) 
 * Messages to `calc` open the calculator 😀 (*because, why not*)
 * Messages to `print-temp` execute an inline script and print the CPU temperature (Linux version only)
 

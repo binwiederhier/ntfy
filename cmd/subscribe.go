@@ -256,6 +256,7 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 	return client.NewConfig(), nil
 }
 
+//lint:ignore U1000 Conditionally used in different builds
 func defaultConfigFileUnix() string {
 	u, _ := user.Current()
 	configFile := clientRootConfigFileUnixAbsolute
@@ -266,6 +267,7 @@ func defaultConfigFileUnix() string {
 	return configFile
 }
 
+//lint:ignore U1000 Conditionally used in different builds
 func defaultConfigFileWindows() string {
 	homeDir, _ := os.UserConfigDir()
 	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative)

@@ -20,7 +20,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
-	google.golang.org/api v0.78.0
+	google.golang.org/api v0.79.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

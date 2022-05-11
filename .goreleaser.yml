@@ -67,17 +67,14 @@ builds:
       post:
         - upx "{{ .Path }}" # apt install upx
   -
-    id: ntfy_darwin_amd64
+    id: ntfy_darwin_all
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [darwin]
-    goarch: [amd64]
-    hooks:
-      post:
-        - upx "{{ .Path }}" # apt install upx
+    goarch: [amd64, arm64] # will be combined to "universal binary" (see below)
 nfpms:
   -
     package_name: ntfy
@@ -146,7 +143,7 @@ archives:
   -
     id: ntfy_darwin
     builds:
-      - ntfy_darwin_amd64
+      - ntfy_darwin_all
     wrap_in_directory: true
     files:
       - LICENSE
@@ -154,6 +151,10 @@ archives:
       - client/client.yml
     replacements:
       darwin: macOS
+universal_binaries:
+  -
+    id: ntfy_darwin_all
+    replace: true
 checksum:
   name_template: 'checksums.txt'
 snapshot:

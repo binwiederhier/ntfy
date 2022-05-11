@@ -14,7 +14,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/))
 
-## ntfy Android app v1.13.0 (UNRELEASED)
+-->
+
+## ntfy Android app v1.13.0
+Released May 11, 2022
+
+This release brings a slightly altered design for the detail view, featuring a card layout to make notifications more easily
+distinguishable from one another. It also ships per-topic settings that allow overriding minimum priority, auto delete threshold
+and custom icons. Aside from that, we've got tons of bug fixes as usual.
 
 **Features:**
 
@@ -37,10 +44,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Thank you:**
 
-Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and 
+Thanks to [@cmeis](https://github.com/cmeis), [@StoyanDimitrov](https://github.com/StoyanDimitrov), [@Fallenbagel](https://github.com/Fallenbagel) for testing, and
 to [@Joeharrison94](https://github.com/Joeharrison94) for the input. And thank you very much to all the translators for catching up so quickly.
-
--->
 
 ## ntfy server v1.22.0
 Released May 7, 2022

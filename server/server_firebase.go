@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	fcmMessageLimit = 4000
+	fcmMessageLimit         = 4000
+	fcmApnsBodyMessageLimit = 100
 )
 
 // maybeTruncateFCMMessage performs best-effort truncation of FCM messages.
@@ -32,6 +33,20 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 		}
 	}
 	return m
+}
+
+// maybeTruncateAPNSBodyMessage truncates the body for APNS.
+//
+// The "body" of the push notification can contain the entire message, which would count doubly for the overall length
+// of the APNS payload. I set a limit of 100 characters before truncating the notification "body" with ellipsis.
+// The message would not be changed (unless truncated for being too long). Note: if the payload is too large (>4KB),
+// APNS will simply reject / discard the notification, meaning it will never arrive on the iOS device.
+func maybeTruncateAPNSBodyMessage(s string) string {
+	if len(s) >= fcmApnsBodyMessageLimit {
+		over := len(s) - fcmApnsBodyMessageLimit + 3 // len("...")
+		return s[:len(s)-over] + "..."
+	}
+	return s
 }
 
 func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subscriber, error) {
@@ -55,6 +70,7 @@ func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subsc
 
 func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, error) {
 	var data map[string]string // Mostly matches https://ntfy.sh/docs/subscribe/api/#json-message-format
+	var apnsConfig *messaging.APNSConfig
 	switch m.Event {
 	case keepaliveEvent, openEvent:
 		data = map[string]string{
@@ -95,6 +111,17 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
 				data["attachment_url"] = m.Attachment.URL
 			}
+			apnsConfig = &messaging.APNSConfig{
+				Payload: &messaging.APNSPayload{
+					Aps: &messaging.Aps{
+						MutableContent: true,
+						Alert: &messaging.ApsAlert{
+							Title: m.Title,
+							Body:  maybeTruncateAPNSBodyMessage(m.Message),
+						},
+					},
+				},
+			}
 		} else {
 			// If anonymous read for a topic is not allowed, we cannot send the message along
 			// via Firebase. Instead, we send a "poll_request" message, asking the client to poll.
@@ -116,5 +143,6 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 		Topic:   m.Topic,
 		Data:    data,
 		Android: androidConfig,
+		APNS:    apnsConfig,
 	}), nil
 }

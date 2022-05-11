@@ -70,9 +70,9 @@ builds:
     id: ntfy_darwin_all
     binary: ntfy
     env:
-      - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
+      - CGO_ENABLED=1 # explicitly disable, since we don't need go-sqlite3
     ldflags:
-      - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+      - "-linkmode=external -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [darwin]
     goarch: [amd64, arm64] # will be combined to "universal binary" (see below)
 nfpms:

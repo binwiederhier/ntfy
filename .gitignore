@@ -1,6 +1,7 @@
 dist/
 build/
 .idea/
+*.swp
 server/docs/
 server/site/
 tools/fbsend/fbsend

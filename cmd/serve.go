@@ -5,15 +5,16 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/server"
-	"heckel.io/ntfy/util"
 	"log"
 	"math"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/util"
 )
 
 func init() {
@@ -39,7 +40,7 @@ var flagsServe = []cli.Flag{
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "attachment-expiry-duration", Aliases: []string{"X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: server.DefaultAttachmentExpiryDuration, DefaultText: "3h", Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "app", Usage: "sets web root to landing page (home) or web app (app)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "app", Usage: "sets web root to landing page (home), web app (app) or disabled (disable)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
@@ -144,12 +145,14 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, base-url must start with http:// or https://")
 	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
-	} else if !util.InStringList([]string{"app", "home"}, webRoot) {
+	} else if !util.InStringList([]string{"app", "home", "disable"}, webRoot) {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	}
 
-	// Default auth permissions
 	webRootIsApp := webRoot == "app"
+	enableWeb := webRoot != "disable"
+
+	// Default auth permissions
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
 	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
 
@@ -229,6 +232,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.BehindProxy = behindProxy
+	conf.EnableWeb = enableWeb
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatalln(err)

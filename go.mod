@@ -11,11 +11,11 @@ require (
 	github.com/emersion/go-smtp v0.15.0
 	github.com/gabriel-vasile/mimetype v1.4.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/mattn/go-sqlite3 v1.14.12
+	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/olebedev/when v0.0.0-20211212231525-59bd4edcf9d6
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.6.0
-	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122
+	golang.org/x/crypto v0.0.0-20220511200225-c6db032c6c88
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
@@ -36,7 +36,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
-	github.com/googleapis/gax-go/v2 v2.3.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
 	github.com/googleapis/go-type-adapters v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

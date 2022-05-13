@@ -68,7 +68,7 @@ help:
 clean: .PHONY
 	rm -rf dist build server/docs server/site
 
-build: web docs server
+build: web docs cli
 
 update: web-deps-update cli-deps-update docs-deps-update
 

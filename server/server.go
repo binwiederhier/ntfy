@@ -263,24 +263,24 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if r.Method == http.MethodGet && r.URL.Path == "/" && s.config.EnableWeb {
-		return s.handleHome(w, r)
-	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" && s.config.EnableWeb {
-		return s.handleExample(w, r)
+	if r.Method == http.MethodGet && r.URL.Path == "/" {
+		return s.ensureWebEnabled(s.handleHome)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
+		return s.ensureWebEnabled(s.handleExample)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
-		return s.handleEmpty(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath && s.config.EnableWeb {
-		return s.handleWebConfig(w, r)
+		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
+		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
-	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) && s.config.EnableWeb {
-		return s.handleStatic(w, r)
-	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) && s.config.EnableWeb {
-		return s.handleDocs(w, r)
+	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
+	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
+		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
 	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
-		return s.handleOptions(w, r)
+		return s.ensureWebEnabled(s.handleOptions)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
 		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
@@ -298,21 +298,21 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && authPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authRead(s.handleTopicAuth))(w, r, v)
 	} else if r.Method == http.MethodGet && (topicPathRegex.MatchString(r.URL.Path) || externalTopicPathRegex.MatchString(r.URL.Path)) {
-		return s.handleTopic(w, r)
+		return s.ensureWebEnabled(s.handleTopic)(w, r, v)
 	}
 	return errHTTPNotFound
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if s.config.WebRootIsApp {
 		r.URL.Path = webAppIndex
 	} else {
 		r.URL.Path = webHomeIndex
 	}
-	return s.handleStatic(w, r)
+	return s.handleStatic(w, r, v)
 }
 
-func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	unifiedpush := readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see PUT/POST too!
 	if unifiedpush {
 		w.Header().Set("Content-Type", "application/json")
@@ -321,7 +321,7 @@ func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	r.URL.Path = webAppIndex
-	return s.handleStatic(w, r)
+	return s.handleStatic(w, r, v)
 }
 
 func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor) error {
@@ -335,12 +335,12 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	return err
 }
 
-func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	_, err := io.WriteString(w, exampleSource)
 	return err
 }
 
-func (s *Server) handleWebConfig(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	appRoot := "/"
 	if !s.config.WebRootIsApp {
 		appRoot = "/app"
@@ -368,13 +368,13 @@ func (s *Server) handleUserStats(w http.ResponseWriter, r *http.Request, v *visi
 	return nil
 }
 
-func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	r.URL.Path = webSiteDir + r.URL.Path
 	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
 	return nil
 }
 
-func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	util.Gzip(http.FileServer(http.FS(docsStaticCached))).ServeHTTP(w, r)
 	return nil
 }
@@ -905,7 +905,7 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 	return sinceNoMessages, errHTTPBadRequestSinceInvalid
 }
 
-func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request) error {
+func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
 	w.Header().Set("Access-Control-Allow-Origin", "*")  // CORS, allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Headers", "*") // CORS, allow auth via JS // FIXME is this terrible?
@@ -1114,6 +1114,15 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests
+		}
+		return next(w, r, v)
+	}
+}
+
+func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if !s.config.EnableWeb {
+			return errHTTPNotFound
 		}
 		return next(w, r, v)
 	}

@@ -128,7 +128,7 @@
 
 # Defines if the root route (/) is pointing to the landing page (as on ntfy.sh) or the
 # web app. If you self-host, you don't want to change this.
-# Can be "app" (default), "home" or "disable" to disable the WebUI.
+# Can be "app" (default), "home" or "disable" to disable the web app entirely.
 #
 # web-root: app
 

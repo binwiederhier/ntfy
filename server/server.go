@@ -8,11 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/auth"
-	"heckel.io/ntfy/util"
 	"io"
 	"log"
 	"net"
@@ -28,6 +23,12 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/util"
 )
 
 // Server is the main server, providing the UI and API for ntfy
@@ -262,19 +263,19 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if r.Method == http.MethodGet && r.URL.Path == "/" {
+	if r.Method == http.MethodGet && r.URL.Path == "/" && s.config.EnableWeb {
 		return s.handleHome(w, r)
-	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
+	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" && s.config.EnableWeb {
 		return s.handleExample(w, r)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.handleEmpty(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath && s.config.EnableWeb {
 		return s.handleWebConfig(w, r)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
-	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) && s.config.EnableWeb {
 		return s.handleStatic(w, r)
-	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) && s.config.EnableWeb {
 		return s.handleDocs(w, r)
 	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
 		return s.limitRequests(s.handleFile)(w, r, v)

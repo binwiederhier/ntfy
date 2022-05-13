@@ -3,15 +3,16 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/server"
-	"heckel.io/ntfy/util"
 	"log"
 	"math"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/util"
 )
 
 func init() {
@@ -146,8 +147,10 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	}
 
-	// Default auth permissions
 	webRootIsApp := webRoot == "app"
+	enableWeb := webRoot != "disable"
+
+	// Default auth permissions
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
 	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
 
@@ -227,6 +230,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.BehindProxy = behindProxy
+	conf.EnableWeb = enableWeb
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatalln(err)

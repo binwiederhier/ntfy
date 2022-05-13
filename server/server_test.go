@@ -6,9 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/auth"
-	"heckel.io/ntfy/util"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +15,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/util"
 )
 
 func TestServer_PublishAndPoll(t *testing.T) {
@@ -160,6 +161,40 @@ func TestServer_StaticSites(t *testing.T) {
 	rr = request(t, s, "GET", "/example.html", "", nil)
 	require.Equal(t, 200, rr.Code)
 	require.Contains(t, rr.Body.String(), "</html>")
+}
+
+func TestServer_WebEnabled(t *testing.T) {
+	conf := newTestConfig(t)
+	conf.EnableWeb = false
+	s := newTestServer(t, conf)
+
+	rr := request(t, s, "GET", "/", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/example.html", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/config.js", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	conf2 := newTestConfig(t)
+	conf2.EnableWeb = true
+	s2 := newTestServer(t, conf2)
+
+	rr = request(t, s2, "GET", "/", "", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/example.html", "", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/config.js", "", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/static/css/home.css", "", nil)
+	require.Equal(t, 200, rr.Code)
 }
 
 func TestServer_PublishLargeMessage(t *testing.T) {
@@ -1303,7 +1338,7 @@ func firebaseServiceAccountFile(t *testing.T) string {
 		return os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE")
 	} else if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT") != "" {
 		filename := filepath.Join(t.TempDir(), "firebase.json")
-		require.NotNil(t, os.WriteFile(filename, []byte(os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT")), 0600))
+		require.NotNil(t, os.WriteFile(filename, []byte(os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT")), 0o600))
 		return filename
 	}
 	t.SkipNow()

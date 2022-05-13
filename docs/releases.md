@@ -9,6 +9,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * [Windows](https://ntfy.sh/docs/install/#windows) and [macOS](https://ntfy.sh/docs/install/#macos) builds for the [ntfy CLI](https://ntfy.sh/docs/subscribe/cli/) ([#112](https://github.com/binwiederhier/ntfy/issues/112))
+* Ability to disable the web app entirely ([#238](https://github.com/binwiederhier/ntfy/issues/238)/[#249](https://github.com/binwiederhier/ntfy/pull/249), thanks to [@Curid](https://github.com/Curid))
 
 **Additional translations:**
 

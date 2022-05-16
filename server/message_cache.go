@@ -48,6 +48,11 @@ const (
 		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+	updateMessageQuery = `
+		UPDATE messages 
+		SET time = ?
+		WHERE topic = ? AND mid = ? AND published = 0 
+	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE topic = ? AND mid = ?`
 	selectMessagesSinceTimeQuery = `
@@ -79,6 +84,11 @@ const (
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
+	`
+	selectMessagesScheduledByTagOrID = `
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_owner, encoding
+		FROM messages 
+		WHERE topic = ? AND (tags LIKE ? OR mid = ?) AND published = 0
 	`
 	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
@@ -219,8 +229,7 @@ func createMemoryFilename() string {
 func (c *messageCache) AddMessage(m *message) error {
 	if m.Event != messageEvent {
 		return errUnexpectedMessageType
-	}
-	if c.nop {
+	} else if c.nop {
 		return nil
 	}
 	published := m.Time <= time.Now().Unix()
@@ -262,6 +271,21 @@ func (c *messageCache) AddMessage(m *message) error {
 		attachmentOwner,
 		m.Encoding,
 		published,
+	)
+	return err
+}
+
+func (c *messageCache) UpdateMessage(m *message) error {
+	if m.Event != messageEvent {
+		return errUnexpectedMessageType
+	} else if c.nop {
+		return nil
+	}
+	_, err := c.db.Exec(
+		updateMessageQuery,
+		m.Time,
+		m.Topic,
+		m.ID,
 	)
 	return err
 }
@@ -407,6 +431,24 @@ func (c *messageCache) AttachmentsExpired() ([]string, error) {
 		return nil, err
 	}
 	return ids, nil
+}
+
+func (c *messageCache) MessagesScheduledByTagOrID(topic, selector string) ([]*message, error) {
+	rows, err := c.db.Query(selectMessagesScheduledByTagOrID, topic, "%"+selector+"%", selector) // Ugly string matching search first, later match exactly
+	if err != nil {
+		return nil, err
+	}
+	maybeMatchingMessages, err := readMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+	messages := make([]*message, 0)
+	for _, m := range maybeMatchingMessages {
+		if util.InStringList(m.Tags, selector) || m.ID == selector {
+			messages = append(messages, m)
+		}
+	}
+	return messages, nil
 }
 
 func readMessages(rows *sql.Rows) ([]*message, error) {

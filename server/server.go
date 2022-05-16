@@ -56,8 +56,9 @@ type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 
 var (
 	// If changed, don't forget to update Android App and auth_sqlite.go
-	topicRegex             = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)               // No /!
-	topicPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)              // Regex must match JS & Android app!
+	topicRegex             = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No /!
+	topicPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`) // Regex must match JS & Android app!
+	updatePathRegex        = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/[^/]+$`)
 	externalTopicPathRegex = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`) // Extended topic path, for web-app, e.g. /example.com/mytopic
 	jsonPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
 	ssePathRegex           = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
@@ -287,6 +288,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && updatePathRegex.MatchString(r.URL.Path) {
+		return s.limitRequests(s.authWrite(s.handleUpdate))(w, r, v)
 	} else if r.Method == http.MethodGet && jsonPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authRead(s.handleSubscribeJSON))(w, r, v)
 	} else if r.Method == http.MethodGet && ssePathRegex.MatchString(r.URL.Path) {
@@ -518,7 +521,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
+	delayStr := readDelayParam(r)
 	if delayStr != "" {
 		if !cache {
 			return false, false, "", false, errHTTPBadRequestDelayNoCache
@@ -526,15 +529,11 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if email != "" {
 			return false, false, "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
 		}
-		delay, err := util.ParseFutureTime(delayStr, time.Now())
+		futureTime, err := s.parseDelay(delayStr)
 		if err != nil {
-			return false, false, "", false, errHTTPBadRequestDelayCannotParse
-		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooSmall
-		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooLarge
+			return false, false, "", false, err
 		}
-		m.Time = delay.Unix()
+		m.Time = futureTime
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
@@ -549,6 +548,22 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		unifiedpush = true
 	}
 	return cache, firebase, email, unifiedpush, nil
+}
+
+func readDelayParam(r *http.Request) string {
+	return readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
+}
+
+func (s *Server) parseDelay(delayStr string) (int64, error) {
+	futureTime, err := util.ParseFutureTime(delayStr, time.Now())
+	if err != nil {
+		return 0, errHTTPBadRequestDelayCannotParse
+	} else if futureTime.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+		return 0, errHTTPBadRequestDelayTooSmall
+	} else if futureTime.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
+		return 0, errHTTPBadRequestDelayTooLarge
+	}
+	return futureTime.Unix(), nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
@@ -635,6 +650,46 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		return errHTTPEntityTooLargeAttachmentTooLarge
 	} else if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	// Parse updatable params
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		return errHTTPBadRequestTopicInvalid
+	}
+	t := parts[1]
+	selector := parts[2]
+	delayStr := readDelayParam(r)
+	if delayStr == "" {
+		return errHTTPBadRequestDelayExpected
+	}
+	futureTime, err := s.parseDelay(delayStr)
+	if err != nil {
+		return err
+	}
+
+	// Update matching message(s) and print them
+	messages, err := s.messageCache.MessagesScheduledByTagOrID(t, selector)
+	if err != nil {
+		return err
+	} else if len(messages) == 0 {
+		return s.handlePublish(w, r, v) // If no messages found, publish a new one!
+	}
+	for _, m := range messages {
+		m.Time = futureTime
+		if err := s.messageCache.UpdateMessage(m); err != nil {
+			return err
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	for _, m := range messages {
+		if err := json.NewEncoder(w).Encode(m); err != nil {
+			return err
+		}
 	}
 	return nil
 }

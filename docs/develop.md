@@ -120,7 +120,7 @@ Typical commands (more see below):
 ...
 ```
 
-If you want to build the **ntfy binary including web app and docs for all supported architectures** (amd64, armv7, and amd64), 
+If you want to build the **ntfy binary including web app and docs for all supported architectures** (amd64, armv7, and arm64), 
 you can simply run `make build`:
 
 ``` shell

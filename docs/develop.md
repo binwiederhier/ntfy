@@ -284,9 +284,13 @@ Then either follow the steps for building with or without Firebase.
     I do build the ntfy Android app using IntelliJ IDEA (Android Studio), so I don't know if these Gradle commands will
     work without issues. Please give me feedback if it does/doesn't work for you.
 
-Without Firebase, you may want to still change the default `app_base_url` in [strings.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/strings.xml)
+Without Firebase, you may want to still change the default `app_base_url` in [values.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/values.xml)
 if you're self-hosting the server. Then run:
 ```
+# Remove Google dependencies (FCM)
+sed -i -e '/google-services/d' build.gradle
+sed -i -e '/google-services/d' app/build.gradle
+
 # To build an unsigned .apk (app/build/outputs/apk/fdroid/*.apk)
 ./gradlew assembleFdroidRelease
 
@@ -303,7 +307,7 @@ To build your own version with Firebase, you must:
 
 * Create a Firebase/FCM account
 * Place your account file at `app/google-services.json`
-* And change `app_base_url` in [strings.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/strings.xml)
+* And change `app_base_url` in [values.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/values.xml)
 * Then run:
 ```
 # To build an unsigned .apk (app/build/outputs/apk/play/*.apk)

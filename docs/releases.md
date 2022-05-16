@@ -14,6 +14,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * Support underscores in server.yml config options ([#255](https://github.com/binwiederhier/ntfy/issues/255), thanks to [@ajdelgado](https://github.com/ajdelgado))
+* Force MAKEFLAGS to --jobs=1 in `Makefile` ([#257](https://github.com/binwiederhier/ntfy/pull/257), thanks to [@oddlama](https://github.com/oddlama))
 
 **Documentation:**
 

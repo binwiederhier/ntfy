@@ -1,3 +1,4 @@
+MAKEFLAGS := --jobs=1
 VERSION := $(shell git describe --tag)
 
 .PHONY:

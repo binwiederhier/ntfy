@@ -19,6 +19,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * Typo in install instructions ([#252](https://github.com/binwiederhier/ntfy/pull/252)/[#251](https://github.com/binwiederhier/ntfy/issues/251), thanks to [@oddlama](https://github.com/oddlama))
+* fix typo in private server example ([#262](https://github.com/binwiederhier/ntfy/pull/262), thanks to [@MayeulC](https://github.com/MayeulC))
 
 **Additional translations:**
 

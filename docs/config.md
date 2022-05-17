@@ -227,7 +227,7 @@ The easiest way to configure a private instance is to set `auth-default-access` 
 
 === "/etc/ntfy/server.yml"
     ``` yaml
-    auth-file "/var/lib/ntfy/user.db"
+    auth-file: "/var/lib/ntfy/user.db"
     auth-default-access: "deny-all"
     ```
 

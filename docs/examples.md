@@ -366,3 +366,16 @@ alerting:
         TRIGGERED: "warning"
         RESOLVED: "white_check_mark"
 ```
+
+## Jellyseerr/Overseerr webhook
+Here is an example for jellyseerr/overseerr webhook json payload. Remember to change the `https://requests.example.com` to your Jellyseerr/Overseerr url.
+```
+{
+    "topic": "requests",
+    "title": "{{event}}",
+    "message": "{{subject}}\n{{message}}\n\nRequested by: {{requestedBy_username}}\n\nStatus: {{media_status}}\nRequest Id: {{request_id}}",
+    "priority": 4,
+    "attach": "{{image}}",
+    "click": "https://requests.example.com/{{media_type}}/{{media_tmdbid}}"
+}
+```

@@ -3,12 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
-	"fmt"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/auth"
-	"strings"
 )
 
 const (
@@ -111,8 +112,13 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
 				data["attachment_url"] = m.Attachment.URL
 			}
+			apnsData := make(map[string]interface{})
+			for k, v := range data {
+				apnsData[k] = v
+			}
 			apnsConfig = &messaging.APNSConfig{
 				Payload: &messaging.APNSPayload{
+					CustomData: apnsData,
 					Aps: &messaging.Aps{
 						MutableContent: true,
 						Alert: &messaging.ApsAlert{

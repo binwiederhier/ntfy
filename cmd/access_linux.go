@@ -26,7 +26,7 @@ var cmdAccess = &cli.Command{
 	Usage:     "Grant/revoke access to a topic, or show access",
 	UsageText: "ntfy access [USERNAME [TOPIC [PERMISSION]]]",
 	Flags:     flagsAccess,
-	Before:    initConfigFileInputSource("config", flagsAccess),
+	Before:    initConfigFileInputSourceFunc("config", flagsAccess),
 	Action:    execUserAccess,
 	Category:  categoryServer,
 	Description: `Manage the access control list for the ntfy server.

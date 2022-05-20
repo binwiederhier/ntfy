@@ -88,6 +88,7 @@ type Config struct {
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
 	BehindProxy                          bool
+	EnableWeb                            bool
 }
 
 // NewConfig instantiates a default new server config
@@ -126,5 +127,6 @@ func NewConfig() *Config {
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		BehindProxy:                          false,
+		EnableWeb:                            true,
 	}
 }

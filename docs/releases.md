@@ -2,15 +2,14 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-<!--
-
-## ntfy server v1.23.0 (UNRELEASED)
+## ntfy server v1.23.0
+Released May 21, 2022
 
 **Features:**
 
 * [Windows](https://ntfy.sh/docs/install/#windows) and [macOS](https://ntfy.sh/docs/install/#macos) builds for the [ntfy CLI](https://ntfy.sh/docs/subscribe/cli/) ([#112](https://github.com/binwiederhier/ntfy/issues/112))
 * Ability to disable the web app entirely ([#238](https://github.com/binwiederhier/ntfy/issues/238)/[#249](https://github.com/binwiederhier/ntfy/pull/249), thanks to [@Curid](https://github.com/Curid))
-* Add APNs config to Firebase messages to support [iOS app](https://github.com/binwiederhier/ntfy/issues/4) ([#247](https://github.com/binwiederhier/ntfy/pull/247))
+* Add APNs config to Firebase messages to support [iOS app](https://github.com/binwiederhier/ntfy/issues/4) ([#247](https://github.com/binwiederhier/ntfy/pull/247), thanks to [@Copephobia](https://github.com/Copephobia))
 
 **Bugs:**
 
@@ -20,13 +19,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * Typo in install instructions ([#252](https://github.com/binwiederhier/ntfy/pull/252)/[#251](https://github.com/binwiederhier/ntfy/issues/251), thanks to [@oddlama](https://github.com/oddlama))
-* fix typo in private server example ([#262](https://github.com/binwiederhier/ntfy/pull/262), thanks to [@MayeulC](https://github.com/MayeulC))
+* Fix typo in private server example ([#262](https://github.com/binwiederhier/ntfy/pull/262), thanks to [@MayeulC](https://github.com/MayeulC))
+* [Examples](examples.md) for [jellyseerr](https://github.com/Fallenbagel/jellyseerr)/[overseerr](https://overseerr.dev/) ([#264](https://github.com/binwiederhier/ntfy/pull/264), thanks to [@Fallenbagel](https://github.com/Fallenbagel))
 
 **Additional translations:**
 
-* Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/))
+* Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/) and [@pireshenrique22](https://hosted.weblate.org/user/pireshenrique22/))
 
--->
+Thank you to the many translators, who helped translate the new strings so quickly. I am humbled and amazed by your help.  
 
 ## ntfy Android app v1.13.0
 Released May 11, 2022

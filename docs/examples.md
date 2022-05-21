@@ -4,6 +4,11 @@ There are a million ways to use ntfy, but here are some inspirations. I try to c
 <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">examples on GitHub</a>, so be sure to check
 those out, too.
 
+!!! info
+    Many of these examples were contributed by ntfy users. If you have other examples of how you use ntfy, please
+    [create a pull request](https://github.com/binwiederhier/ntfy/pulls), and I'll happily include it. Also note, that
+    I cannot guarantee that all of these examples are functional. Many of them I have not tried myself.
+
 ## A long process is done: backups, copying data, pipelines, ...
 I started adding notifications pretty much all of my scripts. Typically, I just chain the <tt>curl</tt> call
 directly to the command I'm running. The following example will either send <i>Laptop backup succeeded</i>
@@ -98,7 +103,8 @@ One of my co-workers uses the following Ansible task to let him know when things
 ```
 
 ## Watchtower notifications (shoutrrr)
-You can use `shoutrrr` generic webhook support to send watchtower notifications to your ntfy topic.
+You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send 
+[Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
 
 Example docker-compose.yml:
 ```yml
@@ -122,7 +128,6 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 ``` cron
 # Check github/ntfy user
 */6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
-~           
 ```
 
 ## Download notifications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd)
@@ -132,11 +137,10 @@ Some simple bash scripts to achieve this are kindly provided in [nickexyz's repo
 ## Node-RED
 You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:
 
-
 <details>
 <summary>Example: Send a message (click to expand)</summary>
 
-```
+``` json
 [
     {
         "id": "c956e688cc74ad8e",
@@ -225,7 +229,7 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
 <details>
 <summary>Example: Send a picture (click to expand)</summary>
 
-```
+``` json
 [
     {
         "id": "d135a13eadeb9d6d",
@@ -341,8 +345,8 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
 
 ## Gatus service health check
 
-An example for a custom alert with <a href="https://github.com/TwiN/gatus">Gatus</a>
-```
+An example for a custom alert with [Gatus](https://github.com/TwiN/gatus):
+``` yaml
 alerting:
   custom:
     url: "https://ntfy.sh"
@@ -368,8 +372,10 @@ alerting:
 ```
 
 ## Jellyseerr/Overseerr webhook
-Here is an example for jellyseerr/overseerr webhook json payload. Remember to change the `https://requests.example.com` to your Jellyseerr/Overseerr url.
-```
+Here is an example for [jellyseerr](https://github.com/Fallenbagel/jellyseerr)/[overseerr](https://overseerr.dev/) webhook
+JSON payload. Remember to change the `https://requests.example.com` to your jellyseerr/overseerr URL.
+
+``` json
 {
     "topic": "requests",
     "title": "{{event}}",

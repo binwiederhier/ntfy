@@ -162,13 +162,14 @@ To build only the `ntfy` binary **without the web app or documentation**, use th
 
 ``` shell
 $ make
-Build server & client (not release version):
-  make cli                     - Build server & client (all architectures)
-  make cli-linux-amd64         - Build server & client (Linux, amd64 only)
-  make cli-linux-armv6         - Build server & client (Linux, armv6 only)
-  make cli-linux-armv7         - Build server & client (Linux, armv7 only)
-  make cli-linux-arm64         - Build server & client (Linux, arm64 only)
-  make cli-windows-amd64       - Build client (Windows, amd64 only)
+Build server & client (using GoReleaser, not release version):
+  make cli                        - Build server & client (all architectures)
+  make cli-linux-amd64            - Build server & client (Linux, amd64 only)
+  make cli-linux-armv6            - Build server & client (Linux, armv6 only)
+  make cli-linux-armv7            - Build server & client (Linux, armv7 only)
+  make cli-linux-arm64            - Build server & client (Linux, arm64 only)
+  make cli-windows-amd64          - Build client (Windows, amd64 only)
+  make cli-darwin-all             - Build client (macOS, arm64+amd64 universal binary)
 ```
 
 So if you're on an amd64/x86_64-based machine, you may just want to run `make cli-linux-amd64` during testing. On a modern
@@ -199,8 +200,10 @@ server/server.go:85:13: pattern docs: no matching files found
 
 This is because we use `go:embed` to embed the documentation and web app, so the Go code expects files to be
 present at `server/docs` and `server/site`. If they are not, you'll see the above error. The `cli-deps-static-sites`
-target creates dummy files that ensures that you'll be able to build.
+target creates dummy files that ensure that you'll be able to build.
 
+While not officially supported (or released), you can build and run the server **on macOS** as well. Simply run 
+`make cli-darwin-server` to build a binary, or `go run main.go serve` (see above) to run it.
 
 ### Build the web app
 The sources for the web app live in `web/`. As long as you have `npm` installed (see above), building the web app 

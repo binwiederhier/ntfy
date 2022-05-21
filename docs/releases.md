@@ -5,6 +5,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## ntfy server v1.23.0
 Released May 21, 2022
 
+This release ships a CLI for Windows and macOS, as well as the ability to disable the web app entirely. On top of that, 
+it adds support for APNs, the iOS messaging service. This is needed for the (soon to be released) iOS app.
+
 **Features:**
 
 * [Windows](https://ntfy.sh/docs/install/#windows) and [macOS](https://ntfy.sh/docs/install/#macos) builds for the [ntfy CLI](https://ntfy.sh/docs/subscribe/cli/) ([#112](https://github.com/binwiederhier/ntfy/issues/112))

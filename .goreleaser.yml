@@ -59,6 +59,7 @@ builds:
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
+    tags: [noserver] # don't include server files
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [windows]
@@ -71,6 +72,7 @@ builds:
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
+    tags: [noserver] # don't include server files
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [darwin]

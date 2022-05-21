@@ -23,7 +23,9 @@ help:
 	@echo "  make cli-linux-armv7         - Build server & client (Linux, armv7 only)"
 	@echo "  make cli-linux-arm64         - Build server & client (Linux, arm64 only)"
 	@echo "  make cli-windows-amd64       - Build client (Windows, amd64 only)"
-	@echo "  make cli-darwin-amd64        - Build client (macOS, amd64 only)"
+	@echo "  make cli-darwin-all          - Build client (macOS, arm64+amd64 universal binary)"
+	@echo "  make cli-devonly-server      - Build client & server (without GoReleaser, on current architecture)"
+	@echo "  make cli-devonly-noserver    - Build client only (without GoReleaser, on current architecture)"
 	@echo
 	@echo "Build web app:"
 	@echo "  make web                     - Build the web app"
@@ -132,15 +134,23 @@ cli-windows-amd64: cli-deps-static-sites
 cli-darwin-all: cli-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_all
 
-cli-devonly-server-any: cli-deps-static-sites
-	# This is a target to build the server manually. This should work an any
-	# architecture, including macOS (which is what it was made for).
-	mkdir -p dist/ntfy_devonly_server_any server/docs
+cli-devonly-server: cli-deps-static-sites
+	# This is a target to build the CLI (including the server) manually. This should work on macOS, too.
+	mkdir -p dist/ntfy_devonly_server server/docs
 	CGO_ENABLED=1 go build \
-		-o dist/ntfy_devonly_server_any/ntfy \
+		-o dist/ntfy_devonly_server/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
 		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+
+cli-devonly-noserver: cli-deps-static-sites
+	# This is a target to build the CLI (excluding the server) manually. This should work on macOS, too.
+	mkdir -p dist/ntfy_devonly_noserver server/docs
+	CGO_ENABLED=0 go build \
+		-o dist/ntfy_devonly_noserver/ntfy \
+		-tags noserver \
+		-ldflags \
+		"-X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 

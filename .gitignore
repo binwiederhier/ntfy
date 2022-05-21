@@ -1,6 +1,7 @@
 dist/
 build/
 .idea/
+.vscode/
 *.swp
 server/docs/
 server/site/

@@ -5,65 +5,68 @@ VERSION := $(shell git describe --tag)
 
 help:
 	@echo "Typical commands (more see below):"
-	@echo "  make build                   - Build web app, documentation and server/client (sloowwww)"
-	@echo "  make cli-linux-amd64         - Build server/client binary (amd64, no web app or docs)"
-	@echo "  make install-linux-amd64     - Install ntfy binary to /usr/bin/ntfy (amd64)"
-	@echo "  make web                     - Build the web app"
-	@echo "  make docs                    - Build the documentation"
-	@echo "  make check                   - Run all tests, vetting/formatting checks and linters"
+	@echo "  make build                      - Build web app, documentation and server/client (sloowwww)"
+	@echo "  make cli-linux-amd64            - Build server/client binary (amd64, no web app or docs)"
+	@echo "  make install-linux-amd64        - Install ntfy binary to /usr/bin/ntfy (amd64)"
+	@echo "  make web                        - Build the web app"
+	@echo "  make docs                       - Build the documentation"
+	@echo "  make check                      - Run all tests, vetting/formatting checks and linters"
 	@echo
 	@echo "Build everything:"
-	@echo "  make build                   - Build web app, documentation and server/client"
-	@echo "  make clean                   - Clean build/dist folders"
+	@echo "  make build                      - Build web app, documentation and server/client"
+	@echo "  make clean                      - Clean build/dist folders"
 	@echo
-	@echo "Build server & client (not release version):"
-	@echo "  make cli                     - Build server & client (all architectures)"
-	@echo "  make cli-linux-amd64         - Build server & client (Linux, amd64 only)"
-	@echo "  make cli-linux-armv6         - Build server & client (Linux, armv6 only)"
-	@echo "  make cli-linux-armv7         - Build server & client (Linux, armv7 only)"
-	@echo "  make cli-linux-arm64         - Build server & client (Linux, arm64 only)"
-	@echo "  make cli-windows-amd64       - Build client (Windows, amd64 only)"
-	@echo "  make cli-darwin-all          - Build client (macOS, arm64+amd64 universal binary)"
-	@echo "  make cli-devonly-server      - Build client & server (without GoReleaser, on current architecture)"
-	@echo "  make cli-devonly-noserver    - Build client only (without GoReleaser, on current architecture)"
+	@echo "Build server & client (using GoReleaser, not release version):"
+	@echo "  make cli                        - Build server & client (all architectures)"
+	@echo "  make cli-linux-amd64            - Build server & client (Linux, amd64 only)"
+	@echo "  make cli-linux-armv6            - Build server & client (Linux, armv6 only)"
+	@echo "  make cli-linux-armv7            - Build server & client (Linux, armv7 only)"
+	@echo "  make cli-linux-arm64            - Build server & client (Linux, arm64 only)"
+	@echo "  make cli-windows-amd64          - Build client (Windows, amd64 only)"
+	@echo "  make cli-darwin-all             - Build client (macOS, arm64+amd64 universal binary)"
+	@echo
+	@echo "Build server & client (without GoReleaser):"
+	@echo "  make cli-linux-server           - Build client & server (no GoReleaser, current arch, Linux)"
+	@echo "  make cli-darwin-server          - Build client & server (no GoReleaser, current arch, macOS)"
+	@echo "  make cli-client                 - Build client only (no GoReleaser, current arch, Linux/macOS/Windows)"
 	@echo
 	@echo "Build web app:"
-	@echo "  make web                     - Build the web app"
-	@echo "  make web-deps                - Install web app dependencies (npm install the universe)"
-	@echo "  make web-build               - Actually build the web app"
+	@echo "  make web                        - Build the web app"
+	@echo "  make web-deps                   - Install web app dependencies (npm install the universe)"
+	@echo "  make web-build                  - Actually build the web app"
 	@echo
 	@echo "Build documentation:"
-	@echo "  make docs                    - Build the documentation"
-	@echo "  make docs-deps               - Install Python dependencies (pip3 install)"
-	@echo "  make docs-build              - Actually build the documentation"
+	@echo "  make docs                       - Build the documentation"
+	@echo "  make docs-deps                  - Install Python dependencies (pip3 install)"
+	@echo "  make docs-build                 - Actually build the documentation"
 	@echo
 	@echo "Test/check:"
-	@echo "  make test                    - Run tests"
-	@echo "  make race                    - Run tests with -race flag"
-	@echo "  make coverage                - Run tests and show coverage"
-	@echo "  make coverage-html           - Run tests and show coverage (as HTML)"
-	@echo "  make coverage-upload         - Upload coverage results to codecov.io"
+	@echo "  make test                       - Run tests"
+	@echo "  make race                       - Run tests with -race flag"
+	@echo "  make coverage                   - Run tests and show coverage"
+	@echo "  make coverage-html              - Run tests and show coverage (as HTML)"
+	@echo "  make coverage-upload            - Upload coverage results to codecov.io"
 	@echo
 	@echo "Lint/format:"
-	@echo "  make fmt                     - Run 'go fmt'"
-	@echo "  make fmt-check               - Run 'go fmt', but don't change anything"
-	@echo "  make vet                     - Run 'go vet'"
-	@echo "  make lint                    - Run 'golint'"
-	@echo "  make staticcheck             - Run 'staticcheck'"
+	@echo "  make fmt                        - Run 'go fmt'"
+	@echo "  make fmt-check                  - Run 'go fmt', but don't change anything"
+	@echo "  make vet                        - Run 'go vet'"
+	@echo "  make lint                       - Run 'golint'"
+	@echo "  make staticcheck                - Run 'staticcheck'"
 	@echo
 	@echo "Releasing:"
-	@echo "  make release                 - Create a release"
-	@echo "  make release-snapshot        - Create a test release"
+	@echo "  make release                    - Create a release"
+	@echo "  make release-snapshot           - Create a test release"
 	@echo
 	@echo "Install locally (requires sudo):"
-	@echo "  make install-linux-amd64     - Copy amd64 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-armv6     - Copy armv6 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-armv7     - Copy armv7 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-arm64     - Copy arm64 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-deb-amd64 - Install .deb from dist/ (amd64 only)"
-	@echo "  make install-linux-deb-armv6 - Install .deb from dist/ (armv6 only)"
-	@echo "  make install-linux-deb-armv7 - Install .deb from dist/ (armv7 only)"
-	@echo "  make install-linux-deb-arm64 - Install .deb from dist/ (arm64 only)"
+	@echo "  make install-linux-amd64        - Copy amd64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-armv6        - Copy armv6 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-armv7        - Copy armv7 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-arm64        - Copy arm64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-deb-amd64    - Install .deb from dist/ (amd64 only)"
+	@echo "  make install-linux-deb-armv6    - Install .deb from dist/ (armv6 only)"
+	@echo "  make install-linux-deb-armv7    - Install .deb from dist/ (armv7 only)"
+	@echo "  make install-linux-deb-arm64    - Install .deb from dist/ (arm64 only)"
 
 
 # Building everything
@@ -134,20 +137,32 @@ cli-windows-amd64: cli-deps-static-sites
 cli-darwin-all: cli-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_all
 
-cli-devonly-server: cli-deps-static-sites
-	# This is a target to build the CLI (including the server) manually. This should work on macOS, too.
-	mkdir -p dist/ntfy_devonly_server server/docs
+cli-linux-server: cli-deps-static-sites
+	# This is a target to build the CLI (including the server) manually.
+	# Use this for development, if you really don't want to install GoReleaser ...
+	mkdir -p dist/ntfy_linux_server server/docs
 	CGO_ENABLED=1 go build \
-		-o dist/ntfy_devonly_server/ntfy \
+		-o dist/ntfy_linux_server/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
 		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
 
-cli-devonly-noserver: cli-deps-static-sites
-	# This is a target to build the CLI (excluding the server) manually. This should work on macOS, too.
-	mkdir -p dist/ntfy_devonly_noserver server/docs
+cli-darwin-server: cli-deps-static-sites
+	# This is a target to build the CLI (including the server) manually.
+	# Use this for macOS/iOS development, so you have a local server to test with.
+	mkdir -p dist/ntfy_darwin_server server/docs
+	CGO_ENABLED=1 go build \
+		-o dist/ntfy_darwin_server/ntfy \
+		-tags sqlite_omit_load_extension,osusergo,netgo \
+		-ldflags \
+		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+
+cli-client: cli-deps-static-sites
+	# This is a target to build the CLI (excluding the server) manually. This should work on Linux/macOS/Windows.
+	# Use this for development, if you really don't want to install GoReleaser ...
+	mkdir -p dist/ntfy_client server/docs
 	CGO_ENABLED=0 go build \
-		-o dist/ntfy_devonly_noserver/ntfy \
+		-o dist/ntfy_client/ntfy \
 		-tags noserver \
 		-ldflags \
 		"-X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"

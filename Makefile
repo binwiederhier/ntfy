@@ -132,6 +132,16 @@ cli-windows-amd64: cli-deps-static-sites
 cli-darwin-all: cli-deps-static-sites
 	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_all
 
+cli-devonly-server-any: cli-deps-static-sites
+	# This is a target to build the server manually. This should work an any
+	# architecture, including macOS (which is what it was made for).
+	mkdir -p dist/ntfy_devonly_server_any server/docs
+	CGO_ENABLED=1 go build \
+		-o dist/ntfy_devonly_server_any/ntfy \
+		-tags sqlite_omit_load_extension,osusergo,netgo \
+		-ldflags \
+		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 
 cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64

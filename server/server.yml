@@ -1,4 +1,7 @@
 # ntfy server config file
+#
+# Please refer to the documentation at https://ntfy.sh/docs/config/ for details.
+# All options also support underscores (_) instead of dashes (-) to comply with the YAML spec.
 
 # Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
 # This setting is currently only used by the attachments and e-mail sending feature (outgoing mail only).

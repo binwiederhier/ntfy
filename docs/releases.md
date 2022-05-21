@@ -11,6 +11,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * [Windows](https://ntfy.sh/docs/install/#windows) and [macOS](https://ntfy.sh/docs/install/#macos) builds for the [ntfy CLI](https://ntfy.sh/docs/subscribe/cli/) ([#112](https://github.com/binwiederhier/ntfy/issues/112))
 * Ability to disable the web app entirely ([#238](https://github.com/binwiederhier/ntfy/issues/238)/[#249](https://github.com/binwiederhier/ntfy/pull/249), thanks to [@Curid](https://github.com/Curid))
 
+**Bugs:**
+
+* Support underscores in server.yml config options ([#255](https://github.com/binwiederhier/ntfy/issues/255), thanks to [@ajdelgado](https://github.com/ajdelgado))
+* Force MAKEFLAGS to --jobs=1 in `Makefile` ([#257](https://github.com/binwiederhier/ntfy/pull/257), thanks to [@oddlama](https://github.com/oddlama))
+
+**Documentation:**
+
+* Typo in install instructions ([#252](https://github.com/binwiederhier/ntfy/pull/252)/[#251](https://github.com/binwiederhier/ntfy/issues/251), thanks to [@oddlama](https://github.com/oddlama))
+* fix typo in private server example ([#262](https://github.com/binwiederhier/ntfy/pull/262), thanks to [@MayeulC](https://github.com/MayeulC))
+
 **Additional translations:**
 
 * Portuguese/Brazil (thanks to [@tiagotriques](https://hosted.weblate.org/user/tiagotriques/))

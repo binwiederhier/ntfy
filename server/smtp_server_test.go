@@ -94,6 +94,24 @@ what's up
 	require.Nil(t, session.Data(strings.NewReader(email)))
 }
 
+func TestSmtpBackend_Plaintext_No_ContentType(t *testing.T) {
+	email := `Subject: Very short mail
+
+what's up
+`
+	conf, backend := newTestBackend(t, func(m *message) error {
+		require.Equal(t, "mytopic", m.Topic)
+		require.Equal(t, "Very short mail", m.Title)
+		require.Equal(t, "what's up", m.Message)
+		return nil
+	})
+	conf.SMTPServerAddrPrefix = ""
+	session, _ := backend.AnonymousLogin(nil)
+	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
+	require.Nil(t, session.Rcpt("mytopic@ntfy.sh"))
+	require.Nil(t, session.Data(strings.NewReader(email)))
+}
+
 func TestSmtpBackend_Plaintext_EncodedSubject(t *testing.T) {
 	email := `Date: Tue, 28 Dec 2021 00:30:10 +0100
 Subject: =?UTF-8?B?VGhyZWUgc2FudGFzIPCfjoXwn46F8J+OhQ==?=

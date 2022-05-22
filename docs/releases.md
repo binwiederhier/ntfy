@@ -2,6 +2,16 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+<!--
+
+## ntfy server v1.24.0 (UNRELEASED)
+
+**Bugs:**
+
+* Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))
+
+-->
+
 ## ntfy server v1.23.0
 Released May 21, 2022
 

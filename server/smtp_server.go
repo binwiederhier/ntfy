@@ -159,37 +159,47 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 }
 
 func readMailBody(msg *mail.Message) (string, error) {
+	if msg.Header.Get("Content-Type") == "" {
+		return readPlainTextMailBody(msg)
+	}
 	contentType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
 	if err != nil {
 		return "", err
 	}
 	if contentType == "text/plain" {
-		body, err := io.ReadAll(msg.Body)
+		return readPlainTextMailBody(msg)
+	} else if strings.HasPrefix(contentType, "multipart/") {
+		return readMultipartMailBody(msg, params)
+	}
+	return "", errUnsupportedContentType
+}
+
+func readPlainTextMailBody(msg *mail.Message) (string, error) {
+	body, err := io.ReadAll(msg.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+func readMultipartMailBody(msg *mail.Message, params map[string]string) (string, error) {
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+	for {
+		part, err := mr.NextPart()
+		if err != nil { // may be io.EOF
+			return "", err
+		}
+		partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
+		if err != nil {
+			return "", err
+		}
+		if partContentType != "text/plain" {
+			continue
+		}
+		body, err := io.ReadAll(part)
 		if err != nil {
 			return "", err
 		}
 		return string(body), nil
 	}
-	if strings.HasPrefix(contentType, "multipart/") {
-		mr := multipart.NewReader(msg.Body, params["boundary"])
-		for {
-			part, err := mr.NextPart()
-			if err != nil { // may be io.EOF
-				return "", err
-			}
-			partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
-			if err != nil {
-				return "", err
-			}
-			if partContentType != "text/plain" {
-				continue
-			}
-			body, err := io.ReadAll(part)
-			if err != nil {
-				return "", err
-			}
-			return string(body), nil
-		}
-	}
-	return "", errUnsupportedContentType
 }

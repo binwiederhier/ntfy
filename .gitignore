@@ -10,3 +10,4 @@ playground/
 secrets/
 *.iml
 node_modules/
+.DS_Store

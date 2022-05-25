@@ -8,10 +8,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* iOS 14.0 support (no ticket, [PR#1](https://github.com/binwiederhier/ntfy-ios/pull/1), thanks to [@callum-99](https://github.com/callum-99))
+* [Message priority](https://ntfy.sh/docs/publish/#message-priority) support (no ticket)
 * Open topic when notification clicked (no ticket)
 * Notification now makes a sound and vibrates (no ticket)
 * Cancel notifications when navigating to topic (no ticket)
+* Support for ntfy priorities (no ticket)
+* iOS 14.0 support (no ticket, [PR#1](https://github.com/binwiederhier/ntfy-ios/pull/1), thanks to [@callum-99](https://github.com/callum-99))
 
 **Bugs:**
 

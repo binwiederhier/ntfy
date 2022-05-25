@@ -187,5 +187,6 @@
     "prefs_users_table": "Tabela de usuários",
     "prefs_users_edit_button": "Editar usuário",
     "prefs_users_delete_button": "Excluir usuário",
-    "error_boundary_unsupported_indexeddb_title": "Navegação anônima não suportada"
+    "error_boundary_unsupported_indexeddb_title": "Navegação anônima não suportada",
+    "error_boundary_unsupported_indexeddb_description": "O ntfy web app precisa do IndexedDB para funcionar, e seu navegador não suporta IndexedDB no modo de navegação privada.<br/><br/>Embora isso seja lamentável, também não faz muito sentido usar o ntfy web app no modo de navegação privada de qualquer maneira, porque tudo é armazenado no armazenamento do navegador. Você pode ler mais sobre isso <githubLink>nesta edição do GitHub</githubLink>, ou falar conosco em <discordLink>Discord</discordLink> ou <matrixLink>Matrix</matrixLink>."
 }

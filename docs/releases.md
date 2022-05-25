@@ -4,6 +4,36 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
+## ntfy iOS app v1.1 (UNRELEASED)
+
+**Features:**
+
+* iOS 14.0 support (no ticket, [PR#1](https://github.com/binwiederhier/ntfy-ios/pull/1), thanks to [@callum-99](https://github.com/callum-99))
+* Open topic when notification clicked (no ticket)
+* Notification now makes a sound and vibrates (no ticket)
+* Cancel notifications when navigating to topic (no ticket)
+
+**Bugs:**
+
+* iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
+
+## ntfy iOS app v1.0 (UNRELEASED)
+
+This is the first version of the ntfy iOS app. It supports only ntfy.sh (no selfhosted servers) and only messages + title
+(no priority, tags, attachments, ...). I'll rapidly add (hopefully) most of the other ntfy features, and then I'll focus
+on selfhosted servers.
+
+The app is now available in the [App Store](http://XXXXXXXXXXX).
+
+**Tickets:**
+
+* iOS app ([#4](https://github.com/binwiederhier/ntfy/issues/4), see also: [TestFlight summary] (https://github.com/binwiederhier/ntfy/issues/4#issuecomment-1133767150))
+
+**Thanks:**
+
+Thank you to all the testers who tried out the app. You guys gave me the confidence that it's ready to release (albeit with
+some known issues, which will be addressed in follow-up releases).
+
 ## ntfy server v1.24.0 (UNRELEASED)
 
 **Bugs:**

@@ -77,7 +77,7 @@ clean: .PHONY
 build: web docs cli
 
 update: web-deps-update cli-deps-update docs-deps-update
-
+	docker pull alpine
 
 # Documentation
 

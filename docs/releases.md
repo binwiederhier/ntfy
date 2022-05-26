@@ -26,6 +26,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Regularly send Firebase keepalive messages to ~poll topic to support self-hosted servers (no ticket)
+* Add subscribe filter to query exact messages by ID (no ticket) 
 
 **Bugs:**
 

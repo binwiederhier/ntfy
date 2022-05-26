@@ -153,6 +153,7 @@ var (
 )
 
 type queryFilter struct {
+	ID       string
 	Message  string
 	Title    string
 	Tags     []string
@@ -160,6 +161,7 @@ type queryFilter struct {
 }
 
 func parseQueryFilters(r *http.Request) (*queryFilter, error) {
+	idFilter := readParam(r, "x-id", "id")
 	messageFilter := readParam(r, "x-message", "message", "m")
 	titleFilter := readParam(r, "x-title", "title", "t")
 	tagsFilter := util.SplitNoEmpty(readParam(r, "x-tags", "tags", "tag", "ta"), ",")
@@ -172,6 +174,7 @@ func parseQueryFilters(r *http.Request) (*queryFilter, error) {
 		priorityFilter = append(priorityFilter, priority)
 	}
 	return &queryFilter{
+		ID:       idFilter,
 		Message:  messageFilter,
 		Title:    titleFilter,
 		Tags:     tagsFilter,
@@ -182,11 +185,11 @@ func parseQueryFilters(r *http.Request) (*queryFilter, error) {
 func (q *queryFilter) Pass(msg *message) bool {
 	if msg.Event != messageEvent {
 		return true // filters only apply to messages
-	}
-	if q.Message != "" && msg.Message != q.Message {
+	} else if q.ID != "" && msg.ID != q.ID {
 		return false
-	}
-	if q.Title != "" && msg.Title != q.Title {
+	} else if q.Message != "" && msg.Message != q.Message {
+		return false
+	} else if q.Title != "" && msg.Title != q.Title {
 		return false
 	}
 	messagePriority := msg.Priority

@@ -38,6 +38,10 @@ some known issues, which will be addressed in follow-up releases).
 
 ## ntfy server v1.24.0 (UNRELEASED)
 
+**Features:**
+
+* Regularly send Firebase keepalive messages to ~poll topic to support self-hosted servers (no ticket)
+
 **Bugs:**
 
 * Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))

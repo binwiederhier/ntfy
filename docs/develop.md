@@ -319,3 +319,9 @@ To build your own version with Firebase, you must:
 # To build a bundle .aab (app/play/release/*.aab)
 ./gradlew bundlePlayRelease
 ```
+
+## iOS app
+The ntfy iOS app source code is available [on GitHub](https://github.com/binwiederhier/ntfy-ios).
+
+!!! info
+    I haven't had time to move the build instructions here. Please check out the repository instead.

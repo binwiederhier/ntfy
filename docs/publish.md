@@ -296,6 +296,8 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
 </figure>
 
 ## Message title
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`). To override the title, 
 you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 
@@ -372,7 +374,9 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 </figure>
 
 ## Message priority
-All messages have a priority, which defines how urgently your phone notifies you. You can set custom
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+All messages have a priority, which defines how urgently your phone notifies you. On Android, you can set custom
 notification sounds and vibration patterns on your phone to map to these priorities (see [Android config](subscribe/phone.md)).
 
 The following priorities exist:
@@ -460,6 +464,8 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 </figure>
 
 ## Tags & emojis 🥳 🎉
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can tag messages with emojis and other relevant strings:
 
 * **Emojis**: If a tag matches an [emoji short code](emojis.md), it'll be converted to an emoji and prepended 
@@ -579,6 +585,8 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 </figure>
 
 ## Scheduled delivery
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself 
 reminders or even to execute commands at a later date (if your subscriber acts on messages).
 
@@ -679,6 +687,8 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
 </tr></table>
 
 ## Webhooks (publish via GET) 
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
 a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
 like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
@@ -782,6 +792,8 @@ Here's an example with a custom message, tags and a priority:
     ```
 
 ## Publish as JSON
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)), 
 adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message 
 as JSON in the request body.
@@ -943,6 +955,8 @@ all the supported fields:
 | `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
 
 ## Action buttons
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can add action buttons to notifications to allow yourself to react to a notification directly. This is incredibly
 useful and has countless applications. 
 
@@ -953,7 +967,7 @@ As of today, the following actions are supported:
 
 * [`view`](#open-websiteapp): Opens a website or app when the action button is tapped
 * [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
-  when the action button is tapped
+  when the action button is tapped (only supported on Android)
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
 
 Here's an example of what that a notification with actions can look like:
@@ -1276,6 +1290,8 @@ The required/optional fields for each action depend on the type of the action it
 for details.
 
 ### Open website/app
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 The `view` action **opens a website or app when the action button is tapped**, e.g. a browser, a Google Maps location, or
 even a deep link into Twitter or a show ntfy topic. How exactly the action is handled depends on how Android and your 
 desktop browser treat the links. Normally it'll just open a link in the browser. 
@@ -1515,6 +1531,8 @@ The `view` action supports the following fields:
 | `clear`  | -️       | *boolean* | `false` | `true`                | Clear notification after action button is tapped |
 
 ### Send Android broadcast
+_Supported on:_ :material-android:
+
 The `broadcast` action **sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
 when the action button is tapped**. This allows integration into automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), which basically means
@@ -1779,6 +1797,8 @@ The `broadcast` action supports the following fields:
 | `clear`  | -️       | *boolean*        | `false`                      | `true`                  | Clear notification after action button is tapped                                                                                                                                       |
 
 ### Send HTTP request
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 The `http` action **sends a HTTP request when the action button is tapped**. You can use this to trigger REST APIs
 for whatever systems you have, e.g. opening the garage door, or turning on/off lights.
 
@@ -1791,14 +1811,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
     curl \
         -d "Garage door has been open for 15 minutes. Close it?" \
-        -H "Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
+        -H "Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
         ntfy.sh/myhome
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --actions="http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
+        --actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
         myhome \
         "Garage door has been open for 15 minutes. Close it?"
     ```
@@ -1807,7 +1827,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ``` http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={"action": "close"}
+    Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={"action": "close"}
 
     Garage door has been open for 15 minutes. Close it?
     ```
@@ -1818,7 +1838,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
         method: 'POST',
         body: 'Garage door has been open for 15 minutes. Close it?',
         headers: { 
-            'Actions': 'http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}' 
+            'Actions': 'http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}' 
         }
     })
     ```
@@ -1826,14 +1846,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Garage door has been open for 15 minutes. Close it?"))
-    req.Header.Set("Actions", "http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}")
+    req.Header.Set("Actions", "http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" }
+    $headers = @{ Actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" }
     $body = "Garage door has been open for 15 minutes. Close it?"
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
@@ -1842,7 +1862,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ``` python
     requests.post("https://ntfy.sh/myhome",
         data="Garage door has been open for 15 minutes. Close it?",
-        headers={ "Actions": "http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" })
+        headers={ "Actions": "http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" })
     ```
 
 === "PHP"
@@ -1852,7 +1872,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: http, Cloor door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
+                "Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
             'content' => 'Garage door has been open for 15 minutes. Close it?'
         ]
     ]));
@@ -2055,6 +2075,8 @@ The `http` action supports the following fields:
 | `clear`   | -️       | *boolean*          | `false`   | `true`                    | Clear notification after HTTP request succeeds. If the request fails, the notification is not cleared.                                                  |
 
 ## Click action
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
 to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
 the web browser (or the app) and open the website.
@@ -2143,6 +2165,8 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 ## Attachments
+_Supported on:_ :material-android: :material-firefox:
+
 You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
 onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
 
@@ -2315,6 +2339,8 @@ Here's an example showing how to attach an APK file:
 </figure>
 
 ## E-mail notifications
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
 you'd like to persist longer, or to blast-notify yourself on all possible channels. 
 
@@ -2425,6 +2451,8 @@ Here's what that looks like in Google Mail:
 </figure>
 
 ## E-mail publishing
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
 You can publish messages to a topic via e-mail, i.e. by sending an email to a specific address. For instance, you can
 publish a message to the topic `sometopic` by sending an e-mail to `ntfy-sometopic@ntfy.sh`. This is useful for e-mail 
 based integrations such as for statuspage.io (though these days most services also support webhooks and HTTP calls).

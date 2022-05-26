@@ -1,14 +1,16 @@
 # Subscribe from your phone
-You can use the [ntfy Android App](https://play.google.com/store/apps/details?id=io.heckel.ntfy) to receive 
-notifications directly on your phone. Just like the server, this app is also [open source](https://github.com/binwiederhier/ntfy-android).
-Since I don't have an iPhone or a Mac, I didn't make an iOS app yet. I'd be awesome if [someone else could help out](https://github.com/binwiederhier/ntfy/issues/4).
+You can use the ntfy [Android App](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [iOS app](https://apps.apple.com/us/app/ntfy/id1625396347)
+to receive notifications directly on your phone. Just like the server, this app is also open source, and the code is available
+on GitHub ([Android](https://github.com/binwiederhier/ntfy-android), [iOS](https://github.com/binwiederhier/ntfy-ios)). Feel free to 
+contribute, or [build your own](../develop.md).
 
 <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="../../static/img/badge-googleplay.png"></a>
 <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="../../static/img/badge-fdroid.png"></a>
+<a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img src="../../static/img/badge-appstore.png"></a>
 
 You can get the Android app from both [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) and 
 from [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/). Both are largely identical, with the one exception that
-the F-Droid flavor does not use Firebase.
+the F-Droid flavor does not use Firebase. The iOS app can be downloaded from the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
 ## Overview
 A picture is worth a thousand words. Here are a few screenshots showing what the app looks like. It's all pretty
@@ -210,9 +212,3 @@ The following intent extras are supported when for the intent with the `io.hecke
 | `message` ❤️ | ✔        | *String*                      | `Some message`    | Message body; **you must set this**                                                |
 | `tags`       | -        | *String*                      | `tag1,tag2,..`    | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
 | `priority`   | -        | *String or Int (between 1-5)* | `4`               | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
-
-## iPhone/iOS
-I almost feel devious for putting the *Download on the App Store* button on this page. Currently, there is no iOS app
-for ntfy, but it's in the works. You can track the status on GitHub.
-
-<a href="https://github.com/binwiederhier/ntfy/issues/4"><img src="../../static/img/badge-appstore.png"></a>

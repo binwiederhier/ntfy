@@ -9,10 +9,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * [Message priority](https://ntfy.sh/docs/publish/#message-priority) support (no ticket)
+* [Tags/emojis](https://ntfy.sh/docs/publish/#tags-emojis) support (no ticket)
+* [Action buttons](https://ntfy.sh/docs/publish/#action-buttons) support (no ticket)
+* [Click action](https://ntfy.sh/docs/publish/#click-action) support (no ticket)
 * Open topic when notification clicked (no ticket)
 * Notification now makes a sound and vibrates (no ticket)
 * Cancel notifications when navigating to topic (no ticket)
-* Support for ntfy priorities (no ticket)
 * iOS 14.0 support (no ticket, [PR#1](https://github.com/binwiederhier/ntfy-ios/pull/1), thanks to [@callum-99](https://github.com/callum-99))
 
 **Bugs:**
@@ -28,6 +30,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
 -->
 

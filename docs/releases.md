@@ -21,6 +21,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.24.0 (UNRELEASED)
 
+**Features:**
+
+* Regularly send Firebase keepalive messages to ~poll topic to support self-hosted servers (no ticket)
+
 **Bugs:**
 
 * Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))
@@ -40,9 +44,10 @@ The app is now available in the [App Store](https://apps.apple.com/us/app/ntfy/i
 
 * iOS app ([#4](https://github.com/binwiederhier/ntfy/issues/4), see also: [TestFlight summary](https://github.com/binwiederhier/ntfy/issues/4#issuecomment-1133767150))
 
-**Thanks:**   
-Thank you to all the testers who tried out the app. You guys gave me the confidence that it's ready to release (albeit with
-some known issues which will be addressed in follow-up releases).
+**Thanks:**
+
+* Thank you to all the testers who tried out the app. You guys gave me the confidence that it's ready to release (albeit with
+  some known issues which will be addressed in follow-up releases).
 
 ## ntfy server v1.23.0
 Released May 21, 2022

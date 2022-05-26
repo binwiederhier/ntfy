@@ -91,6 +91,7 @@ var (
 
 const (
 	firebaseControlTopic     = "~control"                // See Android if changed
+	firebasePollTopic        = "~poll"                   // See iOS if changed
 	emptyMessageBody         = "triggered"               // Used if message body is empty
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
@@ -1074,7 +1075,12 @@ func (s *Server) runFirebaseKeepaliver() {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
 			if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message: %s", err.Error())
+				log.Printf("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
+			}
+		case <-time.After(s.config.FirebasePollInterval):
+			log.Printf("Sending to timer topic %s", firebasePollTopic)
+			if err := s.firebase(newKeepaliveMessage(firebasePollTopic)); err != nil {
+				log.Printf("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
 			}
 		case <-s.closeChan:
 			return

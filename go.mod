@@ -14,20 +14,20 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/olebedev/when v0.0.0-20211212231525-59bd4edcf9d6
 	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.7.1
-	golang.org/x/crypto v0.0.0-20220518034528-6f7dac969898
-	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
+	github.com/urfave/cli/v2 v2.8.1
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
-	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
+	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
-	google.golang.org/api v0.80.0
+	google.golang.org/api v0.81.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
 require github.com/pkg/errors v0.9.1 // indirect
 
 require (
-	cloud.google.com/go v0.101.1 // indirect
+	cloud.google.com/go v0.102.0 // indirect
 	cloud.google.com/go/compute v1.6.1 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/AlekSi/pointer v1.2.0 // indirect
@@ -42,13 +42,14 @@ require (
 	github.com/googleapis/go-type-adapters v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
+	golang.org/x/net v0.0.0-20220524220425-1d687d428aca // indirect
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
+	google.golang.org/genproto v0.0.0-20220525015930-6ca3db687a9d // indirect
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect

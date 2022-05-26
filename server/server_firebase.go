@@ -80,6 +80,24 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 			"event": m.Event,
 			"topic": m.Topic,
 		}
+		// Silent notification; only 2-3 per hour are allowed; delivery not guaranteed
+		// See https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/pushing_background_updates_to_your_app
+		apnsData := make(map[string]interface{})
+		for k, v := range data {
+			apnsData[k] = v
+		}
+		apnsConfig = &messaging.APNSConfig{
+			Headers: map[string]string{
+				"apns-push-type": "background",
+				"apns-priority":  "5",
+			},
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					ContentAvailable: true,
+				},
+				CustomData: apnsData,
+			},
+		}
 	case messageEvent:
 		allowForward := true
 		if auther != nil {

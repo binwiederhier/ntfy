@@ -13,7 +13,8 @@ const (
 	DefaultAtSenderInterval          = 10 * time.Second
 	DefaultMinDelay                  = 10 * time.Second
 	DefaultMaxDelay                  = 3 * 24 * time.Hour
-	DefaultFirebaseKeepaliveInterval = 3 * time.Hour // Not too frequently to save battery
+	DefaultFirebaseKeepaliveInterval = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
+	DefaultFirebasePollInterval      = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 )
 
 // Defines all global and per-visitor limits
@@ -67,6 +68,7 @@ type Config struct {
 	WebRootIsApp                         bool
 	AtSenderInterval                     time.Duration
 	FirebaseKeepaliveInterval            time.Duration
+	FirebasePollInterval                 time.Duration
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string
@@ -117,6 +119,7 @@ func NewConfig() *Config {
 		MaxDelay:                             DefaultMaxDelay,
 		AtSenderInterval:                     DefaultAtSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
+		FirebasePollInterval:                 DefaultFirebasePollInterval,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,
 		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
 		VisitorAttachmentTotalSizeLimit:      DefaultVisitorAttachmentTotalSizeLimit,

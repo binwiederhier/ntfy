@@ -24,13 +24,14 @@ type message struct {
 	Time       int64       `json:"time"`  // Unix time in seconds
 	Event      string      `json:"event"` // One of the above
 	Topic      string      `json:"topic"`
+	Title      string      `json:"title,omitempty"`
+	Message    string      `json:"message,omitempty"`
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
 	Click      string      `json:"click,omitempty"`
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
-	Title      string      `json:"title,omitempty"`
-	Message    string      `json:"message,omitempty"`
+	PollID     string      `json:"poll_id,omitempty"`
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
 }
 
@@ -84,14 +85,11 @@ type messageEncoder func(msg *message) (string, error)
 // newMessage creates a new message with the current timestamp
 func newMessage(event, topic, msg string) *message {
 	return &message{
-		ID:       util.RandomString(messageIDLength),
-		Time:     time.Now().Unix(),
-		Event:    event,
-		Topic:    topic,
-		Priority: 0,
-		Tags:     nil,
-		Title:    "",
-		Message:  msg,
+		ID:      util.RandomString(messageIDLength),
+		Time:    time.Now().Unix(),
+		Event:   event,
+		Topic:   topic,
+		Message: msg,
 	}
 }
 
@@ -108,6 +106,13 @@ func newKeepaliveMessage(topic string) *message {
 // newDefaultMessage is a convenience method to create a notification message
 func newDefaultMessage(topic, msg string) *message {
 	return newMessage(messageEvent, topic, msg)
+}
+
+// newPollRequestMessage is a convenience method to create a poll request message
+func newPollRequestMessage(topic, pollID string) *message {
+	m := newMessage(pollRequestEvent, topic, newMessageBody)
+	m.PollID = pollID
+	return m
 }
 
 func validMessageID(s string) bool {

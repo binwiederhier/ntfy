@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -93,6 +94,7 @@ const (
 	firebaseControlTopic     = "~control"                // See Android if changed
 	firebasePollTopic        = "~poll"                   // See iOS if changed
 	emptyMessageBody         = "triggered"               // Used if message body is empty
+	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
 )
@@ -422,6 +424,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
+	if m.PollID != "" {
+		m = newPollRequestMessage(t.ID, m.PollID)
+	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return err
 	}
@@ -445,6 +450,28 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		go func() {
 			if err := s.mailer.Send(v.ip, email, m); err != nil {
 				log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
+			}
+		}()
+	}
+	if s.config.ForwardPollURL != "" {
+		go func() {
+			topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
+			topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
+			forwardURL := fmt.Sprintf("%s/%s", s.config.ForwardPollURL, topicHash)
+			log.Printf("forwarding: topicURL %s, to upstream url %s", topicURL, forwardURL)
+			req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
+			if err != nil {
+				log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+				return
+			}
+			req.Header.Set("X-Poll-ID", m.ID)
+			response, err := http.DefaultClient.Do(req)
+			if err != nil {
+				log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+				return
+			} else if response.StatusCode != http.StatusOK {
+				log.Printf("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
+				return
 			}
 		}()
 	}
@@ -549,6 +576,12 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		firebase = false
 		unifiedpush = true
 	}
+	m.PollID = readParam(r, "x-poll-id", "poll-id", "poll")
+	if m.PollID != "" {
+		unifiedpush = false
+		cache = false
+		email = ""
+	}
 	return cache, firebase, email, unifiedpush, nil
 }
 
@@ -565,7 +598,9 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 // 5. curl -T file.txt ntfy.sh/mytopic
 //    If file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, unifiedpush bool) error {
-	if unifiedpush {
+	if m.Event == pollRequestEvent {
+		return nil // Ignore body
+	} else if unifiedpush {
 		return s.handleBodyAsMessageAutoDetect(m, body) // Case 1
 	} else if m.Attachment != nil && m.Attachment.URL != "" {
 		return s.handleBodyAsTextMessage(m, body) // Case 2
@@ -710,6 +745,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	w.Header().Set("Access-Control-Allow-Origin", "*")            // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8") // Android/Volley client needs charset!
 	if poll {
+		log.Printf("polling %#v", r.URL)
 		return s.sendOldMessages(topics, since, scheduled, sub)
 	}
 	subscriberIDs := make([]int, 0)

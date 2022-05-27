@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	firebase "firebase.google.com/go"
@@ -64,6 +65,7 @@ func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subsc
 		if err != nil {
 			return err
 		}
+		log.Printf("Sending %#v %#v", m, fbm)
 		_, err = msg.Send(context.Background(), fbm)
 		return err
 	}, nil
@@ -96,6 +98,31 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 					ContentAvailable: true,
 				},
 				CustomData: apnsData,
+			},
+		}
+	case pollRequestEvent:
+		data = map[string]string{
+			"id":      m.ID,
+			"time":    fmt.Sprintf("%d", m.Time),
+			"event":   m.Event,
+			"topic":   m.Topic,
+			"message": m.Message,
+			"poll_id": m.PollID,
+		}
+		apnsData := make(map[string]interface{})
+		for k, v := range data {
+			apnsData[k] = v
+		}
+		apnsConfig = &messaging.APNSConfig{
+			Payload: &messaging.APNSPayload{
+				CustomData: apnsData,
+				Aps: &messaging.Aps{
+					MutableContent: true,
+					Alert: &messaging.ApsAlert{
+						Title: m.Title,
+						Body:  maybeTruncateAPNSBodyMessage(m.Message),
+					},
+				},
 			},
 		}
 	case messageEvent:

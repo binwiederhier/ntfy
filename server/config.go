@@ -69,7 +69,7 @@ type Config struct {
 	AtSenderInterval                     time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	FirebasePollInterval                 time.Duration
-	ForwardPollURL                       string
+	UpstreamBaseURL                      string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string

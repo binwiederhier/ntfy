@@ -32,6 +32,23 @@ func TestToFirebaseMessage_Keepalive(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "background",
+			"apns-priority":  "5",
+		},
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				ContentAvailable: true,
+			},
+			CustomData: map[string]interface{}{
+				"id":    m.ID,
+				"time":  fmt.Sprintf("%d", m.Time),
+				"event": m.Event,
+				"topic": m.Topic,
+			},
+		},
+	}, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":    m.ID,
 		"time":  fmt.Sprintf("%d", m.Time),
@@ -46,6 +63,23 @@ func TestToFirebaseMessage_Open(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "background",
+			"apns-priority":  "5",
+		},
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				ContentAvailable: true,
+			},
+			CustomData: map[string]interface{}{
+				"id":    m.ID,
+				"time":  fmt.Sprintf("%d", m.Time),
+				"event": m.Event,
+				"topic": m.Topic,
+			},
+		},
+	}, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":    m.ID,
 		"time":  fmt.Sprintf("%d", m.Time),
@@ -60,6 +94,25 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 	m.Tags = []string{"tag 1", "tag2"}
 	m.Click = "https://google.com"
 	m.Title = "some title"
+	m.Actions = []*action{
+		{
+			ID:     "123",
+			Action: "view",
+			Label:  "Open page",
+			Clear:  true,
+			URL:    "https://ntfy.sh",
+		},
+		{
+			ID:     "456",
+			Action: "http",
+			Label:  "Close door",
+			URL:    "https://door.com/close",
+			Method: "PUT",
+			Headers: map[string]string{
+				"really": "yes",
+			},
+		},
+	}
 	m.Attachment = &attachment{
 		Name:    "some file.jpg",
 		Type:    "image/jpeg",
@@ -74,6 +127,35 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 	require.Equal(t, &messaging.AndroidConfig{
 		Priority: "high",
 	}, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				MutableContent: true,
+				Alert: &messaging.ApsAlert{
+					Title: "some title",
+					Body:  "this is a message",
+				},
+			},
+			CustomData: map[string]interface{}{
+				"id":                 m.ID,
+				"time":               fmt.Sprintf("%d", m.Time),
+				"event":              "message",
+				"topic":              "mytopic",
+				"priority":           "4",
+				"tags":               strings.Join(m.Tags, ","),
+				"click":              "https://google.com",
+				"title":              "some title",
+				"message":            "this is a message",
+				"actions":            `[{"id":"123","action":"view","label":"Open page","clear":true,"url":"https://ntfy.sh"},{"id":"456","action":"http","label":"Close door","clear":false,"url":"https://door.com/close","method":"PUT","headers":{"really":"yes"}}]`,
+				"encoding":           "",
+				"attachment_name":    "some file.jpg",
+				"attachment_type":    "image/jpeg",
+				"attachment_size":    "12345",
+				"attachment_expires": "98765543",
+				"attachment_url":     "https://example.com/file.jpg",
+			},
+		},
+	}, fbm.APNS)
 	require.Equal(t, map[string]string{
 		"id":                 m.ID,
 		"time":               fmt.Sprintf("%d", m.Time),
@@ -84,6 +166,7 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		"click":              "https://google.com",
 		"title":              "some title",
 		"message":            "this is a message",
+		"actions":            `[{"id":"123","action":"view","label":"Open page","clear":true,"url":"https://ntfy.sh"},{"id":"456","action":"http","label":"Close door","clear":false,"url":"https://door.com/close","method":"PUT","headers":{"really":"yes"}}]`,
 		"encoding":           "",
 		"attachment_name":    "some file.jpg",
 		"attachment_type":    "image/jpeg",
@@ -109,6 +192,41 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 		"time":  fmt.Sprintf("%d", m.Time),
 		"event": "poll_request",
 		"topic": "mytopic",
+	}, fbm.Data)
+}
+
+func TestToFirebaseMessage_PollRequest(t *testing.T) {
+	m := newPollRequestMessage("mytopic", "fOv6k1QbCzo6")
+	fbm, err := toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Equal(t, "mytopic", fbm.Topic)
+	require.Nil(t, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				MutableContent: true,
+				Alert: &messaging.ApsAlert{
+					Title: "",
+					Body:  "New message",
+				},
+			},
+			CustomData: map[string]interface{}{
+				"id":      m.ID,
+				"time":    fmt.Sprintf("%d", m.Time),
+				"event":   "poll_request",
+				"topic":   "mytopic",
+				"message": "New message",
+				"poll_id": "fOv6k1QbCzo6",
+			},
+		},
+	}, fbm.APNS)
+	require.Equal(t, map[string]string{
+		"id":      m.ID,
+		"time":    fmt.Sprintf("%d", m.Time),
+		"event":   "poll_request",
+		"topic":   "mytopic",
+		"message": "New message",
+		"poll_id": "fOv6k1QbCzo6",
 	}, fbm.Data)
 }
 

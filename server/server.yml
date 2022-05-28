@@ -135,6 +135,18 @@
 #
 # web-root: app
 
+# Server URL of a Firebase/APNS-connected ntfy server (likely "https://ntfy.sh").
+#
+# iOS users:
+#   If you use the iOS ntfy app, you MUST configure this to receive timely notifications. You'll like want this:
+#   upstream-base-url: "https://ntfy.sh"
+#
+# If set, all incoming messages will publish a "poll_request" message to the configured upstream server, containing
+# the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
+# This is to prevent the upstream server and Firebase/APNS from being able to read the message.
+#
+# upstream-base-url:
+
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
 # global-topic-limit: 15000

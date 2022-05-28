@@ -440,40 +440,13 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		}
 	}
 	if s.firebase != nil && firebase && !delayed {
-		go func() {
-			if err := s.firebase(m); err != nil {
-				log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
-			}
-		}()
+		go s.sendToFirebase(v, m)
 	}
 	if s.mailer != nil && email != "" && !delayed {
-		go func() {
-			if err := s.mailer.Send(v.ip, email, m); err != nil {
-				log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
-			}
-		}()
+		go s.sendEmail(v, m, email)
 	}
-	if s.config.ForwardPollURL != "" {
-		go func() {
-			topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
-			topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
-			forwardURL := fmt.Sprintf("%s/%s", s.config.ForwardPollURL, topicHash)
-			log.Printf("forwarding: topicURL %s, to upstream url %s", topicURL, forwardURL)
-			req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
-			if err != nil {
-				log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
-				return
-			}
-			req.Header.Set("X-Poll-ID", m.ID)
-			response, err := http.DefaultClient.Do(req)
-			if err != nil {
-				log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
-				return
-			} else if response.StatusCode != http.StatusOK {
-				log.Printf("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
-				return
-			}
-		}()
+	if s.config.UpstreamBaseURL != "" {
+		go s.forwardPollRequest(v, m)
 	}
 	if cache {
 		if err := s.messageCache.AddMessage(m); err != nil {
@@ -489,6 +462,38 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	s.messages++
 	s.mu.Unlock()
 	return nil
+}
+
+func (s *Server) sendToFirebase(v *visitor, m *message) {
+	if err := s.firebase(m); err != nil {
+		log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
+	}
+}
+
+func (s *Server) sendEmail(v *visitor, m *message, email string) {
+	if err := s.mailer.Send(v.ip, email, m); err != nil {
+		log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
+	}
+}
+
+func (s *Server) forwardPollRequest(v *visitor, m *message) {
+	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
+	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
+	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
+	req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
+	if err != nil {
+		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		return
+	}
+	req.Header.Set("X-Poll-ID", m.ID)
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		return
+	} else if response.StatusCode != http.StatusOK {
+		log.Printf("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
+		return
+	}
 }
 
 func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
@@ -587,29 +592,31 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
 //
-// 1. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
+// 1. curl -X POST -H "Poll: 1234" ntfy.sh/...
+//    If a message is flagged as poll request, the body does not matter and is discarded
+// 2. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
 //    If body is binary, encode as base64, if not do not encode
-// 2. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
+// 3. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
 //    Body must be a message, because we attached an external URL
-// 3. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
+// 4. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
 //    Body must be attachment, because we passed a filename
-// 4. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 // 5. curl -T file.txt ntfy.sh/mytopic
+//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
+// 6. curl -T file.txt ntfy.sh/mytopic
 //    If file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, unifiedpush bool) error {
-	if m.Event == pollRequestEvent {
-		return nil // Ignore body
+	if m.Event == pollRequestEvent { // Case 1
+		return nil
 	} else if unifiedpush {
-		return s.handleBodyAsMessageAutoDetect(m, body) // Case 1
+		return s.handleBodyAsMessageAutoDetect(m, body) // Case 2
 	} else if m.Attachment != nil && m.Attachment.URL != "" {
-		return s.handleBodyAsTextMessage(m, body) // Case 2
+		return s.handleBodyAsTextMessage(m, body) // Case 3
 	} else if m.Attachment != nil && m.Attachment.Name != "" {
-		return s.handleBodyAsAttachment(r, v, m, body) // Case 3
+		return s.handleBodyAsAttachment(r, v, m, body) // Case 4
 	} else if !body.LimitReached && utf8.Valid(body.PeekedBytes) {
-		return s.handleBodyAsTextMessage(m, body) // Case 4
+		return s.handleBodyAsTextMessage(m, body) // Case 5
 	}
-	return s.handleBodyAsAttachment(r, v, m, body) // Case 5
+	return s.handleBodyAsAttachment(r, v, m, body) // Case 6
 }
 
 func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedReadCloser) error {
@@ -745,7 +752,6 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	w.Header().Set("Access-Control-Allow-Origin", "*")            // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8") // Android/Volley client needs charset!
 	if poll {
-		log.Printf("polling %#v", r.URL)
 		return s.sendOldMessages(topics, since, scheduled, sub)
 	}
 	subscriberIDs := make([]int, 0)
@@ -1114,7 +1120,6 @@ func (s *Server) runFirebaseKeepaliver() {
 				log.Printf("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
 			}
 		case <-time.After(s.config.FirebasePollInterval):
-			log.Printf("Sending to timer topic %s", firebasePollTopic)
 			if err := s.firebase(newKeepaliveMessage(firebasePollTopic)); err != nil {
 				log.Printf("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
 			}

@@ -21,11 +21,19 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
 
+
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Additional translations:**
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
+
+## ntfy server v1.25.0 (UNRELEASED)
+
+**Documentation**:
+
+* [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))
 
 -->
 

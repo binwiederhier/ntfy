@@ -636,7 +636,7 @@ If set, all incoming messages will publish a poll request to the configured upst
 the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
 
 If `upstream-base-url` is not set, notifications will still eventually get to your device, but delivery can take hours,
-depending on the state of th phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
+depending on the state of the phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
 
 In case you're curious, here's an example of the entire flow: 
 

@@ -184,11 +184,11 @@ If run as `root`, ntfy will look for its config at `/etc/ntfy/client.yml`. For a
 `~/Library/Application Support/ntfy/client.yml` (sample included in the tarball).
 
 ```bash
-curl https://github.com/binwiederhier/ntfy/releases/download/v1.24.0/ntfy_v1.24.0_macOS_all.tar.gz > ntfy_v1.24.0_macOS_all.tar.gz
-tar zxvf ntfy_v1.24.0_macOS_all.tar.gz
-sudo cp -a ntfy_v1.24.0_macOS_all/ntfy /usr/local/bin/ntfy
+curl https://github.com/binwiederhier/ntfy/releases/download/v1.24.0/ntfy_1.24.0_macOS_all.tar.gz > ntfy_1.24.0_macOS_all.tar.gz
+tar zxvf ntfy_1.24.0_macOS_all.tar.gz
+sudo cp -a ntfy_1.24.0_macOS_all/ntfy /usr/local/bin/ntfy
 mkdir ~/Library/Application\ Support/ntfy 
-cp ntfy_v1.24.0_macOS_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
+cp ntfy_1.24.0_macOS_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
 ntfy --help
 ```
 

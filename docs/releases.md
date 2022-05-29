@@ -21,7 +21,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
 
-## ntfy server v1.24.0 (UNRELEASED)
+-->
+
+## ntfy server v1.24.0
+Released May 28, 2022
 
 **Features:**
 
@@ -42,8 +45,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional translations:**
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
-
--->
 
 ## ntfy iOS app v1.0
 Released May 25, 2022

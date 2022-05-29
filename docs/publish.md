@@ -2782,4 +2782,5 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |
 | `X-Firebase`    | `Firebase`                                 | Allows disabling [sending to Firebase](#disable-firebase)                                     |
 | `X-UnifiedPush` | `UnifiedPush`, `up`                        | [UnifiedPush](#unifiedpush) publish option, only to be used by UnifiedPush apps               |
+| `X-Poll-ID`     | `Poll-ID`                                  | Internal parameter, used for [iOS push notifications](config.md#ios-instant-notifications)    |
 | `Authorization` | -                                          | If supported by the server, you can [login to access](#authentication) protected topics       |

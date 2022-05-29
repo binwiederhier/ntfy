@@ -581,7 +581,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		firebase = false
 		unifiedpush = true
 	}
-	m.PollID = readParam(r, "x-poll-id", "poll-id", "poll")
+	m.PollID = readParam(r, "x-poll-id", "poll-id")
 	if m.PollID != "" {
 		unifiedpush = false
 		cache = false

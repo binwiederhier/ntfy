@@ -385,3 +385,51 @@ JSON payload. Remember to change the `https://requests.example.com` to your jell
     "click": "https://requests.example.com/{{media_type}}/{{media_tmdbid}}"
 }
 ```
+
+## Home Assistant
+Here is an example for the configuration.yml file to setup a REST notify component.
+Since Home Assistant is going to POST JSON, you need to specify the root of your ntfy resource.
+
+```yaml
+notify:
+  - name: ntfy
+    platform: rest
+    method: POST_JSON
+    data:
+      topic: YOUR_NTFY_TOPIC
+    title_param_name: title
+    message_param_name: message
+    resource: https://ntfy.sh
+```
+
+If you need to authenticate to your ntfy resource, try this template below:
+
+```yaml
+notify:
+  - name: ntfy
+    platform: rest
+    method: POST_JSON
+    authentication: basic
+    username: YOUR_USERNAME
+    password: YOUR_PASSWORD
+    data:
+      topic: YOUR_NTFY_TOPIC
+    title_param_name: title
+    message_param_name: message
+    resource: https://ntfy.sh
+```
+
+If you need to add any other [ntfy specific parameters](https://ntfy.sh/docs/publish/#publish-as-json) such as priority, tags, etc., add them to the `data` array in the example yml. For example:
+
+```yaml
+notify:
+  - name: ntfy
+    platform: rest
+    method: POST_JSON
+    data:
+      topic: YOUR_NTFY_TOPIC
+      priority: 4
+    title_param_name: title
+    message_param_name: message
+    resource: https://ntfy.sh
+```

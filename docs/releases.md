@@ -21,10 +21,20 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
 
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
 -->
 
 ## ntfy server v1.24.0
 Released May 28, 2022
+
+This release of the ntfy server brings supporting features for the ntfy iOS app. Most importantly, it
+enables support for self-hosted servers in combination with the iOS app. This is to overcome the restrictive
+Apple development environment.
 
 **Features:**
 
@@ -35,12 +45,6 @@ Released May 28, 2022
 **Bugs:**
 
 * Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))
-
-**Additional translations:**
-
-* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
-
-## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Additional translations:**
 

@@ -402,7 +402,7 @@ notify:
     resource: https://ntfy.sh
 ```
 
-If you need to authenticate to your ntfy resource, try this template below:
+If you need to authenticate to your ntfy resource, define the authentication, username and password as below:
 
 ```yaml
 notify:

@@ -151,6 +151,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
+	} else if upstreamBaseURL != "" && baseURL == "" {
+		return errors.New("if upstream-base-url is set, base-url must also be set")
 	}
 
 	webRootIsApp := webRoot == "app"

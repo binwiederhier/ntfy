@@ -618,6 +618,35 @@ Example:
 firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ```
 
+## iOS instant notifications
+Unlike Android, iOS heavily restricts background processing, which sadly makes it impossible to implement instant 
+push notifications without a central server. 
+
+To still support instant notifications on iOS through your self-hosted ntfy server, you have to forward so called `poll_request` 
+messages to the main ntfy.sh server (or any upstream server that's APNS/Firebase connected, if you build your own iOS app),
+which will then forward it to Firebase/APNS.
+
+To configure it, simply set `upstream-base-url` like so:
+
+``` yaml
+upstream-base-url: "https://ntfy.sh"
+```
+
+If set, all incoming messages will publish a poll request to the configured upstream server, containing
+the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
+
+If `upstream-base-url` is not set, notifications will still eventually get to your device, but delivery can take hours,
+depending on the state of th phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
+
+In case you're curious, here's an example of the entire flow: 
+
+- In the iOS app, you subscribe to `https://ntfy.example.com/mytopic`
+- The app subscribes to the Firebase topic `6de73be8dfb7d69e...` (the SHA256 of the topic URL)
+- When you publish a message to `https://ntfy.example.com/mytopic`, your ntfy server will publish a 
+  poll request to `https://ntfy.sh/6de73be8dfb7d69e...` (passing the message ID in the `X-Poll-ID` header)
+- The ntfy.sh server publishes the message to Firebase, which forwards it to APNS, which forwards it to your iOS device
+- Your iOS device receives the poll request, and fetches the actual message from your server, and then displays it
+
 ## Rate limiting
 !!! info
     Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 

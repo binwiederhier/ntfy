@@ -33,6 +33,8 @@ If those screenshots are still not enough, here's a video:
 </figure>
 
 ## Message priority
+_Supported on:_ :material-android: :material-apple:
+
 When you [publish messages](../publish.md#message-priority) to a topic, you can **define a priority**. This priority defines
 how urgently Android will notify you about the notification, and whether they make a sound and/or vibrate.
 
@@ -61,6 +63,8 @@ setting, and other settings such as popover or notification dot:
 </figure>
 
 ## Instant delivery
+_Supported on:_ :material-android:
+
 Instant delivery allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e. 
 when the screen turns off, and you leave it on the desk for a while. This is achieved with a foreground service, which 
 you'll see as a permanent notification that looks like this:
@@ -91,6 +95,8 @@ The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in
 It won't use Firebase for any self-hosted servers, and not at all in the the F-Droid flavor.
 
 ## Share to topic
+_Supported on:_ :material-android:
+
 You can share files to a topic using Android's "Share" feature. This works in almost any app that supports sharing files
 or text, and it's useful for sending yourself links, files or other things. The feature remembers a few of the last topics
 you shared content to and lists them at the bottom.
@@ -103,6 +109,8 @@ The feature is pretty self-explanatory, and one picture says more than a thousan
 </div>
 
 ## ntfy:// links
+_Supported on:_ :material-android:
+
 The ntfy Android app supports deep linking directly to topics. This is useful when integrating with [automation apps](#automation-apps)
 such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm),
 or to simply directly link to a topic from a mobile website. 
@@ -121,6 +129,8 @@ or to simply directly link to a topic from a mobile website.
 ## Integrations
 
 ### UnifiedPush
+_Supported on:_ :material-android:
+
 [UnifiedPush](https://unifiedpush.org) is a standard for receiving push notifications without using the Google-owned
 [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications 
 in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwarding messages to apps that support it. 
@@ -136,6 +146,8 @@ to handle messages. Here's an example with [FluffyChat](https://fluffychat.im/):
 </div>
 
 ### Automation apps
+_Supported on:_ :material-android:
+
 The ntfy Android app integrates nicely with automation apps such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
 or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm). Using Android intents, you can
 **react to incoming messages**, as well as **send messages**.

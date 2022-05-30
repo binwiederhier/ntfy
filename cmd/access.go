@@ -19,7 +19,7 @@ const (
 )
 
 var flagsAccess = append(
-	userCommandFlags(),
+	flagsUser,
 	&cli.BoolFlag{Name: "reset", Aliases: []string{"r"}, Usage: "reset access for user (and topic)"},
 )
 
@@ -28,7 +28,7 @@ var cmdAccess = &cli.Command{
 	Usage:     "Grant/revoke access to a topic, or show access",
 	UsageText: "ntfy access [USERNAME [TOPIC [PERMISSION]]]",
 	Flags:     flagsAccess,
-	Before:    initConfigFileInputSourceFunc("config", flagsAccess),
+	Before:    initLogFunc(initConfigFileInputSourceFunc("config", flagsAccess)),
 	Action:    execUserAccess,
 	Category:  categoryServer,
 	Description: `Manage the access control list for the ntfy server.

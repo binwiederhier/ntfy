@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -181,7 +181,7 @@ func (s *Server) Run() error {
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
-	log.Printf("Listening on%s", listenStr)
+	log.Info("Listening on%s", listenStr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
@@ -221,7 +221,7 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
-	go s.runAtSender()
+	go s.runDelaySender()
 	go s.runFirebaseKeepaliver()
 
 	return <-errChan
@@ -248,16 +248,18 @@ func (s *Server) Stop() {
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	v := s.visitor(r)
+	log.Debug("[%s] %s %s", v.ip, r.Method, r.URL.Path)
+
 	if err := s.handleInternal(w, r, v); err != nil {
 		if websocket.IsWebSocketUpgrade(r) {
-			log.Printf("[%s] WS %s %s - %s", v.ip, r.Method, r.URL.Path, err.Error())
+			log.Info("[%s] WS %s %s - %s", v.ip, r.Method, r.URL.Path, err.Error())
 			return // Do not attempt to write to upgraded connection
 		}
 		httpErr, ok := err.(*errHTTP)
 		if !ok {
 			httpErr = errHTTPInternalError
 		}
-		log.Printf("[%s] HTTP %s %s - %d - %d - %s", v.ip, r.Method, r.URL.Path, httpErr.HTTPCode, httpErr.Code, err.Error())
+		log.Info("[%s] HTTP %s %s - %d - %d - %s", v.ip, r.Method, r.URL.Path, httpErr.HTTPCode, httpErr.Code, err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 		w.WriteHeader(httpErr.HTTPCode)
@@ -434,6 +436,8 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
+	log.Debug("[%s] %s %s: ev=%s, body=%d bytes, delayed=%t, fb=%t, cache=%t, up=%t, email=%s",
+		v.ip, r.Method, r.URL.Path, m.Event, len(body.PeekedBytes), delayed, firebase, cache, unifiedpush, email)
 	if !delayed {
 		if err := t.Publish(m); err != nil {
 			return err
@@ -466,13 +470,13 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
 	if err := s.firebase(m); err != nil {
-		log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
+		log.Warn("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
 	}
 }
 
 func (s *Server) sendEmail(v *visitor, m *message, email string) {
 	if err := s.mailer.Send(v.ip, email, m); err != nil {
-		log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
+		log.Warn("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
 	}
 }
 
@@ -482,16 +486,16 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
 	req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
 	if err != nil {
-		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		log.Warn("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
 		return
 	}
 	req.Header.Set("X-Poll-ID", m.ID)
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		log.Warn("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
 		return
 	} else if response.StatusCode != http.StatusOK {
-		log.Printf("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
+		log.Warn("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
 		return
 	}
 }
@@ -1015,17 +1019,17 @@ func (s *Server) updateStatsAndPrune() {
 		ids, err := s.messageCache.AttachmentsExpired()
 		if err == nil {
 			if err := s.fileCache.Remove(ids...); err != nil {
-				log.Printf("error while deleting attachments: %s", err.Error())
+				log.Warn("Error deleting attachments: %s", err.Error())
 			}
 		} else {
-			log.Printf("error retrieving expired attachments: %s", err.Error())
+			log.Warn("Error retrieving expired attachments: %s", err.Error())
 		}
 	}
 
 	// Prune message cache
 	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
 	if err := s.messageCache.Prune(olderThan); err != nil {
-		log.Printf("error pruning cache: %s", err.Error())
+		log.Warn("Error pruning cache: %s", err.Error())
 	}
 
 	// Prune old topics, remove subscriptions without subscribers
@@ -1034,7 +1038,7 @@ func (s *Server) updateStatsAndPrune() {
 		subs := t.Subscribers()
 		msgs, err := s.messageCache.MessageCount(t.ID)
 		if err != nil {
-			log.Printf("cannot get stats for topic %s: %s", t.ID, err.Error())
+			log.Warn("Cannot get stats for topic %s: %s", t.ID, err.Error())
 			continue
 		}
 		if msgs == 0 && subs == 0 {
@@ -1052,7 +1056,7 @@ func (s *Server) updateStatsAndPrune() {
 	}
 
 	// Print stats
-	log.Printf("Stats: %d message(s) published, %d in cache, %d successful mails, %d failed, %d topic(s) active, %d subscriber(s), %d visitor(s)",
+	log.Info("Stats: %d message(s) published, %d in cache, %d successful mails, %d failed, %d topic(s) active, %d subscriber(s), %d visitor(s)",
 		s.messages, messages, mailSuccess, mailFailure, len(s.topics), subscribers, len(s.visitors))
 }
 
@@ -1096,12 +1100,12 @@ func (s *Server) runManager() {
 	}
 }
 
-func (s *Server) runAtSender() {
+func (s *Server) runDelaySender() {
 	for {
 		select {
 		case <-time.After(s.config.AtSenderInterval):
 			if err := s.sendDelayedMessages(); err != nil {
-				log.Printf("error sending scheduled messages: %s", err.Error())
+				log.Warn("error sending scheduled messages: %s", err.Error())
 			}
 		case <-s.closeChan:
 			return
@@ -1117,11 +1121,11 @@ func (s *Server) runFirebaseKeepaliver() {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
 			if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
+				log.Info("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
 			}
 		case <-time.After(s.config.FirebasePollInterval):
 			if err := s.firebase(newKeepaliveMessage(firebasePollTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
+				log.Info("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
 			}
 		case <-s.closeChan:
 			return
@@ -1140,12 +1144,12 @@ func (s *Server) sendDelayedMessages() error {
 		t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
 		if ok {
 			if err := t.Publish(m); err != nil {
-				log.Printf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
+				log.Info("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
 			}
 		}
 		if s.firebase != nil { // Firebase subscribers may not show up in topics map
 			if err := s.firebase(m); err != nil {
-				log.Printf("unable to publish to Firebase: %v", err.Error())
+				log.Info("unable to publish to Firebase: %v", err.Error())
 			}
 		}
 		if err := s.messageCache.MarkPublished(m); err != nil {
@@ -1252,13 +1256,13 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		username, password, ok := extractUserPass(r)
 		if ok {
 			if user, err = s.auth.Authenticate(username, password); err != nil {
-				log.Printf("authentication failed: %s", err.Error())
+				log.Info("authentication failed: %s", err.Error())
 				return errHTTPUnauthorized
 			}
 		}
 		for _, t := range topics {
 			if err := s.auth.Authorize(user, t.ID, perm); err != nil {
-				log.Printf("unauthorized: %s", err.Error())
+				log.Info("unauthorized: %s", err.Error())
 				return errHTTPForbidden
 			}
 		}

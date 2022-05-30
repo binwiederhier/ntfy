@@ -24,6 +24,17 @@ const (
 	clientUserConfigFileWindowsRelative = "ntfy\\client.yml"
 )
 
+var flagsSubscribe = append(
+	flagsDefault,
+	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
+	&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
+	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, Usage: "username[:password] used to auth against the server"},
+	&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
+	&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
+	&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
+	&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "print verbose output"},
+)
+
 var cmdSubscribe = &cli.Command{
 	Name:      "subscribe",
 	Aliases:   []string{"sub"},
@@ -31,15 +42,8 @@ var cmdSubscribe = &cli.Command{
 	UsageText: "ntfy subscribe [OPTIONS..] [TOPIC]",
 	Action:    execSubscribe,
 	Category:  categoryClient,
-	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
-		&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
-		&cli.StringFlag{Name: "user", Aliases: []string{"u"}, Usage: "username[:password] used to auth against the server"},
-		&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
-		&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
-		&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
-		&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "print verbose output"},
-	},
+	Flags:     flagsSubscribe,
+	Before:    initLogFunc(nil),
 	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
 every arriving message. There are 3 modes in which the command can be run:
 

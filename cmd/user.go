@@ -17,14 +17,19 @@ func init() {
 	commands = append(commands, cmdUser)
 }
 
-var flagsUser = userCommandFlags()
+var flagsUser = append(
+	flagsDefault,
+	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
+)
 
 var cmdUser = &cli.Command{
 	Name:      "user",
 	Usage:     "Manage/show users",
 	UsageText: "ntfy user [list|add|remove|change-pass|change-role] ...",
 	Flags:     flagsUser,
-	Before:    initConfigFileInputSourceFunc("config", flagsUser),
+	Before:    initLogFunc(initConfigFileInputSourceFunc("config", flagsUser)),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{
@@ -268,12 +273,4 @@ func readPasswordAndConfirm(c *cli.Context) (string, error) {
 		return "", errors.New("passwords do not match: try it again, but this time type slooowwwlly")
 	}
 	return string(password), nil
-}
-
-func userCommandFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
-	}
 }

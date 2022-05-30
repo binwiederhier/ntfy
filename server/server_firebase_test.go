@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"firebase.google.com/go/messaging"
+	"firebase.google.com/go/v4/messaging"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/auth"

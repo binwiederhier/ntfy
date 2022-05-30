@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/messaging"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/messaging"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/auth"
 )

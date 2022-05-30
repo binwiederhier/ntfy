@@ -39,6 +39,10 @@ for details).
 
 ## ntfy server v1.25.0 (UNRELEASED)
 
+**Maintenance:**
+
+* Upgrade Firebase Admin SDK to 4.x ([#274](https://github.com/binwiederhier/ntfy/issues/274))
+
 **Documentation**:
 
 * [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))

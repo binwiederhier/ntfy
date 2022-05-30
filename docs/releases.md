@@ -6,6 +6,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy iOS app v1.1 (UNRELEASED)
 
+In this release of the iOS app, we add message priorities (mapped to iOS interruption levels), tags and emojis,
+action buttons to open websites or perform HTTP requests (in the notification and the detail view), a custom click
+action when the notification is tapped, and various other fixes.
+
+It also adds support for self-hosted servers (albeit not supporting auth yet). The selfhosted server needs to be 
+configured to forward poll requests to upstream ntfy.sh for push notifications to work (see [iOS push notifications](https://ntfy.sh/docs/config/#ios-instant-notifications)
+for details).
+
 **Features:**
 
 * [Message priority](https://ntfy.sh/docs/publish/#message-priority) support (no ticket)

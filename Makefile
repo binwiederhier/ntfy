@@ -79,6 +79,18 @@ build: web docs cli
 update: web-deps-update cli-deps-update docs-deps-update
 	docker pull alpine
 
+# Ubuntu-specific
+
+build-deps-ubuntu:
+	sudo apt update
+	sudo apt install -y \
+		curl \
+		gcc-aarch64-linux-gnu \
+		gcc-arm-linux-gnueabi \
+		upx \
+		jq
+	which pip3 || sudo apt install -y python3-pip
+
 # Documentation
 
 docs: docs-deps docs-build
@@ -114,28 +126,29 @@ web-deps:
 web-deps-update:
 	cd web && npm update
 
+
 # Main server/client build
 
 cli: cli-deps
-	goreleaser build --snapshot --rm-dist --debug
+	goreleaser build --snapshot --rm-dist
 
 cli-linux-amd64: cli-deps-static-sites
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_amd64
+	goreleaser build --snapshot --rm-dist --id ntfy_linux_amd64
 
 cli-linux-armv6: cli-deps-static-sites cli-deps-gcc-armv6-armv7
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_armv6
+	goreleaser build --snapshot --rm-dist --id ntfy_linux_armv6
 
 cli-linux-armv7: cli-deps-static-sites cli-deps-gcc-armv6-armv7
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_armv7
+	goreleaser build --snapshot --rm-dist --id ntfy_linux_armv7
 
 cli-linux-arm64: cli-deps-static-sites cli-deps-gcc-arm64
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_linux_arm64
+	goreleaser build --snapshot --rm-dist --id ntfy_linux_arm64
 
 cli-windows-amd64: cli-deps-static-sites
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_windows_amd64
+	goreleaser build --snapshot --rm-dist --id ntfy_windows_amd64
 
 cli-darwin-all: cli-deps-static-sites
-	goreleaser build --snapshot --rm-dist --debug --id ntfy_darwin_all
+	goreleaser build --snapshot --rm-dist --id ntfy_darwin_all
 
 cli-linux-server: cli-deps-static-sites
 	# This is a target to build the CLI (including the server) manually.
@@ -177,6 +190,7 @@ cli-deps-static-sites:
 
 cli-deps-all:
 	which upx || { echo "ERROR: upx not installed. On Ubuntu, run: apt install upx"; exit 1; }
+	go install github.com/goreleaser/goreleaser@latest
 
 cli-deps-gcc-armv6-armv7:
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }
@@ -187,6 +201,18 @@ cli-deps-gcc-arm64:
 cli-deps-update:
 	go get -u
 	go install honnef.co/go/tools/cmd/staticcheck@latest
+	go install golang.org/x/lint/golint@latest
+	go install github.com/goreleaser/goreleaser@latest
+
+cli-build-results:
+	cat dist/config.yaml
+	[ -f dist/artifacts.json ] && cat dist/artifacts.json | jq . || true
+	[ -f dist/metadata.json ] && cat dist/metadata.json | jq . || true
+	[ -f dist/checksums.txt ] && cat dist/checksums.txt || true
+	find dist -maxdepth 2 -type f \
+		\( -name '*.deb' -or -name '*.rpm' -or -name '*.zip' -or -name '*.tar.gz' -or -name 'ntfy' \) \
+		-and -not -path 'dist/goreleaserdocker*' \
+		-exec sha256sum {} \;
 
 # Test/check targets
 
@@ -238,13 +264,13 @@ staticcheck: .PHONY
 
 # Releasing targets
 
-release: clean update cli-deps release-check-tags docs web check
-	goreleaser release --rm-dist --debug
+release: clean update cli-deps release-checks docs web check
+	goreleaser release --rm-dist
 
 release-snapshot: clean update cli-deps docs web check
-	goreleaser release --snapshot --skip-publish --rm-dist --debug
+	goreleaser release --snapshot --skip-publish --rm-dist
 
-release-check-tags:
+release-checks:
 	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))
 	if ! grep -q $(LATEST_TAG) docs/install.md; then\
 	 	echo "ERROR: Must update docs/install.md with latest tag first.";\
@@ -253,6 +279,10 @@ release-check-tags:
 	if ! grep -q $(LATEST_TAG) docs/releases.md; then\
 		echo "ERROR: Must update docs/releases.md with latest tag first.";\
 		exit 1;\
+	fi
+	if [ -n "$(shell git status -s)" ]; then\
+	  echo "ERROR: Git repository is in an unclean state.";\
+	  exit 1;\
 	fi
 
 

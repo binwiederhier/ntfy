@@ -176,6 +176,12 @@ cd ntfysh-bin
 makepkg -si
 ```
 
+## NixOS / Nix
+ntfy is packaged in nixpkgs as `ntfy-sh`. It can be installed by adding the package name to the configuration file and calling `nixos-rebuild`. Alternatively, the following command can be used to install ntfy in the current user environment:
+```
+nix-env -iA ntfy-sh
+```
+
 ## macOS
 The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on macOS as well. 
 To install, please download the tarball, extract it and place it somewhere in your `PATH` (e.g. `/usr/local/bin/ntfy`). 

@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -53,6 +52,21 @@ func TestServer_PublishAndPoll(t *testing.T) {
 	require.Equal(t, 2, len(lines))
 	require.Equal(t, "my first message", lines[0])
 	require.Equal(t, "my second  message", lines[1]) // \n -> " "
+}
+
+func TestServer_PublishWithFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+	require.Equal(t, 1, len(sender.messages))
+	require.Equal(t, "my first message", sender.messages[0].Data["message"])
+	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.Aps.Alert.Body)
+	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.CustomData["message"])
 }
 
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
@@ -264,7 +278,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 func TestServer_PublishAt(t *testing.T) {
 	c := newTestConfig(t)
 	c.MinDelay = time.Second
-	c.AtSenderInterval = 100 * time.Millisecond
+	c.DelayedSenderInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 
 	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
@@ -283,6 +297,13 @@ func TestServer_PublishAt(t *testing.T) {
 	messages = toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "a message", messages[0].Message)
+	require.Equal(t, "", messages[0].Sender) // Never return the sender!
+
+	messages, err := s.messageCache.Messages("mytopic", sinceAllMessages, true)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "a message", messages[0].Message)
+	require.Equal(t, "9.9.9.9", messages[0].Sender) // It's stored in the DB though!
 }
 
 func TestServer_PublishAtWithCacheError(t *testing.T) {
@@ -452,26 +473,6 @@ func TestServer_PublishMessageInHeaderWithNewlines(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, "Line 1\nLine 2", msg.Message) // \\n -> \n !
-}
-
-func TestServer_PublishFirebase(t *testing.T) {
-	// This is unfortunately not much of a test, since it merely fires the messages towards Firebase,
-	// but cannot re-read them. There is no way from Go to read the messages back, or even get an error back.
-	// I tried everything. I already had written the test, and it increases the code coverage, so I'll leave it ... :shrug: ...
-
-	c := newTestConfig(t)
-	c.FirebaseKeyFile = firebaseServiceAccountFile(t) // May skip the test!
-	s := newTestServer(t, c)
-
-	// Normal message
-	response := request(t, s, "PUT", "/mytopic", "This is a message for firebase", nil)
-	msg := toMessage(t, response.Body.String())
-	require.NotEmpty(t, msg.ID)
-
-	// Keepalive message
-	require.Nil(t, s.firebase(newKeepaliveMessage(firebaseControlTopic)))
-
-	time.Sleep(500 * time.Millisecond) // Time for sends
 }
 
 func TestServer_PublishInvalidTopic(t *testing.T) {
@@ -1018,7 +1019,7 @@ func TestServer_PublishAttachment(t *testing.T) {
 	require.Equal(t, int64(5000), msg.Attachment.Size)
 	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(179*time.Minute).Unix()) // Almost 3 hours
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
-	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.Equal(t, "", msg.Sender) // Should never be returned
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
 
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
@@ -1047,7 +1048,7 @@ func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
 	require.Equal(t, int64(21), msg.Attachment.Size)
 	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(3*time.Hour).Unix())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
-	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.Equal(t, "", msg.Sender) // Should never be returned
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
 
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
@@ -1074,7 +1075,7 @@ func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
 	require.Equal(t, "", msg.Attachment.Type)
 	require.Equal(t, int64(0), msg.Attachment.Size)
 	require.Equal(t, int64(0), msg.Attachment.Expires)
-	require.Equal(t, "", msg.Attachment.Owner)
+	require.Equal(t, "", msg.Sender)
 
 	// Slightly unrelated cross-test: make sure we don't add an owner for external attachments
 	size, err := s.messageCache.AttachmentBytesUsed("127.0.0.1")
@@ -1095,7 +1096,7 @@ func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
 	require.Equal(t, "", msg.Attachment.Type)
 	require.Equal(t, int64(0), msg.Attachment.Size)
 	require.Equal(t, int64(0), msg.Attachment.Expires)
-	require.Equal(t, "", msg.Attachment.Owner)
+	require.Equal(t, "", msg.Sender)
 }
 
 func TestServer_PublishAttachmentBadURL(t *testing.T) {
@@ -1331,18 +1332,6 @@ func toHTTPError(t *testing.T, s string) *errHTTP {
 	var e errHTTP
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&e))
 	return &e
-}
-
-func firebaseServiceAccountFile(t *testing.T) string {
-	if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE") != "" {
-		return os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE")
-	} else if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT") != "" {
-		filename := filepath.Join(t.TempDir(), "firebase.json")
-		require.NotNil(t, os.WriteFile(filename, []byte(os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT")), 0o600))
-		return filename
-	}
-	t.SkipNow()
-	return ""
 }
 
 func basicAuth(s string) string {

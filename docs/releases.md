@@ -4,13 +4,39 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
-## ntfy iOS app v1.1 (UNRELEASED)
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
+
+## ntfy server v1.25.0 (UNRELEASED)
+
+**Bugs**:
+
+* Respect Firebase "quota exceeded" response for topics, block Firebase publishing for user for 10min ([#289](https://github.com/binwiederhier/ntfy/issues/289))
+
+**Maintenance:**
+
+* Upgrade Firebase Admin SDK to 4.x ([#274](https://github.com/binwiederhier/ntfy/issues/274))
+* CI: Build from pipeline instead of locally ([#36](https://github.com/binwiederhier/ntfy/issues/36))
+
+**Documentation**:
+
+* [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))
+
+-->
+
+
+## ntfy iOS app v1.1
+Released May 31, 2022
 
 In this release of the iOS app, we add message priorities (mapped to iOS interruption levels), tags and emojis,
 action buttons to open websites or perform HTTP requests (in the notification and the detail view), a custom click
 action when the notification is tapped, and various other fixes.
 
-It also adds support for self-hosted servers (albeit not supporting auth yet). The selfhosted server needs to be 
+It also adds support for self-hosted servers (albeit not supporting auth yet). The self-hosted server needs to be
 configured to forward poll requests to upstream ntfy.sh for push notifications to work (see [iOS push notifications](https://ntfy.sh/docs/config/#ios-instant-notifications)
 for details).
 
@@ -28,26 +54,6 @@ for details).
 **Bugs:**
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
-
-
-## ntfy Android app v1.14.0 (UNRELEASED)
-
-**Additional translations:**
-
-* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
-
-
-## ntfy server v1.25.0 (UNRELEASED)
-
-**Maintenance:**
-
-* Upgrade Firebase Admin SDK to 4.x ([#274](https://github.com/binwiederhier/ntfy/issues/274))
-
-**Documentation**:
-
-* [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))
-
--->
 
 ## ntfy server v1.24.0
 Released May 28, 2022

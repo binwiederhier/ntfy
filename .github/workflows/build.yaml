@@ -1,9 +1,9 @@
-name: test
+name: build
 on: [push, pull_request]
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       -
         name: Install Go
         uses: actions/setup-go@v2
@@ -32,17 +32,8 @@ jobs:
         name: Install dependencies
         run: make build-deps-ubuntu
       -
-        name: Build docs (required for tests)
-        run: make docs
+        name: Build all the things
+        run: make build
       -
-        name: Build web app (required for tests)
-        run: make web
-      -
-        name: Run tests, formatting, vetting and linting
-        run: make check
-      -
-        name: Run coverage
-        run: make coverage
-      -
-        name: Upload coverage to codecov.io
-        run: make coverage-upload
+        name: Print build results and checksums
+        run: make cli-build-results

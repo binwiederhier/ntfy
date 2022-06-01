@@ -32,6 +32,7 @@ type message struct {
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
+	Sender     string      `json:"-"`                  // IP address of uploader, used for rate limiting
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
 }
 
@@ -41,7 +42,6 @@ type attachment struct {
 	Size    int64  `json:"size,omitempty"`
 	Expires int64  `json:"expires,omitempty"`
 	URL     string `json:"url"`
-	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
 }
 
 type action struct {

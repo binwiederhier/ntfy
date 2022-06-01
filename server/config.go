@@ -6,16 +6,16 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
-	DefaultListenHTTP                        = ":80"
-	DefaultCacheDuration                     = 12 * time.Hour
-	DefaultKeepaliveInterval                 = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
-	DefaultManagerInterval                   = time.Minute
-	DefaultAtSenderInterval                  = 10 * time.Second
-	DefaultMinDelay                          = 10 * time.Second
-	DefaultMaxDelay                          = 3 * 24 * time.Hour
-	DefaultFirebaseKeepaliveInterval         = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
-	DefaultFirebasePollInterval              = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
-	DefaultFirebaseQuotaLimitPenaltyDuration = 10 * time.Minute
+	DefaultListenHTTP                           = ":80"
+	DefaultCacheDuration                        = 12 * time.Hour
+	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
+	DefaultManagerInterval                      = time.Minute
+	DefaultDelayedSenderInterval                = 10 * time.Second
+	DefaultMinDelay                             = 10 * time.Second
+	DefaultMaxDelay                             = 3 * 24 * time.Hour
+	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
+	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
+	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 )
 
 // Defines all global and per-visitor limits
@@ -70,7 +70,7 @@ type Config struct {
 	DelayedSenderInterval                time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	FirebasePollInterval                 time.Duration
-	FirebaseQuotaLimitPenaltyDuration    time.Duration
+	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
@@ -120,10 +120,10 @@ func NewConfig() *Config {
 		MessageLimit:                         DefaultMessageLengthLimit,
 		MinDelay:                             DefaultMinDelay,
 		MaxDelay:                             DefaultMaxDelay,
-		DelayedSenderInterval:                DefaultAtSenderInterval,
+		DelayedSenderInterval:                DefaultDelayedSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
-		FirebaseQuotaLimitPenaltyDuration:    DefaultFirebaseQuotaLimitPenaltyDuration,
+		FirebaseQuotaExceededPenaltyDuration: DefaultFirebaseQuotaExceededPenaltyDuration,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,
 		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
 		VisitorAttachmentTotalSizeLimit:      DefaultVisitorAttachmentTotalSizeLimit,

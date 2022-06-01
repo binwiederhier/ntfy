@@ -73,7 +73,7 @@ func (v *visitor) FirebaseAllowed() error {
 func (v *visitor) FirebaseTemporarilyDeny() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.firebase = time.Now().Add(v.config.FirebaseQuotaLimitPenaltyDuration)
+	v.firebase = time.Now().Add(v.config.FirebaseQuotaExceededPenaltyDuration)
 }
 
 func (v *visitor) EmailAllowed() error {

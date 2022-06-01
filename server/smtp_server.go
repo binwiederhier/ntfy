@@ -146,6 +146,7 @@ func (s *smtpSession) publishMessage(m *message) error {
 	url := fmt.Sprintf("%s/%s", s.backend.config.BaseURL, m.Topic)
 	req, err := http.NewRequest("PUT", url, strings.NewReader(m.Message))
 	req.RemoteAddr = s.remoteAddr // rate limiting!!
+	req.Header.Set("X-Forwarded-For", s.remoteAddr)
 	if err != nil {
 		return err
 	}

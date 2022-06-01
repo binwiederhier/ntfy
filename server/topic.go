@@ -15,7 +15,7 @@ type topic struct {
 }
 
 // subscriber is a function that is called for every new message on a topic
-type subscriber func(msg *message) error
+type subscriber func(v *visitor, msg *message) error
 
 // newTopic creates a new topic
 func newTopic(id string) *topic {
@@ -42,12 +42,12 @@ func (t *topic) Unsubscribe(id int) {
 }
 
 // Publish asynchronously publishes to all subscribers
-func (t *topic) Publish(m *message) error {
+func (t *topic) Publish(v *visitor, m *message) error {
 	go func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		for _, s := range t.subscribers {
-			if err := s(m); err != nil {
+			if err := s(v, m); err != nil {
 				log.Printf("error publishing message to subscriber")
 			}
 		}

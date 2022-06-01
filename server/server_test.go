@@ -469,7 +469,8 @@ func TestServer_PublishFirebase(t *testing.T) {
 	require.NotEmpty(t, msg.ID)
 
 	// Keepalive message
-	require.Nil(t, s.firebase(newKeepaliveMessage(firebaseControlTopic)))
+	v := newVisitor(s.config, s.messageCache, "1.2.3.4")
+	require.Nil(t, s.firebase(v, newKeepaliveMessage(firebaseControlTopic)))
 
 	time.Sleep(500 * time.Millisecond) // Time for sends
 }

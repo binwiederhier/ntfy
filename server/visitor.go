@@ -28,6 +28,7 @@ type visitor struct {
 	emails        *rate.Limiter
 	subscriptions util.Limiter
 	bandwidth     util.Limiter
+	firebase      time.Time // Next allowed Firebase message
 	seen          time.Time
 	mu            sync.Mutex
 }
@@ -48,12 +49,9 @@ func newVisitor(conf *Config, messageCache *messageCache, ip string) *visitor {
 		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 		bandwidth:     util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
+		firebase:      time.Unix(0, 0),
 		seen:          time.Now(),
 	}
-}
-
-func (v *visitor) IP() string {
-	return v.ip
 }
 
 func (v *visitor) RequestAllowed() error {
@@ -61,6 +59,21 @@ func (v *visitor) RequestAllowed() error {
 		return errVisitorLimitReached
 	}
 	return nil
+}
+
+func (v *visitor) FirebaseAllowed() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if time.Now().Before(v.firebase) {
+		return errVisitorLimitReached
+	}
+	return nil
+}
+
+func (v *visitor) FirebaseTemporarilyDeny() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.firebase = time.Now().Add(v.config.FirebaseQuotaLimitPenaltyDuration)
 }
 
 func (v *visitor) EmailAllowed() error {

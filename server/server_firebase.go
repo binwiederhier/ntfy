@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	firebase "firebase.google.com/go/v4"
@@ -26,12 +27,20 @@ func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subsc
 	if err != nil {
 		return nil, err
 	}
-	return func(m *message) error {
+	return func(v *visitor, m *message) error {
+		if err := v.FirebaseAllowed(); err != nil {
+			return errHTTPTooManyRequestsFirebaseQuotaReached
+		}
 		fbm, err := toFirebaseMessage(m, auther)
 		if err != nil {
 			return err
 		}
 		_, err = msg.Send(context.Background(), fbm)
+		if err != nil && messaging.IsQuotaExceeded(err) {
+			log.Printf("[%s] FB quota exceeded when trying to publish to topic %s, temporarily denying FB access", v.ip, m.Topic)
+			v.FirebaseTemporarilyDeny()
+			return errHTTPTooManyRequestsFirebaseQuotaReached
+		}
 		return err
 	}, nil
 }

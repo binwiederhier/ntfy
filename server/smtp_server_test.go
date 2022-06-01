@@ -3,6 +3,9 @@ package server
 import (
 	"github.com/emersion/go-smtp"
 	"github.com/stretchr/testify/require"
+	"io"
+	"net"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -27,13 +30,12 @@ Content-Type: text/html; charset="UTF-8"
 <div dir="ltr">what&#39;s up<br clear="all"><div><br></div></div>
 
 --000000000000f3320b05d42915c9--`
-	_, backend := newTestBackend(t, func(m *message) error {
-		require.Equal(t, "mytopic", m.Topic)
-		require.Equal(t, "and one more", m.Title)
-		require.Equal(t, "what's up", m.Message)
-		return nil
+	_, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "and one more", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
 	})
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("ntfy-mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -59,13 +61,12 @@ Content-Type: text/html; charset="UTF-8"
 <div dir="ltr"><br></div>
 
 --000000000000bcf4a405d429f8d4--`
-	_, backend := newTestBackend(t, func(m *message) error {
-		require.Equal(t, "emailtest", m.Topic)
-		require.Equal(t, "", m.Title) // We flipped message and body
-		require.Equal(t, "This email has a subject but no body", m.Message)
-		return nil
+	_, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/emailtest", r.URL.Path)
+		require.Equal(t, "", r.Header.Get("Title")) // We flipped message and body
+		require.Equal(t, "This email has a subject but no body", readAll(t, r.Body))
 	})
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("ntfy-emailtest@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -81,14 +82,13 @@ Content-Type: text/plain; charset="UTF-8"
 
 what's up
 `
-	conf, backend := newTestBackend(t, func(m *message) error {
-		require.Equal(t, "mytopic", m.Topic)
-		require.Equal(t, "and one more", m.Title)
-		require.Equal(t, "what's up", m.Message)
-		return nil
+	conf, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "and one more", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
 	})
 	conf.SMTPServerAddrPrefix = ""
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -99,14 +99,13 @@ func TestSmtpBackend_Plaintext_No_ContentType(t *testing.T) {
 
 what's up
 `
-	conf, backend := newTestBackend(t, func(m *message) error {
-		require.Equal(t, "mytopic", m.Topic)
-		require.Equal(t, "Very short mail", m.Title)
-		require.Equal(t, "what's up", m.Message)
-		return nil
+	conf, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "Very short mail", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
 	})
 	conf.SMTPServerAddrPrefix = ""
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -121,11 +120,10 @@ Content-Type: text/plain; charset="UTF-8"
 
 what's up
 `
-	_, backend := newTestBackend(t, func(m *message) error {
-		require.Equal(t, "Three santas 🎅🎅🎅", m.Title)
-		return nil
+	_, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Three santas 🎅🎅🎅", r.Header.Get("Title"))
 	})
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("ntfy-mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -140,7 +138,7 @@ To: mytopic@ntfy.sh
 Content-Type: text/plain; charset="UTF-8"
 
 you know this is a string.
-it's a long string. 
+it's a long string.
 it's supposed to be longer than the max message length
 which is 4096 bytes,
 it used to be 512 bytes, but I increased that for the UnifiedPush support
@@ -204,9 +202,9 @@ BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 that should do it
 `
-	conf, backend := newTestBackend(t, func(m *message) error {
+	conf, backend := newTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
 		expected := `you know this is a string.
-it's a long string. 
+it's a long string.
 it's supposed to be longer than the max message length
 which is 4096 bytes,
 it used to be 512 bytes, but I increased that for the UnifiedPush support
@@ -266,13 +264,12 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ......................................................................
 ......................................................................
 and with BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-BBBBBBBBBBBBBBBBBBBBBBBB`
+BBBBBBBBBBBBBBBBBBBBBBBBB`
 		require.Equal(t, 4096, len(expected)) // Sanity check
-		require.Equal(t, expected, m.Message)
-		return nil
+		require.Equal(t, expected, readAll(t, r.Body))
 	})
 	conf.SMTPServerAddrPrefix = ""
-	session, _ := backend.AnonymousLogin(nil)
+	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
@@ -288,21 +285,41 @@ Content-Type: text/SOMETHINGELSE
 
 what's up
 `
-	conf, backend := newTestBackend(t, func(m *message) error {
-		return nil
+	conf, backend := newTestBackend(t, func(http.ResponseWriter, *http.Request) {
+		// Nothing.
 	})
 	conf.SMTPServerAddrPrefix = ""
-	session, _ := backend.Login(nil, "user", "pass")
+	session, _ := backend.Login(fakeConnState(t, "1.2.3.4"), "user", "pass")
 	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("mytopic@ntfy.sh"))
 	require.Equal(t, errUnsupportedContentType, session.Data(strings.NewReader(email)))
 }
 
-func newTestBackend(t *testing.T, sub subscriber) (*Config, *smtpBackend) {
+func newTestBackend(t *testing.T, handler func(http.ResponseWriter, *http.Request)) (*Config, *smtpBackend) {
 	conf := newTestConfig(t)
 	conf.SMTPServerListen = ":25"
 	conf.SMTPServerDomain = "ntfy.sh"
 	conf.SMTPServerAddrPrefix = "ntfy-"
-	backend := newMailBackend(conf, sub)
+	backend := newMailBackend(conf, handler)
 	return conf, backend
+}
+
+func readAll(t *testing.T, rc io.ReadCloser) string {
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func fakeConnState(t *testing.T, remoteAddr string) *smtp.ConnectionState {
+	ip, err := net.ResolveIPAddr("ip", remoteAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &smtp.ConnectionState{
+		Hostname:   "myhostname",
+		LocalAddr:  ip,
+		RemoteAddr: ip,
+	}
 }

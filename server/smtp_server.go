@@ -3,10 +3,13 @@ package server
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/emersion/go-smtp"
 	"io"
 	"mime"
 	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
 	"net/mail"
 	"strings"
 	"sync"
@@ -23,25 +26,25 @@ var (
 // smtpBackend implements SMTP server methods.
 type smtpBackend struct {
 	config  *Config
-	sub     subscriber
+	handler func(http.ResponseWriter, *http.Request)
 	success int64
 	failure int64
 	mu      sync.Mutex
 }
 
-func newMailBackend(conf *Config, sub subscriber) *smtpBackend {
+func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Request)) *smtpBackend {
 	return &smtpBackend{
-		config: conf,
-		sub:    sub,
+		config:  conf,
+		handler: handler,
 	}
 }
 
 func (b *smtpBackend) Login(state *smtp.ConnectionState, username, password string) (smtp.Session, error) {
-	return &smtpSession{backend: b}, nil
+	return &smtpSession{backend: b, remoteAddr: state.RemoteAddr.String()}, nil
 }
 
 func (b *smtpBackend) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	return &smtpSession{backend: b}, nil
+	return &smtpSession{backend: b, remoteAddr: state.RemoteAddr.String()}, nil
 }
 
 func (b *smtpBackend) Counts() (success int64, failure int64) {
@@ -52,9 +55,10 @@ func (b *smtpBackend) Counts() (success int64, failure int64) {
 
 // smtpSession is returned after EHLO.
 type smtpSession struct {
-	backend *smtpBackend
-	topic   string
-	mu      sync.Mutex
+	backend    *smtpBackend
+	remoteAddr string
+	topic      string
+	mu         sync.Mutex
 }
 
 func (s *smtpSession) AuthPlain(username, password string) error {
@@ -128,7 +132,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 			m.Message = m.Title // Flip them, this makes more sense
 			m.Title = ""
 		}
-		if err := s.backend.sub(m); err != nil {
+		if err := s.publishMessage(m); err != nil {
 			return err
 		}
 		s.backend.mu.Lock()
@@ -136,6 +140,24 @@ func (s *smtpSession) Data(r io.Reader) error {
 		s.backend.mu.Unlock()
 		return nil
 	})
+}
+
+func (s *smtpSession) publishMessage(m *message) error {
+	url := fmt.Sprintf("%s/%s", s.backend.config.BaseURL, m.Topic)
+	req, err := http.NewRequest("PUT", url, strings.NewReader(m.Message))
+	req.RemoteAddr = s.remoteAddr // rate limiting!!
+	if err != nil {
+		return err
+	}
+	if m.Title != "" {
+		req.Header.Set("Title", m.Title)
+	}
+	rr := httptest.NewRecorder()
+	s.backend.handler(rr, req)
+	if rr.Code != http.StatusOK {
+		return errors.New("error: " + rr.Body.String())
+	}
+	return nil
 }
 
 func (s *smtpSession) Reset() {

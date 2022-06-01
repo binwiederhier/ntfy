@@ -5,6 +5,7 @@ services:
     container_name: ntfy
     command:
       - serve
+    user: UID:GID # optional. Set custom user/group or uid/gid
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
       - /etc/ntfy:/etc/ntfy

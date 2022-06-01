@@ -53,11 +53,7 @@ func (s *testFirebaseSender) Send(m *messaging.Message) error {
 func (s *testFirebaseSender) Messages() []*messaging.Message {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	messages := make([]*messaging.Message, 0)
-	for _, m := range s.messages {
-		messages = append(messages, m)
-	}
-	return messages
+	return append(make([]*messaging.Message, 0), s.messages...)
 }
 
 func TestToFirebaseMessage_Keepalive(t *testing.T) {

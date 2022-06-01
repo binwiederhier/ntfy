@@ -643,9 +643,17 @@ In case you're curious, here's an example of the entire flow:
 - In the iOS app, you subscribe to `https://ntfy.example.com/mytopic`
 - The app subscribes to the Firebase topic `6de73be8dfb7d69e...` (the SHA256 of the topic URL)
 - When you publish a message to `https://ntfy.example.com/mytopic`, your ntfy server will publish a 
-  poll request to `https://ntfy.sh/6de73be8dfb7d69e...` (passing the message ID in the `X-Poll-ID` header)
-- The ntfy.sh server publishes the message to Firebase, which forwards it to APNS, which forwards it to your iOS device
+  poll request to `https://ntfy.sh/6de73be8dfb7d69e...`. The request from your server to the upstream server 
+  contains only the message ID (in the `X-Poll-ID` header), and the SHA256 checksum of the topic URL (as upstream topic).
+- The ntfy.sh server publishes the poll request message to Firebase, which forwards it to APNS, which forwards it to your iOS device
 - Your iOS device receives the poll request, and fetches the actual message from your server, and then displays it
+
+Here's an example of what the self-hosted server forwards to the upstream server. The request is equivalent to this curl:
+
+```
+curl -X POST -H "X-Poll-ID: s4PdJozxM8na" https://ntfy.sh/6de73be8dfb7d69e32fb2c00c23fe7adbd8b5504406e3068c273aa24cef4055b
+{"id":"4HsClFEuCIcs","time":1654087955,"event":"poll_request","topic":"6de73be8dfb7d69e32fb2c00c23fe7adbd8b5504406e3068c273aa24cef4055b","message":"New message","poll_id":"s4PdJozxM8na"}
+```
 
 ## Rate limiting
 !!! info

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -18,31 +19,73 @@ const (
 	fcmApnsBodyMessageLimit = 100
 )
 
-func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subscriber, error) {
+var (
+	errFirebaseQuotaExceeded = errors.New("Firebase quota exceeded")
+)
+
+// firebaseClient is a generic client that formats and sends messages to Firebase.
+// The actual Firebase implementation is implemented in firebaseSenderImpl, to make it testable.
+type firebaseClient struct {
+	sender firebaseSender
+	auther auth.Auther
+}
+
+func newFirebaseClient(sender firebaseSender, auther auth.Auther) *firebaseClient {
+	return &firebaseClient{
+		sender: sender,
+		auther: auther,
+	}
+}
+
+func (c *firebaseClient) Send(v *visitor, m *message) error {
+	if err := v.FirebaseAllowed(); err != nil {
+		return errFirebaseQuotaExceeded
+	}
+	fbm, err := toFirebaseMessage(m, c.auther)
+	if err != nil {
+		return err
+	}
+	err = c.sender.Send(fbm)
+	if err == errFirebaseQuotaExceeded {
+		log.Printf("[%s] FB quota exceeded for topic %s, temporarily denying FB access to visitor", v.ip, m.Topic)
+		v.FirebaseTemporarilyDeny()
+	}
+	return err
+}
+
+// firebaseSender is an interface that represents a client that can send to Firebase Cloud Messaging.
+// In tests, this can be implemented with a mock.
+type firebaseSender interface {
+	// Send sends a message to Firebase, or returns an error. It returns errFirebaseQuotaExceeded
+	// if a rate limit has reached.
+	Send(m *messaging.Message) error
+}
+
+// firebaseSenderImpl is a firebaseSender that actually talks to Firebase
+type firebaseSenderImpl struct {
+	client *messaging.Client
+}
+
+func newFirebaseSender(credentialsFile string) (*firebaseSenderImpl, error) {
 	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(credentialsFile))
 	if err != nil {
 		return nil, err
 	}
-	msg, err := fb.Messaging(context.Background())
+	client, err := fb.Messaging(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return func(v *visitor, m *message) error {
-		if err := v.FirebaseAllowed(); err != nil {
-			return errHTTPTooManyRequestsFirebaseQuotaReached
-		}
-		fbm, err := toFirebaseMessage(m, auther)
-		if err != nil {
-			return err
-		}
-		_, err = msg.Send(context.Background(), fbm)
-		if err != nil && messaging.IsQuotaExceeded(err) {
-			log.Printf("[%s] FB quota exceeded when trying to publish to topic %s, temporarily denying FB access", v.ip, m.Topic)
-			v.FirebaseTemporarilyDeny()
-			return errHTTPTooManyRequestsFirebaseQuotaReached
-		}
-		return err
+	return &firebaseSenderImpl{
+		client: client,
 	}, nil
+}
+
+func (c *firebaseSenderImpl) Send(m *messaging.Message) error {
+	_, err := c.client.Send(context.Background(), m)
+	if err != nil && messaging.IsQuotaExceeded(err) {
+		return errFirebaseQuotaExceeded
+	}
+	return err
 }
 
 // toFirebaseMessage converts a message to a Firebase message.

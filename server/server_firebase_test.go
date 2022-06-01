@@ -26,6 +26,25 @@ func (t testAuther) Authorize(_ *auth.User, _ string, _ auth.Permission) error {
 	return errors.New("unauthorized")
 }
 
+type testFirebaseSender struct {
+	allowed  int
+	messages []*messaging.Message
+}
+
+func newTestFirebaseSender(allowed int) *testFirebaseSender {
+	return &testFirebaseSender{
+		allowed:  allowed,
+		messages: make([]*messaging.Message, 0),
+	}
+}
+func (s *testFirebaseSender) Send(m *messaging.Message) error {
+	if len(s.messages)+1 > s.allowed {
+		return errFirebaseQuotaExceeded
+	}
+	s.messages = append(s.messages, m)
+	return nil
+}
+
 func TestToFirebaseMessage_Keepalive(t *testing.T) {
 	m := newKeepaliveMessage("mytopic")
 	fbm, err := toFirebaseMessage(m, nil)
@@ -284,4 +303,23 @@ func TestMaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 	require.Equal(t, origMessageLength, notTruncatedMessageLength)
 	require.Equal(t, len(serializedOrigFCMMessage), len(serializedNotTruncatedFCMMessage))
 	require.Equal(t, "", notTruncatedFCMMessage.Data["truncated"])
+}
+
+func TestToFirebaseSender_Abuse(t *testing.T) {
+	sender := &testFirebaseSender{allowed: 2}
+	client := newFirebaseClient(sender, &testAuther{})
+	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), "1.2.3.4")
+
+	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
+	require.Equal(t, 1, len(sender.messages))
+
+	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
+	require.Equal(t, 2, len(sender.messages))
+
+	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &message{Topic: "mytopic"}))
+	require.Equal(t, 2, len(sender.messages))
+
+	sender.messages = make([]*messaging.Message, 0) // Reset to test that time limit is working
+	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &message{Topic: "mytopic"}))
+	require.Equal(t, 0, len(sender.messages))
 }

@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -53,6 +52,21 @@ func TestServer_PublishAndPoll(t *testing.T) {
 	require.Equal(t, 2, len(lines))
 	require.Equal(t, "my first message", lines[0])
 	require.Equal(t, "my second  message", lines[1]) // \n -> " "
+}
+
+func TestServer_PublishWithFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+	require.Equal(t, 1, len(sender.messages))
+	require.Equal(t, "my first message", sender.messages[0].Data["message"])
+	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.Aps.Alert.Body)
+	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.CustomData["message"])
 }
 
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
@@ -459,27 +473,6 @@ func TestServer_PublishMessageInHeaderWithNewlines(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, "Line 1\nLine 2", msg.Message) // \\n -> \n !
-}
-
-func TestServer_PublishFirebase(t *testing.T) {
-	// This is unfortunately not much of a test, since it merely fires the messages towards Firebase,
-	// but cannot re-read them. There is no way from Go to read the messages back, or even get an error back.
-	// I tried everything. I already had written the test, and it increases the code coverage, so I'll leave it ... :shrug: ...
-
-	c := newTestConfig(t)
-	c.FirebaseKeyFile = firebaseServiceAccountFile(t) // May skip the test!
-	s := newTestServer(t, c)
-
-	// Normal message
-	response := request(t, s, "PUT", "/mytopic", "This is a message for firebase", nil)
-	msg := toMessage(t, response.Body.String())
-	require.NotEmpty(t, msg.ID)
-
-	// Keepalive message
-	v := newVisitor(s.config, s.messageCache, "1.2.3.4")
-	require.Nil(t, s.firebase(v, newKeepaliveMessage(firebaseControlTopic)))
-
-	time.Sleep(500 * time.Millisecond) // Time for sends
 }
 
 func TestServer_PublishInvalidTopic(t *testing.T) {
@@ -1339,18 +1332,6 @@ func toHTTPError(t *testing.T, s string) *errHTTP {
 	var e errHTTP
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&e))
 	return &e
-}
-
-func firebaseServiceAccountFile(t *testing.T) string {
-	if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE") != "" {
-		return os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT_FILE")
-	} else if os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT") != "" {
-		filename := filepath.Join(t.TempDir(), "firebase.json")
-		require.NotNil(t, os.WriteFile(filename, []byte(os.Getenv("NTFY_TEST_FIREBASE_SERVICE_ACCOUNT")), 0o600))
-		return filename
-	}
-	t.SkipNow()
-	return ""
 }
 
 func basicAuth(s string) string {

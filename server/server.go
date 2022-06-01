@@ -32,22 +32,22 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config       *Config
-	httpServer   *http.Server
-	httpsServer  *http.Server
-	unixListener net.Listener
-	smtpServer   *smtp.Server
-	smtpBackend  *smtpBackend
-	topics       map[string]*topic
-	visitors     map[string]*visitor
-	firebase     subscriber
-	mailer       mailer
-	messages     int64
-	auth         auth.Auther
-	messageCache *messageCache
-	fileCache    *fileCache
-	closeChan    chan bool
-	mu           sync.Mutex
+	config         *Config
+	httpServer     *http.Server
+	httpsServer    *http.Server
+	unixListener   net.Listener
+	smtpServer     *smtp.Server
+	smtpBackend    *smtpBackend
+	topics         map[string]*topic
+	visitors       map[string]*visitor
+	firebaseClient *firebaseClient
+	mailer         mailer
+	messages       int64
+	auth           auth.Auther
+	messageCache   *messageCache
+	fileCache      *fileCache
+	closeChan      chan bool
+	mu             sync.Mutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -134,23 +134,23 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var firebaseSubscriber subscriber
+	var firebaseClient *firebaseClient
 	if conf.FirebaseKeyFile != "" {
-		var err error
-		firebaseSubscriber, err = createFirebaseSubscriber(conf.FirebaseKeyFile, auther)
+		sender, err := newFirebaseSender(conf.FirebaseKeyFile)
 		if err != nil {
 			return nil, err
 		}
+		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	return &Server{
-		config:       conf,
-		messageCache: messageCache,
-		fileCache:    fileCache,
-		firebase:     firebaseSubscriber,
-		mailer:       mailer,
-		topics:       topics,
-		auth:         auther,
-		visitors:     make(map[string]*visitor),
+		config:         conf,
+		messageCache:   messageCache,
+		fileCache:      fileCache,
+		firebaseClient: firebaseClient,
+		mailer:         mailer,
+		topics:         topics,
+		auth:           auther,
+		visitors:       make(map[string]*visitor),
 	}, nil
 }
 
@@ -437,7 +437,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 			return err
 		}
 	}
-	if s.firebase != nil && firebase && !delayed {
+	if s.firebaseClient != nil && firebase && !delayed {
 		go s.sendToFirebase(v, m)
 	}
 	if s.mailer != nil && email != "" && !delayed {
@@ -463,7 +463,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
-	if err := s.firebase(v, m); err != nil {
+	if err := s.firebaseClient.Send(v, m); err != nil {
 		log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
 	}
 }
@@ -1096,20 +1096,16 @@ func (s *Server) runDelayedSender() {
 }
 
 func (s *Server) runFirebaseKeepaliver() {
-	if s.firebase == nil {
+	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, "0.0.0.0")
+	v := newVisitor(s.config, s.messageCache, "0.0.0.0") // Background process, not a real visitor
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			if err := s.firebase(v, newKeepaliveMessage(firebaseControlTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
-			}
+			s.sendToFirebase(v, newKeepaliveMessage(firebaseControlTopic))
 		case <-time.After(s.config.FirebasePollInterval):
-			if err := s.firebase(v, newKeepaliveMessage(firebasePollTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
-			}
+			s.sendToFirebase(v, newKeepaliveMessage(firebasePollTopic))
 		case <-s.closeChan:
 			return
 		}
@@ -1142,7 +1138,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 			}
 		}()
 	}
-	if s.firebase != nil { // Firebase subscribers may not show up in topics map
+	if s.firebaseClient != nil { // Firebase subscribers may not show up in topics map
 		go s.sendToFirebase(v, m)
 	}
 	if s.config.UpstreamBaseURL != "" {

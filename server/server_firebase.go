@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	errFirebaseQuotaExceeded = errors.New("Firebase quota exceeded")
+	errFirebaseQuotaExceeded = errors.New("quota exceeded for Firebase messages to topic")
 )
 
 // firebaseClient is a generic client that formats and sends messages to Firebase.

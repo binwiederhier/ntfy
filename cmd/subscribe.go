@@ -43,7 +43,7 @@ var cmdSubscribe = &cli.Command{
 	Action:    execSubscribe,
 	Category:  categoryClient,
 	Flags:     flagsSubscribe,
-	Before:    initLogFunc(nil),
+	Before:    initLogFunc,
 	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
 every arriving message. There are 3 modes in which the command can be run:
 
@@ -253,7 +253,7 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 	if filename != "" {
 		return client.LoadConfig(filename)
 	}
-	configFile := defaultConfigFile()
+	configFile := defaultClientConfigFile()
 	if s, _ := os.Stat(configFile); s != nil {
 		return client.LoadConfig(configFile)
 	}
@@ -261,7 +261,7 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 }
 
 //lint:ignore U1000 Conditionally used in different builds
-func defaultConfigFileUnix() string {
+func defaultClientConfigFileUnix() string {
 	u, _ := user.Current()
 	configFile := clientRootConfigFileUnixAbsolute
 	if u.Uid != "0" {
@@ -272,7 +272,7 @@ func defaultConfigFileUnix() string {
 }
 
 //lint:ignore U1000 Conditionally used in different builds
-func defaultConfigFileWindows() string {
+func defaultClientConfigFileWindows() string {
 	homeDir, _ := os.UserConfigDir()
 	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative)
 }

@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"heckel.io/ntfy/log"
 	"math/rand"
 	"sync"
 )
@@ -46,10 +46,15 @@ func (t *topic) Publish(v *visitor, m *message) error {
 	go func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		for _, s := range t.subscribers {
-			if err := s(v, m); err != nil {
-				log.Printf("error publishing message to subscriber")
+		if len(t.subscribers) > 0 {
+			log.Debug("%s Forwarding to %d subscriber(s)", logPrefix(v, m), len(t.subscribers))
+			for _, s := range t.subscribers {
+				if err := s(v, m); err != nil {
+					log.Warn("%s Error forwarding to subscriber", logPrefix(v, m))
+				}
 			}
+		} else {
+			log.Debug("%s No subscribers, not forwarding", logPrefix(v, m))
 		}
 	}()
 	return nil

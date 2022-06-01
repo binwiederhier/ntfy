@@ -44,7 +44,7 @@ var cmdPublish = &cli.Command{
 	Action:    execPublish,
 	Category:  categoryClient,
 	Flags:     flagsPublish,
-	Before:    initLogFunc(nil),
+	Before:    initLogFunc,
 	Description: `Publish a message to a ntfy server.
 
 Examples:

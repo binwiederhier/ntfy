@@ -11,5 +11,5 @@ var (
 )
 
 func defaultConfigFile() string {
-	return defaultConfigFileWindows()
+	return defaultClientConfigFileWindows()
 }

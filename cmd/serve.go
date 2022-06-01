@@ -8,7 +8,10 @@ import (
 	"heckel.io/ntfy/log"
 	"math"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -21,9 +24,13 @@ func init() {
 	commands = append(commands, cmdServe)
 }
 
+const (
+	defaultServerConfigFile = "/etc/ntfy/server.yml"
+)
+
 var flagsServe = append(
 	flagsDefault,
-	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: "/etc/ntfy/server.yml", DefaultText: "/etc/ntfy/server.yml", Usage: "config file"},
+	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, DefaultText: defaultServerConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used to as HTTPS listen address"}),
@@ -69,7 +76,7 @@ var cmdServe = &cli.Command{
 	Action:    execServe,
 	Category:  categoryServer,
 	Flags:     flagsServe,
-	Before:    initLogFunc(initConfigFileInputSourceFunc("config", flagsServe)),
+	Before:    initConfigFileInputSourceFunc("config", flagsServe, initLogFunc),
 	Description: `Run the ntfy server and listen for incoming requests
 
 The command will load the configuration from /etc/ntfy/server.yml. Config options can 
@@ -86,6 +93,7 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Read all the options
+	config := c.String("config")
 	baseURL := c.String("base-url")
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
@@ -241,11 +249,15 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.BehindProxy = behindProxy
 	conf.EnableWeb = enableWeb
+
+	// Set up hot-reloading of config
+	go sigHandlerConfigReload(config)
+
+	// Run server
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatal(err)
-	}
-	if err := s.Run(); err != nil {
+	} else if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
 	log.Info("Exiting.")
@@ -261,4 +273,29 @@ func parseSize(s string, defaultValue int64) (v int64, err error) {
 		return 0, err
 	}
 	return v, nil
+}
+
+func sigHandlerConfigReload(config string) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGHUP)
+	for range sigs {
+		log.Info("Partially hot reloading configuration ...")
+		inputSource, err := newYamlSourceFromFile(config, flagsServe)
+		if err != nil {
+			log.Warn("Hot reload failed: %s", err.Error())
+			continue
+		}
+		reloadLogLevel(inputSource)
+	}
+}
+
+func reloadLogLevel(inputSource altsrc.InputSourceContext) {
+	newLevelStr, err := inputSource.String("log-level")
+	if err != nil {
+		log.Warn("Cannot load log level: %s", err.Error())
+		return
+	}
+	newLevel := log.ToLevel(newLevelStr)
+	log.SetLevel(newLevel)
+	log.Info("Log level is %s", newLevel.String())
 }

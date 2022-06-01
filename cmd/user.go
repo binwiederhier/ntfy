@@ -29,7 +29,7 @@ var cmdUser = &cli.Command{
 	Usage:     "Manage/show users",
 	UsageText: "ntfy user [list|add|remove|change-pass|change-role] ...",
 	Flags:     flagsUser,
-	Before:    initLogFunc(initConfigFileInputSourceFunc("config", flagsUser)),
+	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{

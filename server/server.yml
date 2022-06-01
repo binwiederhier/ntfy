@@ -178,3 +178,8 @@
 #
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
+
+# Log level, can be DEBUG, INFO, WARN or ERROR
+# This option can be hot-reloaded by calling "kill -HUP $pid" or "systemctl reload ntfy".
+#
+# log-level: INFO

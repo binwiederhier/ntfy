@@ -63,10 +63,10 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 	msg1 := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg1.ID)
 	require.Equal(t, "my first message", msg1.Message)
-	require.Equal(t, 1, len(sender.messages))
-	require.Equal(t, "my first message", sender.messages[0].Data["message"])
-	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.Aps.Alert.Body)
-	require.Equal(t, "my first message", sender.messages[0].APNS.Payload.CustomData["message"])
+	require.Equal(t, 1, len(sender.Messages()))
+	require.Equal(t, "my first message", sender.Messages()[0].Data["message"])
+	require.Equal(t, "my first message", sender.Messages()[0].APNS.Payload.Aps.Alert.Body)
+	require.Equal(t, "my first message", sender.Messages()[0].APNS.Payload.CustomData["message"])
 }
 
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {

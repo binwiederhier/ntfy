@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/auth"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -29,6 +30,7 @@ func (t testAuther) Authorize(_ *auth.User, _ string, _ auth.Permission) error {
 type testFirebaseSender struct {
 	allowed  int
 	messages []*messaging.Message
+	mu       sync.Mutex
 }
 
 func newTestFirebaseSender(allowed int) *testFirebaseSender {
@@ -37,12 +39,21 @@ func newTestFirebaseSender(allowed int) *testFirebaseSender {
 		messages: make([]*messaging.Message, 0),
 	}
 }
+
 func (s *testFirebaseSender) Send(m *messaging.Message) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(s.messages)+1 > s.allowed {
 		return errFirebaseQuotaExceeded
 	}
 	s.messages = append(s.messages, m)
 	return nil
+}
+
+func (s *testFirebaseSender) Messages() []*messaging.Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append(make([]*messaging.Message, 0), s.messages...)
 }
 
 func TestToFirebaseMessage_Keepalive(t *testing.T) {
@@ -311,15 +322,15 @@ func TestToFirebaseSender_Abuse(t *testing.T) {
 	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), "1.2.3.4")
 
 	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
-	require.Equal(t, 1, len(sender.messages))
+	require.Equal(t, 1, len(sender.Messages()))
 
 	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
-	require.Equal(t, 2, len(sender.messages))
+	require.Equal(t, 2, len(sender.Messages()))
 
 	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &message{Topic: "mytopic"}))
-	require.Equal(t, 2, len(sender.messages))
+	require.Equal(t, 2, len(sender.Messages()))
 
 	sender.messages = make([]*messaging.Message, 0) // Reset to test that time limit is working
 	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &message{Topic: "mytopic"}))
-	require.Equal(t, 0, len(sender.messages))
+	require.Equal(t, 0, len(sender.Messages()))
 }

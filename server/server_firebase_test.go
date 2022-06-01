@@ -119,7 +119,6 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		Size:    12345,
 		Expires: 98765543,
 		URL:     "https://example.com/file.jpg",
-		Owner:   "some-owner",
 	}
 	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
 	require.Nil(t, err)

@@ -443,7 +443,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if s.mailer != nil && email != "" && !delayed {
 		go s.sendEmail(v, m, email)
 	}
-	if s.config.UpstreamBaseURL != "" {
+	if s.config.UpstreamBaseURL != "" && !delayed {
 		go s.forwardPollRequest(v, m)
 	}
 	if cache {
@@ -484,7 +484,10 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		return
 	}
 	req.Header.Set("X-Poll-ID", m.ID)
-	response, err := http.DefaultClient.Do(req)
+	var httpClient = &http.Client{
+		Timeout: time.Second * 10,
+	}
+	response, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
 		return
@@ -566,6 +569,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
+		m.Sender = v.ip // Important for rate limiting
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
@@ -661,7 +665,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		m.Attachment = &attachment{}
 	}
 	var ext string
-	m.Attachment.Owner = v.ip // Important for attachment rate limiting
+	m.Sender = v.ip // Important for attachment rate limiting
 	m.Attachment.Expires = time.Now().Add(s.config.AttachmentExpiryDuration).Unix()
 	m.Attachment.Type, ext = util.DetectContentType(body.PeekedBytes, m.Attachment.Name)
 	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
@@ -1081,7 +1085,7 @@ func (s *Server) runManager() {
 func (s *Server) runDelayedSender() {
 	for {
 		select {
-		case <-time.After(s.config.AtSenderInterval):
+		case <-time.After(s.config.DelayedSenderInterval):
 			if err := s.sendDelayedMessages(); err != nil {
 				log.Printf("error sending scheduled messages: %s", err.Error())
 			}
@@ -1118,7 +1122,7 @@ func (s *Server) sendDelayedMessages() error {
 		return err
 	}
 	for _, m := range messages {
-		v := s.visitorFromIP("0.0.0.0") // FIXME: get message owner!!
+		v := s.visitorFromIP(m.Sender)
 		if err := s.sendDelayedMessage(v, m); err != nil {
 			log.Printf("error sending delayed message: %s", err.Error())
 		}
@@ -1131,14 +1135,18 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	defer s.mu.Unlock()
 	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
 	if ok {
-		if err := t.Publish(v, m); err != nil {
-			return fmt.Errorf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
-		}
+		go func() {
+			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler
+			if err := t.Publish(v, m); err != nil {
+				log.Printf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
+			}
+		}()
 	}
 	if s.firebase != nil { // Firebase subscribers may not show up in topics map
-		if err := s.firebase(v, m); err != nil {
-			return fmt.Errorf("unable to publish to Firebase: %v", err.Error())
-		}
+		go s.sendToFirebase(v, m)
+	}
+	if s.config.UpstreamBaseURL != "" {
+		go s.forwardPollRequest(v, m)
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err

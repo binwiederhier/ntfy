@@ -67,7 +67,7 @@ type Config struct {
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
 	WebRootIsApp                         bool
-	AtSenderInterval                     time.Duration
+	DelayedSenderInterval                time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaLimitPenaltyDuration    time.Duration
@@ -120,7 +120,7 @@ func NewConfig() *Config {
 		MessageLimit:                         DefaultMessageLengthLimit,
 		MinDelay:                             DefaultMinDelay,
 		MaxDelay:                             DefaultMaxDelay,
-		AtSenderInterval:                     DefaultAtSenderInterval,
+		DelayedSenderInterval:                DefaultAtSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
 		FirebaseQuotaLimitPenaltyDuration:    DefaultFirebaseQuotaLimitPenaltyDuration,

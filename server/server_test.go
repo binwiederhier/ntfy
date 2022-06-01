@@ -264,7 +264,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 func TestServer_PublishAt(t *testing.T) {
 	c := newTestConfig(t)
 	c.MinDelay = time.Second
-	c.AtSenderInterval = 100 * time.Millisecond
+	c.DelayedSenderInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 
 	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
@@ -283,6 +283,13 @@ func TestServer_PublishAt(t *testing.T) {
 	messages = toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "a message", messages[0].Message)
+	require.Equal(t, "", messages[0].Sender) // Never return the sender!
+
+	messages, err := s.messageCache.Messages("mytopic", sinceAllMessages, true)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "a message", messages[0].Message)
+	require.Equal(t, "9.9.9.9", messages[0].Sender) // It's stored in the DB though!
 }
 
 func TestServer_PublishAtWithCacheError(t *testing.T) {
@@ -1019,7 +1026,7 @@ func TestServer_PublishAttachment(t *testing.T) {
 	require.Equal(t, int64(5000), msg.Attachment.Size)
 	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(179*time.Minute).Unix()) // Almost 3 hours
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
-	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.Equal(t, "", msg.Sender) // Should never be returned
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
 
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
@@ -1048,7 +1055,7 @@ func TestServer_PublishAttachmentShortWithFilename(t *testing.T) {
 	require.Equal(t, int64(21), msg.Attachment.Size)
 	require.GreaterOrEqual(t, msg.Attachment.Expires, time.Now().Add(3*time.Hour).Unix())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
-	require.Equal(t, "", msg.Attachment.Owner) // Should never be returned
+	require.Equal(t, "", msg.Sender) // Should never be returned
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
 
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
@@ -1075,7 +1082,7 @@ func TestServer_PublishAttachmentExternalWithoutFilename(t *testing.T) {
 	require.Equal(t, "", msg.Attachment.Type)
 	require.Equal(t, int64(0), msg.Attachment.Size)
 	require.Equal(t, int64(0), msg.Attachment.Expires)
-	require.Equal(t, "", msg.Attachment.Owner)
+	require.Equal(t, "", msg.Sender)
 
 	// Slightly unrelated cross-test: make sure we don't add an owner for external attachments
 	size, err := s.messageCache.AttachmentBytesUsed("127.0.0.1")
@@ -1096,7 +1103,7 @@ func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
 	require.Equal(t, "", msg.Attachment.Type)
 	require.Equal(t, int64(0), msg.Attachment.Size)
 	require.Equal(t, int64(0), msg.Attachment.Expires)
-	require.Equal(t, "", msg.Attachment.Owner)
+	require.Equal(t, "", msg.Sender)
 }
 
 func TestServer_PublishAttachmentBadURL(t *testing.T) {

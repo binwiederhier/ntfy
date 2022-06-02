@@ -239,17 +239,18 @@ docker run \
     serve
 ```
 
-With other config options (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):
+With other config options and non-root user (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):
 ```bash
 docker run \
   -v /etc/ntfy:/etc/ntfy \
   -p 80:80 \
+  -u UID:GID \
   -it \
   binwiederhier/ntfy \
   serve
 ```
 
-Using docker-compose:
+Using docker-compose with non-root user:
 ```yaml
 version: "2.1"
 
@@ -259,6 +260,7 @@ services:
     container_name: ntfy
     command:
       - serve
+    user: UID:GID # optional. replace with your own user/group or uid/gid
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
       - /etc/ntfy:/etc/ntfy
@@ -266,6 +268,8 @@ services:
       - 80:80
     restart: unless-stopped
 ```
+
+If using a non-root user when running the docker version, be sure to chown the server.yml, user.db, and cache.db files to the same uid/gid.
 
 Alternatively, you may wish to build a customized Docker image that can be run with fewer command-line arguments and without delivering the configuration file separately.
 ```

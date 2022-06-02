@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
-	"log"
 	"strings"
 	"time"
 )
@@ -540,7 +540,7 @@ func setupNewCacheDB(db *sql.DB) error {
 }
 
 func migrateFrom0(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 0 to 1")
+	log.Info("Migrating cache database schema: from 0 to 1")
 	if _, err := db.Exec(migrate0To1AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -554,7 +554,7 @@ func migrateFrom0(db *sql.DB) error {
 }
 
 func migrateFrom1(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 1 to 2")
+	log.Info("Migrating cache database schema: from 1 to 2")
 	if _, err := db.Exec(migrate1To2AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -565,7 +565,7 @@ func migrateFrom1(db *sql.DB) error {
 }
 
 func migrateFrom2(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 2 to 3")
+	log.Info("Migrating cache database schema: from 2 to 3")
 	if _, err := db.Exec(migrate2To3AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func migrateFrom2(db *sql.DB) error {
 }
 
 func migrateFrom3(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 3 to 4")
+	log.Info("Migrating cache database schema: from 3 to 4")
 	if _, err := db.Exec(migrate3To4AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -587,7 +587,7 @@ func migrateFrom3(db *sql.DB) error {
 }
 
 func migrateFrom4(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 4 to 5")
+	log.Info("Migrating cache database schema: from 4 to 5")
 	if _, err := db.Exec(migrate4To5AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -598,7 +598,7 @@ func migrateFrom4(db *sql.DB) error {
 }
 
 func migrateFrom5(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 5 to 6")
+	log.Info("Migrating cache database schema: from 5 to 6")
 	if _, err := db.Exec(migrate5To6AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -609,7 +609,7 @@ func migrateFrom5(db *sql.DB) error {
 }
 
 func migrateFrom6(db *sql.DB) error {
-	log.Print("Migrating cache database schema: from 6 to 7")
+	log.Info("Migrating cache database schema: from 6 to 7")
 	if _, err := db.Exec(migrate6To7AlterMessagesTableQuery); err != nil {
 		return err
 	}

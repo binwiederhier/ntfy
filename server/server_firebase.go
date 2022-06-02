@@ -10,6 +10,7 @@ import (
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 	"strings"
 )
 
@@ -45,7 +46,7 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 		return err
 	}
 	if log.IsTrace() {
-		log.Trace("%s Firebase message: %s", logMessagePrefix(v, m), maybeMarshalJSON(fbm))
+		log.Trace("%s Firebase message: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(fbm))
 	}
 	err = c.sender.Send(fbm)
 	if err == errFirebaseQuotaExceeded {

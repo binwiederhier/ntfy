@@ -833,9 +833,9 @@ contents. The `TRACE` setting will also print the message contents.
     Both options are very verbose and should only be enabled in production for short periods of time. Otherwise, 
     you're going to run out of disk space pretty quickly.
 
-You can also hot-reload the `log-level` by sending the `SIGHUP` signal to the process (or by calling 
-`systemctl reload ntfy` if it's running inside systemd). You can do so by calling `kill -HUP $(pidof ntfy)`. 
-If succesfull, you'll see something like this:
+You can also hot-reload the `log-level` by sending the `SIGHUP` signal to the process after editing the `server.yml` file.
+You can do so by calling `systemctl reload ntfy` (if ntfy is running inside systemd), or by calling `kill -HUP $(pidof ntfy)`. 
+If successful, you'll see something like this:
 
 ```
 $ ntfy serve

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
-	"log"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -32,7 +33,6 @@ var flagsSubscribe = append(
 	&cli.BoolFlag{Name: "from-config", Aliases: []string{"C"}, Usage: "read subscriptions from config file (service mode)"},
 	&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 	&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
-	&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "print verbose output"},
 )
 
 var cmdSubscribe = &cli.Command{
@@ -190,6 +190,7 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		if !ok {
 			continue
 		}
+		log.Debug("%s Dispatching received message: %s", logMessagePrefix(m), m.Raw)
 		printMessageOrRunCommand(c, m, cmd)
 	}
 	return nil
@@ -199,26 +200,26 @@ func printMessageOrRunCommand(c *cli.Context, m *client.Message, command string)
 	if command != "" {
 		runCommand(c, command, m)
 	} else {
+		log.Debug("%s Printing raw message", logMessagePrefix(m))
 		fmt.Fprintln(c.App.Writer, m.Raw)
 	}
 }
 
 func runCommand(c *cli.Context, command string, m *client.Message) {
 	if err := runCommandInternal(c, command, m); err != nil {
-		fmt.Fprintf(c.App.ErrWriter, "Command failed: %s\n", err.Error())
+		log.Warn("%s Command failed: %s", logMessagePrefix(m), err.Error())
 	}
 }
 
 func runCommandInternal(c *cli.Context, script string, m *client.Message) error {
 	scriptFile := fmt.Sprintf("%s/ntfy-subscribe-%s.%s", os.TempDir(), util.RandomString(10), scriptExt)
-	if err := os.WriteFile(scriptFile, []byte(scriptHeader+script), 0700); err != nil {
+	log.Debug("%s Running command '%s' via temporary script %s", logMessagePrefix(m), script, scriptFile)
+	script = scriptHeader + script
+	if err := os.WriteFile(scriptFile, []byte(script), 0700); err != nil {
 		return err
 	}
 	defer os.Remove(scriptFile)
-	verbose := c.Bool("verbose")
-	if verbose {
-		log.Printf("[%s] Executing: %s (for message: %s)", util.ShortTopicURL(m.TopicURL), script, m.Raw)
-	}
+	log.Debug("%s Executing script %s", logMessagePrefix(m), scriptFile)
 	cmd := exec.Command(scriptLauncher[0], append(scriptLauncher[1:], scriptFile)...)
 	cmd.Stdin = c.App.Reader
 	cmd.Stdout = c.App.Writer
@@ -228,7 +229,7 @@ func runCommandInternal(c *cli.Context, script string, m *client.Message) error 
 }
 
 func envVars(m *client.Message) []string {
-	env := os.Environ()
+	env := make([]string, 0)
 	env = append(env, envVar(m.ID, "NTFY_ID", "id")...)
 	env = append(env, envVar(m.Topic, "NTFY_TOPIC", "topic")...)
 	env = append(env, envVar(fmt.Sprintf("%d", m.Time), "NTFY_TIME", "time")...)
@@ -237,7 +238,11 @@ func envVars(m *client.Message) []string {
 	env = append(env, envVar(fmt.Sprintf("%d", m.Priority), "NTFY_PRIORITY", "priority", "prio", "p")...)
 	env = append(env, envVar(strings.Join(m.Tags, ","), "NTFY_TAGS", "tags", "tag", "ta")...)
 	env = append(env, envVar(m.Raw, "NTFY_RAW", "raw")...)
-	return env
+	sort.Strings(env)
+	if log.IsTrace() {
+		log.Trace("%s With environment:\n%s", logMessagePrefix(m), strings.Join(env, "\n"))
+	}
+	return append(os.Environ(), env...)
 }
 
 func envVar(value string, vars ...string) []string {
@@ -275,4 +280,8 @@ func defaultClientConfigFileUnix() string {
 func defaultClientConfigFileWindows() string {
 	homeDir, _ := os.UserConfigDir()
 	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative)
+}
+
+func logMessagePrefix(m *client.Message) string {
+	return fmt.Sprintf("%s/%s", util.ShortTopicURL(m.TopicURL), m.ID)
 }

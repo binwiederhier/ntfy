@@ -253,7 +253,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 			if isNormalError {
 				log.Debug("%s WebSocket error (this error is okay, it happens a lot): %s", logHTTPPrefix(v, r), err.Error())
 			} else {
-				log.Warn("%s WebSocket error: %s", logHTTPPrefix(v, r), err.Error())
+				log.Info("%s WebSocket error: %s", logHTTPPrefix(v, r), err.Error())
 			}
 			return // Do not attempt to write to upgraded connection
 		}
@@ -446,7 +446,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	log.Debug("%s Received message: event=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
 		logMessagePrefix(v, m), m.Event, len(m.Message), delayed, firebase, cache, unifiedpush, email)
 	if log.IsTrace() {
-		log.Trace("%s Message body: %s", logMessagePrefix(v, m), maybeMarshalJSON(m))
+		log.Trace("%s Message body: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(m))
 	}
 	if !delayed {
 		if err := t.Publish(v, m); err != nil {

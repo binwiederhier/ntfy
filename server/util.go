@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/emersion/go-smtp"
 	"net/http"
@@ -58,15 +57,4 @@ func logHTTPPrefix(v *visitor, r *http.Request) string {
 
 func logSMTPPrefix(state *smtp.ConnectionState) string {
 	return fmt.Sprintf("%s/%s SMTP", state.Hostname, state.RemoteAddr.String())
-}
-
-func maybeMarshalJSON(v interface{}) string {
-	messageJSON, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return "<cannot serialize>"
-	}
-	if len(messageJSON) > 5000 {
-		return string(messageJSON)[:5000]
-	}
-	return string(messageJSON)
 }

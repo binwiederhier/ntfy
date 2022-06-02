@@ -15,6 +15,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## ntfy server v1.25.0
 Released June 2, 2022
 
+This release adds the ability to set a log level to facilitate easier debugging of live systems. It also solves a 
+production problem with a few over-users that resulted in Firebase quota problems (only applying to the over-users). 
+We now block visitors from using Firebase if they trigger a quota exceeded response.
+
+On top of that, we updated the Firebase SDK and are now building the release in GitHub Actions. We've also got two
+more translations: Chinese/Simplified and Dutch.
+
 **Features:**
 
 * Advanced logging, with different log levels and hot reloading of the log level ([#284](https://github.com/binwiederhier/ntfy/pull/284))

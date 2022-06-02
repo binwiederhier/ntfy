@@ -239,10 +239,11 @@ docker run \
     serve
 ```
 
-With other config options and non-root user (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):
+With other config options, host-matched timezone, and non-root user (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):
 ```bash
 docker run \
   -v /etc/ntfy:/etc/ntfy \
+  -v /etc/localtime:/etc/localtime:ro \
   -p 80:80 \
   -u UID:GID \
   -it \
@@ -264,6 +265,7 @@ services:
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
       - /etc/ntfy:/etc/ntfy
+      - /etc/localtime:/etc/localtime:ro # set timezone to match host
     ports:
       - 80:80
     restart: unless-stopped

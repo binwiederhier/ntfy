@@ -9,6 +9,7 @@ services:
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
       - /etc/ntfy:/etc/ntfy
+      - /etc/localtime:/etc/localtime:ro
     ports:
       - 80:80
     restart: unless-stopped

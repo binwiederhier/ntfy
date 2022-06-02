@@ -47,14 +47,14 @@ func (t *topic) Publish(v *visitor, m *message) error {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		if len(t.subscribers) > 0 {
-			log.Debug("%s Forwarding to %d subscriber(s)", logPrefix(v, m), len(t.subscribers))
+			log.Debug("%s Forwarding to %d subscriber(s)", logMessagePrefix(v, m), len(t.subscribers))
 			for _, s := range t.subscribers {
 				if err := s(v, m); err != nil {
-					log.Warn("%s Error forwarding to subscriber", logPrefix(v, m))
+					log.Warn("%s Error forwarding to subscriber", logMessagePrefix(v, m))
 				}
 			}
 		} else {
-			log.Debug("%s No subscribers, not forwarding", logPrefix(v, m))
+			log.Trace("%s No stream or WebSocket subscribers, not forwarding", logMessagePrefix(v, m))
 		}
 	}()
 	return nil

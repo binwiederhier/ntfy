@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
-	"strings"
-
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
+	"fmt"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/log"
+	"strings"
 )
 
 const (
@@ -45,9 +44,12 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 	if err != nil {
 		return err
 	}
+	if log.IsTrace() {
+		log.Trace("%s Firebase message: %s", logMessagePrefix(v, m), maybeMarshalJSON(fbm))
+	}
 	err = c.sender.Send(fbm)
 	if err == errFirebaseQuotaExceeded {
-		log.Printf("[%s] FB quota exceeded for topic %s, temporarily denying FB access to visitor", v.ip, m.Topic)
+		log.Warn("%s Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor", logMessagePrefix(v, m))
 		v.FirebaseTemporarilyDeny()
 	}
 	return err

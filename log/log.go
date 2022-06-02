@@ -11,7 +11,8 @@ type Level int
 
 // Well known log levels
 const (
-	DebugLevel Level = iota
+	TraceLevel Level = iota
+	DebugLevel
 	InfoLevel
 	WarnLevel
 	ErrorLevel
@@ -19,6 +20,8 @@ const (
 
 func (l Level) String() string {
 	switch l {
+	case TraceLevel:
+		return "TRACE"
 	case DebugLevel:
 		return "DEBUG"
 	case InfoLevel:
@@ -36,7 +39,12 @@ var (
 	mu    = &sync.Mutex{}
 )
 
-// Debug prints the given message, if the current log level is DEBUG
+// Trace prints the given message, if the current log level is TRACE
+func Trace(message string, v ...interface{}) {
+	logIf(TraceLevel, message, v...)
+}
+
+// Debug prints the given message, if the current log level is DEBUG or lower
 func Debug(message string, v ...interface{}) {
 	logIf(DebugLevel, message, v...)
 }
@@ -78,18 +86,35 @@ func SetLevel(newLevel Level) {
 // ToLevel converts a string to a Level. It returns InfoLevel if the string
 // does not match any known log levels.
 func ToLevel(s string) Level {
-	switch strings.ToLower(s) {
-	case "debug":
+	switch strings.ToUpper(s) {
+	case "TRACE":
+		return TraceLevel
+	case "DEBUG":
 		return DebugLevel
-	case "info":
+	case "INFO":
 		return InfoLevel
-	case "warn", "warning":
+	case "WARN", "WARNING":
 		return WarnLevel
-	case "error":
+	case "ERROR":
 		return ErrorLevel
 	default:
 		return InfoLevel
 	}
+}
+
+// Loggable returns true if the given log level is lower or equal to the current log level
+func Loggable(l Level) bool {
+	return CurrentLevel() <= l
+}
+
+// IsTrace returns true if the current log level is TraceLevel
+func IsTrace() bool {
+	return Loggable(TraceLevel)
+}
+
+// IsDebug returns true if the current log level is DebugLevel or below
+func IsDebug() bool {
+	return Loggable(DebugLevel)
 }
 
 func logIf(l Level, message string, v ...interface{}) {

@@ -51,6 +51,7 @@
 # cache-file: <filename>
 # cache-duration: "12h"
 
+
 # If set, access to the ntfy server and API can be controlled on a granular level using
 # the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.
 #
@@ -179,7 +180,10 @@
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
 
-# Log level, can be DEBUG, INFO, WARN or ERROR
+# Log level, can be TRACE, DEBUG, INFO, WARN or ERROR
 # This option can be hot-reloaded by calling "kill -HUP $pid" or "systemctl reload ntfy".
+#
+# Be aware that DEBUG (and particularly TRACE) can be VERY CHATTY. Only turn them on for
+# debugging purposes, or your disk will fill up quickly.
 #
 # log-level: INFO

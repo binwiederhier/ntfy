@@ -477,7 +477,7 @@ func TestServer_PublishMessageInHeaderWithNewlines(t *testing.T) {
 
 func TestServer_PublishInvalidTopic(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	s.mailer = &testMailer{}
+	s.smtpSender = &testMailer{}
 	response := request(t, s, "PUT", "/docs", "fail", nil)
 	require.Equal(t, 40010, toHTTPError(t, response.Body.String()).Code)
 }
@@ -743,11 +743,15 @@ type testMailer struct {
 	mu    sync.Mutex
 }
 
-func (t *testMailer) Send(from, to string, m *message) error {
+func (t *testMailer) Send(v *visitor, m *message, to string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.count++
 	return nil
+}
+
+func (t *testMailer) Counts() (total int64, success int64, failure int64) {
+	return 0, 0, 0
 }
 
 func (t *testMailer) Count() int {
@@ -795,7 +799,7 @@ func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
 
 func TestServer_PublishTooManyEmails_Defaults(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	s.mailer = &testMailer{}
+	s.smtpSender = &testMailer{}
 	for i := 0; i < 16; i++ {
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), map[string]string{
 			"E-Mail": "test@example.com",
@@ -812,7 +816,7 @@ func TestServer_PublishTooManyEmails_Replenish(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorEmailLimitReplenish = 500 * time.Millisecond
 	s := newTestServer(t, c)
-	s.mailer = &testMailer{}
+	s.smtpSender = &testMailer{}
 	for i := 0; i < 16; i++ {
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), map[string]string{
 			"E-Mail": "test@example.com",
@@ -838,7 +842,7 @@ func TestServer_PublishTooManyEmails_Replenish(t *testing.T) {
 
 func TestServer_PublishDelayedEmail_Fail(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	s.mailer = &testMailer{}
+	s.smtpSender = &testMailer{}
 	response := request(t, s, "PUT", "/mytopic", "fail", map[string]string{
 		"E-Mail": "test@example.com",
 		"Delay":  "20 min",
@@ -956,7 +960,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
 	mailer := &testMailer{}
 	s := newTestServer(t, newTestConfig(t))
-	s.mailer = mailer
+	s.smtpSender = mailer
 	body := `{"topic":"mytopic","message":"A message","email":"phil@example.com"}`
 	response := request(t, s, "PUT", "/", body, nil)
 	require.Equal(t, 200, response.Code)

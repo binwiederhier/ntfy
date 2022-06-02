@@ -4,33 +4,62 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"mime"
 	"net"
 	"net/smtp"
 	"strings"
+	"sync"
 	"time"
 )
 
 type mailer interface {
-	Send(from, to string, m *message) error
+	Send(v *visitor, m *message, to string) error
+	Counts() (total int64, success int64, failure int64)
 }
 
 type smtpSender struct {
-	config *Config
+	config  *Config
+	success int64
+	failure int64
+	mu      sync.Mutex
 }
 
-func (s *smtpSender) Send(senderIP, to string, m *message) error {
-	host, _, err := net.SplitHostPort(s.config.SMTPSenderAddr)
+func (s *smtpSender) Send(v *visitor, m *message, to string) error {
+	return s.withCount(v, m, func() error {
+		host, _, err := net.SplitHostPort(s.config.SMTPSenderAddr)
+		if err != nil {
+			return err
+		}
+		message, err := formatMail(s.config.BaseURL, v.ip, s.config.SMTPSenderFrom, to, m)
+		if err != nil {
+			return err
+		}
+		auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+		log.Debug("%s Sending mail: via=%s, user=%s, pass=***, to=%s", logMessagePrefix(v, m), s.config.SMTPSenderAddr, s.config.SMTPSenderUser, to)
+		log.Trace("%s Mail body: %s", logMessagePrefix(v, m), message)
+		return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
+	})
+}
+
+func (s *smtpSender) Counts() (total int64, success int64, failure int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.success + s.failure, s.success, s.failure
+}
+
+func (s *smtpSender) withCount(v *visitor, m *message, fn func() error) error {
+	err := fn()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err != nil {
-		return err
+		log.Debug("%s Sending mail failed: %s", logMessagePrefix(v, m), err.Error())
+		s.failure++
+	} else {
+		s.success++
 	}
-	message, err := formatMail(s.config.BaseURL, senderIP, s.config.SMTPSenderFrom, to, m)
-	if err != nil {
-		return err
-	}
-	auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
-	return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
+	return err
 }
 
 func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) {

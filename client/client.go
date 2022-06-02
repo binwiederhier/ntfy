@@ -233,7 +233,7 @@ func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicUR
 		}
 		select {
 		case <-ctx.Done():
-			log.Info("Connection exited", util.ShortTopicURL(topicURL))
+			log.Info("%s Connection exited", util.ShortTopicURL(topicURL))
 			return
 		case <-time.After(10 * time.Second): // TODO Add incremental backoff
 		}

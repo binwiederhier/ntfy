@@ -51,7 +51,6 @@
 # cache-file: <filename>
 # cache-duration: "12h"
 
-
 # If set, access to the ntfy server and API can be controlled on a granular level using
 # the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.
 #

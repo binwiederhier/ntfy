@@ -490,7 +490,7 @@ func (s *Server) sendToFirebase(v *visitor, m *message) {
 func (s *Server) sendEmail(v *visitor, m *message, email string) {
 	log.Debug("%s Sending email to %s", logMessagePrefix(v, m), email)
 	if err := s.smtpSender.Send(v, m, email); err != nil {
-		log.Warn("%s Unable to send email: %v", logMessagePrefix(v, m), err.Error())
+		log.Warn("%s Unable to send email to %s: %v", logMessagePrefix(v, m), email, err.Error())
 	}
 }
 

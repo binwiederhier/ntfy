@@ -17,6 +17,8 @@ var commands = make([]*cli.Command, 0)
 
 var flagsDefault = []cli.Flag{
 	&cli.BoolFlag{Name: "debug", Aliases: []string{"d"}, EnvVars: []string{"NTFY_DEBUG"}, Usage: "enable debug logging"},
+	&cli.BoolFlag{Name: "trace", EnvVars: []string{"NTFY_TRACE"}, Usage: "enable tracing (very verbose, be careful)"},
+	&cli.BoolFlag{Name: "no-log-dates", Aliases: []string{"no_log_dates"}, EnvVars: []string{"NTFY_NO_LOG_DATES"}, Usage: "disable the date/time prefix"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "log-level", Aliases: []string{"log_level"}, Value: log.InfoLevel.String(), EnvVars: []string{"NTFY_LOG_LEVEL"}, Usage: "set log level"}),
 }
 
@@ -38,10 +40,15 @@ func New() *cli.App {
 }
 
 func initLogFunc(c *cli.Context) error {
-	if c.Bool("debug") {
+	if c.Bool("trace") {
+		log.SetLevel(log.TraceLevel)
+	} else if c.Bool("debug") {
 		log.SetLevel(log.DebugLevel)
 	} else {
 		log.SetLevel(log.ToLevel(c.String("log-level")))
+	}
+	if c.Bool("no-log-dates") {
+		log.DisableDates()
 	}
 	return nil
 }

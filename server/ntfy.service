@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=ntfy
 Group=ntfy
-ExecStart=/usr/bin/ntfy serve
+ExecStart=/usr/bin/ntfy serve --no-log-dates
 ExecReload=/bin/kill --signal HUP $MAINPID
 Restart=on-failure
 AmbientCapabilities=CAP_NET_BIND_SERVICE

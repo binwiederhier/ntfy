@@ -83,6 +83,11 @@ func SetLevel(newLevel Level) {
 	level = newLevel
 }
 
+// DisableDates disables the date/time prefix
+func DisableDates() {
+	log.SetFlags(0)
+}
+
 // ToLevel converts a string to a Level. It returns InfoLevel if the string
 // does not match any known log levels.
 func ToLevel(s string) Level {

@@ -5,11 +5,12 @@ services:
     container_name: ntfy
     command:
       - serve
-    user: UID:GID # optional. Set custom user/group or uid/gid
+    environment:
+      - TZ=UTC    # optional: Change to your desired timezone
+    user: UID:GID # optional: Set custom user/group or uid/gid
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
       - /etc/ntfy:/etc/ntfy
-      - /etc/localtime:/etc/localtime:ro
     ports:
       - 80:80
     restart: unless-stopped

@@ -10,6 +10,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
+## ntfy Android app v1.26.0 (UNRELEASED)
+
+**Features:**
+
+* Add `tzdata` to Docker image to allow overriding the timezone with `TZ` ([#307](https://github.com/binwiederhier/ntfy/pull/307), thanks to [@ksurl](https://github.com/ksurl))
+
 -->
 
 ## ntfy server v1.25.0

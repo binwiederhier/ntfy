@@ -39,6 +39,7 @@ Released June 2, 2022
 **Additional translations:**
 
 * Chinese/Simplified (thanks to [@yufei.im](https://hosted.weblate.org/user/yufei.im/))
+* Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
 
 ## ntfy iOS app v1.1
 Released May 31, 2022

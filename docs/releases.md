@@ -12,7 +12,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 -->
 
-## ntfy server v1.25.1
+## ntfy server v1.25.2
 Released June 2, 2022
 
 This release adds the ability to set a log level to facilitate easier debugging of live systems. It also solves a 
@@ -25,7 +25,6 @@ more translations: Chinese/Simplified and Dutch.
 **Features:**
 
 * Advanced logging, with different log levels and hot reloading of the log level ([#284](https://github.com/binwiederhier/ntfy/pull/284))
-* Add `tzdata` to Docker image to allow overriding the timezone with `TZ` ([#307](https://github.com/binwiederhier/ntfy/pull/307), thanks to [@ksurl](https://github.com/ksurl))
 
 **Bugs**:
 

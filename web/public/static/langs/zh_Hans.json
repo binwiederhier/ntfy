@@ -80,7 +80,7 @@
     "publish_dialog_delay_label": "延期",
     "publish_dialog_other_features": "其它功能：",
     "publish_dialog_attach_placeholder": "使用链接地址附加文件，例如 https://f-droid.org/F-Droid.apk",
-    "publish_dialog_delay_reset": "删除延迟交付",
+    "publish_dialog_delay_reset": "删除延期投递",
     "publish_dialog_attach_reset": "移除附件链接地址",
     "publish_dialog_chip_click_label": "点击链接地址",
     "publish_dialog_chip_email_label": "转发邮件",
@@ -95,7 +95,7 @@
     "emoji_picker_search_placeholder": "查找表情符号",
     "emoji_picker_search_clear": "清除搜索",
     "subscribe_dialog_subscribe_title": "订阅主题",
-    "publish_dialog_chip_delay_label": "延迟交付",
+    "publish_dialog_chip_delay_label": "延期投递",
     "publish_dialog_chip_attach_url_label": "链接附件地址",
     "subscribe_dialog_subscribe_use_another_label": "使用其他服务器",
     "subscribe_dialog_subscribe_button_subscribe": "订阅",
@@ -187,5 +187,5 @@
     "publish_dialog_tags_placeholder": "英文逗号分隔标记列表，例如 warning, srv1-backup",
     "publish_dialog_details_examples_description": "有关所有发送功能的示例和详细说明，请参阅<docsLink>文档</docsLink>。",
     "subscribe_dialog_subscribe_description": "主题可能不受密码保护，因此请选择一个不容易猜测的名字。订阅后，您可以使用 PUT/POST 通知。",
-    "publish_dialog_delay_placeholder": "延迟交付，例如{{unixTimestamp}}、{{relativeTime}}或“{{naturalLanguage}}”（仅限英语）"
+    "publish_dialog_delay_placeholder": "延期投递，例如 {{unixTimestamp}}、{{relativeTime}}或「{{naturalLanguage}}」（仅限英语）"
 }

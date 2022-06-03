@@ -20,7 +20,8 @@ const (
 )
 
 var (
-	errFirebaseQuotaExceeded = errors.New("quota exceeded for Firebase messages to topic")
+	errFirebaseQuotaExceeded     = errors.New("quota exceeded for Firebase messages to topic")
+	errFirebaseTemporarilyBanned = errors.New("visitor temporarily banned from using Firebase")
 )
 
 // firebaseClient is a generic client that formats and sends messages to Firebase.
@@ -39,7 +40,7 @@ func newFirebaseClient(sender firebaseSender, auther auth.Auther) *firebaseClien
 
 func (c *firebaseClient) Send(v *visitor, m *message) error {
 	if err := v.FirebaseAllowed(); err != nil {
-		return errFirebaseQuotaExceeded
+		return errFirebaseTemporarilyBanned
 	}
 	fbm, err := toFirebaseMessage(m, c.auther)
 	if err != nil {

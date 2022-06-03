@@ -261,7 +261,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			httpErr = errHTTPInternalError
 		}
-		isNormalError := httpErr.HTTPCode == http.StatusNotFound
+		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest
 		if isNormalError {
 			log.Debug("%s Connection closed with HTTP %d (ntfy error %d): %s", logHTTPPrefix(v, r), httpErr.HTTPCode, httpErr.Code, err.Error())
 		} else {
@@ -483,7 +483,11 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 func (s *Server) sendToFirebase(v *visitor, m *message) {
 	log.Debug("%s Publishing to Firebase", logMessagePrefix(v, m))
 	if err := s.firebaseClient.Send(v, m); err != nil {
-		log.Warn("%s Unable to publish to Firebase: %v", logMessagePrefix(v, m), err.Error())
+		if err == errFirebaseTemporarilyBanned {
+			log.Debug("%s Unable to publish to Firebase: %v", logMessagePrefix(v, m), err.Error())
+		} else {
+			log.Warn("%s Unable to publish to Firebase: %v", logMessagePrefix(v, m), err.Error())
+		}
 	}
 }
 

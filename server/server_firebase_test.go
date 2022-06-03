@@ -331,6 +331,6 @@ func TestToFirebaseSender_Abuse(t *testing.T) {
 	require.Equal(t, 2, len(sender.Messages()))
 
 	sender.messages = make([]*messaging.Message, 0) // Reset to test that time limit is working
-	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &message{Topic: "mytopic"}))
+	require.Equal(t, errFirebaseTemporarilyBanned, client.Send(visitor, &message{Topic: "mytopic"}))
 	require.Equal(t, 0, len(sender.Messages()))
 }

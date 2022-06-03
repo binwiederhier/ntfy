@@ -10,15 +10,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
-## ntfy Android app v1.26.0 (UNRELEASED)
-
-**Features:**
-
-* Add `tzdata` to Docker image to allow overriding the timezone with `TZ` ([#307](https://github.com/binwiederhier/ntfy/pull/307), thanks to [@ksurl](https://github.com/ksurl))
-
 -->
 
-## ntfy server v1.25.0
+## ntfy server v1.25.1
 Released June 2, 2022
 
 This release adds the ability to set a log level to facilitate easier debugging of live systems. It also solves a 
@@ -31,10 +25,12 @@ more translations: Chinese/Simplified and Dutch.
 **Features:**
 
 * Advanced logging, with different log levels and hot reloading of the log level ([#284](https://github.com/binwiederhier/ntfy/pull/284))
+* Add `tzdata` to Docker image to allow overriding the timezone with `TZ` ([#307](https://github.com/binwiederhier/ntfy/pull/307), thanks to [@ksurl](https://github.com/ksurl))
 
 **Bugs**:
 
 * Respect Firebase "quota exceeded" response for topics, block Firebase publishing for user for 10min ([#289](https://github.com/binwiederhier/ntfy/issues/289))
+* Fix documentation header blue header due to mkdocs-material theme update (no ticket) 
 
 **Maintenance:**
 

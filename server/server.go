@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
 	"io"
 	"net"
 	"net/http"
@@ -22,6 +21,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"heckel.io/ntfy/log"
 
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
@@ -75,6 +76,9 @@ var (
 
 	//go:embed "example.html"
 	exampleSource string
+
+	//go:embed site/app.html
+	appHTML string
 
 	//go:embed site
 	webFs        embed.FS
@@ -317,10 +321,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if s.config.WebRootIsApp {
-		r.URL.Path = webAppIndex
-	} else {
-		r.URL.Path = webHomeIndex
+		return s.handleRoot(w, r, v)
 	}
+
+	r.URL.Path = webHomeIndex
 	return s.handleStatic(w, r, v)
 }
 
@@ -332,8 +336,7 @@ func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request, v *visitor)
 		_, err := io.WriteString(w, `{"unifiedpush":{"version":1}}`+"\n")
 		return err
 	}
-	r.URL.Path = webAppIndex
-	return s.handleStatic(w, r, v)
+	return s.handleRoot(w, r, v)
 }
 
 func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor) error {
@@ -353,17 +356,12 @@ func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request, _ *visito
 }
 
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	appRoot := "/"
-	if !s.config.WebRootIsApp {
-		appRoot = "/app"
-	}
 	disallowedTopicsStr := `"` + strings.Join(disallowedTopics, `", "`) + `"`
 	w.Header().Set("Content-Type", "text/javascript")
 	_, err := io.WriteString(w, fmt.Sprintf(`// Generated server configuration
 var config = {
-  appRoot: "%s",
   disallowedTopics: [%s]
-};`, appRoot, disallowedTopicsStr))
+};`, disallowedTopicsStr))
 	return err
 }
 
@@ -377,6 +375,17 @@ func (s *Server) handleUserStats(w http.ResponseWriter, r *http.Request, v *visi
 	if err := json.NewEncoder(w).Encode(stats); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	// Does this need to be sanitized?
+	html := strings.ReplaceAll(appHTML, `currentPath="/"`, `currentPath="`+r.URL.Path+`"`)
+	handle := func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(html))
+	}
+
+	util.Gzip(http.HandlerFunc(handle)).ServeHTTP(w, r)
 	return nil
 }
 
@@ -509,7 +518,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		return
 	}
 	req.Header.Set("X-Poll-ID", m.ID)
-	var httpClient = &http.Client{
+	httpClient := &http.Client{
 		Timeout: time.Second * 10,
 	}
 	response, err := httpClient.Do(req)

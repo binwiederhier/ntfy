@@ -122,7 +122,7 @@ const NavList = (props) => {
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary={t("nav_button_settings")}/>
                 </ListItemButton>
-                <ListItemButton onClick={() => openUrl("/docs")}>
+                <ListItemButton onClick={() => openUrl("docs")}>
                     <ListItemIcon><ArticleIcon/></ListItemIcon>
                     <ListItemText primary={t("nav_button_documentation")}/>
                 </ListItemButton>

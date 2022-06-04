@@ -211,7 +211,7 @@ extract it and place the `ntfy.exe` binary somewhere in your `%Path%`.
 
 The default path for the client config file is at `%AppData%\ntfy\client.yml` (not created automatically, sample in the ZIP file).
 
-Also available at [Scoop's](https://scoop.sh) Main repository:
+Also available in [Scoop's](https://scoop.sh) Main repository:
 
 `scoop install ntfy`
 

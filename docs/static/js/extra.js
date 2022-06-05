@@ -1,8 +1,8 @@
 // Link tabs, as per https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#linked-tabs
 
-const savedTab = localStorage.getItem('savedTab')
-const tabs = document.querySelectorAll(".tabbed-set > input")
-for (const tab of tabs) {
+const savedCodeTab = localStorage.getItem('savedTab')
+const codeTabs = document.querySelectorAll(".tabbed-set > input")
+for (const tab of codeTabs) {
     tab.addEventListener("click", () => {
         const current = document.querySelector(`label[for=${tab.id}]`)
         const pos = current.getBoundingClientRect().top
@@ -25,7 +25,7 @@ for (const tab of tabs) {
     // Select saved tab
     const current = document.querySelector(`label[for=${tab.id}]`)
     const labelContent = current.innerHTML
-    if (savedTab === labelContent) {
+    if (savedCodeTab === labelContent) {
         tab.checked = true
     }
 }

@@ -11,6 +11,6 @@ var (
 	scriptLauncher = []string{"sh", "-c"}
 )
 
-func defaultConfigFile() string {
-	return defaultConfigFileUnix()
+func defaultClientConfigFile() string {
+	return defaultClientConfigFileUnix()
 }

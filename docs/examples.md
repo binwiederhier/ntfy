@@ -44,7 +44,7 @@ fi
 
 ## Server-sent messages in your web app
 Just as you can [subscribe to topics in the Web UI](subscribe/web.md), you can use ntfy in your own
-web application. Check out the <a href="/example.html">live example</a> or just look the source of this page.
+web application. Check out the <a href="/example.html">live example</a>.
 
 ## Notify on SSH login
 Years ago my home server was broken into. That shook me hard, so every time someone logs into any machine that I

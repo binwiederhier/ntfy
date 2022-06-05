@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"github.com/emersion/go-smtp"
 	"net/http"
 	"strings"
 )
@@ -39,4 +41,20 @@ func readQueryParam(r *http.Request, names ...string) string {
 		}
 	}
 	return ""
+}
+
+func logMessagePrefix(v *visitor, m *message) string {
+	return fmt.Sprintf("%s/%s/%s", v.ip, m.Topic, m.ID)
+}
+
+func logHTTPPrefix(v *visitor, r *http.Request) string {
+	requestURI := r.RequestURI
+	if requestURI == "" {
+		requestURI = r.URL.Path
+	}
+	return fmt.Sprintf("%s HTTP %s %s", v.ip, r.Method, requestURI)
+}
+
+func logSMTPPrefix(state *smtp.ConnectionState) string {
+	return fmt.Sprintf("%s/%s SMTP", state.Hostname, state.RemoteAddr.String())
 }

@@ -4,7 +4,67 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
-## ntfy iOS app v1.1 (UNRELEASED)
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
+## ntfy server v1.26.0 (UNRELEASED)
+
+**Features:**
+
+* Windows CLI is now available via [Scoop](https://scoop.sh) ([ScoopInstaller#3594](https://github.com/ScoopInstaller/Main/pull/3594), [#311](https://github.com/binwiederhier/ntfy/pull/311), [#269](https://github.com/binwiederhier/ntfy/issues/269), thanks to [@kzshantonu](https://github.com/kzshantonu))
+
+-->
+
+## ntfy server v1.25.2
+Released June 2, 2022
+
+This release adds the ability to set a log level to facilitate easier debugging of live systems. It also solves a 
+production problem with a few over-users that resulted in Firebase quota problems (only applying to the over-users). 
+We now block visitors from using Firebase if they trigger a quota exceeded response.
+
+On top of that, we updated the Firebase SDK and are now building the release in GitHub Actions. We've also got two
+more translations: Chinese/Simplified and Dutch.
+
+**Features:**
+
+* Advanced logging, with different log levels and hot reloading of the log level ([#284](https://github.com/binwiederhier/ntfy/pull/284))
+
+**Bugs**:
+
+* Respect Firebase "quota exceeded" response for topics, block Firebase publishing for user for 10min ([#289](https://github.com/binwiederhier/ntfy/issues/289))
+* Fix documentation header blue header due to mkdocs-material theme update (no ticket) 
+
+**Maintenance:**
+
+* Upgrade Firebase Admin SDK to 4.x ([#274](https://github.com/binwiederhier/ntfy/issues/274))
+* CI: Build from pipeline instead of locally ([#36](https://github.com/binwiederhier/ntfy/issues/36))
+
+**Documentation**:
+
+* ⚠️ [Privacy policy](privacy.md) updated to reflect additional debug/tracing feature (no ticket)
+* [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))
+* Install instructions for [NixOS/Nix](https://ntfy.sh/docs/install/#nixos-nix) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@arjan-s](https://github.com/arjan-s))
+* Clarify `poll_request` wording for [iOS push notifications](https://ntfy.sh/docs/config/#ios-instant-notifications) ([#300](https://github.com/binwiederhier/ntfy/issues/300), thanks to [@prabirshrestha](https://github.com/prabirshrestha) for reporting)
+* Example for using ntfy with docker-compose.yml without root privileges ([#304](https://github.com/binwiederhier/ntfy/pull/304), thanks to [@ksurl](https://github.com/ksurl))
+
+**Additional translations:**
+
+* Chinese/Simplified (thanks to [@yufei.im](https://hosted.weblate.org/user/yufei.im/))
+* Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
+
+## ntfy iOS app v1.1
+Released May 31, 2022
+
+In this release of the iOS app, we add message priorities (mapped to iOS interruption levels), tags and emojis,
+action buttons to open websites or perform HTTP requests (in the notification and the detail view), a custom click
+action when the notification is tapped, and various other fixes.
+
+It also adds support for self-hosted servers (albeit not supporting auth yet). The self-hosted server needs to be
+configured to forward poll requests to upstream ntfy.sh for push notifications to work (see [iOS push notifications](https://ntfy.sh/docs/config/#ios-instant-notifications)
+for details).
 
 **Features:**
 
@@ -20,22 +80,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
-
-
-## ntfy Android app v1.14.0 (UNRELEASED)
-
-**Additional translations:**
-
-* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
-
-
-## ntfy server v1.25.0 (UNRELEASED)
-
-**Documentation**:
-
-* [Examples](examples.md) for [Home Assistant](https://www.home-assistant.io/) ([#282](https://github.com/binwiederhier/ntfy/pull/282), thanks to [@poblabs](https://github.com/poblabs))
-
--->
 
 ## ntfy server v1.24.0
 Released May 28, 2022

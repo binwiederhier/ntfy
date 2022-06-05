@@ -3,13 +3,15 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/messaging"
 	"fmt"
-	"strings"
-
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/messaging"
 	"google.golang.org/api/option"
 	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
+	"strings"
 )
 
 const (
@@ -17,23 +19,77 @@ const (
 	fcmApnsBodyMessageLimit = 100
 )
 
-func createFirebaseSubscriber(credentialsFile string, auther auth.Auther) (subscriber, error) {
+var (
+	errFirebaseQuotaExceeded     = errors.New("quota exceeded for Firebase messages to topic")
+	errFirebaseTemporarilyBanned = errors.New("visitor temporarily banned from using Firebase")
+)
+
+// firebaseClient is a generic client that formats and sends messages to Firebase.
+// The actual Firebase implementation is implemented in firebaseSenderImpl, to make it testable.
+type firebaseClient struct {
+	sender firebaseSender
+	auther auth.Auther
+}
+
+func newFirebaseClient(sender firebaseSender, auther auth.Auther) *firebaseClient {
+	return &firebaseClient{
+		sender: sender,
+		auther: auther,
+	}
+}
+
+func (c *firebaseClient) Send(v *visitor, m *message) error {
+	if err := v.FirebaseAllowed(); err != nil {
+		return errFirebaseTemporarilyBanned
+	}
+	fbm, err := toFirebaseMessage(m, c.auther)
+	if err != nil {
+		return err
+	}
+	if log.IsTrace() {
+		log.Trace("%s Firebase message: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(fbm))
+	}
+	err = c.sender.Send(fbm)
+	if err == errFirebaseQuotaExceeded {
+		log.Warn("%s Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor", logMessagePrefix(v, m))
+		v.FirebaseTemporarilyDeny()
+	}
+	return err
+}
+
+// firebaseSender is an interface that represents a client that can send to Firebase Cloud Messaging.
+// In tests, this can be implemented with a mock.
+type firebaseSender interface {
+	// Send sends a message to Firebase, or returns an error. It returns errFirebaseQuotaExceeded
+	// if a rate limit has reached.
+	Send(m *messaging.Message) error
+}
+
+// firebaseSenderImpl is a firebaseSender that actually talks to Firebase
+type firebaseSenderImpl struct {
+	client *messaging.Client
+}
+
+func newFirebaseSender(credentialsFile string) (*firebaseSenderImpl, error) {
 	fb, err := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(credentialsFile))
 	if err != nil {
 		return nil, err
 	}
-	msg, err := fb.Messaging(context.Background())
+	client, err := fb.Messaging(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	return func(m *message) error {
-		fbm, err := toFirebaseMessage(m, auther)
-		if err != nil {
-			return err
-		}
-		_, err = msg.Send(context.Background(), fbm)
-		return err
+	return &firebaseSenderImpl{
+		client: client,
 	}, nil
+}
+
+func (c *firebaseSenderImpl) Send(m *messaging.Message) error {
+	_, err := c.client.Send(context.Background(), m)
+	if err != nil && messaging.IsQuotaExceeded(err) {
+		return errFirebaseQuotaExceeded
+	}
+	return err
 }
 
 // toFirebaseMessage converts a message to a Firebase message.

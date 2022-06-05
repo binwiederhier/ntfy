@@ -11,7 +11,7 @@ import (
 
 // initConfigFileInputSourceFunc is like altsrc.InitInputSourceWithContext and altsrc.NewYamlSourceFromFlagFunc, but checks
 // if the config flag is exists and only loads it if it does. If the flag is set and the file exists, it fails.
-func initConfigFileInputSourceFunc(configFlag string, flags []cli.Flag) cli.BeforeFunc {
+func initConfigFileInputSourceFunc(configFlag string, flags []cli.Flag, next cli.BeforeFunc) cli.BeforeFunc {
 	return func(context *cli.Context) error {
 		configFile := context.String(configFlag)
 		if context.IsSet(configFlag) && !util.FileExists(configFile) {
@@ -23,7 +23,15 @@ func initConfigFileInputSourceFunc(configFlag string, flags []cli.Flag) cli.Befo
 		if err != nil {
 			return err
 		}
-		return altsrc.ApplyInputSourceValues(context, inputSource, flags)
+		if err := altsrc.ApplyInputSourceValues(context, inputSource, flags); err != nil {
+			return err
+		}
+		if next != nil {
+			if err := next(context); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }
 

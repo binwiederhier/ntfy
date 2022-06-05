@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gabriel-vasile/mimetype"
@@ -263,4 +264,17 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 // BasicAuth encodes the Authorization header value for basic auth
 func BasicAuth(user, pass string) string {
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, pass))))
+}
+
+// MaybeMarshalJSON returns a JSON string of the given object, or "<cannot serialize>" if serialization failed.
+// This is useful for logging purposes where a failure doesn't matter that much.
+func MaybeMarshalJSON(v interface{}) string {
+	jsonBytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "<cannot serialize>"
+	}
+	if len(jsonBytes) > 5000 {
+		return string(jsonBytes)[:5000]
+	}
+	return string(jsonBytes)
 }

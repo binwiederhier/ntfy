@@ -1,9 +1,12 @@
-name: test
-on: [push, pull_request]
+name: release
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
-  test:
+  release:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       -
         name: Install Go
         uses: actions/setup-go@v2
@@ -29,20 +32,19 @@ jobs:
           key: ${{ runner.os }}-ntfy-${{ hashFiles('**/go.sum', '**/package.lock') }}
           restore-keys: ${{ runner.os }}-ntfy-
       -
+        name: Docker login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      -
         name: Install dependencies
         run: make build-deps-ubuntu
       -
-        name: Build docs (required for tests)
-        run: make docs
+        name: Build and publish
+        run: make release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       -
-        name: Build web app (required for tests)
-        run: make web
-      -
-        name: Run tests, formatting, vetting and linting
-        run: make check
-      -
-        name: Run coverage
-        run: make coverage
-      -
-        name: Upload coverage to codecov.io
-        run: make coverage-upload
+        name: Print build results and checksums
+        run: make cli-build-results

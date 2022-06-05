@@ -7,13 +7,11 @@ import (
 	"embed"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"io"
-	"log"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"path"
@@ -34,22 +32,22 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config       *Config
-	httpServer   *http.Server
-	httpsServer  *http.Server
-	unixListener net.Listener
-	smtpServer   *smtp.Server
-	smtpBackend  *smtpBackend
-	topics       map[string]*topic
-	visitors     map[string]*visitor
-	firebase     subscriber
-	mailer       mailer
-	messages     int64
-	auth         auth.Auther
-	messageCache *messageCache
-	fileCache    *fileCache
-	closeChan    chan bool
-	mu           sync.Mutex
+	config            *Config
+	httpServer        *http.Server
+	httpsServer       *http.Server
+	unixListener      net.Listener
+	smtpServer        *smtp.Server
+	smtpServerBackend *smtpBackend
+	smtpSender        mailer
+	topics            map[string]*topic
+	visitors          map[string]*visitor
+	firebaseClient    *firebaseClient
+	messages          int64
+	auth              auth.Auther
+	messageCache      *messageCache
+	fileCache         *fileCache
+	closeChan         chan bool
+	mu                sync.Mutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -136,23 +134,23 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var firebaseSubscriber subscriber
+	var firebaseClient *firebaseClient
 	if conf.FirebaseKeyFile != "" {
-		var err error
-		firebaseSubscriber, err = createFirebaseSubscriber(conf.FirebaseKeyFile, auther)
+		sender, err := newFirebaseSender(conf.FirebaseKeyFile)
 		if err != nil {
 			return nil, err
 		}
+		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	return &Server{
-		config:       conf,
-		messageCache: messageCache,
-		fileCache:    fileCache,
-		firebase:     firebaseSubscriber,
-		mailer:       mailer,
-		topics:       topics,
-		auth:         auther,
-		visitors:     make(map[string]*visitor),
+		config:         conf,
+		messageCache:   messageCache,
+		fileCache:      fileCache,
+		firebaseClient: firebaseClient,
+		smtpSender:     mailer,
+		topics:         topics,
+		auth:           auther,
+		visitors:       make(map[string]*visitor),
 	}, nil
 }
 
@@ -181,7 +179,7 @@ func (s *Server) Run() error {
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
-	log.Printf("Listening on%s", listenStr)
+	log.Info("Listening on%s, log level is %s", listenStr, log.CurrentLevel().String())
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
@@ -221,7 +219,7 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
-	go s.runAtSender()
+	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
 	return <-errChan
@@ -248,16 +246,27 @@ func (s *Server) Stop() {
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	v := s.visitor(r)
+	log.Debug("%s Dispatching request", logHTTPPrefix(v, r))
 	if err := s.handleInternal(w, r, v); err != nil {
 		if websocket.IsWebSocketUpgrade(r) {
-			log.Printf("[%s] WS %s %s - %s", v.ip, r.Method, r.URL.Path, err.Error())
+			isNormalError := strings.Contains(err.Error(), "i/o timeout")
+			if isNormalError {
+				log.Debug("%s WebSocket error (this error is okay, it happens a lot): %s", logHTTPPrefix(v, r), err.Error())
+			} else {
+				log.Info("%s WebSocket error: %s", logHTTPPrefix(v, r), err.Error())
+			}
 			return // Do not attempt to write to upgraded connection
 		}
 		httpErr, ok := err.(*errHTTP)
 		if !ok {
 			httpErr = errHTTPInternalError
 		}
-		log.Printf("[%s] HTTP %s %s - %d - %d - %s", v.ip, r.Method, r.URL.Path, httpErr.HTTPCode, httpErr.Code, err.Error())
+		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest
+		if isNormalError {
+			log.Debug("%s Connection closed with HTTP %d (ntfy error %d): %s", logHTTPPrefix(v, r), httpErr.HTTPCode, httpErr.Code, err.Error())
+		} else {
+			log.Info("%s Connection closed with HTTP %d (ntfy error %d): %s", logHTTPPrefix(v, r), httpErr.HTTPCode, httpErr.Code, err.Error())
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 		w.WriteHeader(httpErr.HTTPCode)
@@ -434,19 +443,26 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
+	log.Debug("%s Received message: event=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
+		logMessagePrefix(v, m), m.Event, len(m.Message), delayed, firebase, cache, unifiedpush, email)
+	if log.IsTrace() {
+		log.Trace("%s Message body: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(m))
+	}
 	if !delayed {
-		if err := t.Publish(m); err != nil {
+		if err := t.Publish(v, m); err != nil {
 			return err
 		}
-	}
-	if s.firebase != nil && firebase && !delayed {
-		go s.sendToFirebase(v, m)
-	}
-	if s.mailer != nil && email != "" && !delayed {
-		go s.sendEmail(v, m, email)
-	}
-	if s.config.UpstreamBaseURL != "" {
-		go s.forwardPollRequest(v, m)
+		if s.firebaseClient != nil && firebase {
+			go s.sendToFirebase(v, m)
+		}
+		if s.smtpSender != nil && email != "" {
+			go s.sendEmail(v, m, email)
+		}
+		if s.config.UpstreamBaseURL != "" {
+			go s.forwardPollRequest(v, m)
+		}
+	} else {
+		log.Debug("%s Message delayed, will process later", logMessagePrefix(v, m))
 	}
 	if cache {
 		if err := s.messageCache.AddMessage(m); err != nil {
@@ -465,14 +481,20 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
-	if err := s.firebase(m); err != nil {
-		log.Printf("[%s] FB - Unable to publish to Firebase: %v", v.ip, err.Error())
+	log.Debug("%s Publishing to Firebase", logMessagePrefix(v, m))
+	if err := s.firebaseClient.Send(v, m); err != nil {
+		if err == errFirebaseTemporarilyBanned {
+			log.Debug("%s Unable to publish to Firebase: %v", logMessagePrefix(v, m), err.Error())
+		} else {
+			log.Warn("%s Unable to publish to Firebase: %v", logMessagePrefix(v, m), err.Error())
+		}
 	}
 }
 
 func (s *Server) sendEmail(v *visitor, m *message, email string) {
-	if err := s.mailer.Send(v.ip, email, m); err != nil {
-		log.Printf("[%s] MAIL - Unable to send email: %v", v.ip, err.Error())
+	log.Debug("%s Sending email to %s", logMessagePrefix(v, m), email)
+	if err := s.smtpSender.Send(v, m, email); err != nil {
+		log.Warn("%s Unable to send email to %s: %v", logMessagePrefix(v, m), email, err.Error())
 	}
 }
 
@@ -480,18 +502,22 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
 	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
 	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
+	log.Debug("%s Publishing poll request to %s", logMessagePrefix(v, m), forwardURL)
 	req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
 	if err != nil {
-		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		log.Warn("%s Unable to publish poll request: %v", logMessagePrefix(v, m), err.Error())
 		return
 	}
 	req.Header.Set("X-Poll-ID", m.ID)
-	response, err := http.DefaultClient.Do(req)
+	var httpClient = &http.Client{
+		Timeout: time.Second * 10,
+	}
+	response, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("[%s] FWD - Unable to forward poll request: %v", v.ip, err.Error())
+		log.Warn("%s Unable to publish poll request: %v", logMessagePrefix(v, m), err.Error())
 		return
 	} else if response.StatusCode != http.StatusOK {
-		log.Printf("[%s] FWD - Unable to forward poll request, unexpected status: %d", v.ip, response.StatusCode)
+		log.Warn("%s Unable to publish poll request, unexpected HTTP status: %d", logMessagePrefix(v, m), response.StatusCode)
 		return
 	}
 }
@@ -533,7 +559,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPTooManyRequestsLimitEmails
 		}
 	}
-	if s.mailer == nil && email != "" {
+	if s.smtpSender == nil && email != "" {
 		return false, false, "", false, errHTTPBadRequestEmailDisabled
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
@@ -568,6 +594,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
+		m.Sender = v.ip // Important for rate limiting
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
@@ -606,7 +633,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 //    If file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, unifiedpush bool) error {
 	if m.Event == pollRequestEvent { // Case 1
-		return nil
+		return s.handleBodyDiscard(body)
 	} else if unifiedpush {
 		return s.handleBodyAsMessageAutoDetect(m, body) // Case 2
 	} else if m.Attachment != nil && m.Attachment.URL != "" {
@@ -617,6 +644,12 @@ func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body
 		return s.handleBodyAsTextMessage(m, body) // Case 5
 	}
 	return s.handleBodyAsAttachment(r, v, m, body) // Case 6
+}
+
+func (s *Server) handleBodyDiscard(body *util.PeekedReadCloser) error {
+	_, err := io.Copy(io.Discard, body)
+	_ = body.Close()
+	return err
 }
 
 func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedReadCloser) error {
@@ -663,7 +696,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		m.Attachment = &attachment{}
 	}
 	var ext string
-	m.Attachment.Owner = v.ip // Important for attachment rate limiting
+	m.Sender = v.ip // Important for attachment rate limiting
 	m.Attachment.Expires = time.Now().Add(s.config.AttachmentExpiryDuration).Unix()
 	m.Attachment.Type, ext = util.DetectContentType(body.PeekedBytes, m.Attachment.Name)
 	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
@@ -718,6 +751,8 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request, v *v
 }
 
 func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *visitor, contentType string, encoder messageEncoder) error {
+	log.Debug("%s HTTP stream connection opened", logHTTPPrefix(v, r))
+	defer log.Debug("%s HTTP stream connection closed", logHTTPPrefix(v, r))
 	if err := v.SubscriptionAllowed(); err != nil {
 		return errHTTPTooManyRequestsLimitSubscriptions
 	}
@@ -731,7 +766,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	var wlock sync.Mutex
-	sub := func(msg *message) error {
+	sub := func(v *visitor, msg *message) error {
 		if !filters.Pass(msg) {
 			return nil
 		}
@@ -752,7 +787,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	w.Header().Set("Access-Control-Allow-Origin", "*")            // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8") // Android/Volley client needs charset!
 	if poll {
-		return s.sendOldMessages(topics, since, scheduled, sub)
+		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
@@ -763,10 +798,10 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, sub); err != nil {
+	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	for {
@@ -774,8 +809,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		case <-r.Context().Done():
 			return nil
 		case <-time.After(s.config.KeepaliveInterval):
+			log.Trace("%s Sending keepalive message", logHTTPPrefix(v, r))
 			v.Keepalive()
-			if err := sub(newKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
+			if err := sub(v, newKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
 		}
@@ -790,6 +826,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return errHTTPTooManyRequestsLimitSubscriptions
 	}
 	defer v.RemoveSubscription()
+	log.Debug("%s WebSocket connection opened", logHTTPPrefix(v, r))
+	defer log.Debug("%s WebSocket connection closed", logHTTPPrefix(v, r))
 	topics, topicsStr, err := s.topicsFromPath(r.URL.Path)
 	if err != nil {
 		return err
@@ -819,6 +857,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			return err
 		}
 		conn.SetPongHandler(func(appData string) error {
+			log.Trace("%s Received WebSocket pong", logHTTPPrefix(v, r))
 			return conn.SetReadDeadline(time.Now().Add(pongWait))
 		})
 		for {
@@ -835,6 +874,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			if err := conn.SetWriteDeadline(time.Now().Add(wsWriteWait)); err != nil {
 				return err
 			}
+			log.Trace("%s Sending WebSocket ping", logHTTPPrefix(v, r))
 			return conn.WriteMessage(websocket.PingMessage, nil)
 		}
 		for {
@@ -849,7 +889,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			}
 		}
 	})
-	sub := func(msg *message) error {
+	sub := func(v *visitor, msg *message) error {
 		if !filters.Pass(msg) {
 			return nil
 		}
@@ -862,7 +902,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if poll {
-		return s.sendOldMessages(topics, since, scheduled, sub)
+		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
@@ -873,15 +913,16 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, sub); err != nil {
+	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	err = g.Wait()
-	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		return nil // Normal closures are not errors
+	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+		log.Trace("%s WebSocket connection closed: %s", logHTTPPrefix(v, r), err.Error())
+		return nil // Normal closures are not errors; note: "1006 (abnormal closure)" is treated as normal, because people disconnect a lot
 	}
 	return err
 }
@@ -900,7 +941,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	return
 }
 
-func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, sub subscriber) error {
+func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
@@ -910,7 +951,7 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled b
 			return err
 		}
 		for _, m := range messages {
-			if err := sub(m); err != nil {
+			if err := sub(v, m); err != nil {
 				return err
 			}
 		}
@@ -1004,28 +1045,36 @@ func (s *Server) updateStatsAndPrune() {
 	defer s.mu.Unlock()
 
 	// Expire visitors from rate visitors map
+	staleVisitors := 0
 	for ip, v := range s.visitors {
 		if v.Stale() {
+			log.Debug("Deleting stale visitor %s", v.ip)
 			delete(s.visitors, ip)
+			staleVisitors++
 		}
 	}
+	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired attachments
 	if s.fileCache != nil {
 		ids, err := s.messageCache.AttachmentsExpired()
-		if err == nil {
+		if err != nil {
+			log.Warn("Error retrieving expired attachments: %s", err.Error())
+		} else if len(ids) > 0 {
+			log.Debug("Manager: Deleting expired attachments: %v", ids)
 			if err := s.fileCache.Remove(ids...); err != nil {
-				log.Printf("error while deleting attachments: %s", err.Error())
+				log.Warn("Error deleting attachments: %s", err.Error())
 			}
 		} else {
-			log.Printf("error retrieving expired attachments: %s", err.Error())
+			log.Debug("Manager: No expired attachments to delete")
 		}
 	}
 
 	// Prune message cache
 	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
+	log.Debug("Manager: Pruning messages older than %s", olderThan.Format("2006-01-02 15:04:05"))
 	if err := s.messageCache.Prune(olderThan); err != nil {
-		log.Printf("error pruning cache: %s", err.Error())
+		log.Warn("Manager: Error pruning cache: %s", err.Error())
 	}
 
 	// Prune old topics, remove subscriptions without subscribers
@@ -1034,7 +1083,7 @@ func (s *Server) updateStatsAndPrune() {
 		subs := t.Subscribers()
 		msgs, err := s.messageCache.MessageCount(t.ID)
 		if err != nil {
-			log.Printf("cannot get stats for topic %s: %s", t.ID, err.Error())
+			log.Warn("Manager: Cannot get stats for topic %s: %s", t.ID, err.Error())
 			continue
 		}
 		if msgs == 0 && subs == 0 {
@@ -1046,35 +1095,25 @@ func (s *Server) updateStatsAndPrune() {
 	}
 
 	// Mail stats
-	var mailSuccess, mailFailure int64
-	if s.smtpBackend != nil {
-		mailSuccess, mailFailure = s.smtpBackend.Counts()
+	var receivedMailTotal, receivedMailSuccess, receivedMailFailure int64
+	if s.smtpServerBackend != nil {
+		receivedMailTotal, receivedMailSuccess, receivedMailFailure = s.smtpServerBackend.Counts()
+	}
+	var sentMailTotal, sentMailSuccess, sentMailFailure int64
+	if s.smtpSender != nil {
+		sentMailTotal, sentMailSuccess, sentMailFailure = s.smtpSender.Counts()
 	}
 
 	// Print stats
-	log.Printf("Stats: %d message(s) published, %d in cache, %d successful mails, %d failed, %d topic(s) active, %d subscriber(s), %d visitor(s)",
-		s.messages, messages, mailSuccess, mailFailure, len(s.topics), subscribers, len(s.visitors))
+	log.Info("Stats: %d messages published, %d in cache, %d topic(s) active, %d subscriber(s), %d visitor(s), %d mails received (%d successful, %d failed), %d mails sent (%d successful, %d failed)",
+		s.messages, messages, len(s.topics), subscribers, len(s.visitors),
+		receivedMailTotal, receivedMailSuccess, receivedMailFailure,
+		sentMailTotal, sentMailSuccess, sentMailFailure)
 }
 
 func (s *Server) runSMTPServer() error {
-	sub := func(m *message) error {
-		url := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
-		req, err := http.NewRequest("PUT", url, strings.NewReader(m.Message))
-		if err != nil {
-			return err
-		}
-		if m.Title != "" {
-			req.Header.Set("Title", m.Title)
-		}
-		rr := httptest.NewRecorder()
-		s.handle(rr, req)
-		if rr.Code != http.StatusOK {
-			return errors.New("error: " + rr.Body.String())
-		}
-		return nil
-	}
-	s.smtpBackend = newMailBackend(s.config, sub)
-	s.smtpServer = smtp.NewServer(s.smtpBackend)
+	s.smtpServerBackend = newMailBackend(s.config, s.handle)
+	s.smtpServer = smtp.NewServer(s.smtpServerBackend)
 	s.smtpServer.Addr = s.config.SMTPServerListen
 	s.smtpServer.Domain = s.config.SMTPServerDomain
 	s.smtpServer.ReadTimeout = 10 * time.Second
@@ -1096,32 +1135,29 @@ func (s *Server) runManager() {
 	}
 }
 
-func (s *Server) runAtSender() {
+func (s *Server) runFirebaseKeepaliver() {
+	if s.firebaseClient == nil {
+		return
+	}
+	v := newVisitor(s.config, s.messageCache, "0.0.0.0") // Background process, not a real visitor
 	for {
 		select {
-		case <-time.After(s.config.AtSenderInterval):
-			if err := s.sendDelayedMessages(); err != nil {
-				log.Printf("error sending scheduled messages: %s", err.Error())
-			}
+		case <-time.After(s.config.FirebaseKeepaliveInterval):
+			s.sendToFirebase(v, newKeepaliveMessage(firebaseControlTopic))
+		case <-time.After(s.config.FirebasePollInterval):
+			s.sendToFirebase(v, newKeepaliveMessage(firebasePollTopic))
 		case <-s.closeChan:
 			return
 		}
 	}
 }
 
-func (s *Server) runFirebaseKeepaliver() {
-	if s.firebase == nil {
-		return
-	}
+func (s *Server) runDelayedSender() {
 	for {
 		select {
-		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			if err := s.firebase(newKeepaliveMessage(firebaseControlTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebaseControlTopic, err.Error())
-			}
-		case <-time.After(s.config.FirebasePollInterval):
-			if err := s.firebase(newKeepaliveMessage(firebasePollTopic)); err != nil {
-				log.Printf("error sending Firebase keepalive message to %s: %s", firebasePollTopic, err.Error())
+		case <-time.After(s.config.DelayedSenderInterval):
+			if err := s.sendDelayedMessages(); err != nil {
+				log.Warn("Error sending delayed messages: %s", err.Error())
 			}
 		case <-s.closeChan:
 			return
@@ -1130,27 +1166,40 @@ func (s *Server) runFirebaseKeepaliver() {
 }
 
 func (s *Server) sendDelayedMessages() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	messages, err := s.messageCache.MessagesDue()
 	if err != nil {
 		return err
 	}
 	for _, m := range messages {
-		t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
-		if ok {
-			if err := t.Publish(m); err != nil {
-				log.Printf("unable to publish message %s to topic %s: %v", m.ID, m.Topic, err.Error())
+		v := s.visitorFromIP(m.Sender)
+		if err := s.sendDelayedMessage(v, m); err != nil {
+			log.Warn("%s Error sending delayed message: %s", logMessagePrefix(v, m), err.Error())
+		}
+	}
+	return nil
+}
+
+func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	log.Debug("%s Sending delayed message", logMessagePrefix(v, m))
+	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
+	if ok {
+		go func() {
+			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler
+			if err := t.Publish(v, m); err != nil {
+				log.Warn("%s Unable to publish message: %v", logMessagePrefix(v, m), err.Error())
 			}
-		}
-		if s.firebase != nil { // Firebase subscribers may not show up in topics map
-			if err := s.firebase(m); err != nil {
-				log.Printf("unable to publish to Firebase: %v", err.Error())
-			}
-		}
-		if err := s.messageCache.MarkPublished(m); err != nil {
-			return err
-		}
+		}()
+	}
+	if s.firebaseClient != nil { // Firebase subscribers may not show up in topics map
+		go s.sendToFirebase(v, m)
+	}
+	if s.config.UpstreamBaseURL != "" {
+		go s.forwardPollRequest(v, m)
+	}
+	if err := s.messageCache.MarkPublished(m); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1252,13 +1301,13 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		username, password, ok := extractUserPass(r)
 		if ok {
 			if user, err = s.auth.Authenticate(username, password); err != nil {
-				log.Printf("authentication failed: %s", err.Error())
+				log.Info("authentication failed: %s", err.Error())
 				return errHTTPUnauthorized
 			}
 		}
 		for _, t := range topics {
 			if err := s.auth.Authorize(user, t.ID, perm); err != nil {
-				log.Printf("unauthorized: %s", err.Error())
+				log.Info("unauthorized: %s", err.Error())
 				return errHTTPForbidden
 			}
 		}
@@ -1290,8 +1339,6 @@ func extractUserPass(r *http.Request) (username string, password string, ok bool
 // visitor creates or retrieves a rate.Limiter for the given visitor.
 // This function was taken from https://www.alexedwards.net/blog/how-to-rate-limit-http-requests (MIT).
 func (s *Server) visitor(r *http.Request) *visitor {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	remoteAddr := r.RemoteAddr
 	ip, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
@@ -1300,6 +1347,12 @@ func (s *Server) visitor(r *http.Request) *visitor {
 	if s.config.BehindProxy && r.Header.Get("X-Forwarded-For") != "" {
 		ip = r.Header.Get("X-Forwarded-For")
 	}
+	return s.visitorFromIP(ip)
+}
+
+func (s *Server) visitorFromIP(ip string) *visitor {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	v, exists := s.visitors[ip]
 	if !exists {
 		s.visitors[ip] = newVisitor(s.config, s.messageCache, ip)

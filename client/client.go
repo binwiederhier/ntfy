@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -102,6 +102,7 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
 			return nil, err
 		}
 	}
+	log.Debug("%s Publishing message with headers %s", util.ShortTopicURL(topicURL), req.Header)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -136,6 +137,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 	msgChan := make(chan *Message)
 	errChan := make(chan error)
 	topicURL := c.expandTopicURL(topic)
+	log.Debug("%s Polling from topic", util.ShortTopicURL(topicURL))
 	options = append(options, WithPoll())
 	go func() {
 		err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
@@ -171,6 +173,7 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	defer c.mu.Unlock()
 	subscriptionID := util.RandomString(10)
 	topicURL := c.expandTopicURL(topic)
+	log.Debug("%s Subscribing to topic", util.ShortTopicURL(topicURL))
 	ctx, cancel := context.WithCancel(context.Background())
 	c.subscriptions[subscriptionID] = &subscription{
 		ID:       subscriptionID,
@@ -226,11 +229,11 @@ func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicUR
 		// TODO The retry logic is crude and may lose messages. It should record the last message like the
 		//      Android client, use since=, and do incremental backoff too
 		if err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, options...); err != nil {
-			log.Printf("Connection to %s failed: %s", topicURL, err.Error())
+			log.Warn("%s Connection failed: %s", util.ShortTopicURL(topicURL), err.Error())
 		}
 		select {
 		case <-ctx.Done():
-			log.Printf("Connection to %s exited", topicURL)
+			log.Info("%s Connection exited", util.ShortTopicURL(topicURL))
 			return
 		case <-time.After(10 * time.Second): // TODO Add incremental backoff
 		}
@@ -238,7 +241,9 @@ func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicUR
 }
 
 func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, options ...SubscribeOption) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/json", topicURL), nil)
+	streamURL := fmt.Sprintf("%s/json", topicURL)
+	log.Debug("%s Listening to %s", util.ShortTopicURL(topicURL), streamURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
 	if err != nil {
 		return err
 	}
@@ -261,10 +266,12 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
 	}
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
-		m, err := toMessage(scanner.Text(), topicURL, subscriptionID)
+		messageJSON := scanner.Text()
+		m, err := toMessage(messageJSON, topicURL, subscriptionID)
 		if err != nil {
 			return err
 		}
+		log.Trace("%s Message received: %s", util.ShortTopicURL(topicURL), messageJSON)
 		if m.Event == MessageEvent {
 			msgChan <- m
 		}

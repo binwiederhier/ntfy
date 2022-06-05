@@ -33,6 +33,16 @@ too.
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
 
+## Chat
+You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 
+(bridged from Discord), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues), or find more contact information
+[on my website](https://heckel.io/about).
+
+## Announcements / beta testers
+For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
+topic. If you'd like to test the iOS app, join [TestFlight](https://testflight.apple.com/join/P1fFnAm9). For Android betas,
+join Discord/Matrix (I'll eventually make a testing channel in Google Play).
+
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue. To contribute code, check out 
 the [build instructions](https://ntfy.sh/docs/develop/) for the server and the Android app.
@@ -42,11 +52,6 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <a href="https://hosted.weblate.org/engage/ntfy/">
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
-
-## Contact me
-You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 
-(bridged from Discord), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues), or find more contact information
-[on my website](https://heckel.io/about).
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

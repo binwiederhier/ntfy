@@ -157,6 +157,7 @@ universal_binaries:
   -
     id: ntfy_darwin_all
     replace: true
+    name_template: ntfy
 checksum:
   name_template: 'checksums.txt'
 snapshot:

@@ -3,10 +3,15 @@ package server
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/emersion/go-smtp"
+	"heckel.io/ntfy/log"
 	"io"
 	"mime"
 	"mime/multipart"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/mail"
 	"strings"
 	"sync"
@@ -23,49 +28,55 @@ var (
 // smtpBackend implements SMTP server methods.
 type smtpBackend struct {
 	config  *Config
-	sub     subscriber
+	handler func(http.ResponseWriter, *http.Request)
 	success int64
 	failure int64
 	mu      sync.Mutex
 }
 
-func newMailBackend(conf *Config, sub subscriber) *smtpBackend {
+func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Request)) *smtpBackend {
 	return &smtpBackend{
-		config: conf,
-		sub:    sub,
+		config:  conf,
+		handler: handler,
 	}
 }
 
 func (b *smtpBackend) Login(state *smtp.ConnectionState, username, password string) (smtp.Session, error) {
-	return &smtpSession{backend: b}, nil
+	log.Debug("%s Incoming mail, login with user %s", logSMTPPrefix(state), username)
+	return &smtpSession{backend: b, state: state}, nil
 }
 
 func (b *smtpBackend) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	return &smtpSession{backend: b}, nil
+	log.Debug("%s Incoming mail, anonymous login", logSMTPPrefix(state))
+	return &smtpSession{backend: b, state: state}, nil
 }
 
-func (b *smtpBackend) Counts() (success int64, failure int64) {
+func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.success, b.failure
+	return b.success + b.failure, b.success, b.failure
 }
 
 // smtpSession is returned after EHLO.
 type smtpSession struct {
 	backend *smtpBackend
+	state   *smtp.ConnectionState
 	topic   string
 	mu      sync.Mutex
 }
 
 func (s *smtpSession) AuthPlain(username, password string) error {
+	log.Debug("%s AUTH PLAIN (with username %s)", logSMTPPrefix(s.state), username)
 	return nil
 }
 
 func (s *smtpSession) Mail(from string, opts smtp.MailOptions) error {
+	log.Debug("%s MAIL FROM: %s (with options: %#v)", logSMTPPrefix(s.state), from, opts)
 	return nil
 }
 
 func (s *smtpSession) Rcpt(to string) error {
+	log.Debug("%s RCPT TO: %s", logSMTPPrefix(s.state), to)
 	return s.withFailCount(func() error {
 		conf := s.backend.config
 		addressList, err := mail.ParseAddressList(to)
@@ -102,6 +113,11 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+		if log.IsTrace() {
+			log.Trace("%s DATA: %s", logSMTPPrefix(s.state), string(b))
+		} else if log.IsDebug() {
+			log.Debug("%s DATA: %d byte(s)", logSMTPPrefix(s.state), len(b))
+		}
 		msg, err := mail.ReadMessage(bytes.NewReader(b))
 		if err != nil {
 			return err
@@ -128,7 +144,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 			m.Message = m.Title // Flip them, this makes more sense
 			m.Title = ""
 		}
-		if err := s.backend.sub(m); err != nil {
+		if err := s.publishMessage(m); err != nil {
 			return err
 		}
 		s.backend.mu.Lock()
@@ -136,6 +152,33 @@ func (s *smtpSession) Data(r io.Reader) error {
 		s.backend.mu.Unlock()
 		return nil
 	})
+}
+
+func (s *smtpSession) publishMessage(m *message) error {
+	// Extract remote address (for rate limiting)
+	remoteAddr, _, err := net.SplitHostPort(s.state.RemoteAddr.String())
+	if err != nil {
+		remoteAddr = s.state.RemoteAddr.String()
+	}
+
+	// Call HTTP handler with fake HTTP request
+	url := fmt.Sprintf("%s/%s", s.backend.config.BaseURL, m.Topic)
+	req, err := http.NewRequest("POST", url, strings.NewReader(m.Message))
+	req.RequestURI = "/" + m.Topic // just for the logs
+	req.RemoteAddr = remoteAddr    // rate limiting!!
+	req.Header.Set("X-Forwarded-For", remoteAddr)
+	if err != nil {
+		return err
+	}
+	if m.Title != "" {
+		req.Header.Set("Title", m.Title)
+	}
+	rr := httptest.NewRecorder()
+	s.backend.handler(rr, req)
+	if rr.Code != http.StatusOK {
+		return errors.New("error: " + rr.Body.String())
+	}
+	return nil
 }
 
 func (s *smtpSession) Reset() {
@@ -153,6 +196,9 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	s.backend.mu.Lock()
 	defer s.backend.mu.Unlock()
 	if err != nil {
+		// Almost all of these errors are parse errors, and user input errors.
+		// We do not want to spam the log with WARN messages.
+		log.Debug("%s Incoming mail error: %s", logSMTPPrefix(s.state), err.Error())
 		s.backend.failure++
 	}
 	return err

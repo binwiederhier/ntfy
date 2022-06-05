@@ -23,7 +23,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Support for auth and user management ([#277](https://github.com/binwiederhier/ntfy/issues/277))
- 
+* Ability to add default server ([#295](https://github.com/binwiederhier/ntfy/issues/295))
+
 **Bugs:**
 
 * Add validation for selfhosted server URL ([#290](https://github.com/binwiederhier/ntfy/issues/290))

@@ -10,11 +10,23 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
+
 ## ntfy server v1.26.0 (UNRELEASED)
 
 **Features:**
 
 * Windows CLI is now available via [Scoop](https://scoop.sh) ([ScoopInstaller#3594](https://github.com/ScoopInstaller/Main/pull/3594), [#311](https://github.com/binwiederhier/ntfy/pull/311), [#269](https://github.com/binwiederhier/ntfy/issues/269), thanks to [@kzshantonu](https://github.com/kzshantonu))
+
+
+## ntfy iOS app v1.2 (UNRELEASED)
+
+**Features:**
+
+* Support for auth and user management ([#277](https://github.com/binwiederhier/ntfy/issues/277))
+ 
+**Bugs:**
+
+* Add validation for selfhosted server URL ([#290](https://github.com/binwiederhier/ntfy/issues/290))
 
 -->
 

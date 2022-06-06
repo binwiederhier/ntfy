@@ -440,3 +440,6 @@ notify:
 - Set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server URL** and **priority (1-5)**
 - ![Uptime Kuma Setup](static/img/uptimekuma-setup.png)
 - You can now test the notifications and apply them to monitors.
+- ![Uptime Kuma iOS Test](static/img/uptimekuma-ios-test.jpg)
+- ![Uptime Kuma iOS Down](static/img/uptimekuma-ios-down.jpg)
+- ![Uptime Kuma iOS Up](static/img/uptimekuma-ios-up.jpg)

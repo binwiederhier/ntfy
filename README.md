@@ -15,8 +15,7 @@
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
 It's also open source (as you can plainly see) if you want to run your own.
 
-I run a free version of it at **[ntfy.sh](https://ntfy.sh)**, and there's an [open source](https://github.com/binwiederhier/ntfy-android) [Android app](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
-too.
+I run a free version of it at **[ntfy.sh](https://ntfy.sh)**. There's also an [open source Android app](https://github.com/binwiederhier/ntfy-android) (see [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/)), and an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) (see [App Store](https://apps.apple.com/us/app/ntfy/id1625396347)).
 
 <p>
   <img src="web/public/static/img/screenshot-curl.png" height="180">

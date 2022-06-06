@@ -433,3 +433,10 @@ notify:
     message_param_name: message
     resource: https://ntfy.sh
 ```
+
+## Uptime Kuma
+- Go to your [Uptime Kuma](https://github.com/louislam/uptime-kuma) Settings > Notifications, click on **Setup Notification**
+- ![Uptime Kuma Settings](static/img/uptimekuma-settings.png)
+- Set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server URL** and **priority (1-5)**
+- ![Uptime Kuma Setup](static/img/uptimekuma-setup.png)
+- You can now test the notifications and apply them to monitors.

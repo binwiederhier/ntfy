@@ -8,14 +8,14 @@
 [![codecov](https://codecov.io/gh/binwiederhier/ntfy/branch/main/graph/badge.svg?token=A597KQ463G)](https://codecov.io/gh/binwiederhier/ntfy)
 [![Discord](https://img.shields.io/discord/874398661709295626?label=Discord)](https://discord.gg/cT7ECsZj9w)
 [![Matrix](https://img.shields.io/matrix/ntfy:matrix.org?label=Matrix)](https://matrix.to/#/#ntfy:matrix.org)
+[![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
 It's also open source (as you can plainly see) if you want to run your own.
 
-I run a free version of it at **[ntfy.sh](https://ntfy.sh)**, and there's an [open source](https://github.com/binwiederhier/ntfy-android) [Android app](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
-too.
+I run a free version of it at **[ntfy.sh](https://ntfy.sh)**. There's also an [open source Android app](https://github.com/binwiederhier/ntfy-android) (see [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/)), and an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) (see [App Store](https://apps.apple.com/us/app/ntfy/id1625396347)).
 
 <p>
   <img src="web/public/static/img/screenshot-curl.png" height="180">

@@ -16,6 +16,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Windows CLI is now available via [Scoop](https://scoop.sh) ([ScoopInstaller#3594](https://github.com/ScoopInstaller/Main/pull/3594), [#311](https://github.com/binwiederhier/ntfy/pull/311), [#269](https://github.com/binwiederhier/ntfy/issues/269), thanks to [@kzshantonu](https://github.com/kzshantonu))
+* [Uptime Kuma](https://github.com/louislam/uptime-kuma) now allows publishing to ntfy ([uptime-kuma#1674](https://github.com/louislam/uptime-kuma/pull/1674), thanks to [@philippdormann](https://github.com/philippdormann))
+
+**Documentation**
+
+* Added [example](examples.md) for [Uptime Kuma](https://github.com/louislam/uptime-kuma) integration ([#315](https://github.com/binwiederhier/ntfy/pull/315), thanks to [@philippdormann](https://github.com/philippdormann))
 
 
 ## ntfy iOS app v1.2 (UNRELEASED)

@@ -1026,11 +1026,18 @@ func TestServer_PublishAttachment(t *testing.T) {
 	require.Equal(t, "", msg.Sender) // Should never be returned
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
 
+	// GET
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
 	response = request(t, s, "GET", path, "", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "5000", response.Header().Get("Content-Length"))
 	require.Equal(t, content, response.Body.String())
+
+	// HEAD
+	response = request(t, s, "HEAD", path, "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "5000", response.Header().Get("Content-Length"))
+	require.Equal(t, "", response.Body.String())
 
 	// Slightly unrelated cross-test: make sure we add an owner for internal attachments
 	size, err := s.messageCache.AttachmentBytesUsed("9.9.9.9") // See request()

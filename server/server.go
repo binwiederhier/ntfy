@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
 	"io"
 	"net"
 	"net/http"
@@ -22,6 +21,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"heckel.io/ntfy/log"
 
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
@@ -289,7 +290,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
-	} else if r.Method == http.MethodGet && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
+	} else if (r.Method == http.MethodGet || r.Method == http.MethodHead) && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.ensureWebEnabled(s.handleOptions)(w, r, v)
@@ -405,18 +406,23 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	if err != nil {
 		return errHTTPNotFound
 	}
-	if err := v.BandwidthLimiter().Allow(stat.Size()); err != nil {
-		return errHTTPTooManyRequestsAttachmentBandwidthLimit
+	if r.Method == http.MethodGet {
+		if err := v.BandwidthLimiter().Allow(stat.Size()); err != nil {
+			return errHTTPTooManyRequestsAttachmentBandwidthLimit
+		}
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	f, err := os.Open(file)
-	if err != nil {
+	if r.Method == http.MethodGet {
+		f, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
-	return err
+	return nil
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {

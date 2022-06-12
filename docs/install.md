@@ -239,8 +239,8 @@ docker run \
   -p 80:80 \
   -it \
   binwiederhier/ntfy \
-    --cache-file /var/cache/ntfy/cache.db \
-    serve
+    serve \
+    --cache-file /var/cache/ntfy/cache.db
 ```
 
 With other config options, timezone, and non-root user (configured via `/etc/ntfy/server.yml`, see [configuration](config.md) for details):

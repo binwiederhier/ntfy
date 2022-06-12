@@ -25,6 +25,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy iOS app v1.2 (UNRELEASED)
 
+This release adds support for authentication/authorization for self-hosted servers. It also allows you to
+set your server as the default server for new topics.
+
 **Features:**
 
 * Support for auth and user management ([#277](https://github.com/binwiederhier/ntfy/issues/277))

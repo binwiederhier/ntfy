@@ -22,6 +22,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Added [example](examples.md) for [Uptime Kuma](https://github.com/louislam/uptime-kuma) integration ([#315](https://github.com/binwiederhier/ntfy/pull/315), thanks to [@philippdormann](https://github.com/philippdormann))
 * Fix Docker install instructions  ([#320](https://github.com/binwiederhier/ntfy/issues/320), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
+* Add clarifying comments to base-url ([#322](https://github.com/binwiederhier/ntfy/issues/322), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
+
 
 ## ntfy iOS app v1.2 (UNRELEASED)
 

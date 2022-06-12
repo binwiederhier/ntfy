@@ -94,6 +94,7 @@ type Config struct {
 	VisitorEmailLimitReplenish           time.Duration
 	BehindProxy                          bool
 	EnableWeb                            bool
+	Version                              string // injected by App
 }
 
 // NewConfig instantiates a default new server config
@@ -135,5 +136,6 @@ func NewConfig() *Config {
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		BehindProxy:                          false,
 		EnableWeb:                            true,
+		Version:                              "",
 	}
 }

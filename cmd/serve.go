@@ -249,6 +249,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.BehindProxy = behindProxy
 	conf.EnableWeb = enableWeb
+	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

@@ -300,16 +300,16 @@ release-checks:
 # Installing targets
 
 install-linux-amd64: remove-binary
-	sudo cp -a dist/ntfy_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
 
 install-linux-armv6: remove-binary
-	sudo cp -a dist/ntfy_armv6_linux_arm_6/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_armv6_linux_arm_6/ntfy /usr/bin/ntfy
 
 install-linux-armv7: remove-binary
-	sudo cp -a dist/ntfy_armv7_linux_arm_7/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_armv7_linux_arm_7/ntfy /usr/bin/ntfy
 
 install-linux-arm64: remove-binary
-	sudo cp -a dist/ntfy_arm64_linux_arm64/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_arm64_linux_arm64/ntfy /usr/bin/ntfy
 
 remove-binary:
 	sudo rm -f /usr/bin/ntfy

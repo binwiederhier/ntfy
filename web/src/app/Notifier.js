@@ -74,7 +74,21 @@ class Notifier {
     }
 
     supported() {
+        return this.browserSupported() && this.contextSupported();
+    }
+
+    browserSupported() {
         return 'Notification' in window;
+    }
+
+    /**
+     * Returns true if this is a HTTPS site, or served over localhost. Otherwise the Notification API
+     * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification
+     */
+    contextSupported() {
+        return location.protocol === 'https:'
+            || location.hostname.match('^127.')
+            || location.hostname === 'localhost';
     }
 }
 

@@ -11,7 +11,7 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, Badge, CircularProgress, ListSubheader} from "@mui/material";
+import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {openUrl, topicShortUrl, topicUrl} from "../app/utils";
@@ -24,7 +24,7 @@ import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
 import ArticleIcon from '@mui/icons-material/Article';
-import {useTranslation} from "react-i18next";
+import {Trans, useTranslation} from "react-i18next";
 
 const navWidth = 280;
 
@@ -91,14 +91,17 @@ const NavList = (props) => {
     };
 
     const showSubscriptionsList = props.subscriptions?.length > 0;
-    const showNotificationNotSupportedBox = !notifier.supported();
+    const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
+    const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
     const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
+    const navListPadding = (showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox) ? '0' : '';
 
     return (
         <>
             <Toolbar sx={{ display: { xs: 'none', sm: 'block' } }}/>
-            <List component="nav" sx={{ paddingTop: (showNotificationGrantBox || showNotificationNotSupportedBox) ? '0' : '' }}>
-                {showNotificationNotSupportedBox && <NotificationNotSupportedAlert/>}
+            <List component="nav" sx={{ paddingTop: navListPadding }}>
+                {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert/>}
+                {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert/>}
                 {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
                     <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
@@ -211,13 +214,33 @@ const NotificationGrantAlert = (props) => {
     );
 };
 
-const NotificationNotSupportedAlert = () => {
+const NotificationBrowserNotSupportedAlert = () => {
     const { t } = useTranslation();
     return (
         <>
             <Alert severity="warning" sx={{paddingTop: 2}}>
                 <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
                 <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
+            </Alert>
+            <Divider/>
+        </>
+    );
+};
+
+const NotificationContextNotSupportedAlert = () => {
+    const { t } = useTranslation();
+    return (
+        <>
+            <Alert severity="warning" sx={{paddingTop: 2}}>
+                <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+                <Typography gutterBottom>
+                    <Trans
+                        i18nKey="alert_not_supported_context_description"
+                        components={{
+                            mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener"/>
+                        }}
+                    />
+                </Typography>
             </Alert>
             <Divider/>
         </>

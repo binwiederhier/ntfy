@@ -24,6 +24,7 @@
   "alert_grant_button": "Grant now",
   "alert_not_supported_title": "Notifications not supported",
   "alert_not_supported_description": "Notifications are not supported in your browser.",
+  "alert_not_supported_context_description": "Notifications are only supported over HTTPS. This is a limitation of the <mdnLink>Notifications API</mdnLink>.",
   "notifications_list": "Notifications list",
   "notifications_list_item": "Notification",
   "notifications_mark_read": "Mark as read",

@@ -68,6 +68,7 @@ var (
 
 	webConfigPath    = "/config.js"
 	userStatsPath    = "/user/stats"
+	matrixPushPath   = "/_matrix/push/v1/notify"
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -296,6 +297,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleOptions)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
 		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
+		return s.limitRequests(s.transformMatrixJSON(s.authWrite(s.handlePublish)))(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
@@ -1283,6 +1286,51 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 			r.Header.Set("X-Delay", m.Delay)
 		}
 		return next(w, r, v)
+	}
+}
+
+type matrixMessage struct {
+	Notification *matrixNotification `json:"notification"`
+}
+
+type matrixNotification struct {
+	Devices []*matrixDevice `json:"devices"`
+}
+
+type matrixDevice struct {
+	PushKey string `json:"pushkey"`
+}
+
+func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.config.BaseURL == "" {
+			return errHTTPInternalErrorMissingBaseURL
+		}
+		body, err := util.Peek(r.Body, s.config.MessageLimit)
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		var m matrixMessage
+		if err := json.NewDecoder(body).Decode(&m); err != nil {
+			return errHTTPBadRequestMatrixMessageInvalid
+		} else if m.Notification == nil || len(m.Notification.Devices) == 0 {
+			return errHTTPBadRequestMatrixMessageInvalid
+		} else if !strings.HasPrefix(m.Notification.Devices[0].PushKey, s.config.BaseURL+"/") {
+			return errHTTPBadRequestMatrixMessageInvalid
+		}
+		u, err := url.Parse(m.Notification.Devices[0].PushKey)
+		if err != nil {
+			return errHTTPBadRequestMatrixMessageInvalid
+		}
+		r.URL.Path = u.Path
+		r.URL.RawQuery = u.RawQuery
+		r.RequestURI = u.RequestURI()
+		r.Body = io.NopCloser(bytes.NewReader(body.PeekedBytes))
+		if err := next(w, r, v); err != nil {
+			return nil
+		}
+		return nil
 	}
 }
 

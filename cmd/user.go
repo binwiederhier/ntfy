@@ -6,11 +6,12 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
-	"strings"
 )
 
 func init() {
@@ -40,6 +41,7 @@ var cmdUser = &cli.Command{
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
+				&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
 			},
 			Description: `Add a new user to the ntfy user database.
 
@@ -135,14 +137,38 @@ Examples:
 }
 
 func execUserAdd(c *cli.Context) error {
-	username := c.Args().Get(0)
+	var username string
+	var password string
+	userAndPass := c.String("user")
 	role := auth.Role(c.String("role"))
-	if username == "" {
-		return errors.New("username expected, type 'ntfy user add --help' for help")
-	} else if username == userEveryone {
-		return errors.New("username not allowed")
-	} else if !auth.AllowedRole(role) {
-		return errors.New("role must be either 'user' or 'admin'")
+	if userAndPass != "" {
+		parts := strings.SplitN(userAndPass, ":", 2)
+		if len(parts) == 2 {
+			username = parts[0]
+			password = parts[1]
+		} else {
+			p, err := readPasswordAndConfirm(c)
+			if err != nil {
+				return err
+			}
+			username = userAndPass
+			password = p
+		}
+	} else {
+		username = c.Args().Get(0)
+		if username == "" {
+			return errors.New("username expected, type 'ntfy user add --help' for help")
+		} else if username == userEveryone {
+			return errors.New("username not allowed")
+		} else if !auth.AllowedRole(role) {
+			return errors.New("role must be either 'user' or 'admin'")
+		}
+
+		p, err := readPasswordAndConfirm(c)
+		if err != nil {
+			return err
+		}
+		password = p
 	}
 	manager, err := createAuthManager(c)
 	if err != nil {
@@ -150,10 +176,6 @@ func execUserAdd(c *cli.Context) error {
 	}
 	if user, _ := manager.User(username); user != nil {
 		return fmt.Errorf("user %s already exists", username)
-	}
-	password, err := readPasswordAndConfirm(c)
-	if err != nil {
-		return err
 	}
 	if err := manager.AddUser(username, password, role); err != nil {
 		return err

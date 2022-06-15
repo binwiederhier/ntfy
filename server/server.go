@@ -287,6 +287,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
+		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
@@ -428,6 +430,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	return nil
 }
 
+func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
+	return handleMatrixDiscovery(w)
+}
+
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
@@ -498,22 +504,12 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	pushKey := r.Header.Get("X-Matrix-Pushkey")
-	if pushKey == "" {
-		return errHTTPBadRequestMatrixMessageInvalid
-	}
-	response := &matrixResponse{
-		Rejected: make([]string, 0),
-	}
 	_, err := s.handlePublishWithoutResponse(r, v)
 	if err != nil {
-		response.Rejected = append(response.Rejected, pushKey)
+		pushKey := r.Header.Get(matrixPushkeyHeader)
+		return writeMatrixError(w, pushKey, err)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
+	return writeMatrixSuccess(w)
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
@@ -1316,22 +1312,6 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	}
 }
 
-type matrixMessage struct {
-	Notification *matrixNotification `json:"notification"`
-}
-
-type matrixNotification struct {
-	Devices []*matrixDevice `json:"devices"`
-}
-
-type matrixDevice struct {
-	PushKey string `json:"pushkey"`
-}
-
-type matrixResponse struct {
-	Rejected []string `json:"rejected"`
-}
-
 func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.config.BaseURL == "" {
@@ -1350,33 +1330,22 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 		}
 		pushKey := m.Notification.Devices[0].PushKey
 		if !strings.HasPrefix(pushKey, s.config.BaseURL+"/") {
-			return matrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
+			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixPushkeyBaseURLMismatch)
 		}
 		u, err := url.Parse(pushKey)
 		if err != nil {
-			return matrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
+			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
 		}
 		r.URL.Path = u.Path
 		r.URL.RawQuery = u.RawQuery
 		r.RequestURI = u.RequestURI()
 		r.Body = io.NopCloser(bytes.NewReader(body.PeekedBytes))
-		r.Header.Set("X-Matrix-Pushkey", pushKey)
+		r.Header.Set(matrixPushkeyHeader, pushKey)
 		if err := next(w, r, v); err != nil {
-			return matrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
+			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
 		}
 		return nil
 	}
-}
-
-func matrixError(w http.ResponseWriter, pushKey string, err error) error {
-	log.Debug("Matrix message with push key %s rejected: %s", pushKey, err.Error())
-	response := &matrixResponse{
-		Rejected: []string{pushKey},
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *Server) authWrite(next handleFunc) handleFunc {

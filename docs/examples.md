@@ -441,7 +441,6 @@ Then set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server U
     <a href="../../static/img/uptimekuma-setup.png"><img src="../../static/img/uptimekuma-setup.png"/></a>
 </div>
 
-
 You can now test the notifications and apply them to monitors:
 
 <div id="uptimekuma-monitor-screenshots" class="screenshots">

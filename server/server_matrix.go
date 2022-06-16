@@ -130,6 +130,10 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	if err != nil {
 		return nil, &errMatrix{pushKey: pushKey, err: err}
 	}
+	newRequest.RemoteAddr = r.RemoteAddr // Not strictly necessary, since visitor was already extracted
+	if r.Header.Get("X-Forwarded-For") != "" {
+		newRequest.Header.Set("X-Forwarded-For", r.Header.Get("X-Forwarded-For"))
+	}
 	newRequest.Header.Set(matrixPushKeyHeader, pushKey)
 	return newRequest, nil
 }

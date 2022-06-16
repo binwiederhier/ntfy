@@ -949,6 +949,18 @@ func TestServer_MatrixGateway_Push_Failure_EverythingIsWrong(t *testing.T) {
 	require.Equal(t, 400, err.HTTPCode)
 }
 
+func TestServer_MatrixGateway_Push_Failure_Unconfigured(t *testing.T) {
+	c := newTestConfig(t)
+	c.BaseURL = ""
+	s := newTestServer(t, c)
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 500, response.Code)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 50003, err.Code)
+	require.Equal(t, 500, err.HTTPCode)
+}
+
 func TestServer_PublishActions_AndPoll(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{

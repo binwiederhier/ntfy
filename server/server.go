@@ -259,6 +259,10 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 			}
 			return // Do not attempt to write to upgraded connection
 		}
+		if matrixErr, ok := err.(*errMatrix); ok {
+			writeMatrixError(w, r, v, matrixErr)
+			return
+		}
 		httpErr, ok := err.(*errHTTP)
 		if !ok {
 			httpErr = errHTTPInternalError
@@ -506,8 +510,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishWithoutResponse(r, v)
 	if err != nil {
-		pushKey := r.Header.Get(matrixPushkeyHeader)
-		return writeMatrixError(w, pushKey, err)
+		return &errMatrix{pushKey: r.Header.Get(matrixPushKeyHeader), err: err}
 	}
 	return writeMatrixSuccess(w)
 }
@@ -1314,35 +1317,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 
 func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if s.config.BaseURL == "" {
-			return errHTTPInternalErrorMissingBaseURL
-		}
-		body, err := util.Peek(r.Body, s.config.MessageLimit)
+		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
 		if err != nil {
 			return err
 		}
-		defer r.Body.Close()
-		var m matrixMessage
-		if err := json.NewDecoder(body).Decode(&m); err != nil {
-			return errHTTPBadRequestMatrixMessageInvalid
-		} else if m.Notification == nil || len(m.Notification.Devices) == 0 || m.Notification.Devices[0].PushKey == "" {
-			return errHTTPBadRequestMatrixMessageInvalid
-		}
-		pushKey := m.Notification.Devices[0].PushKey
-		if !strings.HasPrefix(pushKey, s.config.BaseURL+"/") {
-			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixPushkeyBaseURLMismatch)
-		}
-		u, err := url.Parse(pushKey)
-		if err != nil {
-			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
-		}
-		r.URL.Path = u.Path
-		r.URL.RawQuery = u.RawQuery
-		r.RequestURI = u.RequestURI()
-		r.Body = io.NopCloser(bytes.NewReader(body.PeekedBytes))
-		r.Header.Set(matrixPushkeyHeader, pushKey)
-		if err := next(w, r, v); err != nil {
-			return writeMatrixError(w, pushKey, errHTTPBadRequestMatrixMessageInvalid)
+		if err := next(w, newRequest, v); err != nil {
+			return &errMatrix{pushKey: newRequest.Header.Get(matrixPushKeyHeader), err: err}
 		}
 		return nil
 	}

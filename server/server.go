@@ -1382,8 +1382,12 @@ func (s *Server) visitor(r *http.Request) *visitor {
 	if err != nil {
 		ip = remoteAddr // This should not happen in real life; only in tests.
 	}
-	if s.config.BehindProxy && r.Header.Get("X-Forwarded-For") != "" {
-		ip = r.Header.Get("X-Forwarded-For")
+	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
+		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
+		// only the right-most address can be trusted (as this is the one added by our proxy server).
+		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
+		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
+		ip = strings.TrimSpace(util.LastString(ips, remoteAddr))
 	}
 	return s.visitorFromIP(ip)
 }

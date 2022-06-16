@@ -23,6 +23,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bugs:**
 
 * Web app: Show "notifications not supported" alert on HTTP ([#323](https://github.com/binwiederhier/ntfy/issues/323), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
+* Use last address in `X-Forwarded-For` header as visitor address ([#328](https://github.com/binwiederhier/ntfy/issues/328))
 
 **Documentation**
 

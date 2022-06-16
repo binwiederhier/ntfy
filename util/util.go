@@ -88,6 +88,14 @@ func SplitKV(s string, sep string) (key string, value string) {
 	return "", strings.TrimSpace(kv[0])
 }
 
+// LastString returns the last string in a slice, or def if s is empty
+func LastString(s []string, def string) string {
+	if len(s) == 0 {
+		return def
+	}
+	return s[len(s)-1]
+}
+
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!

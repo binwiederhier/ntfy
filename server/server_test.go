@@ -1319,6 +1319,39 @@ func TestServer_PublishAttachmentUserStats(t *testing.T) {
 	require.Equal(t, int64(1001), stats.VisitorAttachmentBytesRemaining)
 }
 
+func TestServer_Visitor_XForwardedFor_None(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11"
+	r.Header.Set("X-Forwarded-For", "  ") // Spaces, not empty!
+	v := s.visitor(r)
+	require.Equal(t, "8.9.10.11", v.ip)
+}
+
+func TestServer_Visitor_XForwardedFor_Single(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11"
+	r.Header.Set("X-Forwarded-For", "1.1.1.1")
+	v := s.visitor(r)
+	require.Equal(t, "1.1.1.1", v.ip)
+}
+
+func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4 , 2.4.4.2,234.5.2.1 ")
+	v := s.visitor(r)
+	require.Equal(t, "234.5.2.1", v.ip)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

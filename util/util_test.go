@@ -157,3 +157,8 @@ func TestSplitKV(t *testing.T) {
 	require.Equal(t, "mykey", key)
 	require.Equal(t, "value=with=separator", value)
 }
+
+func TestLastString(t *testing.T) {
+	require.Equal(t, "last", LastString([]string{"first", "second", "last"}, "default"))
+	require.Equal(t, "default", LastString([]string{}, "default"))
+}

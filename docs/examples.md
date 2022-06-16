@@ -437,16 +437,16 @@ Go to your [Uptime Kuma](https://github.com/louislam/uptime-kuma) Settings > Not
 Then set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server URL** and **priority (1-5)**:
 
 <div id="uptimekuma-screenshots" class="screenshots">
-    <a href="../../static/img/uptimekuma-settings.png"><img src="../../static/img/uptimekuma-settings.png"/></a>
-    <a href="../../static/img/uptimekuma-setup.png"><img src="../../static/img/uptimekuma-setup.png"/></a>
+    <a href="../static/img/uptimekuma-settings.png"><img src="../static/img/uptimekuma-settings.png"/></a>
+    <a href="../static/img/uptimekuma-setup.png"><img src="../static/img/uptimekuma-setup.png"/></a>
 </div>
 
 You can now test the notifications and apply them to monitors:
 
 <div id="uptimekuma-monitor-screenshots" class="screenshots">
-    <a href="../../static/img/uptimekuma-ios-test.jpg"><img src="../../static/img/uptimekuma-ios-test.jpg"/></a>
-    <a href="../../static/img/uptimekuma-ios-down.jpg"><img src="../../static/img/uptimekuma-ios-down.jpg"/></a>
-    <a href="../../static/img/uptimekuma-ios-up.jpg"><img src="../../static/img/uptimekuma-ios-up.jpg"/></a>
+    <a href="../static/img/uptimekuma-ios-test.jpg"><img src="../static/img/uptimekuma-ios-test.jpg"/></a>
+    <a href="../static/img/uptimekuma-ios-down.jpg"><img src="../static/img/uptimekuma-ios-down.jpg"/></a>
+    <a href="../static/img/uptimekuma-ios-up.jpg"><img src="../static/img/uptimekuma-ios-up.jpg"/></a>
 </div>
 
 ## Apprise

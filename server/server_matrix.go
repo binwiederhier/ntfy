@@ -113,8 +113,11 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 		return nil, err
 	}
 	defer r.Body.Close()
+	if body.LimitReached {
+		return nil, errHTTPEntityTooLargeMatrixRequestTooLarge
+	}
 	var m matrixRequest
-	if err := json.NewDecoder(body).Decode(&m); err != nil {
+	if err := json.Unmarshal(body.PeekedBytes, &m); err != nil {
 		return nil, errHTTPBadRequestMatrixMessageInvalid
 	} else if m.Notification == nil || len(m.Notification.Devices) == 0 || m.Notification.Devices[0].PushKey == "" {
 		return nil, errHTTPBadRequestMatrixMessageInvalid

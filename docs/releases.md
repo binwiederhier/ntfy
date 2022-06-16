@@ -2,6 +2,15 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+<!--
+
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+
+
 ## ntfy server v1.26.0 (UNRELEASED)
 
 **Features:**
@@ -21,15 +30,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Fix Docker install instructions  ([#320](https://github.com/binwiederhier/ntfy/issues/320), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 * Add clarifying comments to base-url ([#322](https://github.com/binwiederhier/ntfy/issues/322), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 * Update FAQ for iOS app ([#321](https://github.com/binwiederhier/ntfy/issues/321), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
-
-
-<!--
-
-## ntfy Android app v1.14.0 (UNRELEASED)
-
-**Additional translations:**
-
-* Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
 
 ## ntfy iOS app v1.2 (UNRELEASED)

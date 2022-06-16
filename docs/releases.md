@@ -10,8 +10,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 
+-->
 
-## ntfy server v1.26.0 (UNRELEASED)
+## ntfy server v1.26.0
+Released June 16, 2022
+
+This release adds a Matrix Push Gateway directly into ntfy, to make self-hosting a Matrix server easier. The Windows
+CLI is now available via Scoop, and ntfy is now natively supported in Uptime Kuma. 
 
 **Features:**
 
@@ -33,7 +38,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Update FAQ for iOS app ([#321](https://github.com/binwiederhier/ntfy/issues/321), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 
 
-## ntfy iOS app v1.2 (UNRELEASED)
+## ntfy iOS app v1.2
+Released June 16, 2022
 
 This release adds support for authentication/authorization for self-hosted servers. It also allows you to
 set your server as the default server for new topics.
@@ -46,8 +52,6 @@ set your server as the default server for new topics.
 **Bugs:**
 
 * Add validation for selfhosted server URL ([#290](https://github.com/binwiederhier/ntfy/issues/290))
-
--->
 
 ## ntfy server v1.25.2
 Released June 2, 2022

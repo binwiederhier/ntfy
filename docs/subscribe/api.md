@@ -87,7 +87,7 @@ recommended way to subscribe to a topic**. The notable exception is JavaScript, 
 ### Subscribe as SSE stream
 Using [EventSource](https://developer.mozilla.org/en-US/docs/Web/API/EventSource) in JavaScript, you can consume
 notifications via a [Server-Sent Events (SSE)](https://en.wikipedia.org/wiki/Server-sent_events) stream. It's incredibly 
-easy to use. Here's what it looks like. You may also want to check out the [live example](/example.html).
+easy to use. Here's what it looks like. You may also want to check out the [full example on GitHub](https://github.com/binwiederhier/ntfy/tree/main/examples/web-example-eventsource).
 
 === "Command line (curl)"
     ```

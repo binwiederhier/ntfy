@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -171,10 +172,6 @@ func TestServer_StaticSites(t *testing.T) {
 	require.Equal(t, 301, rr.Code)
 
 	// Docs test removed, it was failing annoyingly.
-
-	rr = request(t, s, "GET", "/example.html", "", nil)
-	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), "</html>")
 }
 
 func TestServer_WebEnabled(t *testing.T) {
@@ -183,9 +180,6 @@ func TestServer_WebEnabled(t *testing.T) {
 	s := newTestServer(t, conf)
 
 	rr := request(t, s, "GET", "/", "", nil)
-	require.Equal(t, 404, rr.Code)
-
-	rr = request(t, s, "GET", "/example.html", "", nil)
 	require.Equal(t, 404, rr.Code)
 
 	rr = request(t, s, "GET", "/config.js", "", nil)
@@ -199,9 +193,6 @@ func TestServer_WebEnabled(t *testing.T) {
 	s2 := newTestServer(t, conf2)
 
 	rr = request(t, s2, "GET", "/", "", nil)
-	require.Equal(t, 200, rr.Code)
-
-	rr = request(t, s2, "GET", "/example.html", "", nil)
 	require.Equal(t, 200, rr.Code)
 
 	rr = request(t, s2, "GET", "/config.js", "", nil)
@@ -1389,4 +1380,12 @@ func toHTTPError(t *testing.T, s string) *errHTTP {
 
 func basicAuth(s string) string {
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(s)))
+}
+
+func readAll(t *testing.T, rc io.ReadCloser) string {
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

@@ -9,7 +9,9 @@ those out, too.
     [create a pull request](https://github.com/binwiederhier/ntfy/pulls), and I'll happily include it. Also note, that
     I cannot guarantee that all of these examples are functional. Many of them I have not tried myself.
 
-## A long process is done: backups, copying data, pipelines, ...
+## Cronjobs
+ntfy is perfect for any kind of cronjobs or just when long processes are done (backups, pipelines, rsync copy commands, ...).
+
 I started adding notifications pretty much all of my scripts. Typically, I just chain the <tt>curl</tt> call
 directly to the command I'm running. The following example will either send <i>Laptop backup succeeded</i>
 or ⚠️ <i>Laptop backup failed</i> directly to my phone:
@@ -20,6 +22,15 @@ rsync -a root@laptop /backups/laptop \
   && curl -H prio:low -d "Laptop backup succeeded" ntfy.sh/backups \
   || curl -H tags:warning -H prio:high -d "Laptop backup failed" ntfy.sh/backups
 ```
+
+Here's one for the history books. I desperately want the `github.com/ntfy` organization, but all my tickets with
+GitHub have been hopeless. In case it ever becomes available, I want to know immediately.
+
+``` cron
+# Check github/ntfy user
+*/6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
+```
+
 
 ## Low disk space alerts
 Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but 
@@ -42,11 +53,7 @@ if [ -n "$avail" ]; then
 fi
 ```
 
-## Server-sent messages in your web app
-Just as you can [subscribe to topics in the Web UI](subscribe/web.md), you can use ntfy in your own
-web application. Check out the <a href="/example.html">live example</a>.
-
-## Notify on SSH login
+## SSH login alerts
 Years ago my home server was broken into. That shook me hard, so every time someone logs into any machine that I
 own, I now message myself. Here's an example of how to use <a href="https://en.wikipedia.org/wiki/Linux_PAM">PAM</a>
 to notify yourself on SSH login.
@@ -102,7 +109,7 @@ One of my co-workers uses the following Ansible task to let him know when things
     body: "{{ inventory_hostname }} reseeding complete"
 ```
 
-## Watchtower notifications (shoutrrr)
+## Watchtower (shoutrrr)
 You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send 
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
 
@@ -121,16 +128,7 @@ Or, if you only want to send notifications using shoutrrr:
 shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
 ```
 
-## Random cronjobs
-Alright, here's one for the history books. I desperately want the `github.com/ntfy` organization, but all my tickets with
-GitHub have been hopeless. In case it ever becomes available, I want to know immediately.
-
-``` cron
-# Check github/ntfy user
-*/6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
-```
-
-## Download notifications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd)
+## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd
 It's possible to use custom scripts for all the *arr services, plus SABnzbd. Notifications for downloads, warnings, grabs etc.
 Some simple bash scripts to achieve this are kindly provided in [nickexyz's repository](https://github.com/nickexyz/ntfy-shellscripts). 
 
@@ -343,7 +341,7 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
 
 ![Node red picture flow](static/img/nodered-picture.png)
 
-## Gatus service health check
+## Gatus
 
 An example for a custom alert with [Gatus](https://github.com/TwiN/gatus):
 ``` yaml
@@ -435,11 +433,38 @@ notify:
 ```
 
 ## Uptime Kuma
-- Go to your [Uptime Kuma](https://github.com/louislam/uptime-kuma) Settings > Notifications, click on **Setup Notification**
-- ![Uptime Kuma Settings](static/img/uptimekuma-settings.png)
-- Set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server URL** and **priority (1-5)**
-- ![Uptime Kuma Setup](static/img/uptimekuma-setup.png)
-- You can now test the notifications and apply them to monitors.
-- ![Uptime Kuma iOS Test](static/img/uptimekuma-ios-test.jpg)
-- ![Uptime Kuma iOS Down](static/img/uptimekuma-ios-down.jpg)
-- ![Uptime Kuma iOS Up](static/img/uptimekuma-ios-up.jpg)
+Go to your [Uptime Kuma](https://github.com/louislam/uptime-kuma) Settings > Notifications, click on **Setup Notification**.
+Then set your desired **title** (e.g. "Uptime Kuma"), **ntfy topic**, **Server URL** and **priority (1-5)**:
+
+<div id="uptimekuma-screenshots" class="screenshots">
+    <a href="../../static/img/uptimekuma-settings.png"><img src="../../static/img/uptimekuma-settings.png"/></a>
+    <a href="../../static/img/uptimekuma-setup.png"><img src="../../static/img/uptimekuma-setup.png"/></a>
+</div>
+
+
+You can now test the notifications and apply them to monitors:
+
+<div id="uptimekuma-monitor-screenshots" class="screenshots">
+    <a href="../../static/img/uptimekuma-ios-test.jpg"><img src="../../static/img/uptimekuma-ios-test.jpg"/></a>
+    <a href="../../static/img/uptimekuma-ios-down.jpg"><img src="../../static/img/uptimekuma-ios-down.jpg"/></a>
+    <a href="../../static/img/uptimekuma-ios-up.jpg"><img src="../../static/img/uptimekuma-ios-up.jpg"/></a>
+</div>
+
+## Apprise
+ntfy is integrated natively into [Apprise](https://github.com/caronc/apprise) (also check out the 
+[Apprise/ntfy wiki page](https://github.com/caronc/apprise/wiki/Notify_ntfy)).
+
+You can use it like this:
+
+```
+apprise -vv -t "Test Message Title" -b "Test Message Body" \
+   ntfy://mytopic
+```
+
+Or with your own server like this:
+
+```
+apprise -vv -t "Test Message Title" -b "Test Message Body" \
+   ntfy://ntfy.example.com/mytopic
+```
+

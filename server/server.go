@@ -75,9 +75,6 @@ var (
 	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
 	attachURLRegex   = regexp.MustCompile(`^https?://`)
 
-	//go:embed "example.html"
-	exampleSource string
-
 	//go:embed site
 	webFs        embed.FS
 	webFsCached  = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
@@ -283,8 +280,6 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleHome)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
-		return s.ensureWebEnabled(s.handleExample)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
@@ -354,11 +349,6 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	_, err := io.WriteString(w, `{"success":true}`+"\n")
-	return err
-}
-
-func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	_, err := io.WriteString(w, exampleSource)
 	return err
 }
 
@@ -435,7 +425,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 }
 
 func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
-	return handleMatrixDiscovery(w)
+	return writeMatrixDiscoveryResponse(w)
 }
 
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {

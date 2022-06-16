@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -171,10 +172,6 @@ func TestServer_StaticSites(t *testing.T) {
 	require.Equal(t, 301, rr.Code)
 
 	// Docs test removed, it was failing annoyingly.
-
-	rr = request(t, s, "GET", "/example.html", "", nil)
-	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), "</html>")
 }
 
 func TestServer_WebEnabled(t *testing.T) {
@@ -183,9 +180,6 @@ func TestServer_WebEnabled(t *testing.T) {
 	s := newTestServer(t, conf)
 
 	rr := request(t, s, "GET", "/", "", nil)
-	require.Equal(t, 404, rr.Code)
-
-	rr = request(t, s, "GET", "/example.html", "", nil)
 	require.Equal(t, 404, rr.Code)
 
 	rr = request(t, s, "GET", "/config.js", "", nil)
@@ -199,9 +193,6 @@ func TestServer_WebEnabled(t *testing.T) {
 	s2 := newTestServer(t, conf2)
 
 	rr = request(t, s2, "GET", "/", "", nil)
-	require.Equal(t, 200, rr.Code)
-
-	rr = request(t, s2, "GET", "/example.html", "", nil)
 	require.Equal(t, 200, rr.Code)
 
 	rr = request(t, s2, "GET", "/config.js", "", nil)
@@ -916,6 +907,60 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	require.Equal(t, "this is a unifiedpush text message", m.Message)
 }
 
+func TestServer_MatrixGateway_Discovery(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "GET", "/_matrix/push/v1/notify", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"unifiedpush":{"gateway":"matrix"}}`+"\n", response.Body.String())
+}
+
+func TestServer_MatrixGateway_Push_Success(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, notification, m.Message)
+}
+
+func TestServer_MatrixGateway_Push_Failure_InvalidPushkey(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	notification := `{"notification":{"devices":[{"pushkey":"http://wrong-base-url.com/mytopic?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"rejected":["http://wrong-base-url.com/mytopic?up=1"]}`+"\n", response.Body.String())
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, "", response.Body.String()) // Empty!
+}
+
+func TestServer_MatrixGateway_Push_Failure_EverythingIsWrong(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	notification := `{"message":"this is not really a Matrix message"}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 400, response.Code)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 40019, err.Code)
+	require.Equal(t, 400, err.HTTPCode)
+}
+
+func TestServer_MatrixGateway_Push_Failure_Unconfigured(t *testing.T) {
+	c := newTestConfig(t)
+	c.BaseURL = ""
+	s := newTestServer(t, c)
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 500, response.Code)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 50003, err.Code)
+	require.Equal(t, 500, err.HTTPCode)
+}
+
 func TestServer_PublishActions_AndPoll(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{
@@ -1347,4 +1392,12 @@ func toHTTPError(t *testing.T, s string) *errHTTP {
 
 func basicAuth(s string) string {
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(s)))
+}
+
+func readAll(t *testing.T, rc io.ReadCloser) string {
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

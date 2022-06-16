@@ -13,15 +13,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.26.0 (UNRELEASED)
 
-**Bugs:**
-
-* Web app: Show "notifications not supported" alert on HTTP ([#323](https://github.com/binwiederhier/ntfy/issues/323), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
-
 **Features:**
 
+* ntfy now is a [Matrix Push Gateway](https://spec.matrix.org/v1.2/push-gateway-api/) (in combination with [UnifiedPush](https://unifiedpush.org) as the [Provider Push Protocol](https://unifiedpush.org/developers/gateway/), [#319](https://github.com/binwiederhier/ntfy/issues/319)/[#326](https://github.com/binwiederhier/ntfy/pull/326), thanks to [@MayeulC](https://github.com/MayeulC) for reporting)
 * Windows CLI is now available via [Scoop](https://scoop.sh) ([ScoopInstaller#3594](https://github.com/ScoopInstaller/Main/pull/3594), [#311](https://github.com/binwiederhier/ntfy/pull/311), [#269](https://github.com/binwiederhier/ntfy/issues/269), thanks to [@kzshantonu](https://github.com/kzshantonu))
 * [Uptime Kuma](https://github.com/louislam/uptime-kuma) now allows publishing to ntfy ([uptime-kuma#1674](https://github.com/louislam/uptime-kuma/pull/1674), thanks to [@philippdormann](https://github.com/philippdormann))
 * Display ntfy version in `ntfy serve` command  ([#314](https://github.com/binwiederhier/ntfy/issues/314), thanks to [@poblabs](https://github.com/poblabs))
+
+**Bugs:**
+
+* Web app: Show "notifications not supported" alert on HTTP ([#323](https://github.com/binwiederhier/ntfy/issues/323), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 
 **Documentation**
 

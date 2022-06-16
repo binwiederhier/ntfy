@@ -2735,6 +2735,22 @@ parameter (or any of its aliases `unifiedpush` or `up`) to `1` to [disable Fireb
 option is mostly equivalent to `Firebase: no`, but was introduced to allow future flexibility. The flag additionally 
 enables auto-detection of the message encoding. If the message is binary, it'll be encoded as base64.
 
+### Matrix Gateway
+The ntfy server implements a [Matrix Push Gateway](https://spec.matrix.org/v1.2/push-gateway-api/) (in combination with
+[UnifiedPush](https://unifiedpush.org) as the [Provider Push Protocol](https://unifiedpush.org/developers/gateway/)). This makes it easier to integrate
+with self-hosted [Matrix](https://matrix.org/) servers (such as [synapse](https://github.com/matrix-org/synapse)), since 
+you don't have to set up a separate push proxy (such as [common-proxies](https://github.com/UnifiedPush/common-proxies)).
+
+In short, ntfy accepts Matrix messages on the `/_matrix/push/v1/notify` endpoint (see [Push Gateway API](https://spec.matrix.org/v1.2/push-gateway-api/)), 
+and forwards them to the ntfy topic defined in the `pushkey` of the message. The message will then be forwarded to the
+ntfy Android app, and passed on to the Matrix client there.
+
+There is a nice diagram in the [Push Gateway docs](https://spec.matrix.org/v1.2/push-gateway-api/). In this diagram, the
+ntfy server plays the role of the Push Gateway, as well as the Push Provider. UnifiedPush is the Provider Push Protocol.
+
+!!! info
+    This is not a generic Matrix Push Gateway. It only works in combination with UnifiedPush and ntfy.
+
 ## Public topics
 Obviously all topics on ntfy.sh are public, but there are a few designated topics that are used in examples, and topics
 that you can use to try out what [authentication and access control](#authentication) looks like.

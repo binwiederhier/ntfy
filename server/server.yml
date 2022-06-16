@@ -4,8 +4,12 @@
 # All options also support underscores (_) instead of dashes (-) to comply with the YAML spec.
 
 # Public facing base URL of the service (e.g. https://ntfy.sh or https://ntfy.example.com)
-# This setting is currently only used by attachments, e-mail sending (outgoing mail only), as well
-# as in combination with upstream-base-url (for iOS push notifications for self-hosted servers).
+#
+# This setting is required for any of the following features:
+# - attachments (to return a download URL)
+# - e-mail sending (for the topic URL in the email footer)
+# - iOS push notifications for self-hosted servers (to calculate the Firebase poll_request topic)
+# - Matrix Push Gateway (to validate that the pushkey is correct)
 #
 # base-url:
 

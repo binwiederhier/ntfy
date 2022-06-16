@@ -68,14 +68,12 @@ var (
 
 	webConfigPath    = "/config.js"
 	userStatsPath    = "/user/stats"
+	matrixPushPath   = "/_matrix/push/v1/notify"
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
 	attachURLRegex   = regexp.MustCompile(`^https?://`)
-
-	//go:embed "example.html"
-	exampleSource string
 
 	//go:embed site
 	webFs        embed.FS
@@ -258,6 +256,10 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 			}
 			return // Do not attempt to write to upgraded connection
 		}
+		if matrixErr, ok := err.(*errMatrix); ok {
+			writeMatrixError(w, r, v, matrixErr)
+			return
+		}
 		httpErr, ok := err.(*errHTTP)
 		if !ok {
 			httpErr = errHTTPInternalError
@@ -278,14 +280,14 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if r.Method == http.MethodGet && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleHome)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == "/example.html" {
-		return s.ensureWebEnabled(s.handleExample)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
+		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
@@ -296,6 +298,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleOptions)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
 		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
+		return s.limitRequests(s.transformMatrixJSON(s.authWrite(s.handlePublishMatrix)))(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
@@ -345,11 +349,6 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	_, err := io.WriteString(w, `{"success":true}`+"\n")
-	return err
-}
-
-func (s *Server) handleExample(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	_, err := io.WriteString(w, exampleSource)
 	return err
 }
 
@@ -425,25 +424,29 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	return nil
 }
 
-func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
+	return writeMatrixDiscoveryResponse(w)
+}
+
+func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
 	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, v, m)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
-		return err
+		return nil, err
 	}
 	if m.Message == "" {
 		m.Message = emptyMessageBody
@@ -456,7 +459,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	}
 	if !delayed {
 		if err := t.Publish(v, m); err != nil {
-			return err
+			return nil, err
 		}
 		if s.firebaseClient != nil && firebase {
 			go s.sendToFirebase(v, m)
@@ -472,18 +475,34 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	}
 	if cache {
 		if err := s.messageCache.AddMessage(m); err != nil {
-			return err
+			return nil, err
 		}
+	}
+	s.mu.Lock()
+	s.messages++
+	s.mu.Unlock()
+	return m, nil
+}
+
+func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	m, err := s.handlePublishWithoutResponse(r, v)
+	if err != nil {
+		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(m); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	s.messages++
-	s.mu.Unlock()
 	return nil
+}
+
+func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	_, err := s.handlePublishWithoutResponse(r, v)
+	if err != nil {
+		return &errMatrix{pushKey: r.Header.Get(matrixPushKeyHeader), err: err}
+	}
+	return writeMatrixSuccess(w)
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
@@ -1283,6 +1302,19 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 			r.Header.Set("X-Delay", m.Delay)
 		}
 		return next(w, r, v)
+	}
+}
+
+func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
+		if err != nil {
+			return err
+		}
+		if err := next(w, newRequest, v); err != nil {
+			return &errMatrix{pushKey: newRequest.Header.Get(matrixPushKeyHeader), err: err}
+		}
+		return nil
 	}
 }
 

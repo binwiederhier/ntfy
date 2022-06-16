@@ -42,3 +42,10 @@ decent now.
 [Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the
 server and listens for incoming notifications. This consumes additional battery (see above),
 but delivers notifications instantly.
+
+## Where can I donate?
+Many people have asked (thanks for that!), but I am currently not accepting any donations. The cost is manageable 
+($25/month for hosting, and $99/year for the Apple cert) right now, and I don't want to have to feel obligated to 
+anyone by accepting their money.
+
+I may ask for donations in the future, though. After all, $400 per year isn't nothing... 

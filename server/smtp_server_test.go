@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/emersion/go-smtp"
 	"github.com/stretchr/testify/require"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -302,14 +301,6 @@ func newTestBackend(t *testing.T, handler func(http.ResponseWriter, *http.Reques
 	conf.SMTPServerAddrPrefix = "ntfy-"
 	backend := newMailBackend(conf, handler)
 	return conf, backend
-}
-
-func readAll(t *testing.T, rc io.ReadCloser) string {
-	b, err := io.ReadAll(rc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
 }
 
 func fakeConnState(t *testing.T, remoteAddr string) *smtp.ConnectionState {

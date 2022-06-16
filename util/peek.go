@@ -18,7 +18,8 @@ type PeekedReadCloser struct {
 	closed       bool
 }
 
-// Peek reads the underlying ReadCloser into memory up until the limit and returns a PeekedReadCloser
+// Peek reads the underlying ReadCloser into memory up until the limit and returns a PeekedReadCloser.
+// It does not return an error if limit is reached. Instead, LimitReached will be set to true.
 func Peek(underlying io.ReadCloser, limit int) (*PeekedReadCloser, error) {
 	if underlying == nil {
 		underlying = io.NopCloser(strings.NewReader(""))

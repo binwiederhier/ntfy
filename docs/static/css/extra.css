@@ -60,7 +60,8 @@ figure video {
 }
 
 .screenshots img {
-    height: 230px;
+    max-height: 230px;
+    max-width: 300px;
     margin: 3px;
     border-radius: 5px;
     filter: drop-shadow(2px 2px 2px #ddd);

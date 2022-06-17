@@ -181,6 +181,8 @@ Here's a list of extras you can access. Most likely, you'll want to filter for `
 | `tags`          | *String*                     | `tag1,tag2,..`     | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
 | `tags_map`      | *String*                     | `0=tag1,1=tag2,..` | Map of tags to make it easier to map first, second, ... tag                        |
 | `priority`      | *Int (between 1-5)*          | `4`                | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+| `attachment_name`| *String*                    | `attachment.jpg`   | The filename of the attachment; may be empty if not set                            |
+| `attachment_url`| *String*                     | `https://ntfy.sh/file/afUbjadfl7ErP.jpg` | The URL of the attachment on the server; may be empty if not set |
 
 #### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)

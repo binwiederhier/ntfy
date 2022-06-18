@@ -180,23 +180,27 @@ notification popups:
 
 Here's a list of extras you can access. Most likely, you'll want to filter for `topic` and react on `message`:
 
-| Extra name      | Type                         | Example            | Description                                                                        |
-|-----------------|------------------------------|--------------------|------------------------------------------------------------------------------------|
-| `id`            | *String*                     | `bP8dMjO8ig`       | Randomly chosen message identifier (likely not very useful for task automation)    |
-| `base_url`      | *String*                     | `https://ntfy.sh`  | Root URL of the ntfy server this message came from                                 |
-| `topic` ❤️      | *String*                     | `mytopic`          | Topic name; **you'll likely want to filter for a specific topic**                  |
-| `muted`         | *Boolean*                    | `true`             | Indicates whether the subscription was muted in the app                            |
-| `muted_str`     | *String (`true` or `false`)* | `true`             | Same as `muted`, but as string `true` or `false`                                   |
-| `time`          | *Int*                        | `1635528741`       | Message date time, as Unix time stamp                                              |
-| `title`         | *String*                     | `Some title`       | Message [title](../publish.md#message-title); may be empty if not set              |
-| `message` ❤️    | *String*                     | `Some message`     | Message body; **this is likely what you're interested in**                         |
-| `message_bytes` | *ByteArray*                  | `(binary data)`    | Message body as binary data                                                        |
-| `encoding`️     | *String*                     | -                  | Message encoding (empty or "base64")                                               |
-| `tags`          | *String*                     | `tag1,tag2,..`     | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
-| `tags_map`      | *String*                     | `0=tag1,1=tag2,..` | Map of tags to make it easier to map first, second, ... tag                        |
-| `priority`      | *Int (between 1-5)*          | `4`                | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
-| `attachment_name`| *String*                    | `attachment.jpg`   | The filename of the attachment; may be empty if not set                            |
-| `attachment_url`| *String*                     | `https://ntfy.sh/file/afUbjadfl7ErP.jpg` | The URL of the attachment on the server; may be empty if not set |
+| Extra name           | Type                         | Example                                  | Description                                                                        |
+|----------------------|------------------------------|------------------------------------------|------------------------------------------------------------------------------------|
+| `id`                 | *String*                     | `bP8dMjO8ig`                             | Randomly chosen message identifier (likely not very useful for task automation)    |
+| `base_url`           | *String*                     | `https://ntfy.sh`                        | Root URL of the ntfy server this message came from                                 |
+| `topic` ❤️           | *String*                     | `mytopic`                                | Topic name; **you'll likely want to filter for a specific topic**                  |
+| `muted`              | *Boolean*                    | `true`                                   | Indicates whether the subscription was muted in the app                            |
+| `muted_str`          | *String (`true` or `false`)* | `true`                                   | Same as `muted`, but as string `true` or `false`                                   |
+| `time`               | *Int*                        | `1635528741`                             | Message date time, as Unix time stamp                                              |
+| `title`              | *String*                     | `Some title`                             | Message [title](../publish.md#message-title); may be empty if not set              |
+| `message` ❤️         | *String*                     | `Some message`                           | Message body; **this is likely what you're interested in**                         |
+| `message_bytes`      | *ByteArray*                  | `(binary data)`                          | Message body as binary data                                                        |
+| `encoding`️          | *String*                     | -                                        | Message encoding (empty or "base64")                                               |
+| `tags`               | *String*                     | `tag1,tag2,..`                           | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
+| `tags_map`           | *String*                     | `0=tag1,1=tag2,..`                       | Map of tags to make it easier to map first, second, ... tag                        |
+| `priority`           | *Int (between 1-5)*          | `4`                                      | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+| `click`              | *String*                     | `https://google.com`                     | [Click action](../publish.md#click-action) URL, or empty if not set                |
+| `attachment_name`    | *String*                     | `attachment.jpg`                         | Filename of the attachment; may be empty if not set                                |
+| `attachment_type`    | *String*                     | `image/jpeg`                             | Mime type of the attachment; may be empty if not set                               |
+| `attachment_size`    | *Long*                       | `9923111`                                | Size in bytes of the attachment; may be zero if not set                            |
+| `attachment_expires` | *Long*                       | `1655514244`                             | Expiry date as Unix timestamp of the attachment URL; may be zero if not set        |
+| `attachment_url`     | *String*                     | `https://ntfy.sh/file/afUbjadfl7ErP.jpg` | URL of the attachment; may be empty if not set                                     |
 
 #### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)

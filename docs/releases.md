@@ -6,9 +6,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
+**Bugs:**
+
+* Fixed: Long-click selecting of notifications scrolls to the top (#235, thanks to [@wunter8](https://github.com/wunter8))
+* Add attachment and click URL extras to MESSAGE_RECEIVED broadcast (#330, thanks to [@wunter8](https://github.com/wunter8))
+
 **Additional translations:**
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
+* Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
+
+Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
 -->
 
@@ -36,7 +44,6 @@ CLI is now available via Scoop, and ntfy is now natively supported in Uptime Kum
 * Fix Docker install instructions  ([#320](https://github.com/binwiederhier/ntfy/issues/320), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 * Add clarifying comments to base-url ([#322](https://github.com/binwiederhier/ntfy/issues/322), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 * Update FAQ for iOS app ([#321](https://github.com/binwiederhier/ntfy/issues/321), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
-
 
 ## ntfy iOS app v1.2
 Released June 16, 2022

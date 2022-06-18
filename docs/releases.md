@@ -8,8 +8,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bugs:**
 
-* Fixed: Long-click selecting of notifications scrolls to the top (#235, thanks to [@wunter8](https://github.com/wunter8))
-* Add attachment and click URL extras to MESSAGE_RECEIVED broadcast (#330, thanks to [@wunter8](https://github.com/wunter8))
+* Fixed: Long-click selecting of notifications scrolls to the top ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
+* Add attachment and click URL extras to MESSAGE_RECEIVED broadcast ([#329](https://github.com/binwiederhier/ntfy/issues/329), thanks to [@wunter8](https://github.com/wunter8))
 
 **Additional translations:**
 

@@ -8,8 +8,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bugs:**
 
-* Fixed: Long-click selecting of notifications scrolls to the top ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
+* Long-click selecting of notifications doesn't scoll to the top anymore ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
 * Add attachment and click URL extras to MESSAGE_RECEIVED broadcast ([#329](https://github.com/binwiederhier/ntfy/issues/329), thanks to [@wunter8](https://github.com/wunter8))
+* Accessibility: Clear/choose service URL button in base URL dropdown now has a label ([#292](https://github.com/binwiederhier/ntfy/issues/292), thanks to [@mhameed](https://github.com/mhameed) for reporting)
 
 **Additional translations:**
 

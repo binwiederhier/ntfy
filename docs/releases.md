@@ -6,6 +6,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
+**Features:**
+
+* Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
+
 **Bugs:**
 
 * Long-click selecting of notifications doesn't scoll to the top anymore ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))

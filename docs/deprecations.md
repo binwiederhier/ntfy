@@ -14,15 +14,15 @@ Due to [reports of varying battery consumption](https://github.com/binwiederhier
 seems to depend on the phone), JSON HTTP stream support will not be removed. Instead, I'll just flip the default to 
 WebSocket in June.
 
-### Android app: Using `since=<timestamp>` instead of `since=<id>`
-> Active since 2022-02-27, behavior will change in **May 2022**
+## Previous deprecations
 
-In about 3 months, the Android app will start using `since=<id>` instead of `since=<timestamp>`, which means that it will
-not work with servers older than v1.16.0 anymore. This is to simplify handling of deduplication in the Android app.
+### Android app: Using `since=<timestamp>` instead of `since=<id>`
+> Active since 2022-02-27, behavior changed with v1.14.0
+
+The Android app started using `since=<id>` instead of `since=<timestamp>`, which means as of Android app v1.14.0, 
+it will not work with servers older than v1.16.0 anymore. This is to simplify handling of deduplication in the Android app.
 
 The `since=<timestamp>` endpoint will continue to work. This is merely a notice that the Android app behavior will change.
-
-## Previous deprecations
 
 ### Running server via `ntfy` (instead of `ntfy serve`)
 > Deprecated 2021-12-17, behavior changed with v1.10.0

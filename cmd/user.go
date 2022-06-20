@@ -6,11 +6,12 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
-	"strings"
 )
 
 func init() {
@@ -40,6 +41,7 @@ var cmdUser = &cli.Command{
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
+				&cli.StringFlag{Name: "password", Aliases: []string{"p"}, EnvVars: []string{"NTFY_PASSWORD"}, Usage: "user password"},
 			},
 			Description: `Add a new user to the ntfy user database.
 
@@ -137,6 +139,7 @@ Examples:
 func execUserAdd(c *cli.Context) error {
 	username := c.Args().Get(0)
 	role := auth.Role(c.String("role"))
+	password := c.String("password")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
 	} else if username == userEveryone {
@@ -151,9 +154,14 @@ func execUserAdd(c *cli.Context) error {
 	if user, _ := manager.User(username); user != nil {
 		return fmt.Errorf("user %s already exists", username)
 	}
-	password, err := readPasswordAndConfirm(c)
-	if err != nil {
-		return err
+	// If the password env var was not set, read it from stdin
+	if password == "" {
+		p, err := readPasswordAndConfirm(c)
+		if err != nil {
+			return err
+		}
+
+		password = p
 	}
 	if err := manager.AddUser(username, password, role); err != nil {
 		return err

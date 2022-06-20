@@ -41,7 +41,7 @@ var cmdUser = &cli.Command{
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
-				&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
+				&cli.StringFlag{Name: "password", Aliases: []string{"p"}, EnvVars: []string{"NTFY_PASSWORD"}, Usage: "user password"},
 			},
 			Description: `Add a new user to the ntfy user database.
 
@@ -137,39 +137,27 @@ Examples:
 }
 
 func execUserAdd(c *cli.Context) error {
-	var username string
-	var password string
-	userAndPass := c.String("user")
+	password := c.String("user")
 	role := auth.Role(c.String("role"))
-	if userAndPass != "" {
-		parts := strings.SplitN(userAndPass, ":", 2)
-		if len(parts) == 2 {
-			username = parts[0]
-			password = parts[1]
-		} else {
-			p, err := readPasswordAndConfirm(c)
-			if err != nil {
-				return err
-			}
-			username = userAndPass
-			password = p
-		}
-	} else {
-		username = c.Args().Get(0)
-		if username == "" {
-			return errors.New("username expected, type 'ntfy user add --help' for help")
-		} else if username == userEveryone {
-			return errors.New("username not allowed")
-		} else if !auth.AllowedRole(role) {
-			return errors.New("role must be either 'user' or 'admin'")
-		}
+	username = c.Args().Get(0)
+	if username == "" {
+		return errors.New("username expected, type 'ntfy user add --help' for help")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
+	} else if !auth.AllowedRole(role) {
+		return errors.New("role must be either 'user' or 'admin'")
+	}
 
+	// If the password env var was not set, read it from stdin
+	if password == "" {
 		p, err := readPasswordAndConfirm(c)
 		if err != nil {
 			return err
 		}
+
 		password = p
 	}
+
 	manager, err := createAuthManager(c)
 	if err != nil {
 		return err

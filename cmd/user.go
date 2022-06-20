@@ -137,7 +137,7 @@ Examples:
 }
 
 func execUserAdd(c *cli.Context) error {
-	username = c.Args().Get(0)
+	username := c.Args().Get(0)
 	role := auth.Role(c.String("role"))
 	password := c.String("user")
 	if username == "" {

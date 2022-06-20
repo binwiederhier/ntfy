@@ -3,8 +3,10 @@ package server
 import (
 	"fmt"
 	"github.com/emersion/go-smtp"
+	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -57,4 +59,33 @@ func logHTTPPrefix(v *visitor, r *http.Request) string {
 
 func logSMTPPrefix(state *smtp.ConnectionState) string {
 	return fmt.Sprintf("%s/%s SMTP", state.Hostname, state.RemoteAddr.String())
+}
+
+func renderHTTPRequest(r *http.Request) string {
+	peekLimit := 4096
+	lines := fmt.Sprintf("%s %s %s\n", r.Method, r.URL.RequestURI(), r.Proto)
+	for key, values := range r.Header {
+		for _, value := range values {
+			lines += fmt.Sprintf("%s: %s\n", key, value)
+		}
+	}
+	lines += "\n"
+	body, err := util.Peek(r.Body, peekLimit)
+	if err != nil {
+		lines = fmt.Sprintf("(could not read body: %s)\n", err.Error())
+	} else if utf8.Valid(body.PeekedBytes) {
+		lines += string(body.PeekedBytes)
+		if body.LimitReached {
+			lines += fmt.Sprintf(" ... (peeked %d bytes)", peekLimit)
+		}
+		lines += "\n"
+	} else {
+		if body.LimitReached {
+			lines += fmt.Sprintf("(peeked bytes not UTF-8, peek limit of %d bytes reached, hex: %x ...)\n", peekLimit, body.PeekedBytes)
+		} else {
+			lines += fmt.Sprintf("(peeked bytes not UTF-8, %d bytes, hex: %x)\n", len(body.PeekedBytes), body.PeekedBytes)
+		}
+	}
+	r.Body = body // Important: Reset body, so it can be re-read
+	return strings.TrimSpace(lines)
 }

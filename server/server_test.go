@@ -907,11 +907,21 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	require.Equal(t, "this is a unifiedpush text message", m.Message)
 }
 
-func TestServer_MatrixGateway_Discovery(t *testing.T) {
+func TestServer_MatrixGateway_Discovery_Success(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "GET", "/_matrix/push/v1/notify", "", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"unifiedpush":{"gateway":"matrix"}}`+"\n", response.Body.String())
+}
+
+func TestServer_MatrixGateway_Discovery_Failure_Unconfigured(t *testing.T) {
+	c := newTestConfig(t)
+	c.BaseURL = ""
+	s := newTestServer(t, c)
+	response := request(t, s, "GET", "/_matrix/push/v1/notify", "", nil)
+	require.Equal(t, 500, response.Code)
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 50003, err.Code)
 }
 
 func TestServer_MatrixGateway_Push_Success(t *testing.T) {

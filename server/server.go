@@ -246,6 +246,9 @@ func (s *Server) Stop() {
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	v := s.visitor(r)
 	log.Debug("%s Dispatching request", logHTTPPrefix(v, r))
+	if log.IsTrace() {
+		log.Trace("%s Entire request (headers and body):\n%s", logHTTPPrefix(v, r), renderHTTPRequest(r))
+	}
 	if err := s.handleInternal(w, r, v); err != nil {
 		if websocket.IsWebSocketUpgrade(r) {
 			isNormalError := strings.Contains(err.Error(), "i/o timeout")
@@ -425,6 +428,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 }
 
 func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
+	if s.config.BaseURL == "" {
+		return errHTTPInternalErrorMissingBaseURL
+	}
 	return writeMatrixDiscoveryResponse(w)
 }
 

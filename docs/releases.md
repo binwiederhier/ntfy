@@ -4,11 +4,23 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 <!--
 
+## ntfy server v1.27.0 (UNRELEASED)
+
+**Features:**
+
+* Trace: Log entire HTTP request to simplify debugging (no ticket)
+
+**Bugs:**
+
+* Return HTTP 500 for GET /_matrix/push/v1/notify when base-url is not configured (no ticket)
+
+
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Features:**
 
 * Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
+* Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
 
 **Bugs:**
 

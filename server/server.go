@@ -16,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -972,19 +973,26 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	return
 }
 
+// sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
+// marker, returning only messages that are newer than the marker.
 func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
+	messages := make([]*message, 0)
 	for _, t := range topics {
-		messages, err := s.messageCache.Messages(t.ID, since, scheduled)
+		topicMessages, err := s.messageCache.Messages(t.ID, since, scheduled)
 		if err != nil {
 			return err
 		}
-		for _, m := range messages {
-			if err := sub(v, m); err != nil {
-				return err
-			}
+		messages = append(messages, topicMessages...)
+	}
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].Time < messages[j].Time
+	})
+	for _, m := range messages {
+		if err := sub(v, m); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -147,7 +147,13 @@ func execUserAdd(c *cli.Context) error {
 	} else if !auth.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-
+	manager, err := createAuthManager(c)
+	if err != nil {
+		return err
+	}
+	if user, _ := manager.User(username); user != nil {
+		return fmt.Errorf("user %s already exists", username)
+	}
 	// If the password env var was not set, read it from stdin
 	if password == "" {
 		p, err := readPasswordAndConfirm(c)
@@ -156,14 +162,6 @@ func execUserAdd(c *cli.Context) error {
 		}
 
 		password = p
-	}
-
-	manager, err := createAuthManager(c)
-	if err != nil {
-		return err
-	}
-	if user, _ := manager.User(username); user != nil {
-		return fmt.Errorf("user %s already exists", username)
 	}
 	if err := manager.AddUser(username, password, role); err != nil {
 		return err

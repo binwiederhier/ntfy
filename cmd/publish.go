@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func init() {
@@ -30,6 +32,7 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
+	&cli.IntFlag{Name: "pid", Aliases: []string{"done", "w"}, EnvVars: []string{"NTFY_PID"}, Usage: "monitor process with given PID and publish when it exists"},
 	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
 	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
 	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},
@@ -86,6 +89,7 @@ func execPublish(c *cli.Context) error {
 	file := c.String("file")
 	email := c.String("email")
 	user := c.String("user")
+	pid := c.Int("pid")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
 	envTopic := c.Bool("env-topic")
@@ -178,6 +182,11 @@ func execPublish(c *cli.Context) error {
 			}
 		}
 	}
+	if pid > 0 {
+		if err := waitForProcess(pid); err != nil {
+			return err
+		}
+	}
 	cl := client.New(conf)
 	m, err := cl.PublishReader(topic, body, options...)
 	if err != nil {
@@ -186,5 +195,17 @@ func execPublish(c *cli.Context) error {
 	if !quiet {
 		fmt.Fprintln(c.App.Writer, strings.TrimSpace(m.Raw))
 	}
+	return nil
+}
+
+func waitForProcess(pid int) error {
+	if !processExists(pid) {
+		return fmt.Errorf("process with PID %d not running", pid)
+	}
+	log.Debug("Waiting for process with PID %d to exit", pid)
+	for processExists(pid) {
+		time.Sleep(500 * time.Millisecond)
+	}
+	log.Debug("Process with PID %d exited", pid)
 	return nil
 }

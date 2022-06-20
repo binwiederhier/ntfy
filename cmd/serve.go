@@ -162,6 +162,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && baseURL == "" {
 		return errors.New("if upstream-base-url is set, base-url must also be set")
+	} else if upstreamBaseURL != "" && baseURL != "" && baseURL == upstreamBaseURL {
+		return errors.New("base-url and upstream-base-url cannot be identical, you'll likely want to set upstream-base-url to https://ntfy.sh, see https://ntfy.sh/docs/config/#ios-instant-notifications")
 	}
 
 	webRootIsApp := webRoot == "app"

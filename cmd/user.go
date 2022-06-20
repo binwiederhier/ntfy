@@ -139,7 +139,7 @@ Examples:
 func execUserAdd(c *cli.Context) error {
 	username := c.Args().Get(0)
 	role := auth.Role(c.String("role"))
-	password := c.String("user")
+	password := c.String("password")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
 	} else if username == userEveryone {

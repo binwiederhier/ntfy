@@ -1080,10 +1080,13 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 }
 
 func (s *Server) updateStatsAndPrune() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	log.Debug("Manager: Running cleanup")
+
+	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
+	//          there is no mutex for the entire function.
 
 	// Expire visitors from rate visitors map
+	s.mu.Lock()
 	staleVisitors := 0
 	for ip, v := range s.visitors {
 		if v.Stale() {
@@ -1092,6 +1095,7 @@ func (s *Server) updateStatsAndPrune() {
 			staleVisitors++
 		}
 	}
+	s.mu.Unlock()
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired attachments
@@ -1116,22 +1120,30 @@ func (s *Server) updateStatsAndPrune() {
 		log.Warn("Manager: Error pruning cache: %s", err.Error())
 	}
 
+	// Message count per topic
+	var messages int
+	messageCounts, err := s.messageCache.MessageCounts()
+	if err != nil {
+		log.Warn("Manager: Cannot get message counts: %s", err.Error())
+		messageCounts = make(map[string]int) // Empty, so we can continue
+	}
+	for _, count := range messageCounts {
+		messages += count
+	}
+
 	// Prune old topics, remove subscriptions without subscribers
-	var subscribers, messages int
+	s.mu.Lock()
+	var subscribers int
 	for _, t := range s.topics {
 		subs := t.Subscribers()
-		msgs, err := s.messageCache.MessageCount(t.ID)
-		if err != nil {
-			log.Warn("Manager: Cannot get stats for topic %s: %s", t.ID, err.Error())
-			continue
-		}
-		if msgs == 0 && subs == 0 {
+		msgs, exists := messageCounts[t.ID]
+		if subs == 0 && (!exists || msgs == 0) {
 			delete(s.topics, t.ID)
 			continue
 		}
 		subscribers += subs
-		messages += msgs
 	}
+	s.mu.Unlock()
 
 	// Mail stats
 	var receivedMailTotal, receivedMailSuccess, receivedMailFailure int64

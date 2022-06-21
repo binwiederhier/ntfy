@@ -1090,7 +1090,7 @@ func (s *Server) updateStatsAndPrune() {
 	staleVisitors := 0
 	for ip, v := range s.visitors {
 		if v.Stale() {
-			log.Debug("Deleting stale visitor %s", v.ip)
+			log.Trace("Deleting stale visitor %s", v.ip)
 			delete(s.visitors, ip)
 			staleVisitors++
 		}
@@ -1131,13 +1131,14 @@ func (s *Server) updateStatsAndPrune() {
 		messages += count
 	}
 
-	// Prune old topics, remove subscriptions without subscribers
+	// Remove subscriptions without subscribers
 	s.mu.Lock()
 	var subscribers int
 	for _, t := range s.topics {
-		subs := t.Subscribers()
+		subs := t.SubscribersCount()
 		msgs, exists := messageCounts[t.ID]
 		if subs == 0 && (!exists || msgs == 0) {
+			log.Trace("Deleting empty topic %s", t.ID)
 			delete(s.topics, t.ID)
 			continue
 		}

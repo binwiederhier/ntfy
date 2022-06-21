@@ -34,9 +34,9 @@ func testCacheMessages(t *testing.T, c *messageCache) {
 	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example")))      // These should not be added!
 
 	// mytopic: count
-	count, err := c.MessageCounts("mytopic")
+	counts, err := c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 2, count)
+	require.Equal(t, 2, counts["mytopic"])
 
 	// mytopic: since all
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
@@ -66,18 +66,18 @@ func testCacheMessages(t *testing.T, c *messageCache) {
 	require.Equal(t, "my other message", messages[0].Message)
 
 	// example: count
-	count, err = c.MessageCounts("example")
+	counts, err = c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 1, count)
+	require.Equal(t, 1, counts["example"])
 
 	// example: since all
 	messages, _ = c.Messages("example", sinceAllMessages, false)
 	require.Equal(t, "my example message", messages[0].Message)
 
 	// non-existing: count
-	count, err = c.MessageCounts("doesnotexist")
+	counts, err = c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 0, count)
+	require.Equal(t, 0, counts["doesnotexist"])
 
 	// non-existing: since all
 	messages, _ = c.Messages("doesnotexist", sinceAllMessages, false)
@@ -255,13 +255,13 @@ func testCachePrune(t *testing.T, c *messageCache) {
 	require.Nil(t, c.AddMessage(m3))
 	require.Nil(t, c.Prune(time.Unix(2, 0)))
 
-	count, err := c.MessageCounts("mytopic")
+	counts, err := c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 1, count)
+	require.Equal(t, 1, counts["mytopic"])
 
-	count, err = c.MessageCounts("another_topic")
+	counts, err = c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 0, count)
+	require.Equal(t, 0, counts["another_topic"])
 
 	messages, err := c.Messages("mytopic", sinceAllMessages, false)
 	require.Nil(t, err)

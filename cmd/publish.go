@@ -9,19 +9,22 @@ import (
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
 
 func init() {
-	commands = append(commands, cmdPublish)
+	commands = append(commands, cmdPublish, cmdDone)
 }
 
 var flagsPublish = append(
 	flagsDefault,
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "title", Aliases: []string{"t"}, EnvVars: []string{"NTFY_TITLE"}, Usage: "message title"},
+	&cli.StringFlag{Name: "message", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MESSAGE"}, Usage: "message body"},
 	&cli.StringFlag{Name: "priority", Aliases: []string{"p"}, EnvVars: []string{"NTFY_PRIORITY"}, Usage: "priority of the message (1=min, 2=low, 3=default, 4=high, 5=max)"},
 	&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, EnvVars: []string{"NTFY_TAGS"}, Usage: "comma separated list of tags and emojis"},
 	&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, EnvVars: []string{"NTFY_DELAY"}, Usage: "delay/schedule message"},
@@ -73,7 +76,78 @@ it has incredibly useful information: https://ntfy.sh/docs/publish/.
 ` + clientCommandDescriptionSuffix,
 }
 
+var cmdDone = &cli.Command{
+	Name:      "done",
+	Usage:     "xxx",
+	UsageText: "xxx",
+	Action:    execDone,
+	Category:  categoryClient,
+	Flags:     flagsPublish,
+	Before:    initLogFunc,
+	Description: `xxx
+` + clientCommandDescriptionSuffix,
+}
+
+func execDone(c *cli.Context) error {
+	return execPublishInternal(c, true)
+}
+
 func execPublish(c *cli.Context) error {
+	return execPublishInternal(c, false)
+}
+
+func parseTopicMessageCommand(c *cli.Context, isDoneCommand bool) (topic string, message string, command []string, err error) {
+	// 1. ntfy done <topic> <command>
+	// 2. ntfy done --pid <pid> <topic> [<message>]
+	// 3. NTFY_TOPIC=.. ntfy done <command>
+	// 4. NTFY_TOPIC=.. ntfy done --pid <pid> [<message>]
+	// 5. ntfy publish <topic> [<message>]
+	// 6. NTFY_TOPIC=.. ntfy publish [<message>]
+	var args []string
+	topic, args, err = parseTopicAndArgs(c)
+	if err != nil {
+		return
+	}
+	if isDoneCommand {
+		if c.Int("pid") > 0 {
+			message = strings.Join(args, " ")
+		} else if len(args) > 0 {
+			command = args
+		} else {
+			err = errors.New("must either specify --pid or a command")
+		}
+	} else {
+		message = strings.Join(args, " ")
+	}
+	if c.String("message") != "" {
+		message = c.String("message")
+	}
+	return
+}
+
+func parseTopicAndArgs(c *cli.Context) (topic string, args []string, err error) {
+	envTopic := c.Bool("env-topic")
+	if envTopic {
+		topic = os.Getenv("NTFY_TOPIC")
+		if topic == "" {
+			return "", nil, errors.New("if --env-topic is passed, must define NTFY_TOPIC environment variable")
+		}
+		return topic, remainingArgs(c, 0), nil
+	}
+	if c.NArg() < 1 {
+		return "", nil, errors.New("must specify topic")
+	}
+	return c.Args().Get(0), remainingArgs(c, 1), nil
+}
+
+func remainingArgs(c *cli.Context, fromIndex int) []string {
+	if c.NArg() > fromIndex {
+		return c.Args().Slice()[fromIndex:]
+	}
+	return []string{}
+}
+
+func execPublishInternal(c *cli.Context, doneCmd bool) error {
 	conf, err := loadConfig(c)
 	if err != nil {
 		return err
@@ -89,25 +163,13 @@ func execPublish(c *cli.Context) error {
 	file := c.String("file")
 	email := c.String("email")
 	user := c.String("user")
-	pid := c.Int("pid")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
-	envTopic := c.Bool("env-topic")
 	quiet := c.Bool("quiet")
-	var topic, message string
-	if envTopic {
-		topic = os.Getenv("NTFY_TOPIC")
-		if c.NArg() > 0 {
-			message = strings.Join(c.Args().Slice(), " ")
-		}
-	} else {
-		if c.NArg() < 1 {
-			return errors.New("must specify topic, type 'ntfy publish --help' for help")
-		}
-		topic = c.Args().Get(0)
-		if c.NArg() > 1 {
-			message = strings.Join(c.Args().Slice()[1:], " ")
-		}
+	pid := c.Int("pid")
+	topic, message, command, err := parseTopicMessageCommand(c, doneCmd)
+	if err != nil {
+		return err
 	}
 	var options []client.PublishOption
 	if title != "" {
@@ -160,6 +222,18 @@ func execPublish(c *cli.Context) error {
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
 	}
+	if pid > 0 {
+		if err := waitForProcess(pid); err != nil {
+			return err
+		}
+	} else if len(command) > 0 {
+		cmdResultMessage, err := runAndWaitForCommand(command)
+		if err != nil {
+			return err
+		} else if message == "" {
+			message = cmdResultMessage
+		}
+	}
 	var body io.Reader
 	if file == "" {
 		body = strings.NewReader(message)
@@ -180,11 +254,6 @@ func execPublish(c *cli.Context) error {
 			if err != nil {
 				return err
 			}
-		}
-	}
-	if pid > 0 {
-		if err := waitForProcess(pid); err != nil {
-			return err
 		}
 	}
 	cl := client.New(conf)
@@ -208,4 +277,38 @@ func waitForProcess(pid int) error {
 	}
 	log.Debug("Process with PID %d exited", pid)
 	return nil
+}
+
+func runAndWaitForCommand(command []string) (message string, err error) {
+	prettyCmd := formatCommand(command)
+	log.Debug("Running command: %s", prettyCmd)
+	cmd := exec.Command(command[0], command[1:]...)
+	if log.IsTrace() {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	if err := cmd.Run(); err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			message = fmt.Sprintf("Command failed (exit code %d): %s", exitError.ExitCode(), prettyCmd)
+		} else {
+			message = fmt.Sprintf("Command failed: %s, error: %s", prettyCmd, err.Error())
+		}
+	} else {
+		message = fmt.Sprintf("Command done: %s", prettyCmd)
+	}
+	log.Debug(message)
+	return message, nil
+}
+
+func formatCommand(command []string) string {
+	quoted := []string{command[0]}
+	noQuotesRegex := regexp.MustCompile(`^[-_./a-z0-9]+$`)
+	for _, c := range command[1:] {
+		if noQuotesRegex.MatchString(c) {
+			quoted = append(quoted, c)
+		} else {
+			quoted = append(quoted, fmt.Sprintf(`"%s"`, c))
+		}
+	}
+	return strings.Join(quoted, " ")
 }

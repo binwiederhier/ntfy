@@ -26,6 +26,7 @@ var (
 	randomMutex        = sync.Mutex{}
 	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
 	errInvalidPriority = errors.New("invalid priority")
+	noQuotesRegex      = regexp.MustCompile(`^[-_./:@a-zA-Z0-9]+$`)
 )
 
 // FileExists checks if a file exists, and returns true if it does
@@ -118,38 +119,6 @@ func ValidRandomString(s string, length int) bool {
 		}
 	}
 	return true
-}
-
-// DurationToHuman converts a duration to a human-readable format
-func DurationToHuman(d time.Duration) (str string) {
-	if d == 0 {
-		return "0"
-	}
-
-	d = d.Round(time.Second)
-	days := d / time.Hour / 24
-	if days > 0 {
-		str += fmt.Sprintf("%dd", days)
-	}
-	d -= days * time.Hour * 24
-
-	hours := d / time.Hour
-	if hours > 0 {
-		str += fmt.Sprintf("%dh", hours)
-	}
-	d -= hours * time.Hour
-
-	minutes := d / time.Minute
-	if minutes > 0 {
-		str += fmt.Sprintf("%dm", minutes)
-	}
-	d -= minutes * time.Minute
-
-	seconds := d / time.Second
-	if seconds > 0 {
-		str += fmt.Sprintf("%ds", seconds)
-	}
-	return
 }
 
 // ParsePriority parses a priority string into its equivalent integer value
@@ -285,4 +254,23 @@ func MaybeMarshalJSON(v interface{}) string {
 		return string(jsonBytes)[:5000]
 	}
 	return string(jsonBytes)
+}
+
+// QuoteCommand combines a command array to a string, quoting arguments that need quoting.
+// This function is naive, and sometimes wrong. It is only meant for lo pretty-printing a command.
+//
+// Warning: Never use this function with the intent to run the resulting command.
+//
+// Example:
+//    []string{"ls", "-al", "Document Folder"} -> ls -al "Document Folder"
+func QuoteCommand(command []string) string {
+	var quoted []string
+	for _, c := range command {
+		if noQuotesRegex.MatchString(c) {
+			quoted = append(quoted, c)
+		} else {
+			quoted = append(quoted, fmt.Sprintf(`"%s"`, c))
+		}
+	}
+	return strings.Join(quoted, " ")
 }

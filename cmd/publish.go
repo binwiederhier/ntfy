@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func init() {
@@ -20,6 +23,7 @@ var flagsPublish = append(
 	flagsDefault,
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "title", Aliases: []string{"t"}, EnvVars: []string{"NTFY_TITLE"}, Usage: "message title"},
+	&cli.StringFlag{Name: "message", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MESSAGE"}, Usage: "message body"},
 	&cli.StringFlag{Name: "priority", Aliases: []string{"p"}, EnvVars: []string{"NTFY_PRIORITY"}, Usage: "priority of the message (1=min, 2=low, 3=default, 4=high, 5=max)"},
 	&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, EnvVars: []string{"NTFY_TAGS"}, Usage: "comma separated list of tags and emojis"},
 	&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, EnvVars: []string{"NTFY_DELAY"}, Usage: "delay/schedule message"},
@@ -30,6 +34,8 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
+	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
+	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run command and wait until it finishes before publishing"},
 	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
 	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
 	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},
@@ -37,14 +43,16 @@ var flagsPublish = append(
 )
 
 var cmdPublish = &cli.Command{
-	Name:      "publish",
-	Aliases:   []string{"pub", "send", "trigger"},
-	Usage:     "Send message via a ntfy server",
-	UsageText: "ntfy publish [OPTIONS..] TOPIC [MESSAGE]\nNTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE]",
-	Action:    execPublish,
-	Category:  categoryClient,
-	Flags:     flagsPublish,
-	Before:    initLogFunc,
+	Name:    "publish",
+	Aliases: []string{"pub", "send", "trigger"},
+	Usage:   "Send message via a ntfy server",
+	UsageText: `ntfy publish [OPTIONS..] TOPIC [MESSAGE...]
+ntfy publish [OPTIONS..] --wait-cmd COMMAND...
+NTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE...]`,
+	Action:   execPublish,
+	Category: categoryClient,
+	Flags:    flagsPublish,
+	Before:   initLogFunc,
 	Description: `Publish a message to a ntfy server.
 
 Examples:
@@ -59,8 +67,10 @@ Examples:
   ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
   ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
   ntfy pub -u phil:mypass secret Psst                     # Publish with username/password
+  ntfy pub --wait-pid 1234 mytopic                        # Wait for process 1234 to exit before publishing
+  ntfy pub --wait-cmd mytopic rsync -av ./ /tmp/a         # Run command and publish after it completes
   NTFY_USER=phil:mypass ntfy pub secret Psst              # Use env variables to set username/password
-  NTFY_TOPIC=mytopic ntfy pub -P "some message""          # Use NTFY_TOPIC variable as topic 
+  NTFY_TOPIC=mytopic ntfy pub -P "some message"           # Use NTFY_TOPIC variable as topic 
   cat flower.jpg | ntfy pub --file=- flowers 'Nice!'      # Same as above, send image.jpg as attachment
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
  
@@ -88,22 +98,11 @@ func execPublish(c *cli.Context) error {
 	user := c.String("user")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
-	envTopic := c.Bool("env-topic")
 	quiet := c.Bool("quiet")
-	var topic, message string
-	if envTopic {
-		topic = os.Getenv("NTFY_TOPIC")
-		if c.NArg() > 0 {
-			message = strings.Join(c.Args().Slice(), " ")
-		}
-	} else {
-		if c.NArg() < 1 {
-			return errors.New("must specify topic, type 'ntfy publish --help' for help")
-		}
-		topic = c.Args().Get(0)
-		if c.NArg() > 1 {
-			message = strings.Join(c.Args().Slice()[1:], " ")
-		}
+	pid := c.Int("wait-pid")
+	topic, message, command, err := parseTopicMessageCommand(c)
+	if err != nil {
+		return err
 	}
 	var options []client.PublishOption
 	if title != "" {
@@ -156,6 +155,21 @@ func execPublish(c *cli.Context) error {
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
 	}
+	if pid > 0 {
+		newMessage, err := waitForProcess(pid)
+		if err != nil {
+			return err
+		} else if message == "" {
+			message = newMessage
+		}
+	} else if len(command) > 0 {
+		newMessage, err := runAndWaitForCommand(command)
+		if err != nil {
+			return err
+		} else if message == "" {
+			message = newMessage
+		}
+	}
 	var body io.Reader
 	if file == "" {
 		body = strings.NewReader(message)
@@ -187,4 +201,92 @@ func execPublish(c *cli.Context) error {
 		fmt.Fprintln(c.App.Writer, strings.TrimSpace(m.Raw))
 	}
 	return nil
+}
+
+// parseTopicMessageCommand reads the topic and the remaining arguments from the context.
+
+// There are a few cases to consider:
+//   ntfy publish <topic> [<message>]
+//   ntfy publish --wait-cmd <topic> <command>
+//   NTFY_TOPIC=.. ntfy publish [<message>]
+//   NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
+func parseTopicMessageCommand(c *cli.Context) (topic string, message string, command []string, err error) {
+	var args []string
+	topic, args, err = parseTopicAndArgs(c)
+	if err != nil {
+		return
+	}
+	if c.Bool("wait-cmd") {
+		if len(args) == 0 {
+			err = errors.New("must specify command when --wait-cmd is passed, type 'ntfy publish --help' for help")
+			return
+		}
+		command = args
+	} else {
+		message = strings.Join(args, " ")
+	}
+	if c.String("message") != "" {
+		message = c.String("message")
+	}
+	return
+}
+
+func parseTopicAndArgs(c *cli.Context) (topic string, args []string, err error) {
+	envTopic := c.Bool("env-topic")
+	if envTopic {
+		fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mDeprecation notice: The --env-topic/-P flag will be removed in July 2022, see https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
+		topic = os.Getenv("NTFY_TOPIC")
+		if topic == "" {
+			return "", nil, errors.New("when --env-topic is passed, must define NTFY_TOPIC environment variable")
+		}
+		return topic, remainingArgs(c, 0), nil
+	}
+	if c.NArg() < 1 {
+		return "", nil, errors.New("must specify topic, type 'ntfy publish --help' for help")
+	}
+	return c.Args().Get(0), remainingArgs(c, 1), nil
+}
+
+func remainingArgs(c *cli.Context, fromIndex int) []string {
+	if c.NArg() > fromIndex {
+		return c.Args().Slice()[fromIndex:]
+	}
+	return []string{}
+}
+
+func waitForProcess(pid int) (message string, err error) {
+	if !processExists(pid) {
+		return "", fmt.Errorf("process with PID %d not running", pid)
+	}
+	start := time.Now()
+	log.Debug("Waiting for process with PID %d to exit", pid)
+	for processExists(pid) {
+		time.Sleep(500 * time.Millisecond)
+	}
+	runtime := time.Since(start).Round(time.Millisecond)
+	log.Debug("Process with PID %d exited after %s", pid, runtime)
+	return fmt.Sprintf("Process with PID %d exited after %s", pid, runtime), nil
+}
+
+func runAndWaitForCommand(command []string) (message string, err error) {
+	prettyCmd := util.QuoteCommand(command)
+	log.Debug("Running command: %s", prettyCmd)
+	start := time.Now()
+	cmd := exec.Command(command[0], command[1:]...)
+	if log.IsTrace() {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	err = cmd.Run()
+	runtime := time.Since(start).Round(time.Millisecond)
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			log.Debug("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd)
+			return fmt.Sprintf("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd), nil
+		}
+		// Hard fail when command does not exist or could not be properly launched
+		return "", fmt.Errorf("command failed: %s, error: %s", prettyCmd, err.Error())
+	}
+	log.Debug("Command succeeded after %s: %s", runtime, prettyCmd)
+	return fmt.Sprintf("Command succeeded after %s: %s", runtime, prettyCmd), nil
 }

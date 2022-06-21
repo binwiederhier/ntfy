@@ -162,3 +162,9 @@ func TestLastString(t *testing.T) {
 	require.Equal(t, "last", LastString([]string{"first", "second", "last"}, "default"))
 	require.Equal(t, "default", LastString([]string{}, "default"))
 }
+
+func TestQuoteCommand(t *testing.T) {
+	require.Equal(t, `ls -al "Document Folder"`, QuoteCommand([]string{"ls", "-al", "Document Folder"}))
+	require.Equal(t, `rsync -av /home/phil/ root@example.com:/home/phil/`, QuoteCommand([]string{"rsync", "-av", "/home/phil/", "root@example.com:/home/phil/"}))
+	require.Equal(t, `/home/sweet/home "Äöü this is a test" "\a\b"`, QuoteCommand([]string{"/home/sweet/home", "Äöü this is a test", "\\a\\b"}))
+}

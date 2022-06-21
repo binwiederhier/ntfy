@@ -11,13 +11,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
 
 func init() {
-	commands = append(commands, cmdPublish, cmdDone)
+	commands = append(commands, cmdPublish)
 }
 
 var flagsPublish = append(
@@ -35,7 +34,8 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
-	&cli.IntFlag{Name: "pid", Aliases: []string{"done", "w"}, EnvVars: []string{"NTFY_PID"}, Usage: "monitor process with given PID and publish when it exists"},
+	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
+	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run and wait until command finishes before publishing"},
 	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
 	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
 	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},
@@ -43,14 +43,16 @@ var flagsPublish = append(
 )
 
 var cmdPublish = &cli.Command{
-	Name:      "publish",
-	Aliases:   []string{"pub", "send", "trigger"},
-	Usage:     "Send message via a ntfy server",
-	UsageText: "ntfy publish [OPTIONS..] TOPIC [MESSAGE]\nNTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE]",
-	Action:    execPublish,
-	Category:  categoryClient,
-	Flags:     flagsPublish,
-	Before:    initLogFunc,
+	Name:    "publish",
+	Aliases: []string{"pub", "send", "trigger"},
+	Usage:   "Send message via a ntfy server",
+	UsageText: `ntfy publish [OPTIONS..] TOPIC [MESSAGE...]
+ntfy publish [OPTIONS..] --wait-cmd -P COMMAND...
+NTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE...]`,
+	Action:   execPublish,
+	Category: categoryClient,
+	Flags:    flagsPublish,
+	Before:   initLogFunc,
 	Description: `Publish a message to a ntfy server.
 
 Examples:
@@ -65,8 +67,10 @@ Examples:
   ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
   ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
   ntfy pub -u phil:mypass secret Psst                     # Publish with username/password
+  ntfy pub --wait-pid 1234 mytopic                        # Wait for process 1234 to exit before publishing
+  ntfy pub --wait-cmd mytopic rsync -av ./ /tmp/a         # Run command and publish after it completes
   NTFY_USER=phil:mypass ntfy pub secret Psst              # Use env variables to set username/password
-  NTFY_TOPIC=mytopic ntfy pub -P "some message""          # Use NTFY_TOPIC variable as topic 
+  NTFY_TOPIC=mytopic ntfy pub -P "some message"           # Use NTFY_TOPIC variable as topic 
   cat flower.jpg | ntfy pub --file=- flowers 'Nice!'      # Same as above, send image.jpg as attachment
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
  
@@ -76,78 +80,7 @@ it has incredibly useful information: https://ntfy.sh/docs/publish/.
 ` + clientCommandDescriptionSuffix,
 }
 
-var cmdDone = &cli.Command{
-	Name:      "done",
-	Usage:     "xxx",
-	UsageText: "xxx",
-	Action:    execDone,
-	Category:  categoryClient,
-	Flags:     flagsPublish,
-	Before:    initLogFunc,
-	Description: `xxx
-` + clientCommandDescriptionSuffix,
-}
-
-func execDone(c *cli.Context) error {
-	return execPublishInternal(c, true)
-}
-
 func execPublish(c *cli.Context) error {
-	return execPublishInternal(c, false)
-}
-
-func parseTopicMessageCommand(c *cli.Context, isDoneCommand bool) (topic string, message string, command []string, err error) {
-	// 1. ntfy done <topic> <command>
-	// 2. ntfy done --pid <pid> <topic> [<message>]
-	// 3. NTFY_TOPIC=.. ntfy done <command>
-	// 4. NTFY_TOPIC=.. ntfy done --pid <pid> [<message>]
-	// 5. ntfy publish <topic> [<message>]
-	// 6. NTFY_TOPIC=.. ntfy publish [<message>]
-	var args []string
-	topic, args, err = parseTopicAndArgs(c)
-	if err != nil {
-		return
-	}
-	if isDoneCommand {
-		if c.Int("pid") > 0 {
-			message = strings.Join(args, " ")
-		} else if len(args) > 0 {
-			command = args
-		} else {
-			err = errors.New("must either specify --pid or a command")
-		}
-	} else {
-		message = strings.Join(args, " ")
-	}
-	if c.String("message") != "" {
-		message = c.String("message")
-	}
-	return
-}
-
-func parseTopicAndArgs(c *cli.Context) (topic string, args []string, err error) {
-	envTopic := c.Bool("env-topic")
-	if envTopic {
-		topic = os.Getenv("NTFY_TOPIC")
-		if topic == "" {
-			return "", nil, errors.New("if --env-topic is passed, must define NTFY_TOPIC environment variable")
-		}
-		return topic, remainingArgs(c, 0), nil
-	}
-	if c.NArg() < 1 {
-		return "", nil, errors.New("must specify topic")
-	}
-	return c.Args().Get(0), remainingArgs(c, 1), nil
-}
-
-func remainingArgs(c *cli.Context, fromIndex int) []string {
-	if c.NArg() > fromIndex {
-		return c.Args().Slice()[fromIndex:]
-	}
-	return []string{}
-}
-
-func execPublishInternal(c *cli.Context, doneCmd bool) error {
 	conf, err := loadConfig(c)
 	if err != nil {
 		return err
@@ -166,8 +99,8 @@ func execPublishInternal(c *cli.Context, doneCmd bool) error {
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
 	quiet := c.Bool("quiet")
-	pid := c.Int("pid")
-	topic, message, command, err := parseTopicMessageCommand(c, doneCmd)
+	pid := c.Int("wait-pid")
+	topic, message, command, err := parseTopicMessageCommand(c)
 	if err != nil {
 		return err
 	}
@@ -226,6 +159,9 @@ func execPublishInternal(c *cli.Context, doneCmd bool) error {
 		if err := waitForProcess(pid); err != nil {
 			return err
 		}
+		if message == "" {
+			message = fmt.Sprintf("process with PID %d exited", pid)
+		}
 	} else if len(command) > 0 {
 		cmdResultMessage, err := runAndWaitForCommand(command)
 		if err != nil {
@@ -267,6 +203,54 @@ func execPublishInternal(c *cli.Context, doneCmd bool) error {
 	return nil
 }
 
+func parseTopicMessageCommand(c *cli.Context) (topic string, message string, command []string, err error) {
+	// 1. ntfy publish --wait-cmd <topic> <command>
+	// 2. NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
+	// 3. ntfy publish <topic> [<message>]
+	// 4. NTFY_TOPIC=.. ntfy publish [<message>]
+	var args []string
+	topic, args, err = parseTopicAndArgs(c)
+	if err != nil {
+		return
+	}
+	if c.Bool("wait-cmd") {
+		if len(args) == 0 {
+			err = errors.New("must specify command when --wait-cmd is passed, type 'ntfy publish --help' for help")
+			return
+		}
+		command = args
+	} else {
+		message = strings.Join(args, " ")
+	}
+	if c.String("message") != "" {
+		message = c.String("message")
+	}
+	return
+}
+
+func parseTopicAndArgs(c *cli.Context) (topic string, args []string, err error) {
+	envTopic := c.Bool("env-topic")
+	if envTopic {
+		fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mDeprecation notice: The --env-topic/-P flag will be removed in July 2022, see https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
+		topic = os.Getenv("NTFY_TOPIC")
+		if topic == "" {
+			return "", nil, errors.New("when --env-topic is passed, must define NTFY_TOPIC environment variable")
+		}
+		return topic, remainingArgs(c, 0), nil
+	}
+	if c.NArg() < 1 {
+		return "", nil, errors.New("must specify topic, type 'ntfy publish --help' for help")
+	}
+	return c.Args().Get(0), remainingArgs(c, 1), nil
+}
+
+func remainingArgs(c *cli.Context, fromIndex int) []string {
+	if c.NArg() > fromIndex {
+		return c.Args().Slice()[fromIndex:]
+	}
+	return []string{}
+}
+
 func waitForProcess(pid int) error {
 	if !processExists(pid) {
 		return fmt.Errorf("process with PID %d not running", pid)
@@ -280,7 +264,7 @@ func waitForProcess(pid int) error {
 }
 
 func runAndWaitForCommand(command []string) (message string, err error) {
-	prettyCmd := formatCommand(command)
+	prettyCmd := util.QuoteCommand(command)
 	log.Debug("Running command: %s", prettyCmd)
 	cmd := exec.Command(command[0], command[1:]...)
 	if log.IsTrace() {
@@ -298,17 +282,4 @@ func runAndWaitForCommand(command []string) (message string, err error) {
 	}
 	log.Debug(message)
 	return message, nil
-}
-
-func formatCommand(command []string) string {
-	quoted := []string{command[0]}
-	noQuotesRegex := regexp.MustCompile(`^[-_./a-z0-9]+$`)
-	for _, c := range command[1:] {
-		if noQuotesRegex.MatchString(c) {
-			quoted = append(quoted, c)
-		} else {
-			quoted = append(quoted, fmt.Sprintf(`"%s"`, c))
-		}
-	}
-	return strings.Join(quoted, " ")
 }

@@ -1,20 +1,34 @@
 # Deprecation notices
 This page is used to list deprecation notices for ntfy. Deprecated commands and options will be 
-**removed after ~3 months** from the time they were deprecated.
+**removed after 1-3 months** from the time they were deprecated. How long the feature is deprecated
+before the behavior is changed depends on the severity of the change, and how prominent the feature is.
 
 ## Active deprecations
 
-### Android app: WebSockets will become the default connection protocol  
-> Active since 2022-03-13, behavior will change in **June 2022**
+### ntfy CLI: `ntfy publish --env-topic` will be removed
+> Active since 2022-06-20, behavior will change end of **July 2022**
 
-In future versions of the Android app, instant delivery connections and connections to self-hosted servers will
-be using the WebSockets protocol. This potentially requires [configuration changes in your proxy](https://ntfy.sh/docs/config/#nginxapache2caddy).
+The `ntfy publish --env-topic` option will be removed. It'll still be possible to specify a topic via the 
+`NTFY_TOPIC` environment variable, but it won't be necessary anymore to specify the `--env-topic` flag.
 
-Due to [reports of varying battery consumption](https://github.com/binwiederhier/ntfy/issues/190) (which entirely 
-seems to depend on the phone), JSON HTTP stream support will not be removed. Instead, I'll just flip the default to 
-WebSocket in June.
+=== "Before"
+    ```
+    $ NTFY_TOPIC=mytopic ntfy publish --env-topic "this is the message"
+    ```
+
+=== "After"
+    ```
+    $ NTFY_TOPIC=mytopic ntfy publish "this is the message"
+    ```
 
 ## Previous deprecations
+
+### <del>Android app: WebSockets will become the default connection protocol</del>
+> Active since 2022-03-13, behavior will not change (deprecation removed 2022-06-20)
+
+Instant delivery connections and connections to self-hosted servers in the Android app were going to switch
+to use the WebSockets protocol by default. It was decided to keep JSON stream as the most compatible default
+and add a notice banner in the Android app instead.
 
 ### Android app: Using `since=<timestamp>` instead of `since=<id>`
 > Active since 2022-02-27, behavior changed with v1.14.0

@@ -49,7 +49,7 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
-	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE topic = ? AND mid = ?`
+	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
 	selectMessagesSinceTimeQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
 		FROM messages 
@@ -294,7 +294,7 @@ func (c *messageCache) messagesSinceTime(topic string, since sinceMarker, schedu
 }
 
 func (c *messageCache) messagesSinceID(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
-	idrows, err := c.db.Query(selectRowIDFromMessageID, topic, since.ID())
+	idrows, err := c.db.Query(selectRowIDFromMessageID, since.ID())
 	if err != nil {
 		return nil, err
 	}

@@ -437,6 +437,53 @@ func TestServer_PublishAndPollSince(t *testing.T) {
 	require.Equal(t, 40008, toHTTPError(t, response.Body.String()).Code)
 }
 
+func newMessageWithTimestamp(topic, message string, timestamp int64) *message {
+	m := newDefaultMessage(topic, message)
+	m.Time = timestamp
+	return m
+}
+
+func TestServer_PollSinceID_MultipleTopics(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic1", "test 1", 1655740277)))
+	markerMessage := newMessageWithTimestamp("mytopic2", "test 2", 1655740283)
+	require.Nil(t, s.messageCache.AddMessage(markerMessage))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic1", "test 3", 1655740289)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic2", "test 4", 1655740293)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic1", "test 5", 1655740297)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic2", "test 6", 1655740303)))
+
+	response := request(t, s, "GET", fmt.Sprintf("/mytopic1,mytopic2/json?poll=1&since=%s", markerMessage.ID), "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Equal(t, 4, len(messages))
+	require.Equal(t, "test 3", messages[0].Message)
+	require.Equal(t, "mytopic1", messages[0].Topic)
+	require.Equal(t, "test 4", messages[1].Message)
+	require.Equal(t, "mytopic2", messages[1].Topic)
+	require.Equal(t, "test 5", messages[2].Message)
+	require.Equal(t, "mytopic1", messages[2].Topic)
+	require.Equal(t, "test 6", messages[3].Message)
+	require.Equal(t, "mytopic2", messages[3].Topic)
+}
+
+func TestServer_PollSinceID_MultipleTopics_IDDoesNotMatch(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic1", "test 3", 1655740289)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic2", "test 4", 1655740293)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic1", "test 5", 1655740297)))
+	require.Nil(t, s.messageCache.AddMessage(newMessageWithTimestamp("mytopic2", "test 6", 1655740303)))
+
+	response := request(t, s, "GET", "/mytopic1,mytopic2/json?poll=1&since=NoMatchForID", "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Equal(t, 4, len(messages))
+	require.Equal(t, "test 3", messages[0].Message)
+	require.Equal(t, "test 4", messages[1].Message)
+	require.Equal(t, "test 5", messages[2].Message)
+	require.Equal(t, "test 6", messages[3].Message)
+}
+
 func TestServer_PublishViaGET(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

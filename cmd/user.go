@@ -6,11 +6,13 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
-	"strings"
 )
 
 func init() {
@@ -36,7 +38,7 @@ var cmdUser = &cli.Command{
 			Name:      "add",
 			Aliases:   []string{"a"},
 			Usage:     "Adds a new user",
-			UsageText: "ntfy user add [--role=admin|user] USERNAME",
+			UsageText: "ntfy user add [--role=admin|user] USERNAME\nNTFY_PASSWORD=... ntfy user add [--role=admin|user] USERNAME",
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
@@ -48,8 +50,12 @@ granted otherwise by the auth-default-access setting). An admin user has read an
 topics.
 
 Examples:
-  ntfy user add phil                 # Add regular user phil  
-  ntfy user add --role=admin phil    # Add admin user phil
+  ntfy user add phil                     # Add regular user phil  
+  ntfy user add --role=admin phil        # Add admin user phil
+  NTFY_PASSWORD=... ntfy user add phil   # Add user, using env variable to set password (for scripts)
+
+You may set the NTFY_PASSWORD environment variable to pass the password. This is useful if 
+you are creating users via scripts.
 `,
 		},
 		{
@@ -68,7 +74,7 @@ Example:
 			Name:      "change-pass",
 			Aliases:   []string{"chp"},
 			Usage:     "Changes a user's password",
-			UsageText: "ntfy user change-pass USERNAME",
+			UsageText: "ntfy user change-pass USERNAME\nNTFY_PASSWORD=... ntfy user change-pass USERNAME",
 			Action:    execUserChangePass,
 			Description: `Change the password for the given user.
 
@@ -76,7 +82,12 @@ The new password will be read from STDIN, and it'll be confirmed by typing
 it twice. 
 
 Example:
-    ntfy user change-pass phil
+  ntfy user change-pass phil
+  NTFY_PASSWORD=.. ntfy user change-pass phil
+
+You may set the NTFY_PASSWORD environment variable to pass the new password. This is 
+useful if you are updating users via scripts.
+
 `,
 		},
 		{
@@ -125,18 +136,24 @@ The command allows you to add/remove/change users in the ntfy user database, as 
 passwords or roles.
 
 Examples:
-  ntfy user list                     # Shows list of users (alias: 'ntfy access')                      
-  ntfy user add phil                 # Add regular user phil  
-  ntfy user add --role=admin phil    # Add admin user phil
-  ntfy user del phil                 # Delete user phil
-  ntfy user change-pass phil         # Change password for user phil
-  ntfy user change-role phil admin   # Make user phil an admin 
+  ntfy user list                               # Shows list of users (alias: 'ntfy access')                      
+  ntfy user add phil                           # Add regular user phil  
+  NTFY_PASSWORD=... ntfy user add phil         # As above, using env variable to set password (for scripts)
+  ntfy user add --role=admin phil              # Add admin user phil
+  ntfy user del phil                           # Delete user phil
+  ntfy user change-pass phil                   # Change password for user phil
+  NTFY_PASSWORD=.. ntfy user change-pass phil  # As above, using env variable to set password (for scripts)
+  ntfy user change-role phil admin             # Make user phil an admin 
+
+For the 'ntfy user add' and 'ntfy user change-pass' commands, you may set the NTFY_PASSWORD environment
+variable to pass the new password. This is useful if you are creating/updating users via scripts.
 `,
 }
 
 func execUserAdd(c *cli.Context) error {
 	username := c.Args().Get(0)
 	role := auth.Role(c.String("role"))
+	password := os.Getenv("NTFY_PASSWORD")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
 	} else if username == userEveryone {
@@ -151,9 +168,13 @@ func execUserAdd(c *cli.Context) error {
 	if user, _ := manager.User(username); user != nil {
 		return fmt.Errorf("user %s already exists", username)
 	}
-	password, err := readPasswordAndConfirm(c)
-	if err != nil {
-		return err
+	if password == "" {
+		p, err := readPasswordAndConfirm(c)
+		if err != nil {
+			return err
+		}
+
+		password = p
 	}
 	if err := manager.AddUser(username, password, role); err != nil {
 		return err
@@ -185,6 +206,7 @@ func execUserDel(c *cli.Context) error {
 
 func execUserChangePass(c *cli.Context) error {
 	username := c.Args().Get(0)
+	password := os.Getenv("NTFY_PASSWORD")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user change-pass --help' for help")
 	} else if username == userEveryone {
@@ -197,9 +219,11 @@ func execUserChangePass(c *cli.Context) error {
 	if _, err := manager.User(username); err == auth.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
-	password, err := readPasswordAndConfirm(c)
-	if err != nil {
-		return err
+	if password == "" {
+		password, err = readPasswordAndConfirm(c)
+		if err != nil {
+			return err
+		}
 	}
 	if err := manager.ChangePassword(username, password); err != nil {
 		return err

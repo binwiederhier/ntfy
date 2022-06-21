@@ -8,6 +8,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* ntfy CLI can now [wait for a command or PID](https://ntfy.sh/docs/subscribe/cli/#wait-for-pidcommand) before publishing ([#263](https://github.com/binwiederhier/ntfy/issues/263), thanks to the [original ntfy](https://github.com/dschep/ntfy) for the idea) 
 * Trace: Log entire HTTP request to simplify debugging (no ticket)
 * Allow setting user password via `NTFY_PASSWORD` env variable ([#327](https://github.com/binwiederhier/ntfy/pull/327), thanks to [@Kenix3](https://github.com/Kenix3))
 

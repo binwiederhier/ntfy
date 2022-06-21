@@ -56,6 +56,71 @@ quick ones:
     ntfy pub mywebhook
     ```
 
+### Attaching a local file
+You can easily upload and attach a local file to a notification:
+
+```
+$ ntfy pub --file README.md mytopic | jq .
+{
+  "id": "meIlClVLABJQ",
+  "time": 1655825460,
+  "event": "message",
+  "topic": "mytopic",
+  "message": "You received a file: README.md",
+  "attachment": {
+    "name": "README.md",
+    "type": "text/plain; charset=utf-8",
+    "size": 2892,
+    "expires": 1655836260,
+    "url": "https://ntfy.sh/file/meIlClVLABJQ.txt"
+  }
+}
+```
+
+### Wait for PID/command
+If you have a long-running command, you may wrap it directly with `ntfy publish --wait-cmd`,
+or if you forgot to wrap it and it's already running, wait for the process to complete with
+`ntfy publish --wait-pid`.
+
+Run a command and wait for it to complete (here: `rsync ...`):
+
+```
+$ ntfy pub --wait-cmd mytopic rsync -av ./ root@example.com:/backups/ | jq .
+{
+  "id": "Re0rWXZQM8WB",
+  "time": 1655825624,
+  "event": "message",
+  "topic": "mytopic",
+  "message": "Command succeeded after 56.553s: rsync -av ./ root@example.com:/backups/"
+}
+```
+
+Or, if you already started the long-running process and want to wait for it, you can do this:
+
+=== "Using a PID directly"
+    ```
+    $ ntfy pub --wait-pid 8458 mytopic | jq .
+    {
+      "id": "orM6hJKNYkWb",
+      "time": 1655825827,
+      "event": "message",
+      "topic": "mytopic",
+      "message": "Process with PID 8458 exited after 2.003s"
+    }
+    ```
+
+=== "Using a `pidof`"
+    ```
+    $ ntfy pub --wait-pid $(pidof rsync) mytopic | jq .
+    {
+      "id": "orM6hJKNYkWb",
+      "time": 1655825827,
+      "event": "message",
+      "topic": "mytopic",
+      "message": "Process with PID 8458 exited after 2.003s"
+    }
+    ```
+
 ## Subscribe to topics
 You can subscribe to topics using `ntfy subscribe`. Depending on how it is called, this command
 will either print or execute a command for every arriving message. There are a few different ways 

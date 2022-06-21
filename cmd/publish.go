@@ -35,7 +35,7 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
 	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
-	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run and wait until command finishes before publishing"},
+	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run command and wait until it finishes before publishing"},
 	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
 	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
 	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},

@@ -121,38 +121,6 @@ func ValidRandomString(s string, length int) bool {
 	return true
 }
 
-// DurationToHuman converts a duration to a human-readable format
-func DurationToHuman(d time.Duration) (str string) {
-	if d == 0 {
-		return "0"
-	}
-
-	d = d.Round(time.Second)
-	days := d / time.Hour / 24
-	if days > 0 {
-		str += fmt.Sprintf("%dd", days)
-	}
-	d -= days * time.Hour * 24
-
-	hours := d / time.Hour
-	if hours > 0 {
-		str += fmt.Sprintf("%dh", hours)
-	}
-	d -= hours * time.Hour
-
-	minutes := d / time.Minute
-	if minutes > 0 {
-		str += fmt.Sprintf("%dm", minutes)
-	}
-	d -= minutes * time.Minute
-
-	seconds := d / time.Second
-	if seconds > 0 {
-		str += fmt.Sprintf("%ds", seconds)
-	}
-	return
-}
-
 // ParsePriority parses a priority string into its equivalent integer value
 func ParsePriority(priority string) (int, error) {
 	switch strings.TrimSpace(strings.ToLower(priority)) {

@@ -5,32 +5,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
-	"time"
 )
-
-func TestDurationToHuman_SevenDays(t *testing.T) {
-	d := 7 * 24 * time.Hour
-	require.Equal(t, "7d", DurationToHuman(d))
-}
-
-func TestDurationToHuman_MoreThanOneDay(t *testing.T) {
-	d := 49 * time.Hour
-	require.Equal(t, "2d1h", DurationToHuman(d))
-}
-
-func TestDurationToHuman_LessThanOneDay(t *testing.T) {
-	d := 17*time.Hour + 15*time.Minute
-	require.Equal(t, "17h15m", DurationToHuman(d))
-}
-
-func TestDurationToHuman_TenOfThings(t *testing.T) {
-	d := 10*time.Hour + 10*time.Minute + 10*time.Second
-	require.Equal(t, "10h10m10s", DurationToHuman(d))
-}
-
-func TestDurationToHuman_Zero(t *testing.T) {
-	require.Equal(t, "0", DurationToHuman(0))
-}
 
 func TestRandomString(t *testing.T) {
 	s1 := RandomString(10)

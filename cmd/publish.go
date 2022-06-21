@@ -47,7 +47,7 @@ var cmdPublish = &cli.Command{
 	Aliases: []string{"pub", "send", "trigger"},
 	Usage:   "Send message via a ntfy server",
 	UsageText: `ntfy publish [OPTIONS..] TOPIC [MESSAGE...]
-ntfy publish [OPTIONS..] --wait-cmd -P COMMAND...
+ntfy publish [OPTIONS..] --wait-cmd COMMAND...
 NTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE...]`,
 	Action:   execPublish,
 	Category: categoryClient,
@@ -156,18 +156,18 @@ func execPublish(c *cli.Context) error {
 		options = append(options, client.WithBasicAuth(user, pass))
 	}
 	if pid > 0 {
-		if err := waitForProcess(pid); err != nil {
-			return err
-		}
-		if message == "" {
-			message = fmt.Sprintf("process with PID %d exited", pid)
-		}
-	} else if len(command) > 0 {
-		cmdResultMessage, err := runAndWaitForCommand(command)
+		newMessage, err := waitForProcess(pid)
 		if err != nil {
 			return err
 		} else if message == "" {
-			message = cmdResultMessage
+			message = newMessage
+		}
+	} else if len(command) > 0 {
+		newMessage, err := runAndWaitForCommand(command)
+		if err != nil {
+			return err
+		} else if message == "" {
+			message = newMessage
 		}
 	}
 	var body io.Reader
@@ -203,11 +203,14 @@ func execPublish(c *cli.Context) error {
 	return nil
 }
 
+// parseTopicMessageCommand reads the topic and the remaining arguments from the context.
+
+// There are a few cases to consider:
+//   ntfy publish <topic> [<message>]
+//   ntfy publish --wait-cmd <topic> <command>
+//   NTFY_TOPIC=.. ntfy publish [<message>]
+//   NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
 func parseTopicMessageCommand(c *cli.Context) (topic string, message string, command []string, err error) {
-	// 1. ntfy publish --wait-cmd <topic> <command>
-	// 2. NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
-	// 3. ntfy publish <topic> [<message>]
-	// 4. NTFY_TOPIC=.. ntfy publish [<message>]
 	var args []string
 	topic, args, err = parseTopicAndArgs(c)
 	if err != nil {
@@ -251,35 +254,39 @@ func remainingArgs(c *cli.Context, fromIndex int) []string {
 	return []string{}
 }
 
-func waitForProcess(pid int) error {
+func waitForProcess(pid int) (message string, err error) {
 	if !processExists(pid) {
-		return fmt.Errorf("process with PID %d not running", pid)
+		return "", fmt.Errorf("process with PID %d not running", pid)
 	}
+	start := time.Now()
 	log.Debug("Waiting for process with PID %d to exit", pid)
 	for processExists(pid) {
 		time.Sleep(500 * time.Millisecond)
 	}
-	log.Debug("Process with PID %d exited", pid)
-	return nil
+	runtime := time.Since(start).Round(time.Millisecond)
+	log.Debug("Process with PID %d exited after %s", pid, runtime)
+	return fmt.Sprintf("Process with PID %d exited after %s", pid, runtime), nil
 }
 
 func runAndWaitForCommand(command []string) (message string, err error) {
 	prettyCmd := util.QuoteCommand(command)
 	log.Debug("Running command: %s", prettyCmd)
+	start := time.Now()
 	cmd := exec.Command(command[0], command[1:]...)
 	if log.IsTrace() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	runtime := time.Since(start).Round(time.Millisecond)
+	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			message = fmt.Sprintf("Command failed (exit code %d): %s", exitError.ExitCode(), prettyCmd)
-		} else {
-			message = fmt.Sprintf("Command failed: %s, error: %s", prettyCmd, err.Error())
+			log.Debug("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd)
+			return fmt.Sprintf("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd), nil
 		}
-	} else {
-		message = fmt.Sprintf("Command done: %s", prettyCmd)
+		// Hard fail when command does not exist or could not be properly launched
+		return "", fmt.Errorf("command failed: %s, error: %s", prettyCmd, err.Error())
 	}
-	log.Debug(message)
-	return message, nil
+	log.Debug("Command succeeded after %s: %s", runtime, prettyCmd)
+	return fmt.Sprintf("Command succeeded after %s: %s", runtime, prettyCmd), nil
 }

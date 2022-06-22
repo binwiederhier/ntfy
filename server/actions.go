@@ -186,6 +186,8 @@ func populateAction(newAction *action, section int, key, value string) error {
 			newAction.Method = value
 		case "body":
 			newAction.Body = value
+    case "intent":
+      newAction.Intent = value
 		default:
 			return fmt.Errorf("key '%s' unknown", key)
 		}

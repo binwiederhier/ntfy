@@ -14,6 +14,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bugs:**
 
+* Fix slow requests due to excessive locking ([#338](https://github.com/binwiederhier/ntfy/issues/338))
 * Return HTTP 500 for GET /_matrix/push/v1/notify when base-url is not configured (no ticket)
 * Disallow setting `upstream-base-url` to the same value as `base-url` ([#334](https://github.com/binwiederhier/ntfy/issues/334), thanks to [@oester](https://github.com/oester) for reporting)
 * Fix `since=<id>` implementation for multiple topics ([#336](https://github.com/binwiederhier/ntfy/issues/336), thanks to [@karmanyaahm](https://github.com/karmanyaahm) for reporting)

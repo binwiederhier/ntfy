@@ -1165,8 +1165,11 @@ func (s *Server) updateStatsAndPrune() {
 	}
 
 	// Print stats
+	s.mu.Lock()
+	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
+	s.mu.Unlock()
 	log.Info("Stats: %d messages published, %d in cache, %d topic(s) active, %d subscriber(s), %d visitor(s), %d mails received (%d successful, %d failed), %d mails sent (%d successful, %d failed)",
-		s.messages, messages, len(s.topics), subscribers, len(s.visitors),
+		messagesCount, messages, topicsCount, subscribers, visitorsCount,
 		receivedMailTotal, receivedMailSuccess, receivedMailFailure,
 		sentMailTotal, sentMailSuccess, sentMailFailure)
 }

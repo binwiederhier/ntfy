@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -1407,6 +1408,41 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 	r.Header.Set("X-Forwarded-For", "1.2.3.4 , 2.4.4.2,234.5.2.1 ")
 	v := s.visitor(r)
 	require.Equal(t, "234.5.2.1", v.ip)
+}
+
+func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
+	count := 1000
+	s := newTestServer(t, newTestConfig(t))
+
+	// Add lots of messages
+	log.Printf("Adding %d messages", count)
+	start := time.Now()
+	for i := 0; i < count; i++ {
+		require.Nil(t, s.messageCache.AddMessage(newDefaultMessage(fmt.Sprintf("topic%d", i), "some message")))
+	}
+	log.Printf("Done: Adding %d messages; took %s", count, time.Since(start).Round(time.Millisecond))
+
+	// Update stats
+	statsChan := make(chan bool)
+	go func() {
+		log.Printf("Updating stats")
+		start := time.Now()
+		s.updateStatsAndPrune()
+		log.Printf("Done: Updating stats; took %s", time.Since(start).Round(time.Millisecond))
+		statsChan <- true
+	}()
+	time.Sleep(50 * time.Millisecond) // Make sure it starts first
+
+	// Publish message (during stats update)
+	log.Printf("Publishing message")
+	start = time.Now()
+	response := request(t, s, "PUT", "/mytopic", "some body", nil)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "some body", m.Message)
+	require.True(t, time.Since(start) < 500*time.Millisecond)
+	log.Printf("Done: Publishing message; took %s", time.Since(start).Round(time.Millisecond))
+
+	<-statsChan
 }
 
 func newTestConfig(t *testing.T) *Config {

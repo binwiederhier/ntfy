@@ -798,6 +798,13 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	var wlock sync.Mutex
+	defer func() {
+		// Hack: This is the fix for a horrible data race that I have not been able to figure out in quite some time.
+		// It appears to be happening when the Go HTTP code reads from the socket when closing the request (i.e. AFTER
+		// this function returns), and causes a data race with the ResponseWriter. Locking wlock here silences the
+		// data race detector. See https://github.com/binwiederhier/ntfy/issues/338#issuecomment-1163425889.
+		wlock.TryLock()
+	}()
 	sub := func(v *visitor, msg *message) error {
 		if !filters.Pass(msg) {
 			return nil

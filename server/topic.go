@@ -50,9 +50,13 @@ func (t *topic) Publish(v *visitor, m *message) error {
 		if len(subscribers) > 0 {
 			log.Debug("%s Forwarding to %d subscriber(s)", logMessagePrefix(v, m), len(subscribers))
 			for _, s := range subscribers {
-				if err := s(v, m); err != nil {
-					log.Warn("%s Error forwarding to subscriber", logMessagePrefix(v, m))
-				}
+				// We call the subscriber functions in their own Go routines because they are blocking, and
+				// we don't want individual slow subscribers to be able to block others.
+				go func(s subscriber) {
+					if err := s(v, m); err != nil {
+						log.Warn("%s Error forwarding to subscriber", logMessagePrefix(v, m))
+					}
+				}(s)
 			}
 		} else {
 			log.Trace("%s No stream or WebSocket subscribers, not forwarding", logMessagePrefix(v, m))

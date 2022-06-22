@@ -82,7 +82,7 @@ const (
 	`
 	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
-	selectMessageCountForTopicQuery = `SELECT COUNT(*) FROM messages WHERE topic = ?`
+	selectMessageCountPerTopicQuery = `SELECT topic, COUNT(*) FROM messages GROUP BY topic`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
 	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
 	selectAttachmentsExpiredQuery   = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
@@ -332,22 +332,24 @@ func (c *messageCache) MarkPublished(m *message) error {
 	return err
 }
 
-func (c *messageCache) MessageCount(topic string) (int, error) {
-	rows, err := c.db.Query(selectMessageCountForTopicQuery, topic)
+func (c *messageCache) MessageCounts() (map[string]int, error) {
+	rows, err := c.db.Query(selectMessageCountPerTopicQuery)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer rows.Close()
+	var topic string
 	var count int
-	if !rows.Next() {
-		return 0, errors.New("no rows found")
+	counts := make(map[string]int)
+	for rows.Next() {
+		if err := rows.Scan(&topic, &count); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		counts[topic] = count
 	}
-	if err := rows.Scan(&count); err != nil {
-		return 0, err
-	} else if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	return count, nil
+	return counts, nil
 }
 
 func (c *messageCache) Topics() (map[string]*topic, error) {

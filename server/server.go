@@ -798,6 +798,13 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	var wlock sync.Mutex
+	defer func() {
+		// Hack: This is the fix for a horrible data race that I have not been able to figure out in quite some time.
+		// It appears to be happening when the Go HTTP code reads from the socket when closing the request (i.e. AFTER
+		// this function returns), and causes a data race with the ResponseWriter. Locking wlock here silences the
+		// data race detector. See https://github.com/binwiederhier/ntfy/issues/338#issuecomment-1163425889.
+		wlock.TryLock()
+	}()
 	sub := func(v *visitor, msg *message) error {
 		if !filters.Pass(msg) {
 			return nil
@@ -1080,18 +1087,23 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 }
 
 func (s *Server) updateStatsAndPrune() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	log.Debug("Manager: Starting")
+	defer log.Debug("Manager: Finished")
+
+	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
+	//          there is no mutex for the entire function.
 
 	// Expire visitors from rate visitors map
+	s.mu.Lock()
 	staleVisitors := 0
 	for ip, v := range s.visitors {
 		if v.Stale() {
-			log.Debug("Deleting stale visitor %s", v.ip)
+			log.Trace("Deleting stale visitor %s", v.ip)
 			delete(s.visitors, ip)
 			staleVisitors++
 		}
 	}
+	s.mu.Unlock()
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired attachments
@@ -1116,22 +1128,31 @@ func (s *Server) updateStatsAndPrune() {
 		log.Warn("Manager: Error pruning cache: %s", err.Error())
 	}
 
-	// Prune old topics, remove subscriptions without subscribers
-	var subscribers, messages int
+	// Message count per topic
+	var messages int
+	messageCounts, err := s.messageCache.MessageCounts()
+	if err != nil {
+		log.Warn("Manager: Cannot get message counts: %s", err.Error())
+		messageCounts = make(map[string]int) // Empty, so we can continue
+	}
+	for _, count := range messageCounts {
+		messages += count
+	}
+
+	// Remove subscriptions without subscribers
+	s.mu.Lock()
+	var subscribers int
 	for _, t := range s.topics {
-		subs := t.Subscribers()
-		msgs, err := s.messageCache.MessageCount(t.ID)
-		if err != nil {
-			log.Warn("Manager: Cannot get stats for topic %s: %s", t.ID, err.Error())
-			continue
-		}
-		if msgs == 0 && subs == 0 {
+		subs := t.SubscribersCount()
+		msgs, exists := messageCounts[t.ID]
+		if subs == 0 && (!exists || msgs == 0) {
+			log.Trace("Deleting empty topic %s", t.ID)
 			delete(s.topics, t.ID)
 			continue
 		}
 		subscribers += subs
-		messages += msgs
 	}
+	s.mu.Unlock()
 
 	// Mail stats
 	var receivedMailTotal, receivedMailSuccess, receivedMailFailure int64
@@ -1219,10 +1240,10 @@ func (s *Server) sendDelayedMessages() error {
 }
 
 func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	log.Debug("%s Sending delayed message", logMessagePrefix(v, m))
+	s.mu.Lock()
 	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
+	s.mu.Unlock()
 	if ok {
 		go func() {
 			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler

@@ -78,9 +78,9 @@ $ ntfy pub --file README.md mytopic | jq .
 ```
 
 ### Wait for PID/command
-If you have a long-running command, you may wrap it directly with `ntfy publish --wait-cmd`,
-or if you forgot to wrap it and it's already running, wait for the process to complete with
-`ntfy publish --wait-pid`.
+If you have a long-running command and want to **publish a notification when the command completes**, 
+you may wrap it with `ntfy publish --wait-cmd` (aliases: `--cmd`, `--done`). Or, if you forgot to wrap it, and the
+command is already running, you can wait for the process to complete with `ntfy publish --wait-pid` (alias: `--pid`).
 
 Run a command and wait for it to complete (here: `rsync ...`):
 
@@ -95,7 +95,7 @@ $ ntfy pub --wait-cmd mytopic rsync -av ./ root@example.com:/backups/ | jq .
 }
 ```
 
-Or, if you already started the long-running process and want to wait for it, you can do this:
+Or, if you already started the long-running process and want to wait for it using its process ID (PID), you can do this:
 
 === "Using a PID directly"
     ```

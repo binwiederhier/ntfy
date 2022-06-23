@@ -26,7 +26,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 
 -->
 
-## ntfy server v1.27.1
+## ntfy server v1.27.2
 Released June 23, 2022
 
 **Features:**

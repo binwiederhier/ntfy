@@ -52,6 +52,14 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, "some command", actions[0].Extras["command"])
 	require.Equal(t, "a parameter", actions[0].Extras["some_param"])
 
+  // Broadcast action with intent
+  actions, err = parseActions("action=broadcast, label=Do a thing, intent=io.heckel.ntfy.TEST_INTENT")
+  require.Nil(t, err)
+  require.Equal(t, 1, len(actions))
+  require.Equal(t, "broadcast", actions[0].Action)
+  require.Equal(t, "Do a thing", actions[0].Label)
+  require.Equal(t, "io.heckel.ntfy.TEST_INTENT", actions[0].Intent)
+
 	// Headers with dashes
 	actions, err = parseActions("action=http, label=Send request, url=http://example.com, method=GET, headers.Content-Type=application/json, headers.Authorization=Basic sdasffsf")
 	require.Nil(t, err)

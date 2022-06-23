@@ -88,6 +88,18 @@ const (
 	selectAttachmentsExpiredQuery   = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
+// Performance & setup queries (see https://phiresky.github.io/blog/2020/sqlite-performance-tuning/)
+// - Write-ahead log (speeds up reads)
+// - Only sync on WAL checkpoint
+// - Temporary indices in memory
+const (
+	setupQueries = `
+		pragma journal_mode = WAL;
+		pragma synchronous = normal;
+		pragma temp_store = memory;
+	`
+)
+
 // Schema management queries
 const (
 	currentSchemaVersion          = 7
@@ -222,52 +234,66 @@ func createMemoryFilename() string {
 }
 
 func (c *messageCache) AddMessage(m *message) error {
-	if m.Event != messageEvent {
-		return errUnexpectedMessageType
-	}
+	return c.addMessages([]*message{m})
+}
+
+func (c *messageCache) addMessages(ms []*message) error {
 	if c.nop {
 		return nil
 	}
-	published := m.Time <= time.Now().Unix()
-	tags := strings.Join(m.Tags, ",")
-	var attachmentName, attachmentType, attachmentURL string
-	var attachmentSize, attachmentExpires int64
-	if m.Attachment != nil {
-		attachmentName = m.Attachment.Name
-		attachmentType = m.Attachment.Type
-		attachmentSize = m.Attachment.Size
-		attachmentExpires = m.Attachment.Expires
-		attachmentURL = m.Attachment.URL
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
 	}
-	var actionsStr string
-	if len(m.Actions) > 0 {
-		actionsBytes, err := json.Marshal(m.Actions)
+	defer tx.Rollback()
+	for _, m := range ms {
+		if m.Event != messageEvent {
+			return errUnexpectedMessageType
+		}
+		published := m.Time <= time.Now().Unix()
+		tags := strings.Join(m.Tags, ",")
+		var attachmentName, attachmentType, attachmentURL string
+		var attachmentSize, attachmentExpires int64
+		if m.Attachment != nil {
+			attachmentName = m.Attachment.Name
+			attachmentType = m.Attachment.Type
+			attachmentSize = m.Attachment.Size
+			attachmentExpires = m.Attachment.Expires
+			attachmentURL = m.Attachment.URL
+		}
+		var actionsStr string
+		if len(m.Actions) > 0 {
+			actionsBytes, err := json.Marshal(m.Actions)
+			if err != nil {
+				return err
+			}
+			actionsStr = string(actionsBytes)
+		}
+		_, err := tx.Exec(
+			insertMessageQuery,
+			m.ID,
+			m.Time,
+			m.Topic,
+			m.Message,
+			m.Title,
+			m.Priority,
+			tags,
+			m.Click,
+			actionsStr,
+			attachmentName,
+			attachmentType,
+			attachmentSize,
+			attachmentExpires,
+			attachmentURL,
+			m.Sender,
+			m.Encoding,
+			published,
+		)
 		if err != nil {
 			return err
 		}
-		actionsStr = string(actionsBytes)
 	}
-	_, err := c.db.Exec(
-		insertMessageQuery,
-		m.ID,
-		m.Time,
-		m.Topic,
-		m.Message,
-		m.Title,
-		m.Priority,
-		tags,
-		m.Click,
-		actionsStr,
-		attachmentName,
-		attachmentType,
-		attachmentSize,
-		attachmentExpires,
-		attachmentURL,
-		m.Sender,
-		m.Encoding,
-		published,
-	)
-	return err
+	return tx.Commit()
 }
 
 func (c *messageCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
@@ -486,6 +512,11 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 }
 
 func setupCacheDB(db *sql.DB) error {
+	// Performance: WAL mode, only sync on WAL checkpoints
+	if _, err := db.Exec(setupQueries); err != nil {
+		return err
+	}
+
 	// If 'messages' table does not exist, this must be a new database
 	rowsMC, err := db.Query(selectMessagesCountQuery)
 	if err != nil {

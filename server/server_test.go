@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"math/rand"
@@ -1411,15 +1412,22 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 }
 
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
-	count := 1000
-	s := newTestServer(t, newTestConfig(t))
+	count := 50000
+	c := newTestConfig(t)
+	c.TotalTopicLimit = 50001
+	s := newTestServer(t, c)
 
 	// Add lots of messages
 	log.Printf("Adding %d messages", count)
 	start := time.Now()
+	messages := make([]*message, 0)
 	for i := 0; i < count; i++ {
-		require.Nil(t, s.messageCache.AddMessage(newDefaultMessage(fmt.Sprintf("topic%d", i), "some message")))
+		topicID := fmt.Sprintf("topic%d", i)
+		_, err := s.topicsFromIDs(topicID) // Add topic to internal s.topics array
+		require.Nil(t, err)
+		messages = append(messages, newDefaultMessage(topicID, "some message"))
 	}
+	require.Nil(t, s.messageCache.addMessages(messages))
 	log.Printf("Done: Adding %d messages; took %s", count, time.Since(start).Round(time.Millisecond))
 
 	// Update stats
@@ -1438,11 +1446,13 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	start = time.Now()
 	response := request(t, s, "PUT", "/mytopic", "some body", nil)
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "some body", m.Message)
-	require.True(t, time.Since(start) < 500*time.Millisecond)
+	assert.Equal(t, "some body", m.Message)
+	assert.True(t, time.Since(start) < 100*time.Millisecond)
 	log.Printf("Done: Publishing message; took %s", time.Since(start).Round(time.Millisecond))
 
+	// Wait for all goroutines
 	<-statsChan
+	log.Printf("Done: Waiting for all locks")
 }
 
 func newTestConfig(t *testing.T) *Config {

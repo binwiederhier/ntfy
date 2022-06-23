@@ -29,6 +29,10 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 ## ntfy server v1.27.2
 Released June 23, 2022
 
+This release brings two new CLI options to wait for a command to finish, or for a PID to exit. It also adds more detail
+to trace debug output. Aside from other bugs, it fixes a performance issue that occurred in large installations every 
+minute or so, due to competing stats gathering (personal installations will likely be unaffected by this). 
+
 **Features:**
 
 * Add `cache-startup-queries` option to allow custom [SQLite performance tuning](config.md#wal-for-message-cache) (no ticket)

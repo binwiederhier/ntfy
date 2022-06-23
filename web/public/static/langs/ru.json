@@ -150,5 +150,9 @@
     "error_boundary_stack_trace": "Трассировка стека",
     "error_boundary_gathering_info": "Соберите больше информации …",
     "publish_dialog_drop_file_here": "Перетащите файл юда",
-    "prefs_notifications_min_priority_high_and_higher": "Высокий приоритет и выше"
+    "prefs_notifications_min_priority_high_and_higher": "Высокий приоритет и выше",
+    "action_bar_toggle_action_menu": "Открыть/закрыть меню",
+    "action_bar_show_menu": "Показать меню",
+    "action_bar_logo_alt": "ntfy лого",
+    "emoji_picker_search_clear": "Очистить поиск"
 }

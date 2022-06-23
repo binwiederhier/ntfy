@@ -57,6 +57,7 @@ type Config struct {
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
+	CacheStartupQueries                  string
 	AuthFile                             string
 	AuthDefaultRead                      bool
 	AuthDefaultWrite                     bool

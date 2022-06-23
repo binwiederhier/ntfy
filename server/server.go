@@ -158,7 +158,7 @@ func createMessageCache(conf *Config) (*messageCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile, false)
+		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, false)
 	}
 	return newMemCache()
 }

@@ -88,18 +88,6 @@ const (
 	selectAttachmentsExpiredQuery   = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
-// Performance & setup queries (see https://phiresky.github.io/blog/2020/sqlite-performance-tuning/)
-// - Write-ahead log (speeds up reads)
-// - Only sync on WAL checkpoint
-// - Temporary indices in memory
-const (
-	setupQueries = `
-		pragma journal_mode = WAL;
-		pragma synchronous = normal;
-		pragma temp_store = memory;
-	`
-)
-
 // Schema management queries
 const (
 	currentSchemaVersion          = 7
@@ -198,12 +186,12 @@ type messageCache struct {
 }
 
 // newSqliteCache creates a SQLite file-backed cache
-func newSqliteCache(filename string, nop bool) (*messageCache, error) {
+func newSqliteCache(filename, startupQueries string, nop bool) (*messageCache, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
 	}
-	if err := setupCacheDB(db); err != nil {
+	if err := setupCacheDB(db, startupQueries); err != nil {
 		return nil, err
 	}
 	return &messageCache{
@@ -214,13 +202,13 @@ func newSqliteCache(filename string, nop bool) (*messageCache, error) {
 
 // newMemCache creates an in-memory cache
 func newMemCache() (*messageCache, error) {
-	return newSqliteCache(createMemoryFilename(), false)
+	return newSqliteCache(createMemoryFilename(), "", false)
 }
 
 // newNopCache creates an in-memory cache that discards all messages;
 // it is always empty and can be used if caching is entirely disabled
 func newNopCache() (*messageCache, error) {
-	return newSqliteCache(createMemoryFilename(), true)
+	return newSqliteCache(createMemoryFilename(), "", true)
 }
 
 // createMemoryFilename creates a unique memory filename to use for the SQLite backend.
@@ -511,10 +499,12 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	return messages, nil
 }
 
-func setupCacheDB(db *sql.DB) error {
-	// Performance: WAL mode, only sync on WAL checkpoints
-	if _, err := db.Exec(setupQueries); err != nil {
-		return err
+func setupCacheDB(db *sql.DB, startupQueries string) error {
+	// Run startup queries
+	if startupQueries != "" {
+		if _, err := db.Exec(startupQueries); err != nil {
+			return err
+		}
 	}
 
 	// If 'messages' table does not exist, this must be a new database

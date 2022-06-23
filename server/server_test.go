@@ -1415,6 +1415,7 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	count := 50000
 	c := newTestConfig(t)
 	c.TotalTopicLimit = 50001
+	c.CacheStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	s := newTestServer(t, c)
 
 	// Add lots of messages

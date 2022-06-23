@@ -378,7 +378,7 @@ func TestSqliteCache_Migration_From0(t *testing.T) {
 	require.Nil(t, db.Close())
 
 	// Create cache to trigger migration
-	c := newSqliteTestCacheFromFile(t, filename)
+	c := newSqliteTestCacheFromFile(t, filename, "")
 	checkSchemaVersion(t, c.db)
 
 	messages, err := c.Messages("mytopic", sinceAllMessages, false)
@@ -424,7 +424,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Nil(t, db.Close())
 
 	// Create cache to trigger migration
-	c := newSqliteTestCacheFromFile(t, filename)
+	c := newSqliteTestCacheFromFile(t, filename, "")
 	checkSchemaVersion(t, c.db)
 
 	// Add delayed message
@@ -441,6 +441,37 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	messages, err = c.Messages("mytopic", sinceAllMessages, true)
 	require.Nil(t, err)
 	require.Equal(t, 11, len(messages))
+}
+
+func TestSqliteCache_StartupQueries_WAL(t *testing.T) {
+	filename := newSqliteTestCacheFile(t)
+	startupQueries := `pragma journal_mode = WAL; 
+pragma synchronous = normal; 
+pragma temp_store = memory;`
+	db, err := newSqliteCache(filename, startupQueries, false)
+	require.Nil(t, err)
+	require.Nil(t, db.AddMessage(newDefaultMessage("mytopic", "some message")))
+	require.FileExists(t, filename)
+	require.FileExists(t, filename+"-wal")
+	require.FileExists(t, filename+"-shm")
+}
+
+func TestSqliteCache_StartupQueries_None(t *testing.T) {
+	filename := newSqliteTestCacheFile(t)
+	startupQueries := ""
+	db, err := newSqliteCache(filename, startupQueries, false)
+	require.Nil(t, err)
+	require.Nil(t, db.AddMessage(newDefaultMessage("mytopic", "some message")))
+	require.FileExists(t, filename)
+	require.NoFileExists(t, filename+"-wal")
+	require.NoFileExists(t, filename+"-shm")
+}
+
+func TestSqliteCache_StartupQueries_Fail(t *testing.T) {
+	filename := newSqliteTestCacheFile(t)
+	startupQueries := `xx error`
+	_, err := newSqliteCache(filename, startupQueries, false)
+	require.Error(t, err)
 }
 
 func checkSchemaVersion(t *testing.T, db *sql.DB) {
@@ -468,7 +499,7 @@ func TestMemCache_NopCache(t *testing.T) {
 }
 
 func newSqliteTestCache(t *testing.T) *messageCache {
-	c, err := newSqliteCache(newSqliteTestCacheFile(t), false)
+	c, err := newSqliteCache(newSqliteTestCacheFile(t), "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -479,8 +510,8 @@ func newSqliteTestCacheFile(t *testing.T) string {
 	return filepath.Join(t.TempDir(), "cache.db")
 }
 
-func newSqliteTestCacheFromFile(t *testing.T, filename string) *messageCache {
-	c, err := newSqliteCache(filename, false)
+func newSqliteTestCacheFromFile(t *testing.T, filename, startupQueries string) *messageCache {
+	c, err := newSqliteCache(filename, startupQueries, false)
 	if err != nil {
 		t.Fatal(err)
 	}

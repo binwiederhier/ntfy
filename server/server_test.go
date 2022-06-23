@@ -1068,6 +1068,7 @@ func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
 	body := `{"topic":"mytopic","message":"A message","email":"phil@example.com"}`
 	response := request(t, s, "PUT", "/", body, nil)
 	require.Equal(t, 200, response.Code)
+	time.Sleep(100 * time.Millisecond) // E-Mail publishing happens in a Go routine
 
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, "mytopic", m.Topic)

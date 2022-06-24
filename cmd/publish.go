@@ -34,11 +34,11 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
-	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
-	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run command and wait until it finishes before publishing"},
-	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
-	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
-	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},
+	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"wait_pid", "pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
+	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"wait_cmd", "cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run command and wait until it finishes before publishing"},
+	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"no_cache", "C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
+	&cli.BoolFlag{Name: "no-firebase", Aliases: []string{"no_firebase", "F"}, EnvVars: []string{"NTFY_NO_FIREBASE"}, Usage: "do not forward message to Firebase"},
+	&cli.BoolFlag{Name: "env-topic", Aliases: []string{"env_topic", "P"}, EnvVars: []string{"NTFY_ENV_TOPIC"}, Usage: "use topic from NTFY_TOPIC env variable"},
 	&cli.BoolFlag{Name: "quiet", Aliases: []string{"q"}, EnvVars: []string{"NTFY_QUIET"}, Usage: "do not print message"},
 )
 

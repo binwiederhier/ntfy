@@ -8,6 +8,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Subscriptions can now have a display name ([#313](https://github.com/binwiederhier/ntfy/issues/313), thanks to [@wunter8](https://github.com/wunter8))
 * Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
 

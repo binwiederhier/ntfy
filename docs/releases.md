@@ -26,11 +26,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
-## ntfy server v1.27.3 (UNRELEASED)
 
-**Features:**
+## ntfy server v1.28.0 (UNRELEASED)
 
+**Bugs:**
+
+* `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
+
 -->
 
 ## ntfy server v1.27.2

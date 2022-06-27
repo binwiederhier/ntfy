@@ -1746,7 +1746,7 @@ And the same example using [JSON publishing](#publish-as-json):
             }
         )
 
-    # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras', otherwise it will read System.Collections.Hashtable in the resturned json
+    # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras', otherwise it will read System.Collections.Hashtable in the returned json
 
     } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
@@ -2018,7 +2018,7 @@ And the same example using [JSON publishing](#publish-as-json):
                 body    = '{"action": "close"}'
             }
         )
-        # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', otherwise it will read System.Collections.Hashtable in the resturned json    
+        # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', otherwise it will read System.Collections.Hashtable in the returned json    
     } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```

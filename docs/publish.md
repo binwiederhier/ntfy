@@ -883,19 +883,25 @@ is the only required one:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-            "topic"="powershell"
-            "title"="Low disk space alert"
-            "message"="Disk space is low at 5.1 GB"
-            "priority"=4
-            "attach"="https://filesrv.lan/space.jpg"
-            "filename"="diskspace.jpg"
-            "tags"=@("warning","cd")
-            "click"= "https://homecamera.lan/xasds1h2xsSsa/"
-            "actions"=@[@{ "action"="view", "label"="Admin panel", "url"="https://filesrv.lan/admin" }]
-          } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+$uri = "https://ntfy.sh"
+$body = @{
+    topic    = "powershell"
+    title    = "Low disk space alert"
+    message  = "Disk space is low at 5.1 GB"
+    priority = 4
+    attach   = "https://filesrv.lan/space.jpg"
+    filename = "diskspace.jpg"
+    tags     = @("warning", "cd")
+    click    = "https://homecamera.lan/xasds1h2xsSsa/"
+    actions  = @(
+        @{ 
+            action = "view"
+            label  = "Admin panel"
+            url    = "https://filesrv.lan/admin"
+        }
+    )
+} | ConvertTo-Json
+Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
@@ -1210,24 +1216,24 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ``` powershell
     $uri = "https://ntfy.sh"
     $body = @{
-        "topic"="myhome"
-        "message"="You left the house. Turn down the A/C?"
-        "actions"=@(
+        topic   = "myhome"
+        message = "You left the house. Turn down the A/C?"
+        actions = @(
             @{
-                "action"="view"
-                "label"="Open portal"
-                "url"="https://home.nest.com/"
-                "clear"=true
+                action = "view"
+                label  = "Open portal"
+                url    = "https://home.nest.com/"
+                clear  = $true
             },
             @{
-                "action"="http",
-                "label"="Turn down"
-                "url"="https://api.nest.com/"
-                "body"="{\"temperature\": 65}"
+                action = "http"
+                label  = "Turn down"
+                url    = "https://api.nest.com/"
+                body   = '{"temperature": 65}'
             }
         )
     } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
@@ -1470,9 +1476,9 @@ And the same example using [JSON publishing](#publish-as-json):
     ``` powershell
     $uri = "https://ntfy.sh"
     $body = @{
-        "topic"="myhome"
-        "message"="Somebody retweetet your tweet."
-        "actions"=@(
+        topic = "myhome"
+        message = "Somebody retweetet your tweet."
+        actions = @(
             @{
                 "action"="view"
                 "label"="Open Twitter"
@@ -1727,19 +1733,22 @@ And the same example using [JSON publishing](#publish-as-json):
     ``` powershell
     $uri = "https://ntfy.sh"
     $body = @{
-        "topic"="wifey"
-        "message"="Your wife requested you send a picture of yourself."
-        "actions"=@(
+        topic = "wifey"
+        message = "Your wife requested you send a picture of yourself."
+        actions = @(
             @{
-                "action"="broadcast"
-                "label"="Take picture"
-                "extras"=@{
-                    "cmd"="pic"
-                    "camera"="front"
+                action = "broadcast"
+                label = "Take picture"
+                extras = @{
+                     cmd ="pic"
+                     camera = "front"
                 }
             }
         )
-    } | ConvertTo-Json
+
+    # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras', otherwise it will read System.Collections.Hashtable in the resturned json
+
+    } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
@@ -1995,22 +2004,22 @@ And the same example using [JSON publishing](#publish-as-json):
     ``` powershell
     $uri = "https://ntfy.sh"
     $body = @{
-        "topic"="myhome"
-        "message"="Garage door has been open for 15 minutes. Close it?"
-        "actions"=@(
+        topic   = "myhome"
+        message = "Garage door has been open for 15 minutes. Close it?"
+        actions = @(
             @{
-                "action"="http",
-                "label"="Close door"
-                "url"="https://api.mygarage.lan/"
-                "method"="PUT"
-                "headers"=@{
-                  "Authorization"="Bearer zAzsx1sk.."
+                action  = "http"
+                label   = "Close door"
+                url     = "https://api.mygarage.lan/"
+                method  = "PUT"
+                headers = @{
+                    Authorization = "Bearer zAzsx1sk.."
                 }
-                "body"="{\"action\": \"close\"}"
+                body    = '{"action": "close"}'
             }
-          }
         )
-    } | ConvertTo-Json
+        # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', otherwise it will read System.Collections.Hashtable in the resturned json    
+    } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 

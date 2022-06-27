@@ -32,6 +32,10 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 
+**Documentation:**
+
+* Fix some PowerShell publish docs ([#345](https://github.com/binwiederhier/ntfy/pull/345), thanks to [@noahpeltier](https://github.com/noahpeltier))
+
 -->
 
 ## ntfy server v1.27.2

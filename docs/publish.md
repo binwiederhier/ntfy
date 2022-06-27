@@ -883,25 +883,25 @@ is the only required one:
 
 === "PowerShell"
     ``` powershell
-$uri = "https://ntfy.sh"
-$body = @{
-    topic    = "powershell"
-    title    = "Low disk space alert"
-    message  = "Disk space is low at 5.1 GB"
-    priority = 4
-    attach   = "https://filesrv.lan/space.jpg"
-    filename = "diskspace.jpg"
-    tags     = @("warning", "cd")
-    click    = "https://homecamera.lan/xasds1h2xsSsa/"
-    actions  = @(
-        @{ 
-            action = "view"
-            label  = "Admin panel"
-            url    = "https://filesrv.lan/admin"
-        }
-    )
-} | ConvertTo-Json
-Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+    $uri = "https://ntfy.sh"
+    $body = @{
+        topic    = "mytopic"
+        title    = "Low disk space alert"
+        message  = "Disk space is low at 5.1 GB"
+        priority = 4
+        attach   = "https://filesrv.lan/space.jpg"
+        filename = "diskspace.jpg"
+        tags     = @("warning", "cd")
+        click    = "https://homecamera.lan/xasds1h2xsSsa/"
+        actions  = @(
+            @{ 
+                action = "view"
+                label  = "Admin panel"
+                url    = "https://filesrv.lan/admin"
+            }
+        )
+    } | ConvertTo-Json
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
@@ -1233,7 +1233,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
             }
         )
     } | ConvertTo-Json
-Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
 
 === "Python"
@@ -1731,6 +1731,9 @@ And the same example using [JSON publishing](#publish-as-json):
 
 === "PowerShell"
     ``` powershell
+    # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras',
+    # otherwise it will read System.Collections.Hashtable in the returned JSON
+
     $uri = "https://ntfy.sh"
     $body = @{
         topic = "wifey"
@@ -1745,9 +1748,6 @@ And the same example using [JSON publishing](#publish-as-json):
                 }
             }
         )
-
-    # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras', otherwise it will read System.Collections.Hashtable in the returned json
-
     } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```
@@ -2002,6 +2002,9 @@ And the same example using [JSON publishing](#publish-as-json):
 
 === "PowerShell"
     ``` powershell
+    # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', 
+    # otherwise it will read System.Collections.Hashtable in the returned JSON
+
     $uri = "https://ntfy.sh"
     $body = @{
         topic   = "myhome"
@@ -2018,7 +2021,6 @@ And the same example using [JSON publishing](#publish-as-json):
                 body    = '{"action": "close"}'
             }
         )
-        # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', otherwise it will read System.Collections.Hashtable in the returned json    
     } | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
     ```

@@ -1,13 +1,12 @@
 import {
-    basicAuth,
-    encodeBase64,
     fetchLinesIterator,
     maybeWithBasicAuth,
     topicShortUrl,
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince, userStatsUrl
+    topicUrlJsonPollWithSince,
+    userStatsUrl
 } from "./utils";
 import userManager from "./UserManager";
 

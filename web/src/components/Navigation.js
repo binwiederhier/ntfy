@@ -14,7 +14,7 @@ import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import {openUrl, topicShortUrl, topicUrl} from "../app/utils";
+import {openUrl, topicDisplayName, topicUrl} from "../app/utils";
 import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -173,12 +173,10 @@ const SubscriptionItem = (props) => {
     const icon = (subscription.state === ConnectionState.Connecting)
         ? <CircularProgress size="24px"/>
         : <Badge badgeContent={iconBadge} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
-    const label = (subscription.baseUrl === window.location.origin)
-        ? subscription.topic
-        : topicShortUrl(subscription.baseUrl, subscription.topic);
+    const displayName = topicDisplayName(subscription);
     const ariaLabel = (subscription.state === ConnectionState.Connecting)
-        ? `${label} (${t("nav_button_connecting")})`
-        : label;
+        ? `${displayName} (${t("nav_button_connecting")})`
+        : displayName;
     const handleClick = async () => {
         navigate(routes.forSubscription(subscription));
         await subscriptionManager.markNotificationsRead(subscription.id);
@@ -186,7 +184,7 @@ const SubscriptionItem = (props) => {
     return (
         <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
             <ListItemIcon>{icon}</ListItemIcon>
-            <ListItemText primary={label}/>
+            <ListItemText primary={displayName}/>
             {subscription.mutedUntil > 0 &&
                 <ListItemIcon edge="end" aria-label={t("nav_button_muted")}><NotificationsOffOutlined /></ListItemIcon>}
         </ListItemButton>

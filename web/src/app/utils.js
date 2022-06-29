@@ -38,6 +38,15 @@ export const disallowedTopic = (topic) => {
     return config.disallowedTopics.includes(topic);
 }
 
+export const topicDisplayName = (subscription) => {
+    if (subscription.displayName) {
+        return subscription.displayName;
+    } else if (subscription.baseUrl === window.location.origin) {
+        return subscription.topic;
+    }
+    return topicShortUrl(subscription.baseUrl, subscription.topic);
+};
+
 // Format emojis (see emoji.js)
 const emojis = {};
 rawEmojis.forEach(emoji => {

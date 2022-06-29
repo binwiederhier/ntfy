@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {useEffect, useRef, useState} from "react";
 import Box from "@mui/material/Box";
-import {formatShortDateTime, shuffle, topicShortUrl} from "../app/utils";
+import {formatShortDateTime, shuffle, topicDisplayName, topicShortUrl} from "../app/utils";
 import {useLocation, useNavigate} from "react-router-dom";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -24,13 +24,14 @@ import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
 import {useTranslation} from "react-i18next";
 import {Portal, Snackbar} from "@mui/material";
+import SubscriptionSettingsDialog from "./SubscriptionSettingsDialog";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();
     const location = useLocation();
     let title = "ntfy";
     if (props.selected) {
-        title = topicShortUrl(props.selected.baseUrl, props.selected.topic);
+        title = topicDisplayName(props.selected);
     } else if (location.pathname === "/settings") {
         title = t("action_bar_settings");
     }
@@ -79,6 +80,7 @@ const SettingsIcons = (props) => {
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const [snackOpen, setSnackOpen] = useState(false);
+    const [subscriptionSettingsOpen, setSubscriptionSettingsOpen] = useState(false);
     const anchorRef = useRef(null);
     const subscription = props.subscription;
 
@@ -115,6 +117,10 @@ const SettingsIcons = (props) => {
             navigate(routes.root);
         }
     };
+
+    const handleSubscriptionSettings = async () => {
+        setSubscriptionSettingsOpen(true);
+    }
 
     const handleSendTestMessage = async () => {
         const baseUrl = props.subscription.baseUrl;
@@ -201,6 +207,7 @@ const SettingsIcons = (props) => {
                         <Paper>
                             <ClickAwayListener onClickAway={handleClose}>
                                 <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
+                                    <MenuItem onClick={handleSubscriptionSettings}>{t("action_bar_subscription_settings")}</MenuItem>
                                     <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
                                     <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
                                     <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
@@ -216,6 +223,14 @@ const SettingsIcons = (props) => {
                     autoHideDuration={3000}
                     onClose={() => setSnackOpen(false)}
                     message={t("message_bar_error_publishing")}
+                />
+            </Portal>
+            <Portal>
+                <SubscriptionSettingsDialog
+                    key={`subscriptionSettingsDialog${subscription.id}`}
+                    open={subscriptionSettingsOpen}
+                    subscription={subscription}
+                    onClose={() => setSubscriptionSettingsOpen(false)}
                 />
             </Portal>
         </>

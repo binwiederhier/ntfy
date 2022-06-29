@@ -1,4 +1,4 @@
-import {formatMessage, formatTitleWithDefault, openUrl, playSound, topicShortUrl} from "./utils";
+import {formatMessage, formatTitleWithDefault, openUrl, playSound, topicDisplayName, topicShortUrl} from "./utils";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 import logo from "../img/ntfy.png";
@@ -18,8 +18,9 @@ class Notifier {
             return;
         }
         const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
+        const displayName = topicDisplayName(subscription);
         const message = formatMessage(notification);
-        const title = formatTitleWithDefault(notification, shortUrl);
+        const title = formatTitleWithDefault(notification, displayName);
 
         // Show notification
         console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);

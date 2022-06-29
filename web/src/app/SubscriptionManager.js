@@ -133,6 +133,12 @@ class SubscriptionManager {
         });
     }
 
+    async setDisplayName(subscriptionId, displayName) {
+        await db.subscriptions.update(subscriptionId, {
+            displayName: displayName
+        });
+    }
+
     async pruneNotifications(thresholdTimestamp) {
         await db.notifications
             .where("time").below(thresholdTimestamp)

@@ -35,6 +35,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 **Bugs:**
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
+* Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
 
 **Documentation:**
 

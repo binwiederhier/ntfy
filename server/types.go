@@ -174,7 +174,7 @@ func parseQueryFilters(r *http.Request) (*queryFilter, error) {
 	for _, p := range util.SplitNoEmpty(readParam(r, "x-priority", "priority", "prio", "p"), ",") {
 		priority, err := util.ParsePriority(p)
 		if err != nil {
-			return nil, err
+			return nil, errHTTPBadRequestPriorityInvalid
 		}
 		priorityFilter = append(priorityFilter, priority)
 	}

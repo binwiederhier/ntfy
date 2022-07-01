@@ -123,7 +123,8 @@ func ValidRandomString(s string, length int) bool {
 
 // ParsePriority parses a priority string into its equivalent integer value
 func ParsePriority(priority string) (int, error) {
-	switch strings.TrimSpace(strings.ToLower(priority)) {
+	p := strings.TrimSpace(strings.ToLower(priority))
+	switch p {
 	case "":
 		return 0, nil
 	case "1", "min":
@@ -137,6 +138,11 @@ func ParsePriority(priority string) (int, error) {
 	case "5", "max", "urgent":
 		return 5, nil
 	default:
+		// Ignore new HTTP Priority header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
+		// Cloudflare adds this to requests when forwarding to the backend (ntfy), so we just ignore it.
+		if strings.HasPrefix(p, "u=") {
+			return 3, nil
+		}
 		return 0, errInvalidPriority
 	}
 }

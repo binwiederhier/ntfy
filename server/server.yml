@@ -26,6 +26,7 @@
 # This can be useful to avoid port issues on local systems, and to simplify permissions.
 #
 # listen-unix: <socket-path>
+# listen-unix-mode: <linux permissions, e.g. 0700>
 
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #

@@ -31,6 +31,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 **Features:**
 
 * Subscription display name for the web app ([#348](https://github.com/binwiederhier/ntfy/pull/348))
+* Allow setting socket permissions via `--listen-unix-mode` ([#356](https://github.com/binwiederhier/ntfy/pull/356), thanks to [@koro666](https://github.com/koro666))
 
 **Bugs:**
 

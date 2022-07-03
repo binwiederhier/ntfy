@@ -174,7 +174,7 @@ func (s *Server) Run() error {
 		listenStr += fmt.Sprintf(" %s[https]", s.config.ListenHTTPS)
 	}
 	if s.config.ListenUnix != "" {
-		listenStr += fmt.Sprintf(" %s[unix/%04o]", s.config.ListenUnix, s.config.ListenUnixMode)
+		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
 	}
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
@@ -204,13 +204,17 @@ func (s *Server) Run() error {
 			os.Remove(s.config.ListenUnix)
 			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
 			if err != nil {
+				s.mu.Unlock()
 				errChan <- err
 				return
 			}
-			if err := os.Chmod(s.config.ListenUnix, s.config.ListenUnixMode); err != nil {
-				s.unixListener.Close()
-				errChan <- err
-				return
+			defer s.unixListener.Close()
+			if s.config.ListenUnixMode > 0 {
+				if err := os.Chmod(s.config.ListenUnix, s.config.ListenUnixMode); err != nil {
+					s.mu.Unlock()
+					errChan <- err
+					return
+				}
 			}
 			s.mu.Unlock()
 			httpServer := &http.Server{Handler: mux}

@@ -1,12 +1,14 @@
 package server
 
 import (
+	"io/fs"
 	"time"
 )
 
 // Defines default config settings (excluding limits, see below)
 const (
 	DefaultListenHTTP                           = ":80"
+	DefaultListenUnixMode                       = 0777
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
 	DefaultManagerInterval                      = time.Minute
@@ -52,6 +54,7 @@ type Config struct {
 	ListenHTTP                           string
 	ListenHTTPS                          string
 	ListenUnix                           string
+	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
 	FirebaseKeyFile                      string
@@ -105,6 +108,7 @@ func NewConfig() *Config {
 		ListenHTTP:                           DefaultListenHTTP,
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
+		ListenUnixMode:                       DefaultListenUnixMode,
 		KeyFile:                              "",
 		CertFile:                             "",
 		FirebaseKeyFile:                      "",

@@ -5,6 +5,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"heckel.io/ntfy/log"
 	"math"
 	"net"
@@ -35,6 +36,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used to as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, Value: server.DefaultListenUnixMode, Usage: "file mode of unix socket"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
@@ -99,6 +101,7 @@ func execServe(c *cli.Context) error {
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
+	listenUnixMode := c.Int("listen-unix-mode")
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
@@ -219,6 +222,7 @@ func execServe(c *cli.Context) error {
 	conf.ListenHTTP = listenHTTP
 	conf.ListenHTTPS = listenHTTPS
 	conf.ListenUnix = listenUnix
+	conf.ListenUnixMode = fs.FileMode(listenUnixMode)
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile
 	conf.FirebaseKeyFile = firebaseKeyFile

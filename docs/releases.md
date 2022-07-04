@@ -9,8 +9,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Subscriptions can now have a display name ([#313](https://github.com/binwiederhier/ntfy/issues/313), thanks to [@wunter8](https://github.com/wunter8))
-* Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
+* Display name for UnifiedPush subscriptions ([#355](https://github.com/binwiederhier/ntfy/issues/355), thanks to [@wunter8](https://github.com/wunter8))
+* Polling is now done with `since=<id>` API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
+* Move action buttons in notification cards ([#236](https://github.com/binwiederhier/ntfy/issues/236), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 

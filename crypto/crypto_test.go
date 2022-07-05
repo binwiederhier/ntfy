@@ -18,6 +18,16 @@ func TestEncryptDecrypt(t *testing.T) {
 	require.Equal(t, message, plaintext)
 }
 
+func TestEncryptDecryptJWE(t *testing.T) {
+	message := "this is a message or is it?"
+	ciphertext, err := EncryptJWE(message, []byte("AES256Key-32Characters1234567890"))
+	require.Nil(t, err)
+	plaintext, err := DecryptJWE(ciphertext, []byte("AES256Key-32Characters1234567890"))
+	require.Nil(t, err)
+	log.Println(ciphertext)
+	require.Equal(t, message, plaintext)
+}
+
 func TestEncryptExpectedOutputxxxxx(t *testing.T) {
 	// These values are taken from https://docs.pushbullet.com/#encryption
 	// The following expected ciphertext from the site was used as a baseline:

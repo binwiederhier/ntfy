@@ -25,7 +25,10 @@ require (
 
 require github.com/pkg/errors v0.9.1 // indirect
 
-require firebase.google.com/go/v4 v4.8.0
+require (
+	firebase.google.com/go/v4 v4.8.0
+	gopkg.in/square/go-jose.v2 v2.6.0
+)
 
 require (
 	cloud.google.com/go v0.102.1 // indirect

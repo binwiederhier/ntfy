@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 )
+import "gopkg.in/square/go-jose.v2"
 
 const (
 	versionByte  = 0x31 // "1"
@@ -79,6 +80,30 @@ func Decrypt(input string, key []byte) (string, error) {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+func EncryptJWE(plaintext string, key []byte) (string, error) {
+	enc, err := jose.NewEncrypter(jose.A256GCM, jose.Recipient{Algorithm: jose.DIRECT, Key: key}, nil)
+	if err != nil {
+		return "", err
+	}
+	jwe, err := enc.Encrypt([]byte(plaintext))
+	if err != nil {
+		return "", err
+	}
+	return jwe.CompactSerialize()
+}
+
+func DecryptJWE(input string, key []byte) (string, error) {
+	jwe, err := jose.ParseEncrypted(input)
+	if err != nil {
+		return "", err
+	}
+	out, err := jwe.Decrypt(key)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 func appendSlices(s ...[]byte) []byte {

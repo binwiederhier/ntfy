@@ -204,8 +204,17 @@ func (s *Server) Run() error {
 			os.Remove(s.config.ListenUnix)
 			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
 			if err != nil {
+				s.mu.Unlock()
 				errChan <- err
 				return
+			}
+			defer s.unixListener.Close()
+			if s.config.ListenUnixMode > 0 {
+				if err := os.Chmod(s.config.ListenUnix, s.config.ListenUnixMode); err != nil {
+					s.mu.Unlock()
+					errChan <- err
+					return
+				}
 			}
 			s.mu.Unlock()
 			httpServer := &http.Server{Handler: mux}
@@ -1107,8 +1116,9 @@ func (s *Server) updateStatsAndPrune() {
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired attachments
-	if s.fileCache != nil {
-		ids, err := s.messageCache.AttachmentsExpired()
+	if s.fileCache != nil && s.config.AttachmentExpiryDuration > 0 {
+		olderThan := time.Now().Add(-1 * s.config.AttachmentExpiryDuration)
+		ids, err := s.fileCache.Expired(olderThan)
 		if err != nil {
 			log.Warn("Error retrieving expired attachments: %s", err.Error())
 		} else if len(ids) > 0 {

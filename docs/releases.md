@@ -9,14 +9,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Subscriptions can now have a display name ([#313](https://github.com/binwiederhier/ntfy/issues/313), thanks to [@wunter8](https://github.com/wunter8))
-* Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
+* Display name for UnifiedPush subscriptions ([#355](https://github.com/binwiederhier/ntfy/issues/355), thanks to [@wunter8](https://github.com/wunter8))
+* Polling is now done with `since=<id>` API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
+* Move action buttons in notification cards ([#236](https://github.com/binwiederhier/ntfy/issues/236), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 
 * Long-click selecting of notifications doesn't scroll to the top anymore ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
 * Add attachment and click URL extras to MESSAGE_RECEIVED broadcast ([#329](https://github.com/binwiederhier/ntfy/issues/329), thanks to [@wunter8](https://github.com/wunter8))
 * Accessibility: Clear/choose service URL button in base URL dropdown now has a label ([#292](https://github.com/binwiederhier/ntfy/issues/292), thanks to [@mhameed](https://github.com/mhameed) for reporting)
+* Web: Switched "Pop" and "Pop Swoosh" sounds ([#352](https://github.com/binwiederhier/ntfy/issues/352), thanks to [@coma-toast](https://github.com/coma-toast) for reporting)
 
 **Additional translations:**
 
@@ -31,11 +34,13 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 **Features:**
 
 * Subscription display name for the web app ([#348](https://github.com/binwiederhier/ntfy/pull/348))
+* Allow setting socket permissions via `--listen-unix-mode` ([#356](https://github.com/binwiederhier/ntfy/pull/356), thanks to [@koro666](https://github.com/koro666))
 
 **Bugs:**
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
+* Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
 
 **Documentation:**
 

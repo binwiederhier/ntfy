@@ -85,7 +85,6 @@ const (
 	selectMessageCountPerTopicQuery = `SELECT topic, COUNT(*) FROM messages GROUP BY topic`
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
 	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
-	selectAttachmentsExpiredQuery   = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires < ?`
 )
 
 // Schema management queries
@@ -407,26 +406,6 @@ func (c *messageCache) AttachmentBytesUsed(sender string) (int64, error) {
 		return 0, err
 	}
 	return size, nil
-}
-
-func (c *messageCache) AttachmentsExpired() ([]string, error) {
-	rows, err := c.db.Query(selectAttachmentsExpiredQuery, time.Now().Unix())
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	ids := make([]string, 0)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return ids, nil
 }
 
 func readMessages(rows *sql.Rows) ([]*message, error) {

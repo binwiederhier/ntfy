@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io/fs"
 	"time"
 )
 
@@ -52,6 +53,7 @@ type Config struct {
 	ListenHTTP                           string
 	ListenHTTPS                          string
 	ListenUnix                           string
+	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
 	FirebaseKeyFile                      string
@@ -105,6 +107,7 @@ func NewConfig() *Config {
 		ListenHTTP:                           DefaultListenHTTP,
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
+		ListenUnixMode:                       0,
 		KeyFile:                              "",
 		CertFile:                             "",
 		FirebaseKeyFile:                      "",

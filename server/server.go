@@ -1116,8 +1116,9 @@ func (s *Server) updateStatsAndPrune() {
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired attachments
-	if s.fileCache != nil {
-		ids, err := s.messageCache.AttachmentsExpired()
+	if s.fileCache != nil && s.config.AttachmentExpiryDuration > 0 {
+		olderThan := time.Now().Add(-1 * s.config.AttachmentExpiryDuration)
+		ids, err := s.fileCache.Expired(olderThan)
 		if err != nil {
 			log.Warn("Error retrieving expired attachments: %s", err.Error())
 		} else if len(ids) > 0 {

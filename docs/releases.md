@@ -40,6 +40,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
+* Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
 
 **Documentation:**
 

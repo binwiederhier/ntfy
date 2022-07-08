@@ -344,10 +344,6 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	size, err = c.AttachmentBytesUsed("5.6.7.8")
 	require.Nil(t, err)
 	require.Equal(t, int64(0), size)
-
-	ids, err := c.AttachmentsExpired()
-	require.Nil(t, err)
-	require.Equal(t, []string{"m1"}, ids)
 }
 
 func TestSqliteCache_Migration_From0(t *testing.T) {

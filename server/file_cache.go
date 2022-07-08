@@ -2,16 +2,18 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
+	"time"
 )
 
 var (
-	fileIDRegex      = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
+	fileIDRegex      = regexp.MustCompile(fmt.Sprintf(`^[-_A-Za-z0-9]{%d}$`, messageIDLength))
 	errInvalidFileID = errors.New("invalid file ID")
 	errFileExists    = errors.New("file exists")
 )
@@ -86,6 +88,25 @@ func (c *fileCache) Remove(ids ...string) error {
 	c.totalSizeCurrent = size
 	c.mu.Unlock()
 	return nil
+}
+
+// Expired returns a list of file IDs for expired files
+func (c *fileCache) Expired(olderThan time.Time) ([]string, error) {
+	entries, err := os.ReadDir(c.dir)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(olderThan) && fileIDRegex.MatchString(e.Name()) {
+			ids = append(ids, e.Name())
+		}
+	}
+	return ids, nil
 }
 
 func (c *fileCache) Size() int64 {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -16,10 +17,10 @@ var (
 
 func TestFileCache_Write_Success(t *testing.T) {
 	dir, c := newTestFileCache(t)
-	size, err := c.Write("abc", strings.NewReader("normal file"), util.NewFixedLimiter(999))
+	size, err := c.Write("abcdefghijkl", strings.NewReader("normal file"), util.NewFixedLimiter(999))
 	require.Nil(t, err)
 	require.Equal(t, int64(11), size)
-	require.Equal(t, "normal file", readFile(t, dir+"/abc"))
+	require.Equal(t, "normal file", readFile(t, dir+"/abcdefghijkl"))
 	require.Equal(t, int64(11), c.Size())
 	require.Equal(t, int64(10229), c.Remaining())
 }
@@ -27,18 +28,18 @@ func TestFileCache_Write_Success(t *testing.T) {
 func TestFileCache_Write_Remove_Success(t *testing.T) {
 	dir, c := newTestFileCache(t) // max = 10k (10240), each = 1k (1024)
 	for i := 0; i < 10; i++ {     // 10x999 = 9990
-		size, err := c.Write(fmt.Sprintf("abc%d", i), bytes.NewReader(make([]byte, 999)))
+		size, err := c.Write(fmt.Sprintf("abcdefghijk%d", i), bytes.NewReader(make([]byte, 999)))
 		require.Nil(t, err)
 		require.Equal(t, int64(999), size)
 	}
 	require.Equal(t, int64(9990), c.Size())
 	require.Equal(t, int64(250), c.Remaining())
-	require.FileExists(t, dir+"/abc1")
-	require.FileExists(t, dir+"/abc5")
+	require.FileExists(t, dir+"/abcdefghijk1")
+	require.FileExists(t, dir+"/abcdefghijk5")
 
-	require.Nil(t, c.Remove("abc1", "abc5"))
-	require.NoFileExists(t, dir+"/abc1")
-	require.NoFileExists(t, dir+"/abc5")
+	require.Nil(t, c.Remove("abcdefghijk1", "abcdefghijk5"))
+	require.NoFileExists(t, dir+"/abcdefghijk1")
+	require.NoFileExists(t, dir+"/abcdefghijk5")
 	require.Equal(t, int64(7992), c.Size())
 	require.Equal(t, int64(2248), c.Remaining())
 }
@@ -46,27 +47,50 @@ func TestFileCache_Write_Remove_Success(t *testing.T) {
 func TestFileCache_Write_FailedTotalSizeLimit(t *testing.T) {
 	dir, c := newTestFileCache(t)
 	for i := 0; i < 10; i++ {
-		size, err := c.Write(fmt.Sprintf("abc%d", i), bytes.NewReader(oneKilobyteArray))
+		size, err := c.Write(fmt.Sprintf("abcdefghijk%d", i), bytes.NewReader(oneKilobyteArray))
 		require.Nil(t, err)
 		require.Equal(t, int64(1024), size)
 	}
-	_, err := c.Write("abc11", bytes.NewReader(oneKilobyteArray))
+	_, err := c.Write("abcdefghijkX", bytes.NewReader(oneKilobyteArray))
 	require.Equal(t, util.ErrLimitReached, err)
-	require.NoFileExists(t, dir+"/abc11")
+	require.NoFileExists(t, dir+"/abcdefghijkX")
 }
 
 func TestFileCache_Write_FailedFileSizeLimit(t *testing.T) {
 	dir, c := newTestFileCache(t)
-	_, err := c.Write("abc", bytes.NewReader(make([]byte, 1025)))
+	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1025)))
 	require.Equal(t, util.ErrLimitReached, err)
-	require.NoFileExists(t, dir+"/abc")
+	require.NoFileExists(t, dir+"/abcdefghijkl")
 }
 
 func TestFileCache_Write_FailedAdditionalLimiter(t *testing.T) {
 	dir, c := newTestFileCache(t)
-	_, err := c.Write("abc", bytes.NewReader(make([]byte, 1001)), util.NewFixedLimiter(1000))
+	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1001)), util.NewFixedLimiter(1000))
 	require.Equal(t, util.ErrLimitReached, err)
-	require.NoFileExists(t, dir+"/abc")
+	require.NoFileExists(t, dir+"/abcdefghijkl")
+}
+
+func TestFileCache_RemoveExpired(t *testing.T) {
+	dir, c := newTestFileCache(t)
+	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1001)))
+	require.Nil(t, err)
+	_, err = c.Write("notdeleted12", bytes.NewReader(make([]byte, 1001)))
+	require.Nil(t, err)
+
+	modTime := time.Now().Add(-1 * 4 * time.Hour)
+	require.Nil(t, os.Chtimes(dir+"/abcdefghijkl", modTime, modTime))
+
+	olderThan := time.Now().Add(-1 * 3 * time.Hour)
+	ids, err := c.Expired(olderThan)
+	require.Nil(t, err)
+	require.Equal(t, []string{"abcdefghijkl"}, ids)
+	require.Nil(t, c.Remove(ids...))
+	require.NoFileExists(t, dir+"/abcdefghijkl")
+	require.FileExists(t, dir+"/notdeleted12")
+
+	ids, err = c.Expired(olderThan)
+	require.Nil(t, err)
+	require.Empty(t, ids)
 }
 
 func newTestFileCache(t *testing.T) (dir string, cache *fileCache) {

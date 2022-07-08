@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Publish to ntfy.sh</title>
+</head>
+<body>
+    <input id="password" placeholder="Topic password"/>
+    <button onclick="publish()">Publish encrypted message</button>
+</body>
+<script async src="https://unpkg.com/jose@4.8.3/dist/browser/jwe/compact/encrypt.js" type="module"></script>
+<script async src="publish-encrypted.js" type="module"></script>
+</html>

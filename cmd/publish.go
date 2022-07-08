@@ -100,6 +100,7 @@ func execPublish(c *cli.Context) error {
 	noFirebase := c.Bool("no-firebase")
 	quiet := c.Bool("quiet")
 	pid := c.Int("wait-pid")
+	//password := os.Getenv("NTFY_PASSWORD")
 	topic, message, command, err := parseTopicMessageCommand(c)
 	if err != nil {
 		return err

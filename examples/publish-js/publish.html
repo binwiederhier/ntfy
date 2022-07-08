@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Publish to ntfy.sh</title>
+</head>
+<body>
+    <button onclick="publish()">Publish</button>
+</body>
+<script>
+    function publish() {
+        fetch('https://ntfy.sh/mytopic', {
+            method: 'POST', // PUT works too
+            body: 'Backup successful 😀'
+        });
+    }
+</script>
+</html>

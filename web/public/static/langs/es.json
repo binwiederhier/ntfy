@@ -74,7 +74,7 @@
     "publish_dialog_drop_file_here": "Suelta el archivo aquí",
     "emoji_picker_search_placeholder": "Buscar emojis",
     "subscribe_dialog_subscribe_title": "Suscribirse al tópico",
-    "subscribe_dialog_subscribe_description": "Los tópicos pueden no estar protegidos por contraseña, así que elija un nombre que no sea fácil de adivinar. Una vez suscrito, puede hacer PUT/PIST de notificaciones.",
+    "subscribe_dialog_subscribe_description": "Los tópicos pueden no estar protegidos por contraseña, así que elija un nombre que no sea fácil de adivinar. Una vez suscrito, puede hacer PUT/POST de notificaciones.",
     "subscribe_dialog_subscribe_topic_placeholder": "Nombre del tópico, ej. phil_alerts",
     "subscribe_dialog_subscribe_use_another_label": "Usar otro servidor",
     "subscribe_dialog_login_title": "Es necesario iniciar sesión",

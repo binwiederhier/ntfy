@@ -33,7 +33,7 @@ type message struct {
 	Attachment *attachment `json:"attachment,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
 	Sender     string      `json:"-"`                  // IP address of uploader, used for rate limiting
-	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
+	Encoding   string      `json:"encoding,omitempty"` // empty for UTF-8, "base64", or "jwe" (encrypted)
 }
 
 type attachment struct {
@@ -112,6 +112,12 @@ func newDefaultMessage(topic, msg string) *message {
 func newPollRequestMessage(topic, pollID string) *message {
 	m := newMessage(pollRequestEvent, topic, newMessageBody)
 	m.PollID = pollID
+	return m
+}
+
+func newEncryptedMessage(topic, msg string) *message {
+	m := newMessage(messageEvent, topic, msg)
+	m.Encoding = encodingJWE
 	return m
 }
 

@@ -13,31 +13,31 @@ const (
 	keyDerivIter  = 50000
 )
 
-func DeriveKey(password string, topicURL string) []byte {
+func DeriveKey(password, topicURL string) []byte {
 	salt := sha256.Sum256([]byte(topicURL))
 	return pbkdf2.Key([]byte(password), salt[:], keyDerivIter, keyLenBytes, sha256.New)
 }
 
-func Encrypt(plaintext string, key []byte) (string, error) {
+func Encrypt(plaintext []byte, key []byte) (string, error) {
 	enc, err := jose.NewEncrypter(jweEncryption, jose.Recipient{Algorithm: jweAlgorithm, Key: key}, nil)
 	if err != nil {
 		return "", err
 	}
-	jwe, err := enc.Encrypt([]byte(plaintext))
+	jwe, err := enc.Encrypt(plaintext)
 	if err != nil {
 		return "", err
 	}
 	return jwe.CompactSerialize()
 }
 
-func Decrypt(input string, key []byte) (string, error) {
-	jwe, err := jose.ParseEncrypted(input)
+func Decrypt(ciphertext string, key []byte) ([]byte, error) {
+	jwe, err := jose.ParseEncrypted(ciphertext)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	out, err := jwe.Decrypt(key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(out), nil
+	return out, nil
 }

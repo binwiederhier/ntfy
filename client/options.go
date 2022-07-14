@@ -92,6 +92,10 @@ func WithNoFirebase() PublishOption {
 	return WithHeader("X-Firebase", "no")
 }
 
+func WithEncrypted() PublishOption {
+	return WithHeader("X-Encryption", "jwe")
+}
+
 // WithSince limits the number of messages returned from the server. The parameter since can be a Unix
 // timestamp (see WithSinceUnixTime), a duration (WithSinceDuration) the word "all" (see WithSinceAll).
 func WithSince(since string) SubscribeOption {

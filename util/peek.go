@@ -38,6 +38,16 @@ func Peek(underlying io.ReadCloser, limit int) (*PeekedReadCloser, error) {
 	}, nil
 }
 
+func PeekLimit(underlying io.ReadCloser, limit int) (*PeekedReadCloser, error) {
+	rc, err := Peek(underlying, limit)
+	if err != nil {
+		return nil, err
+	} else if rc.LimitReached {
+		return nil, ErrLimitReached
+	}
+	return rc, nil
+}
+
 // Read reads from the peeked bytes and then from the underlying stream
 func (r *PeekedReadCloser) Read(p []byte) (n int, err error) {
 	if r.closed {

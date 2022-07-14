@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/crypto"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
@@ -13,6 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+)
+
+const (
+	encryptedMessageBytesLimit = 100 * 1024 * 1024 // 100 MB
 )
 
 func init() {
@@ -100,7 +105,7 @@ func execPublish(c *cli.Context) error {
 	noFirebase := c.Bool("no-firebase")
 	quiet := c.Bool("quiet")
 	pid := c.Int("wait-pid")
-	//password := os.Getenv("NTFY_PASSWORD")
+	password := os.Getenv("NTFY_PASSWORD")
 	topic, message, command, err := parseTopicMessageCommand(c)
 	if err != nil {
 		return err
@@ -193,6 +198,20 @@ func execPublish(c *cli.Context) error {
 			}
 		}
 	}
+	if password != "" {
+		topicURL := expandTopicURL(topic, conf.DefaultHost)
+		key := crypto.DeriveKey(password, topicURL)
+		peaked, err := util.PeekLimit(io.NopCloser(body), encryptedMessageBytesLimit)
+		if err != nil {
+			return err
+		}
+		ciphertext, err := crypto.Encrypt(peaked.PeekedBytes, key)
+		if err != nil {
+			return err
+		}
+		body = strings.NewReader(ciphertext)
+		options = append(options, client.WithEncrypted())
+	}
 	cl := client.New(conf)
 	m, err := cl.PublishReader(topic, body, options...)
 	if err != nil {
@@ -204,8 +223,17 @@ func execPublish(c *cli.Context) error {
 	return nil
 }
 
-// parseTopicMessageCommand reads the topic and the remaining arguments from the context.
+func expandTopicURL(topic, defaultHost string) string {
+	if strings.HasPrefix(topic, "http://") || strings.HasPrefix(topic, "https://") {
+		return topic
+	} else if strings.Contains(topic, "/") {
+		return fmt.Sprintf("https://%s", topic)
+	}
+	return fmt.Sprintf("%s/%s", defaultHost, topic)
+}
 
+// parseTopicMessageCommand reads the topic and the remaining arguments from the context.
+//
 // There are a few cases to consider:
 //   ntfy publish <topic> [<message>]
 //   ntfy publish --wait-cmd <topic> <command>

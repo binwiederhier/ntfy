@@ -95,6 +95,7 @@ const (
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
+	encodingJWE              = "jwe"
 )
 
 // WebSocket constants
@@ -461,6 +462,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
+	if m.Encoding == encodingJWE {
+		m = newEncryptedMessage(t.ID, m.Message)
+	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
 	}
@@ -643,6 +647,10 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if err != nil {
 			return false, false, "", false, wrapErrHTTP(errHTTPBadRequestActionsInvalid, err.Error())
 		}
+	}
+	encryption := readParam(r, "x-encryption", "encryption", "encrypted", "encrypt", "enc")
+	if encryption == "yes" || encryption == "true" || encryption == "1" || encryption == encodingJWE {
+		m.Encoding = encodingJWE
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {

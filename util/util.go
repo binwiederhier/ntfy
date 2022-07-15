@@ -177,6 +177,8 @@ func ShortTopicURL(s string) string {
 func DetectContentType(b []byte, filename string) (mimeType string, ext string) {
 	if strings.HasSuffix(strings.ToLower(filename), ".apk") {
 		return "application/vnd.android.package-archive", ".apk"
+	} else if strings.HasSuffix(strings.ToLower(filename), ".jwe") {
+		return "application/jose", ".jwe"
 	}
 	m := mimetype.Detect(b)
 	mimeType, ext = m.String(), m.Extension()

@@ -115,8 +115,8 @@ func newPollRequestMessage(topic, pollID string) *message {
 	return m
 }
 
-func newEncryptedMessage(topic, msg string) *message {
-	m := newMessage(messageEvent, topic, msg)
+func newEncryptedMessage(topic string) *message {
+	m := newMessage(messageEvent, topic, "")
 	m.Encoding = encodingJWE
 	return m
 }

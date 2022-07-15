@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -1459,6 +1461,51 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	log.Printf("Done: Waiting for all locks")
 }
 
+func TestServer_PublishEncrypted_Simple(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	ciphertext := "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..gSRYZeX6eBhlj13w.LOchcxFXwALXE2GqdoSwFJEXdMyEbLfLKV9geXr17WrAN-nH7ya1VQ_Y6ebT1w.2eyLaTUfc_rpKaZr4-5I1Q"
+	response := request(t, s, "PUT", "/mytopic", ciphertext, map[string]string{
+		"Encoding": "jwe",
+		"Title":    "this will be stripped",
+	})
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "jwe", m.Encoding)
+	require.Equal(t, "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..gSRYZeX6eBhlj13w.LOchcxFXwALXE2GqdoSwFJEXdMyEbLfLKV9geXr17WrAN-nH7ya1VQ_Y6ebT1w.2eyLaTUfc_rpKaZr4-5I1Q", m.Message)
+	require.Equal(t, "", m.Title)
+}
+
+func TestServer_PublishEncrypted_Simple_TooLarge(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	ciphertext := util.RandomString(5001) // > 4096
+	response := request(t, s, "PUT", "/mytopic", ciphertext, map[string]string{
+		"Encoding": "jwe",
+	})
+	err := toHTTPError(t, response.Body.String())
+	require.Equal(t, 413, err.HTTPCode)
+	require.Equal(t, 41303, err.Code)
+}
+
+func TestServer_PublishEncrypted_WithAttachment(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	parts := map[string]string{
+		"message":    "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..gSRYZeX6eBhlj13w.LOchcxFXwALXE2GqdoSwFJEXdMyEbLfLKV9geXr17WrAN-nH7ya1VQ_Y6ebT1w.2eyLaTUfc_rpKaZr4-5I1Q",
+		"attachment": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..vbe1Qv_-mKYbUgce.EfmOUIUi7lxXZG_o4bqXZ9pmpr1Rzs4Y5QLE2XD2_aw_SQ.y2hadrN5b2LEw7_PJHhbcA",
+	}
+	response := requestMultipart(t, s, "PUT", "/mytopic", parts, map[string]string{
+		"Encoding": "jwe",
+	})
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "jwe", m.Encoding)
+	require.Equal(t, "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..gSRYZeX6eBhlj13w.LOchcxFXwALXE2GqdoSwFJEXdMyEbLfLKV9geXr17WrAN-nH7ya1VQ_Y6ebT1w.2eyLaTUfc_rpKaZr4-5I1Q", m.Message)
+	require.Equal(t, "attachment.jwe", m.Attachment.Name)
+	require.Equal(t, "application/jose", m.Attachment.Type)
+	require.Equal(t, int64(127), m.Attachment.Size)
+
+	file := filepath.Join(s.config.AttachmentCacheDir, m.ID)
+	require.FileExists(t, file)
+	require.Equal(t, "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..vbe1Qv_-mKYbUgce.EfmOUIUi7lxXZG_o4bqXZ9pmpr1Rzs4Y5QLE2XD2_aw_SQ.y2hadrN5b2LEw7_PJHhbcA", readFile(t, file))
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
@@ -1482,6 +1529,29 @@ func request(t *testing.T, s *Server, method, url, body string, headers map[stri
 		t.Fatal(err)
 	}
 	req.RemoteAddr = "9.9.9.9" // Used for tests
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	s.handle(rr, req)
+	return rr
+}
+
+func requestMultipart(t *testing.T, s *Server, method, url string, parts map[string]string, headers map[string]string) *httptest.ResponseRecorder {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	for k, v := range parts {
+		mw, _ := w.CreateFormField(k)
+		_, err := io.Copy(mw, strings.NewReader(v))
+		require.Nil(t, err)
+	}
+	require.Nil(t, w.Close())
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest(method, url, &b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RemoteAddr = "9.9.9.9" // Used for tests
+	req.Header.Set("Content-Type", w.FormDataContentType())
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

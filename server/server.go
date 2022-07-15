@@ -415,7 +415,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	}
 	messageID := matches[1]
 	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
-	stat, err := os.Stat(file)
+	stat, err := os.Stat(file) // TODO: Why is this here and not in fileCache?!
 	if err != nil {
 		return errHTTPNotFound
 	}
@@ -450,20 +450,24 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
-	body, err := util.Peek(r.Body, s.config.MessageLimit)
-	if err != nil {
-		return nil, err
-	}
 	m := newDefaultMessage(t.ID, "")
 	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, v, m)
 	if err != nil {
 		return nil, err
 	}
+	var body *util.PeekedReadCloser
+	if m.Encoding == encodingJWE {
+		m = newEncryptedMessage(t.ID)
+		if body, err = s.handlePublishEncrypted(r, m); err != nil {
+			return nil, err
+		}
+	} else {
+		if body, err = util.Peek(r.Body, s.config.MessageLimit); err != nil {
+			return nil, err
+		}
+	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
-	}
-	if m.Encoding == encodingJWE {
-		m = newEncryptedMessage(t.ID, m.Message)
 	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
@@ -523,6 +527,50 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 		return &errMatrix{pushKey: r.Header.Get(matrixPushKeyHeader), err: err}
 	}
 	return writeMatrixSuccess(w)
+}
+
+func (s *Server) handlePublishEncrypted(r *http.Request, m *message) (body *util.PeekedReadCloser, err error) {
+	multipart := strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/")
+	if multipart {
+		mp, err := r.MultipartReader()
+		if err != nil {
+			return nil, err
+		}
+		p, err := mp.NextPart()
+		if err != nil {
+			return nil, err
+		} else if p.FormName() != "message" {
+			return nil, errHTTPBadRequestUnexpectedMultipartField
+		}
+		messageBody, err := util.PeekLimit(p, s.config.MessageLimit)
+		if err == util.ErrLimitReached {
+			return nil, errHTTPEntityTooLargeEncryptedMessageTooLarge
+		} else if err != nil {
+			return nil, err
+		}
+		m.Message = string(messageBody.PeekedBytes)
+		p, err = mp.NextPart()
+		if err != nil {
+			return nil, err
+		} else if p.FormName() != "attachment" {
+			return nil, errHTTPBadRequestUnexpectedMultipartField
+		}
+		m.Attachment = &attachment{
+			Name: "attachment.jwe", // Force handlePublishBody into "attachment" mode
+		}
+		body, err = util.Peek(p, s.config.MessageLimit)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if body, err = util.PeekLimit(r.Body, s.config.MessageLimit); err == util.ErrLimitReached {
+			return nil, errHTTPEntityTooLargeEncryptedMessageTooLarge
+		} else if err != nil {
+			return nil, err
+		}
+		m.Message = string(body.PeekedBytes)
+	}
+	return body, nil
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
@@ -621,6 +669,9 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		for _, s := range util.SplitNoEmpty(tagsStr, ",") {
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
+	}
+	if encoding := readParam(r, "x-encoding", "encoding"); encoding == encodingJWE {
+		m.Encoding = encoding
 	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {

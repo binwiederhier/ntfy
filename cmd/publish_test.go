@@ -52,6 +52,7 @@ func TestCLI_Publish_All_The_Things(t *testing.T) {
 		"--tags", "tag1,tag2",
 		// No --delay, --email
 		"--click", "https://ntfy.sh",
+		"--icon", "https://ntfy.sh/static/img/ntfy.png",
 		"--attach", "https://f-droid.org/F-Droid.apk",
 		"--filename", "fdroid.apk",
 		"--no-cache",

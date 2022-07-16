@@ -28,6 +28,7 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "tags", Aliases: []string{"tag", "T"}, EnvVars: []string{"NTFY_TAGS"}, Usage: "comma separated list of tags and emojis"},
 	&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, EnvVars: []string{"NTFY_DELAY"}, Usage: "delay/schedule message"},
 	&cli.StringFlag{Name: "click", Aliases: []string{"U"}, EnvVars: []string{"NTFY_CLICK"}, Usage: "URL to open when notification is clicked"},
+	&cli.StringFlag{Name: "icon", Aliases: []string{"i"}, EnvVars: []string{"NTFY_ICON"}, Usage: "URL to use as notification icon"},
 	&cli.StringFlag{Name: "actions", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ACTIONS"}, Usage: "actions JSON array or simple definition"},
 	&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
 	&cli.StringFlag{Name: "filename", Aliases: []string{"name", "n"}, EnvVars: []string{"NTFY_FILENAME"}, Usage: "filename for the attachment"},
@@ -64,6 +65,7 @@ Examples:
   ntfy pub --at=8:30am delayed_topic Laterzz              # Send message at 8:30am
   ntfy pub -e phil@example.com alerts 'App is down!'      # Also send email to phil@example.com
   ntfy pub --click="https://reddit.com" redd 'New msg'    # Opens Reddit when notification is clicked
+  ntfy pub --icon="http://some.tld/icon.png" 'Icon!'      # Send notification with custom icon
   ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
   ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
   ntfy pub -u phil:mypass secret Psst                     # Publish with username/password
@@ -90,6 +92,7 @@ func execPublish(c *cli.Context) error {
 	tags := c.String("tags")
 	delay := c.String("delay")
 	click := c.String("click")
+	icon := c.String("icon")
 	actions := c.String("actions")
 	attach := c.String("attach")
 	filename := c.String("filename")
@@ -119,6 +122,9 @@ func execPublish(c *cli.Context) error {
 	}
 	if click != "" {
 		options = append(options, client.WithClick(click))
+	}
+	if icon != "" {
+		options = append(options, client.WithIcon(icon))
 	}
 	if actions != "" {
 		options = append(options, client.WithActions(strings.ReplaceAll(actions, "\n", " ")))

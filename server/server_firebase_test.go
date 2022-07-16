@@ -123,6 +123,11 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 	m.Priority = 4
 	m.Tags = []string{"tag 1", "tag2"}
 	m.Click = "https://google.com"
+	m.Icon = &icon{
+		URL:  "https://ntfy.sh/static/img/ntfy.png",
+		Type: "image/jpeg",
+		Size: 4567,
+	}
 	m.Title = "some title"
 	m.Actions = []*action{
 		{
@@ -173,6 +178,9 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 				"priority":           "4",
 				"tags":               strings.Join(m.Tags, ","),
 				"click":              "https://google.com",
+				"icon_url":           "https://ntfy.sh/static/img/ntfy.png",
+				"icon_type":          "image/jpeg",
+				"icon_size":          "4567",
 				"title":              "some title",
 				"message":            "this is a message",
 				"actions":            `[{"id":"123","action":"view","label":"Open page","clear":true,"url":"https://ntfy.sh"},{"id":"456","action":"http","label":"Close door","clear":false,"url":"https://door.com/close","method":"PUT","headers":{"really":"yes"}}]`,
@@ -193,6 +201,9 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		"priority":           "4",
 		"tags":               strings.Join(m.Tags, ","),
 		"click":              "https://google.com",
+		"icon_url":           "https://ntfy.sh/static/img/ntfy.png",
+		"icon_type":          "image/jpeg",
+		"icon_size":          "4567",
 		"title":              "some title",
 		"message":            "this is a message",
 		"actions":            `[{"id":"123","action":"view","label":"Open page","clear":true,"url":"https://ntfy.sh"},{"id":"456","action":"http","label":"Close door","clear":false,"url":"https://door.com/close","method":"PUT","headers":{"really":"yes"}}]`,

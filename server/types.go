@@ -31,6 +31,7 @@ type message struct {
 	Click      string      `json:"click,omitempty"`
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
+	Icon       *icon       `json:"icon,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
 	Sender     string      `json:"-"`                  // IP address of uploader, used for rate limiting
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
@@ -42,6 +43,12 @@ type attachment struct {
 	Size    int64  `json:"size,omitempty"`
 	Expires int64  `json:"expires,omitempty"`
 	URL     string `json:"url"`
+}
+
+type icon struct {
+	URL  string `json:"url"`
+	Type string `json:"type,omitempty"`
+	Size int64  `json:"size,omitempty"`
 }
 
 type action struct {
@@ -74,6 +81,7 @@ type publishMessage struct {
 	Click    string   `json:"click"`
 	Actions  []action `json:"actions"`
 	Attach   string   `json:"attach"`
+	Icon     string   `json:"icon"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
 	Delay    string   `json:"delay"`

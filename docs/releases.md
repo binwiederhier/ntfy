@@ -10,6 +10,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Polling is now done with since=<id> API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 
@@ -24,6 +25,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
+## ntfy server v1.27.3 (UNRELEASED)
+
+**Features:**
+
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 -->
 
 ## ntfy server v1.27.2

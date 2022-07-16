@@ -56,6 +56,11 @@ func WithClick(url string) PublishOption {
 	return WithHeader("X-Click", url)
 }
 
+// WithIcon makes the notification use the given URL as its icon
+func WithIcon(icon string) PublishOption {
+	return WithHeader("X-Icon", icon)
+}
+
 // WithActions adds custom user actions to the notification. The value can be either a JSON array or the
 // simple format definition. See https://ntfy.sh/docs/publish/#action-buttons for details.
 func WithActions(value string) PublishOption {

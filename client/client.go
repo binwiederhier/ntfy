@@ -68,7 +68,7 @@ type Attachment struct {
 
 // Icon represents a message icon
 type Icon struct {
-	Url  string `json:"url"`
+	URL  string `json:"url"`
 	Type string `json:"type,omitempty"`
 	Size int64  `json:"size,omitempty"`
 }

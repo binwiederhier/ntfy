@@ -75,6 +75,7 @@ var (
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
 	attachURLRegex   = regexp.MustCompile(`^https?://`)
+	iconURLRegex     = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -568,6 +569,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
+	ico := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
@@ -593,6 +595,13 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if m.Attachment.Name == "" {
 			m.Attachment.Name = "attachment"
 		}
+	}
+	if ico != "" {
+		m.Icon = &icon{}
+		if !iconURLRegex.MatchString(ico) {
+			return false, false, "", false, errHTTPBadRequestIconURLInvalid
+		}
+		m.Icon.URL = ico
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {
@@ -1335,6 +1344,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Click != "" {
 			r.Header.Set("X-Click", m.Click)
+		}
+		if m.Icon != "" {
+			r.Header.Set("X-Icon", m.Icon)
 		}
 		if len(m.Actions) > 0 {
 			actionsStr, err := json.Marshal(m.Actions)

@@ -2349,6 +2349,84 @@ Here's an example showing how to attach an APK file:
   <figcaption>File attachment sent from an external URL</figcaption>
 </figure>
 
+## Icons
+_Supported on:_ :material-android:
+
+You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
+parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
+the icon (up to 300KB) and show it in the notification. Only jpeg and png images are supported at this time.
+
+Here's an example showing how to include an icon:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -X POST \
+        -H "Icon: https://ntfy.sh/docs/static/img/ntfy.png" \
+        ntfy.sh/customIcons
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --icon="https://ntfy.sh/docs/static/img/ntfy.png" \
+        customIcons
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /customIcons HTTP/1.1
+    Host: ntfy.sh
+    Icon: https://ntfy.sh/docs/static/img/ntfy.png
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/customIcons', {
+        method: 'POST',
+        headers: { 'Icon': 'https://ntfy.sh/docs/static/img/ntfy.png' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/customIcons", file)
+    req.Header.Set("Icon", "https://ntfy.sh/docs/static/img/ntfy.png")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/customIcons"
+    $headers = @{ Icon="https://ntfy.sh/docs/static/img/ntfy.png" }
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.put("https://ntfy.sh/customIcons",
+        headers={ "Icon": "https://ntfy.sh/docs/static/img/ntfy.png" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/customIcons', false, stream_context_create([
+        'http' => [
+        'method' => 'PUT',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Icon: https://ntfy.sh/docs/static/img/ntfy.png",
+        ]
+    ]));
+    ```
+
+Here's an example of how it will look on Android:
+
+<figure markdown>
+  ![file attachment](static/img/android-screenshot-icon.png){ width=500 }
+  <figcaption>Custom icon from an external URL</figcaption>
+</figure>
+
 ## E-mail notifications
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
@@ -2804,6 +2882,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
+| `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |

@@ -38,44 +38,47 @@ const (
 			attachment_url TEXT NOT NULL,
 			sender TEXT NOT NULL,
 			encoding TEXT NOT NULL,
-			published INT NOT NULL
+			published INT NOT NULL,
+			icon_url TEXT NOT NULL,
+			icon_type TEXT NOT NULL,
+			icon_size INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_mid ON messages (mid);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, published) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, published, icon_url, icon_type, icon_size)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
 	selectMessagesSinceTimeQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, icon_url, icon_type, icon_size
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, icon_url, icon_type, icon_size
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, icon_url, icon_type, icon_size
 		FROM messages 
 		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, icon_url, icon_type, icon_size
 		FROM messages 
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, icon_url, icon_type, icon_size
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
@@ -89,7 +92,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 7
+	currentSchemaVersion          = 8
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -177,6 +180,13 @@ const (
 	migrate6To7AlterMessagesTableQuery = `
 		ALTER TABLE messages RENAME COLUMN attachment_owner TO sender;
 	`
+
+	// 7 -> 8
+	migrate7To8AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN icon_url TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN icon_type TEXT NOT NULL DEFAULT('');
+		ALTER TABLE messages ADD COLUMN icon_size INT NOT NULL DEFAULT('0');
+	`
 )
 
 type messageCache struct {
@@ -248,6 +258,13 @@ func (c *messageCache) addMessages(ms []*message) error {
 			attachmentExpires = m.Attachment.Expires
 			attachmentURL = m.Attachment.URL
 		}
+		var iconURL, iconType string
+		var iconSize int64
+		if m.Icon != nil {
+			iconURL = m.Icon.URL
+			iconType = m.Icon.Type
+			iconSize = m.Icon.Size
+		}
 		var actionsStr string
 		if len(m.Actions) > 0 {
 			actionsBytes, err := json.Marshal(m.Actions)
@@ -275,6 +292,9 @@ func (c *messageCache) addMessages(ms []*message) error {
 			m.Sender,
 			m.Encoding,
 			published,
+			iconURL,
+			iconType,
+			iconSize,
 		)
 		if err != nil {
 			return err
@@ -412,9 +432,9 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	defer rows.Close()
 	messages := make([]*message, 0)
 	for rows.Next() {
-		var timestamp, attachmentSize, attachmentExpires int64
+		var timestamp, attachmentSize, attachmentExpires, iconSize int64
 		var priority int
-		var id, topic, msg, title, tagsStr, click, actionsStr, attachmentName, attachmentType, attachmentURL, sender, encoding string
+		var id, topic, msg, title, tagsStr, click, actionsStr, attachmentName, attachmentType, attachmentURL, sender, encoding, iconURL, iconType string
 		err := rows.Scan(
 			&id,
 			&timestamp,
@@ -432,6 +452,9 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			&attachmentURL,
 			&sender,
 			&encoding,
+			&iconURL,
+			&iconType,
+			&iconSize,
 		)
 		if err != nil {
 			return nil, err
@@ -456,6 +479,14 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 				URL:     attachmentURL,
 			}
 		}
+		var ico *icon
+		if iconURL != "" {
+			ico = &icon{
+				URL:  iconURL,
+				Type: iconType,
+				Size: iconSize,
+			}
+		}
 		messages = append(messages, &message{
 			ID:         id,
 			Time:       timestamp,
@@ -466,6 +497,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Priority:   priority,
 			Tags:       tags,
 			Click:      click,
+			Icon:       ico,
 			Actions:    actions,
 			Attachment: att,
 			Sender:     sender,
@@ -524,6 +556,8 @@ func setupCacheDB(db *sql.DB, startupQueries string) error {
 		return migrateFrom5(db)
 	} else if schemaVersion == 6 {
 		return migrateFrom6(db)
+	} else if schemaVersion == 7 {
+		return migrateFrom7(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -616,6 +650,17 @@ func migrateFrom6(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 7); err != nil {
+		return err
+	}
+	return migrateFrom7(db)
+}
+
+func migrateFrom7(db *sql.DB) error {
+	log.Info("Migrating cache database schema: from 7 to 8")
+	if _, err := db.Exec(migrate7To8AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 8); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

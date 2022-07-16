@@ -166,6 +166,11 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
 				data["attachment_url"] = m.Attachment.URL
 			}
+			if m.Icon != nil {
+				data["icon_url"] = m.Icon.URL
+				data["icon_type"] = m.Icon.Type
+				data["icon_size"] = fmt.Sprintf("%d", m.Icon.Size)
+			}
 			apnsConfig = createAPNSAlertConfig(m, data)
 		} else {
 			// If anonymous read for a topic is not allowed, we cannot send the message along

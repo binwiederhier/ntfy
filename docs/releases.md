@@ -13,6 +13,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Polling is now done with `since=<id>` API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
 * Move action buttons in notification cards ([#236](https://github.com/binwiederhier/ntfy/issues/236), thanks to [@wunter8](https://github.com/wunter8))
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 
@@ -41,12 +42,12 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
 * Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
 **Documentation:**
 
 * Fix some PowerShell publish docs ([#345](https://github.com/binwiederhier/ntfy/pull/345), thanks to [@noahpeltier](https://github.com/noahpeltier))
 
--->
 
 ## ntfy server v1.27.2
 Released June 23, 2022

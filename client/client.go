@@ -47,6 +47,7 @@ type Message struct { // TODO combine with server.message
 	Priority   int
 	Tags       []string
 	Click      string
+	Icon       *Icon
 	Attachment *Attachment
 
 	// Additional fields
@@ -63,6 +64,13 @@ type Attachment struct {
 	Expires int64  `json:"expires,omitempty"`
 	URL     string `json:"url"`
 	Owner   string `json:"-"` // IP address of uploader, used for rate limiting
+}
+
+// Icon represents a message icon
+type Icon struct {
+	Url  string `json:"url"`
+	Type string `json:"type,omitempty"`
+	Size int64  `json:"size,omitempty"`
 }
 
 type subscription struct {

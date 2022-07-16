@@ -1046,7 +1046,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
 		`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4,` +
-		`"delay":"30min"}`
+		`"icon":"https://ntfy.sh/static/img/ntfy.png", "delay":"30min"}`
 	response := request(t, s, "PUT", "/", body, nil)
 	require.Equal(t, 200, response.Code)
 
@@ -1058,6 +1058,8 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "http://google.com", m.Attachment.URL)
 	require.Equal(t, "google.pdf", m.Attachment.Name)
 	require.Equal(t, "http://ntfy.sh", m.Click)
+	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon.URL)
+
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)
 	require.True(t, m.Time < time.Now().Unix()+31*60)

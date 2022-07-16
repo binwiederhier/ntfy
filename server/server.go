@@ -96,6 +96,8 @@ const (
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"
 	encodingJWE              = "jwe"
+	multipartFieldMessage    = "message"
+	multipartFieldAttachment = "attachment"
 )
 
 // WebSocket constants
@@ -539,8 +541,8 @@ func (s *Server) handlePublishEncrypted(r *http.Request, m *message) (body *util
 		p, err := mp.NextPart()
 		if err != nil {
 			return nil, err
-		} else if p.FormName() != "message" {
-			return nil, errHTTPBadRequestUnexpectedMultipartField
+		} else if p.FormName() != multipartFieldMessage {
+			return nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldMessage, p.FormName())
 		}
 		messageBody, err := util.PeekLimit(p, s.config.MessageLimit)
 		if err == util.ErrLimitReached {
@@ -552,11 +554,11 @@ func (s *Server) handlePublishEncrypted(r *http.Request, m *message) (body *util
 		p, err = mp.NextPart()
 		if err != nil {
 			return nil, err
-		} else if p.FormName() != "attachment" {
-			return nil, errHTTPBadRequestUnexpectedMultipartField
+		} else if p.FormName() != multipartFieldAttachment {
+			return nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldAttachment, p.FormName())
 		}
 		m.Attachment = &attachment{
-			Name: "attachment.jwe", // Force handlePublishBody into "attachment" mode
+			Name: "attachment.jwe", // Force handlePublishBody into "attachment" mode; .jwe forces application/jose type
 		}
 		body, err = util.Peek(p, s.config.MessageLimit)
 		if err != nil {

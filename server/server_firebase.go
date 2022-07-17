@@ -151,6 +151,7 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				"title":    m.Title,
 				"message":  m.Message,
 				"encoding": m.Encoding,
+				"icon":     m.Icon,
 			}
 			if len(m.Actions) > 0 {
 				actions, err := json.Marshal(m.Actions)
@@ -165,11 +166,6 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				data["attachment_size"] = fmt.Sprintf("%d", m.Attachment.Size)
 				data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
 				data["attachment_url"] = m.Attachment.URL
-			}
-			if m.Icon != nil {
-				data["icon_url"] = m.Icon.URL
-				data["icon_type"] = m.Icon.Type
-				data["icon_size"] = fmt.Sprintf("%d", m.Icon.Size)
 			}
 			apnsConfig = createAPNSAlertConfig(m, data)
 		} else {

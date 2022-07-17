@@ -74,6 +74,7 @@ func TestCLI_Publish_All_The_Things(t *testing.T) {
 	require.Equal(t, "", m.Attachment.Owner)
 	require.Equal(t, int64(0), m.Attachment.Expires)
 	require.Equal(t, "", m.Attachment.Type)
+	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
 }
 
 func TestCLI_Publish_Wait_PID_And_Cmd(t *testing.T) {

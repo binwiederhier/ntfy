@@ -569,7 +569,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
-	ico := readParam(r, "x-icon", "icon")
+	m.Icon = readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
@@ -595,13 +595,6 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if m.Attachment.Name == "" {
 			m.Attachment.Name = "attachment"
 		}
-	}
-	if ico != "" {
-		m.Icon = &icon{}
-		if !iconURLRegex.MatchString(ico) {
-			return false, false, "", false, errHTTPBadRequestIconURLInvalid
-		}
-		m.Icon.URL = ico
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {

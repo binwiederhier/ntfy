@@ -1058,7 +1058,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "http://google.com", m.Attachment.URL)
 	require.Equal(t, "google.pdf", m.Attachment.Name)
 	require.Equal(t, "http://ntfy.sh", m.Click)
-	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon.URL)
+	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
 
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)

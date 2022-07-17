@@ -74,8 +74,7 @@ var (
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
-	attachURLRegex   = regexp.MustCompile(`^https?://`)
-	iconURLRegex     = regexp.MustCompile(`^https?://`)
+	urlRegex         = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -569,7 +568,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
-	m.Icon = readParam(r, "x-icon", "icon")
+	icon := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
@@ -579,7 +578,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		m.Attachment.Name = filename
 	}
 	if attach != "" {
-		if !attachURLRegex.MatchString(attach) {
+		if !urlRegex.MatchString(attach) {
 			return false, false, "", false, errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
@@ -595,6 +594,12 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 		if m.Attachment.Name == "" {
 			m.Attachment.Name = "attachment"
 		}
+	}
+	if icon != "" {
+		if !urlRegex.MatchString(icon) {
+			return false, false, "", false, errHTTPBadRequestIconURLInvalid
+		}
+		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {

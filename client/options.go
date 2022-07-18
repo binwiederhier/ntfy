@@ -92,8 +92,9 @@ func WithNoFirebase() PublishOption {
 	return WithHeader("X-Firebase", "no")
 }
 
+// WithEncrypted sets the encoding header to "jwe"
 func WithEncrypted() PublishOption {
-	return WithHeader("X-Encryption", "jwe")
+	return WithHeader("X-Encoding", "jwe")
 }
 
 // WithSince limits the number of messages returned from the server. The parameter since can be a Unix

@@ -447,6 +447,11 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
+type inputMessage struct {
+	message
+	cache bool
+}
+
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
@@ -1367,7 +1372,7 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 			return err
 		}
 		defer r.Body.Close()
-		var m publishMessage
+		var m PublishMessage
 		if err := json.NewDecoder(body).Decode(&m); err != nil {
 			return errHTTPBadRequestJSONInvalid
 		}

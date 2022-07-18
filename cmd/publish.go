@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/crypto"
 	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/server"
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
@@ -14,10 +14,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-)
-
-const (
-	encryptedMessageBytesLimit = 100 * 1024 * 1024 // 100 MB
 )
 
 func init() {
@@ -110,33 +106,26 @@ func execPublish(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	pm := &server.PublishMessage{
+		Topic:    topic,
+		Title:    title,
+		Message:  message,
+		Tags:     util.SplitNoEmpty(tags, ","),
+		Click:    click,
+		Actions:  nil,
+		Attach:   attach,
+		Filename: filename,
+		Email:    email,
+		Delay:    delay,
+	}
 	var options []client.PublishOption
-	if title != "" {
-		options = append(options, client.WithTitle(title))
+	p, err := util.ParsePriority(priority)
+	if err != nil {
+		return err
 	}
-	if priority != "" {
-		options = append(options, client.WithPriority(priority))
-	}
-	if tags != "" {
-		options = append(options, client.WithTagsList(tags))
-	}
-	if delay != "" {
-		options = append(options, client.WithDelay(delay))
-	}
-	if click != "" {
-		options = append(options, client.WithClick(click))
-	}
+	pm.Priority = p
 	if actions != "" {
 		options = append(options, client.WithActions(strings.ReplaceAll(actions, "\n", " ")))
-	}
-	if attach != "" {
-		options = append(options, client.WithAttach(attach))
-	}
-	if filename != "" {
-		options = append(options, client.WithFilename(filename))
-	}
-	if email != "" {
-		options = append(options, client.WithEmail(email))
 	}
 	if noCache {
 		options = append(options, client.WithNoCache())
@@ -165,15 +154,15 @@ func execPublish(c *cli.Context) error {
 		newMessage, err := waitForProcess(pid)
 		if err != nil {
 			return err
-		} else if message == "" {
-			message = newMessage
+		} else if pm.Message == "" {
+			pm.Message = newMessage
 		}
 	} else if len(command) > 0 {
 		newMessage, err := runAndWaitForCommand(command)
 		if err != nil {
 			return err
-		} else if message == "" {
-			message = newMessage
+		} else if pm.Message == "" {
+			pm.Message = newMessage
 		}
 	}
 	var body io.Reader
@@ -198,38 +187,21 @@ func execPublish(c *cli.Context) error {
 			}
 		}
 	}
-	if password != "" {
-		topicURL := expandTopicURL(topic, conf.DefaultHost)
-		key := crypto.DeriveKey(password, topicURL)
-		peaked, err := util.PeekLimit(io.NopCloser(body), encryptedMessageBytesLimit)
-		if err != nil {
-			return err
-		}
-		ciphertext, err := crypto.Encrypt(peaked.PeekedBytes, key)
-		if err != nil {
-			return err
-		}
-		body = strings.NewReader(ciphertext)
-		options = append(options, client.WithEncrypted())
-	}
+	var m *client.Message
 	cl := client.New(conf)
-	m, err := cl.PublishReader(topic, body, options...)
-	if err != nil {
-		return err
+	if password != "" {
+		if m, err = cl.PublishEncryptedReader(topic, m, password, options...); err != nil {
+			return err
+		}
+	} else {
+		if m, err = cl.PublishReader(topic, m, options...); err != nil {
+			return err
+		}
 	}
 	if !quiet {
 		fmt.Fprintln(c.App.Writer, strings.TrimSpace(m.Raw))
 	}
 	return nil
-}
-
-func expandTopicURL(topic, defaultHost string) string {
-	if strings.HasPrefix(topic, "http://") || strings.HasPrefix(topic, "https://") {
-		return topic
-	} else if strings.Contains(topic, "/") {
-		return fmt.Sprintf("https://%s", topic)
-	}
-	return fmt.Sprintf("%s/%s", defaultHost, topic)
 }
 
 // parseTopicMessageCommand reads the topic and the remaining arguments from the context.

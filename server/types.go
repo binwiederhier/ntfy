@@ -64,8 +64,8 @@ func newAction() *action {
 	}
 }
 
-// publishMessage is used as input when publishing as JSON
-type publishMessage struct {
+// PublishMessage is used as input when publishing as JSON
+type PublishMessage struct {
 	Topic    string   `json:"topic"`
 	Title    string   `json:"title"`
 	Message  string   `json:"message"`

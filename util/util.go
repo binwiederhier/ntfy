@@ -172,6 +172,16 @@ func ShortTopicURL(s string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
 }
 
+// ExpandTopicURL expands a topic to a fully qualified URL, e.g. "mytopic" -> "https://ntfy.sh/mytopic"
+func ExpandTopicURL(topic, defaultHost string) string {
+	if strings.HasPrefix(topic, "http://") || strings.HasPrefix(topic, "https://") {
+		return topic
+	} else if strings.Contains(topic, "/") {
+		return fmt.Sprintf("https://%s", topic)
+	}
+	return fmt.Sprintf("%s/%s", defaultHost, topic)
+}
+
 // DetectContentType probes the byte array b and returns mime type and file extension.
 // The filename is only used to override certain special cases.
 func DetectContentType(b []byte, filename string) (mimeType string, ext string) {

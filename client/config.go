@@ -12,8 +12,11 @@ const (
 
 // Config is the config struct for a Client
 type Config struct {
-	DefaultHost string `yaml:"default-host"`
-	Subscribe   []struct {
+	DefaultHost     string `yaml:"default-host"`
+	DefaultUser     string `yaml:"default-user"`
+	DefaultPassword string `yaml:"default-password"`
+	DefaultCommand  string `yaml:"default-command"`
+	Subscribe       []struct {
 		Topic    string            `yaml:"topic"`
 		User     string            `yaml:"user"`
 		Password string            `yaml:"password"`
@@ -25,8 +28,11 @@ type Config struct {
 // NewConfig creates a new Config struct for a Client
 func NewConfig() *Config {
 	return &Config{
-		DefaultHost: DefaultBaseURL,
-		Subscribe:   nil,
+		DefaultHost:     DefaultBaseURL,
+		DefaultUser:     "",
+		DefaultPassword: "",
+		DefaultCommand:  "",
+		Subscribe:       nil,
 	}
 }
 

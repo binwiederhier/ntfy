@@ -5,6 +5,12 @@
 #
 # default-host: https://ntfy.sh
 
+# Defaults below will be used when a topic does not have its own settings
+#
+# default-user:
+# default-password:
+# default-command:
+
 # Subscriptions to topics and their actions. This option is primarily used by the systemd service,
 # or if you cann "ntfy subscribe --from-config" directly.
 #

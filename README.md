@@ -58,7 +58,7 @@ Made with ❤️ by [Philipp C. Heckel](https://heckel.io).
 The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
 Third party libraries and resources:
-* [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI
+* [github.com/urfave/cli](https://github.com/urfave/cli) (MIT) is used to drive the CLI
 * [Mixkit sounds](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) are used as notification sounds
 * [Sounds from notificationsounds.com](https://notificationsounds.com) (Creative Commons Attribution) are used as notification sounds
 * [Roboto Font](https://fonts.google.com/specimen/Roboto) (Apache 2.0) is used as a font in everything web

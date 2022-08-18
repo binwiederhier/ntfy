@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -312,12 +313,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.ensureWebEnabled(s.handleOptions)(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
-		return s.limitRequests(s.transformBodyJSON(s.authWrite(s.handlePublish)))(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && (r.URL.Path == "/" || topicPathRegex.MatchString(r.URL.Path)) {
+		return s.limitRequests(s.handlePublishAll)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
 		return s.limitRequests(s.transformMatrixJSON(s.authWrite(s.handlePublishMatrix)))(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
-		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && jsonPathRegex.MatchString(r.URL.Path) {
@@ -447,12 +446,7 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-type inputMessage struct {
-	message
-	cache bool
-}
-
-func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
+func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, error) {
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
 		return nil, err
@@ -464,7 +458,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	}
 	var body *util.PeekedReadCloser
 	if m.Encoding == encodingJWE {
-		m = newEncryptedMessage(t.ID)
+		m = newEncryptedMessage(t.ID, im.M)
 		if body, err = s.handlePublishEncrypted(r, m); err != nil {
 			return nil, err
 		}
@@ -515,8 +509,223 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	return m, nil
 }
 
+type inputMessage struct {
+	PublishMessage
+	AttachmentBody io.ReadCloser
+	Cache          bool
+	Firebase       bool
+	UnifiedPush    bool
+	PollID         string
+	Encoding       string
+}
+
+func (s *Server) handlePublishAll(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	// TODO authWrite
+	im, err := s.parsePublishInputMessage(r, v)
+	if err != nil {
+		return err
+	}
+	t, err := s.topicsFromID(im.Topic)
+	if err != nil {
+		return err
+	}
+	m, err := s.checkAndConvertPublishMessage(v, im)
+	if err != nil {
+		return err
+	}
+	var body *util.PeekedReadCloser
+
+	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
+		return err
+	}
+	if m.Message == "" {
+		m.Message = emptyMessageBody
+	}
+	delayed := m.Time > time.Now().Unix()
+	log.Debug("%s Received message: event=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
+		logMessagePrefix(v, m), m.Event, len(m.Message), delayed, im.Firebase, im.Cache, im.UnifiedPush, im.Email)
+	if log.IsTrace() {
+		log.Trace("%s Message body: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(m))
+	}
+	if !delayed {
+		if err := t.Publish(v, m); err != nil {
+			return err
+		}
+		if s.firebaseClient != nil && im.Firebase {
+			go s.sendToFirebase(v, m)
+		}
+		if s.smtpSender != nil && im.Email != "" {
+			go s.sendEmail(v, m, im.Email)
+		}
+		if s.config.UpstreamBaseURL != "" {
+			go s.forwardPollRequest(v, m)
+		}
+	} else {
+		log.Debug("%s Message delayed, will process later", logMessagePrefix(v, m))
+	}
+	if im.Cache {
+		if err := s.messageCache.AddMessage(m); err != nil {
+			return err
+		}
+	}
+	s.mu.Lock()
+	s.messages++
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *Server) parsePublishInputMessage(r *http.Request, v *visitor) (im *inputMessage, err error) {
+	im = &inputMessage{}
+	encrypted := readParam(r, "x-encoding", "encoding") == encodingJWE
+	multipart := strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/")
+	isJSON := r.URL.Path == "/"
+	if err := s.parsePublishParams(r, im); err != nil {
+		return nil, err
+	}
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 2 {
+		return nil, errHTTPBadRequestTopicInvalid
+	}
+	im.Topic = parts[1]
+	if multipart {
+		im.Message, im.AttachmentBody, err = s.readMultipart(r)
+		if err != nil {
+			return nil, err
+		}
+		if !encrypted && isJSON {
+			if err := json.NewDecoder(strings.NewReader(im.Message)).Decode(&im.PublishMessage); err != nil {
+				return nil, errHTTPBadRequestJSONInvalid
+			}
+		}
+	} else {
+		body, err := util.Peek(r.Body, s.config.MessageLimit)
+		if err != nil {
+			return nil, err
+		}
+		if encrypted {
+			if body.LimitReached {
+				return nil, errHTTPEntityTooLargeMessageTooLarge
+			}
+			im.Message = string(body.PeekedBytes)
+		} else if body.LimitReached {
+			im.AttachmentBody = body
+		} else if isJSON {
+			if err := json.NewDecoder(strings.NewReader(im.Message)).Decode(&im.PublishMessage); err != nil {
+				return nil, errHTTPBadRequestJSONInvalid
+			}
+		} else {
+			im.Message = string(body.PeekedBytes)
+		}
+	}
+	return im, nil
+}
+
+func (s *Server) readMultipart(r *http.Request) (message string, attachment io.ReadCloser, err error) {
+	mp, err := r.MultipartReader()
+	if err != nil {
+		return "", nil, err
+	}
+	p, err := mp.NextPart()
+	if err != nil {
+		return "", nil, err
+	} else if p.FormName() != multipartFieldMessage {
+		return "", nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldMessage, p.FormName())
+	}
+	messageBody, err := util.PeekLimit(p, s.config.MessageLimit)
+	if err == util.ErrLimitReached {
+		return "", nil, errHTTPEntityTooLargeMessageTooLarge
+	} else if err != nil {
+		return "", nil, err
+	}
+	message = string(messageBody.PeekedBytes)
+	attachment, err = mp.NextPart()
+	if err != nil {
+		return "", nil, err
+	} else if p.FormName() != multipartFieldAttachment {
+		return "", nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldAttachment, p.FormName())
+	}
+	return message, attachment, nil
+}
+
+func (s *Server) checkAndConvertPublishMessage(v *visitor, im *inputMessage) (m *message, err error) {
+	if m.PollID != "" {
+		im.Cache = false
+		im.Email = ""
+		im.UnifiedPush = false
+		return newPollRequestMessage(im.Topic, m.PollID), nil
+	} else if im.Encoding == encodingJWE {
+		im.Email = ""
+		im.UnifiedPush = false
+		return newEncryptedMessage(im.Topic, im.Message), nil
+	}
+	m = newDefaultMessage(im.Topic, im.Message)
+	m.Title = im.Title
+	m.Priority = im.Priority
+	m.Tags = im.Tags
+	m.Click = im.Click
+	m.Actions = im.Actions
+	if im.Attach != "" || im.Filename != "" {
+		m.Attachment = &attachment{}
+	}
+	if im.Filename != "" {
+		m.Attachment.Name = im.Filename
+	}
+	if im.Attach != "" {
+		if !attachURLRegex.MatchString(im.Attach) {
+			return nil, errHTTPBadRequestAttachmentURLInvalid
+		}
+		if im.AttachmentBody != nil {
+			return nil, errors.New("cannot attach and send attachment body") // TODO test for this
+		}
+		m.Attachment.URL = im.Attach
+		if im.Filename == "" {
+			u, err := url.Parse(m.Attachment.URL)
+			if err == nil {
+				m.Attachment.Name = path.Base(u.Path)
+				if m.Attachment.Name == "." || m.Attachment.Name == "/" {
+					m.Attachment.Name = ""
+				}
+			}
+		}
+		if m.Attachment.Name == "" {
+			m.Attachment.Name = "attachment"
+		}
+	}
+	if im.Email != "" {
+		if err := v.EmailAllowed(); err != nil {
+			return nil, errHTTPTooManyRequestsLimitEmails
+		}
+	}
+	if s.smtpSender == nil && im.Email != "" {
+		return nil, errHTTPBadRequestEmailDisabled
+	}
+	if im.Delay != "" {
+		if !im.Cache {
+			return nil, errHTTPBadRequestDelayNoCache
+		}
+		if im.Email != "" {
+			return nil, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+		}
+		delay, err := util.ParseFutureTime(im.Delay, time.Now())
+		if err != nil {
+			return nil, errHTTPBadRequestDelayCannotParse
+		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+			return nil, errHTTPBadRequestDelayTooSmall
+		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
+			return nil, errHTTPBadRequestDelayTooLarge
+		}
+		m.Time = delay.Unix()
+		m.Sender = v.ip // Important for rate limiting
+	}
+	if im.UnifiedPush {
+		im.Firebase = false
+		im.UnifiedPush = true
+	}
+	return m, nil
+}
+
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	m, err := s.handlePublishWithoutResponse(r, v)
+	m, err := s.handlePublishInternal(r, v)
 	if err != nil {
 		return err
 	}
@@ -529,55 +738,11 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	_, err := s.handlePublishWithoutResponse(r, v)
+	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
 		return &errMatrix{pushKey: r.Header.Get(matrixPushKeyHeader), err: err}
 	}
 	return writeMatrixSuccess(w)
-}
-
-func (s *Server) handlePublishEncrypted(r *http.Request, m *message) (body *util.PeekedReadCloser, err error) {
-	multipart := strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/")
-	if multipart {
-		mp, err := r.MultipartReader()
-		if err != nil {
-			return nil, err
-		}
-		p, err := mp.NextPart()
-		if err != nil {
-			return nil, err
-		} else if p.FormName() != multipartFieldMessage {
-			return nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldMessage, p.FormName())
-		}
-		messageBody, err := util.PeekLimit(p, s.config.MessageLimit)
-		if err == util.ErrLimitReached {
-			return nil, errHTTPEntityTooLargeEncryptedMessageTooLarge
-		} else if err != nil {
-			return nil, err
-		}
-		m.Message = string(messageBody.PeekedBytes)
-		p, err = mp.NextPart()
-		if err != nil {
-			return nil, err
-		} else if p.FormName() != multipartFieldAttachment {
-			return nil, wrapErrHTTP(errHTTPBadRequestUnexpectedMultipartField, "expected '%s', got '%s'", multipartFieldAttachment, p.FormName())
-		}
-		m.Attachment = &attachment{
-			Name: "attachment.jwe", // Force handlePublishBody into "attachment" mode; .jwe forces application/jose type
-		}
-		body, err = util.Peek(p, s.config.MessageLimit)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if body, err = util.PeekLimit(r.Body, s.config.MessageLimit); err == util.ErrLimitReached {
-			return nil, errHTTPEntityTooLargeEncryptedMessageTooLarge
-		} else if err != nil {
-			return nil, err
-		}
-		m.Message = string(body.PeekedBytes)
-	}
-	return body, nil
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
@@ -622,53 +787,23 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
-	cache = readBoolParam(r, true, "x-cache", "cache")
-	firebase = readBoolParam(r, true, "x-firebase", "firebase")
+func (s *Server) parsePublishParams(r *http.Request, m *inputMessage) error {
+	m.Message = strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
-	filename := readParam(r, "x-filename", "filename", "file", "f")
-	attach := readParam(r, "x-attach", "attach", "a")
-	if attach != "" || filename != "" {
-		m.Attachment = &attachment{}
-	}
-	if filename != "" {
-		m.Attachment.Name = filename
-	}
-	if attach != "" {
-		if !attachURLRegex.MatchString(attach) {
-			return false, false, "", false, errHTTPBadRequestAttachmentURLInvalid
-		}
-		m.Attachment.URL = attach
-		if m.Attachment.Name == "" {
-			u, err := url.Parse(m.Attachment.URL)
-			if err == nil {
-				m.Attachment.Name = path.Base(u.Path)
-				if m.Attachment.Name == "." || m.Attachment.Name == "/" {
-					m.Attachment.Name = ""
-				}
-			}
-		}
-		if m.Attachment.Name == "" {
-			m.Attachment.Name = "attachment"
-		}
-	}
-	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
-	if email != "" {
-		if err := v.EmailAllowed(); err != nil {
-			return false, false, "", false, errHTTPTooManyRequestsLimitEmails
-		}
-	}
-	if s.smtpSender == nil && email != "" {
-		return false, false, "", false, errHTTPBadRequestEmailDisabled
-	}
-	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
-	if messageStr != "" {
-		m.Message = messageStr
-	}
+	m.Filename = readParam(r, "x-filename", "filename", "file", "f")
+	m.Attach = readParam(r, "x-attach", "attach", "a")
+	m.Email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
+	m.Delay = readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
+	m.Encoding = readParam(r, "x-encoding", "encoding")
+	m.UnifiedPush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
+	m.Cache = readBoolParam(r, true, "x-cache", "cache")
+	m.Firebase = readBoolParam(r, true, "x-firebase", "firebase")
+	m.PollID = readParam(r, "x-poll-id", "poll-id")
+	var err error
 	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if err != nil {
-		return false, false, "", false, errHTTPBadRequestPriorityInvalid
+		return errHTTPBadRequestPriorityInvalid
 	}
 	tagsStr := readParam(r, "x-tags", "tags", "tag", "ta")
 	if tagsStr != "" {
@@ -677,51 +812,14 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			m.Tags = append(m.Tags, strings.TrimSpace(s))
 		}
 	}
-	if encoding := readParam(r, "x-encoding", "encoding"); encoding == encodingJWE {
-		m.Encoding = encoding
-	}
-	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
-	if delayStr != "" {
-		if !cache {
-			return false, false, "", false, errHTTPBadRequestDelayNoCache
-		}
-		if email != "" {
-			return false, false, "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
-		}
-		delay, err := util.ParseFutureTime(delayStr, time.Now())
-		if err != nil {
-			return false, false, "", false, errHTTPBadRequestDelayCannotParse
-		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooSmall
-		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooLarge
-		}
-		m.Time = delay.Unix()
-		m.Sender = v.ip // Important for rate limiting
-	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
 		m.Actions, err = parseActions(actionsStr)
 		if err != nil {
-			return false, false, "", false, wrapErrHTTP(errHTTPBadRequestActionsInvalid, err.Error())
+			return wrapErrHTTP(errHTTPBadRequestActionsInvalid, err.Error())
 		}
 	}
-	encryption := readParam(r, "x-encryption", "encryption", "encrypted", "encrypt", "enc")
-	if encryption == "yes" || encryption == "true" || encryption == "1" || encryption == encodingJWE {
-		m.Encoding = encodingJWE
-	}
-	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
-	if unifiedpush {
-		firebase = false
-		unifiedpush = true
-	}
-	m.PollID = readParam(r, "x-poll-id", "poll-id")
-	if m.PollID != "" {
-		unifiedpush = false
-		cache = false
-		email = ""
-	}
-	return cache, firebase, email, unifiedpush, nil
+	return nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
@@ -1142,12 +1240,22 @@ func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	return topics, parts[1], nil
 }
 
+func (s *Server) topicsFromID(id string) (*topic, error) {
+	t, err := s.topicsFromIDs(id)
+	if err != nil {
+		return nil, err
+	} else if len(t) == 0 {
+		return nil, errHTTPBadRequestTopicDisallowed
+	}
+	return t[0], nil
+}
+
 func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
 	for _, id := range ids {
-		if util.InStringList(disallowedTopics, id) {
+		if id == "" || util.InStringList(disallowedTopics, id) {
 			return nil, errHTTPBadRequestTopicDisallowed
 		}
 		if _, ok := s.topics[id]; !ok {
@@ -1358,62 +1466,6 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if !s.config.EnableWeb {
 			return errHTTPNotFound
-		}
-		return next(w, r, v)
-	}
-}
-
-// transformBodyJSON peeks the request body, reads the JSON, and converts it to headers
-// before passing it on to the next handler. This is meant to be used in combination with handlePublish.
-func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
-	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		body, err := util.Peek(r.Body, s.config.MessageLimit)
-		if err != nil {
-			return err
-		}
-		defer r.Body.Close()
-		var m PublishMessage
-		if err := json.NewDecoder(body).Decode(&m); err != nil {
-			return errHTTPBadRequestJSONInvalid
-		}
-		if !topicRegex.MatchString(m.Topic) {
-			return errHTTPBadRequestTopicInvalid
-		}
-		if m.Message == "" {
-			m.Message = emptyMessageBody
-		}
-		r.URL.Path = "/" + m.Topic
-		r.Body = io.NopCloser(strings.NewReader(m.Message))
-		if m.Title != "" {
-			r.Header.Set("X-Title", m.Title)
-		}
-		if m.Priority != 0 {
-			r.Header.Set("X-Priority", fmt.Sprintf("%d", m.Priority))
-		}
-		if m.Tags != nil && len(m.Tags) > 0 {
-			r.Header.Set("X-Tags", strings.Join(m.Tags, ","))
-		}
-		if m.Attach != "" {
-			r.Header.Set("X-Attach", m.Attach)
-		}
-		if m.Filename != "" {
-			r.Header.Set("X-Filename", m.Filename)
-		}
-		if m.Click != "" {
-			r.Header.Set("X-Click", m.Click)
-		}
-		if len(m.Actions) > 0 {
-			actionsStr, err := json.Marshal(m.Actions)
-			if err != nil {
-				return errHTTPBadRequestJSONInvalid
-			}
-			r.Header.Set("X-Actions", string(actionsStr))
-		}
-		if m.Email != "" {
-			r.Header.Set("X-Email", m.Email)
-		}
-		if m.Delay != "" {
-			r.Header.Set("X-Delay", m.Delay)
 		}
 		return next(w, r, v)
 	}

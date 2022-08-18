@@ -66,17 +66,17 @@ func newAction() *action {
 
 // PublishMessage is used as input when publishing as JSON
 type PublishMessage struct {
-	Topic    string   `json:"topic"`
-	Title    string   `json:"title"`
-	Message  string   `json:"message"`
-	Priority int      `json:"priority"`
-	Tags     []string `json:"tags"`
-	Click    string   `json:"click"`
-	Actions  []action `json:"actions"`
-	Attach   string   `json:"attach"`
-	Filename string   `json:"filename"`
-	Email    string   `json:"email"`
-	Delay    string   `json:"delay"`
+	Topic    string    `json:"topic"`
+	Title    string    `json:"title"`
+	Message  string    `json:"message"`
+	Priority int       `json:"priority"`
+	Tags     []string  `json:"tags"`
+	Click    string    `json:"click"`
+	Actions  []*action `json:"actions"`
+	Attach   string    `json:"attach"`
+	Filename string    `json:"filename"`
+	Email    string    `json:"email"`
+	Delay    string    `json:"delay"`
 }
 
 // messageEncoder is a function that knows how to encode a message
@@ -115,8 +115,8 @@ func newPollRequestMessage(topic, pollID string) *message {
 	return m
 }
 
-func newEncryptedMessage(topic string) *message {
-	m := newMessage(messageEvent, topic, "")
+func newEncryptedMessage(topic, message string) *message {
+	m := newMessage(messageEvent, topic, message)
 	m.Encoding = encodingJWE
 	return m
 }

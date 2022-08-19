@@ -180,15 +180,11 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			user = s.User
 		} else if conf.DefaultUser != "" {
 			user = conf.DefaultUser
-		} else {
-			user = ""
 		}
 		if s.Password != "" {
 			password = s.Password
 		} else if conf.DefaultPassword != "" {
 			password = conf.DefaultPassword
-		} else {
-			password = ""
 		}
 		if user != "" && password != "" {
 			topicOptions = append(topicOptions, client.WithBasicAuth(user, password))

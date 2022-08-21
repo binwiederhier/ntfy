@@ -1,0 +1,93 @@
+# Integrations + community projects
+
+There are quite a few projects that work with ntfy, integrate ntfy, or have been built around ntfy. It's super exciting to see what you guys have come up with. Feel free to [create a pull request on GitHub](https://github.com/binwiederhier/ntfy/issues) to add your own project here.
+
+I've added a ⭐ to projects or posts that have a significant following, or had a lot of interaction by the community.
+
+## Public ntfy servers
+
+| URL                                           |  Country  |
+|-----------------------------------------------|:---------:|
+| [ntfy.sh](https://ntfy.sh/) (*Official*)      |   🇺🇸    |
+| [ntfy.tedomum.net](https://ntfy.tedomum.net/) | 🇫🇷 🇪🇺 |
+| [ntfy.jae.fi](https://ntfy.jae.fi/)           | 🇫🇮 🇪🇺 |
+
+## Official integrations
+
+- [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push Notifications that work with just about every platform
+- [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
+- [Robusta](https://docs.robusta.dev/master/catalog/sinks/webhook.html) ⭐ - open source platform for Kubernetes troubleshooting
+- [borgmatic](https://torsion.org/borgmatic/docs/how-to/monitor-your-backups/#third-party-monitoring-services) ⭐ - configuration-driven backup software for servers and workstations
+- [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users
+
+## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
+
+- [Element](https://f-droid.org/packages/im.vector.app/) ⭐ - Matrix client
+- [SchildiChat](https://schildi.chat/android/) ⭐ - Matrix client
+- [Tusky](https://tusky.app/) ⭐ - Fediverse client
+- [Fedilab](https://fedilab.app/) - Fediverse client
+- [FindMyDevice](https://gitlab.com/Nulide/findmydevice/) - Find your Device with an SMS or online with the help of FMDServer
+- [Tox Push Message App](https://github.com/zoff99/tox_push_msg_app) - Tox Push Message App
+
+## Libraries 
+
+- [ntfy-php-library](https://github.com/VerifiedJoseph/ntfy-php-library) - PHP library for sending messages using a ntfy server (PHP)
+- [ntfy-notifier](https://github.com/DAcodedBEAT/ntfy-notifier) - Symfony Notifier integration for ntfy (PHP)
+- [ntfpy](https://github.com/Nevalicjus/ntfpy) - API Wrapper for ntfy.sh (Python)
+- [pyntfy](https://github.com/DP44/pyntfy) - A module for interacting with ntfy notifications (Python)
+- [vntfy](https://github.com/lmangani/vntfy) - Barebone V client for ntfy (V)
+- [ntfy-middleman](https://github.com/nachotp/ntfy-middleman) - Wraps APIs and send notifications using ntfy.sh on schedule (Python)
+
+## CLIs + GUIs
+
+- [ntfy.sh.sh](https://github.com/mininmobile/ntfy.sh.sh) - Run scripts on ntfy.sh events
+- [ntfy Desktop client](https://github.com/mininmobile/ntfy-desktop) - Cross-platform desktop application for ntfy
+- [ntfy svelte front-end](https://github.com/novatorem/Ntfy) - Front-end built with svelte
+- [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
+- [ntfysh-windows](https://github.com/lucas-bortoli/ntfysh-windows) - A ntfy client for Windows Desktop
+- [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
+- [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
+
+## Projects + scripts 
+
+- [Grafana-to-ntfy](https://github.com/kittyandrew/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Rust)
+- [ntfy-long-zsh-command](https://github.com/robfox92/ntfy-long-zsh-command) - Notifies you once a long-running command completes (zsh)
+- [ntfy-shellscripts](https://github.com/nickexyz/ntfy-shellscripts) - A few scripts for the ntfy project (Shell)
+- [QuickStatus](https://github.com/corneliusroot/QuickStatus) - A shell script to alert to any immediate problems upon login (Shell)
+- [ntfy.el](https://github.com/shombando/ntfy) - Send notifications from Emacs (Emacs)
+- [backup-projects](https://gist.github.com/anthonyaxenov/826ba65abbabd5b00196bc3e6af76002) - Stupidly simple backup script for own projects (Shell)
+- [grav-plugin-whistleblower](https://github.com/Himmlisch-Studios/grav-plugin-whistleblower) - Grav CMS plugin to get notifications via ntfy (PHP)
+- [ntfy-server-status](https://github.com/filip2cz/ntfy-server-status) -  Checking if server is online and reporting through ntfy (C)
+- [borg-based backup](https://github.com/davidhi7/backup) - Simple borg-based backup script with notifications based on ntfy.sh or Discord webhooks (Python/Shell)
+- [ntfy.sh *arr script](https://github.com/agent-squirrel/nfty-arr-script) - Quick and hacky script to get sonarr/radarr to notify the ntfy.sh service (Shell)
+- [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)
+- [send_to_phone](https://github.com/whipped-cream/send_to_phone) - Scripts to upload a file to Transfer.sh and ping ntfy with the download link (Python)
+- [ntfy Discord bot](https://github.com/R0dn3yS/ntfy-bot) - WIP ntfy discord bot (TypeScript)
+- [ntfy Discord bot](https://github.com/binwiederhier/ntfy-bot) - ntfy Discord bot (Go)
+- [Bettarr Notifications](https://github.com/NiNiyas/Bettarr-Notifications) - Better Notifications for Sonarr and Radarr (Python)
+- [Notify me the intruders](https://github.com/nothingbutlucas/notify_me_the_intruders) - Notify you if they are intruders or new connections on your network (Shell)
+- [Send GitHub Action to ntfy](https://github.com/NiNiyas/ntfy-action) - Send GitHub Action workflow notifications to ntfy (JS)
+- [ntfy alertmanager bridge](https://github.com/aTable/ntfy_alertmanager_bridge) - Basic alertmanager bridge to ntfy (JS)
+- [restreamchat2ntfy](https://github.com/kurohuku7/restreamchat2ntfy) - Send restream.io chat to ntfy to check on the Meta Quest (JS)
+- [k8s-ntfy-deployment-service](https://github.com/Christian42/k8s-ntfy-deployment-service) - Automatic Kubernetes (k8s) ntfy deployment
+
+## Blog + forum posts
+
+- [4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - 8/2022
+- [Easy notifications from R](https://sometimesir.com/posts/easy-notifications-from-r/) - 6/2022
+- [ntfy is finally coming to iOS, and Matrix/UnifiedPush gateway support](https://www.reddit.com/r/selfhosted/comments/vdzvxi/ntfy_is_finally_coming_to_ios_with_full/) ⭐ - 6/2022
+- [无需注册的通知服务ntfy](https://wbsu2003.4everland.app/2022/05/30/%E6%97%A0%E9%9C%80%E6%B3%A8%E5%86%8C%E7%9A%84%E9%80%9A%E7%9F%A5%E6%9C%8D%E5%8A%A1ntfy/) - 5/2022
+- [Install guide (with Docker)](https://chowdera.com/2022/150/202205301257379077.html) - 5/2022
+- [Updated review post (Jan-Lukas Else)](https://jlelse.blog/thoughts/2022/04/ntfy) - 4/2022
+- [Reddit feature update post](https://www.reddit.com/r/selfhosted/comments/uetlso/ntfy_is_a_tool_to_send_push_notifications_to_your/) ⭐ - 4/2022
+- [無料で簡単に通知の送受信ができつつオープンソースでセルフホストも可能な「ntfy」を使ってみた (Gigazine)](https://gigazine.net/news/20220404-ntfy-push-notification/) - 4/2022
+- [Pocketmags ntfy review](https://pocketmags.com/us/linux-format-magazine/march-2022/articles/1104187/ntfy) - 3/2022
+- [Reddit web app release post](https://www.reddit.com/r/selfhosted/comments/tc0p0u/say_hello_to_the_brand_new_ntfysh_web_app_push/) ⭐ - 3/2022
+- [Lemmy post (Jakob)](https://lemmy.eus/post/15541) - 1/2022
+- [Reddit UnifiedPush release post](https://www.reddit.com/r/selfhosted/comments/s5jylf/my_open_source_notification_android_app_and/) ⭐ - 1/2022
+- [ntfy: send notifications from your computer to your phone](https://rs1.es/tutorials/2022/01/19/ntfy-send-notifications-phone.html) - 1/2022
+- [Short ntfy review (Jan-Lukas Else)](https://jlelse.blog/links/2021/12/ntfy-sh) - 12/2021
+- [Free MacroDroid webhook alternative (FrameXX)](https://www.macrodroidforum.com/index.php?threads/ntfy-sh-free-macrodroid-webhook-alternative.1505/) - 12/2021
+- [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - 11/2021
+- [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - 12/2021
+- [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - 11/2021

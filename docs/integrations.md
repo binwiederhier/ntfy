@@ -73,7 +73,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
-- [4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - 8/2022
+- [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - 8/2022
+- [Fedora Magazine | 4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - 8/2022
+- [Docker로 오픈소스 푸시알람 프로젝트 ntfy.sh 설치 및 사용하기.(Feat. Uptimekuma)](https://svrforum.com/svr/398979) - 8/2022
 - [Easy notifications from R](https://sometimesir.com/posts/easy-notifications-from-r/) - 6/2022
 - [ntfy is finally coming to iOS, and Matrix/UnifiedPush gateway support](https://www.reddit.com/r/selfhosted/comments/vdzvxi/ntfy_is_finally_coming_to_ios_with_full/) ⭐ - 6/2022
 - [无需注册的通知服务ntfy](https://wbsu2003.4everland.app/2022/05/30/%E6%97%A0%E9%9C%80%E6%B3%A8%E5%86%8C%E7%9A%84%E9%80%9A%E7%9F%A5%E6%9C%8D%E5%8A%A1ntfy/) - 5/2022

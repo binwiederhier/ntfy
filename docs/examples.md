@@ -479,7 +479,7 @@ You can create two Alert Contacts each with a different icon and priority, for e
     "click": https://uptimerobot.com/dashboard#*monitorID*
 }
 ```
-You can now add the Alerts Contact(s) to the monitors and test the notifications:
+You can now add the created Alerts Contact(s) to the monitor(s) and test the notifications:
 
 <div id="uptimerobot-monitor-screenshots" class="screenshots">
     <a href="../static/img/uptimerobot-test.jpg"><img src="../static/img/uptimerobot-test.jpg"/></a>

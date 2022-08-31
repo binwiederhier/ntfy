@@ -1,3 +1,5 @@
+// +build darwin linux dragonfly freebsd netbsd openbsd
+
 package cmd
 
 import "syscall"

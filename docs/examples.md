@@ -449,6 +449,43 @@ You can now test the notifications and apply them to monitors:
     <a href="../static/img/uptimekuma-ios-up.jpg"><img src="../static/img/uptimekuma-ios-up.jpg"/></a>
 </div>
 
+## UptimeRobot
+Go to your [UptimeRobot](https://github.com/uptimerobot) My Settings > Alert Contacts > Add Alert Contact
+Select **Alert Contact Type** = Webhook. Then set your desired **Friendly Name** (e.g. "ntfy-sh-UP"), **URL to Notify**, **POST value** and select checkbox **Send as JSON (application/json)**. Make sure to send the JSON POST request to ntfy.domain.com without the topic name in the url and include the "topic" name in the JSON body.
+
+<div id="uptimerobot-monitor-setup" class="screenshots">
+    <a href="../static/img/uptimerobot-setup.jpg"><img src="../static/img/uptimerobot-setup.jpg"/></a>
+</div>
+
+```
+{
+    "topic":"myTopic",
+    "title": "*monitorFriendlyName* *alertTypeFriendlyName*",
+    "message": "*alertDetails*", 
+    "tags": ["green_circle"],
+    "priority": 3,
+    "click": https://uptimerobot.com/dashboard#*monitorID*
+}
+```
+You can create two Alert Contacts each with a different icon and priority, for example:
+
+```
+{
+    "topic":"myTopic",
+    "title": "*monitorFriendlyName* *alertTypeFriendlyName*",
+    "message": "*alertDetails*", 
+    "tags": ["red_circle"],
+    "priority": 3,
+    "click": https://uptimerobot.com/dashboard#*monitorID*
+}
+```
+You can now add the created Alerts Contact(s) to the monitor(s) and test the notifications:
+
+<div id="uptimerobot-monitor-screenshots" class="screenshots">
+    <a href="../static/img/uptimerobot-test.jpg"><img src="../static/img/uptimerobot-test.jpg"/></a>
+</div>
+
+
 ## Apprise
 ntfy is integrated natively into [Apprise](https://github.com/caronc/apprise) (also check out the 
 [Apprise/ntfy wiki page](https://github.com/caronc/apprise/wiki/Notify_ntfy)).

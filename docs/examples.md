@@ -457,7 +457,7 @@ Select **Alert Contact Type** = Webhook. Then set your desired **Friendly Name**
     <a href="../static/img/uptimerobot-setup.jpg"><img src="../static/img/uptimerobot-setup.jpg"/></a>
 </div>
 
-```
+``` json
 {
     "topic":"myTopic",
     "title": "*monitorFriendlyName* *alertTypeFriendlyName*",
@@ -469,7 +469,7 @@ Select **Alert Contact Type** = Webhook. Then set your desired **Friendly Name**
 ```
 You can create two Alert Contacts each with a different icon and priority, for example:
 
-```
+``` json
 {
     "topic":"myTopic",
     "title": "*monitorFriendlyName* *alertTypeFriendlyName*",

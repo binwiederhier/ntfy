@@ -42,10 +42,13 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
 * Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
+* Better logging for Matrix push key errors ([#384](https://github.com/binwiederhier/ntfy/pull/384), thanks to [@christophehenry](https://github.com/christophehenry))
 
 **Documentation:**
 
 * Fix some PowerShell publish docs ([#345](https://github.com/binwiederhier/ntfy/pull/345), thanks to [@noahpeltier](https://github.com/noahpeltier))
+* Clarified Docker install instructions ([#361](https://github.com/binwiederhier/ntfy/issues/361), thanks to [@barart](https://github.com/barart) for reporting)  
+* Mismatched quotation marks ([#392](https://github.com/binwiederhier/ntfy/pull/392)], thanks to [@connorlanigan](https://github.com/connorlanigan))
 
 -->
 

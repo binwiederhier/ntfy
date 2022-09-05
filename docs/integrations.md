@@ -12,6 +12,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 | [ntfy.tedomum.net](https://ntfy.tedomum.net/) | 🇫🇷 🇪🇺 |
 | [ntfy.jae.fi](https://ntfy.jae.fi/)           | 🇫🇮 🇪🇺 |
 
+Thanks to everyone running a public server. **You guys rock!** To the users: Be aware that server operators can log your 
+messages until I finally finish implementing end-to-end encryption.
+
 ## Official integrations
 
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push Notifications that work with just about every platform

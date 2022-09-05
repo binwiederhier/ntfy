@@ -228,6 +228,11 @@ The server exposes its web UI and the API on port 80, so you need to expose that
 [message cache](config.md#message-cache), you also need to map a volume to `/var/cache/ntfy`. To change other settings, 
 you should map `/etc/ntfy`, so you can edit `/etc/ntfy/server.yml`.
 
+!!! info
+    Note that the Docker image **does not contain a `/etc/ntfy/server.yml` file**. If you'd like to use a config file, 
+    please manually create one outside the image and map it as a volume, e.g. via `-v /etc/ntfy:/etc/ntfy`. You may
+    use the [`server.yml` file on GitHub](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml) as a template.
+
 Basic usage (no cache or additional config):
 ```
 docker run -p 80:80 -it binwiederhier/ntfy serve

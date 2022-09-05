@@ -2,8 +2,9 @@
 
 ---
 
-## 👶 Baby break!
-(8/2022) Hey folks, my daughter is about to be born, so I'll be taking some time off from working on ntfy. I'll likely return to working on features and bugs in a few weeks. I hope you understand. I may post some pictures in [#387](https://github.com/binwiederhier/ntfy/issues/387) 🥰   
+## 👶 Baby break - My baby girl was born!
+Hey folks, my daughter was born on 8/30/22, so I'll be taking some time off from working on ntfy. I'll likely return 
+to working on features and bugs in a few weeks. I hope you understand. I posted some pictures in [#387](https://github.com/binwiederhier/ntfy/issues/387) 🥰   
 
 ---
 
@@ -59,6 +60,11 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <a href="https://hosted.weblate.org/engage/ntfy/">
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
+
+## Donations
+I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
+I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
+appreciated.
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

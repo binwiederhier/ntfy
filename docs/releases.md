@@ -36,13 +36,13 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 
 * Subscription display name for the web app ([#348](https://github.com/binwiederhier/ntfy/pull/348))
 * Allow setting socket permissions via `--listen-unix-mode` ([#356](https://github.com/binwiederhier/ntfy/pull/356), thanks to [@koro666](https://github.com/koro666))
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bugs:**
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
 * Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
-* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
 **Documentation:**
 

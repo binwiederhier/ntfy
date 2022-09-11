@@ -29,9 +29,9 @@ type message struct {
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
 	Click      string      `json:"click,omitempty"`
+	Icon       string      `json:"icon,omitempty"`
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
-	Icon       string      `json:"icon,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
 	Sender     string      `json:"-"`                  // IP address of uploader, used for rate limiting
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
@@ -73,9 +73,9 @@ type publishMessage struct {
 	Priority int      `json:"priority"`
 	Tags     []string `json:"tags"`
 	Click    string   `json:"click"`
+	Icon     string   `json:"icon"`
 	Actions  []action `json:"actions"`
 	Attach   string   `json:"attach"`
-	Icon     string   `json:"icon"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
 	Delay    string   `json:"delay"`

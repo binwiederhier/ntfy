@@ -148,10 +148,10 @@ func toFirebaseMessage(m *message, auther auth.Auther) (*messaging.Message, erro
 				"priority": fmt.Sprintf("%d", m.Priority),
 				"tags":     strings.Join(m.Tags, ","),
 				"click":    m.Click,
+				"icon":     m.Icon,
 				"title":    m.Title,
 				"message":  m.Message,
 				"encoding": m.Encoding,
-				"icon":     m.Icon,
 			}
 			if len(m.Actions) > 0 {
 				actions, err := json.Marshal(m.Actions)

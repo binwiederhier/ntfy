@@ -1,3 +1,6 @@
+//go:build linux || dragonfly || freebsd || netbsd || openbsd
+// +build linux dragonfly freebsd netbsd openbsd
+
 package cmd
 
 const (

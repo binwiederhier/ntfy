@@ -1166,7 +1166,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "You left the house. Turn down the A/C?",
+            message: "You left the house. Turn down the A/C?",
             actions: [
                 {
                     action: "view",

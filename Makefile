@@ -1,5 +1,6 @@
 MAKEFLAGS := --jobs=1
 VERSION := $(shell git describe --tag)
+COMMIT := $(shell git rev-parse --short HEAD)
 
 .PHONY:
 
@@ -169,7 +170,7 @@ cli-linux-server: cli-deps-static-sites
 		-o dist/ntfy_linux_server/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
-		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+		"-linkmode=external -extldflags=-static -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
 cli-darwin-server: cli-deps-static-sites
 	# This is a target to build the CLI (including the server) manually.
@@ -179,7 +180,7 @@ cli-darwin-server: cli-deps-static-sites
 		-o dist/ntfy_darwin_server/ntfy \
 		-tags sqlite_omit_load_extension,osusergo,netgo \
 		-ldflags \
-		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
 cli-client: cli-deps-static-sites
 	# This is a target to build the CLI (excluding the server) manually. This should work on Linux/macOS/Windows.
@@ -189,7 +190,7 @@ cli-client: cli-deps-static-sites
 		-o dist/ntfy_client/ntfy \
 		-tags noserver \
 		-ldflags \
-		"-X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD) -X main.date=$(shell date +%s)"
+		"-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 

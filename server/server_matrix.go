@@ -124,7 +124,7 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	}
 	pushKey := m.Notification.Devices[0].PushKey // We ignore other devices for now, see discussion in #316
 	if !strings.HasPrefix(pushKey, baseURL+"/") {
-		return nil, &errMatrix{pushKey: pushKey, err: errHTTPBadRequestMatrixPushkeyBaseURLMismatch}
+		return nil, &errMatrix{pushKey: pushKey, err: wrapErrHTTP(errHTTPBadRequestMatrixPushkeyBaseURLMismatch, "received push key: %s, configured base URL: %s", pushKey, baseURL)}
 	}
 	newRequest, err := http.NewRequest(http.MethodPost, pushKey, io.NopCloser(bytes.NewReader(body.PeekedBytes)))
 	if err != nil {

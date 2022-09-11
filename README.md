@@ -1,5 +1,13 @@
 ![ntfy](web/public/static/img/ntfy.png)
 
+---
+
+## 👶 Baby break - My baby girl was born!
+Hey folks, my daughter was born on 8/30/22, so I'll be taking some time off from working on ntfy. I'll likely return 
+to working on features and bugs in a few weeks. I hope you understand. I posted some pictures in [#387](https://github.com/binwiederhier/ntfy/issues/387) 🥰   
+
+---
+
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
 [![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy)
@@ -53,12 +61,17 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
 
+## Donations
+I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
+I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
+appreciated.
+
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   
 The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
 Third party libraries and resources:
-* [github.com/urfave/cli/v2](https://github.com/urfave/cli/v2) (MIT) is used to drive the CLI
+* [github.com/urfave/cli](https://github.com/urfave/cli) (MIT) is used to drive the CLI
 * [Mixkit sounds](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) are used as notification sounds
 * [Sounds from notificationsounds.com](https://notificationsounds.com) (Creative Commons Attribution) are used as notification sounds
 * [Roboto Font](https://fonts.google.com/specimen/Roboto) (Apache 2.0) is used as a font in everything web

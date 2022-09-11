@@ -2220,8 +2220,8 @@ Here's an example showing how to upload an image:
     Host: ntfy.sh
     Filename: flower.jpg
     Content-Type: 52312
-
-    <binary JPEG data>
+     
+    (binary JPEG data)
     ```
 
 === "JavaScript"
@@ -2354,69 +2354,97 @@ _Supported on:_ :material-android:
 
 You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
 parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
-the icon (up to 300KB) and show it in the notification. Only jpeg and png images are supported at this time.
+the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are 
+cached locally in the client until the notification is deleted. **Only JPEG and PNG images are supported at this time**.
 
 Here's an example showing how to include an icon:
 
 === "Command line (curl)"
     ```
     curl \
-        -X POST \
-        -H "Icon: https://ntfy.sh/docs/static/img/ntfy.png" \
-        ntfy.sh/customIcons
+        -H "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        -H "Title: Kodi: Resuming Playback" \
+        -H "Tags: arrow_forward" \
+        -d "The Wire, S01E01" \
+        ntfy.sh/tvshows
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --icon="https://ntfy.sh/docs/static/img/ntfy.png" \
-        customIcons
+        --icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        --title="Kodi: Resuming Playback" \
+        --tags="arrow_forward" \
+        tvshows \
+        "The Wire, S01E01"
     ```
 
 === "HTTP"
     ``` http
-    POST /customIcons HTTP/1.1
+    POST /tvshows HTTP/1.1
     Host: ntfy.sh
-    Icon: https://ntfy.sh/docs/static/img/ntfy.png
+    Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png
+    Tags: arrow_forward
+    Title: Kodi: Resuming Playback
+
+    The Wire, S01E01
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/customIcons', {
+    fetch('https://ntfy.sh/tvshows', {
         method: 'POST',
-        headers: { 'Icon': 'https://ntfy.sh/docs/static/img/ntfy.png' }
+        headers: { 
+            'Icon': 'https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png',
+            'Title': 'Kodi: Resuming Playback',
+            'Tags': 'arrow_forward'
+        },
+        body: "The Wire, S01E01"
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/customIcons", file)
-    req.Header.Set("Icon", "https://ntfy.sh/docs/static/img/ntfy.png")
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/tvshows", strings.NewReader("The Wire, S01E01"))
+    req.Header.Set("Icon", "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png")
+    req.Header.Set("Tags", "arrow_forward")
+    req.Header.Set("Title", "Kodi: Resuming Playback")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/customIcons"
-    $headers = @{ Icon="https://ntfy.sh/docs/static/img/ntfy.png" }
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -UseBasicParsing
+    $uri = "https://ntfy.sh/tvshows"
+    $headers = @{ Title"="Kodi: Resuming Playback"
+                  Tags="arrow_forward"
+                  Icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" }
+    $body = "The Wire, S01E01"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
     ``` python
-    requests.put("https://ntfy.sh/customIcons",
-        headers={ "Icon": "https://ntfy.sh/docs/static/img/ntfy.png" })
+    requests.post("https://ntfy.sh/tvshows",
+        data="The Wire, S01E01",
+        headers={
+            "Title": "Kodi: Resuming Playback",
+            "Tags": "arrow_forward",
+            "Icon": "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+        })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/customIcons', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/tvshows', false, stream_context_create([
         'http' => [
         'method' => 'PUT',
         'header' =>
             "Content-Type: text/plain\r\n" . // Does not matter
-            "Icon: https://ntfy.sh/docs/static/img/ntfy.png",
-        ]
+            "Title: Kodi: Resuming Playback\r\n" .
+            "Tags: arrow_forward\r\n" .
+            "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png",
+        ],
+        'content' => "The Wire, S01E01"
     ]));
     ```
 

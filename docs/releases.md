@@ -2,8 +2,6 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-<!--
-
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Features:**
@@ -26,10 +24,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 * Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
+* Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
-
--->
 
 ## ntfy server v1.28.0 (UNRELEASED)
 

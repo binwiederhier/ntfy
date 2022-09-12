@@ -805,8 +805,24 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
 
 === "/etc/nginx/nginx.conf"
     ```
+    # Rate limit all IP addresses
     http {
 	  limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
+    }
+
+    # Alternatively, whitelist certain IP addresses
+    http {
+      geo $limited {
+        default 1;
+        116.203.112.46/32 0;
+        132.226.42.65/32 0;
+        ...
+      }
+      map $limited $limitkey {
+        1 $binary_remote_addr;
+        0 "";
+      }
+      limit_req_zone $limitkey zone=one:10m rate=1r/s;
     }
     ```
 

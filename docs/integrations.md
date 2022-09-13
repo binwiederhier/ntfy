@@ -22,6 +22,8 @@ messages until I finally finish implementing end-to-end encryption.
 - [Robusta](https://docs.robusta.dev/master/catalog/sinks/webhook.html) ⭐ - open source platform for Kubernetes troubleshooting
 - [borgmatic](https://torsion.org/borgmatic/docs/how-to/monitor-your-backups/#third-party-monitoring-services) ⭐ - configuration-driven backup software for servers and workstations
 - [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users
+- [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
+- [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

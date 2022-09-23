@@ -53,6 +53,11 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 * Clarified Docker install instructions ([#361](https://github.com/binwiederhier/ntfy/issues/361), thanks to [@barart](https://github.com/barart) for reporting)
 * Mismatched quotation marks ([#392](https://github.com/binwiederhier/ntfy/pull/392)], thanks to [@connorlanigan](https://github.com/connorlanigan))
 
+**Additional translations:**
+
+* Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
+
+
 ## ntfy server v1.27.2
 Released June 23, 2022
 

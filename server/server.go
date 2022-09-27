@@ -667,18 +667,18 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
 //
-// 1. curl -X POST -H "Poll: 1234" ntfy.sh/...
-//    If a message is flagged as poll request, the body does not matter and is discarded
-// 2. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
-//    If body is binary, encode as base64, if not do not encode
-// 3. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
-//    Body must be a message, because we attached an external URL
-// 4. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
-//    Body must be attachment, because we passed a filename
-// 5. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
-// 6. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is > message limit, treat it as an attachment
+//  1. curl -X POST -H "Poll: 1234" ntfy.sh/...
+//     If a message is flagged as poll request, the body does not matter and is discarded
+//  2. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
+//     If body is binary, encode as base64, if not do not encode
+//  3. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
+//     Body must be a message, because we attached an external URL
+//  4. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
+//     Body must be attachment, because we passed a filename
+//  5. curl -T file.txt ntfy.sh/mytopic
+//     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
+//  6. curl -T file.txt ntfy.sh/mytopic
+//     If file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, unifiedpush bool) error {
 	if m.Event == pollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)

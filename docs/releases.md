@@ -2,7 +2,12 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy Android app v1.14.0 (UNRELEASED)
+## ntfy Android app v1.14.0 
+Released September 27, 2022
+
+This release adds the ability to set a custom icon to each notification, as well as a display name to subscriptions. We
+also moved the action buttons in the detail view to a more logical place, fixed a bunch of bugs, and added four more
+languages. Hurray!
 
 **Features:**
 
@@ -18,7 +23,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Long-click selecting of notifications doesn't scroll to the top anymore ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
 * Add attachment and click URL extras to MESSAGE_RECEIVED broadcast ([#329](https://github.com/binwiederhier/ntfy/issues/329), thanks to [@wunter8](https://github.com/wunter8))
 * Accessibility: Clear/choose service URL button in base URL dropdown now has a label ([#292](https://github.com/binwiederhier/ntfy/issues/292), thanks to [@mhameed](https://github.com/mhameed) for reporting)
-* Web: Switched "Pop" and "Pop Swoosh" sounds ([#352](https://github.com/binwiederhier/ntfy/issues/352), thanks to [@coma-toast](https://github.com/coma-toast) for reporting)
 
 **Additional translations:**
 
@@ -29,7 +33,15 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
-## ntfy server v1.28.0 (UNRELEASED)
+## ntfy server v1.28.0
+Released September 27, 2022
+
+This release primarily adds icon support for the Android app, and adds a display name to subscriptions in the web app.
+Aside from that, we fixed a few random bugs, most importantly the `Priority` header bug that allows the use behind
+Cloudflare. We also added a ton of documentation. Most prominently, an [integrations + projects page](https://ntfy.sh/docs/integrations/).
+
+As of now, I also have started accepting **[donations and sponsorships](https://github.com/sponsors/binwiederhier)** 💸. 
+I would be very humbled if you consider donating.
 
 **Features:**
 
@@ -45,6 +57,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
 * Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket)
 * Better logging for Matrix push key errors ([#384](https://github.com/binwiederhier/ntfy/pull/384), thanks to [@christophehenry](https://github.com/christophehenry))
+* Web: Switched "Pop" and "Pop Swoosh" sounds ([#352](https://github.com/binwiederhier/ntfy/issues/352), thanks to [@coma-toast](https://github.com/coma-toast) for reporting)
 
 **Documentation:**
 

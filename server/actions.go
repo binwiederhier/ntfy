@@ -87,7 +87,8 @@ func parseActionsFromJSON(s string) ([]*action, error) {
 // https://ntfy.sh/docs/publish/#action-buttons), into an array of actions.
 //
 // It can parse an actions string like this:
-//    view, "Look ma, commas and \"quotes\" too", url=https://..; action=broadcast, ...
+//
+//	view, "Look ma, commas and \"quotes\" too", url=https://..; action=broadcast, ...
 //
 // It works by advancing the position ("pos") through the input string ("input").
 //
@@ -96,10 +97,11 @@ func parseActionsFromJSON(s string) ([]*action, error) {
 // though it does not use state functions at all.
 //
 // Other resources:
-//   https://adampresley.github.io/2015/04/12/writing-a-lexer-and-parser-in-go-part-1.html
-//   https://github.com/adampresley/sample-ini-parser/blob/master/services/lexer/lexer/Lexer.go
-//   https://github.com/benbjohnson/sql-parser/blob/master/scanner.go
-//   https://blog.gopheracademy.com/advent-2014/parsers-lexers/
+//
+//	https://adampresley.github.io/2015/04/12/writing-a-lexer-and-parser-in-go-part-1.html
+//	https://github.com/adampresley/sample-ini-parser/blob/master/services/lexer/lexer/Lexer.go
+//	https://github.com/benbjohnson/sql-parser/blob/master/scanner.go
+//	https://blog.gopheracademy.com/advent-2014/parsers-lexers/
 func parseActionsFromSimple(s string) ([]*action, error) {
 	if !utf8.ValidString(s) {
 		return nil, errors.New("invalid utf-8 string")

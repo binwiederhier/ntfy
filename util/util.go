@@ -268,7 +268,8 @@ func MaybeMarshalJSON(v interface{}) string {
 // Warning: Never use this function with the intent to run the resulting command.
 //
 // Example:
-//    []string{"ls", "-al", "Document Folder"} -> ls -al "Document Folder"
+//
+//	[]string{"ls", "-al", "Document Folder"} -> ls -al "Document Folder"
 func QuoteCommand(command []string) string {
 	var quoted []string
 	for _, c := range command {

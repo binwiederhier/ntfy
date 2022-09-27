@@ -164,11 +164,12 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 // The method returns a unique subscriptionID that can be used in Unsubscribe.
 //
 // Example:
-//   c := client.New(client.NewConfig())
-//   subscriptionID := c.Subscribe("mytopic")
-//   for m := range c.Messages {
-//     fmt.Printf("New message: %s", m.Message)
-//   }
+//
+//	c := client.New(client.NewConfig())
+//	subscriptionID := c.Subscribe("mytopic")
+//	for m := range c.Messages {
+//	  fmt.Printf("New message: %s", m.Message)
+//	}
 func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()

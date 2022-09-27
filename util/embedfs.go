@@ -11,14 +11,13 @@ import (
 // CachingEmbedFS is a wrapper around embed.FS that allows setting a ModTime, so that the
 // default static file server can send 304s back. It can be used like this:
 //
-//   var (
-//      //go:embed docs
-//      docsStaticFs     embed.FS
-//      docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
-//   )
+//	  var (
+//	     //go:embed docs
+//	     docsStaticFs     embed.FS
+//	     docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
+//	  )
 //
-// 	 http.FileServer(http.FS(docsStaticCached)).ServeHTTP(w, r)
-//
+//		 http.FileServer(http.FS(docsStaticCached)).ServeHTTP(w, r)
 type CachingEmbedFS struct {
 	ModTime time.Time
 	FS      embed.FS

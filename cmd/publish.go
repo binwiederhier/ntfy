@@ -212,10 +212,11 @@ func execPublish(c *cli.Context) error {
 // parseTopicMessageCommand reads the topic and the remaining arguments from the context.
 
 // There are a few cases to consider:
-//   ntfy publish <topic> [<message>]
-//   ntfy publish --wait-cmd <topic> <command>
-//   NTFY_TOPIC=.. ntfy publish [<message>]
-//   NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
+//
+//	ntfy publish <topic> [<message>]
+//	ntfy publish --wait-cmd <topic> <command>
+//	NTFY_TOPIC=.. ntfy publish [<message>]
+//	NTFY_TOPIC=.. ntfy publish --wait-cmd <command>
 func parseTopicMessageCommand(c *cli.Context) (topic string, message string, command []string, err error) {
 	var args []string
 	topic, args, err = parseTopicAndArgs(c)

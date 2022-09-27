@@ -47,17 +47,17 @@ import (
 //
 // From the message, we only require the "pushkey", as it represents our target topic URL.
 // A message may look like this (excerpt):
-//    {
-//      "notification": {
-//        "devices": [
-//           {
-//              "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1",
-//              ...
-//           }
-//        ]
-//      }
-//    }
 //
+//	{
+//	  "notification": {
+//	    "devices": [
+//	       {
+//	          "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1",
+//	          ...
+//	       }
+//	    ]
+//	  }
+//	}
 type matrixRequest struct {
 	Notification *struct {
 		Devices []*struct {
@@ -96,14 +96,13 @@ const (
 //
 // It basically converts a Matrix push gatewqy request:
 //
-//    POST /_matrix/push/v1/notify HTTP/1.1
-//    { "notification": { "devices": [ { "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1", ... } ] } }
+//	POST /_matrix/push/v1/notify HTTP/1.1
+//	{ "notification": { "devices": [ { "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1", ... } ] } }
 //
 // to a ntfy request, looking like this:
 //
-//    POST /upDAHJKFFDFD?up=1 HTTP/1.1
-//    { "notification": { "devices": [ { "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1", ... } ] } }
-//
+//	POST /upDAHJKFFDFD?up=1 HTTP/1.1
+//	{ "notification": { "devices": [ { "pushkey": "https://ntfy.sh/upDAHJKFFDFD?up=1", ... } ] } }
 func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int) (*http.Request, error) {
 	if baseURL == "" {
 		return nil, errHTTPInternalErrorMissingBaseURL

@@ -2,7 +2,7 @@ package util
 
 import (
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -19,7 +19,7 @@ func TestRandomString(t *testing.T) {
 
 func TestFileExists(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "somefile.txt")
-	require.Nil(t, ioutil.WriteFile(filename, []byte{0x25, 0x86}, 0600))
+	require.Nil(t, os.WriteFile(filename, []byte{0x25, 0x86}, 0600))
 	require.True(t, FileExists(filename))
 	require.False(t, FileExists(filename+".doesnotexist"))
 }

@@ -64,9 +64,7 @@ builds:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [windows]
     goarch: [amd64]
-    hooks:
-      post:
-        - upx "{{ .Path }}" # apt install upx
+    # No "upx" for Windows to hopefully avoid Virus warnings
   -
     id: ntfy_darwin_all
     binary: ntfy

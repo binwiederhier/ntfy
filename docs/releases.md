@@ -25,6 +25,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 * Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
 * Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
+* Polish (thanks to [@Namax0r](https://hosted.weblate.org/user/Namax0r/))
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
@@ -56,7 +57,7 @@ Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up s
 **Additional translations:**
 
 * Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
-
+* Polish (thanks to [@Namax0r](https://hosted.weblate.org/user/Namax0r/))
 
 ## ntfy server v1.27.2
 Released June 23, 2022

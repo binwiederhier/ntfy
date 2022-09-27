@@ -436,7 +436,7 @@ const Appearance = () => {
 const Language = () => {
     const { t, i18n } = useTranslation();
     const labelId = "prefLanguage";
-    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
     const lang = i18n.language ?? "en";
 
@@ -463,6 +463,7 @@ const Language = () => {
                     <MenuItem value="nb_NO">Norsk bokmål</MenuItem>
                     <MenuItem value="uk">Українська</MenuItem>
                     <MenuItem value="pt_BR">Português (Brasil)</MenuItem>
+                    <MenuItem value="pl">Polski</MenuItem>
                     <MenuItem value="ru">Русский</MenuItem>
                     <MenuItem value="tr">Türkçe</MenuItem>
                 </Select>

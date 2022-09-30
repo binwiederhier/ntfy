@@ -8,6 +8,24 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Updated developer docs, bump nodejs and go version ([#414](https://github.com/binwiederhier/ntfy/issues/414), thanks to [@YJSoft](https://github.com/YJSoft) for reporting)
 
+**Sponsorships:**:
+
+Thank you to the amazing folks who decided to [sponsor ntfy](https://github.com/sponsors/binwiederhier). Thank you for 
+helping carry the cost of the public server and developer licenses, and more importantly: Thank you for believing in ntfy! 
+You guys rock!
+
+Sponsors (alphabetical order): 
+
+* [@aspyct](https://github.com/aspyct)
+* [@codinghipster](https://github.com/codinghipster)
+* [@HinFort](https://github.com/HinFort)
+* [@mckay115](https://github.com/mckay115)
+* [@neutralinsomniac](https://github.com/neutralinsomniac)
+* [@nickexyz](https://github.com/nickexyz)
+* [@qcasey](https://github.com/qcasey)
+* [@Salamafet](https://github.com/Salamafet)
+* +1 private sponsor
+
 ## ntfy Android app v1.14.0 
 Released September 27, 2022
 

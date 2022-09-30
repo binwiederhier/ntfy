@@ -64,7 +64,16 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 ## Donations
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
 I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
-appreciated.
+appreciated. A big fat Thank You to the folks already sponsoring ntfy:
+
+<a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
+<a href="https://github.com/codinghipster"><img src="https://github.com/codinghipster.png" width="40px" /></a>
+<a href="https://github.com/HinFort"><img src="https://github.com/HinFort.png" width="40px" /></a>
+<a href="https://github.com/mckay115"><img src="https://github.com/mckay115.png" width="40px" /></a>
+<a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
+<a href="https://github.com/nickexyz"><img src="https://github.com/nickexyz.png" width="40px" /></a>
+<a href="https://github.com/qcasey"><img src="https://github.com/qcasey.png" width="40px" /></a>
+<a href="https://github.com/Salamafet"><img src="https://github.com/Salamafet.png" width="40px" /></a>
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

@@ -161,9 +161,9 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, base-url must start with http:// or https://")
 	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
 		return errors.New("if set, base-url must not end with a slash (/)")
-	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
+	} else if !util.Contains([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
-	} else if !util.InStringList([]string{"app", "home", "disable"}, webRoot) {
+	} else if !util.Contains([]string{"app", "home", "disable"}, webRoot) {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")

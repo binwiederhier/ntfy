@@ -203,10 +203,10 @@ func (q *queryFilter) Pass(msg *message) bool {
 	if messagePriority == 0 {
 		messagePriority = 3 // For query filters, default priority (3) is the same as "not set" (0)
 	}
-	if len(q.Priority) > 0 && !util.InIntList(q.Priority, messagePriority) {
+	if len(q.Priority) > 0 && !util.Contains(q.Priority, messagePriority) {
 		return false
 	}
-	if len(q.Tags) > 0 && !util.InStringListAll(msg.Tags, q.Tags) {
+	if len(q.Tags) > 0 && !util.ContainsAll(msg.Tags, q.Tags) {
 		return false
 	}
 	return true

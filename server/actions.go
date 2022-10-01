@@ -60,13 +60,13 @@ func parseActions(s string) (actions []*action, err error) {
 		return nil, fmt.Errorf("only %d actions allowed", actionsMax)
 	}
 	for _, action := range actions {
-		if !util.InStringList(actionsAll, action.Action) {
+		if !util.Contains(actionsAll, action.Action) {
 			return nil, fmt.Errorf("parameter 'action' cannot be '%s', valid values are 'view', 'broadcast' and 'http'", action.Action)
 		} else if action.Label == "" {
 			return nil, fmt.Errorf("parameter 'label' is required")
-		} else if util.InStringList(actionsWithURL, action.Action) && action.URL == "" {
+		} else if util.Contains(actionsWithURL, action.Action) && action.URL == "" {
 			return nil, fmt.Errorf("parameter 'url' is required for action '%s'", action.Action)
-		} else if action.Action == actionHTTP && util.InStringList([]string{"GET", "HEAD"}, action.Method) && action.Body != "" {
+		} else if action.Action == actionHTTP && util.Contains([]string{"GET", "HEAD"}, action.Method) && action.Body != "" {
 			return nil, fmt.Errorf("parameter 'body' cannot be set if method is %s", action.Method)
 		}
 	}
@@ -156,7 +156,7 @@ func populateAction(newAction *action, section int, key, value string) error {
 		key = "action"
 	} else if key == "" && section == 1 {
 		key = "label"
-	} else if key == "" && section == 2 && util.InStringList(actionsWithURL, newAction.Action) {
+	} else if key == "" && section == 2 && util.Contains(actionsWithURL, newAction.Action) {
 		key = "url"
 	}
 
@@ -178,7 +178,7 @@ func populateAction(newAction *action, section int, key, value string) error {
 			newAction.Label = value
 		case "clear":
 			lvalue := strings.ToLower(value)
-			if !util.InStringList([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
+			if !util.Contains([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
 				return fmt.Errorf("parameter 'clear' cannot be '%s', only boolean values are allowed (true/yes/1/false/no/0)", value)
 			}
 			newAction.Clear = lvalue == "true" || lvalue == "yes" || lvalue == "1"

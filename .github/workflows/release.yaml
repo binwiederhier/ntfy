@@ -16,7 +16,7 @@ jobs:
         name: Install node
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '17'
       -
         name: Checkout code
         uses: actions/checkout@v2

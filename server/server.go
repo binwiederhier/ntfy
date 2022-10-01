@@ -1088,7 +1088,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
 	for _, id := range ids {
-		if util.InStringList(disallowedTopics, id) {
+		if util.Contains(disallowedTopics, id) {
 			return nil, errHTTPBadRequestTopicDisallowed
 		}
 		if _, ok := s.topics[id]; !ok {
@@ -1286,7 +1286,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if util.InStringList(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.Contains(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests

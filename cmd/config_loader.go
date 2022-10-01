@@ -40,7 +40,7 @@ func initConfigFileInputSourceFunc(configFlag string, flags []cli.Flag, next cli
 // This function also maps aliases, so a .yml file can contain short options, or options with underscores
 // instead of dashes. See https://github.com/binwiederhier/ntfy/issues/255.
 func newYamlSourceFromFile(file string, flags []cli.Flag) (altsrc.InputSourceContext, error) {
-	var rawConfig map[interface{}]interface{}
+	var rawConfig map[any]any
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err

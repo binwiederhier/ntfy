@@ -30,7 +30,7 @@ func Gzip(next http.Handler) http.Handler {
 }
 
 var gzPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		w := gzip.NewWriter(io.Discard)
 		return w
 	},

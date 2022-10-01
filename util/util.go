@@ -241,7 +241,7 @@ func BasicAuth(user, pass string) string {
 
 // MaybeMarshalJSON returns a JSON string of the given object, or "<cannot serialize>" if serialization failed.
 // This is useful for logging purposes where a failure doesn't matter that much.
-func MaybeMarshalJSON(v interface{}) string {
+func MaybeMarshalJSON(v any) string {
 	jsonBytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "<cannot serialize>"

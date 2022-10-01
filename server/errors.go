@@ -23,7 +23,7 @@ func (e errHTTP) JSON() string {
 	return string(b)
 }
 
-func wrapErrHTTP(err *errHTTP, message string, args ...interface{}) *errHTTP {
+func wrapErrHTTP(err *errHTTP, message string, args ...any) *errHTTP {
 	return &errHTTP{
 		Code:     err.Code,
 		HTTPCode: err.HTTPCode,

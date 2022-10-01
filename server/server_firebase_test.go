@@ -71,7 +71,7 @@ func TestToFirebaseMessage_Keepalive(t *testing.T) {
 			Aps: &messaging.Aps{
 				ContentAvailable: true,
 			},
-			CustomData: map[string]interface{}{
+			CustomData: map[string]any{
 				"id":    m.ID,
 				"time":  fmt.Sprintf("%d", m.Time),
 				"event": m.Event,
@@ -102,7 +102,7 @@ func TestToFirebaseMessage_Open(t *testing.T) {
 			Aps: &messaging.Aps{
 				ContentAvailable: true,
 			},
-			CustomData: map[string]interface{}{
+			CustomData: map[string]any{
 				"id":    m.ID,
 				"time":  fmt.Sprintf("%d", m.Time),
 				"event": m.Event,
@@ -166,7 +166,7 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 					Body:  "this is a message",
 				},
 			},
-			CustomData: map[string]interface{}{
+			CustomData: map[string]any{
 				"id":                 m.ID,
 				"time":               fmt.Sprintf("%d", m.Time),
 				"event":              "message",
@@ -242,7 +242,7 @@ func TestToFirebaseMessage_PollRequest(t *testing.T) {
 					Body:  "New message",
 				},
 			},
-			CustomData: map[string]interface{}{
+			CustomData: map[string]any{
 				"id":      m.ID,
 				"time":    fmt.Sprintf("%d", m.Time),
 				"event":   "poll_request",

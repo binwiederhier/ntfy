@@ -217,7 +217,7 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.
 func createAPNSAlertConfig(m *message, data map[string]string) *messaging.APNSConfig {
-	apnsData := make(map[string]interface{})
+	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
 	}
@@ -241,7 +241,7 @@ func createAPNSAlertConfig(m *message, data map[string]string) *messaging.APNSCo
 //
 // See https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/pushing_background_updates_to_your_app
 func createAPNSBackgroundConfig(data map[string]string) *messaging.APNSConfig {
-	apnsData := make(map[string]interface{})
+	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
 	}

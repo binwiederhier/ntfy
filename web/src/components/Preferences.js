@@ -458,6 +458,7 @@ const Language = () => {
                     <MenuItem value="fr">Français</MenuItem>
                     <MenuItem value="it">Italiano</MenuItem>
                     <MenuItem value="hu">Magyar</MenuItem>
+                    <MenuItem value="ko">한국어</MenuItem>
                     <MenuItem value="ja">日本語</MenuItem>
                     <MenuItem value="nl">Nederlands</MenuItem>
                     <MenuItem value="nb_NO">Norsk bokmål</MenuItem>

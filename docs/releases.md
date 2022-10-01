@@ -8,6 +8,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Updated developer docs, bump nodejs and go version ([#414](https://github.com/binwiederhier/ntfy/issues/414), thanks to [@YJSoft](https://github.com/YJSoft) for reporting)
 
+**Additional translations:**
+
+* Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
+
 **Sponsorships:**:
 
 Thank you to the amazing folks who decided to [sponsor ntfy](https://github.com/sponsors/binwiederhier). Thank you for 

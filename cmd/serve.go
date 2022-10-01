@@ -157,14 +157,18 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") && strings.HasSuffix(baseURL, "/") {
-		return errors.New("if set, base-url must start with http:// or https://, and must not end with a slash (/)")
+	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		return errors.New("if set, base-url must start with http:// or https://")
+	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
+		return errors.New("if set, base-url must not end with a slash (/)")
 	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	} else if !util.InStringList([]string{"app", "home", "disable"}, webRoot) {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
+	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
+		return errors.New("if set, upstream-base-url must not end with a slash (/)")
 	} else if upstreamBaseURL != "" && baseURL == "" {
 		return errors.New("if upstream-base-url is set, base-url must also be set")
 	} else if upstreamBaseURL != "" && baseURL != "" && baseURL == upstreamBaseURL {

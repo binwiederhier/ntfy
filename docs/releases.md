@@ -4,6 +4,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.29.0 (UNRELEASED)
 
+**Bug fixes:**
+
+* Subscriptions can now have a display name ([#370](https://github.com/binwiederhier/ntfy/issues/370), thanks to [@tfheen](https://github.com/tfheen) for reporting)
+
 **Documentation:**
 
 * Updated developer docs, bump nodejs and go version ([#414](https://github.com/binwiederhier/ntfy/issues/414), thanks to [@YJSoft](https://github.com/YJSoft) for reporting)

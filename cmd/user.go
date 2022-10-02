@@ -273,7 +273,7 @@ func createAuthManager(c *cli.Context) (auth.Manager, error) {
 		return nil, errors.New("option auth-file not set; auth is unconfigured for this server")
 	} else if !util.FileExists(authFile) {
 		return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
-	} else if !util.InStringList([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
+	} else if !util.Contains([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only' or 'deny-all'")
 	}
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"

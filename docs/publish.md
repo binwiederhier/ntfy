@@ -1166,7 +1166,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "You left the house. Turn down the A/C?",
+            message: "You left the house. Turn down the A/C?",
             actions: [
                 {
                     action: "view",
@@ -2220,8 +2220,8 @@ Here's an example showing how to upload an image:
     Host: ntfy.sh
     Filename: flower.jpg
     Content-Type: 52312
-
-    <binary JPEG data>
+     
+    (binary JPEG data)
     ```
 
 === "JavaScript"
@@ -2347,6 +2347,112 @@ Here's an example showing how to attach an APK file:
 <figure markdown>
   ![file attachment](static/img/android-screenshot-attachment-file.png){ width=500 }
   <figcaption>File attachment sent from an external URL</figcaption>
+</figure>
+
+## Icons
+_Supported on:_ :material-android:
+
+You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
+parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
+the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are 
+cached locally in the client until the notification is deleted. **Only JPEG and PNG images are supported at this time**.
+
+Here's an example showing how to include an icon:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -H "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        -H "Title: Kodi: Resuming Playback" \
+        -H "Tags: arrow_forward" \
+        -d "The Wire, S01E01" \
+        ntfy.sh/tvshows
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        --title="Kodi: Resuming Playback" \
+        --tags="arrow_forward" \
+        tvshows \
+        "The Wire, S01E01"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /tvshows HTTP/1.1
+    Host: ntfy.sh
+    Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png
+    Tags: arrow_forward
+    Title: Kodi: Resuming Playback
+
+    The Wire, S01E01
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/tvshows', {
+        method: 'POST',
+        headers: { 
+            'Icon': 'https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png',
+            'Title': 'Kodi: Resuming Playback',
+            'Tags': 'arrow_forward'
+        },
+        body: "The Wire, S01E01"
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/tvshows", strings.NewReader("The Wire, S01E01"))
+    req.Header.Set("Icon", "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png")
+    req.Header.Set("Tags", "arrow_forward")
+    req.Header.Set("Title", "Kodi: Resuming Playback")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.sh/tvshows"
+    $headers = @{ Title"="Kodi: Resuming Playback"
+                  Tags="arrow_forward"
+                  Icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" }
+    $body = "The Wire, S01E01"
+    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/tvshows",
+        data="The Wire, S01E01",
+        headers={
+            "Title": "Kodi: Resuming Playback",
+            "Tags": "arrow_forward",
+            "Icon": "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+        })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/tvshows', false, stream_context_create([
+        'http' => [
+        'method' => 'PUT',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Title: Kodi: Resuming Playback\r\n" .
+            "Tags: arrow_forward\r\n" .
+            "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png",
+        ],
+        'content' => "The Wire, S01E01"
+    ]));
+    ```
+
+Here's an example of how it will look on Android:
+
+<figure markdown>
+  ![file attachment](static/img/android-screenshot-icon.png){ width=500 }
+  <figcaption>Custom icon from an external URL</figcaption>
 </figure>
 
 ## E-mail notifications
@@ -2804,6 +2910,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
+| `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |

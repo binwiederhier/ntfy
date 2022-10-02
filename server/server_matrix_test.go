@@ -56,7 +56,7 @@ func TestMatrix_NewRequestFromMatrixJSON_MismatchingPushKey(t *testing.T) {
 	_, err := newRequestFromMatrixJSON(r, baseURL, maxLength)
 	matrixErr, ok := err.(*errMatrix)
 	require.True(t, ok)
-	require.Equal(t, errHTTPBadRequestMatrixPushkeyBaseURLMismatch, matrixErr.err)
+	require.Equal(t, "invalid request: push key must be prefixed with base URL, received push key: https://ntfy.example.com/upABCDEFGHI?up=1, configured base URL: https://ntfy.sh", matrixErr.err.Error())
 	require.Equal(t, "https://ntfy.example.com/upABCDEFGHI?up=1", matrixErr.pushKey)
 }
 

@@ -175,11 +175,28 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		for filter, value := range s.If {
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
 		}
-		if s.User != "" && s.Password != "" {
-			topicOptions = append(topicOptions, client.WithBasicAuth(s.User, s.Password))
+		var user, password string
+		if s.User != "" {
+			user = s.User
+		} else if conf.DefaultUser != "" {
+			user = conf.DefaultUser
+		}
+		if s.Password != "" {
+			password = s.Password
+		} else if conf.DefaultPassword != "" {
+			password = conf.DefaultPassword
+		}
+		if user != "" && password != "" {
+			topicOptions = append(topicOptions, client.WithBasicAuth(user, password))
 		}
 		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
-		cmds[subscriptionID] = s.Command
+		if s.Command != "" {
+			cmds[subscriptionID] = s.Command
+		} else if conf.DefaultCommand != "" {
+			cmds[subscriptionID] = conf.DefaultCommand
+		} else {
+			cmds[subscriptionID] = ""
+		}
 	}
 	if topic != "" {
 		subscriptionID := cl.Subscribe(topic, options...)

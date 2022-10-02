@@ -2,9 +2,45 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-<!--
+## ntfy server v1.29.0 (UNRELEASED)
 
-## ntfy Android app v1.14.0 (UNRELEASED)
+**Bug fixes + maintenance:**
+
+* Subscriptions can now have a display name ([#370](https://github.com/binwiederhier/ntfy/issues/370), thanks to [@tfheen](https://github.com/tfheen) for reporting)
+* Bump Go version to Go 18.x ([#422](https://github.com/binwiederhier/ntfy/issues/422))
+
+**Documentation:**
+
+* Updated developer docs, bump nodejs and go version ([#414](https://github.com/binwiederhier/ntfy/issues/414), thanks to [@YJSoft](https://github.com/YJSoft) for reporting)
+
+**Additional translations:**
+
+* Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
+
+**Sponsorships:**:
+
+Thank you to the amazing folks who decided to [sponsor ntfy](https://github.com/sponsors/binwiederhier). Thank you for 
+helping carry the cost of the public server and developer licenses, and more importantly: Thank you for believing in ntfy! 
+You guys rock!
+
+Sponsors (alphabetical order): 
+
+* [@aspyct](https://github.com/aspyct)
+* [@codinghipster](https://github.com/codinghipster)
+* [@HinFort](https://github.com/HinFort)
+* [@mckay115](https://github.com/mckay115)
+* [@neutralinsomniac](https://github.com/neutralinsomniac)
+* [@nickexyz](https://github.com/nickexyz)
+* [@qcasey](https://github.com/qcasey)
+* [@Salamafet](https://github.com/Salamafet)
+* +1 private sponsor
+
+## ntfy Android app v1.14.0 
+Released September 27, 2022
+
+This release adds the ability to set a custom icon to each notification, as well as a display name to subscriptions. We
+also moved the action buttons in the detail view to a more logical place, fixed a bunch of bugs, and added four more
+languages. Hurray!
 
 **Features:**
 
@@ -13,40 +49,61 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Polling is now done with `since=<id>` API, which makes deduping easier ([#165](https://github.com/binwiederhier/ntfy/issues/165))
 * Turned JSON stream deprecation banner into "Use WebSockets" banner (no ticket)
 * Move action buttons in notification cards ([#236](https://github.com/binwiederhier/ntfy/issues/236), thanks to [@wunter8](https://github.com/wunter8))
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
 
-**Bugs:**
+**Bug fixes:**
 
 * Long-click selecting of notifications doesn't scroll to the top anymore ([#235](https://github.com/binwiederhier/ntfy/issues/235), thanks to [@wunter8](https://github.com/wunter8))
 * Add attachment and click URL extras to MESSAGE_RECEIVED broadcast ([#329](https://github.com/binwiederhier/ntfy/issues/329), thanks to [@wunter8](https://github.com/wunter8))
 * Accessibility: Clear/choose service URL button in base URL dropdown now has a label ([#292](https://github.com/binwiederhier/ntfy/issues/292), thanks to [@mhameed](https://github.com/mhameed) for reporting)
-* Web: Switched "Pop" and "Pop Swoosh" sounds ([#352](https://github.com/binwiederhier/ntfy/issues/352), thanks to [@coma-toast](https://github.com/coma-toast) for reporting)
 
 **Additional translations:**
 
 * Italian (thanks to [@Genio2003](https://hosted.weblate.org/user/Genio2003/))
 * Dutch (thanks to [@SchoNie](https://hosted.weblate.org/user/SchoNie/))
+* Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
+* Polish (thanks to [@Namax0r](https://hosted.weblate.org/user/Namax0r/))
 
 Thank you to [@wunter8](https://github.com/wunter8) for proactively picking up some Android tickets, and fixing them! You rock!
 
+## ntfy server v1.28.0
+Released September 27, 2022
 
-## ntfy server v1.28.0 (UNRELEASED)
+This release primarily adds icon support for the Android app, and adds a display name to subscriptions in the web app.
+Aside from that, we fixed a few random bugs, most importantly the `Priority` header bug that allows the use behind
+Cloudflare. We also added a ton of documentation. Most prominently, an [integrations + projects page](https://ntfy.sh/docs/integrations/).
+
+As of now, I also have started accepting **[donations and sponsorships](https://github.com/sponsors/binwiederhier)** 💸. 
+I would be very humbled if you consider donating.
 
 **Features:**
 
 * Subscription display name for the web app ([#348](https://github.com/binwiederhier/ntfy/pull/348))
 * Allow setting socket permissions via `--listen-unix-mode` ([#356](https://github.com/binwiederhier/ntfy/pull/356), thanks to [@koro666](https://github.com/koro666))
+* Icons can be set for each individual notification ([#126](https://github.com/binwiederhier/ntfy/issues/126), thanks to [@wunter8](https://github.com/wunter8))
+* CLI: Allow default username/password in `client.yml` ([#372](https://github.com/binwiederhier/ntfy/pull/372), thanks to [@wunter8](https://github.com/wunter8))
+* Build support for other Unix systems ([#393](https://github.com/binwiederhier/ntfy/pull/393), thanks to [@la-ninpre](https://github.com/la-ninpre))
 
-**Bugs:**
+**Bug fixes:**
 
 * `ntfy user` commands don't work with `auth_file` but works with `auth-file` ([#344](https://github.com/binwiederhier/ntfy/issues/344), thanks to [@Histalek](https://github.com/Histalek) for reporting)
 * Ignore new draft HTTP `Priority` header  ([#351](https://github.com/binwiederhier/ntfy/issues/351), thanks to [@ksurl](https://github.com/ksurl) for reporting)
-* Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket) 
+* Delete expired attachments based on mod time instead of DB entry to avoid races (no ticket)
+* Better logging for Matrix push key errors ([#384](https://github.com/binwiederhier/ntfy/pull/384), thanks to [@christophehenry](https://github.com/christophehenry))
+* Web: Switched "Pop" and "Pop Swoosh" sounds ([#352](https://github.com/binwiederhier/ntfy/issues/352), thanks to [@coma-toast](https://github.com/coma-toast) for reporting)
 
 **Documentation:**
 
+* Added [integrations + projects page](https://ntfy.sh/docs/integrations/) (**so many integrations, whoa!**)
+* Added example for [UptimeRobot](https://ntfy.sh/docs/examples/#uptimerobot)
 * Fix some PowerShell publish docs ([#345](https://github.com/binwiederhier/ntfy/pull/345), thanks to [@noahpeltier](https://github.com/noahpeltier))
+* Clarified Docker install instructions ([#361](https://github.com/binwiederhier/ntfy/issues/361), thanks to [@barart](https://github.com/barart) for reporting)
+* Mismatched quotation marks ([#392](https://github.com/binwiederhier/ntfy/pull/392)], thanks to [@connorlanigan](https://github.com/connorlanigan))
 
--->
+**Additional translations:**
+
+* Ukranian (thanks to [@v.kopitsa](https://hosted.weblate.org/user/v.kopitsa/))
+* Polish (thanks to [@Namax0r](https://hosted.weblate.org/user/Namax0r/))
 
 ## ntfy server v1.27.2
 Released June 23, 2022
@@ -62,7 +119,7 @@ minute or so, due to competing stats gathering (personal installations will like
 * Trace: Log entire HTTP request to simplify debugging (no ticket)
 * Allow setting user password via `NTFY_PASSWORD` env variable ([#327](https://github.com/binwiederhier/ntfy/pull/327), thanks to [@Kenix3](https://github.com/Kenix3))
 
-**Bugs:**
+**Bug fixes:**
 
 * Fix slow requests due to excessive locking ([#338](https://github.com/binwiederhier/ntfy/issues/338))
 * Return HTTP 500 for `GET /_matrix/push/v1/notify` when `base-url` is not configured (no ticket)
@@ -87,7 +144,7 @@ CLI is now available via Scoop, and ntfy is now natively supported in Uptime Kum
 * [Uptime Kuma](https://github.com/louislam/uptime-kuma) now allows publishing to ntfy ([uptime-kuma#1674](https://github.com/louislam/uptime-kuma/pull/1674), thanks to [@philippdormann](https://github.com/philippdormann))
 * Display ntfy version in `ntfy serve` command  ([#314](https://github.com/binwiederhier/ntfy/issues/314), thanks to [@poblabs](https://github.com/poblabs))
 
-**Bugs:**
+**Bug fixes:**
 
 * Web app: Show "notifications not supported" alert on HTTP ([#323](https://github.com/binwiederhier/ntfy/issues/323), thanks to [@milksteakjellybeans](https://github.com/milksteakjellybeans) for reporting)
 * Use last address in `X-Forwarded-For` header as visitor address ([#328](https://github.com/binwiederhier/ntfy/issues/328))
@@ -110,7 +167,7 @@ set your server as the default server for new topics.
 * Support for auth and user management ([#277](https://github.com/binwiederhier/ntfy/issues/277))
 * Ability to add default server ([#295](https://github.com/binwiederhier/ntfy/issues/295))
 
-**Bugs:**
+**Bug fixes:**
 
 * Add validation for selfhosted server URL ([#290](https://github.com/binwiederhier/ntfy/issues/290))
 
@@ -173,7 +230,7 @@ for details).
 * Cancel notifications when navigating to topic (no ticket)
 * iOS 14.0 support (no ticket, [PR#1](https://github.com/binwiederhier/ntfy-ios/pull/1), thanks to [@callum-99](https://github.com/callum-99))
 
-**Bugs:**
+**Bug fixes:**
 
 * iOS UI not always updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267))
 
@@ -190,7 +247,7 @@ Apple development environment.
 * Add subscribe filter to query exact messages by ID (no ticket)
 * Support for `poll_request` messages to support [iOS push notifications](https://ntfy.sh/docs/config/#ios-instant-notifications) for self-hosted servers (no ticket)
 
-**Bugs:**
+**Bug fixes:**
 
 * Support emails without `Content-Type` ([#265](https://github.com/binwiederhier/ntfy/issues/265), thanks to [@dmbonsall](https://github.com/dmbonsall))
 
@@ -228,7 +285,7 @@ it adds support for APNs, the iOS messaging service. This is needed for the (soo
 * Ability to disable the web app entirely ([#238](https://github.com/binwiederhier/ntfy/issues/238)/[#249](https://github.com/binwiederhier/ntfy/pull/249), thanks to [@Curid](https://github.com/Curid))
 * Add APNs config to Firebase messages to support [iOS app](https://github.com/binwiederhier/ntfy/issues/4) ([#247](https://github.com/binwiederhier/ntfy/pull/247), thanks to [@Copephobia](https://github.com/Copephobia))
 
-**Bugs:**
+**Bug fixes:**
 
 * Support underscores in server.yml config options ([#255](https://github.com/binwiederhier/ntfy/issues/255), thanks to [@ajdelgado](https://github.com/ajdelgado))
 * Force MAKEFLAGS to --jobs=1 in `Makefile` ([#257](https://github.com/binwiederhier/ntfy/pull/257), thanks to [@oddlama](https://github.com/oddlama))
@@ -257,7 +314,7 @@ and custom icons. Aside from that, we've got tons of bug fixes as usual.
 * Per-subscription settings, custom subscription icons ([#155](https://github.com/binwiederhier/ntfy/issues/155), thanks to [@mztiq](https://github.com/mztiq) for reporting)
 * Cards in notification detail view ([#175](https://github.com/binwiederhier/ntfy/issues/175), thanks to [@cmeis](https://github.com/cmeis) for reporting)
 
-**Bugs:**
+**Bug fixes:**
 
 * Accurate naming of "mute notifications" from "pause notifications" ([#224](https://github.com/binwiederhier/ntfy/issues/224), thanks to [@shadow00](https://github.com/shadow00) for reporting)
 * Make messages with links selectable ([#226](https://github.com/binwiederhier/ntfy/issues/226), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
@@ -290,7 +347,7 @@ We've also improved the documentation a little and added translations for three 
 * Better parsing of the user actions, allowing quotes (no ticket)
 * Add "mark as read" icon button to notification ([#243](https://github.com/binwiederhier/ntfy/pull/243), thanks to [@wunter8](https://github.com/wunter8))
 
-**Bugs:**
+**Bug fixes:**
 
 * `Upgrade` header check is now case in-sensitive ([#228](https://github.com/binwiederhier/ntfy/issues/228), thanks to [@wunter8](https://github.com/wunter8) for finding it)
 * Made web app sounds quieter ([#222](https://github.com/binwiederhier/ntfy/issues/222))
@@ -332,7 +389,7 @@ languages and fixed a ton of bugs.
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
 * Channel settings option to configure DND override, sounds, etc. ([#91](https://github.com/binwiederhier/ntfy/issues/91))
 
-**Bugs:**
+**Bug fixes:**
 
 * Validate URLs when changing default server and server in user management ([#193](https://github.com/binwiederhier/ntfy/issues/193),
   thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov) for reporting)
@@ -373,7 +430,7 @@ Limited support is available in the web app.
 * Added ARMv6 build ([#200](https://github.com/binwiederhier/ntfy/issues/200), thanks to [@jcrubioa](https://github.com/jcrubioa) for reporting)
 * Web app internationalization support 🇧🇬 🇩🇪 🇺🇸 🌎 ([#189](https://github.com/binwiederhier/ntfy/issues/189))
 
-**Bugs:**
+**Bug fixes:**
 
 * Web app: English language strings fixes, additional descriptions for settings ([#203](https://github.com/binwiederhier/ntfy/issues/203), thanks to [@StoyanDimitrov](https://github.com/StoyanDimitrov))
 * Web app: Show error message snackbar when sending test notification fails ([#205](https://github.com/binwiederhier/ntfy/issues/205), thanks to [@cmeis](https://github.com/cmeis))
@@ -413,7 +470,7 @@ Released Apr 7, 2022
 * Translations to different languages ([#188](https://github.com/binwiederhier/ntfy/issues/188), thanks to
   [@StoyanDimitrov](https://github.com/StoyanDimitrov) for initiating things)
 
-**Bugs:**
+**Bug fixes:**
 
 * IllegalStateException: Failed to build unique file ([#177](https://github.com/binwiederhier/ntfy/issues/177), thanks to [@Fallenbagel](https://github.com/Fallenbagel) for reporting)
 * SQLiteConstraintException: Crash during UP registration ([#185](https://github.com/binwiederhier/ntfy/issues/185))
@@ -447,7 +504,7 @@ Released Apr 6, 2022
 
 * Added message bar and publish dialog ([#196](https://github.com/binwiederhier/ntfy/issues/196)) 
 
-**Bugs:**
+**Bug fixes:**
 
 * Added `EXPOSE 80/tcp` to Dockerfile to support auto-discovery in [Traefik](https://traefik.io/) ([#195](https://github.com/binwiederhier/ntfy/issues/195), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d))
 
@@ -463,7 +520,7 @@ Released Apr 6, 2022
 ## ntfy server v1.19.0
 Released Mar 30, 2022
 
-**Bugs:**
+**Bug fixes:**
 
 * Do not pack binary with `upx` for armv7/arm64 due to `illegal instruction` errors ([#191](https://github.com/binwiederhier/ntfy/issues/191), thanks to [@iexos](https://github.com/iexos))
 * Do not allow comma in topic name in publish via GET endpoint (no ticket)

@@ -23,7 +23,7 @@ func (e errHTTP) JSON() string {
 	return string(b)
 }
 
-func wrapErrHTTP(err *errHTTP, message string, args ...interface{}) *errHTTP {
+func wrapErrHTTP(err *errHTTP, message string, args ...any) *errHTTP {
 	return &errHTTP{
 		Code:     err.Code,
 		HTTPCode: err.HTTPCode,
@@ -53,6 +53,7 @@ var (
 	errHTTPBadRequestMatrixMessageInvalid            = &errHTTP{40019, http.StatusBadRequest, "invalid request: Matrix JSON invalid", "https://ntfy.sh/docs/publish/#matrix-gateway"}
 	errHTTPBadRequestMatrixPushkeyBaseURLMismatch    = &errHTTP{40020, http.StatusBadRequest, "invalid request: push key must be prefixed with base URL", "https://ntfy.sh/docs/publish/#matrix-gateway"}
 	errHTTPBadRequestUnexpectedMultipartField        = &errHTTP{40021, http.StatusBadRequest, "invalid request: unexpected multipart field", "https://ntfy.sh/docs/publish/#end-to-end-encryption"}
+	errHTTPBadRequestIconURLInvalid                  = &errHTTP{40021, http.StatusBadRequest, "invalid request: icon URL is invalid", "https://ntfy.sh/docs/publish/#icons"}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication"}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication"}

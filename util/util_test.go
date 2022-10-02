@@ -2,7 +2,7 @@ package util
 
 import (
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -19,27 +19,27 @@ func TestRandomString(t *testing.T) {
 
 func TestFileExists(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "somefile.txt")
-	require.Nil(t, ioutil.WriteFile(filename, []byte{0x25, 0x86}, 0600))
+	require.Nil(t, os.WriteFile(filename, []byte{0x25, 0x86}, 0600))
 	require.True(t, FileExists(filename))
 	require.False(t, FileExists(filename+".doesnotexist"))
 }
 
 func TestInStringList(t *testing.T) {
 	s := []string{"one", "two"}
-	require.True(t, InStringList(s, "two"))
-	require.False(t, InStringList(s, "three"))
+	require.True(t, Contains(s, "two"))
+	require.False(t, Contains(s, "three"))
 }
 
 func TestInStringListAll(t *testing.T) {
 	s := []string{"one", "two", "three", "four"}
-	require.True(t, InStringListAll(s, []string{"two", "four"}))
-	require.False(t, InStringListAll(s, []string{"three", "five"}))
+	require.True(t, ContainsAll(s, []string{"two", "four"}))
+	require.False(t, ContainsAll(s, []string{"three", "five"}))
 }
 
-func TestInIntList(t *testing.T) {
+func TestContains(t *testing.T) {
 	s := []int{1, 2}
-	require.True(t, InIntList(s, 2))
-	require.False(t, InIntList(s, 3))
+	require.True(t, Contains(s, 2))
+	require.False(t, Contains(s, 3))
 }
 
 func TestSplitNoEmpty(t *testing.T) {

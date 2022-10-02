@@ -3,7 +3,7 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       -
         name: Install Go
         uses: actions/setup-go@v2
@@ -13,7 +13,7 @@ jobs:
         name: Install node
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '17'
       -
         name: Checkout code
         uses: actions/checkout@v2

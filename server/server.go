@@ -75,7 +75,7 @@ var (
 	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
-	attachURLRegex   = regexp.MustCompile(`^https?://`)
+	urlRegex         = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -671,7 +671,7 @@ func (s *Server) checkAndConvertPublishMessage(v *visitor, im *inputMessage) (m 
 		m.Attachment.Name = im.Filename
 	}
 	if im.Attach != "" {
-		if !attachURLRegex.MatchString(im.Attach) {
+		if !urlRegex.MatchString(im.Attach) {
 			return nil, errHTTPBadRequestAttachmentURLInvalid
 		}
 		if im.AttachmentBody != nil {
@@ -690,6 +690,12 @@ func (s *Server) checkAndConvertPublishMessage(v *visitor, im *inputMessage) (m 
 		if m.Attachment.Name == "" {
 			m.Attachment.Name = "attachment"
 		}
+	}
+	if im.Icon != "" {
+		if !urlRegex.MatchString(im.Icon) {
+			return nil, errHTTPBadRequestIconURLInvalid
+		}
+		m.Icon = im.Icon
 	}
 	if im.Email != "" {
 		if err := v.EmailAllowed(); err != nil {
@@ -791,6 +797,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *inputMessage) error {
 	m.Message = strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
+	m.Icon = readParam(r, "x-icon", "icon")
 	m.Filename = readParam(r, "x-filename", "filename", "file", "f")
 	m.Attach = readParam(r, "x-attach", "attach", "a")
 	m.Email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
@@ -824,18 +831,18 @@ func (s *Server) parsePublishParams(r *http.Request, m *inputMessage) error {
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
 //
-// 1. curl -X POST -H "Poll: 1234" ntfy.sh/...
-//    If a message is flagged as poll request, the body does not matter and is discarded
-// 2. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
-//    If body is binary, encode as base64, if not do not encode
-// 3. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
-//    Body must be a message, because we attached an external URL
-// 4. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
-//    Body must be attachment, because we passed a filename
-// 5. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
-// 6. curl -T file.txt ntfy.sh/mytopic
-//    If file.txt is > message limit, treat it as an attachment
+//  1. curl -X POST -H "Poll: 1234" ntfy.sh/...
+//     If a message is flagged as poll request, the body does not matter and is discarded
+//  2. curl -T somebinarydata.bin "ntfy.sh/mytopic?up=1"
+//     If body is binary, encode as base64, if not do not encode
+//  3. curl -H "Attach: http://example.com/file.jpg" ntfy.sh/mytopic
+//     Body must be a message, because we attached an external URL
+//  4. curl -T short.txt -H "Filename: short.txt" ntfy.sh/mytopic
+//     Body must be attachment, because we passed a filename
+//  5. curl -T file.txt ntfy.sh/mytopic
+//     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
+//  6. curl -T file.txt ntfy.sh/mytopic
+//     If file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, unifiedpush bool) error {
 	if m.Event == pollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)
@@ -1255,7 +1262,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
 	for _, id := range ids {
-		if id == "" || util.InStringList(disallowedTopics, id) {
+		if util.Contains(disallowedTopics, id) {
 			return nil, errHTTPBadRequestTopicDisallowed
 		}
 		if _, ok := s.topics[id]; !ok {
@@ -1453,7 +1460,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if util.InStringList(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.Contains(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests

@@ -35,8 +35,8 @@ func FileExists(filename string) bool {
 	return stat != nil
 }
 
-// InStringList returns true if needle is contained in haystack
-func InStringList(haystack []string, needle string) bool {
+// Contains returns true if needle is contained in haystack
+func Contains[T comparable](haystack []T, needle T) bool {
 	for _, s := range haystack {
 		if s == needle {
 			return true
@@ -45,8 +45,8 @@ func InStringList(haystack []string, needle string) bool {
 	return false
 }
 
-// InStringListAll returns true if all needles are contained in haystack
-func InStringListAll(haystack []string, needles []string) bool {
+// ContainsAll returns true if all needles are contained in haystack
+func ContainsAll[T comparable](haystack []T, needles []T) bool {
 	matches := 0
 	for _, s := range haystack {
 		for _, needle := range needles {
@@ -56,16 +56,6 @@ func InStringListAll(haystack []string, needles []string) bool {
 		}
 	}
 	return matches == len(needles)
-}
-
-// InIntList returns true if needle is contained in haystack
-func InIntList(haystack []int, needle int) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
-	}
-	return false
 }
 
 // SplitNoEmpty splits a string using strings.Split, but filters out empty strings
@@ -263,7 +253,7 @@ func BasicAuth(user, pass string) string {
 
 // MaybeMarshalJSON returns a JSON string of the given object, or "<cannot serialize>" if serialization failed.
 // This is useful for logging purposes where a failure doesn't matter that much.
-func MaybeMarshalJSON(v interface{}) string {
+func MaybeMarshalJSON(v any) string {
 	jsonBytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "<cannot serialize>"
@@ -280,7 +270,8 @@ func MaybeMarshalJSON(v interface{}) string {
 // Warning: Never use this function with the intent to run the resulting command.
 //
 // Example:
-//    []string{"ls", "-al", "Document Folder"} -> ls -al "Document Folder"
+//
+//	[]string{"ls", "-al", "Document Folder"} -> ls -al "Document Folder"
 func QuoteCommand(command []string) string {
 	var quoted []string
 	for _, c := range command {

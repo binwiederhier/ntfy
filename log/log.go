@@ -40,32 +40,32 @@ var (
 )
 
 // Trace prints the given message, if the current log level is TRACE
-func Trace(message string, v ...interface{}) {
+func Trace(message string, v ...any) {
 	logIf(TraceLevel, message, v...)
 }
 
 // Debug prints the given message, if the current log level is DEBUG or lower
-func Debug(message string, v ...interface{}) {
+func Debug(message string, v ...any) {
 	logIf(DebugLevel, message, v...)
 }
 
 // Info prints the given message, if the current log level is INFO or lower
-func Info(message string, v ...interface{}) {
+func Info(message string, v ...any) {
 	logIf(InfoLevel, message, v...)
 }
 
 // Warn prints the given message, if the current log level is WARN or lower
-func Warn(message string, v ...interface{}) {
+func Warn(message string, v ...any) {
 	logIf(WarnLevel, message, v...)
 }
 
 // Error prints the given message, if the current log level is ERROR or lower
-func Error(message string, v ...interface{}) {
+func Error(message string, v ...any) {
 	logIf(ErrorLevel, message, v...)
 }
 
 // Fatal prints the given message, and exits the program
-func Fatal(v ...interface{}) {
+func Fatal(v ...any) {
 	log.Fatalln(v...)
 }
 
@@ -122,7 +122,7 @@ func IsDebug() bool {
 	return Loggable(DebugLevel)
 }
 
-func logIf(l Level, message string, v ...interface{}) {
+func logIf(l Level, message string, v ...any) {
 	if CurrentLevel() <= l {
 		log.Printf(l.String()+" "+message, v...)
 	}

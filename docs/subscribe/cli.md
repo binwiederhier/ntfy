@@ -254,6 +254,14 @@ I hope this shows how powerful this command is. Here's a short video that demons
   <figcaption>Execute all the things</figcaption>
 </figure>
 
+If most (or all) of your subscription usernames, passwords, and commands are the same, you can specify a `default-user`, `default-password`, and `default-command` at the top of the
+`client.yml`. If a subscription does not specify a username/password to use or does not have a command, the defaults will be used, otherwise, the subscription settings will
+override the defaults.
+
+!!! warning
+    Because the `default-user` and `default-password` will be sent for each topic that does not have its own username/password (even if the topic does not require authentication),
+    be sure that the servers/topics you subscribe to use HTTPS to prevent leaking the username and password.
+
 ### Using the systemd service
 You can use the `ntfy-client` systemd service (see [ntfy-client.service](https://github.com/binwiederhier/ntfy/blob/main/client/ntfy-client.service))
 to subscribe to multiple topics just like in the example above. The service is automatically installed (but not started)

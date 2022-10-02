@@ -60,13 +60,13 @@ func parseActions(s string) (actions []*action, err error) {
 		return nil, fmt.Errorf("only %d actions allowed", actionsMax)
 	}
 	for _, action := range actions {
-		if !util.InStringList(actionsAll, action.Action) {
+		if !util.Contains(actionsAll, action.Action) {
 			return nil, fmt.Errorf("parameter 'action' cannot be '%s', valid values are 'view', 'broadcast' and 'http'", action.Action)
 		} else if action.Label == "" {
 			return nil, fmt.Errorf("parameter 'label' is required")
-		} else if util.InStringList(actionsWithURL, action.Action) && action.URL == "" {
+		} else if util.Contains(actionsWithURL, action.Action) && action.URL == "" {
 			return nil, fmt.Errorf("parameter 'url' is required for action '%s'", action.Action)
-		} else if action.Action == actionHTTP && util.InStringList([]string{"GET", "HEAD"}, action.Method) && action.Body != "" {
+		} else if action.Action == actionHTTP && util.Contains([]string{"GET", "HEAD"}, action.Method) && action.Body != "" {
 			return nil, fmt.Errorf("parameter 'body' cannot be set if method is %s", action.Method)
 		}
 	}
@@ -87,7 +87,8 @@ func parseActionsFromJSON(s string) ([]*action, error) {
 // https://ntfy.sh/docs/publish/#action-buttons), into an array of actions.
 //
 // It can parse an actions string like this:
-//    view, "Look ma, commas and \"quotes\" too", url=https://..; action=broadcast, ...
+//
+//	view, "Look ma, commas and \"quotes\" too", url=https://..; action=broadcast, ...
 //
 // It works by advancing the position ("pos") through the input string ("input").
 //
@@ -96,10 +97,11 @@ func parseActionsFromJSON(s string) ([]*action, error) {
 // though it does not use state functions at all.
 //
 // Other resources:
-//   https://adampresley.github.io/2015/04/12/writing-a-lexer-and-parser-in-go-part-1.html
-//   https://github.com/adampresley/sample-ini-parser/blob/master/services/lexer/lexer/Lexer.go
-//   https://github.com/benbjohnson/sql-parser/blob/master/scanner.go
-//   https://blog.gopheracademy.com/advent-2014/parsers-lexers/
+//
+//	https://adampresley.github.io/2015/04/12/writing-a-lexer-and-parser-in-go-part-1.html
+//	https://github.com/adampresley/sample-ini-parser/blob/master/services/lexer/lexer/Lexer.go
+//	https://github.com/benbjohnson/sql-parser/blob/master/scanner.go
+//	https://blog.gopheracademy.com/advent-2014/parsers-lexers/
 func parseActionsFromSimple(s string) ([]*action, error) {
 	if !utf8.ValidString(s) {
 		return nil, errors.New("invalid utf-8 string")
@@ -154,7 +156,7 @@ func populateAction(newAction *action, section int, key, value string) error {
 		key = "action"
 	} else if key == "" && section == 1 {
 		key = "label"
-	} else if key == "" && section == 2 && util.InStringList(actionsWithURL, newAction.Action) {
+	} else if key == "" && section == 2 && util.Contains(actionsWithURL, newAction.Action) {
 		key = "url"
 	}
 
@@ -176,7 +178,7 @@ func populateAction(newAction *action, section int, key, value string) error {
 			newAction.Label = value
 		case "clear":
 			lvalue := strings.ToLower(value)
-			if !util.InStringList([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
+			if !util.Contains([]string{"true", "yes", "1", "false", "no", "0"}, lvalue) {
 				return fmt.Errorf("parameter 'clear' cannot be '%s', only boolean values are allowed (true/yes/1/false/no/0)", value)
 			}
 			newAction.Clear = lvalue == "true" || lvalue == "yes" || lvalue == "1"

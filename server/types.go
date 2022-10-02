@@ -29,6 +29,7 @@ type message struct {
 	Priority   int         `json:"priority,omitempty"`
 	Tags       []string    `json:"tags,omitempty"`
 	Click      string      `json:"click,omitempty"`
+	Icon       string      `json:"icon,omitempty"`
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
@@ -66,17 +67,18 @@ func newAction() *action {
 
 // PublishMessage is used as input when publishing as JSON
 type PublishMessage struct {
-	Topic    string    `json:"topic"`
-	Title    string    `json:"title"`
-	Message  string    `json:"message"`
-	Priority int       `json:"priority"`
-	Tags     []string  `json:"tags"`
-	Click    string    `json:"click"`
-	Actions  []*action `json:"actions"`
-	Attach   string    `json:"attach"`
-	Filename string    `json:"filename"`
-	Email    string    `json:"email"`
-	Delay    string    `json:"delay"`
+	Topic    string   `json:"topic"`
+	Title    string   `json:"title"`
+	Message  string   `json:"message"`
+	Priority int      `json:"priority"`
+	Tags     []string `json:"tags"`
+	Click    string   `json:"click"`
+	Icon     string   `json:"icon"`
+	Actions  []action `json:"actions"`
+	Attach   string   `json:"attach"`
+	Filename string   `json:"filename"`
+	Email    string   `json:"email"`
+	Delay    string   `json:"delay"`
 }
 
 // messageEncoder is a function that knows how to encode a message
@@ -207,10 +209,10 @@ func (q *queryFilter) Pass(msg *message) bool {
 	if messagePriority == 0 {
 		messagePriority = 3 // For query filters, default priority (3) is the same as "not set" (0)
 	}
-	if len(q.Priority) > 0 && !util.InIntList(q.Priority, messagePriority) {
+	if len(q.Priority) > 0 && !util.Contains(q.Priority, messagePriority) {
 		return false
 	}
-	if len(q.Tags) > 0 && !util.InStringListAll(msg.Tags, q.Tags) {
+	if len(q.Tags) > 0 && !util.ContainsAll(msg.Tags, q.Tags) {
 		return false
 	}
 	return true

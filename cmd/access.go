@@ -97,11 +97,11 @@ func execUserAccess(c *cli.Context) error {
 }
 
 func changeAccess(c *cli.Context, manager auth.Manager, username string, topic string, perms string) error {
-	if !util.InStringList([]string{"", "read-write", "rw", "read-only", "read", "ro", "write-only", "write", "wo", "none", "deny"}, perms) {
+	if !util.Contains([]string{"", "read-write", "rw", "read-only", "read", "ro", "write-only", "write", "wo", "none", "deny"}, perms) {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	}
-	read := util.InStringList([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
-	write := util.InStringList([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
+	read := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
+	write := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
 	user, err := manager.User(username)
 	if err == auth.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)

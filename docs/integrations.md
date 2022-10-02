@@ -75,9 +75,12 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy alertmanager bridge](https://github.com/aTable/ntfy_alertmanager_bridge) - Basic alertmanager bridge to ntfy (JS)
 - [restreamchat2ntfy](https://github.com/kurohuku7/restreamchat2ntfy) - Send restream.io chat to ntfy to check on the Meta Quest (JS)
 - [k8s-ntfy-deployment-service](https://github.com/Christian42/k8s-ntfy-deployment-service) - Automatic Kubernetes (k8s) ntfy deployment
+- [huginn-global-entry-notif](https://github.com/kylezoa/huginn-global-entry-notif) - Checks CBP API for available appointments with Huginn (JSON)
+- [ntfyer](https://github.com/KikyTokamuro/ntfyer) - Sending various information to your ntfy topic by time (TypeScript)
 
 ## Blog + forum posts
 
+- [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - 9/2022 
 - [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - 8/2022
 - [Fedora Magazine | 4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - 8/2022
 - [Docker로 오픈소스 푸시알람 프로젝트 ntfy.sh 설치 및 사용하기.(Feat. Uptimekuma)](https://svrforum.com/svr/398979) - 8/2022

@@ -506,17 +506,16 @@ apprise -vv -t "Test Message Title" -b "Test Message Body" \
 
 
 ## Rundeck
-Rundeck by default sends only HTML email which is not processed by ntfy SMTP server.
-
-Append following configurations to [rundeck-config.properties](https://docs.rundeck.com/docs/administration/configuration/config-file-reference.html) :
+Rundeck by default sends only HTML email which is not processed by ntfy SMTP server. Append following configurations to 
+[rundeck-config.properties](https://docs.rundeck.com/docs/administration/configuration/config-file-reference.html) :
 
 ```
 # Template
 rundeck.mail.template.file=/path/to/template.html
 rundeck.mail.template.log.formatted=false
 ```
-Example `template.html`:
 
+Example `template.html`:
 ```html
 <div>Execution ${execution.id} was <b>${execution.status}</b></div>
 <ul>
@@ -525,13 +524,9 @@ Example `template.html`:
     <li><a href="${execution.projectHref}">Project: ${execution.project}</a></li>
     <li><a href="${rundeck.href}">Rundeck</a></li>
 </ul>
-<p>
-
-</p>
 ```
 
-Add notification on Rundeck:
+Add notification on Rundeck (attachment type must be: `Attached as file to email`):
 ![Rundeck](static/img/rundeck.png)
 
-Attachment type must be: `Attached as file to email`
 

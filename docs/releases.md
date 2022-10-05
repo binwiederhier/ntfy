@@ -12,6 +12,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * Updated developer docs, bump nodejs and go version ([#414](https://github.com/binwiederhier/ntfy/issues/414), thanks to [@YJSoft](https://github.com/YJSoft) for reporting)
+* Added Rundeck example ([#427](https://github.com/binwiederhier/ntfy/pull/427), thanks to [@demogorgonz](https://github.com/demogorgonz))
 
 **Additional translations:**
 

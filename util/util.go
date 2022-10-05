@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"golang.org/x/term"
 	"io"
 	"math/rand"
 	"os"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gabriel-vasile/mimetype"
+	"golang.org/x/term"
 )
 
 const (
@@ -39,6 +40,16 @@ func FileExists(filename string) bool {
 func Contains[T comparable](haystack []T, needle T) bool {
 	for _, s := range haystack {
 		if s == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsContains returns true if any element of haystack .Contains(needle).
+func ContainsContains[T interface{ Contains(U) bool }, U any](haystack []T, needle U) bool {
+	for _, s := range haystack {
+		if s.Contains(needle) {
 			return true
 		}
 	}

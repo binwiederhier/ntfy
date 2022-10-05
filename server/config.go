@@ -2,6 +2,7 @@ package server
 
 import (
 	"io/fs"
+	"net/netip"
 	"time"
 )
 
@@ -92,7 +93,7 @@ type Config struct {
 	VisitorAttachmentDailyBandwidthLimit int
 	VisitorRequestLimitBurst             int
 	VisitorRequestLimitReplenish         time.Duration
-	VisitorRequestExemptIPAddrs          []string
+	VisitorRequestExemptIPAddrs          []netip.Prefix
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
 	BehindProxy                          bool
@@ -135,7 +136,7 @@ func NewConfig() *Config {
 		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
 		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
-		VisitorRequestExemptIPAddrs:          make([]string, 0),
+		VisitorRequestExemptIPAddrs:          make([]netip.Prefix, 0),
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		BehindProxy:                          false,

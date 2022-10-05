@@ -32,7 +32,7 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 		if err != nil {
 			return err
 		}
-		message, err := formatMail(s.config.BaseURL, v.ip, s.config.SMTPSenderFrom, to, m)
+		message, err := formatMail(s.config.BaseURL, v.ip.String(), s.config.SMTPSenderFrom, to, m)
 		if err != nil {
 			return err
 		}

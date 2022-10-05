@@ -2,10 +2,12 @@ package server
 
 import (
 	"errors"
-	"golang.org/x/time/rate"
-	"heckel.io/ntfy/util"
+	"net/netip"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
+	"heckel.io/ntfy/util"
 )
 
 const (
@@ -23,7 +25,7 @@ var (
 type visitor struct {
 	config        *Config
 	messageCache  *messageCache
-	ip            string
+	ip            netip.Addr
 	requests      *rate.Limiter
 	emails        *rate.Limiter
 	subscriptions util.Limiter
@@ -40,7 +42,7 @@ type visitorStats struct {
 	VisitorAttachmentBytesRemaining int64 `json:"visitorAttachmentBytesRemaining"`
 }
 
-func newVisitor(conf *Config, messageCache *messageCache, ip string) *visitor {
+func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr) *visitor {
 	return &visitor{
 		config:        conf,
 		messageCache:  messageCache,
@@ -115,7 +117,7 @@ func (v *visitor) Stale() bool {
 }
 
 func (v *visitor) Stats() (*visitorStats, error) {
-	attachmentsBytesUsed, err := v.messageCache.AttachmentBytesUsed(v.ip)
+	attachmentsBytesUsed, err := v.messageCache.AttachmentBytesUsed(v.ip.String())
 	if err != nil {
 		return nil, err
 	}

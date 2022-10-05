@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path"
@@ -42,7 +43,7 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	smtpSender        mailer
 	topics            map[string]*topic
-	visitors          map[string]*visitor
+	visitors          map[netip.Addr]*visitor
 	firebaseClient    *firebaseClient
 	messages          int64
 	auth              auth.Auther
@@ -150,7 +151,7 @@ func New(conf *Config) (*Server, error) {
 		smtpSender:     mailer,
 		topics:         topics,
 		auth:           auther,
-		visitors:       make(map[string]*visitor),
+		visitors:       make(map[netip.Addr]*visitor),
 	}, nil
 }
 
@@ -642,8 +643,8 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
-		m.Sender = v.ip // Important for rate limiting
 	}
+	m.Sender = v.ip // Important for rate limiting
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
 		m.Actions, err = parseActions(actionsStr)
@@ -1219,7 +1220,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, "0.0.0.0") // Background process, not a real visitor
+	v := newVisitor(s.config, s.messageCache, netip.MustParseAddr("0.0.0.0")) // Background process, not a real visitor
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -1286,7 +1287,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if util.Contains(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.ContainsContains(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests
@@ -1436,21 +1437,29 @@ func extractUserPass(r *http.Request) (username string, password string, ok bool
 // This function was taken from https://www.alexedwards.net/blog/how-to-rate-limit-http-requests (MIT).
 func (s *Server) visitor(r *http.Request) *visitor {
 	remoteAddr := r.RemoteAddr
-	ip, _, err := net.SplitHostPort(remoteAddr)
+	ipport, err := netip.ParseAddrPort(remoteAddr)
+	ip := ipport.Addr()
 	if err != nil {
-		ip = remoteAddr // This should not happen in real life; only in tests.
+		ip = netip.MustParseAddr(remoteAddr) // This should not happen in real life; only in tests. So, using MustParse, which panics on error.
 	}
 	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
 		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
 		// only the right-most address can be trusted (as this is the one added by our proxy server).
 		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
-		ip = strings.TrimSpace(util.LastString(ips, remoteAddr))
+		myip, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
+		if err != nil {
+			log.Error("Invalid IP Address Received from proxy in X-Forwarded-For header. This should NEVER happen, your proxy is seriously broken: ", ip, err)
+			// fall back to regular remote address if x forwarded for is damaged
+		} else {
+			ip = myip
+		}
+
 	}
 	return s.visitorFromIP(ip)
 }
 
-func (s *Server) visitorFromIP(ip string) *visitor {
+func (s *Server) visitorFromIP(ip netip.Addr) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, exists := s.visitors[ip]

@@ -6,17 +6,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/auth"
@@ -814,7 +816,7 @@ func TestServer_PublishTooRequests_Defaults(t *testing.T) {
 
 func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
 	c := newTestConfig(t)
-	c.VisitorRequestExemptIPAddrs = []string{"9.9.9.9"} // see request()
+	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
 	for i := 0; i < 65; i++ { // > 60
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)

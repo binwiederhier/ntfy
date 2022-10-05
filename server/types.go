@@ -1,9 +1,11 @@
 package server
 
 import (
-	"heckel.io/ntfy/util"
 	"net/http"
+	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/util"
 )
 
 // List of possible events
@@ -33,7 +35,7 @@ type message struct {
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
-	Sender     string      `json:"-"`                  // IP address of uploader, used for rate limiting
+	Sender     netip.Addr  `json:"-"`                  // IP address of uploader, used for rate limiting
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
 }
 

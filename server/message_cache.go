@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
+	"strings"
+	"time"
+
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
-	"strings"
-	"time"
 )
 
 var (
@@ -279,7 +281,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 			attachmentSize,
 			attachmentExpires,
 			attachmentURL,
-			m.Sender,
+			m.Sender.String(),
 			m.Encoding,
 			published,
 		)
@@ -477,7 +479,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Icon:       icon,
 			Actions:    actions,
 			Attachment: att,
-			Sender:     sender,
+			Sender:     netip.MustParseAddr(sender), // Must parse assuming database must be correct
 			Encoding:   encoding,
 		})
 	}

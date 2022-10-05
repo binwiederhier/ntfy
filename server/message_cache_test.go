@@ -3,11 +3,13 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"net/netip"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSqliteCache_Messages(t *testing.T) {
@@ -281,7 +283,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires1 := time.Now().Add(-4 * time.Hour).Unix()
 	m := newDefaultMessage("mytopic", "flower for you")
 	m.ID = "m1"
-	m.Sender = "1.2.3.4"
+	m.Sender = netip.MustParseAddr("1.2.3.4")
 	m.Attachment = &attachment{
 		Name:    "flower.jpg",
 		Type:    "image/jpeg",
@@ -294,7 +296,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires2 := time.Now().Add(2 * time.Hour).Unix() // Future
 	m = newDefaultMessage("mytopic", "sending you a car")
 	m.ID = "m2"
-	m.Sender = "1.2.3.4"
+	m.Sender = netip.MustParseAddr("1.2.3.4")
 	m.Attachment = &attachment{
 		Name:    "car.jpg",
 		Type:    "image/jpeg",
@@ -307,7 +309,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires3 := time.Now().Add(1 * time.Hour).Unix() // Future
 	m = newDefaultMessage("another-topic", "sending you another car")
 	m.ID = "m3"
-	m.Sender = "1.2.3.4"
+	m.Sender = netip.MustParseAddr("1.2.3.4")
 	m.Attachment = &attachment{
 		Name:    "another-car.jpg",
 		Type:    "image/jpeg",

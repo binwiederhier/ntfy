@@ -23,7 +23,7 @@ to facilitate service restarts, message polling and to overcome client network d
 Yes. The server (including this Web UI) can be self-hosted, and the Android/iOS app supports adding topics from
 your own server as well. Check out the [install instructions](install.md).
 
-## Why is Firebase used?
+## Is Firebase used?
 In addition to caching messages locally and delivering them to long-polling subscribers, all messages are also
 published to Firebase Cloud Messaging (FCM) (if `FirebaseKeyFile` is set, which it is on ntfy.sh). This
 is to facilitate notifications on Android. 
@@ -42,6 +42,16 @@ decent now.
 [Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the
 server and listens for incoming notifications. This consumes additional battery (see above),
 but delivers notifications instantly.
+
+## Can I disable the web app? Can I protect it with a login screen?
+The web app is a static website without a backend (other than the ntfy API). All data is stored locally in the browser
+cache and local storage. That means it does not need to be protected with a login screen, and it poses no additional 
+security risk. So technically, it does not need to be disabled.
+
+However, if you still want to disable it, you can do so with the `web-root: disable` option in the `server.yml` file. 
+
+Think of the ntfy web app like an Android/iOS app. It is freely available and accessible to anyone, yet useless without
+a proper backend. So as long as you secure your backend with ACLs, exposing the ntfy web app to the Internet is harmless.
 
 ## Where can I donate?
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier).

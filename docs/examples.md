@@ -506,7 +506,7 @@ apprise -vv -t "Test Message Title" -b "Test Message Body" \
 
 
 ## Rundeck
-Rundeck by default sends only HTML which is not processed by ntfy SMTP server.
+Rundeck by default sends only HTML email which is not processed by ntfy SMTP server.
 
 Append following configurations to [rundeck-config.properties](https://docs.rundeck.com/docs/administration/configuration/config-file-reference.html) :
 

@@ -456,6 +456,11 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 				return nil, err
 			}
 		}
+		senderIP, err := netip.ParseAddr(sender)
+		if err != nil {
+			senderIP = netip.IPv4Unspecified() // if no IP stored in database, 0.0.0.0
+		}
+
 		var att *attachment
 		if attachmentName != "" && attachmentURL != "" {
 			att = &attachment{
@@ -479,7 +484,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Icon:       icon,
 			Actions:    actions,
 			Attachment: att,
-			Sender:     netip.MustParseAddr(sender), // Must parse assuming database must be correct
+			Sender:     senderIP, // Must parse assuming database must be correct
 			Encoding:   encoding,
 		})
 	}

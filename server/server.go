@@ -643,8 +643,8 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
+		m.Sender = v.ip // Important for rate limiting
 	}
-	m.Sender = v.ip // Important for rate limiting
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
 		m.Actions, err = parseActions(actionsStr)
@@ -1220,7 +1220,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, netip.MustParseAddr("0.0.0.0")) // Background process, not a real visitor
+	v := newVisitor(s.config, s.messageCache, netip.IPv4Unspecified()) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -1287,7 +1287,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if util.ContainsContains(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
 			return errHTTPTooManyRequestsLimitRequests
@@ -1449,8 +1449,8 @@ func (s *Server) visitor(r *http.Request) *visitor {
 		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
 		myip, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
 		if err != nil {
-			log.Error("Invalid IP Address Received from proxy in X-Forwarded-For header. This should NEVER happen, your proxy is seriously broken: ", ip, err)
-			// fall back to regular remote address if x forwarded for is damaged
+			log.Error("invalid IP address %s received in X-Forwarded-For header: %s", ip, err.Error())
+			// fall back to regular remote address if X-Forwarded-For is damaged
 		} else {
 			ip = myip
 		}

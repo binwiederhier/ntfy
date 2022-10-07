@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -46,8 +47,8 @@ func Contains[T comparable](haystack []T, needle T) bool {
 	return false
 }
 
-// ContainsContains returns true if any element of haystack .Contains(needle).
-func ContainsContains[T interface{ Contains(U) bool }, U any](haystack []T, needle U) bool {
+// ContainsIP returns true if any one of the of prefixes contains the ip.
+func ContainsIP(haystack []netip.Prefix, needle netip.Addr) bool {
 	for _, s := range haystack {
 		if s.Contains(needle) {
 			return true

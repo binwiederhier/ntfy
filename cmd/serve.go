@@ -306,31 +306,30 @@ func sigHandlerConfigReload(config string) {
 }
 
 func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
-        //try parsing as prefix
-        prefix, err := netip.ParsePrefix(host)
-        if err == nil {
-                prefixes = append(prefixes, prefix.Masked()) // masked and canonical for easy of debugging, shouldn't matter
-                return prefixes, nil                         // success
-        }
+	//try parsing as prefix
+	prefix, err := netip.ParsePrefix(host)
+	if err == nil {
+		prefixes = append(prefixes, prefix.Masked()) // Masked returns the prefix in its canonical form,  the same for every ip in the range. This exists for ease of debugging. For example, 10.1.2.3/16 is 10.1.0.0/16.
+		return prefixes, nil                         // success
+	}
 
-        // not a prefix, parse as host or IP
-        // LookupHost forwards through if it's an IP
-        ips, err := net.LookupHost(host)
-        if err == nil {
-                for _, i := range ips {
-                        ip, err := netip.ParseAddr(i)
-                        if err == nil {
-                                prefix, err := ip.Prefix(ip.BitLen())
-                                if err != nil {
-                                        return prefixes, errors.New(fmt.Sprint("ip", ip, " successfully parsed as IP but unable to turn into prefix. THIS SHOULD NEVER HAPPEN. err:", err.Error()))
-                                }
-                                prefixes = append(prefixes, prefix.Masked()) //also masked canonical ip
-                        }
-                }
-        }
-        return
+	// not a prefix, parse as host or IP
+	// LookupHost forwards through if it's an IP
+	ips, err := net.LookupHost(host)
+	if err == nil {
+		for _, i := range ips {
+			ip, err := netip.ParseAddr(i)
+			if err == nil {
+				prefix, err := ip.Prefix(ip.BitLen())
+				if err != nil {
+					return prefixes, errors.New(fmt.Sprint("ip", ip, " successfully parsed as IP but unable to turn into prefix. THIS SHOULD NEVER HAPPEN. err:", err.Error()))
+				}
+				prefixes = append(prefixes, prefix.Masked()) //also masked canonical ip
+			}
+		}
+	}
+	return
 }
-
 
 func reloadLogLevel(inputSource altsrc.InputSourceContext) {
 	newLevelStr, err := inputSource.String("log-level")

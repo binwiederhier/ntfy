@@ -314,18 +314,19 @@ func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
 	}
 
 	// not a prefix, parse as host or IP
-	// LookupHost forwards through if it's an IP
+	// LookupHost passes through an IP as is
 	ips, err := net.LookupHost(host)
-	if err == nil {
-		for _, i := range ips {
-			ip, err := netip.ParseAddr(i)
-			if err == nil {
-				prefix, err := ip.Prefix(ip.BitLen())
-				if err != nil {
-					return prefixes, errors.New(fmt.Sprint("ip", ip, " successfully parsed as IP but unable to turn into prefix. THIS SHOULD NEVER HAPPEN. err:", err.Error()))
-				}
-				prefixes = append(prefixes, prefix.Masked()) //also masked canonical ip
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range ips {
+		ip, err := netip.ParseAddr(i)
+		if err == nil {
+			prefix, err := ip.Prefix(ip.BitLen())
+			if err != nil {
+				return nil, fmt.Errorf("%s successfully parsed but unable to make prefix: %s", ip.String(), err.Error())
 			}
+			prefixes = append(prefixes, prefix.Masked()) //also masked canonical ip
 		}
 	}
 	return

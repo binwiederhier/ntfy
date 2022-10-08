@@ -217,9 +217,7 @@ func execServe(c *cli.Context) error {
 			log.Warn("cannot resolve host %s: %s, ignoring visitor request exemption", host, err.Error())
 			continue
 		}
-		for _, ip := range ips {
-			visitorRequestLimitExemptIPs = append(visitorRequestLimitExemptIPs, ip)
-		}
+		visitorRequestLimitExemptIPs = append(visitorRequestLimitExemptIPs, ips...)
 	}
 
 	// Run server

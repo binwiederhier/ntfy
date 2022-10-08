@@ -1437,14 +1437,14 @@ func extractUserPass(r *http.Request) (username string, password string, ok bool
 // This function was taken from https://www.alexedwards.net/blog/how-to-rate-limit-http-requests (MIT).
 func (s *Server) visitor(r *http.Request) *visitor {
 	remoteAddr := r.RemoteAddr
-	ipport, err := netip.ParseAddrPort(remoteAddr)
-	ip := ipport.Addr()
+	addrPort, err := netip.ParseAddrPort(remoteAddr)
+	ip := addrPort.Addr()
 	if err != nil {
 		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
 		ip, err = netip.ParseAddr(remoteAddr)
 		if err != nil {
 			ip = netip.IPv4Unspecified()
-			log.Error("Unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+			log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
 		}
 	}
 	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
@@ -1452,14 +1452,13 @@ func (s *Server) visitor(r *http.Request) *visitor {
 		// only the right-most address can be trusted (as this is the one added by our proxy server).
 		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
-		myip, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
+		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
 		if err != nil {
 			log.Error("invalid IP address %s received in X-Forwarded-For header: %s", ip, err.Error())
-			// fall back to regular remote address if X-Forwarded-For is damaged
+			// Fall back to regular remote address if X-Forwarded-For is damaged
 		} else {
-			ip = myip
+			ip = realIP
 		}
-
 	}
 	return s.visitorFromIP(ip)
 }

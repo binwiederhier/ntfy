@@ -304,27 +304,25 @@ func sigHandlerConfigReload(config string) {
 }
 
 func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
-	//try parsing as prefix
+	// Try parsing as prefix, e.g. 10.0.1.0/24
 	prefix, err := netip.ParsePrefix(host)
 	if err == nil {
-		prefixes = append(prefixes, prefix.Masked()) // Masked returns the prefix in its canonical form,  the same for every ip in the range. This exists for ease of debugging. For example, 10.1.2.3/16 is 10.1.0.0/16.
-		return prefixes, nil                         // success
+		prefixes = append(prefixes, prefix.Masked())
+		return prefixes, nil
 	}
-
-	// not a prefix, parse as host or IP
-	// LookupHost passes through an IP as is
+	// Not a prefix, parse as host or IP (LookupHost passes through an IP as is)
 	ips, err := net.LookupHost(host)
 	if err != nil {
 		return nil, err
 	}
-	for _, i := range ips {
-		ip, err := netip.ParseAddr(i)
+	for _, ipStr := range ips {
+		ip, err := netip.ParseAddr(ipStr)
 		if err == nil {
 			prefix, err := ip.Prefix(ip.BitLen())
 			if err != nil {
 				return nil, fmt.Errorf("%s successfully parsed but unable to make prefix: %s", ip.String(), err.Error())
 			}
-			prefixes = append(prefixes, prefix.Masked()) //also masked canonical ip
+			prefixes = append(prefixes, prefix.Masked())
 		}
 	}
 	return

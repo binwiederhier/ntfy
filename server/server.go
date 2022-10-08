@@ -1440,7 +1440,12 @@ func (s *Server) visitor(r *http.Request) *visitor {
 	ipport, err := netip.ParseAddrPort(remoteAddr)
 	ip := ipport.Addr()
 	if err != nil {
-		ip = netip.MustParseAddr(remoteAddr) // This should not happen in real life; only in tests. So, using MustParse, which panics on error.
+		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
+		ip, err = netip.ParseAddr(remoteAddr)
+		if err != nil {
+			ip = netip.IPv4Unspecified()
+			log.Error("Unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+		}
 	}
 	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
 		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,

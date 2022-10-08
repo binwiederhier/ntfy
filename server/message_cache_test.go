@@ -3,11 +3,17 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"net/netip"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+var (
+	exampleIP1234 = netip.MustParseAddr("1.2.3.4")
 )
 
 func TestSqliteCache_Messages(t *testing.T) {
@@ -281,7 +287,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires1 := time.Now().Add(-4 * time.Hour).Unix()
 	m := newDefaultMessage("mytopic", "flower for you")
 	m.ID = "m1"
-	m.Sender = "1.2.3.4"
+	m.Sender = exampleIP1234
 	m.Attachment = &attachment{
 		Name:    "flower.jpg",
 		Type:    "image/jpeg",
@@ -294,7 +300,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires2 := time.Now().Add(2 * time.Hour).Unix() // Future
 	m = newDefaultMessage("mytopic", "sending you a car")
 	m.ID = "m2"
-	m.Sender = "1.2.3.4"
+	m.Sender = exampleIP1234
 	m.Attachment = &attachment{
 		Name:    "car.jpg",
 		Type:    "image/jpeg",
@@ -307,7 +313,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires3 := time.Now().Add(1 * time.Hour).Unix() // Future
 	m = newDefaultMessage("another-topic", "sending you another car")
 	m.ID = "m3"
-	m.Sender = "1.2.3.4"
+	m.Sender = exampleIP1234
 	m.Attachment = &attachment{
 		Name:    "another-car.jpg",
 		Type:    "image/jpeg",
@@ -327,7 +333,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	require.Equal(t, int64(5000), messages[0].Attachment.Size)
 	require.Equal(t, expires1, messages[0].Attachment.Expires)
 	require.Equal(t, "https://ntfy.sh/file/AbDeFgJhal.jpg", messages[0].Attachment.URL)
-	require.Equal(t, "1.2.3.4", messages[0].Sender)
+	require.Equal(t, "1.2.3.4", messages[0].Sender.String())
 
 	require.Equal(t, "sending you a car", messages[1].Message)
 	require.Equal(t, "car.jpg", messages[1].Attachment.Name)
@@ -335,7 +341,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	require.Equal(t, int64(10000), messages[1].Attachment.Size)
 	require.Equal(t, expires2, messages[1].Attachment.Expires)
 	require.Equal(t, "https://ntfy.sh/file/aCaRURL.jpg", messages[1].Attachment.URL)
-	require.Equal(t, "1.2.3.4", messages[1].Sender)
+	require.Equal(t, "1.2.3.4", messages[1].Sender.String())
 
 	size, err := c.AttachmentBytesUsed("1.2.3.4")
 	require.Nil(t, err)

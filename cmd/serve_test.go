@@ -2,17 +2,19 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/test"
-	"heckel.io/ntfy/util"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/test"
+	"heckel.io/ntfy/util"
 )
 
 func init() {
@@ -68,6 +70,22 @@ func TestCLI_Serve_WebSocket(t *testing.T) {
 	m := toMessage(t, string(data))
 	require.Equal(t, "my message", m.Message)
 	require.Equal(t, "mytopic", m.Topic)
+}
+
+func TestIP_Host_Parsing(t *testing.T) {
+	cases := map[string]string{
+		"1.1.1.1":          "1.1.1.1/32",
+		"fd00::1234":       "fd00::1234/128",
+		"192.168.0.3/24":   "192.168.0.0/24",
+		"10.1.2.3/8":       "10.0.0.0/8",
+		"201:be93::4a6/21": "201:b800::/21",
+	}
+	for q, expectedAnswer := range cases {
+		ips, err := parseIPHostPrefix(q)
+		require.Nil(t, err)
+		assert.Equal(t, 1, len(ips))
+		assert.Equal(t, expectedAnswer, ips[0].String())
+	}
 }
 
 func newEmptyFile(t *testing.T) string {

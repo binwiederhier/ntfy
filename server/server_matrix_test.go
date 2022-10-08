@@ -1,11 +1,13 @@
 package server
 
 import (
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMatrix_NewRequestFromMatrixJSON_Success(t *testing.T) {
@@ -70,7 +72,7 @@ func TestMatrix_WriteMatrixDiscoveryResponse(t *testing.T) {
 func TestMatrix_WriteMatrixError(t *testing.T) {
 	w := httptest.NewRecorder()
 	r, _ := http.NewRequest("POST", "http://ntfy.example.com/_matrix/push/v1/notify", nil)
-	v := newVisitor(newTestConfig(t), nil, "1.2.3.4")
+	v := newVisitor(newTestConfig(t), nil, netip.MustParseAddr("1.2.3.4"))
 	require.Nil(t, writeMatrixError(w, r, v, &errMatrix{"https://ntfy.example.com/upABCDEFGHI?up=1", errHTTPBadRequestMatrixPushkeyBaseURLMismatch}))
 	require.Equal(t, 200, w.Result().StatusCode)
 	require.Equal(t, `{"rejected":["https://ntfy.example.com/upABCDEFGHI?up=1"]}`+"\n", w.Body.String())

@@ -1,10 +1,12 @@
 package util
 
 import (
-	"github.com/stretchr/testify/require"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRandomString(t *testing.T) {
@@ -40,6 +42,13 @@ func TestContains(t *testing.T) {
 	s := []int{1, 2}
 	require.True(t, Contains(s, 2))
 	require.False(t, Contains(s, 3))
+}
+
+func TestContainsIP(t *testing.T) {
+	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("1.1.1.1")))
+	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("fd12:1234:5678::9876")))
+	require.False(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("1.2.0.1")))
+	require.False(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("fc00::1")))
 }
 
 func TestSplitNoEmpty(t *testing.T) {

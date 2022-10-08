@@ -5,15 +5,17 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/log"
 	"io/fs"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"heckel.io/ntfy/log"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
@@ -208,16 +210,14 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Resolve hosts
-	visitorRequestLimitExemptIPs := make([]string, 0)
+	visitorRequestLimitExemptIPs := make([]netip.Prefix, 0)
 	for _, host := range visitorRequestLimitExemptHosts {
-		ips, err := net.LookupIP(host)
+		ips, err := parseIPHostPrefix(host)
 		if err != nil {
 			log.Warn("cannot resolve host %s: %s, ignoring visitor request exemption", host, err.Error())
 			continue
 		}
-		for _, ip := range ips {
-			visitorRequestLimitExemptIPs = append(visitorRequestLimitExemptIPs, ip.String())
-		}
+		visitorRequestLimitExemptIPs = append(visitorRequestLimitExemptIPs, ips...)
 	}
 
 	// Run server
@@ -301,6 +301,31 @@ func sigHandlerConfigReload(config string) {
 		}
 		reloadLogLevel(inputSource)
 	}
+}
+
+func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
+	// Try parsing as prefix, e.g. 10.0.1.0/24
+	prefix, err := netip.ParsePrefix(host)
+	if err == nil {
+		prefixes = append(prefixes, prefix.Masked())
+		return prefixes, nil
+	}
+	// Not a prefix, parse as host or IP (LookupHost passes through an IP as is)
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return nil, err
+	}
+	for _, ipStr := range ips {
+		ip, err := netip.ParseAddr(ipStr)
+		if err == nil {
+			prefix, err := ip.Prefix(ip.BitLen())
+			if err != nil {
+				return nil, fmt.Errorf("%s successfully parsed but unable to make prefix: %s", ip.String(), err.Error())
+			}
+			prefixes = append(prefixes, prefix.Masked())
+		}
+	}
+	return
 }
 
 func reloadLogLevel(inputSource altsrc.InputSourceContext) {

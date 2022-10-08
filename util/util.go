@@ -5,16 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
-	"golang.org/x/term"
 	"io"
 	"math/rand"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gabriel-vasile/mimetype"
+	"golang.org/x/term"
 )
 
 const (
@@ -39,6 +41,16 @@ func FileExists(filename string) bool {
 func Contains[T comparable](haystack []T, needle T) bool {
 	for _, s := range haystack {
 		if s == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsIP returns true if any one of the of prefixes contains the ip.
+func ContainsIP(haystack []netip.Prefix, needle netip.Addr) bool {
+	for _, s := range haystack {
+		if s.Contains(needle) {
 			return true
 		}
 	}

@@ -3,13 +3,15 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"firebase.google.com/go/v4/messaging"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/auth"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
+
+	"firebase.google.com/go/v4/messaging"
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/auth"
 )
 
 type testAuther struct {
@@ -322,7 +324,7 @@ func TestMaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 func TestToFirebaseSender_Abuse(t *testing.T) {
 	sender := &testFirebaseSender{allowed: 2}
 	client := newFirebaseClient(sender, &testAuther{})
-	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), "1.2.3.4")
+	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), netip.MustParseAddr("1.2.3.4"))
 
 	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
 	require.Equal(t, 1, len(sender.Messages()))

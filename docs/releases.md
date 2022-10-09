@@ -4,10 +4,15 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.29.0 (UNRELEASED)
 
+**Features:**
+
+* Allow IP CIDRs in `visitor-request-limit-exempt-hosts` ([#423](https://github.com/binwiederhier/ntfy/issues/423), thanks to [@karmanyaahm](https://github.com/karmanyaahm))
+
 **Bug fixes + maintenance:**
 
 * Subscriptions can now have a display name ([#370](https://github.com/binwiederhier/ntfy/issues/370), thanks to [@tfheen](https://github.com/tfheen) for reporting)
 * Bump Go version to Go 18.x ([#422](https://github.com/binwiederhier/ntfy/issues/422))
+* Web: Strip trailing slash when subscribing ([#428](https://github.com/binwiederhier/ntfy/issues/428), thanks to [@raining1123](https://github.com/raining1123) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 
 **Documentation:**
 

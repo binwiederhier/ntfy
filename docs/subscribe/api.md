@@ -302,13 +302,12 @@ $ curl -s ntfy.sh/mytopic1,mytopic2/json
 ### Authentication
 Depending on whether the server is configured to support [access control](../config.md#access-control), some topics
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
-To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
-with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
-your password.
+To publish/subscribe to protected topics, you can:
 
-```
-curl -u phil:mypass -s "https://ntfy.example.com/mytopic/json"
-```
+* Use [basic auth](../publish.md#basic-auth), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+* or use the [`auth` query parameter](../publish.md#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
+
+Please refer to the [publishing documentation](../publish.md#authentication) for additional details.
 
 ## JSON message format
 Both the [`/json` endpoint](#subscribe-as-json-stream) and the [`/sse` endpoint](#subscribe-as-sse-stream) return a JSON

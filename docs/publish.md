@@ -2596,16 +2596,23 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
 ### Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
-To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
-with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
-your password. 
+To publish/subscribe to protected topics, you can: 
 
-Here's a simple example:
+* Use [basic auth](#basic-auth), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+* or use the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
+
+!!! warning
+    Base64 only encodes username and password. It **is not encrypting it**. For your self-hosted server, 
+    **be sure to use HTTPS to avoid eavesdropping** and exposing your password. 
+
+#### Basic auth
+Here's an example using [Basic auth](https://en.wikipedia.org/wiki/Basic_access_authentication), with a user `testuser` 
+and password `fakepassword`:
 
 === "Command line (curl)"
     ```
     curl \
-      -u phil:mypass \
+      -u testuser:fakepassword \
       -d "Look ma, with auth" \
       https://ntfy.example.com/mysecrets
     ```
@@ -2613,7 +2620,7 @@ Here's a simple example:
 === "ntfy CLI"
     ```
     ntfy publish \
-      -u phil:mypass \
+      -u testuser:fakepassword \
       ntfy.example.com/mysecrets \
       "Look ma, with auth"
     ```
@@ -2622,7 +2629,7 @@ Here's a simple example:
     ``` http
     POST /mysecrets HTTP/1.1
     Host: ntfy.example.com
-    Authorization: Basic cGhpbDpteXBhc3M=
+    Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
 
     Look ma, with auth
     ```
@@ -2633,7 +2640,7 @@ Here's a simple example:
         method: 'POST', // PUT works too
         body: 'Look ma, with auth',
         headers: {
-            'Authorization': 'Basic cGhpbDpteXBhc3M='
+            'Authorization': 'Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk'
         }
     })
     ```
@@ -2642,14 +2649,14 @@ Here's a simple example:
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
     strings.NewReader("Look ma, with auth"))
-    req.Header.Set("Authorization", "Basic cGhpbDpteXBhc3M=")
+    req.Header.Set("Authorization", "Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
     $uri = "https://ntfy.example.com/mysecrets"
-    $credentials = 'username:password'
+    $credentials = 'testuser:fakepassword'
     $encodedCredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($credentials))
     $headers = @{Authorization="Basic $encodedCredentials"}
     $message = "Look ma, with auth"
@@ -2661,7 +2668,7 @@ Here's a simple example:
     requests.post("https://ntfy.example.com/mysecrets",
     data="Look ma, with auth",
     headers={
-        "Authorization": "Basic cGhpbDpteXBhc3M="
+        "Authorization": "Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk"
     })
     ```
 
@@ -2672,32 +2679,112 @@ Here's a simple example:
             'method' => 'POST', // PUT also works
             'header' =>
                 'Content-Type: text/plain\r\n' .
-                'Authorization: Basic cGhpbDpteXBhc3M=',
+                'Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk',
             'content' => 'Look ma, with auth'
         ]
     ]));
     ```
 
-#### Auth Query Param
-In some instances, you may want to send auth credentials in the URL (e.g., a GET webhook or a JSON POST request). You
-can use the `auth` query parameter. Set the value to the base64 encoding of the value of the `Authorization` header
-and strip any trailing `=`. **Be sure to only send auth credentials over an HTTPS connection**
+To generate the `Authorization` header, use **standard base64** to encode the colon-separated `<username>:<password>` 
+and prepend the word `Basic`, i.e. `Authorization: Basic base64(<username>:<password>)`. Here's some pseudo-code that 
+hopefully explains it better:
 
-Here is an example:
 ```
-    Step 1. base64(user:pass)             -> base64(testuser:fakepassword)                    -> dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
-    Step 2. Authorization header          -> Basic base64(testuser:fakepassword)              -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
-    Step 3. base64(Authorization header)  -> base64(Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk)       -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw==
-    Step 4. remove trailing `=` (if any)  -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw== -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
-    Step 5. add query param to URL        -> https://ntfy.sh/topic                            -> https://ntfy.sh/topic?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
+username   = "testuser"
+password   = "fakepassword"
+authHeader = "Basic " + base64(username + ":" + password) // -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
 ```
-
-!!! note
-    Do NOT remove trailing `=` after step 2
 
 The following command will generate the appropriate value for you on *nix systems:
 
-```echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='```
+```
+echo "Basic $(echo -n 'testuser:fakepassword' | base64)"
+```
+
+#### Query param
+Here's an example using the `auth` query parameter:
+
+=== "Command line (curl)"
+    ```
+    curl \
+      -d "Look ma, with auth" \
+      "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+      -u testuser:fakepassword \
+      ntfy.example.com/mysecrets \
+      "Look ma, with auth"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw HTTP/1.1
+    Host: ntfy.example.com
+
+    Look ma, with auth
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw', {
+        method: 'POST', // PUT works too
+        body: 'Look ma, with auth'
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw",
+        strings.NewReader("Look ma, with auth"))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
+    $message = "Look ma, with auth"
+    Invoke-RestMethod -Uri $uri -Body $message  -Method "Post" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw",
+    data="Look ma, with auth"
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' => 'Content-Type: text/plain',
+            'content' => 'Look ma, with auth'
+        ]
+    ]));
+    ```
+
+To generate the value of the `auth` parameter, encode the value of the `Authorization` header (see anove) using 
+**raw base64 encoding** (like base64, but strip any trailing `=`). Here's some pseudo-code that hopefully 
+explains it better:
+
+```
+username   = "testuser"
+password   = "fakepassword"
+authHeader = "Basic " + base64(username + ":" + password) // -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
+authParam  = base64_raw(authHeader) // -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw (no trailing =)
+
+// If your language does not have a function to encode raw base64, simply use normal base64
+// and REMOVE TRAILING "=" characters. 
+```
+
+The following command will generate the appropriate value for you on *nix systems:
+
+```
+echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='
+```
 
 ### Message caching
 !!! info

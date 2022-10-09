@@ -90,6 +90,13 @@ const SubscribePage = (props) => {
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();
+    const updateBaseUrl = (ev, newVal) => {
+        if (validUrl(newVal)) {
+          props.setBaseUrl(newVal.replace(/\/$/, '')); // strip trailing slash after https?://
+        } else {
+          props.setBaseUrl(newVal);
+        }
+    };
     return (
         <>
             <DialogTitle>{t("subscribe_dialog_subscribe_title")}</DialogTitle>
@@ -128,7 +135,7 @@ const SubscribePage = (props) => {
                     options={existingBaseUrls}
                     sx={{ maxWidth: 400 }}
                     inputValue={props.baseUrl}
-                    onInputChange={(ev, newVal) => props.setBaseUrl(newVal)}
+                    onInputChange={updateBaseUrl}
                     renderInput={ (params) =>
                         <TextField
                             {...params}

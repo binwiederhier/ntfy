@@ -12,14 +12,14 @@ const (
 
 // Config is the config struct for a Client
 type Config struct {
-	DefaultHost     string `yaml:"default-host"`
-	DefaultUser     string `yaml:"default-user"`
-	DefaultPassword string `yaml:"default-password"`
-	DefaultCommand  string `yaml:"default-command"`
+	DefaultHost     string  `yaml:"default-host"`
+	DefaultUser     string  `yaml:"default-user"`
+	DefaultPassword *string `yaml:"default-password"`
+	DefaultCommand  string  `yaml:"default-command"`
 	Subscribe       []struct {
 		Topic    string            `yaml:"topic"`
 		User     string            `yaml:"user"`
-		Password string            `yaml:"password"`
+		Password *string           `yaml:"password"`
 		Command  string            `yaml:"command"`
 		If       map[string]string `yaml:"if"`
 	} `yaml:"subscribe"`
@@ -30,7 +30,7 @@ func NewConfig() *Config {
 	return &Config{
 		DefaultHost:     DefaultBaseURL,
 		DefaultUser:     "",
-		DefaultPassword: "",
+		DefaultPassword: nil,
 		DefaultCommand:  "",
 		Subscribe:       nil,
 	}

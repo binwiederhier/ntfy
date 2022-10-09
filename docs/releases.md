@@ -8,6 +8,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Subscriptions can now have a display name ([#370](https://github.com/binwiederhier/ntfy/issues/370), thanks to [@tfheen](https://github.com/tfheen) for reporting)
 * Bump Go version to Go 18.x ([#422](https://github.com/binwiederhier/ntfy/issues/422))
+* Allow empty passwords in `client.yml` ([#374](https://github.com/binwiederhier/ntfy/issues/374), thanks to [@cyqsimon](https://github.com/cyqsimon) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 
 **Documentation:**
 

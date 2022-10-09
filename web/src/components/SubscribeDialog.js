@@ -92,7 +92,7 @@ const SubscribePage = (props) => {
     })();
     const updateBaseUrl = (ev, newVal) => {
         if (validUrl(newVal)) {
-          props.setBaseUrl(newVal.replace(/\/$/, '')); // strip traililng / after https?://
+          props.setBaseUrl(newVal.replace(/\/$/, '')); // strip trailing slash after https?://
         } else {
           props.setBaseUrl(newVal);
         }

@@ -2680,15 +2680,17 @@ Here's a simple example:
 
 #### Auth Query Param
 In some instances, you may want to send auth credentials in the URL (e.g., a GET webhook or a JSON POST request). You
-can use the `auth` query parameter. Set the value to the base64 encoding of the value of the `Authorization` header and strip any trailing `=`. **Be sure to only send auth credentials over an HTTPS connection**
+can use the `auth` query parameter. Set the value to the base64 encoding of the value of the `Authorization` header
+and strip any trailing `=`. **Be sure to only send auth credentials over an HTTPS connection**
 
 Here is an example:
-
-1. base64(user:pass) -> base64(testuser:fakepassword) -> dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
-2. Authorization header -> Basic base64(testuser:fakepassword) -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
-3. base64(Authorization header) -> base64(Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk) -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw==
-4. remove trailing `=` (if any) -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw== -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
-5. add query param to URL -> https://ntfy.sh/topic -> https://ntfy.sh/topic?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
+```
+    Step 1. base64(user:pass)             -> base64(testuser:fakepassword)                    -> dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
+    Step 2. Authorization header          -> Basic base64(testuser:fakepassword)              -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
+    Step 3. base64(Authorization header)  -> base64(Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk)       -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw==
+    Step 4. remove trailing `=` (if any)  -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw== -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
+    Step 5. add query param to URL        -> https://ntfy.sh/topic                            -> https://ntfy.sh/topic?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw
+```
 
 !!! note
     Do NOT remove trailing `=` after step 2

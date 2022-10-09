@@ -5,10 +5,14 @@
 #
 # default-host: https://ntfy.sh
 
-# Defaults below will be used when a topic does not have its own settings
+# Default username and password will be used with "ntfy publish" if no credentials are provided on command line
+# Default username and password will be used with "ntfy subscribe" if no credentials are provided in subscription below
+# For an empty password, use empty double-quotes ("")
 #
 # default-user:
 # default-password:
+
+# Default command will execute after "ntfy subscribe" receives a message if no command is provided in subscription below
 # default-command:
 
 # Subscriptions to topics and their actions. This option is primarily used by the systemd service,

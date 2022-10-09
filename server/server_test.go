@@ -836,7 +836,7 @@ func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
 	response := request(t, s, "PUT", "/mytopic", "message", nil)
 	require.Equal(t, 429, response.Code)
 
-	time.Sleep(510 * time.Millisecond)
+	time.Sleep(520 * time.Millisecond)
 	response = request(t, s, "PUT", "/mytopic", "message", nil)
 	require.Equal(t, 200, response.Code)
 }

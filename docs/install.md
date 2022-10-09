@@ -66,9 +66,9 @@ Installation via Debian repository:
 === "x86_64/amd64"
     ```bash
     sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/heckel.io.gpg
+    curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/archive.heckel.io.gpg
     sudo apt install apt-transport-https
-    sudo sh -c "echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/heckel.io.gpg] https://archive.heckel.io/apt debian main' \
+    sudo sh -c "echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/archive.heckel.io.gpg] https://archive.heckel.io/apt debian main' \
         > /etc/apt/sources.list.d/archive.heckel.io.list"  
     sudo apt update
     sudo apt install ntfy
@@ -78,10 +78,11 @@ Installation via Debian repository:
 
 === "armv7/armhf"
     ```bash
-    curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/archive.heckel.io.gpg
     sudo apt install apt-transport-https
-    sudo sh -c "echo 'deb [arch=armhf] https://archive.heckel.io/apt debian main' \
-        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+    sudo sh -c "echo 'deb [arch=armhf signed-by=/etc/apt/keyrings/archive.heckel.io.gpg] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"
     sudo apt update
     sudo apt install ntfy
     sudo systemctl enable ntfy
@@ -90,10 +91,11 @@ Installation via Debian repository:
 
 === "arm64"
     ```bash
-    curl -sSL https://archive.heckel.io/apt/pubkey.txt | sudo apt-key add -
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/archive.heckel.io.gpg
     sudo apt install apt-transport-https
-    sudo sh -c "echo 'deb [arch=arm64] https://archive.heckel.io/apt debian main' \
-        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+    sudo sh -c "echo 'deb [arch=arm64 signed-by=/etc/apt/keyrings/archive.heckel.io.gpg] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"
     sudo apt update
     sudo apt install ntfy
     sudo systemctl enable ntfy

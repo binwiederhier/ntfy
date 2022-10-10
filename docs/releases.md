@@ -22,6 +22,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Officially document `?auth=..` query parameter ([#433](https://github.com/binwiederhier/ntfy/pull/433), thanks to [@wunter8](https://github.com/wunter8))
 * Added Rundeck example ([#427](https://github.com/binwiederhier/ntfy/pull/427), thanks to [@demogorgonz](https://github.com/demogorgonz))
 * Fix Debian installation instructions ([#237](https://github.com/binwiederhier/ntfy/issues/237), thanks to [@Joeharrison94](https://github.com/Joeharrison94) for reporting)
+* Updated [example](https://ntfy.sh/docs/examples/#gatus) with official [Gatus](https://github.com/TwiN/gatus) integration (thanks to [@TwiN](https://github.com/TwiN))
 
 **Additional translations:**
 

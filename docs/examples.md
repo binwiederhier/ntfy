@@ -342,9 +342,22 @@ You can use the HTTP request node to send messages with [Node-RED](https://noder
 ![Node red picture flow](static/img/nodered-picture.png)
 
 ## Gatus
+To use ntfy with [Gatus](https://github.com/TwiN/gatus), you can use the `ntfy` alerting provider like so:
 
-An example for a custom alert with [Gatus](https://github.com/TwiN/gatus):
-``` yaml
+```yaml
+alerting:
+  ntfy:
+    url: "https://ntfy.sh"
+    topic: "YOUR_NTFY_TOPIC"
+    priority: 3
+```
+
+For more information on using ntfy with Gatus, refer to [Configuring ntfy alerts](https://github.com/TwiN/gatus#configuring-ntfy-alerts).
+
+<details>
+  <summary>Alternative: Using the custom alerting provider</summary>
+
+```yaml
 alerting:
   custom:
     url: "https://ntfy.sh"
@@ -368,6 +381,9 @@ alerting:
         TRIGGERED: "warning"
         RESOLVED: "white_check_mark"
 ```
+
+</details>
+
 
 ## Jellyseerr/Overseerr webhook
 Here is an example for [jellyseerr](https://github.com/Fallenbagel/jellyseerr)/[overseerr](https://overseerr.dev/) webhook

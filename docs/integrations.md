@@ -44,6 +44,7 @@ messages until I finally finish implementing end-to-end encryption.
 - [pyntfy](https://github.com/DP44/pyntfy) - A module for interacting with ntfy notifications (Python)
 - [vntfy](https://github.com/lmangani/vntfy) - Barebone V client for ntfy (V)
 - [ntfy-middleman](https://github.com/nachotp/ntfy-middleman) - Wraps APIs and send notifications using ntfy.sh on schedule (Python)
+- [ntfy-dotnet](https://github.com/nwithan8/ntfy-dotnet) - .NET client library to interact with a ntfy server (C# / .NET)
 
 ## CLIs + GUIs
 

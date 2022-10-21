@@ -13,6 +13,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Subscriptions can now have a display name ([#370](https://github.com/binwiederhier/ntfy/issues/370), thanks to [@tfheen](https://github.com/tfheen) for reporting)
 * Bump Go version to Go 18.x ([#422](https://github.com/binwiederhier/ntfy/issues/422))
 * Web: Strip trailing slash when subscribing ([#428](https://github.com/binwiederhier/ntfy/issues/428), thanks to [@raining1123](https://github.com/raining1123) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
+* Web: Strip trailing slash after server URL in publish dialog ([#441](https://github.com/binwiederhier/ntfy/issues/441), thanks to [@wunter8](https://github.com/wunter8))
 * Allow empty passwords in `client.yml` ([#374](https://github.com/binwiederhier/ntfy/issues/374), thanks to [@cyqsimon](https://github.com/cyqsimon) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 * `ntfy pub` will now use default username and password from `client.yml` ([#431](https://github.com/binwiederhier/ntfy/issues/431), thanks to [@wunter8](https://github.com/wunter8) for fixing)
 

@@ -90,6 +90,14 @@ const PublishDialog = (props) => {
         setMessage(props.message);
     }, [props.message]);
 
+    const updateBaseUrl = (newVal) => {
+        if (validUrl(newVal)) {
+          setBaseUrl(newVal.replace(/\/$/, '')); // strip traililng slash after https?://
+        } else {
+          setBaseUrl(newVal);
+        }
+    };
+
     const handleSubmit = async () => {
         const url = new URL(topicUrl(baseUrl, topic));
         if (title.trim()) {
@@ -242,7 +250,7 @@ const PublishDialog = (props) => {
                                 label={t("publish_dialog_base_url_label")}
                                 placeholder={t("publish_dialog_base_url_placeholder")}
                                 value={baseUrl}
-                                onChange={ev => setBaseUrl(ev.target.value)}
+                                onChange={ev => updateBaseUrl(ev.target.value)}
                                 disabled={disabled}
                                 type="url"
                                 variant="standard"

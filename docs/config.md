@@ -448,31 +448,16 @@ or the root domain:
       server_name ntfy.sh;
 
       location / {
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix
-        set $redirect_https "";
-        if ($request_method = GET) {
-          set $redirect_https "yes";
-        }
-        if ($request_uri ~* "^/([-_a-z0-9]{0,64}$|docs/|static/)") {
-          set $redirect_https "${redirect_https}yes";
-        }
-        if ($redirect_https = "yesyes") {
-          return 302 https://$http_host$request_uri$is_args$query_string;
-        }
+        return 302 https://$http_host$request_uri$is_args$query_string;
 
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
-    
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_redirect off;
-     
+
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
+
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
@@ -486,7 +471,7 @@ or the root domain:
       server_name ntfy.sh;
     
       ssl_session_cache builtin:1000 shared:SSL:10m;
-      ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+      ssl_protocols TLSv1.2 TLSv1.3;
       ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
       ssl_prefer_server_ciphers on;
     
@@ -497,19 +482,15 @@ or the root domain:
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
 
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_redirect off;
-     
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
+
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
-        
+
         client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }

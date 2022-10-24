@@ -41,6 +41,7 @@ Sponsors (alphabetical order):
 * [@codinghipster](https://github.com/codinghipster)
 * [@HinFort](https://github.com/HinFort)
 * [@johnnyip](https://github.com/johnnyip)
+* [@JonDerThan](https://github.com/JonDerThan)
 * [@Lexevolution](https://github.com/Lexevolution)
 * [@mckay115](https://github.com/mckay115)
 * [@neutralinsomniac](https://github.com/neutralinsomniac)

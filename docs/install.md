@@ -297,7 +297,9 @@ This image can be pushed to a container registry and shipped independently. All 
 
 ## Kubernetes
 
-The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function.
+The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function. There
+are a few options to mix and match, including a deployment without a cache file, a stateful set with a persistant cache, and a standalone
+unmanaged pod.
 
 
 === "deployment"
@@ -305,35 +307,88 @@ The setup for Kubernetes is very similar to that for Docker, and requires a fair
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-    name: ntfy
+      name: ntfy
     spec:
-    selector:
+      selector:
         matchLabels:
-        app: ntfy
-    template:
+          app: ntfy
+      template:
         metadata:
-        labels:
+          labels:
             app: ntfy
         spec:
-        containers:
-        - name: ntfy
+          containers:
+          - name: ntfy
             image: binwiederhier/ntfy
             args: ["serve"]
             resources:
-            limits:
+              limits:
                 memory: "128Mi"
                 cpu: "500m"
             ports:
             - containerPort: 80
-            name: http
+              name: http
             volumeMounts:
             - name: config
-            mountPath: "/etc/ntfy"
-            readOnly: true
-        volumes:
+              mountPath: "/etc/ntfy"
+              readOnly: true
+          volumes:
             - name: config
-            configMap:
+              configMap:
                 name: ntfy
+    ---
+    # Basic service for port 80
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ntfy
+    spec:
+      selector:
+        app: ntfy
+      ports:
+      - port: 80
+        targetPort: 80
+    ```
+
+=== "stateful set"
+    ```yaml
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: ntfy
+    spec:
+      selector:
+        matchLabels:
+          app: ntfy
+      serviceName: ntfy
+      template:
+        metadata:
+          labels:
+            app: ntfy
+        spec:
+          containers:
+          - name: ntfy
+            image: binwiederhier/ntfy
+            args: ["serve", "--cache-file /var/cache/ntfy/cache.db"]
+            ports:
+            - containerPort: 80
+              name: http
+            volumeMounts:
+            - name: config
+              mountPath: "/etc/ntfy"
+              readOnly: true
+          volumes:
+            - name: config
+              configMap:
+                name: ntfy
+      volumeClaimTemplates:
+      - metadata:
+          name: cache
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 1Gi
     ```
 
 === "pod"
@@ -372,7 +427,7 @@ Configuration is relatively straightforward. As an exmaple, a minimal configurat
     apiVersion: v1
     kind: ConfigMap
     metadata:
-    name: ntfy
+      name: ntfy
     data:
     server.yml: |
         # Template: https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
@@ -383,19 +438,3 @@ Configuration is relatively straightforward. As an exmaple, a minimal configurat
     ```bash
     kubectl create configmap ntfy --from-file=server.yml 
     ```
-
-A small service is also required to properly route your traffic to the pod - it is recommended to use an ingress, but a NodePort may also
-be acceptable.
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: ntfy
-spec:
-  selector:
-    app: ntfy
-  ports:
-  - port: 80
-    targetPort: 80
-```

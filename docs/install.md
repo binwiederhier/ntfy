@@ -294,3 +294,147 @@ COPY server.yml /etc/ntfy/server.yml
 ENTRYPOINT ["ntfy", "serve"]
 ```
 This image can be pushed to a container registry and shipped independently. All that's needed when running it is mapping ntfy's port to a host port.
+
+## Kubernetes
+
+The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function. There
+are a few options to mix and match, including a deployment without a cache file, a stateful set with a persistant cache, and a standalone
+unmanaged pod.
+
+
+=== "deployment"
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ntfy
+    spec:
+      selector:
+        matchLabels:
+          app: ntfy
+      template:
+        metadata:
+          labels:
+            app: ntfy
+        spec:
+          containers:
+          - name: ntfy
+            image: binwiederhier/ntfy
+            args: ["serve"]
+            resources:
+              limits:
+                memory: "128Mi"
+                cpu: "500m"
+            ports:
+            - containerPort: 80
+              name: http
+            volumeMounts:
+            - name: config
+              mountPath: "/etc/ntfy"
+              readOnly: true
+          volumes:
+            - name: config
+              configMap:
+                name: ntfy
+    ---
+    # Basic service for port 80
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ntfy
+    spec:
+      selector:
+        app: ntfy
+      ports:
+      - port: 80
+        targetPort: 80
+    ```
+
+=== "stateful set"
+    ```yaml
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: ntfy
+    spec:
+      selector:
+        matchLabels:
+          app: ntfy
+      serviceName: ntfy
+      template:
+        metadata:
+          labels:
+            app: ntfy
+        spec:
+          containers:
+          - name: ntfy
+            image: binwiederhier/ntfy
+            args: ["serve", "--cache-file /var/cache/ntfy/cache.db"]
+            ports:
+            - containerPort: 80
+              name: http
+            volumeMounts:
+            - name: config
+              mountPath: "/etc/ntfy"
+              readOnly: true
+          volumes:
+            - name: config
+              configMap:
+                name: ntfy
+      volumeClaimTemplates:
+      - metadata:
+          name: cache
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 1Gi
+    ```
+
+=== "pod"
+    ```yaml
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      labels:
+        app: ntfy
+    spec:
+      containers:
+      - name: ntfy
+        image: binwiederhier/ntfy
+        args: ["serve"]
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: "/etc/ntfy"
+          readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: ntfy
+    ```
+
+Configuration is relatively straightforward. As an exmaple, a minimal configuration is provided.
+
+=== "resource definition"
+    ```yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ntfy
+    data:
+    server.yml: |
+        # Template: https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
+        base-url: https://ntfy.sh
+    ```
+
+=== "from-file"
+    ```bash
+    kubectl create configmap ntfy --from-file=server.yml 
+    ```

@@ -84,6 +84,7 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfyer](https://github.com/KikyTokamuro/ntfyer) - Sending various information to your ntfy topic by time (TypeScript)
 - [git-simple-notifier](https://github.com/plamenjm/git-simple-notifier) - Script running git-log, checking for new repositories (Shell)
 - [ntfy-to-slack](https://github.com/ozskywalker/ntfy-to-slack) - Tool to subscribe to a ntfy topic and send the messages to a Slack webhook (Go)
+- [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) -  Ansible action plugin to post JSON messages to nfty (Python)
 
 ## Blog + forum posts
 

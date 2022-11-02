@@ -6,11 +6,12 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Public ntfy servers
 
-| URL                                           |  Country  |
-|-----------------------------------------------|:---------:|
-| [ntfy.sh](https://ntfy.sh/) (*Official*)      |   🇺🇸    |
-| [ntfy.tedomum.net](https://ntfy.tedomum.net/) | 🇫🇷 🇪🇺 |
-| [ntfy.jae.fi](https://ntfy.jae.fi/)           | 🇫🇮 🇪🇺 |
+| URL                                               |  Country  |
+|---------------------------------------------------|:---------:|
+| [ntfy.sh](https://ntfy.sh/) (*Official*)          |   🇺🇸    |
+| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 🇪🇺 |
+| [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 🇪🇺 |
+| [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 🇪🇺 |
 
 Thanks to everyone running a public server. **You guys rock!** To the users: Be aware that server operators can log your 
 messages until I finally finish implementing end-to-end encryption.
@@ -82,9 +83,13 @@ messages until I finally finish implementing end-to-end encryption.
 - [huginn-global-entry-notif](https://github.com/kylezoa/huginn-global-entry-notif) - Checks CBP API for available appointments with Huginn (JSON)
 - [ntfyer](https://github.com/KikyTokamuro/ntfyer) - Sending various information to your ntfy topic by time (TypeScript)
 - [git-simple-notifier](https://github.com/plamenjm/git-simple-notifier) - Script running git-log, checking for new repositories (Shell)
+- [ntfy-to-slack](https://github.com/ozskywalker/ntfy-to-slack) - Tool to subscribe to a ntfy topic and send the messages to a Slack webhook (Go)
+- [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) -  Ansible action plugin to post JSON messages to nfty (Python)
 
 ## Blog + forum posts
 
+- [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - 10/2022
+- [Neue Services: Ntfy, TikTok und RustDesk](https://adminforge.de/tools/neue-services-ntfy-tiktok-und-rustdesk/) - 9/2022
 - [Ntfy, le service de notifications qu’il vous faut](https://www.cachem.fr/ntfy-le-service-de-notifications-quil-vous-faut/) - 9/2022
 - [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - 9/2022 
 - [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - 8/2022

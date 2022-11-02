@@ -16,6 +16,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Web: Strip trailing slash after server URL in publish dialog ([#441](https://github.com/binwiederhier/ntfy/issues/441), thanks to [@wunter8](https://github.com/wunter8))
 * Allow empty passwords in `client.yml` ([#374](https://github.com/binwiederhier/ntfy/issues/374), thanks to [@cyqsimon](https://github.com/cyqsimon) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 * `ntfy pub` will now use default username and password from `client.yml` ([#431](https://github.com/binwiederhier/ntfy/issues/431), thanks to [@wunter8](https://github.com/wunter8) for fixing)
+* Make `ntfy sub` work with `NTFY_USER` env variable ([#447](https://github.com/binwiederhier/ntfy/pull/447), thanks to [SuperSandro2000](https://github.com/SuperSandro2000))
 
 **Documentation:**
 
@@ -24,6 +25,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Added Rundeck example ([#427](https://github.com/binwiederhier/ntfy/pull/427), thanks to [@demogorgonz](https://github.com/demogorgonz))
 * Fix Debian installation instructions ([#237](https://github.com/binwiederhier/ntfy/issues/237), thanks to [@Joeharrison94](https://github.com/Joeharrison94) for reporting)
 * Updated [example](https://ntfy.sh/docs/examples/#gatus) with official [Gatus](https://github.com/TwiN/gatus) integration (thanks to [@TwiN](https://github.com/TwiN))
+* Added [Kubernetes install instructions](https://ntfy.sh/docs/install/#kubernetes) ([#452](https://github.com/binwiederhier/ntfy/pull/452), thanks to [@gmemstr](https://github.com/gmemstr))
+* Added [additional NixOS links for self-hosting](https://ntfy.sh/docs/install/#nixos-nix) ([#462](https://github.com/binwiederhier/ntfy/pull/462), thanks to [@wamserma](https://github.com/wamserma))
 
 **Additional translations:**
 
@@ -41,6 +44,7 @@ Sponsors (alphabetical order):
 * [@codinghipster](https://github.com/codinghipster)
 * [@HinFort](https://github.com/HinFort)
 * [@johnnyip](https://github.com/johnnyip)
+* [@JonDerThan](https://github.com/JonDerThan)
 * [@Lexevolution](https://github.com/Lexevolution)
 * [@mckay115](https://github.com/mckay115)
 * [@neutralinsomniac](https://github.com/neutralinsomniac)

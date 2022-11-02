@@ -17,6 +17,7 @@ to working on features and bugs in a few weeks. I hope you understand. I posted 
 [![Discord](https://img.shields.io/discord/874398661709295626?label=Discord)](https://discord.gg/cT7ECsZj9w)
 [![Matrix](https://img.shields.io/matrix/ntfy:matrix.org?label=Matrix)](https://matrix.to/#/#ntfy:matrix.org)
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
+[![Reddit](https://img.shields.io/reddit/subreddit-subscribers/ntfy?color=%23317f6f&label=-%20r%2Fntfy&style=social)](https://www.reddit.com/r/ntfy/)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
@@ -41,10 +42,15 @@ I run a free version of it at **[ntfy.sh](https://ntfy.sh)**. There's also an [o
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
 
-## Chat
-You can directly contact me **[on Discord](https://discord.gg/cT7ECsZj9w)** or [on Matrix](https://matrix.to/#/#ntfy:matrix.org) 
-(bridged from Discord), or via the [GitHub issues](https://github.com/binwiederhier/ntfy/issues), or find more contact information
-[on my website](https://heckel.io/about).
+## Chat / forum
+There are a few ways to get in touch with me and/or the rest of the community. Feel free to use any of these methods. Whatever
+works best for you:
+
+* [Discord server](https://discord.gg/cT7ECsZj9w) - direct chat with the community
+* [Matrix room #ntfy](https://matrix.to/#/#ntfy:matrix.org) (+ [Matrix space](https://matrix.to/#/#ntfy-space:matrix.org)) - same chat, bridged from Discord
+* [Reddit r/ntfy](https://www.reddit.com/r/ntfy/) - asynchronous forum (_new as of October 2022_)
+* [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
+* [Email](https://heckel.io/about) - reach me directly (_I usually prefer the other methods_)
 
 ## Announcements / beta testers
 For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
@@ -70,6 +76,7 @@ appreciated. A big fat Thank You to the folks already sponsoring ntfy:
 <a href="https://github.com/codinghipster"><img src="https://github.com/codinghipster.png" width="40px" /></a>
 <a href="https://github.com/HinFort"><img src="https://github.com/HinFort.png" width="40px" /></a>
 <a href="https://github.com/johnnyip"><img src="https://github.com/johnnyip.png" width="40px" /></a>
+<a href="https://github.com/JonDerThan"><img src="https://github.com/JonDerThan.png" width="40px" /></a>
 <a href="https://github.com/Lexevolution"><img src="https://github.com/Lexevolution.png" width="40px" /></a>
 <a href="https://github.com/mckay115"><img src="https://github.com/mckay115.png" width="40px" /></a>
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>

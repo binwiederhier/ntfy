@@ -29,7 +29,7 @@ var flagsSubscribe = append(
 	flagsDefault,
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
-	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, Usage: "username[:password] used to auth against the server"},
+	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
 	&cli.BoolFlag{Name: "from-config", Aliases: []string{"from_config", "C"}, Usage: "read subscriptions from config file (service mode)"},
 	&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 	&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},

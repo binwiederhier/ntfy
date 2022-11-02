@@ -441,8 +441,94 @@ by forwarding the `Connection` and `Upgrade` headers accordingly.
 In this example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
 
-=== "nginx (/etc/nginx/sites-*/ntfy)"
+=== "nginx (convenient)"
     ```
+    # /etc/nginx/sites-*/ntfy
+    #
+    # This config allows insecure HTTP POST/PUT requests against topics to allow a short curl syntax (without -L
+    # and "https://" prefix). It also disables output buffering, which has worked well for the ntfy.sh server.
+    #
+    # This is how ntfy.sh is configured.
+
+    server {
+      listen 80;
+      server_name ntfy.sh;
+
+      location / {
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+        # it to work with curl without the annoying https:// prefix
+        set $redirect_https "";
+        if ($request_method = GET) {
+          set $redirect_https "yes";
+        }
+        if ($request_uri ~* "^/([-_a-z0-9]{0,64}$|docs/|static/)") {
+          set $redirect_https "${redirect_https}yes";
+        }
+        if ($redirect_https = "yesyes") {
+          return 302 https://$http_host$request_uri$is_args$query_string;
+        }
+
+        proxy_pass http://127.0.0.1:2586;
+        proxy_http_version 1.1;
+    
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_redirect off;
+     
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    
+        proxy_connect_timeout 3m;
+        proxy_send_timeout 3m;
+        proxy_read_timeout 3m;
+
+        client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
+      }
+    }
+    
+    server {
+      listen 443 ssl;
+      server_name ntfy.sh;
+    
+      ssl_session_cache builtin:1000 shared:SSL:10m;
+      ssl_protocols TLSv1.2 TLSv1.3;
+      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
+      ssl_prefer_server_ciphers on;
+    
+      ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
+    
+      location / {
+        proxy_pass http://127.0.0.1:2586;
+        proxy_http_version 1.1;
+
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_redirect off;
+     
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    
+        proxy_connect_timeout 3m;
+        proxy_send_timeout 3m;
+        proxy_read_timeout 3m;
+        
+        client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
+      }
+    }
+    ```
+
+=== "nginx (more secure)"
+    ```
+    # /etc/nginx/sites-*/ntfy
+    #
+    # This config requires the use of the -L flag in curl to redirect to HTTPS, and it keeps nginx output buffering
+    # enabled. While recommended, I have had issues with that in the past.
+    
     server {
       listen 80;
       server_name ntfy.sh;
@@ -496,8 +582,10 @@ or the root domain:
     }
     ```
 
-=== "Apache2 (/etc/apache2/sites-*/ntfy.conf)"
+=== "Apache2"
     ```
+    # /etc/apache2/sites-*/ntfy.conf
+
     <VirtualHost *:80>
         ServerName ntfy.sh
 

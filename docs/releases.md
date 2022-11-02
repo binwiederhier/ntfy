@@ -27,6 +27,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Updated [example](https://ntfy.sh/docs/examples/#gatus) with official [Gatus](https://github.com/TwiN/gatus) integration (thanks to [@TwiN](https://github.com/TwiN))
 * Added [Kubernetes install instructions](https://ntfy.sh/docs/install/#kubernetes) ([#452](https://github.com/binwiederhier/ntfy/pull/452), thanks to [@gmemstr](https://github.com/gmemstr))
 * Added [additional NixOS links for self-hosting](https://ntfy.sh/docs/install/#nixos-nix) ([#462](https://github.com/binwiederhier/ntfy/pull/462), thanks to [@wamserma](https://github.com/wamserma))
+* Added additional [more secure nginx config example](https://ntfy.sh/docs/config/#nginxapache2caddy) ([#451](https://github.com/binwiederhier/ntfy/pull/451), thanks to [SuperSandro2000](https://github.com/SuperSandro2000))
 
 **Additional translations:**
 

@@ -101,7 +101,7 @@ It looked something like this:
 You can easily integrate ntfy into Ansible, Salt, or Puppet to notify you when runs are done or are highstated.
 One of my co-workers uses the following Ansible task to let him know when things are done:
 
-```yml
+``` yaml
 - name: Send ntfy.sh update
   uri:
     url: "https://ntfy.sh/{{ ntfy_channel }}"
@@ -113,7 +113,7 @@ There's also a dedicated Ansible action plugin (one which runs on the Ansible co
 [ansible-ntfy](https://github.com/jpmens/ansible-ntfy). The following task posts a message
 to ntfy at its default URL (`attrs` and other attributes are optional):
 
-```yml
+``` yaml
 - name: "Notify ntfy that we're done"
   ntfy:
        msg: "deployment on {{ inventory_hostname }} is complete. 🐄"
@@ -127,7 +127,7 @@ You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook s
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
 
 Example docker-compose.yml:
-```yml
+``` yaml
 services:
   watchtower:
     image: containrrr/watchtower

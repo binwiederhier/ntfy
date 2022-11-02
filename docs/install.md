@@ -185,8 +185,6 @@ ntfy is packaged in nixpkgs as `ntfy-sh`. It can be installed by adding the pack
 nix-env -iA ntfy-sh
 ```
 
-NixOS also supports [declarative setup of the ntfy server](https://search.nixos.org/options?channel=unstable&show=services.ntfy-sh.enable&from=0&size=50&sort=relevance&type=packages&query=ntfy). 
-
 ## macOS
 The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on macOS as well. 
 To install, please [download the tarball](https://github.com/binwiederhier/ntfy/releases/download/v1.28.0/ntfy_1.28.0_macOS_all.tar.gz), 
@@ -300,12 +298,12 @@ This image can be pushed to a container registry and shipped independently. All 
 ## Kubernetes
 
 The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function. There
-are a few options to mix and match, including a deployment without a cache file, a stateful set with a persistant cache, and a standalone
+are a few options to mix and match, including a deployment without a cache file, a stateful set with a persistent cache, and a standalone
 unmanaged pod.
 
-
-=== "deployment"
-    ```yaml
+Deployment
+===
+  ```yaml
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -350,10 +348,12 @@ unmanaged pod.
       ports:
       - port: 80
         targetPort: 80
-    ```
+  ```
 
-=== "stateful set"
-    ```yaml
+
+Stateful set
+=== 
+  ```yaml
     apiVersion: apps/v1
     kind: StatefulSet
     metadata:
@@ -391,10 +391,12 @@ unmanaged pod.
           resources:
             requests:
               storage: 1Gi
-    ```
+  ```
 
-=== "pod"
-    ```yaml
+Pod
+===
+
+  ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -420,12 +422,15 @@ unmanaged pod.
         - name: config
           configMap:
             name: ntfy
-    ```
+```
 
-Configuration is relatively straightforward. As an exmaple, a minimal configuration is provided.
+Configuration is relatively straightforward. As an example, a minimal configuration is provided.
 
-=== "resource definition"
-    ```yaml
+
+Resource definition
+=== 
+
+  ```yaml
     apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -434,9 +439,179 @@ Configuration is relatively straightforward. As an exmaple, a minimal configurat
     server.yml: |
         # Template: https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
         base-url: https://ntfy.sh
-    ```
+  ```
 
-=== "from-file"
-    ```bash
+
+from-file
+=== 
+
+  ```bash
     kubectl create configmap ntfy --from-file=server.yml 
-    ```
+  ```
+
+Kustomize-based deployment with persistent storage and Traefik ingress
+===
+
+Kustomize allows for deploying templated configurations in easy way
+
+### Kustomization
+Create new folder, name it nfty and create kustomization.yaml within along all resources listed below. 
+Ingress is optional - you can skip this one if planning to expose service using different service type (hash it out from kustomization file)
+
+```yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ntfy-deployment.yaml # main deployment
+  - ntfy-svc.yaml # service connecting two pods together
+  - ntfy-pvc.yaml # pvc uset to store cache and attachment
+  - ntfy-ingress.yaml # ingress traefik
+
+configMapGenerator: # will parse config from raw config to configmap,it allows for dynamic reload of application if additional app is deployed ie https://github.com/stakater/Reloader
+    - name: server-config
+      files: 
+        - server.yml
+
+namespace: TESTNAMESPACE # select namaespace for whole application 
+
+----
+
+apiVersion: kustomize.config.k8s.io/v1beta1 #local resources
+kind: Kustomization
+resources:
+  - git@github.com:gituser/kustomize.git/kustomize/main/ #WIP when complete config will be stored in repo 
+
+namespace: TESTNAMESPACE # select namaespace for whole application 
+
+```
+
+### ntfy-deployment.yaml
+
+```yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntfy-deployment
+  labels:
+    app: ntfy-deployment
+spec:
+  revisionHistoryLimit: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ntfy-pod
+  template:
+    metadata:
+      labels:
+        app: ntfy-pod
+    spec:
+      containers:
+        - name: ntfy 
+          image: binwiederhier/ntfy:v1.28.0 # select version here latest is not the greatest idea !
+          args: ["serve"]
+          env:  #example of adjustments made in environmental variables
+            - name: TZ # set timezone
+              value: XXXXXXX
+            - name: NTFY_DEBUG # enable/disable debug
+              value: "false"
+            - name: NTFY_LOG_LEVEL # adjust log level
+              value: INFO
+            - name: NTFY_BASE_URL # add base url
+              value: XXXXXXXXXX 
+          ports: 
+            - containerPort: 80
+              name: http-ntfy
+          resources:
+            limits:
+              memory: 300Mi
+              cpu:  200m
+            requests:
+                  cpu: 150m
+                  memory: 150Mi
+          volumeMounts:
+            - mountPath: /etc/ntfy/server.yml
+              subPath: server.yml
+              name: config-volume # generated vie configMapGenerator from kustomization file
+            - mountPath: /var/cache/ntfy
+              name: cache-volume #cache volume mounted to persistent volume
+      volumes:
+        - name: config-volume
+          configMap:  # uses configmap generator to parse server.yml to configmap
+            name: server-config
+        - name: cache-volume
+          persistentVolumeClaim: # stores /cache/ntfy in defined pv
+            claimName: ntfy-pvc
+```
+
+### ntfy-pvc.yaml
+Stores all in cache folder for event of the pod re-deployment
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ntfy-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path # adjust storage if needed
+  resources:
+    requests:
+      storage: 1Gi
+
+```
+
+### ntfy-svc.yaml
+Exposes pod to internal network of  the cluster
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntfy-svc  
+spec:
+  type: ClusterIP
+  selector:
+    app: ntfy-pod
+  ports:
+    - name: http-ntfy-out
+      protocol: TCP
+      port: 80
+      targetPort:  http-ntfy
+```
+
+### ntfy-ingress.yaml
+If cluster uses Ingress controller you have to deploy ingress to access application externally. It will not have TLS/SSL enabled so you have to deploy cert-manager and generate CA cert along certificate for service
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ntfy-ingress
+spec:
+  rules:
+    - host: ntfy.test #select own
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name:  ntfy-svc
+                port:
+                  number: 80
+```
+
+### server.yml
+
+```yaml
+cache-file: "/var/cache/ntfy/cache.db"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+```
+
+### Deploying from kustomization
+Go one level up from folder where all resources were created and apply configuration
+
+```bash
+kubectl apply -k /nfty
+```

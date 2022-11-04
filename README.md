@@ -81,6 +81,7 @@ appreciated. A big fat Thank You to the folks already sponsoring ntfy:
 <a href="https://github.com/mckay115"><img src="https://github.com/mckay115.png" width="40px" /></a>
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/nickexyz"><img src="https://github.com/nickexyz.png" width="40px" /></a>
+<a href="https://github.com/12nick12"><img src="https://github.com/12nick12.png" width="40px" /></a>
 <a href="https://github.com/qcasey"><img src="https://github.com/qcasey.png" width="40px" /></a>
 <a href="https://github.com/Salamafet"><img src="https://github.com/Salamafet.png" width="40px" /></a>
 

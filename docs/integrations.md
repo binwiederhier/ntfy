@@ -85,10 +85,13 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfyer](https://github.com/KikyTokamuro/ntfyer) - Sending various information to your ntfy topic by time (TypeScript)
 - [git-simple-notifier](https://github.com/plamenjm/git-simple-notifier) - Script running git-log, checking for new repositories (Shell)
 - [ntfy-to-slack](https://github.com/ozskywalker/ntfy-to-slack) - Tool to subscribe to a ntfy topic and send the messages to a Slack webhook (Go)
-- [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) -  Ansible action plugin to post JSON messages to nfty (Python)
+- [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) - Ansible action plugin to post JSON messages to ntfy (Python)
+- [ntfy-notification-channel](https://github.com/wijourdil/ntfy-notification-channel) - Laravel Notification channel for ntfy (PHP)
 
 ## Blog + forum posts
 
+- [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - 11/2022
+- [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - 10/2022 
 - [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - 10/2022
 - [Neue Services: Ntfy, TikTok und RustDesk](https://adminforge.de/tools/neue-services-ntfy-tiktok-und-rustdesk/) - 9/2022
 - [Ntfy, le service de notifications qu’il vous faut](https://www.cachem.fr/ntfy-le-service-de-notifications-quil-vous-faut/) - 9/2022

@@ -439,164 +439,152 @@ Configuration is relatively straightforward. As an example, a minimal configurat
     kubectl create configmap ntfy --from-file=server.yml 
     ```
 
-### Kustomization
-Create new folder, name it nfty and create kustomization.yaml within along all resources listed below. 
-Ingress is optional - you can skip this one if planning to expose service using different service type (hash it out from kustomization file)
+## Kustomize
 
-```yaml
+`ntfy` can be deployed in Kubernetes cluster with [Kustomize](https://github.com/kubernetes-sigs/kustomize) - tool used to customize Kubernetes objects using kustomization file.
 
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - ntfy-deployment.yaml # main deployment
-  - ntfy-svc.yaml # service connecting two pods together
-  - ntfy-pvc.yaml # pvc uset to store cache and attachment
-  - ntfy-ingress.yaml # ingress traefik
-
-configMapGenerator: # will parse config from raw config to configmap,it allows for dynamic reload of application if additional app is deployed ie https://github.com/stakater/Reloader
-    - name: server-config
-      files: 
-        - server.yml
-
-namespace: TESTNAMESPACE # select namaespace for whole application 
-
-----
-
-apiVersion: kustomize.config.k8s.io/v1beta1 #local resources
-kind: Kustomization
-resources:
-  - git@github.com:gituser/kustomize.git/kustomize/main/ #WIP when complete config will be stored in repo 
-
-namespace: TESTNAMESPACE # select namaespace for whole application 
-
-```
-
-### ntfy-deployment.yaml
-
-```yaml
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ntfy-deployment
-  labels:
-    app: ntfy-deployment
-spec:
-  revisionHistoryLimit: 1
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ntfy-pod
-  template:
-    metadata:
-      labels:
-        app: ntfy-pod
-    spec:
-      containers:
-        - name: ntfy 
-          image: binwiederhier/ntfy:v1.28.0 # select version here latest is not the greatest idea !
-          args: ["serve"]
-          env:  #example of adjustments made in environmental variables
-            - name: TZ # set timezone
-              value: XXXXXXX
-            - name: NTFY_DEBUG # enable/disable debug
-              value: "false"
-            - name: NTFY_LOG_LEVEL # adjust log level
-              value: INFO
-            - name: NTFY_BASE_URL # add base url
-              value: XXXXXXXXXX 
-          ports: 
-            - containerPort: 80
-              name: http-ntfy
-          resources:
-            limits:
-              memory: 300Mi
-              cpu:  200m
-            requests:
-                  cpu: 150m
-                  memory: 150Mi
-          volumeMounts:
-            - mountPath: /etc/ntfy/server.yml
-              subPath: server.yml
-              name: config-volume # generated vie configMapGenerator from kustomization file
-            - mountPath: /var/cache/ntfy
-              name: cache-volume #cache volume mounted to persistent volume
-      volumes:
-        - name: config-volume
-          configMap:  # uses configmap generator to parse server.yml to configmap
-            name: server-config
-        - name: cache-volume
-          persistentVolumeClaim: # stores /cache/ntfy in defined pv
-            claimName: ntfy-pvc
-```
-
-### ntfy-pvc.yaml
-Stores all in cache folder for event of the pod re-deployment
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ntfy-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path # adjust storage if needed
-  resources:
-    requests:
-      storage: 1Gi
-
-```
-
-### ntfy-svc.yaml
-Exposes pod to internal network of  the cluster
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: ntfy-svc  
-spec:
-  type: ClusterIP
-  selector:
-    app: ntfy-pod
-  ports:
-    - name: http-ntfy-out
-      protocol: TCP
-      port: 80
-      targetPort:  http-ntfy
-```
-
-### ntfy-ingress.yaml
-If cluster uses Ingress controller you have to deploy ingress to access application externally. It will not have TLS/SSL enabled so you have to deploy cert-manager and generate CA cert along certificate for service
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ntfy-ingress
-spec:
-  rules:
-    - host: ntfy.test #select own
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name:  ntfy-svc
-                port:
-                  number: 80
-```
-
-### server.yml
-
-```yaml
-cache-file: "/var/cache/ntfy/cache.db"
-attachment-cache-dir: "/var/cache/ntfy/attachments"
-```
-
-### Deploying from kustomization
-Go one level up from folder where all resources were created and apply configuration
+1. Create new folder - `ntfy`
+2. Add all files listed below 
+    1. kustomization.yaml - stores all configmaps and resources used in deployment
+    2. ntfy-deployment.yam - define deployment type and it's parameters-
+    3. ntfy-pvc.yaml -  describes how [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) will be created 
+    4. ntfy-svc.yaml -  expose application to the internal kubernetes network
+    5. ntfy-ingress.yaml - expose service to outside network using [Ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
+    6. server.yaml - simple server configuration
+4. Replace **TESTNAMESPACE** within kustomization.yaml with designated namespace 
+5. Replace **ntfy.test** within ntfy-ingress.yaml with desired DNS name
+6. Apply configuration to cluster set in current context: 
 
 ```bash
-kubectl apply -k /nfty
+kubectl apply -k /ntfy
 ```
+
+=== "kustomization.yaml"
+    ```yaml
+    apiVersion: kustomize.config.k8s.io/v1beta1
+    kind: Kustomization
+    resources:
+      - ntfy-deployment.yaml # deployment definition
+      - ntfy-svc.yaml # service connecting pods to cluster network
+      - ntfy-pvc.yaml # pvc used to store cache and attachment
+      - ntfy-ingress.yaml # ingress definition
+    configMapGenerator: # will parse config from raw config to configmap,it allows for dynamic reload of application if additional app is deployed ie https://github.com/stakater/Reloader
+        - name: server-config
+          files: 
+            - server.yml
+    namespace: TESTNAMESPACE # select namespace for whole application 
+    ```
+=== "ntfy-deployment.yaml"
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ntfy-deployment
+      labels:
+        app: ntfy-deployment
+    spec:
+      revisionHistoryLimit: 1
+      replicas: 1
+      selector:
+        matchLabels:
+          app: ntfy-pod
+      template:
+        metadata:
+          labels:
+            app: ntfy-pod
+        spec:
+          containers:
+            - name: ntfy 
+              image: binwiederhier/ntfy:v1.28.0 # set deployed version
+              args: ["serve"]
+              env:  #example of adjustments made in environmental variables
+                - name: TZ # set timezone
+                  value: XXXXXXX
+                - name: NTFY_DEBUG # enable/disable debug
+                  value: "false"
+                - name: NTFY_LOG_LEVEL # adjust log level
+                  value: INFO
+                - name: NTFY_BASE_URL # add base url
+                  value: XXXXXXXXXX 
+              ports: 
+                - containerPort: 80
+                  name: http-ntfy
+              resources:
+                limits:
+                  memory: 300Mi
+                  cpu:  200m
+                requests:
+                      cpu: 150m
+                      memory: 150Mi
+              volumeMounts:
+                  - mountPath: /etc/ntfy/server.yml
+                    subPath: server.yml
+                    name: config-volume # generated vie configMapGenerator from kustomization file
+                  - mountPath: /var/cache/ntfy
+                    name: cache-volume #cache volume mounted to persistent volume
+            volumes:
+              - name: config-volume
+                configMap:  # uses configmap generator to parse server.yml to configmap
+                  name: server-config
+              - name: cache-volume
+                persistentVolumeClaim: # stores /cache/ntfy in defined pv
+                  claimName: ntfy-pvc
+    ```
+  
+=== "ntfy-pvc.yaml"
+    ```yaml
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: ntfy-pvc
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: local-path # adjust storage if needed
+      resources:
+        requests:
+          storage: 1Gi
+    ```
+
+=== "ntfy-svc.yaml"
+    ```yaml
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ntfy-svc  
+    spec:
+      type: ClusterIP
+      selector:
+        app: ntfy-pod
+      ports:
+        - name: http-ntfy-out
+          protocol: TCP
+          port: 80
+          targetPort:  http-ntfy
+    ```
+
+=== "ntfy-ingress.yaml"
+    ```yaml
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: ntfy-ingress
+    spec:
+      rules:
+        - host: ntfy.test #select own
+          http:
+            paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name:  ntfy-svc
+                    port:
+                      number: 80
+    ```
+
+=== "server.yml"
+    ```yaml
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```

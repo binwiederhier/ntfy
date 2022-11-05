@@ -50,6 +50,7 @@ Sponsors (alphabetical order):
 * [@mckay115](https://github.com/mckay115)
 * [@neutralinsomniac](https://github.com/neutralinsomniac)
 * [@nickexyz](https://github.com/nickexyz)
+* [@12nick12](https://github.com/12nick12)
 * [@qcasey](https://github.com/qcasey)
 * [@Salamafet](https://github.com/Salamafet)
 * +1 private sponsor

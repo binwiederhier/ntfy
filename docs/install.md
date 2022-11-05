@@ -299,11 +299,11 @@ This image can be pushed to a container registry and shipped independently. All 
 
 The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function. There
 are a few options to mix and match, including a deployment without a cache file, a stateful set with a persistent cache, and a standalone
-unmanaged pod.
+unmanned pod.
 
-Deployment
-===
-  ```yaml
+
+=== "deployment"
+    ```yaml
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -348,12 +348,10 @@ Deployment
       ports:
       - port: 80
         targetPort: 80
-  ```
+    ```
 
-
-Stateful set
-=== 
-  ```yaml
+=== "stateful set"
+    ```yaml
     apiVersion: apps/v1
     kind: StatefulSet
     metadata:
@@ -391,12 +389,10 @@ Stateful set
           resources:
             requests:
               storage: 1Gi
-  ```
+    ```
 
-Pod
-===
-
-  ```yaml
+=== "pod"
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -422,15 +418,12 @@ Pod
         - name: config
           configMap:
             name: ntfy
-```
+    ```
 
 Configuration is relatively straightforward. As an example, a minimal configuration is provided.
 
-
-Resource definition
-=== 
-
-  ```yaml
+=== "resource definition"
+    ```yaml
     apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -439,20 +432,12 @@ Resource definition
     server.yml: |
         # Template: https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
         base-url: https://ntfy.sh
-  ```
+    ```
 
-
-from-file
-=== 
-
-  ```bash
+=== "from-file"
+    ```bash
     kubectl create configmap ntfy --from-file=server.yml 
-  ```
-
-Kustomize-based deployment with persistent storage and Traefik ingress
-===
-
-Kustomize allows for deploying templated configurations in easy way
+    ```
 
 ### Kustomization
 Create new folder, name it nfty and create kustomization.yaml within along all resources listed below. 

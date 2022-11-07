@@ -399,7 +399,9 @@ const performHttpAction = async (notification, action) => {
         const response = await fetch(action.url, {
             method: action.method ?? "POST",
             headers: action.headers ?? {},
-            body: action.body ?? ""
+            // This must not null-coalesce to a non nullish value. Otherwise, the fetch API
+            // will reject it for "having a body"
+            body: action.body
         });
         console.log(`[Notifications] HTTP user action response`, response);
         const success = response.status >= 200 && response.status <= 299;

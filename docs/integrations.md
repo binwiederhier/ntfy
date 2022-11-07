@@ -90,6 +90,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - 11/2022
 - [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - 11/2022
 - [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - 10/2022 
 - [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - 10/2022
@@ -103,6 +104,7 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy is finally coming to iOS, and Matrix/UnifiedPush gateway support](https://www.reddit.com/r/selfhosted/comments/vdzvxi/ntfy_is_finally_coming_to_ios_with_full/) ⭐ - 6/2022
 - [无需注册的通知服务ntfy](https://wbsu2003.4everland.app/2022/05/30/%E6%97%A0%E9%9C%80%E6%B3%A8%E5%86%8C%E7%9A%84%E9%80%9A%E7%9F%A5%E6%9C%8D%E5%8A%A1ntfy/) - 5/2022
 - [Install guide (with Docker)](https://chowdera.com/2022/150/202205301257379077.html) - 5/2022
+- [无需注册的通知服务ntfy](https://blog.csdn.net/wbsu2004/article/details/125040247) - 5/2022
 - [Updated review post (Jan-Lukas Else)](https://jlelse.blog/thoughts/2022/04/ntfy) - 4/2022
 - [Reddit feature update post](https://www.reddit.com/r/selfhosted/comments/uetlso/ntfy_is_a_tool_to_send_push_notifications_to_your/) ⭐ - 4/2022
 - [無料で簡単に通知の送受信ができつつオープンソースでセルフホストも可能な「ntfy」を使ってみた (Gigazine)](https://gigazine.net/news/20220404-ntfy-push-notification/) - 4/2022

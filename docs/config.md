@@ -724,7 +724,9 @@ curl -X POST -H "X-Poll-ID: s4PdJozxM8na" https://ntfy.sh/6de73be8dfb7d69e32fb2c
 {"id":"4HsClFEuCIcs","time":1654087955,"event":"poll_request","topic":"6de73be8dfb7d69e32fb2c00c23fe7adbd8b5504406e3068c273aa24cef4055b","message":"New message","poll_id":"s4PdJozxM8na"}
 ```
 
-The self-hosted server literally sends the message "New message" for every message. Even if your message is "Some other message", the message will always be "New message". This is so that if iOS cannot talk to the selfhosted server (in time, or at all), it'll show "New message" as a popup.
+Note that the self-hosted server literally sends the message `New message` for every message, even if your message 
+may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
+it'll show `New message` as a popup.
 
 ## Rate limiting
 !!! info

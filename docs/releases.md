@@ -45,7 +45,9 @@ Sponsors (alphabetical order):
 
 * [@aspyct](https://github.com/aspyct)
 * [@codinghipster](https://github.com/codinghipster)
+* [@eanplatter](https://github.com/eanplatter)
 * [@HinFort](https://github.com/HinFort)
+* [@jesse-persons](https://github.com/jesse-persons)
 * [@johnnyip](https://github.com/johnnyip)
 * [@JonDerThan](https://github.com/JonDerThan)
 * [@Lexevolution](https://github.com/Lexevolution)
@@ -54,6 +56,7 @@ Sponsors (alphabetical order):
 * [@nickexyz](https://github.com/nickexyz)
 * [@12nick12](https://github.com/12nick12)
 * [@qcasey](https://github.com/qcasey)
+* [@richardklafter](https://github.com/richardklafter)
 * [@Salamafet](https://github.com/Salamafet)
 * +1 private sponsor
 

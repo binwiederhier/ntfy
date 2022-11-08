@@ -46,6 +46,7 @@ Sponsors (alphabetical order):
 * [@aspyct](https://github.com/aspyct)
 * [@codinghipster](https://github.com/codinghipster)
 * [@eanplatter](https://github.com/eanplatter)
+* [@fnoelscher](https://github.com/fnoelscher)
 * [@HinFort](https://github.com/HinFort)
 * [@jesse-persons](https://github.com/jesse-persons)
 * [@johnnyip](https://github.com/johnnyip)

@@ -2,6 +2,13 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
+
+
 ## ntfy server v1.29.0 (UNRELEASED)
 
 **Features:**
@@ -30,6 +37,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Added [additional NixOS links for self-hosting](https://ntfy.sh/docs/install/#nixos-nix) ([#462](https://github.com/binwiederhier/ntfy/pull/462), thanks to [@wamserma](https://github.com/wamserma))
 * Added additional [more secure nginx config example](https://ntfy.sh/docs/config/#nginxapache2caddy) ([#451](https://github.com/binwiederhier/ntfy/pull/451), thanks to [SuperSandro2000](https://github.com/SuperSandro2000))
 * Minor fixes in the config table ([#470](https://github.com/binwiederhier/ntfy/pull/470), thanks to [snh](https://github.com/snh))
+* Fix broken link ([#476](https://github.com/binwiederhier/ntfy/pull/476), thanks to [@shuuji3](https://github.com/shuuji3))
 
 **Additional translations:**
 
@@ -44,11 +52,11 @@ You guys rock!
 Sponsors (alphabetical order): 
 
 * [@aspyct](https://github.com/aspyct)
+* [@bnorick](https://github.com/bnorick)
 * [@codinghipster](https://github.com/codinghipster)
 * [@eanplatter](https://github.com/eanplatter)
 * [@fnoelscher](https://github.com/fnoelscher)
 * [@HinFort](https://github.com/HinFort)
-* [@jesse-persons](https://github.com/jesse-persons)
 * [@johnnyip](https://github.com/johnnyip)
 * [@JonDerThan](https://github.com/JonDerThan)
 * [@Lexevolution](https://github.com/Lexevolution)
@@ -57,9 +65,9 @@ Sponsors (alphabetical order):
 * [@nickexyz](https://github.com/nickexyz)
 * [@12nick12](https://github.com/12nick12)
 * [@qcasey](https://github.com/qcasey)
-* [@richardklafter](https://github.com/richardklafter)
 * [@Salamafet](https://github.com/Salamafet)
-* +1 private sponsor
+* [@snh](https://github.com/snh) 
+* and all the private sponsors
 
 ## ntfy Android app v1.14.0 
 Released September 27, 2022

@@ -77,7 +77,9 @@ appreciated. A big fat Thank You to the folks already sponsoring ntfy:
 <a href="https://github.com/codinghipster"><img src="https://github.com/codinghipster.png" width="40px" /></a>
 <a href="https://github.com/eanplatter"><img src="https://github.com/eanplatter.png" width="40px" /></a>
 <a href="https://github.com/fnoelscher"><img src="https://github.com/fnoelscher.png" width="40px" /></a>
+<a href="https://github.com/hen-x"><img src="https://github.com/hen-x.png" width="40px" /></a>
 <a href="https://github.com/HinFort"><img src="https://github.com/HinFort.png" width="40px" /></a>
+<a href="https://github.com/JamieGoodson"><img src="https://github.com/JamieGoodson.png" width="40px" /></a>
 <a href="https://github.com/johnnyip"><img src="https://github.com/johnnyip.png" width="40px" /></a>
 <a href="https://github.com/JonDerThan"><img src="https://github.com/JonDerThan.png" width="40px" /></a>
 <a href="https://github.com/Lexevolution"><img src="https://github.com/Lexevolution.png" width="40px" /></a>

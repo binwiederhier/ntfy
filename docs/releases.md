@@ -54,6 +54,8 @@ Sponsors (alphabetical order):
 * [@aspyct](https://github.com/aspyct)
 * [@bnorick](https://github.com/bnorick)
 * [@codinghipster](https://github.com/codinghipster)
+* [@cremesk](https://github.com/cremesk)
+* [@dangowans](https://github.com/dangowans)
 * [@eanplatter](https://github.com/eanplatter)
 * [@fnoelscher](https://github.com/fnoelscher)
 * [@hen-x](https://github.com/hen-x)

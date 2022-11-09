@@ -17,7 +17,7 @@ We support amd64, armv7 and arm64.
 3. Or (optionally) create/edit `~/.config/ntfy/client.yml` (or `/etc/ntfy/client.yml`, see [sample client.yml](https://github.com/binwiederhier/ntfy/blob/main/client/client.yml))
 
 To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` when using the deb/rpm).
-To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI][subscribe/cli.md]
+To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI](subscribe/cli.md)
 for details). 
 
 ## Linux binaries

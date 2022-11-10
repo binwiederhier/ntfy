@@ -70,31 +70,31 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 ## Donations
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
 I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
-appreciated. A big fat Thank You to the folks already sponsoring ntfy:
+appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 
+<a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
-<a href="https://github.com/bnorick"><img src="https://github.com/bnorick.png" width="40px" /></a>
+<a href="https://github.com/nickexyz"><img src="https://github.com/nickexyz.png" width="40px" /></a>
+<a href="https://github.com/qcasey"><img src="https://github.com/qcasey.png" width="40px" /></a>
+<a href="https://github.com/mckay115"><img src="https://github.com/mckay115.png" width="40px" /></a>
+<a href="https://github.com/Salamafet"><img src="https://github.com/Salamafet.png" width="40px" /></a>
 <a href="https://github.com/codinghipster"><img src="https://github.com/codinghipster.png" width="40px" /></a>
-<a href="https://github.com/cremesk"><img src="https://github.com/cremesk.png" width="40px" /></a>
-<a href="https://github.com/dangowans"><img src="https://github.com/dangowans.png" width="40px" /></a>
-<a href="https://github.com/eanplatter"><img src="https://github.com/eanplatter.png" width="40px" /></a>
-<a href="https://github.com/fnoelscher"><img src="https://github.com/fnoelscher.png" width="40px" /></a>
-<a href="https://github.com/hen-x"><img src="https://github.com/hen-x.png" width="40px" /></a>
 <a href="https://github.com/HinFort"><img src="https://github.com/HinFort.png" width="40px" /></a>
-<a href="https://github.com/JamieGoodson"><img src="https://github.com/JamieGoodson.png" width="40px" /></a>
+<a href="https://github.com/Lexevolution"><img src="https://github.com/Lexevolution.png" width="40px" /></a>
 <a href="https://github.com/johnnyip"><img src="https://github.com/johnnyip.png" width="40px" /></a>
 <a href="https://github.com/JonDerThan"><img src="https://github.com/JonDerThan.png" width="40px" /></a>
-<a href="https://github.com/Lexevolution"><img src="https://github.com/Lexevolution.png" width="40px" /></a>
-<a href="https://github.com/mckay115"><img src="https://github.com/mckay115.png" width="40px" /></a>
-<a href="https://github.com/mnault"><img src="https://github.com/mnault.png" width="40px" /></a>
-<a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
-<a href="https://github.com/nwithan8"><img src="https://github.com/nwithan8.png" width="40px" /></a>
-<a href="https://github.com/nickexyz"><img src="https://github.com/nickexyz.png" width="40px" /></a>
 <a href="https://github.com/12nick12"><img src="https://github.com/12nick12.png" width="40px" /></a>
-<a href="https://github.com/peterleiser"><img src="https://github.com/peterleiser.png" width="40px" /></a>
-<a href="https://github.com/qcasey"><img src="https://github.com/qcasey.png" width="40px" /></a>
-<a href="https://github.com/Salamafet"><img src="https://github.com/Salamafet.png" width="40px" /></a>
+<a href="https://github.com/eanplatter"><img src="https://github.com/eanplatter.png" width="40px" /></a>
+<a href="https://github.com/fnoelscher"><img src="https://github.com/fnoelscher.png" width="40px" /></a>
+<a href="https://github.com/bnorick"><img src="https://github.com/bnorick.png" width="40px" /></a>
 <a href="https://github.com/snh"><img src="https://github.com/snh.png" width="40px" /></a>
+<a href="https://github.com/hen-x"><img src="https://github.com/hen-x.png" width="40px" /></a>
+<a href="https://github.com/JamieGoodson"><img src="https://github.com/JamieGoodson.png" width="40px" /></a>
+<a href="https://github.com/cremesk"><img src="https://github.com/cremesk.png" width="40px" /></a>
+<a href="https://github.com/dangowans"><img src="https://github.com/dangowans.png" width="40px" /></a>
+<a href="https://github.com/mnault"><img src="https://github.com/mnault.png" width="40px" /></a>
+<a href="https://github.com/nwithan8"><img src="https://github.com/nwithan8.png" width="40px" /></a>
+<a href="https://github.com/peterleiser"><img src="https://github.com/peterleiser.png" width="40px" /></a>
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

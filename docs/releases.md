@@ -47,31 +47,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Thank you to the amazing folks who decided to [sponsor ntfy](https://github.com/sponsors/binwiederhier). Thank you for 
 helping carry the cost of the public server and developer licenses, and more importantly: Thank you for believing in ntfy! 
-You guys rock!
+You guys rock! 
 
-Sponsors (alphabetical order): 
-
-* [@aspyct](https://github.com/aspyct)
-* [@bnorick](https://github.com/bnorick)
-* [@codinghipster](https://github.com/codinghipster)
-* [@cremesk](https://github.com/cremesk)
-* [@dangowans](https://github.com/dangowans)
-* [@eanplatter](https://github.com/eanplatter)
-* [@fnoelscher](https://github.com/fnoelscher)
-* [@hen-x](https://github.com/hen-x)
-* [@HinFort](https://github.com/HinFort)
-* [@JamieGoodson](https://github.com/JamieGoodson)
-* [@johnnyip](https://github.com/johnnyip)
-* [@JonDerThan](https://github.com/JonDerThan)
-* [@Lexevolution](https://github.com/Lexevolution)
-* [@mckay115](https://github.com/mckay115)
-* [@neutralinsomniac](https://github.com/neutralinsomniac)
-* [@nickexyz](https://github.com/nickexyz)
-* [@12nick12](https://github.com/12nick12)
-* [@qcasey](https://github.com/qcasey)
-* [@Salamafet](https://github.com/Salamafet)
-* [@snh](https://github.com/snh) 
-* and all the private sponsors
+A list of all the sponsors can be found in the [README](https://github.com/binwiederhier/ntfy/blob/main/README.md).
 
 ## ntfy Android app v1.14.0 
 Released September 27, 2022

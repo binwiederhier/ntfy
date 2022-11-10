@@ -186,14 +186,14 @@ const BackgroundPush = () => {
     return (
         <Pref
             labelId={"background_push"} 
-            title={"prefs_notification_background"}
-            description={"Enable background notifications?"}
-            >
+            title={"Background notifications"}
+            description={"Push notifications are delivered in the background"}
+        >
         <FormControl 
             fullWidth 
             variant="standard" 
             sx={{ m: 1 }}
-            >
+        >
             <Checkbox
                 onChange={handleChange}
             >
@@ -523,8 +523,14 @@ const Install = () => {
 
 
     return (
-        <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-            <Button variant="contained">
+        <FormControl 
+            fullWidth 
+            variant="standard" 
+            sx={{ m: 1 }}
+        >
+            <Button 
+                variant="contained"
+            >
                 Install
             </Button>
         </FormControl>

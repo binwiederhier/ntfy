@@ -3,6 +3,7 @@ import {useEffect, useState} from 'react';
 import {
     CardActions,
     CardContent,
+    Checkbox,
     FormControl,
     Select,
     Stack,
@@ -42,6 +43,7 @@ const Preferences = () => {
                 <Notifications/>
                 <Appearance/>
                 <Users/>
+                <Installation/>
             </Stack>
         </Container>
     );
@@ -58,6 +60,7 @@ const Notifications = () => {
                 <Sound/>
                 <MinPriority/>
                 <DeleteAfter/>
+                <BackgroundPush/>
             </PrefGroup>
         </Card>
     );
@@ -169,6 +172,33 @@ const DeleteAfter = () => {
                     <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
                 </Select>
             </FormControl>
+        </Pref>
+    )
+};
+
+const BackgroundPush = () => {
+    const { t } = useTranslation();
+
+    const handleChange = () => {
+        console.log('The checkbox was toggled.');
+    }
+
+    return (
+        <Pref
+            labelId={"background_push"} 
+            title={"prefs_notification_background"}
+            description={"Enable background notifications?"}
+            >
+        <FormControl 
+            fullWidth 
+            variant="standard" 
+            sx={{ m: 1 }}
+            >
+            <Checkbox
+                onChange={handleChange}
+            >
+            </Checkbox>
+        </FormControl>
         </Pref>
     )
 };
@@ -472,5 +502,33 @@ const Language = () => {
         </Pref>
     )
 };
+
+const Installation = () => {
+    const { t } = useTranslation(); // Need help setting up the locale
+
+
+    return (
+        <Card sx={{p: 3}} aria-label={"Install ntfy"}>
+        <Typography variant="h5" sx={{marginBottom: 2}}>
+            {"Install NTFY"}
+        </Typography>
+        <Install/>
+        </Card>
+    )
+}
+
+const Install = () => {
+    const { t } = useTranslation();
+
+
+
+    return (
+        <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+            <Button variant="contained">
+                Install
+            </Button>
+        </FormControl>
+    )
+}
 
 export default Preferences;

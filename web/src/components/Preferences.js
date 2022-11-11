@@ -520,7 +520,59 @@ const Installation = () => {
 const Install = () => {
     const { t } = useTranslation();
 
+    const [installationSupported, setInstallationSuported] = useState(false);
+    const [promptInstall, setPromptInstall] = useState(null);
+    const [isInstalled, setIsInstalled] = useState(false);
+    const [deferredPrompt, setDeferredPrompt] = useState();
 
+    useEffect(() => {
+        if ('BeforeInstallPromptEvent' in window) {
+            console.log('BeforeInstallPromptEvent supported but not fired.');
+            setInstallationSuported(true);
+        } else {
+            console.log('BeforeInstallPromptEvent not supported.');
+            return;
+        }
+    }, [])
+
+    const onClick = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await e.userChoice;
+            if (outcome === 'accepted') {
+                setIsInstalled(true);
+            } else if (outcome === 'dismissed') {
+                console.log('App installer was dismissed.')
+            }
+        }
+    }
+
+    useEffect(() => {
+        window.addEventListener("beforeinstallprompt", (e) => {
+            console.log('beforeinstallprompt fired.')
+            e.preventDefault();
+            setDeferredPrompt(e);
+        });
+    }, [])
+
+
+
+    if (!installationSupported) {
+        return (
+            <FormControl 
+            fullWidth 
+            variant="standard" 
+            sx={{ m: 1 }}
+        >
+            <Button 
+                variant="contained"
+                disabled={true}
+            >
+                Browser not supported.
+            </Button>
+        </FormControl>
+        )
+    }
 
     return (
         <FormControl 
@@ -530,6 +582,7 @@ const Install = () => {
         >
             <Button 
                 variant="contained"
+                onClick={async () => await onClick()}
             >
                 Install
             </Button>

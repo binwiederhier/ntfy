@@ -2,6 +2,13 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy Android app v1.14.0 (UNRELEASED)
+
+**Additional translations:**
+
+* Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
+
+
 ## ntfy server v1.29.0 (UNRELEASED)
 
 **Features:**
@@ -17,6 +24,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Allow empty passwords in `client.yml` ([#374](https://github.com/binwiederhier/ntfy/issues/374), thanks to [@cyqsimon](https://github.com/cyqsimon) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 * `ntfy pub` will now use default username and password from `client.yml` ([#431](https://github.com/binwiederhier/ntfy/issues/431), thanks to [@wunter8](https://github.com/wunter8) for fixing)
 * Make `ntfy sub` work with `NTFY_USER` env variable ([#447](https://github.com/binwiederhier/ntfy/pull/447), thanks to [SuperSandro2000](https://github.com/SuperSandro2000))
+* Web: Disallow GET/HEAD requests with body in actions ([#468](https://github.com/binwiederhier/ntfy/issues/468), thanks to [@ollien](https://github.com/ollien))
 
 **Documentation:**
 
@@ -28,6 +36,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Added [Kubernetes install instructions](https://ntfy.sh/docs/install/#kubernetes) ([#452](https://github.com/binwiederhier/ntfy/pull/452), thanks to [@gmemstr](https://github.com/gmemstr))
 * Added [additional NixOS links for self-hosting](https://ntfy.sh/docs/install/#nixos-nix) ([#462](https://github.com/binwiederhier/ntfy/pull/462), thanks to [@wamserma](https://github.com/wamserma))
 * Added additional [more secure nginx config example](https://ntfy.sh/docs/config/#nginxapache2caddy) ([#451](https://github.com/binwiederhier/ntfy/pull/451), thanks to [SuperSandro2000](https://github.com/SuperSandro2000))
+* Minor fixes in the config table ([#470](https://github.com/binwiederhier/ntfy/pull/470), thanks to [snh](https://github.com/snh))
+* Fix broken link ([#476](https://github.com/binwiederhier/ntfy/pull/476), thanks to [@shuuji3](https://github.com/shuuji3))
 
 **Additional translations:**
 
@@ -37,23 +47,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Thank you to the amazing folks who decided to [sponsor ntfy](https://github.com/sponsors/binwiederhier). Thank you for 
 helping carry the cost of the public server and developer licenses, and more importantly: Thank you for believing in ntfy! 
-You guys rock!
+You guys rock! 
 
-Sponsors (alphabetical order): 
-
-* [@aspyct](https://github.com/aspyct)
-* [@codinghipster](https://github.com/codinghipster)
-* [@HinFort](https://github.com/HinFort)
-* [@johnnyip](https://github.com/johnnyip)
-* [@JonDerThan](https://github.com/JonDerThan)
-* [@Lexevolution](https://github.com/Lexevolution)
-* [@mckay115](https://github.com/mckay115)
-* [@neutralinsomniac](https://github.com/neutralinsomniac)
-* [@nickexyz](https://github.com/nickexyz)
-* [@12nick12](https://github.com/12nick12)
-* [@qcasey](https://github.com/qcasey)
-* [@Salamafet](https://github.com/Salamafet)
-* +1 private sponsor
+A list of all the sponsors can be found in the [README](https://github.com/binwiederhier/ntfy/blob/main/README.md).
 
 ## ntfy Android app v1.14.0 
 Released September 27, 2022

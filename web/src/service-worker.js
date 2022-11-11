@@ -21,3 +21,8 @@ clientsClaim();
 // even if you decide not to use precaching. See https://cra.link/PWA
 precacheAndRoute(self.__WB_MANIFEST);
 
+self.addEventListener("fetch", event => {
+    // Dummy event listener to pass PWA installation criteria.
+    console.log('Fetch event fired.')
+})
+

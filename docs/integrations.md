@@ -88,6 +88,8 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy-to-slack](https://github.com/ozskywalker/ntfy-to-slack) - Tool to subscribe to a ntfy topic and send the messages to a Slack webhook (Go)
 - [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) - Ansible action plugin to post JSON messages to ntfy (Python)
 - [ntfy-notification-channel](https://github.com/wijourdil/ntfy-notification-channel) - Laravel Notification channel for ntfy (PHP)
+- [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
+- [ntfy-sdk](https://gitlab.com/p2kishimoto/ntfy-sdk) - ntfy client library to send notifications (Rust)
 
 ## Blog + forum posts
 

@@ -90,6 +90,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [TLDR Newsletter Daily Update 2022-11-09](https://tldr.tech/tech/newsletter/2022-11-09) - 11/2022
 - [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - 11/2022
 - [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - 11/2022
 - [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - 11/2022

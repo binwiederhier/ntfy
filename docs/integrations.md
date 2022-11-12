@@ -93,6 +93,8 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - 11/2022
+- [Push Notifications for KDE](https://volkerkrause.eu/2022/11/12/kde-unifiedpush-push-notifications.html) - 11/2022
 - [TLDR Newsletter Daily Update 2022-11-09](https://tldr.tech/tech/newsletter/2022-11-09) - 11/2022
 - [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - 11/2022
 - [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - 11/2022

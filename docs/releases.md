@@ -2,14 +2,24 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+<!--
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Additional translations:**
 
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
+-->
 
+## ntfy server v1.29.0
+Released November 12, 2022
 
-## ntfy server v1.29.0 (UNRELEASED)
+This release adds the ability to add rate limit exemptions for IP ranges instead of just specific IP addresses. It also fixes 
+a few bugs in the web app and the CLI and adds lots of new examples and install instructions.
+
+Thanks to [some love on HN](https://news.ycombinator.com/item?id=33517944), we got so many new ntfy users trying out ntfy
+and joining the [chat rooms](https://github.com/binwiederhier/ntfy#chat--forum). **Welcome to the ntfy community to all of you!** 
+We also got a ton of new **[sponsors and donations](https://github.com/sponsors/binwiederhier)** 💸, which is amazing. I'd like to thank
+all of you for believing in the project, and for helping me pay the server cost. The HN spike increased the AWS cost quite a bit.
 
 **Features:**
 

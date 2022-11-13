@@ -14,6 +14,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
 -->
 
+## ntfy server v1.30.0 (UNRELREASED)
+
+**Documentation:**
+
+* GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
+
 ## ntfy server v1.29.0
 Released November 12, 2022
 

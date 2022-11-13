@@ -122,6 +122,19 @@ to ntfy at its default URL (`attrs` and other attributes are optional):
           priority: 1
 ```
 
+## GitHub Actions
+You can send a message during a workflow run with curl. Here is an example sending info about the repo, commit and job status.
+``` yaml
+- name: Actions Ntfy
+  run: |
+    curl \
+      -u ${{ secrets.NTFY_CRED }} \
+      -H "Title: Title here" \
+      -H "Content-Type: text/plain" \
+      -d $'Repo: ${{ github.repository }}\nCommit: ${{ github.sha }}\nRef: ${{ github.ref }}\nStatus: ${{ job.status}}' \
+      ${{ secrets.NTFY_URL }}
+```
+
 ## Watchtower (shoutrrr)
 You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send 
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.

@@ -5,6 +5,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 <!--
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
+**Bug fixes:**
+
+* Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
+
 **Additional translations:**
 
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))

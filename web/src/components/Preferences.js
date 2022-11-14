@@ -175,19 +175,37 @@ const DeleteAfter = () => {
         </Pref>
     )
 };
-
+/**
+ * WIP. No logic for delivering background notifications yet, just scaffolding for the view and database entry.
+ * @returns {[JSX.Element | null]} Checkbox to toggle background notifications. Returns null if app is not installed.
+ */
 const BackgroundPush = () => {
     const { t } = useTranslation();
 
-    const handleChange = () => {
-        console.log('The checkbox was toggled.');
+    const [ backgroundPush, setBackgroundPush ] = useState(false);
+    const [ canBeToggled, setCanBeToggled ] = useState(false);
+
+    const handleChange = async () => {
+        setBackgroundPush(!backgroundPush);
+        await prefs.setBackgroundPush(backgroundPush);
+    }
+    // https://developer.mozilla.org/en-US/docs/Web/API/Window/appinstalled_event
+    // This event is only fired upon successful PWA installation.
+    useEffect(() => {
+        window.addEventListener('appinstalled', () => {
+            setCanBeToggled(true);
+        })
+    },[])
+    // Hide the option if we are not in a PWA.
+    if (!canBeToggled) {
+        return null;
     }
 
     return (
         <Pref
-            labelId={"background_push"} 
-            title={"Background notifications"}
-            description={"Push notifications are delivered in the background"}
+        labelId={"background_push"} 
+        title={"Background notifications"}
+        description={"Push notifications are delivered in the background"}
         >
         <FormControl 
             fullWidth 
@@ -198,8 +216,8 @@ const BackgroundPush = () => {
                 onChange={handleChange}
             >
             </Checkbox>
-        </FormControl>
-        </Pref>
+    </FormControl>
+    </Pref>
     )
 };
 
@@ -502,76 +520,58 @@ const Language = () => {
         </Pref>
     )
 };
-
+/**
+ * Installation menu, with button that triggers PWA installation.
+ * @returns {[ JSX.Element | null ]} Installation card and button if the browser environment supports installing PWAs, null if not.
+ */
 const Installation = () => {
+    // https://web.dev/learn/pwa/installation-prompt/
     const { t } = useTranslation(); // Need help setting up the locale
 
+    // https://web.dev/codelab-make-installable/
+    const [ isInstallableChrome, setIsInstallableChrome ] = useState(false);
+    const [ deferredPromptEvent, setDeferredPromptEvent ] = useState(null);
 
-    return (
-        <Card sx={{p: 3}} aria-label={"Install ntfy"}>
-        <Typography variant="h5" sx={{marginBottom: 2}}>
-            {"Install NTFY"}
-        </Typography>
-        <Install/>
-        </Card>
-    )
-}
-
-const Install = () => {
-    const { t } = useTranslation();
-
-    const [installationSupported, setInstallationSuported] = useState(false);
-    const [promptInstall, setPromptInstall] = useState(null);
-    const [isInstalled, setIsInstalled] = useState(false);
-    const [deferredPrompt, setDeferredPrompt] = useState();
-
+    // Determine if browser environment passes installation criteria.
     useEffect(() => {
         if ('BeforeInstallPromptEvent' in window) {
-            console.log('BeforeInstallPromptEvent supported but not fired.');
-            setInstallationSuported(true);
-        } else {
-            console.log('BeforeInstallPromptEvent not supported.');
-            return;
+            setIsInstallableChrome(true);
         }
-    }, [])
+    });
 
-    const onClick = async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await e.userChoice;
-            if (outcome === 'accepted') {
-                setIsInstalled(true);
-            } else if (outcome === 'dismissed') {
-                console.log('App installer was dismissed.')
-            }
-        }
+    // Save the deferred prompt event, pass it as a prop to the button.
+    useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            setDeferredPromptEvent(e);
+        });
+    });
+
+    // If the web app is in Google Chrome, is installable, and we are NOT in a PWA environment show this option.
+    // Otherwise, return an empty component.
+    if (isInstallableChrome && deferredPromptEvent) {
+        return (
+            <Card sx={{p: 3}} aria-label={"Install ntfy"}>
+            <Typography variant="h5" sx={{marginBottom: 2}}>
+                {"Install NTFY"}
+            </Typography>
+            <InstallChrome
+                deferredPrompt={deferredPromptEvent}
+            />
+            </Card>
+        )
     }
 
-    useEffect(() => {
-        window.addEventListener("beforeinstallprompt", (e) => {
-            console.log('beforeinstallprompt fired.')
-            e.preventDefault();
-            setDeferredPrompt(e);
-        });
-    }, [])
+    // Return nothing if installation criteria are not met.
+    return null;
 
+}
 
+const InstallChrome = ({ deferredPrompt }) => {
+    const { t } = useTranslation();
 
-    if (!installationSupported) {
-        return (
-            <FormControl 
-            fullWidth 
-            variant="standard" 
-            sx={{ m: 1 }}
-        >
-            <Button 
-                variant="contained"
-                disabled={true}
-            >
-                Browser not supported.
-            </Button>
-        </FormControl>
-        )
+    const onClick = async () => {
+        deferredPrompt.prompt();
     }
 
     return (
@@ -582,7 +582,7 @@ const Install = () => {
         >
             <Button 
                 variant="contained"
-                onClick={async () => await onClick()}
+                onClick={async (e) => await onClick(e)}
             >
                 Install
             </Button>

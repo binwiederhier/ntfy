@@ -2,7 +2,6 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-<!--
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Bug fixes:**
@@ -12,13 +11,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional translations:**
 
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
--->
 
 ## ntfy server v1.30.0 (UNRELREASED)
 
 **Documentation:**
 
 * GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
+
+**Other things:**
+
+* Put ntfy.sh/docs assets on GitHub pages to reduce AWS outbound traffic cost ([#491](https://github.com/binwiederhier/ntfy/issues/491))
 
 ## ntfy server v1.29.0
 Released November 12, 2022

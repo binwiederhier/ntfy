@@ -13,19 +13,13 @@ jobs:
         with:
           repository: binwiederhier/ntfy-docs.github.io
           path: build/ntfy-docs.github.io
+          token: ${{secrets.NTFY_DOCS_PUBLISH_TOKEN}}
       -
         name: Build docs
-        run: | 
-          make docs
-          ls server/docs/
+        run: make docs
       -
         name: Copy generated docs
-        run: | 
-          echo "New docs:"
-          ls -1 server/docs/
-          echo "Existing docs:"
-          ls -1 build/ntfy-docs.github.io/docs/
-          rsync -av --delete server/docs/ build/ntfy-docs.github.io/docs/
+        run: rsync -av --exclude CNAME --delete server/docs/ build/ntfy-docs.github.io/docs/
       -
         name: Publish docs
         run: |

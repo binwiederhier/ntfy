@@ -7,28 +7,22 @@ jobs:
       -
         name: Checkout ntfy code
         uses: actions/checkout@v3
-        with:
-          path: ntfy
       -
         name: Checkout docs pages code
         uses: actions/checkout@v3
         with:
           repository: binwiederhier/ntfy-docs.github.io
-          path: ntfy-docs.github.io
+          path: build/ntfy-docs.github.io
       -
         name: Build docs
-        run: |
-          pwd
-          ls
-          cd ntfy
-          make docs
-          rsync -av --delete docs/ ../ntfy-docs.github.io/docs/
+        run: make docs
+      -
+        name: Copy generated docs
+        run: rsync -av --delete docs/ build/ntfy-docs.github.io/docs/
       -
         name: Publish docs
         run: |
-          pwd
-          ls
-          cd ntfy-docs.github.io
+          cd build/ntfy-docs.github.io
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"          
           git add docs/

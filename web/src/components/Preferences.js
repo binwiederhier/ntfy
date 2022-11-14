@@ -582,7 +582,7 @@ const InstallChrome = ({ deferredPrompt }) => {
         >
             <Button 
                 variant="contained"
-                onClick={async (e) => await onClick(e)}
+                onClick={async () => await onClick()}
             >
                 Install
             </Button>

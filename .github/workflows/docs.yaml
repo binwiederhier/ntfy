@@ -1,0 +1,36 @@
+name: docs
+on:
+  push:
+    branches:
+      - main
+jobs:
+  publish-docs:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout ntfy code
+        uses: actions/checkout@v3
+      -
+        name: Checkout docs pages code
+        uses: actions/checkout@v3
+        with:
+          repository: binwiederhier/ntfy-docs.github.io
+          path: build/ntfy-docs.github.io
+          token: ${{secrets.NTFY_DOCS_PUSH_TOKEN}}
+          # Expires after 1 year, re-generate via
+          # User -> Settings -> Developer options -> Personal Access Tokens -> Fine Grained Token
+      -
+        name: Build docs
+        run: make docs
+      -
+        name: Copy generated docs
+        run: rsync -av --exclude CNAME --delete server/docs/ build/ntfy-docs.github.io/docs/
+      -
+        name: Publish docs
+        run: |
+          cd build/ntfy-docs.github.io
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"          
+          git add docs/
+          git commit -m "Updated docs"
+          git push origin main

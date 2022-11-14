@@ -1,7 +1,7 @@
 name: docs
 on: [push, pull_request]
 jobs:
-  build:
+  docs:
     runs-on: ubuntu-latest
     steps:
       -
@@ -20,7 +20,12 @@ jobs:
           ls server/docs/
       -
         name: Copy generated docs
-        run: rsync -av --delete server/docs/ build/ntfy-docs.github.io/docs/
+        run: | 
+          echo "New docs:"
+          ls -1 server/docs/
+          echo "Existing docs:"
+          ls -1 build/ntfy-docs.github.io/docs/
+          rsync -av --delete server/docs/ build/ntfy-docs.github.io/docs/
       -
         name: Publish docs
         run: |

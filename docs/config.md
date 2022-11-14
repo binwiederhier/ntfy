@@ -309,9 +309,14 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     ]));
     ```
 
-### UnifiedPush compatibility
+### Example: UnifiedPush
+[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
+has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. 
+The topic names used by UnifiedPush all start with the `up*` prefix. Please refer to the 
+**[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users)** for more details.
 
-UnifiedPush requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. The topic names used by UnifiedPush all start with the `up` prefix. You should either allow anonymous write access for the entire prefix or explicitly per topic:
+To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either 
+allow anonymous write access for the entire prefix or explicitly per topic:
 
 === "Prefix"
     ```
@@ -320,10 +325,8 @@ UnifiedPush requires that the [application server](https://unifiedpush.org/spec/
 
 === "Explicitly"
     ```
-    $ ntfy access '*' 'upYzMtZGZiYTY5' write-only
+    $ ntfy access '*' upYzMtZGZiYTY5 write-only
     ```
-
-see https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users
 
 ## E-mail notifications
 To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 

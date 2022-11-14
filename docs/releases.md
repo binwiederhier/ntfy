@@ -17,10 +17,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
+* UnifiedPush ACL clarification ([#497](https://github.com/binwiederhier/ntfy/issues/497), thanks to [@bt90](https://github.com/bt90)) 
 
 **Other things:**
 
-* Put ntfy.sh/docs assets on GitHub pages to reduce AWS outbound traffic cost ([#491](https://github.com/binwiederhier/ntfy/issues/491))
+* Put ntfy.sh docs on GitHub pages to reduce AWS outbound traffic cost ([#491](https://github.com/binwiederhier/ntfy/issues/491))
 
 ## ntfy server v1.29.0
 Released November 12, 2022

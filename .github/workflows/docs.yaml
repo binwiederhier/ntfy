@@ -1,0 +1,36 @@
+name: docs
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout ntfy code
+        uses: actions/checkout@v3
+        with:
+          path: ntfy
+      -
+        name: Checkout docs pages code
+        uses: actions/checkout@v3
+        with:
+          repository: binwiederhier/ntfy-docs.github.io
+          path: ntfy-docs.github.io
+      -
+        name: Build docs
+        run: |
+          pwd
+          ls
+          cd ntfy
+          make docs
+          rsync -av --delete docs/ ../ntfy-docs.github.io/docs/
+      -
+        name: Publish docs
+        run: |
+          pwd
+          ls
+          cd ntfy-docs.github.io
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"          
+          git add docs/
+          git commit -m "Updated docs"
+          git push origin main

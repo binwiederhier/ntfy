@@ -13,7 +13,9 @@ jobs:
         with:
           repository: binwiederhier/ntfy-docs.github.io
           path: build/ntfy-docs.github.io
-          token: ${{secrets.NTFY_DOCS_PUBLISH_TOKEN}}
+          token: ${{secrets.NTFY_DOCS_PUSH_TOKEN}}
+          # Expires after 1 year, re-generate via
+          # User -> Settings -> Developer options -> Personal Access Tokens -> Fine Grained Token
       -
         name: Build docs
         run: make docs

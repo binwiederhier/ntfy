@@ -47,6 +47,7 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy-middleman](https://github.com/nachotp/ntfy-middleman) - Wraps APIs and send notifications using ntfy.sh on schedule (Python)
 - [ntfy-dotnet](https://github.com/nwithan8/ntfy-dotnet) - .NET client library to interact with a ntfy server (C# / .NET)
 - [node-ntfy-publish](https://github.com/cityssm/node-ntfy-publish) - A Node package to publish notifications to an ntfy server (Node)
+- [ntfy](https://github.com/jonocarroll/ntfy) - Wraps the ntfy API with pipe-friendly tooling (R)
 
 ## CLIs + GUIs
 

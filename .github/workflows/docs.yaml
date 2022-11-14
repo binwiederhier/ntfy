@@ -15,10 +15,12 @@ jobs:
           path: build/ntfy-docs.github.io
       -
         name: Build docs
-        run: make docs
+        run: | 
+          make docs
+          ls server/docs/
       -
         name: Copy generated docs
-        run: rsync -av --delete docs/ build/ntfy-docs.github.io/docs/
+        run: rsync -av --delete server/docs/ build/ntfy-docs.github.io/docs/
       -
         name: Publish docs
         run: |

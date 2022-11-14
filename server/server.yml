@@ -173,8 +173,9 @@
 # Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
 # - visitor-request-limit-burst is the initial bucket of requests each visitor has
 # - visitor-request-limit-replenish is the rate at which the bucket is refilled
-# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames and IPs to be
-#   exempt from request rate limiting; hostnames are resolved at the time the server is started
+# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames, IPs or CIDRs to be
+#   exempt from request rate limiting. Hostnames are resolved at the time the server is started.
+#   Example: "1.2.3.4,ntfy.example.com,8.7.6.0/24"
 #
 # visitor-request-limit-burst: 60
 # visitor-request-limit-replenish: "5s"

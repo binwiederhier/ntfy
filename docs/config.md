@@ -309,6 +309,22 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     ]));
     ```
 
+### UnifiedPush compatibility
+
+UnifiedPush requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. The topic names used by UnifiedPush all start with the `up` prefix. You should either allow anonymous write access for the entire prefix or explicitly per topic:
+
+=== "Prefix"
+    ```
+    $ ntfy access '*' 'up*' write-only
+    ```
+
+=== "Explicitly"
+    ```
+    $ ntfy access '*' 'upYzMtZGZiYTY5' write-only
+    ```
+
+see https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users
+
 ## E-mail notifications
 To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 
 you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g. 

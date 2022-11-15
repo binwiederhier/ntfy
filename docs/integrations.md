@@ -94,6 +94,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [Tracking layoffs, tech worker demand still high, ntfy, devenv, Markdoc & Mike Bifulco](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) - 11/2022
 - [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - 11/2022
 - [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - 11/2022
 - [Push Notifications for KDE](https://volkerkrause.eu/2022/11/12/kde-unifiedpush-push-notifications.html) - 11/2022

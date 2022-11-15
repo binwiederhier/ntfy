@@ -188,8 +188,9 @@ const (
 )
 
 type messageCache struct {
-	db  *sql.DB
-	nop bool
+	db    *sql.DB
+	queue *util.BatchingQueue[*message]
+	nop   bool
 }
 
 // newSqliteCache creates a SQLite file-backed cache
@@ -201,10 +202,21 @@ func newSqliteCache(filename, startupQueries string, nop bool) (*messageCache, e
 	if err := setupCacheDB(db, startupQueries); err != nil {
 		return nil, err
 	}
-	return &messageCache{
-		db:  db,
-		nop: nop,
-	}, nil
+	queue := util.NewBatchingQueue[*message](20, 500*time.Millisecond)
+	cache := &messageCache{
+		db:    db,
+		queue: queue,
+		nop:   nop,
+	}
+	go func() {
+		for messages := range queue.Pop() {
+			log.Debug("Adding %d messages to cache", len(messages))
+			if err := cache.addMessages(messages); err != nil {
+				log.Error("error: %s", err.Error())
+			}
+		}
+	}()
+	return cache, nil
 }
 
 // newMemCache creates an in-memory cache
@@ -230,6 +242,10 @@ func createMemoryFilename() string {
 
 func (c *messageCache) AddMessage(m *message) error {
 	return c.addMessages([]*message{m})
+}
+
+func (c *messageCache) QueueMessage(m *message) {
+	c.queue.Push(m)
 }
 
 func (c *messageCache) addMessages(ms []*message) error {

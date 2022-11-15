@@ -491,9 +491,11 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		log.Debug("%s Message delayed, will process later", logMessagePrefix(v, m))
 	}
 	if cache {
-		if err := s.messageCache.AddMessage(m); err != nil {
+		log.Trace("%s Queuing for cache", logMessagePrefix(v, m))
+		s.messageCache.QueueMessage(m)
+		/*if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
-		}
+		}*/
 	}
 	s.mu.Lock()
 	s.messages++

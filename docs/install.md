@@ -431,7 +431,7 @@ Configuration is relatively straightforward. As an exmaple, a minimal configurat
     metadata:
       name: ntfy
     data:
-    server.yml: |
+      server.yml: |
         # Template: https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
         base-url: https://ntfy.sh
     ```

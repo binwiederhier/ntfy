@@ -97,6 +97,7 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/peterleiser"><img src="https://github.com/peterleiser.png" width="40px" /></a>
 <a href="https://github.com/portothree"><img src="https://github.com/portothree.png" width="40px" /></a>
 <a href="https://github.com/finngreig"><img src="https://github.com/finngreig.png" width="40px" /></a>
+<a href="https://github.com/skrollme"><img src="https://github.com/skrollme.png" width="40px" /></a>
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

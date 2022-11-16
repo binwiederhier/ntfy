@@ -313,7 +313,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		log.Warn("Cache: Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
+		log.Error("Cache: Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
 		return err
 	}
 	log.Debug("Cache: Wrote %d message(s) in %v", len(ms), time.Since(start))

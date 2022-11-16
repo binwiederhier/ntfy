@@ -53,6 +53,12 @@
 #       pragma journal_mode = WAL;
 #       pragma synchronous = normal;
 #       pragma temp_store = memory;
+#       pragma busy_timeout = 15000;
+#       vacuum;
+#
+# The "cache-batch-size" and "cache-batch-timeout" parameter allow enabling async batch writing
+# of messages. If set, messages will be queued and written to the database in batches of the given
+# size, or after the given timeout. This is only required for high volume servers.
 #
 # Debian/RPM package users:
 #   Use /var/cache/ntfy/cache.db as cache file to avoid permission issues. The package

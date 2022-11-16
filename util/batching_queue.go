@@ -48,10 +48,13 @@ func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueu
 func (q *BatchingQueue[T]) Enqueue(element T) {
 	q.mu.Lock()
 	q.in = append(q.in, element)
-	limitReached := len(q.in) == q.batchSize
+	var elements []T
+	if len(q.in) == q.batchSize {
+		elements = q.dequeueAll()
+	}
 	q.mu.Unlock()
-	if limitReached {
-		q.out <- q.dequeueAll()
+	if len(elements) > 0 {
+		q.out <- elements
 	}
 }
 
@@ -61,8 +64,6 @@ func (q *BatchingQueue[T]) Dequeue() <-chan []T {
 }
 
 func (q *BatchingQueue[T]) dequeueAll() []T {
-	q.mu.Lock()
-	defer q.mu.Unlock()
 	elements := make([]T, len(q.in))
 	copy(elements, q.in)
 	q.in = q.in[:0]
@@ -75,7 +76,9 @@ func (q *BatchingQueue[T]) timeoutTicker() {
 	}
 	ticker := time.NewTicker(q.timeout)
 	for range ticker.C {
+		q.mu.Lock()
 		elements := q.dequeueAll()
+		q.mu.Unlock()
 		if len(elements) > 0 {
 			q.out <- elements
 		}

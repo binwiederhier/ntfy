@@ -24,7 +24,7 @@ func TestBatchingQueue_InfTimeout(t *testing.T) {
 	for i := 0; i < 101; i++ {
 		go q.Enqueue(i)
 	}
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(time.Second)
 	mu.Lock()
 	require.Equal(t, 100, total) // One is missing, stuck in the last batch!
 	require.Equal(t, 4, len(batches))

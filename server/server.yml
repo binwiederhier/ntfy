@@ -65,6 +65,8 @@
 # cache-file: <filename>
 # cache-duration: "12h"
 # cache-startup-queries:
+# cache-batch-size: 0
+# cache-batch-timeout: "0ms"
 
 # If set, access to the ntfy server and API can be controlled on a granular level using
 # the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.

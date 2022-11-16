@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+// BatchingQueue is a queue that creates batches of the enqueued elements based on a
+// max batch size and a batch timeout.
+//
+// Example:
+//
+//	q := NewBatchingQueue[int](2, 500 * time.Millisecond)
+//	go func() {
+//	  for batch := range q.Dequeue() {
+//	    fmt.Println(batch)
+//	  }
+//	}()
+//	q.Enqueue(1)
+//	q.Enqueue(2)
+//	q.Enqueue(3)
+//	time.Sleep(time.Second)
+//
+// This example will emit batch [1, 2] immediately (because the batch size is 2), and
+// a batch [3] after 500ms.
 type BatchingQueue[T any] struct {
 	batchSize int
 	timeout   time.Duration
@@ -13,6 +31,7 @@ type BatchingQueue[T any] struct {
 	mu        sync.Mutex
 }
 
+// NewBatchingQueue creates a new BatchingQueue
 func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueue[T] {
 	q := &BatchingQueue[T]{
 		batchSize: batchSize,
@@ -20,37 +39,45 @@ func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueu
 		in:        make([]T, 0),
 		out:       make(chan []T),
 	}
-	ticker := time.NewTicker(timeout)
-	go func() {
-		for range ticker.C {
-			elements := q.popAll()
-			if len(elements) > 0 {
-				q.out <- elements
-			}
-		}
-	}()
+	go q.timeoutTicker()
 	return q
 }
 
-func (c *BatchingQueue[T]) Push(element T) {
-	c.mu.Lock()
-	c.in = append(c.in, element)
-	limitReached := len(c.in) == c.batchSize
-	c.mu.Unlock()
+// Enqueue enqueues an element to the queue. If the configured batch size is reached,
+// the batch will be emitted immediately.
+func (q *BatchingQueue[T]) Enqueue(element T) {
+	q.mu.Lock()
+	q.in = append(q.in, element)
+	limitReached := len(q.in) == q.batchSize
+	q.mu.Unlock()
 	if limitReached {
-		c.out <- c.popAll()
+		q.out <- q.dequeueAll()
 	}
 }
 
-func (c *BatchingQueue[T]) Pop() <-chan []T {
-	return c.out
+// Dequeue returns a channel emitting batches of elements
+func (q *BatchingQueue[T]) Dequeue() <-chan []T {
+	return q.out
 }
 
-func (c *BatchingQueue[T]) popAll() []T {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	elements := make([]T, len(c.in))
-	copy(elements, c.in)
-	c.in = c.in[:0]
+func (q *BatchingQueue[T]) dequeueAll() []T {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	elements := make([]T, len(q.in))
+	copy(elements, q.in)
+	q.in = q.in[:0]
 	return elements
+}
+
+func (q *BatchingQueue[T]) timeoutTicker() {
+	if q.timeout == 0 {
+		return
+	}
+	ticker := time.NewTicker(q.timeout)
+	for range ticker.C {
+		elements := q.dequeueAll()
+		if len(elements) > 0 {
+			q.out <- elements
+		}
+	}
 }

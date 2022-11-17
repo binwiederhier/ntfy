@@ -14,6 +14,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.30.0 (UNRELREASED)
 
+**Features:**
+
+* High-load servers: Allow asynchronous batch-writing of messages to cache via `cache-batch-*` options ([#498](https://github.com/binwiederhier/ntfy/issues/498)/[#502](https://github.com/binwiederhier/ntfy/pull/502))   
+
 **Documentation:**
 
 * GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
@@ -22,6 +26,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Other things:**
 
 * Put ntfy.sh docs on GitHub pages to reduce AWS outbound traffic cost ([#491](https://github.com/binwiederhier/ntfy/issues/491))
+* The ntfy.sh server hardware was upgraded to a bigger box. If you'd like to help out carrying the server cost, **[sponsorships and donations](https://github.com/sponsors/binwiederhier)** 💸 would be very much appreciated
 
 ## ntfy server v1.29.0
 Released November 12, 2022

@@ -61,6 +61,8 @@ type Config struct {
 	CacheFile                            string
 	CacheDuration                        time.Duration
 	CacheStartupQueries                  string
+	CacheBatchSize                       int
+	CacheBatchTimeout                    time.Duration
 	AuthFile                             string
 	AuthDefaultRead                      bool
 	AuthDefaultWrite                     bool
@@ -114,6 +116,8 @@ func NewConfig() *Config {
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
+		CacheBatchSize:                       0,
+		CacheBatchTimeout:                    0,
 		AuthFile:                             "",
 		AuthDefaultRead:                      true,
 		AuthDefaultWrite:                     true,

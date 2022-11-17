@@ -44,6 +44,7 @@ const (
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_mid ON messages (mid);
+		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		COMMIT;
 	`
@@ -92,7 +93,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 8
+	currentSchemaVersion          = 9
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -185,15 +186,21 @@ const (
 	migrate7To8AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN icon TEXT NOT NULL DEFAULT('');
 	`
+
+	// 8 -> 9
+	migrate8To9AlterMessagesTableQuery = `
+		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);	
+	`
 )
 
 type messageCache struct {
-	db  *sql.DB
-	nop bool
+	db    *sql.DB
+	queue *util.BatchingQueue[*message]
+	nop   bool
 }
 
 // newSqliteCache creates a SQLite file-backed cache
-func newSqliteCache(filename, startupQueries string, nop bool) (*messageCache, error) {
+func newSqliteCache(filename, startupQueries string, batchSize int, batchTimeout time.Duration, nop bool) (*messageCache, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -201,21 +208,28 @@ func newSqliteCache(filename, startupQueries string, nop bool) (*messageCache, e
 	if err := setupCacheDB(db, startupQueries); err != nil {
 		return nil, err
 	}
-	return &messageCache{
-		db:  db,
-		nop: nop,
-	}, nil
+	var queue *util.BatchingQueue[*message]
+	if batchSize > 0 || batchTimeout > 0 {
+		queue = util.NewBatchingQueue[*message](batchSize, batchTimeout)
+	}
+	cache := &messageCache{
+		db:    db,
+		queue: queue,
+		nop:   nop,
+	}
+	go cache.processMessageBatches()
+	return cache, nil
 }
 
 // newMemCache creates an in-memory cache
 func newMemCache() (*messageCache, error) {
-	return newSqliteCache(createMemoryFilename(), "", false)
+	return newSqliteCache(createMemoryFilename(), "", 0, 0, false)
 }
 
 // newNopCache creates an in-memory cache that discards all messages;
 // it is always empty and can be used if caching is entirely disabled
 func newNopCache() (*messageCache, error) {
-	return newSqliteCache(createMemoryFilename(), "", true)
+	return newSqliteCache(createMemoryFilename(), "", 0, 0, true)
 }
 
 // createMemoryFilename creates a unique memory filename to use for the SQLite backend.
@@ -228,14 +242,23 @@ func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
 }
 
+// AddMessage stores a message to the message cache synchronously, or queues it to be stored at a later date asyncronously.
+// The message is queued only if "batchSize" or "batchTimeout" are passed to the constructor.
 func (c *messageCache) AddMessage(m *message) error {
+	if c.queue != nil {
+		c.queue.Enqueue(m)
+		return nil
+	}
 	return c.addMessages([]*message{m})
 }
 
+// addMessages synchronously stores a match of messages. If the database is locked, the transaction waits until
+// SQLite's busy_timeout is exceeded before erroring out.
 func (c *messageCache) addMessages(ms []*message) error {
 	if c.nop {
 		return nil
 	}
+	start := time.Now()
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
@@ -289,7 +312,12 @@ func (c *messageCache) addMessages(ms []*message) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		log.Error("Cache: Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
+		return err
+	}
+	log.Debug("Cache: Wrote %d message(s) in %v", len(ms), time.Since(start))
+	return nil
 }
 
 func (c *messageCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
@@ -395,8 +423,12 @@ func (c *messageCache) Topics() (map[string]*topic, error) {
 }
 
 func (c *messageCache) Prune(olderThan time.Time) error {
-	_, err := c.db.Exec(pruneMessagesQuery, olderThan.Unix())
-	return err
+	start := time.Now()
+	if _, err := c.db.Exec(pruneMessagesQuery, olderThan.Unix()); err != nil {
+		log.Warn("Cache: Pruning failed (after %v): %s", time.Since(start), err.Error())
+	}
+	log.Debug("Cache: Pruning successful (took %v)", time.Since(start))
+	return nil
 }
 
 func (c *messageCache) AttachmentBytesUsed(sender string) (int64, error) {
@@ -415,6 +447,17 @@ func (c *messageCache) AttachmentBytesUsed(sender string) (int64, error) {
 		return 0, err
 	}
 	return size, nil
+}
+
+func (c *messageCache) processMessageBatches() {
+	if c.queue == nil {
+		return
+	}
+	for messages := range c.queue.Dequeue() {
+		if err := c.addMessages(messages); err != nil {
+			log.Error("Cache: %s", err.Error())
+		}
+	}
 }
 
 func readMessages(rows *sql.Rows) ([]*message, error) {
@@ -542,6 +585,8 @@ func setupCacheDB(db *sql.DB, startupQueries string) error {
 		return migrateFrom6(db)
 	} else if schemaVersion == 7 {
 		return migrateFrom7(db)
+	} else if schemaVersion == 8 {
+		return migrateFrom8(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
@@ -645,6 +690,17 @@ func migrateFrom7(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 8); err != nil {
+		return err
+	}
+	return migrateFrom8(db)
+}
+
+func migrateFrom8(db *sql.DB) error {
+	log.Info("Migrating cache database schema: from 8 to 9")
+	if _, err := db.Exec(migrate8To9AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 9); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

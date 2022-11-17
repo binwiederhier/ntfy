@@ -825,19 +825,27 @@ out [this discussion on Reddit](https://www.reddit.com/r/golang/comments/r9u4ee/
 
 Depending on *how you run it*, here are a few limits that are relevant:
 
-### WAL for message cache
+### Message cache
 By default, the [message cache](#message-cache) (defined by `cache-file`) uses the SQLite default settings, which means it
 syncs to disk on every write. For personal servers, this is perfectly adequate. For larger installations, such as ntfy.sh,
 the [write-ahead log (WAL)](https://sqlite.org/wal.html) should be enabled, and the sync mode should be adjusted. 
 See [this article](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/) for details.
 
+In addition to that, for very high load servers (such as ntfy.sh), it may be beneficial to write messages to the cache
+in batches, and asynchronously. This can be enabled with the `cache-batch-size` and `cache-batch-timeout`. If you start
+seeing `database locked` messages in the logs, you should probably enable that.
+
 Here's how ntfy.sh has been tuned in the `server.yml` file:
 
 ``` yaml
+cache-batch-size: 25
+cache-batch-timeout: "1s"
 cache-startup-queries: |
     pragma journal_mode = WAL;
     pragma synchronous = normal;
     pragma temp_store = memory;
+    pragma busy_timeout = 15000;
+    vacuum;
 ```
 
 ### For systemd services
@@ -990,6 +998,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).             |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                        |
 | `cache-startup-queries`                    | `NTFY_CACHE_STARTUP_QUERIES`                    | *string (SQL queries)*                              | -                 | SQL queries to run during database startup; this is useful for tuning and [enabling WAL mode](#wal-for-message-cache)                                                                                                           |
+| `cache-batch-size`                         | `NTFY_CACHE_BATCH_SIZE`                         | *int*                                               | 0                 | Max size of messages to batch together when writing to message cache (if zero, writes are synchronous)                                                                                                                          |
+| `cache-batch-timeout`                      | `NTFY_CACHE_BATCH_TIMEOUT`                      | *duration*                                          | 0s                | Timeout for batched async writes to the message cache (if zero, writes are synchronous)                                                                                                                                         |
 | `auth-file`                                | `NTFY_AUTH_FILE`                                | *filename*                                          | -                 | Auth database file used for access control. If set, enables authentication and access control. See [access control](#access-control).                                                                                           |
 | `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | `read-write`      | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                             |
 | `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false             | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection.                                                                                                 |
@@ -1054,6 +1064,8 @@ OPTIONS:
    --behind-proxy, --behind_proxy, -P                                                                  if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
    --cache-duration since, --cache_duration since, -b since                                            buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
    --cache-file value, --cache_file value, -C value                                                    cache file used for message caching [$NTFY_CACHE_FILE]
+   --cache-batch-size value, --cache_batch_size value                                                  max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]
+   --cache-batch-timeout value, --cache_batch_timeout value                                            timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]   
    --cache-startup-queries value, --cache_startup_queries value                                        queries run when the cache database is initialized [$NTFY_CACHE_STARTUP_QUERIES]
    --cert-file value, --cert_file value, -E value                                                      certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --config value, -c value                                                                            config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]

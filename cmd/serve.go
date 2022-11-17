@@ -44,6 +44,8 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
+	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-startup-queries", Aliases: []string{"cache_startup_queries"}, EnvVars: []string{"NTFY_CACHE_STARTUP_QUERIES"}, Usage: "queries run when the cache database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"auth_default_access", "p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
@@ -110,6 +112,8 @@ func execServe(c *cli.Context) error {
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
+	cacheBatchSize := c.Int("cache-batch-size")
+	cacheBatchTimeout := c.Duration("cache-batch-timeout")
 	authFile := c.String("auth-file")
 	authDefaultAccess := c.String("auth-default-access")
 	attachmentCacheDir := c.String("attachment-cache-dir")
@@ -233,6 +237,8 @@ func execServe(c *cli.Context) error {
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.CacheStartupQueries = cacheStartupQueries
+	conf.CacheBatchSize = cacheBatchSize
+	conf.CacheBatchTimeout = cacheBatchTimeout
 	conf.AuthFile = authFile
 	conf.AuthDefaultRead = authDefaultRead
 	conf.AuthDefaultWrite = authDefaultWrite

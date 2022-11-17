@@ -159,7 +159,7 @@ func createMessageCache(conf *Config) (*messageCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, false)
+		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
 	}
 	return newMemCache()
 }
@@ -491,6 +491,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		log.Debug("%s Message delayed, will process later", logMessagePrefix(v, m))
 	}
 	if cache {
+		log.Debug("%s Adding message to cache", logMessagePrefix(v, m))
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}

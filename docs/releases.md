@@ -4,12 +4,40 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
+**Bug fixes:**
+
+* Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
+
 **Additional translations:**
 
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
 
+## ntfy server v1.30.0 (UNRELREASED)
 
-## ntfy server v1.29.0 (UNRELEASED)
+**Features:**
+
+* High-load servers: Allow asynchronous batch-writing of messages to cache via `cache-batch-*` options ([#498](https://github.com/binwiederhier/ntfy/issues/498)/[#502](https://github.com/binwiederhier/ntfy/pull/502))   
+
+**Documentation:**
+
+* GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
+* UnifiedPush ACL clarification ([#497](https://github.com/binwiederhier/ntfy/issues/497), thanks to [@bt90](https://github.com/bt90)) 
+
+**Other things:**
+
+* Put ntfy.sh docs on GitHub pages to reduce AWS outbound traffic cost ([#491](https://github.com/binwiederhier/ntfy/issues/491))
+* The ntfy.sh server hardware was upgraded to a bigger box. If you'd like to help out carrying the server cost, **[sponsorships and donations](https://github.com/sponsors/binwiederhier)** 💸 would be very much appreciated
+
+## ntfy server v1.29.0
+Released November 12, 2022
+
+This release adds the ability to add rate limit exemptions for IP ranges instead of just specific IP addresses. It also fixes 
+a few bugs in the web app and the CLI and adds lots of new examples and install instructions.
+
+Thanks to [some love on HN](https://news.ycombinator.com/item?id=33517944), we got so many new ntfy users trying out ntfy
+and joining the [chat rooms](https://github.com/binwiederhier/ntfy#chat--forum). **Welcome to the ntfy community to all of you!** 
+We also got a ton of new **[sponsors and donations](https://github.com/sponsors/binwiederhier)** 💸, which is amazing. I'd like to thank
+all of you for believing in the project, and for helping me pay the server cost. The HN spike increased the AWS cost quite a bit.
 
 **Features:**
 

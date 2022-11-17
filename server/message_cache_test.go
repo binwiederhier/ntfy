@@ -450,7 +450,7 @@ func TestSqliteCache_StartupQueries_WAL(t *testing.T) {
 	startupQueries := `pragma journal_mode = WAL; 
 pragma synchronous = normal; 
 pragma temp_store = memory;`
-	db, err := newSqliteCache(filename, startupQueries, false)
+	db, err := newSqliteCache(filename, startupQueries, 0, 0, false)
 	require.Nil(t, err)
 	require.Nil(t, db.AddMessage(newDefaultMessage("mytopic", "some message")))
 	require.FileExists(t, filename)
@@ -461,7 +461,7 @@ pragma temp_store = memory;`
 func TestSqliteCache_StartupQueries_None(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
 	startupQueries := ""
-	db, err := newSqliteCache(filename, startupQueries, false)
+	db, err := newSqliteCache(filename, startupQueries, 0, 0, false)
 	require.Nil(t, err)
 	require.Nil(t, db.AddMessage(newDefaultMessage("mytopic", "some message")))
 	require.FileExists(t, filename)
@@ -472,7 +472,7 @@ func TestSqliteCache_StartupQueries_None(t *testing.T) {
 func TestSqliteCache_StartupQueries_Fail(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
 	startupQueries := `xx error`
-	_, err := newSqliteCache(filename, startupQueries, false)
+	_, err := newSqliteCache(filename, startupQueries, 0, 0, false)
 	require.Error(t, err)
 }
 
@@ -501,7 +501,7 @@ func TestMemCache_NopCache(t *testing.T) {
 }
 
 func newSqliteTestCache(t *testing.T) *messageCache {
-	c, err := newSqliteCache(newSqliteTestCacheFile(t), "", false)
+	c, err := newSqliteCache(newSqliteTestCacheFile(t), "", 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +513,7 @@ func newSqliteTestCacheFile(t *testing.T) string {
 }
 
 func newSqliteTestCacheFromFile(t *testing.T, filename, startupQueries string) *messageCache {
-	c, err := newSqliteCache(filename, startupQueries, false)
+	c, err := newSqliteCache(filename, startupQueries, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}

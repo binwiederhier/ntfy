@@ -53,6 +53,12 @@
 #       pragma journal_mode = WAL;
 #       pragma synchronous = normal;
 #       pragma temp_store = memory;
+#       pragma busy_timeout = 15000;
+#       vacuum;
+#
+# The "cache-batch-size" and "cache-batch-timeout" parameter allow enabling async batch writing
+# of messages. If set, messages will be queued and written to the database in batches of the given
+# size, or after the given timeout. This is only required for high volume servers.
 #
 # Debian/RPM package users:
 #   Use /var/cache/ntfy/cache.db as cache file to avoid permission issues. The package
@@ -65,6 +71,8 @@
 # cache-file: <filename>
 # cache-duration: "12h"
 # cache-startup-queries:
+# cache-batch-size: 0
+# cache-batch-timeout: "0ms"
 
 # If set, access to the ntfy server and API can be controlled on a granular level using
 # the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.
@@ -173,8 +181,9 @@
 # Rate limiting: Allowed GET/PUT/POST requests per second, per visitor:
 # - visitor-request-limit-burst is the initial bucket of requests each visitor has
 # - visitor-request-limit-replenish is the rate at which the bucket is refilled
-# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames and IPs to be
-#   exempt from request rate limiting; hostnames are resolved at the time the server is started
+# - visitor-request-limit-exempt-hosts is a comma-separated list of hostnames, IPs or CIDRs to be
+#   exempt from request rate limiting. Hostnames are resolved at the time the server is started.
+#   Example: "1.2.3.4,ntfy.example.com,8.7.6.0/24"
 #
 # visitor-request-limit-burst: 60
 # visitor-request-limit-replenish: "5s"

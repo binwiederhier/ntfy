@@ -47,6 +47,7 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy-middleman](https://github.com/nachotp/ntfy-middleman) - Wraps APIs and send notifications using ntfy.sh on schedule (Python)
 - [ntfy-dotnet](https://github.com/nwithan8/ntfy-dotnet) - .NET client library to interact with a ntfy server (C# / .NET)
 - [node-ntfy-publish](https://github.com/cityssm/node-ntfy-publish) - A Node package to publish notifications to an ntfy server (Node)
+- [ntfy](https://github.com/jonocarroll/ntfy) - Wraps the ntfy API with pipe-friendly tooling (R)
 
 ## CLIs + GUIs
 
@@ -88,9 +89,16 @@ messages until I finally finish implementing end-to-end encryption.
 - [ntfy-to-slack](https://github.com/ozskywalker/ntfy-to-slack) - Tool to subscribe to a ntfy topic and send the messages to a Slack webhook (Go)
 - [ansible-ntfy](https://github.com/jpmens/ansible-ntfy) - Ansible action plugin to post JSON messages to ntfy (Python)
 - [ntfy-notification-channel](https://github.com/wijourdil/ntfy-notification-channel) - Laravel Notification channel for ntfy (PHP)
+- [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
+- [ntfy-sdk](https://gitlab.com/p2kishimoto/ntfy-sdk) - ntfy client library to send notifications (Rust)
 
 ## Blog + forum posts
 
+- [Tracking layoffs, tech worker demand still high, ntfy, devenv, Markdoc & Mike Bifulco](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) - 11/2022
+- [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - 11/2022
+- [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - 11/2022
+- [Push Notifications for KDE](https://volkerkrause.eu/2022/11/12/kde-unifiedpush-push-notifications.html) - 11/2022
+- [TLDR Newsletter Daily Update 2022-11-09](https://tldr.tech/tech/newsletter/2022-11-09) - 11/2022
 - [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - 11/2022
 - [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - 11/2022
 - [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - 11/2022

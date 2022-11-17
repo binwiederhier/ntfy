@@ -185,6 +185,8 @@ ntfy is packaged in nixpkgs as `ntfy-sh`. It can be installed by adding the pack
 nix-env -iA ntfy-sh
 ```
 
+NixOS also supports [declarative setup of the ntfy server](https://search.nixos.org/options?channel=unstable&show=services.ntfy-sh.enable&from=0&size=50&sort=relevance&type=packages&query=ntfy). 
+
 ## macOS
 The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on macOS as well. 
 To install, please [download the tarball](https://github.com/binwiederhier/ntfy/releases/download/v1.28.0/ntfy_1.28.0_macOS_all.tar.gz), 

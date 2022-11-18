@@ -94,6 +94,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [ MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - 11/2022
 - [Tracking layoffs, tech worker demand still high, ntfy, devenv, Markdoc & Mike Bifulco](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) - 11/2022
 - [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - 11/2022
 - [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - 11/2022

@@ -28,6 +28,7 @@ requests.
 
 * GitHub Actions example ([#492](https://github.com/binwiederhier/ntfy/pull/492), thanks to [@ksurl](https://github.com/ksurl))
 * UnifiedPush ACL clarification ([#497](https://github.com/binwiederhier/ntfy/issues/497), thanks to [@bt90](https://github.com/bt90)) 
+* Install instructions for Kustomize ([#463](https://github.com/binwiederhier/ntfy/pull/463), thanks to [@l-maciej](https://github.com/l-maciej))
 
 **Other things:**
 

@@ -443,19 +443,20 @@ Configuration is relatively straightforward. As an example, a minimal configurat
 
 ## Kustomize
 
-`ntfy` can be deployed in Kubernetes cluster with [Kustomize](https://github.com/kubernetes-sigs/kustomize) - tool used to customize Kubernetes objects using kustomization file.
+ntfy can be deployed in a Kubernetes cluster with [Kustomize](https://github.com/kubernetes-sigs/kustomize), a tool used
+to customize Kubernetes objects using a `kustomization.yaml` file.
 
 1. Create new folder - `ntfy`
 2. Add all files listed below 
-    1. kustomization.yaml - stores all configmaps and resources used in deployment
-    2. ntfy-deployment.yam - define deployment type and it's parameters-
-    3. ntfy-pvc.yaml -  describes how [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) will be created 
-    4. ntfy-svc.yaml -  expose application to the internal kubernetes network
-    5. ntfy-ingress.yaml - expose service to outside network using [Ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
-    6. server.yaml - simple server configuration
-4. Replace **TESTNAMESPACE** within kustomization.yaml with designated namespace 
-5. Replace **ntfy.test** within ntfy-ingress.yaml with desired DNS name
-6. Apply configuration to cluster set in current context: 
+    1. `kustomization.yaml` - stores all configmaps and resources used in a deployment
+    2. `ntfy-deployment.yaml` - define deployment type and its parameters
+    3. `ntfy-pvc.yaml` - describes how [persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) will be created 
+    4. `ntfy-svc.yaml` - expose application to the internal kubernetes network
+    5. `ntfy-ingress.yaml` - expose service to outside the network using [ingress controller](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
+    6. `server.yaml` - simple server configuration
+3. Replace **TESTNAMESPACE** within `kustomization.yaml` with designated namespace 
+4. Replace **ntfy.test** within `ntfy-ingress.yaml` with desired DNS name
+5. Apply configuration to cluster set in current context: 
 
 ```bash
 kubectl apply -k /ntfy

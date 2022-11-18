@@ -476,6 +476,29 @@ func TestSqliteCache_StartupQueries_Fail(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestSqliteCache_Sender(t *testing.T) {
+	testSender(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Sender(t *testing.T) {
+	testSender(t, newMemTestCache(t))
+}
+
+func testSender(t *testing.T, c *messageCache) {
+	m1 := newDefaultMessage("mytopic", "mymessage")
+	m1.Sender = netip.MustParseAddr("1.2.3.4")
+	require.Nil(t, c.AddMessage(m1))
+
+	m2 := newDefaultMessage("mytopic", "mymessage without sender")
+	require.Nil(t, c.AddMessage(m2))
+
+	messages, err := c.Messages("mytopic", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+	require.Equal(t, messages[0].Sender, netip.MustParseAddr("1.2.3.4"))
+	require.Equal(t, messages[1].Sender, netip.Addr{})
+}
+
 func checkSchemaVersion(t *testing.T, db *sql.DB) {
 	rows, err := db.Query(`SELECT version FROM schemaVersion`)
 	require.Nil(t, err)

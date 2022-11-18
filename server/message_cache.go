@@ -287,6 +287,10 @@ func (c *messageCache) addMessages(ms []*message) error {
 			}
 			actionsStr = string(actionsBytes)
 		}
+		var sender string
+		if m.Sender.IsValid() {
+			sender = m.Sender.String()
+		}
 		_, err := tx.Exec(
 			insertMessageQuery,
 			m.ID,
@@ -304,7 +308,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 			attachmentSize,
 			attachmentExpires,
 			attachmentURL,
-			m.Sender.String(),
+			sender,
 			m.Encoding,
 			published,
 		)
@@ -501,9 +505,8 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 		}
 		senderIP, err := netip.ParseAddr(sender)
 		if err != nil {
-			senderIP = netip.IPv4Unspecified() // if no IP stored in database, 0.0.0.0
+			senderIP = netip.Addr{} // if no IP stored in database, return invalid address
 		}
-
 		var att *attachment
 		if attachmentName != "" && attachmentURL != "" {
 			att = &attachment{

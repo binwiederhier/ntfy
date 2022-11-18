@@ -12,11 +12,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Korean (thanks to [@YJSofta0f97461d82447ac](https://hosted.weblate.org/user/YJSofta0f97461d82447ac/))
 
-## ntfy server v1.30.0 (UNRELREASED)
+## ntfy server v1.29.1
+Released November 17, 2022
 
-**Features:**
+This is mostly a bugfix release to address the high load on ntfy.sh. There are now two new options that allow
+synchronous batch-writing of messages to the cache. This avoids database locking, and subsequent pileups of waiting
+requests.
 
-* High-load servers: Allow asynchronous batch-writing of messages to cache via `cache-batch-*` options ([#498](https://github.com/binwiederhier/ntfy/issues/498)/[#502](https://github.com/binwiederhier/ntfy/pull/502))   
+**Bug fixes:**
+
+* High-load servers: Allow asynchronous batch-writing of messages to cache via `cache-batch-*` options ([#498](https://github.com/binwiederhier/ntfy/issues/498)/[#502](https://github.com/binwiederhier/ntfy/pull/502))
+* Sender column in cache.db shows invalid IP ([#503](https://github.com/binwiederhier/ntfy/issues/503))
 
 **Documentation:**
 

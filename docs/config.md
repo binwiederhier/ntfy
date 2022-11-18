@@ -907,7 +907,7 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     ```
     # Rate limit all IP addresses
     http {
-	  limit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;
+	  limit_req_zone $binary_remote_addr zone=one:10m rate=45r/m;
     }
 
     # Alternatively, whitelist certain IP addresses
@@ -922,7 +922,7 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
         1 $binary_remote_addr;
         0 "";
       }
-      limit_req_zone $limitkey zone=one:10m rate=1r/s;
+      limit_req_zone $limitkey zone=one:10m rate=45r/m;
     }
     ```
 
@@ -951,7 +951,7 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     action = iptables-multiport[name=ReqLimit, port="http,https", protocol=tcp]
     logpath = /var/log/nginx/error.log
     findtime = 600
-    bantime = 7200
+    bantime = 14400
     maxretry = 10
     ```
 

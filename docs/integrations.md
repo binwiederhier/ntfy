@@ -94,39 +94,39 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
-- [MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - 11/2022
-- [Tracking layoffs, tech worker demand still high, ntfy, devenv, Markdoc & Mike Bifulco](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) - 11/2022
-- [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - 11/2022
-- [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - 11/2022
-- [Push Notifications for KDE](https://volkerkrause.eu/2022/11/12/kde-unifiedpush-push-notifications.html) - 11/2022
-- [TLDR Newsletter Daily Update 2022-11-09](https://tldr.tech/tech/newsletter/2022-11-09) - 11/2022
-- [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - 11/2022
-- [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - 11/2022
-- [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - 11/2022
-- [Zero-cost push notifications to your phone or desktop via PUT/POST ](https://lobste.rs/s/41dq13/zero_cost_push_notifications_your_phone) - 10/2022
-- [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - 10/2022 
-- [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - 10/2022
-- [Neue Services: Ntfy, TikTok und RustDesk](https://adminforge.de/tools/neue-services-ntfy-tiktok-und-rustdesk/) - 9/2022
-- [Ntfy, le service de notifications qu’il vous faut](https://www.cachem.fr/ntfy-le-service-de-notifications-quil-vous-faut/) - 9/2022
-- [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - 9/2022 
-- [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - 8/2022
-- [Fedora Magazine | 4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - 8/2022
-- [Docker로 오픈소스 푸시알람 프로젝트 ntfy.sh 설치 및 사용하기.(Feat. Uptimekuma)](https://svrforum.com/svr/398979) - 8/2022
-- [Easy notifications from R](https://sometimesir.com/posts/easy-notifications-from-r/) - 6/2022
-- [ntfy is finally coming to iOS, and Matrix/UnifiedPush gateway support](https://www.reddit.com/r/selfhosted/comments/vdzvxi/ntfy_is_finally_coming_to_ios_with_full/) ⭐ - 6/2022
-- [无需注册的通知服务ntfy](https://wbsu2003.4everland.app/2022/05/30/%E6%97%A0%E9%9C%80%E6%B3%A8%E5%86%8C%E7%9A%84%E9%80%9A%E7%9F%A5%E6%9C%8D%E5%8A%A1ntfy/) - 5/2022
-- [Install guide (with Docker)](https://chowdera.com/2022/150/202205301257379077.html) - 5/2022
-- [无需注册的通知服务ntfy](https://blog.csdn.net/wbsu2004/article/details/125040247) - 5/2022
-- [Updated review post (Jan-Lukas Else)](https://jlelse.blog/thoughts/2022/04/ntfy) - 4/2022
-- [Reddit feature update post](https://www.reddit.com/r/selfhosted/comments/uetlso/ntfy_is_a_tool_to_send_push_notifications_to_your/) ⭐ - 4/2022
-- [無料で簡単に通知の送受信ができつつオープンソースでセルフホストも可能な「ntfy」を使ってみた (Gigazine)](https://gigazine.net/news/20220404-ntfy-push-notification/) - 4/2022
-- [Pocketmags ntfy review](https://pocketmags.com/us/linux-format-magazine/march-2022/articles/1104187/ntfy) - 3/2022
-- [Reddit web app release post](https://www.reddit.com/r/selfhosted/comments/tc0p0u/say_hello_to_the_brand_new_ntfysh_web_app_push/) ⭐ - 3/2022
-- [Lemmy post (Jakob)](https://lemmy.eus/post/15541) - 1/2022
-- [Reddit UnifiedPush release post](https://www.reddit.com/r/selfhosted/comments/s5jylf/my_open_source_notification_android_app_and/) ⭐ - 1/2022
-- [ntfy: send notifications from your computer to your phone](https://rs1.es/tutorials/2022/01/19/ntfy-send-notifications-phone.html) - 1/2022
-- [Short ntfy review (Jan-Lukas Else)](https://jlelse.blog/links/2021/12/ntfy-sh) - 12/2021
-- [Free MacroDroid webhook alternative (FrameXX)](https://www.macrodroidforum.com/index.php?threads/ntfy-sh-free-macrodroid-webhook-alternative.1505/) - 12/2021
-- [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - 11/2021
-- [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - 12/2021
-- [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - 11/2021
+- [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022
+- [MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - youtube.com - 11/2022
+- [Changelog | Tracking layoffs, tech worker demand still high, ntfy, ...](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) ⭐ - changelog.com - 11/2022
+- [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - pointer.io - 11/2022
+- [Envie Push Notifications por POST (de graça e sem cadastro)](https://www.tabnews.com.br/filipedeschamps/envie-push-notifications-por-post-de-graca-e-sem-cadastro) - tabnews.com.br - 11/2022
+- [Push Notifications for KDE](https://volkerkrause.eu/2022/11/12/kde-unifiedpush-push-notifications.html) - volkerkrause.eu - 11/2022
+- [TLDR Newsletter Daily Update 2022-11-09](https://tldr.tech/tech/newsletter/2022-11-09) ⭐ - tldr.tech - 11/2022
+- [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - news.ycombinator.com - 11/2022
+- [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - lunarok-domotique.com - 11/2022
+- [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - blog.parravidales.es - 11/2022
+- [Zero-cost push notifications to your phone or desktop via PUT/POST ](https://lobste.rs/s/41dq13/zero_cost_push_notifications_your_phone) - lobste.rs - 10/2022
+- [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - jpmens.net - 10/2022 
+- [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - youtube.com - 10/2022
+- [Neue Services: Ntfy, TikTok und RustDesk](https://adminforge.de/tools/neue-services-ntfy-tiktok-und-rustdesk/) - adminforge.de - 9/2022
+- [Ntfy, le service de notifications qu’il vous faut](https://www.cachem.fr/ntfy-le-service-de-notifications-quil-vous-faut/) - cachem.fr - 9/2022
+- [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - cachem.fr - 9/2022 
+- [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - thejeshgn.com - 8/2022
+- [Fedora Magazine | 4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - fedoramagazine.org - 8/2022
+- [Docker로 오픈소스 푸시알람 프로젝트 ntfy.sh 설치 및 사용하기.(Feat. Uptimekuma)](https://svrforum.com/svr/398979) - svrforum.com - 8/2022
+- [Easy notifications from R](https://sometimesir.com/posts/easy-notifications-from-r/) - sometimesir.com - 6/2022
+- [ntfy is finally coming to iOS, and Matrix/UnifiedPush gateway support](https://www.reddit.com/r/selfhosted/comments/vdzvxi/ntfy_is_finally_coming_to_ios_with_full/) ⭐ - reddit.com - 6/2022
+- [Install guide (with Docker)](https://chowdera.com/2022/150/202205301257379077.html) - chowdera.com - 5/2022
+- [无需注册的通知服务ntfy](https://blog.csdn.net/wbsu2004/article/details/125040247) - blog.csdn.net - 5/2022
+- [Updated review post (Jan-Lukas Else)](https://jlelse.blog/thoughts/2022/04/ntfy) - jlelse.blog - 4/2022
+- [Reddit feature update post](https://www.reddit.com/r/selfhosted/comments/uetlso/ntfy_is_a_tool_to_send_push_notifications_to_your/) ⭐ - reddit.com - 4/2022
+- [無料で簡単に通知の送受信ができつつオープンソースでセルフホストも可能な「ntfy」を使ってみた](https://gigazine.net/news/20220404-ntfy-push-notification/) - gigazine.net - 4/2022
+- [Pocketmags ntfy review](https://pocketmags.com/us/linux-format-magazine/march-2022/articles/1104187/ntfy) - pocketmags.com - 3/2022
+- [Reddit web app release post](https://www.reddit.com/r/selfhosted/comments/tc0p0u/say_hello_to_the_brand_new_ntfysh_web_app_push/) ⭐ - reddit.com- 3/2022
+- [Lemmy post (Jakob)](https://lemmy.eus/post/15541) - lemmy.eus - 1/2022
+- [Reddit UnifiedPush release post](https://www.reddit.com/r/selfhosted/comments/s5jylf/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 1/2022
+- [ntfy: send notifications from your computer to your phone](https://rs1.es/tutorials/2022/01/19/ntfy-send-notifications-phone.html) - rs1.es - 1/2022
+- [Short ntfy review (Jan-Lukas Else)](https://jlelse.blog/links/2021/12/ntfy-sh) - jlelse.blog - 12/2021
+- [Free MacroDroid webhook alternative (FrameXX)](https://www.macrodroidforum.com/index.php?threads/ntfy-sh-free-macrodroid-webhook-alternative.1505/) - macrodroidforum.com - 12/2021
+- [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - ugeek.github.io - 11/2021
+- [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
+- [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021

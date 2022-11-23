@@ -6,7 +6,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* Upgrade Android dependencies to SDK 33 (no ticket)
+* Upgrade Android dependencies and build toolchain to SDK 33 (no ticket)
+* Simplify F-Droid build: Disable tasks for Google Services ([#516](https://github.com/binwiederhier/ntfy/issues/516), thanks to [@markosopcic](https://github.com/markosopcic))
 * Android 13: Ask for permission to post notifications ([#508](https://github.com/binwiederhier/ntfy/issues/508))
 * Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
 * Fix auto-delete if some icons do not exist anymore ([#506](https://github.com/binwiederhier/ntfy/issues/506))

@@ -41,5 +41,11 @@
     "alert_grant_description": "Ge din webbläsare behörighet att visa skrivbordsnotiser.",
     "alert_not_supported_description": "Notiser stöds inte i din webbläsare.",
     "notifications_mark_read": "Markera som läst",
-    "notifications_attachment_file_video": "video fil"
+    "notifications_attachment_file_video": "video fil",
+    "notifications_click_copy_url_button": "Kopiera länk",
+    "notifications_click_open_button": "Öppna länk",
+    "notifications_actions_open_url_title": "Gå till {{url}}",
+    "notifications_none_for_any_title": "Du har inte fått några notiser.",
+    "notifications_example": "Exempel",
+    "notifications_loading": "Laddar notiser …"
 }

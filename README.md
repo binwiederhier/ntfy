@@ -67,7 +67,7 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
 
-## Donations
+## Sponsors
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
 I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
 appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
@@ -101,6 +101,10 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/gergepalfi"><img src="https://github.com/gergepalfi.png" width="40px" /></a>
 <a href="https://github.com/tonyakwei"><img src="https://github.com/tonyakwei.png" width="40px" /></a>
 <a href="https://github.com/crosbyh"><img src="https://github.com/crosbyh.png" width="40px" /></a>
+
+I'd also like to thank [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
+
+<a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

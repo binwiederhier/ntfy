@@ -1316,7 +1316,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 === "Command line (curl)"
     ```
     curl \
-        -d "Somebody retweetet your tweet." \
+        -d "Somebody retweeted your tweet." \
         -H "Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" \
     ntfy.sh/myhome
     ```
@@ -1326,7 +1326,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ntfy publish \
         --actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" \
         myhome \
-        "Somebody retweetet your tweet."
+        "Somebody retweeted your tweet."
     ```
 
 === "HTTP"
@@ -1335,14 +1335,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     Host: ntfy.sh
     Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392
 
-    Somebody retweetet your tweet.
+    Somebody retweeted your tweet.
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/myhome', {
         method: 'POST',
-        body: 'Somebody retweetet your tweet.',
+        body: 'Somebody retweeted your tweet.',
         headers: { 
             'Actions': 'view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392' 
         }
@@ -1351,7 +1351,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Somebody retweetet your tweet."))
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Somebody retweeted your tweet."))
     req.Header.Set("Actions", "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392")
     http.DefaultClient.Do(req)
     ```
@@ -1360,14 +1360,14 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ``` powershell
     $uri = "https://ntfy.sh/myhome"
     $headers = @{ Actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" }
-    $body = "Somebody retweetet your tweet."
+    $body = "Somebody retweeted your tweet."
     Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
     ```
 
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/myhome",
-        data="Somebody retweetet your tweet.",
+        data="Somebody retweeted your tweet.",
         headers={ "Actions": "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" })
     ```
 
@@ -1379,7 +1379,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'header' =>
                 "Content-Type: text/plain\r\n" .
                 "Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392",
-            'content' => 'Somebody retweetet your tweet.'
+            'content' => 'Somebody retweeted your tweet.'
         ]
     ]));
     ```
@@ -1391,7 +1391,7 @@ And the same example using [JSON publishing](#publish-as-json):
     curl ntfy.sh \
       -d '{
         "topic": "myhome",
-        "message": "Somebody retweetet your tweet.",
+        "message": "Somebody retweeted your tweet.",
         "actions": [
           {
             "action": "view",
@@ -1413,7 +1413,7 @@ And the same example using [JSON publishing](#publish-as-json):
             }
         ]' \
         myhome \
-        "Somebody retweetet your tweet."
+        "Somebody retweeted your tweet."
     ```
 
 === "HTTP"
@@ -1423,7 +1423,7 @@ And the same example using [JSON publishing](#publish-as-json):
 
     {
         "topic": "myhome",
-        "message": "Somebody retweetet your tweet.",
+        "message": "Somebody retweeted your tweet.",
         "actions": [
           {
             "action": "view",
@@ -1440,7 +1440,7 @@ And the same example using [JSON publishing](#publish-as-json):
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "Somebody retweetet your tweet.",
+            message": "Somebody retweeted your tweet.",
             actions: [
                 {
                     action: "view",
@@ -1459,7 +1459,7 @@ And the same example using [JSON publishing](#publish-as-json):
     
     body := `{
         "topic": "myhome",
-        "message": "Somebody retweetet your tweet.",
+        "message": "Somebody retweeted your tweet.",
         "actions": [
           {
             "action": "view",
@@ -1477,7 +1477,7 @@ And the same example using [JSON publishing](#publish-as-json):
     $uri = "https://ntfy.sh"
     $body = @{
         topic = "myhome"
-        message = "Somebody retweetet your tweet."
+        message = "Somebody retweeted your tweet."
         actions = @(
             @{
                 "action"="view"
@@ -1494,7 +1494,7 @@ And the same example using [JSON publishing](#publish-as-json):
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "myhome",
-            "message": "Somebody retweetet your tweet.",
+            "message": "Somebody retweeted your tweet.",
             "actions": [
                 {
                     "action": "view",
@@ -1514,7 +1514,7 @@ And the same example using [JSON publishing](#publish-as-json):
             'header' => "Content-Type: application/json",
             'content' => json_encode([
                 "topic": "myhome",
-                "message": "Somebody retweetet your tweet.",
+                "message": "Somebody retweeted your tweet.",
                 "actions": [
                     [
                         "action": "view",

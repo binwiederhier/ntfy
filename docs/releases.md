@@ -11,6 +11,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Android 13: Ask for permission to post notifications ([#508](https://github.com/binwiederhier/ntfy/issues/508))
 * Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
 * Fix auto-delete if some icons do not exist anymore ([#506](https://github.com/binwiederhier/ntfy/issues/506))
+* Fix notification icon color ([#480](https://github.com/binwiederhier/ntfy/issues/480), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)
+* Fix topics do not re-subscribe to Firebase after restoring from backup ([#511](https://github.com/binwiederhier/ntfy/issues/511))
+* Add donate button (no ticket)
 
 **Additional translations:**
 

@@ -1,13 +1,5 @@
 ![ntfy](web/public/static/img/ntfy.png)
 
----
-
-## 👶 Baby break - My baby girl was born!
-Hey folks, my daughter was born on 8/30/22, so I'll be taking some time off from working on ntfy. I'll likely return 
-to working on features and bugs in a few weeks. I hope you understand. I posted some pictures in [#387](https://github.com/binwiederhier/ntfy/issues/387) 🥰   
-
----
-
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
 [![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy)

@@ -4,6 +4,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
+**Features:**
+
+* Add thematic/adaptive launcher icon ([#513](https://github.com/binwiederhier/ntfy/issues/513), thanks to [@daedric7](https://github.com/daedric7) for reporting)
+
 **Bug fixes + maintenance:**
 
 * Upgrade Android dependencies and build toolchain to SDK 33 (no ticket)

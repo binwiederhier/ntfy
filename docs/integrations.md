@@ -96,6 +96,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [ntfy - Push Notification Service](https://www.reddit.com/r/ntfy/comments/z6wu6c/ntfy_blog_post_covering_installation_usage_and/) - dizzytech.de - 11/2022 
 - [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022
 - [MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - youtube.com - 11/2022
 - [Changelog | Tracking layoffs, tech worker demand still high, ntfy, ...](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) ⭐ - changelog.com - 11/2022

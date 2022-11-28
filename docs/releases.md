@@ -19,6 +19,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Upgrade Android dependencies and build toolchain to SDK 33 (no ticket)
 * Simplify F-Droid build: Disable tasks for Google Services ([#516](https://github.com/binwiederhier/ntfy/issues/516), thanks to [@markosopcic](https://github.com/markosopcic))
 * Android 13: Ask for permission to post notifications ([#508](https://github.com/binwiederhier/ntfy/issues/508))
+* Android 13: Do not allow swiping away the foreground notification ([#521](https://github.com/binwiederhier/ntfy/issues/521), thanks to [@alexhorner](https://github.com/alexhorner) for reporting)
 * Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
 * Fix auto-delete if some icons do not exist anymore ([#506](https://github.com/binwiederhier/ntfy/issues/506))
 * Fix notification icon color ([#480](https://github.com/binwiederhier/ntfy/issues/480), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)

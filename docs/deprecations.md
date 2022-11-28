@@ -4,11 +4,14 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 before the behavior is changed depends on the severity of the change, and how prominent the feature is.
 
 ## Active deprecations
+_No active deprecations_
+
+## Previous deprecations
 
 ### ntfy CLI: `ntfy publish --env-topic` will be removed
-> Active since 2022-06-20, behavior will change end of **July 2022**
+> Active since 2022-06-20, behavior changed with v1.30.0
 
-The `ntfy publish --env-topic` option will be removed. It'll still be possible to specify a topic via the 
+The `ntfy publish --env-topic` option will be removed. It'll still be possible to specify a topic via the
 `NTFY_TOPIC` environment variable, but it won't be necessary anymore to specify the `--env-topic` flag.
 
 === "Before"
@@ -20,8 +23,6 @@ The `ntfy publish --env-topic` option will be removed. It'll still be possible t
     ```
     $ NTFY_TOPIC=mytopic ntfy publish "this is the message"
     ```
-
-## Previous deprecations
 
 ### <del>Android app: WebSockets will become the default connection protocol</del>
 > Active since 2022-03-13, behavior will not change (deprecation removed 2022-06-20)

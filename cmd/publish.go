@@ -49,7 +49,7 @@ var cmdPublish = &cli.Command{
 	Usage:   "Send message via a ntfy server",
 	UsageText: `ntfy publish [OPTIONS..] TOPIC [MESSAGE...]
 ntfy publish [OPTIONS..] --wait-cmd COMMAND...
-NTFY_TOPIC=.. ntfy publish [OPTIONS..] -P [MESSAGE...]`,
+NTFY_TOPIC=.. ntfy publish [OPTIONS..] [MESSAGE...]`,
 	Action:   execPublish,
 	Category: categoryClient,
 	Flags:    flagsPublish,
@@ -72,7 +72,7 @@ Examples:
   ntfy pub --wait-pid 1234 mytopic                        # Wait for process 1234 to exit before publishing
   ntfy pub --wait-cmd mytopic rsync -av ./ /tmp/a         # Run command and publish after it completes
   NTFY_USER=phil:mypass ntfy pub secret Psst              # Use env variables to set username/password
-  NTFY_TOPIC=mytopic ntfy pub -P "some message"           # Use NTFY_TOPIC variable as topic 
+  NTFY_TOPIC=mytopic ntfy pub "some message"              # Use NTFY_TOPIC variable as topic 
   cat flower.jpg | ntfy pub --file=- flowers 'Nice!'      # Same as above, send image.jpg as attachment
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
  
@@ -241,13 +241,9 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 }
 
 func parseTopicAndArgs(c *cli.Context) (topic string, args []string, err error) {
-	envTopic := c.Bool("env-topic")
-	if envTopic {
-		fmt.Fprintln(c.App.ErrWriter, "\x1b[1;33mDeprecation notice: The --env-topic/-P flag will be removed in July 2022, see https://ntfy.sh/docs/deprecations/ for details.\x1b[0m")
-		topic = os.Getenv("NTFY_TOPIC")
-		if topic == "" {
-			return "", nil, errors.New("when --env-topic is passed, must define NTFY_TOPIC environment variable")
-		}
+	envTopic := os.Getenv("NTFY_TOPIC")
+	if envTopic != "" {
+		topic = envTopic
 		return topic, remainingArgs(c, 0), nil
 	}
 	if c.NArg() < 1 {

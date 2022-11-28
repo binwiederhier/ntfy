@@ -2,6 +2,12 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v1.30.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
+
 ## ntfy Android app v1.14.0 (UNRELEASED)
 
 **Features:**

@@ -18,6 +18,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Fix notification icon color ([#480](https://github.com/binwiederhier/ntfy/issues/480), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)
 * Fix topics do not re-subscribe to Firebase after restoring from backup ([#511](https://github.com/binwiederhier/ntfy/issues/511))
 * Fix crashes from large images ([#474](https://github.com/binwiederhier/ntfy/issues/474), thanks to [@daedric7](https://github.com/daedric7) for reporting)
+* Fix notification click opens wrong subscription ([#261](https://github.com/binwiederhier/ntfy/issues/261), thanks to [@SMAW](https://github.com/SMAW) for reporting)
 * Add donate button (no ticket)
 
 **Additional translations:**

@@ -25,10 +25,14 @@ import logo from "../img/ntfy.svg";
 import {useTranslation} from "react-i18next";
 import {Portal, Snackbar} from "@mui/material";
 import SubscriptionSettingsDialog from "./SubscriptionSettingsDialog";
+import session from "../app/Session";
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import Button from "@mui/material/Button";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();
     const location = useLocation();
+    const username = session.username();
     let title = "ntfy";
     if (props.selected) {
         title = topicDisplayName(props.selected);
@@ -69,6 +73,7 @@ const ActionBar = (props) => {
                         subscription={props.selected}
                         onUnsubscribe={props.onUnsubscribe}
                     />}
+                <ProfileIcon/>
             </Toolbar>
         </AppBar>
     );
@@ -114,7 +119,7 @@ const SettingsIcons = (props) => {
         if (newSelected) {
             navigate(routes.forSubscription(newSelected));
         } else {
-            navigate(routes.root);
+            navigate(routes.app);
         }
     };
 
@@ -236,5 +241,91 @@ const SettingsIcons = (props) => {
         </>
     );
 };
+
+const ProfileIcon = (props) => {
+    const { t } = useTranslation();
+    const [open, setOpen] = useState(false);
+    const anchorRef = useRef(null);
+    const username = session.username();
+
+    const handleToggleOpen = () => {
+        setOpen((prevOpen) => !prevOpen);
+    };
+
+    const handleClose = (event) => {
+        if (anchorRef.current && anchorRef.current.contains(event.target)) {
+            return;
+        }
+        setOpen(false);
+    };
+
+    const handleListKeyDown = (event) => {
+        if (event.key === 'Tab') {
+            event.preventDefault();
+            setOpen(false);
+        } else if (event.key === 'Escape') {
+            setOpen(false);
+        }
+    }
+
+    const handleUpgrade = () => {
+        // TODO
+    };
+
+    const handleLogout = () => {
+        session.reset();
+        window.location.href = routes.app;
+    };
+
+    // return focus to the button when we transitioned from !open -> open
+    const prevOpen = useRef(open);
+    useEffect(() => {
+        if (prevOpen.current === true && open === false) {
+            anchorRef.current.focus();
+        }
+        prevOpen.current = open;
+    }, [open]);
+
+    return (
+        <>
+            {username &&
+                <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} sx={{marginRight: 0}} aria-label={t("xxxxxxx")}>
+                    <AccountCircleIcon/>
+                </IconButton>
+            }
+            {!username &&
+                <>
+                    <Button>Sign in</Button>
+                    <Button>Sign up</Button>
+                </>
+            }
+            <Popper
+                open={open}
+                anchorEl={anchorRef.current}
+                role={undefined}
+                placement="bottom-start"
+                transition
+                disablePortal
+            >
+                {({TransitionProps, placement}) => (
+                    <Grow
+                        {...TransitionProps}
+                        style={{transformOrigin: placement === 'bottom-start' ? 'left top' : 'left bottom'}}
+                    >
+                        <Paper>
+                            <ClickAwayListener onClickAway={handleClose}>
+                                <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
+                                    <MenuItem onClick={handleUpgrade}>Upgrade</MenuItem>
+                                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                                </MenuList>
+                            </ClickAwayListener>
+                        </Paper>
+                    </Grow>
+                )}
+            </Popper>
+        </>
+    );
+};
+
 
 export default ActionBar;

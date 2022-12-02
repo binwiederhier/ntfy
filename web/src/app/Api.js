@@ -5,7 +5,7 @@ import {
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince,
+    topicUrlJsonPollWithSince, userAuthUrl,
     userStatsUrl
 } from "./utils";
 import userManager from "./UserManager";
@@ -101,7 +101,7 @@ class Api {
         return send;
     }
 
-    async auth(baseUrl, topic, user) {
+    async topicAuth(baseUrl, topic, user) {
         const url = topicUrlAuth(baseUrl, topic);
         console.log(`[Api] Checking auth for ${url}`);
         const response = await fetch(url, {
@@ -115,6 +115,22 @@ class Api {
             return false;
         }
         throw new Error(`Unexpected server response ${response.status}`);
+    }
+
+    async userAuth(baseUrl, user) {
+        const url = userAuthUrl(baseUrl);
+        console.log(`[Api] Checking auth for ${url}`);
+        const response = await fetch(url, {
+            headers: maybeWithBasicAuth({}, user)
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        const json = await response.json();
+        if (!json.token) {
+            throw new Error(`Unexpected server response: Cannot find token`);
+        }
+        return json.token;
     }
 
     async userStats(baseUrl) {

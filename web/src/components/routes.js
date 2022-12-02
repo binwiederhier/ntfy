@@ -2,7 +2,9 @@ import config from "../app/config";
 import {shortUrl} from "../app/utils";
 
 const routes = {
-    root: config.appRoot,
+    home: "/",
+    login: "/login",
+    app: config.appRoot,
     settings: "/settings",
     subscription: "/:topic",
     subscriptionExternal: "/:baseUrl/:topic",

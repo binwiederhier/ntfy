@@ -23,6 +23,8 @@ import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
 import {Backdrop, CircularProgress} from "@mui/material";
+import Home from "./Home";
+import Login from "./Login";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -35,8 +37,10 @@ const App = () => {
                     <CssBaseline/>
                     <ErrorBoundary>
                         <Routes>
+                            <Route path={routes.home} element={<Home/>}/>
+                            <Route path={routes.login} element={<Login/>}/>
                             <Route element={<Layout/>}>
-                                <Route path={routes.root} element={<AllSubscriptions/>}/>
+                                <Route path={routes.app} element={<AllSubscriptions/>}/>
                                 <Route path={routes.settings} element={<Preferences/>}/>
                                 <Route path={routes.subscription} element={<SingleSubscription/>}/>
                                 <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>

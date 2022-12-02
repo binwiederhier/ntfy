@@ -18,30 +18,62 @@ const (
 const (
 	createAuthTablesQueries = `
 		BEGIN;
-		CREATE TABLE IF NOT EXISTS user (
-			user TEXT NOT NULL PRIMARY KEY,
-			pass TEXT NOT NULL,
-			role TEXT NOT NULL
+		CREATE TABLE IF NOT EXISTS plan (
+			id INT NOT NULL,		
+			name TEXT NOT NULL,	
+			limit_messages INT,
+			PRIMARY KEY (id)
 		);
-		CREATE TABLE IF NOT EXISTS access (
-			user TEXT NOT NULL,		
+		CREATE TABLE IF NOT EXISTS user (
+		    id INTEGER PRIMARY KEY AUTOINCREMENT,
+			plan_id INT,
+			user TEXT NOT NULL,
+			pass TEXT NOT NULL,
+			role TEXT NOT NULL,
+			language TEXT,
+			notification_sound TEXT,
+			notification_min_priority INT,
+			notification_delete_after INT,
+		    FOREIGN KEY (plan_id) REFERENCES plan (id)
+		);
+		CREATE UNIQUE INDEX idx_user ON user (user);
+		CREATE TABLE IF NOT EXISTS user_access (
+			user_id INT NOT NULL,		
 			topic TEXT NOT NULL,
 			read INT NOT NULL,
 			write INT NOT NULL,
-			PRIMARY KEY (topic, user)
+			PRIMARY KEY (user_id, topic),
+			FOREIGN KEY (user_id) REFERENCES user (id)
 		);
+		CREATE TABLE IF NOT EXISTS user_subscription (
+			user_id INT NOT NULL,		
+			base_url TEXT NOT NULL,	
+			topic TEXT NOT NULL,
+			PRIMARY KEY (user_id, base_url, topic)
+		);
+		CREATE TABLE IF NOT EXISTS user_token (
+			token TEXT NOT NULL,
+			user_id INT NOT NULL,
+			expires INT NOT NULL,
+			PRIMARY KEY (token)
+		);
+		CREATE INDEX idx_user_id ON user_token (user_id);  
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
+		CREATE INDEX IF NOT EXISTS idx_user ON user_subscription (user);
+		INSERT INTO plan (id, name) VALUES (1, 'Admin') ON CONFLICT (id) DO NOTHING;
+		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
 		COMMIT;
 	`
 	selectUserQuery       = `SELECT pass, role FROM user WHERE user = ?`
 	selectTopicPermsQuery = `
 		SELECT read, write 
-		FROM access 
-		WHERE user IN ('*', ?) AND ? LIKE topic
-		ORDER BY user DESC
+		FROM user_access
+		JOIN user ON user.user = '*' OR user.user = ?
+		WHERE ? LIKE user_access.topic
+		ORDER BY user.user DESC
 	`
 )
 
@@ -53,15 +85,11 @@ const (
 	updateUserRoleQuery  = `UPDATE user SET role = ? WHERE user = ?`
 	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
 
-	upsertUserAccessQuery = `
-		INSERT INTO access (user, topic, read, write) 
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT (user, topic) DO UPDATE SET read=excluded.read, write=excluded.write
-	`
-	selectUserAccessQuery  = `SELECT topic, read, write FROM access WHERE user = ?`
-	deleteAllAccessQuery   = `DELETE FROM access`
-	deleteUserAccessQuery  = `DELETE FROM access WHERE user = ?`
-	deleteTopicAccessQuery = `DELETE FROM access WHERE user = ? AND topic = ?`
+	upsertUserAccessQuery  = `INSERT INTO user_access (user_id, topic, read, write) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?)`
+	selectUserAccessQuery  = `SELECT topic, read, write FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
+	deleteAllAccessQuery   = `DELETE FROM user_access`
+	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
+	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
 )
 
 // Schema management queries

@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import session from "./Session";
 
 // Uses Dexie.js
 // https://dexie.org/docs/API-Reference#quick-reference
@@ -6,7 +7,8 @@ import Dexie from 'dexie';
 // Notes:
 // - As per docs, we only declare the indexable columns, not all columns
 
-const db = new Dexie('ntfy');
+const dbName = (session.username()) ? `ntfy-${session.username()}` : "ntfy";
+const db = new Dexie(dbName);
 
 db.version(1).stores({
     subscriptions: '&id,baseUrl',

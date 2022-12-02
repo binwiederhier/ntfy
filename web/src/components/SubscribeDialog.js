@@ -63,7 +63,7 @@ const SubscribePage = (props) => {
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
         const username = (user) ? user.username : t("subscribe_dialog_error_user_anonymous");
-        const success = await api.auth(baseUrl, topic, user);
+        const success = await api.topicAuth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
             if (user) {
@@ -163,7 +163,7 @@ const LoginPage = (props) => {
     const topic = props.topic;
     const handleLogin = async () => {
         const user = {baseUrl, username, password};
-        const success = await api.auth(baseUrl, topic, user);
+        const success = await api.topicAuth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
             setErrorText(t("subscribe_dialog_error_user_not_authorized", { username: username }));

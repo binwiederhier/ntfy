@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"heckel.io/ntfy/auth"
 	"net/netip"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ type visitor struct {
 	config        *Config
 	messageCache  *messageCache
 	ip            netip.Addr
+	user          *auth.User
 	requests      *rate.Limiter
 	emails        *rate.Limiter
 	subscriptions util.Limiter
@@ -42,11 +44,12 @@ type visitorStats struct {
 	VisitorAttachmentBytesRemaining int64 `json:"visitorAttachmentBytesRemaining"`
 }
 
-func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr) *visitor {
+func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
 	return &visitor{
 		config:        conf,
 		messageCache:  messageCache,
 		ip:            ip,
+		user:          user,
 		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
 		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),

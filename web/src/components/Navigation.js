@@ -104,14 +104,14 @@ const NavList = (props) => {
                 {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert/>}
                 {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
-                    <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
+                    <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.appRoot}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>
                         <ListItemText primary={t("nav_button_all_notifications")}/>
                     </ListItemButton>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader>{t("nav_topics_title")}</ListSubheader>
-                        <ListItemButton onClick={() => navigate(routes.root)} selected={location.pathname === config.appRoot}>
+                        <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.appRoot}>
                             <ListItemIcon><ChatBubble/></ListItemIcon>
                             <ListItemText primary={t("nav_button_all_notifications")}/>
                         </ListItemButton>

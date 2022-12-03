@@ -6,10 +6,12 @@ import (
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/util"
 	"strings"
 )
 
 const (
+	tokenLength             = 32
 	bcryptCost              = 10
 	intentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match bcryptCost
 )
@@ -67,7 +69,17 @@ const (
 		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
 		COMMIT;
 	`
-	selectUserQuery       = `SELECT pass, role FROM user WHERE user = ?`
+	selectUserByNameQuery = `
+		SELECT user, pass, role, language 
+		FROM user 
+		WHERE user = ?
+	`
+	selectUserByTokenQuery = `
+		SELECT user, pass, role, language 
+		FROM user
+		JOIN user_token on user.id = user_token.user_id
+		WHERE token = ?
+	`
 	selectTopicPermsQuery = `
 		SELECT read, write 
 		FROM user_access
@@ -90,6 +102,8 @@ const (
 	deleteAllAccessQuery   = `DELETE FROM user_access`
 	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
+
+	insertTokenQuery = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
 )
 
 // Schema management queries
@@ -126,7 +140,7 @@ func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth
 	}, nil
 }
 
-// Authenticate checks username and password and returns a user if correct. The method
+// AuthenticateUser checks username and password and returns a user if correct. The method
 // returns in constant-ish time, regardless of whether the user exists or the password is
 // correct or incorrect.
 func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
@@ -143,6 +157,23 @@ func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
 		return nil, ErrUnauthenticated
 	}
 	return user, nil
+}
+
+func (a *SQLiteAuth) AuthenticateToken(token string) (*User, error) {
+	user, err := a.userByToken(token)
+	if err != nil {
+		return nil, ErrUnauthenticated
+	}
+	return user, nil
+}
+
+func (a *SQLiteAuth) GenerateToken(user *User) (string, error) {
+	token := util.RandomString(tokenLength)
+	expires := 1 // FIXME
+	if _, err := a.db.Exec(insertTokenQuery, user.Name, token, expires); err != nil {
+		return "", err
+	}
+	return token, nil
 }
 
 // Authorize returns nil if the given user has access to the given topic using the desired
@@ -255,16 +286,29 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 	if username == Everyone {
 		return a.everyoneUser()
 	}
-	rows, err := a.db.Query(selectUserQuery, username)
+	rows, err := a.db.Query(selectUserByNameQuery, username)
 	if err != nil {
 		return nil, err
 	}
+	return a.readUser(rows)
+}
+
+func (a *SQLiteAuth) userByToken(token string) (*User, error) {
+	rows, err := a.db.Query(selectUserByTokenQuery, token)
+	if err != nil {
+		return nil, err
+	}
+	return a.readUser(rows)
+}
+
+func (a *SQLiteAuth) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
-	var hash, role string
+	var username, hash, role string
+	var language sql.NullString
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&hash, &role); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &language); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -274,10 +318,11 @@ func (a *SQLiteAuth) User(username string) (*User, error) {
 		return nil, err
 	}
 	return &User{
-		Name:   username,
-		Hash:   hash,
-		Role:   Role(role),
-		Grants: grants,
+		Name:     username,
+		Hash:     hash,
+		Role:     Role(role),
+		Grants:   grants,
+		Language: language.String,
 	}, nil
 }
 

@@ -18,7 +18,7 @@ type testAuther struct {
 	Allow bool
 }
 
-func (t testAuther) Authenticate(_, _ string) (*auth.User, error) {
+func (t testAuther) AuthenticateUser(_, _ string) (*auth.User, error) {
 	return nil, errors.New("not used")
 }
 

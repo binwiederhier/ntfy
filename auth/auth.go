@@ -6,12 +6,16 @@ import (
 	"regexp"
 )
 
-// Auther is a generic interface to implement password-based authentication and authorization
+// Auther is a generic interface to implement password and token based authentication and authorization
 type Auther interface {
 	// Authenticate checks username and password and returns a user if correct. The method
 	// returns in constant-ish time, regardless of whether the user exists or the password is
 	// correct or incorrect.
 	Authenticate(username, password string) (*User, error)
+
+	AuthenticateToken(token string) (*User, error)
+
+	GenerateToken(user *User) (string, error)
 
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
@@ -56,10 +60,11 @@ type Manager interface {
 
 // User is a struct that represents a user
 type User struct {
-	Name   string
-	Hash   string // password hash (bcrypt)
-	Role   Role
-	Grants []Grant
+	Name     string
+	Hash     string // password hash (bcrypt)
+	Role     Role
+	Grants   []Grant
+	Language string
 }
 
 // Grant is a struct that represents an access control entry to a topic

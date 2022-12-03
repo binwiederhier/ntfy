@@ -25,6 +25,10 @@ import "./i18n"; // Translations!
 import {Backdrop, CircularProgress} from "@mui/material";
 import Home from "./Home";
 import Login from "./Login";
+import i18n from "i18next";
+import api from "../app/Api";
+import prefs from "../app/Prefs";
+import session from "../app/Session";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -81,6 +85,21 @@ const Layout = () => {
     useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
+    useEffect(() => {
+        (async () => {
+            const account = await api.userAccount("http://localhost:2586", session.token());
+            if (account) {
+                if (account.language) {
+                    await i18n.changeLanguage(account.language);
+                }
+                if (account.notification) {
+                    if (account.notification.sound) {
+                        await prefs.setSound(account.notification.sound);
+                    }
+                }
+            }
+        })();
+    });
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>

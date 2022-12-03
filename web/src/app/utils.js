@@ -20,6 +20,7 @@ export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/aut
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const userStatsUrl = (baseUrl) => `${baseUrl}/user/stats`;
 export const userAuthUrl = (baseUrl) => `${baseUrl}/user/auth`;
+export const userAccountUrl = (baseUrl) => `${baseUrl}/user/account`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
@@ -95,10 +96,16 @@ export const unmatchedTags = (tags) => {
     else return tags.filter(tag => !(tag in emojis));
 }
 
-
 export const maybeWithBasicAuth = (headers, user) => {
     if (user) {
         headers['Authorization'] = `Basic ${encodeBase64(`${user.username}:${user.password}`)}`;
+    }
+    return headers;
+}
+
+export const maybeWithBearerAuth = (headers, token) => {
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
 }

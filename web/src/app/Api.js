@@ -1,11 +1,13 @@
 import {
     fetchLinesIterator,
-    maybeWithBasicAuth,
+    maybeWithBasicAuth, maybeWithBearerAuth,
     topicShortUrl,
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince, userAuthUrl,
+    topicUrlJsonPollWithSince,
+    userAccountUrl,
+    userAuthUrl,
     userStatsUrl
 } from "./utils";
 import userManager from "./UserManager";
@@ -143,6 +145,20 @@ class Api {
         const stats = await response.json();
         console.log(`[Api] Stats`, stats);
         return stats;
+    }
+
+    async userAccount(baseUrl, token) {
+        const url = userAccountUrl(baseUrl);
+        console.log(`[Api] Fetching user account ${url}`);
+        const response = await fetch(url, {
+            headers: maybeWithBearerAuth({}, token)
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        const account = await response.json();
+        console.log(`[Api] Account`, account);
+        return account;
     }
 }
 

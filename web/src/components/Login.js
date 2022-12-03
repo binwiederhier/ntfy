@@ -32,7 +32,7 @@ const Login = () => {
             email: data.get('email'),
             password: data.get('password'),
         });
-        const user ={
+        const user = {
             username: data.get('email'),
             password: data.get('password'),
         }

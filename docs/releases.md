@@ -33,6 +33,7 @@ icon color.
 * Fix topics do not re-subscribe to Firebase after restoring from backup ([#511](https://github.com/binwiederhier/ntfy/issues/511))
 * Fix crashes from large images ([#474](https://github.com/binwiederhier/ntfy/issues/474), thanks to [@daedric7](https://github.com/daedric7) for reporting)
 * Fix notification click opens wrong subscription ([#261](https://github.com/binwiederhier/ntfy/issues/261), thanks to [@SMAW](https://github.com/SMAW) for reporting)
+* Fix Firebase-only "link expired" issue ([#529](https://github.com/binwiederhier/ntfy/issues/529))
 * Add donate button (no ticket)
 
 **Additional translations:**

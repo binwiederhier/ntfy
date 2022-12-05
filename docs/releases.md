@@ -8,7 +8,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
 
-## ntfy Android app v1.15.0 (UNRELEASED)
+## ntfy Android app v1.15.1 (UNRELEASED)
 
 This release is mainly a platform and dependency upgrade release, sprinkled with lots and lots of bugfixes. This version
 now targets SDK 33 (Android 13), and brings a few Android 13 specific improvements. Most prominently, ntfy now supports 

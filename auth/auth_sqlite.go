@@ -54,17 +54,15 @@ const (
 			PRIMARY KEY (user_id, base_url, topic)
 		);
 		CREATE TABLE IF NOT EXISTS user_token (
-			token TEXT NOT NULL,
 			user_id INT NOT NULL,
+			token TEXT NOT NULL,
 			expires INT NOT NULL,
-			PRIMARY KEY (token)
+			PRIMARY KEY (user_id, token)
 		);
-		CREATE INDEX idx_user_id ON user_token (user_id);  
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
-		CREATE INDEX IF NOT EXISTS idx_user ON user_subscription (user);
 		INSERT INTO plan (id, name) VALUES (1, 'Admin') ON CONFLICT (id) DO NOTHING;
 		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
 		COMMIT;

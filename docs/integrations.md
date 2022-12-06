@@ -6,15 +6,19 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Public ntfy servers
 
-| URL                                               |  Country  |
-|---------------------------------------------------|:---------:|
-| [ntfy.sh](https://ntfy.sh/) (*Official*)          |   🇺🇸    |
-| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 🇪🇺 |
-| [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 🇪🇺 |
-| [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 🇪🇺 |
+Here's a list of public ntfy servers. As of right now, there is only one official server. The others are provided by the 
+ntfy community. Thanks to everyone running a public server. **You guys rock!**
 
-Thanks to everyone running a public server. **You guys rock!** To the users: Be aware that server operators can log your 
-messages until I finally finish implementing end-to-end encryption.
+| URL                                               | Country            |
+|---------------------------------------------------|--------------------|
+| [ntfy.sh](https://ntfy.sh/) (*Official*)          | 🇺🇸 United States |
+| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 France        |
+| [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 Finland       |
+| [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
+| [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
+
+Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
+and uptime of third party servers, so use of each server is **at your own discretion**.
 
 ## Official integrations
 
@@ -53,7 +57,7 @@ messages until I finally finish implementing end-to-end encryption.
 ## CLIs + GUIs
 
 - [ntfy.sh.sh](https://github.com/mininmobile/ntfy.sh.sh) - Run scripts on ntfy.sh events
-- [ntfy Desktop client](https://github.com/mininmobile/ntfy-desktop) - Cross-platform desktop application for ntfy
+- [ntfy Desktop client](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
 - [ntfy svelte front-end](https://github.com/novatorem/Ntfy) - Front-end built with svelte
 - [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
 - [ntfysh-windows](https://github.com/lucas-bortoli/ntfysh-windows) - A ntfy client for Windows Desktop
@@ -96,6 +100,7 @@ messages until I finally finish implementing end-to-end encryption.
 
 ## Blog + forum posts
 
+- [ntfy.sh](https://paramdeo.com/til/ntfy-sh) - paramdeo.com - 11/2022
 - [Using ntfy to warn me when my computer is discharging](https://ulysseszh.github.io/programming/2022/11/28/ntfy-warn-discharge.html) - ulysseszh.github.io - 11/2022
 - [ntfy - Push Notification Service](https://dizzytech.de/posts/ntfy/) - dizzytech.de - 11/2022 
 - [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022

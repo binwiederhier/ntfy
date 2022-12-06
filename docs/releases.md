@@ -8,6 +8,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
 
+
+## ntfy Android app v1.16.0 (UNRELEASED)
+
+**Bug fixes:**
+
+* Android 5 (SDK 21): Fix crash on unsubscribing ([#528](https://github.com/binwiederhier/ntfy/issues/528), thanks to Roger M.)
+
 ## ntfy Android app v1.15.2 (UNRELEASED)
 
 This release is mainly a platform and dependency upgrade release, sprinkled with lots and lots of bugfixes. This version

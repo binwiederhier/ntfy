@@ -172,6 +172,20 @@ class Api {
         console.log(`[Api] Account`, account);
         return account;
     }
+
+    async updateUserAccount(baseUrl, token, payload) {
+        const url = userAccountUrl(baseUrl);
+        const body = JSON.stringify(payload);
+        console.log(`[Api] Updating user account ${url}: ${body}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: maybeWithBearerAuth({}, token),
+            body: body
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
 }
 
 const api = new Api();

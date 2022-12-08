@@ -34,6 +34,8 @@ import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
+import api from "../app/Api";
+import session from "../app/Session";
 
 const Preferences = () => {
     return (
@@ -443,7 +445,9 @@ const Language = () => {
 
     const handleChange = async (ev) => {
         await i18n.changeLanguage(ev.target.value);
-        //api.update
+        await api.updateUserAccount("http://localhost:2586", session.token(), {
+            language: ev.target.value
+        });
     };
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.

@@ -16,6 +16,7 @@ type Auther interface {
 	AuthenticateToken(token string) (*User, error)
 	CreateToken(user *User) (string, error)
 	RemoveToken(user *User) error
+	ChangeSettings(user *User) error
 
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
@@ -60,12 +61,29 @@ type Manager interface {
 
 // User is a struct that represents a user
 type User struct {
-	Name     string
-	Hash     string // password hash (bcrypt)
-	Token    string // Only set if token was used to log in
-	Role     Role
-	Grants   []Grant
-	Language string
+	Name   string
+	Hash   string // password hash (bcrypt)
+	Token  string // Only set if token was used to log in
+	Role   Role
+	Grants []Grant
+	Prefs  *UserPrefs
+}
+
+type UserPrefs struct {
+	Language      string                 `json:"language,omitempty"`
+	Notification  *UserNotificationPrefs `json:"notification,omitempty"`
+	Subscriptions []*UserSubscription    `json:"subscriptions,omitempty"`
+}
+
+type UserSubscription struct {
+	BaseURL string `json:"base_url"`
+	Topic   string `json:"topic"`
+}
+
+type UserNotificationPrefs struct {
+	Sound       string `json:"sound"`
+	MinPriority string `json:"min_priority"`
+	DeleteAfter int    `json:"delete_after"`
 }
 
 // Grant is a struct that represents an access control entry to a topic

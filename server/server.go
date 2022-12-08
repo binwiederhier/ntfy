@@ -323,6 +323,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleUserTokenDelete(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userAccountPath {
 		return s.handleUserAccount(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == userAccountPath {
+		return s.handleUserAccountUpdate(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -453,29 +455,16 @@ func (s *Server) handleUserTokenDelete(w http.ResponseWriter, r *http.Request, v
 	return nil
 }
 
-type userSubscriptionResponse struct {
-	BaseURL string `json:"base_url"`
-	Topic   string `json:"topic"`
-}
-
-type userNotificationSettingsResponse struct {
-	Sound       string `json:"sound"`
-	MinPriority string `json:"min_priority"`
-	DeleteAfter int    `json:"delete_after"`
-}
-
 type userPlanResponse struct {
 	Id   int    `json:"id"`
 	Name string `json:"name"`
 }
 
 type userAccountResponse struct {
-	Username      string                            `json:"username"`
-	Role          string                            `json:"role,omitempty"`
-	Language      string                            `json:"language,omitempty"`
-	Plan          *userPlanResponse                 `json:"plan,omitempty"`
-	Notification  *userNotificationSettingsResponse `json:"notification,omitempty"`
-	Subscriptions []*userSubscriptionResponse       `json:"subscriptions,omitempty"`
+	Username string            `json:"username"`
+	Role     string            `json:"role,omitempty"`
+	Plan     *userPlanResponse `json:"plan,omitempty"`
+	Settings *auth.UserPrefs   `json:"settings,omitempty"`
 }
 
 func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -485,10 +474,7 @@ func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *vi
 	if v.user != nil {
 		response.Username = v.user.Name
 		response.Role = string(v.user.Role)
-		response.Language = v.user.Language
-		response.Notification = &userNotificationSettingsResponse{
-			Sound: "dadum",
-		}
+		response.Settings = v.user.Prefs
 	} else {
 		response = &userAccountResponse{
 			Username: auth.Everyone,
@@ -499,6 +485,41 @@ func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	return nil
+}
+
+func (s *Server) handleUserAccountUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	if v.user == nil {
+		return errors.New("no user")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	body, err := util.Peek(r.Body, 4096)               // FIXME
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	var newPrefs auth.UserPrefs
+	if err := json.NewDecoder(body).Decode(&newPrefs); err != nil {
+		return err
+	}
+	if v.user.Prefs == nil {
+		v.user.Prefs = &auth.UserPrefs{}
+	}
+	prefs := v.user.Prefs
+	if newPrefs.Language != "" {
+		prefs.Language = newPrefs.Language
+	}
+	if newPrefs.Notification != nil {
+		if prefs.Notification == nil {
+			prefs.Notification = &auth.UserNotificationPrefs{}
+		}
+		if newPrefs.Notification.DeleteAfter > 0 {
+			prefs.Notification.DeleteAfter = newPrefs.Notification.DeleteAfter
+		}
+		// ...
+	}
+	// ...
+	return s.auth.ChangeSettings(v.user)
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {

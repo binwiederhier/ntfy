@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
@@ -32,10 +33,7 @@ const (
 			user TEXT NOT NULL,
 			pass TEXT NOT NULL,
 			role TEXT NOT NULL,
-			language TEXT,
-			notification_sound TEXT,
-			notification_min_priority INT,
-			notification_delete_after INT,
+			settings JSON,
 		    FOREIGN KEY (plan_id) REFERENCES plan (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
@@ -46,13 +44,7 @@ const (
 			write INT NOT NULL,
 			PRIMARY KEY (user_id, topic),
 			FOREIGN KEY (user_id) REFERENCES user (id)
-		);
-		CREATE TABLE IF NOT EXISTS user_subscription (
-			user_id INT NOT NULL,		
-			base_url TEXT NOT NULL,	
-			topic TEXT NOT NULL,
-			PRIMARY KEY (user_id, base_url, topic)
-		);
+		);		
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id INT NOT NULL,
 			token TEXT NOT NULL,
@@ -68,12 +60,12 @@ const (
 		COMMIT;
 	`
 	selectUserByNameQuery = `
-		SELECT user, pass, role, language 
+		SELECT user, pass, role, settings 
 		FROM user 
 		WHERE user = ?
 	`
 	selectUserByTokenQuery = `
-		SELECT user, pass, role, language 
+		SELECT user, pass, role, settings 
 		FROM user
 		JOIN user_token on user.id = user_token.user_id
 		WHERE token = ?
@@ -101,8 +93,9 @@ const (
 	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
 
-	insertTokenQuery = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
-	deleteTokenQuery = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
+	insertTokenQuery        = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
+	deleteTokenQuery        = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
+	updateUserSettingsQuery = `UPDATE user SET settings = ? WHERE user = ?`
 )
 
 // Schema management queries
@@ -181,6 +174,17 @@ func (a *SQLiteAuth) RemoveToken(user *User) error {
 		return ErrUnauthorized
 	}
 	if _, err := a.db.Exec(deleteTokenQuery, user.Name, user.Token); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SQLiteAuth) ChangeSettings(user *User) error {
+	settings, err := json.Marshal(user.Prefs)
+	if err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(updateUserSettingsQuery, string(settings), user.Name); err != nil {
 		return err
 	}
 	return nil
@@ -314,11 +318,11 @@ func (a *SQLiteAuth) userByToken(token string) (*User, error) {
 func (a *SQLiteAuth) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var language sql.NullString
+	var prefs sql.NullString
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &language); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -327,13 +331,19 @@ func (a *SQLiteAuth) readUser(rows *sql.Rows) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &User{
-		Name:     username,
-		Hash:     hash,
-		Role:     Role(role),
-		Grants:   grants,
-		Language: language.String,
-	}, nil
+	user := &User{
+		Name:   username,
+		Hash:   hash,
+		Role:   Role(role),
+		Grants: grants,
+	}
+	if prefs.Valid {
+		user.Prefs = &UserPrefs{}
+		if err := json.Unmarshal([]byte(prefs.String), user.Prefs); err != nil {
+			return nil, err
+		}
+	}
+	return user, nil
 }
 
 func (a *SQLiteAuth) everyoneUser() (*User, error) {

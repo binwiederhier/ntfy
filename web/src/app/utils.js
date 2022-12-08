@@ -249,3 +249,12 @@ export async function* fetchLinesIterator(fileURL, headers) {
         yield chunk.substr(startIndex); // last line didn't end in a newline char
     }
 }
+
+export const randomAlphanumericString = (len) => {
+    const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let id = "";
+    for (let i = 0; i < len; i++) {
+        id += alphabet[(Math.random() * alphabet.length) | 0];
+    }
+    return id;
+}

@@ -9,7 +9,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
-import {topicUrl, validTopic, validUrl} from "../app/utils";
+import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
@@ -104,21 +104,26 @@ const SubscribePage = (props) => {
                 <DialogContentText>
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    id="topic"
-                    placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
-                    value={props.topic}
-                    onChange={ev => props.setTopic(ev.target.value)}
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    inputProps={{
-                        maxLength: 64,
-                        "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
-                    }}
-                />
+                <div style={{display: 'flex'}} role="row">
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        id="topic"
+                        placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
+                        value={props.topic}
+                        onChange={ev => props.setTopic(ev.target.value)}
+                        type="text"
+                        fullWidth
+                        variant="standard"
+                        inputProps={{
+                            maxLength: 64,
+                            "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
+                        }}
+                        />
+                        <Button onClick={() => {props.setTopic(randomAlphanumericString(16))}} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                            {t("subscribe_dialog_subscribe_button_generate_topic_name")}
+                        </Button>
+                </div>
                 <FormControlLabel
                     sx={{pt: 1}}
                     control={

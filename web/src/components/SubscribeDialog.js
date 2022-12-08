@@ -18,6 +18,18 @@ import {useTranslation} from "react-i18next";
 
 const publicBaseUrl = "https://ntfy.sh";
 
+const randomAlphanumericString = () => {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const size = 16;
+
+    let id = '';
+    let i = size;
+    while (i--) {
+      id += alphabet[(Math.random() * alphabet.length) | 0];
+    }
+    return id;
+  }
+
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState("");
     const [topic, setTopic] = useState("");
@@ -104,21 +116,26 @@ const SubscribePage = (props) => {
                 <DialogContentText>
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    id="topic"
-                    placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
-                    value={props.topic}
-                    onChange={ev => props.setTopic(ev.target.value)}
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    inputProps={{
-                        maxLength: 64,
-                        "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
-                    }}
-                />
+                <div style={{display: 'flex'}} role="row">
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        id="topic"
+                        placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
+                        value={props.topic}
+                        onChange={ev => props.setTopic(ev.target.value)}
+                        type="text"
+                        fullWidth
+                        variant="standard"
+                        inputProps={{
+                            maxLength: 64,
+                            "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
+                        }}
+                        />
+                        <Button onClick={() => {props.setTopic(randomAlphanumericString())}} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                            {t("subscribe_dialog_subscribe_button_generate_topic_name")}
+                        </Button>
+                </div>
                 <FormControlLabel
                     sx={{pt: 1}}
                     control={

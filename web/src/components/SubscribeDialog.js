@@ -15,10 +15,20 @@ import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
-import {customAlphabet} from 'nanoid/non-secure'
 
 const publicBaseUrl = "https://ntfy.sh";
-const randomAlphanumericString = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 21);
+
+const randomAlphanumericString = () => {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const size = 16;
+
+    let id = '';
+    let i = size;
+    while (i--) {
+      id += alphabet[(Math.random() * alphabet.length) | 0];
+    }
+    return id;
+  }
 
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState("");

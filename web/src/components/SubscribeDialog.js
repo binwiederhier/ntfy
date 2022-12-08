@@ -9,7 +9,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
-import {topicUrl, validTopic, validUrl} from "../app/utils";
+import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
@@ -17,18 +17,6 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 
 const publicBaseUrl = "https://ntfy.sh";
-
-const randomAlphanumericString = () => {
-    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    const size = 16;
-
-    let id = '';
-    let i = size;
-    while (i--) {
-      id += alphabet[(Math.random() * alphabet.length) | 0];
-    }
-    return id;
-  }
 
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState("");
@@ -132,7 +120,7 @@ const SubscribePage = (props) => {
                             "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
                         }}
                         />
-                        <Button onClick={() => {props.setTopic(randomAlphanumericString())}} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                        <Button onClick={() => {props.setTopic(randomAlphanumericString(16))}} style={{flexShrink: "0", marginTop: "0.5em"}}>
                             {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                         </Button>
                 </div>

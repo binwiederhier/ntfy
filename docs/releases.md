@@ -4,6 +4,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v1.30.0 (UNRELEASED)
 
+**Features:**
+
+* Web: Generate random topic name button ([#453](https://github.com/binwiederhier/ntfy/issues/453), thanks to [@yardenshoham](https://github.com/yardenshoham))
+
 **Bug fixes + maintenance:**
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)

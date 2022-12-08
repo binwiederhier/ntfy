@@ -19,6 +19,7 @@
     "i18next-browser-languagedetector": "^6.1.4",
     "i18next-http-backend": "^1.4.0",
     "js-base64": "^3.7.2",
+    "nanoid": "^4.0.0",
     "react": "latest",
     "react-dom": "latest",
     "react-i18next": "^11.16.2",

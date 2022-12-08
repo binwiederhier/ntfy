@@ -15,8 +15,10 @@ import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
+import {customAlphabet} from 'nanoid/non-secure'
 
 const publicBaseUrl = "https://ntfy.sh";
+const randomAlphanumericString = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 21);
 
 const SubscribeDialog = (props) => {
     const [baseUrl, setBaseUrl] = useState("");
@@ -77,6 +79,17 @@ const SubscribePage = (props) => {
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         props.onSuccess();
     };
+    const generateTopicName = () => {
+        const entropy = randomAlphanumericString();
+        let newTopic = props.topic;
+        if (newTopic) {
+            newTopic += "-" + entropy;
+        } else {
+            const sliceIndex = entropy.length / 2;
+            newTopic = entropy.slice(0, sliceIndex) + "-" + entropy.slice(sliceIndex);
+        }
+        props.setTopic(newTopic);
+    }
     const handleUseAnotherChanged = (e) => {
         props.setBaseUrl("");
         setAnotherServerVisible(e.target.checked);
@@ -118,7 +131,8 @@ const SubscribePage = (props) => {
                         maxLength: 64,
                         "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
                     }}
-                />
+                    />
+                <Button onClick={generateTopicName} disabled={props.topic.includes("-")}>{t("subscribe_dialog_subscribe_button_generate_topic_name")}</Button><br />
                 <FormControlLabel
                     sx={{pt: 1}}
                     control={

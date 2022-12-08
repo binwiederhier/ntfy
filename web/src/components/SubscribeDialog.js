@@ -89,17 +89,6 @@ const SubscribePage = (props) => {
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         props.onSuccess();
     };
-    const generateTopicName = () => {
-        const entropy = randomAlphanumericString();
-        let newTopic = props.topic;
-        if (newTopic) {
-            newTopic += "-" + entropy;
-        } else {
-            const sliceIndex = entropy.length / 2;
-            newTopic = entropy.slice(0, sliceIndex) + "-" + entropy.slice(sliceIndex);
-        }
-        props.setTopic(newTopic);
-    }
     const handleUseAnotherChanged = (e) => {
         props.setBaseUrl("");
         setAnotherServerVisible(e.target.checked);
@@ -143,7 +132,7 @@ const SubscribePage = (props) => {
                             "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
                         }}
                         />
-                        <Button onClick={generateTopicName} disabled={props.topic.includes("-")} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                        <Button onClick={() => {props.setTopic(randomAlphanumericString())}} style={{flexShrink: "0", marginTop: "0.5em"}}>
                             {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                         </Button>
                 </div>

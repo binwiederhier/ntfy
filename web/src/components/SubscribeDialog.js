@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Autocomplete, Checkbox, FormControlLabel, Grid, useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
@@ -60,14 +60,6 @@ const SubscribeDialog = (props) => {
                 onSuccess={handleSuccess}
             />}
         </Dialog>
-    );
-};
-
-const Row = (props) => {
-    return (
-        <div style={{display: 'flex'}} role="row">
-            {props.children}
-        </div>
     );
 };
 

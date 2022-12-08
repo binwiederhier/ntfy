@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, FormControlLabel, Grid, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {topicUrl, validTopic, validUrl} from "../app/utils";
@@ -50,6 +50,14 @@ const SubscribeDialog = (props) => {
                 onSuccess={handleSuccess}
             />}
         </Dialog>
+    );
+};
+
+const Row = (props) => {
+    return (
+        <div style={{display: 'flex'}} role="row">
+            {props.children}
+        </div>
     );
 };
 
@@ -117,22 +125,26 @@ const SubscribePage = (props) => {
                 <DialogContentText>
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    id="topic"
-                    placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
-                    value={props.topic}
-                    onChange={ev => props.setTopic(ev.target.value)}
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    inputProps={{
-                        maxLength: 64,
-                        "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
-                    }}
-                    />
-                <Button onClick={generateTopicName} disabled={props.topic.includes("-")}>{t("subscribe_dialog_subscribe_button_generate_topic_name")}</Button><br />
+                <div style={{display: 'flex'}} role="row">
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        id="topic"
+                        placeholder={t("subscribe_dialog_subscribe_topic_placeholder")}
+                        value={props.topic}
+                        onChange={ev => props.setTopic(ev.target.value)}
+                        type="text"
+                        fullWidth
+                        variant="standard"
+                        inputProps={{
+                            maxLength: 64,
+                            "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
+                        }}
+                        />
+                        <Button onClick={generateTopicName} disabled={props.topic.includes("-")} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                            {t("subscribe_dialog_subscribe_button_generate_topic_name")}
+                        </Button>
+                </div>
                 <FormControlLabel
                     sx={{pt: 1}}
                     control={

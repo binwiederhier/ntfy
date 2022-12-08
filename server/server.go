@@ -34,6 +34,17 @@ import (
 	"heckel.io/ntfy/util"
 )
 
+/*
+	TODO
+		expire tokens
+		auto-refresh tokens from UI
+		pricing page
+		home page
+
+
+
+*/
+
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
@@ -71,7 +82,7 @@ var (
 
 	webConfigPath    = "/config.js"
 	userStatsPath    = "/user/stats" // FIXME get rid of this in favor of /user/account
-	userAuthPath     = "/user/auth"
+	userTokenPath    = "/user/token"
 	userAccountPath  = "/user/account"
 	matrixPushPath   = "/_matrix/push/v1/notify"
 	staticRegex      = regexp.MustCompile(`^/static/.+`)
@@ -306,8 +317,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == userAuthPath {
-		return s.handleUserAuth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == userTokenPath {
+		return s.handleUserTokenCreate(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == userTokenPath {
+		return s.handleUserTokenDelete(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userAccountPath {
 		return s.handleUserAccount(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
@@ -408,16 +421,16 @@ type tokenAuthResponse struct {
 	Token string `json:"token"`
 }
 
-func (s *Server) handleUserAuth(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleUserTokenCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user == nil {
 		return errHTTPUnauthorized
 	}
-	token, err := s.auth.GenerateToken(v.user)
+	token, err := s.auth.CreateToken(v.user)
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "text/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &tokenAuthResponse{
 		Token: token,
@@ -425,6 +438,18 @@ func (s *Server) handleUserAuth(w http.ResponseWriter, r *http.Request, v *visit
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Server) handleUserTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	// TODO rate limit
+	if v.user == nil || v.user.Token == "" {
+		return errHTTPUnauthorized
+	}
+	if err := s.auth.RemoveToken(v.user); err != nil {
+		return err
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	return nil
 }
 
@@ -454,7 +479,7 @@ type userAccountResponse struct {
 }
 
 func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	w.Header().Set("Content-Type", "text/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &userAccountResponse{}
 	if v.user != nil {
@@ -1136,7 +1161,7 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")  // CORS, allow cross-origin requests
 	w.Header().Set("Access-Control-Allow-Headers", "*") // CORS, allow auth via JS // FIXME is this terrible?
 	return nil

@@ -36,7 +36,7 @@ const Login = () => {
             username: data.get('email'),
             password: data.get('password'),
         }
-        const token = await api.userAuth("http://localhost:2586"/*window.location.origin*/, user);
+        const token = await api.login("http://localhost:2586"/*window.location.origin*/, user);
         console.log(`[Api] User auth for user ${user.username} successful, token is ${token}`);
         session.store(user.username, token);
         window.location.href = routes.app;

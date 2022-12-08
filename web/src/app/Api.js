@@ -7,7 +7,7 @@ import {
     topicUrlJsonPoll,
     topicUrlJsonPollWithSince,
     userAccountUrl,
-    userAuthUrl,
+    userTokenUrl,
     userStatsUrl
 } from "./utils";
 import userManager from "./UserManager";
@@ -119,8 +119,8 @@ class Api {
         throw new Error(`Unexpected server response ${response.status}`);
     }
 
-    async userAuth(baseUrl, user) {
-        const url = userAuthUrl(baseUrl);
+    async login(baseUrl, user) {
+        const url = userTokenUrl(baseUrl);
         console.log(`[Api] Checking auth for ${url}`);
         const response = await fetch(url, {
             headers: maybeWithBasicAuth({}, user)
@@ -133,6 +133,18 @@ class Api {
             throw new Error(`Unexpected server response: Cannot find token`);
         }
         return json.token;
+    }
+
+    async logout(baseUrl, token) {
+        const url = userTokenUrl(baseUrl);
+        console.log(`[Api] Logging out from ${url} using token ${token}`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: maybeWithBearerAuth({}, token)
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
     }
 
     async userStats(baseUrl) {

@@ -84,7 +84,10 @@ const NotificationList = (props) => {
     useEffect(() => {
         return () => {
             setMaxCount(pageSize);
-            document.getElementById("main").scrollTo(0, 0);
+            const main = document.getElementById("main");
+            if (main) {
+                main.scrollTo(0, 0);
+            }
         }
     }, [props.id]);
 

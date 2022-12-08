@@ -246,7 +246,7 @@ const ProfileIcon = (props) => {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const anchorRef = useRef(null);
-    const username = session.username();
+    const navigate = useNavigate();
 
     const handleToggleOpen = () => {
         setOpen((prevOpen) => !prevOpen);
@@ -272,7 +272,8 @@ const ProfileIcon = (props) => {
         // TODO
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await api.logout("http://localhost:2586"/*window.location.origin*/, session.token());
         session.reset();
         window.location.href = routes.app;
     };
@@ -288,15 +289,15 @@ const ProfileIcon = (props) => {
 
     return (
         <>
-            {username &&
+            {session.exists() &&
                 <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} sx={{marginRight: 0}} aria-label={t("xxxxxxx")}>
                     <AccountCircleIcon/>
                 </IconButton>
             }
-            {!username &&
+            {!session.exists() &&
                 <>
-                    <Button>Sign in</Button>
-                    <Button>Sign up</Button>
+                    <Button color="inherit" variant="outlined" onClick={() => navigate(routes.login)}>Sign in</Button>
+                    <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)}>Sign up</Button>
                 </>
             }
             <Popper

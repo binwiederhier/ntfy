@@ -102,6 +102,7 @@ const (
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
 
 	insertTokenQuery = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
+	deleteTokenQuery = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
 )
 
 // Schema management queries
@@ -138,7 +139,7 @@ func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth
 	}, nil
 }
 
-// AuthenticateUser checks username and password and returns a user if correct. The method
+// Authenticate checks username and password and returns a user if correct. The method
 // returns in constant-ish time, regardless of whether the user exists or the password is
 // correct or incorrect.
 func (a *SQLiteAuth) Authenticate(username, password string) (*User, error) {
@@ -162,16 +163,27 @@ func (a *SQLiteAuth) AuthenticateToken(token string) (*User, error) {
 	if err != nil {
 		return nil, ErrUnauthenticated
 	}
+	user.Token = token
 	return user, nil
 }
 
-func (a *SQLiteAuth) GenerateToken(user *User) (string, error) {
+func (a *SQLiteAuth) CreateToken(user *User) (string, error) {
 	token := util.RandomString(tokenLength)
 	expires := 1 // FIXME
 	if _, err := a.db.Exec(insertTokenQuery, user.Name, token, expires); err != nil {
 		return "", err
 	}
 	return token, nil
+}
+
+func (a *SQLiteAuth) RemoveToken(user *User) error {
+	if user.Token == "" {
+		return ErrUnauthorized
+	}
+	if _, err := a.db.Exec(deleteTokenQuery, user.Name, user.Token); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Authorize returns nil if the given user has access to the given topic using the desired

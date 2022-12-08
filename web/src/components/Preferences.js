@@ -441,6 +441,11 @@ const Language = () => {
     const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
     const lang = i18n.language ?? "en";
 
+    const handleChange = async (ev) => {
+        await i18n.changeLanguage(ev.target.value);
+        //api.update
+    };
+
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
     // Languages names from: https://www.omniglot.com/language/names.htm
     // Better: Sidebar in Wikipedia: https://en.wikipedia.org/wiki/Bokm%C3%A5l
@@ -448,7 +453,7 @@ const Language = () => {
     return (
         <Pref labelId={labelId} title={title}>
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-                <Select value={lang} onChange={(ev) => i18n.changeLanguage(ev.target.value)} aria-labelledby={labelId}>
+                <Select value={lang} onChange={handleChange} aria-labelledby={labelId}>
                     <MenuItem value="en">English</MenuItem>
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
@@ -474,6 +479,10 @@ const Language = () => {
     )
 };
 
+const AccessControl = () => {
+    return <></>;
+}
+/*
 const AccessControl = () => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
@@ -632,6 +641,6 @@ const AccessControlDialog = (props) => {
         </Dialog>
     );
 };
-
+*/
 
 export default Preferences;

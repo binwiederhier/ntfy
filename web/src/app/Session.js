@@ -9,6 +9,10 @@ class Session {
         localStorage.removeItem("token");
     }
 
+    exists() {
+        return this.username() && this.token();
+    }
+
     username() {
         return localStorage.getItem("user");
     }

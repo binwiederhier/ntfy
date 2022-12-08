@@ -14,8 +14,8 @@ type Auther interface {
 	Authenticate(username, password string) (*User, error)
 
 	AuthenticateToken(token string) (*User, error)
-
-	GenerateToken(user *User) (string, error)
+	CreateToken(user *User) (string, error)
+	RemoveToken(user *User) error
 
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
@@ -62,6 +62,7 @@ type Manager interface {
 type User struct {
 	Name     string
 	Hash     string // password hash (bcrypt)
+	Token    string // Only set if token was used to log in
 	Role     Role
 	Grants   []Grant
 	Language string

@@ -4,6 +4,7 @@ import {shortUrl} from "../app/utils";
 const routes = {
     home: "/",
     login: "/login",
+    signup: "/signup",
     app: config.appRoot,
     settings: "/settings",
     subscription: "/:topic",

@@ -30,6 +30,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users
 - [Sonarr](https://sonarr.tv/) ⭐ - PVR for Usenet and BitTorrent users
 - [Gatus](https://gatus.io/) ⭐ - Automated service health dashboard
+- [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative / workflow automation tool
 - [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 

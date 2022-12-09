@@ -22,6 +22,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Official integrations
 
+- [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative. Build workflow automation without spending time and money.
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool

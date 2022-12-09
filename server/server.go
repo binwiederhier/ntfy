@@ -40,6 +40,7 @@ import (
 		auto-refresh tokens from UI
 		pricing page
 		home page
+		reserve topics
 
 
 
@@ -80,16 +81,18 @@ var (
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
-	webConfigPath    = "/config.js"
-	userStatsPath    = "/user/stats" // FIXME get rid of this in favor of /user/account
-	userTokenPath    = "/user/token"
-	userAccountPath  = "/user/account"
-	matrixPushPath   = "/_matrix/push/v1/notify"
-	staticRegex      = regexp.MustCompile(`^/static/.+`)
-	docsRegex        = regexp.MustCompile(`^/docs(|/.*)$`)
-	fileRegex        = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
-	urlRegex         = regexp.MustCompile(`^https?://`)
+	webConfigPath               = "/config.js"
+	userStatsPath               = "/user/stats" // FIXME get rid of this in favor of /user/account
+	userTokenPath               = "/user/token"
+	userAccountPath             = "/user/account"
+	userSubscriptionPath        = "/user/subscription"
+	userSubscriptionDeleteRegex = regexp.MustCompile(`^/user/subscription/([-_A-Za-z0-9]{16})$`)
+	matrixPushPath              = "/_matrix/push/v1/notify"
+	staticRegex                 = regexp.MustCompile(`^/static/.+`)
+	docsRegex                   = regexp.MustCompile(`^/docs(|/.*)$`)
+	fileRegex                   = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
+	disallowedTopics            = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
+	urlRegex                    = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -325,6 +328,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleUserAccount(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == userAccountPath {
 		return s.handleUserAccountUpdate(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == userSubscriptionPath {
+		return s.handleUserSubscriptionAdd(w, r, v)
+	} else if r.Method == http.MethodDelete && userSubscriptionDeleteRegex.MatchString(r.URL.Path) {
+		return s.handleUserSubscriptionDelete(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -461,10 +468,12 @@ type userPlanResponse struct {
 }
 
 type userAccountResponse struct {
-	Username string            `json:"username"`
-	Role     string            `json:"role,omitempty"`
-	Plan     *userPlanResponse `json:"plan,omitempty"`
-	Settings *auth.UserPrefs   `json:"settings,omitempty"`
+	Username      string                      `json:"username"`
+	Role          string                      `json:"role,omitempty"`
+	Plan          *userPlanResponse           `json:"plan,omitempty"`
+	Language      string                      `json:"language,omitempty"`
+	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
+	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
 }
 
 func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -474,7 +483,17 @@ func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *vi
 	if v.user != nil {
 		response.Username = v.user.Name
 		response.Role = string(v.user.Role)
-		response.Settings = v.user.Prefs
+		if v.user.Prefs != nil {
+			if v.user.Prefs.Language != "" {
+				response.Language = v.user.Prefs.Language
+			}
+			if v.user.Prefs.Notification != nil {
+				response.Notification = v.user.Prefs.Notification
+			}
+			if v.user.Prefs.Subscriptions != nil {
+				response.Subscriptions = v.user.Prefs.Subscriptions
+			}
+		}
 	} else {
 		response = &userAccountResponse{
 			Username: auth.Everyone,
@@ -516,10 +535,81 @@ func (s *Server) handleUserAccountUpdate(w http.ResponseWriter, r *http.Request,
 		if newPrefs.Notification.DeleteAfter > 0 {
 			prefs.Notification.DeleteAfter = newPrefs.Notification.DeleteAfter
 		}
-		// ...
+		if newPrefs.Notification.Sound != "" {
+			prefs.Notification.Sound = newPrefs.Notification.Sound
+		}
+		if newPrefs.Notification.MinPriority > 0 {
+			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
+		}
 	}
-	// ...
 	return s.auth.ChangeSettings(v.user)
+}
+
+func (s *Server) handleUserSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	if v.user == nil {
+		return errors.New("no user")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	body, err := util.Peek(r.Body, 4096)               // FIXME
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	var newSubscription auth.UserSubscription
+	if err := json.NewDecoder(body).Decode(&newSubscription); err != nil {
+		return err
+	}
+	if v.user.Prefs == nil {
+		v.user.Prefs = &auth.UserPrefs{}
+	}
+	newSubscription.ID = "" // Client cannot set ID
+	for _, subscription := range v.user.Prefs.Subscriptions {
+		if newSubscription.BaseURL == subscription.BaseURL && newSubscription.Topic == subscription.Topic {
+			newSubscription = *subscription
+			break
+		}
+	}
+	if newSubscription.ID == "" {
+		newSubscription.ID = util.RandomString(16)
+		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, &newSubscription)
+		if err := s.auth.ChangeSettings(v.user); err != nil {
+			return err
+		}
+	}
+	if err := json.NewEncoder(w).Encode(newSubscription); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) handleUserSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	if v.user == nil {
+		return errors.New("no user")
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	matches := userSubscriptionDeleteRegex.FindStringSubmatch(r.URL.Path)
+	if len(matches) != 2 {
+		return errHTTPInternalErrorInvalidFilePath // FIXME
+	}
+	subscriptionID := matches[1]
+	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
+		return nil
+	}
+	newSubscriptions := make([]*auth.UserSubscription, 0)
+	for _, subscription := range v.user.Prefs.Subscriptions {
+		if subscription.ID != subscriptionID {
+			newSubscriptions = append(newSubscriptions, subscription)
+		}
+	}
+	if len(newSubscriptions) < len(v.user.Prefs.Subscriptions) {
+		v.user.Prefs.Subscriptions = newSubscriptions
+		if err := s.auth.ChangeSettings(v.user); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {

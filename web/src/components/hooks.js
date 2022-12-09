@@ -7,6 +7,8 @@ import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
+import session from "../app/Session";
+import api from "../app/Api";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -61,6 +63,13 @@ export const useAutoSubscribe = (subscriptions, selected) => {
             console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
+                if (session.exists()) {
+                    const remoteSubscription = await api.userSubscriptionAdd("http://localhost:2586", session.token(), {
+                        base_url: baseUrl,
+                        topic: params.topic
+                    });
+                    await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+                }
                 poller.pollInBackground(subscription); // Dangle!
             })();
         }

@@ -15,6 +15,7 @@ import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
+import session from "../app/Session";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -26,6 +27,13 @@ const SubscribeDialog = (props) => {
     const handleSuccess = async () => {
         const actualBaseUrl = (baseUrl) ? baseUrl : window.location.origin;
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
+        if (session.exists()) {
+            const remoteSubscription = await api.userSubscriptionAdd("http://localhost:2586", session.token(), {
+                base_url: actualBaseUrl,
+                topic: topic
+            });
+            await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+        }
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }

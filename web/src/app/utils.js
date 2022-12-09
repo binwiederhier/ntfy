@@ -21,6 +21,8 @@ export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topi
 export const userStatsUrl = (baseUrl) => `${baseUrl}/user/stats`;
 export const userTokenUrl = (baseUrl) => `${baseUrl}/user/token`;
 export const userAccountUrl = (baseUrl) => `${baseUrl}/user/account`;
+export const userSubscriptionUrl = (baseUrl) => `${baseUrl}/user/subscription`;
+export const userSubscriptionDeleteUrl = (baseUrl, id) => `${baseUrl}/user/subscription/${id}`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

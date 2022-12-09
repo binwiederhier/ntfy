@@ -96,10 +96,19 @@ const Layout = () => {
                     if (account.notification.sound) {
                         await prefs.setSound(account.notification.sound);
                     }
+                    if (account.notification.delete_after) {
+                        await prefs.setDeleteAfter(account.notification.delete_after);
+                    }
+                    if (account.notification.min_priority) {
+                        await prefs.setMinPriority(account.notification.min_priority);
+                    }
+                }
+                if (account.subscriptions) {
+                    await subscriptionManager.syncFromRemote(account.subscriptions);
                 }
             }
         })();
-    });
+    }, []);
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>

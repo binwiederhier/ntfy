@@ -18,15 +18,41 @@ class SubscriptionManager {
     }
 
     async add(baseUrl, topic) {
+        const id = topicUrl(baseUrl, topic);
+        const existingSubscription = await this.get(id);
+        if (existingSubscription) {
+            return existingSubscription;
+        }
         const subscription = {
             id: topicUrl(baseUrl, topic),
             baseUrl: baseUrl,
             topic: topic,
             mutedUntil: 0,
-            last: null
+            last: null,
+            remoteId: null
         };
         await db.subscriptions.put(subscription);
         return subscription;
+    }
+
+    async syncFromRemote(remoteSubscriptions) {
+        // Add remote subscriptions
+        let remoteIds = [];
+        for (let i = 0; i < remoteSubscriptions.length; i++) {
+            const remote = remoteSubscriptions[i];
+            const local = await this.add(remote.base_url, remote.topic);
+            await this.setRemoteId(local.id, remote.id);
+            remoteIds.push(remote.id);
+        }
+
+        // Remove local subscriptions that do not exist remotely
+        const localSubscriptions = await db.subscriptions.toArray();
+        for (let i = 0; i < localSubscriptions.length; i++) {
+            const local = localSubscriptions[i];
+            if (local.remoteId && !remoteIds.includes(local.remoteId)) {
+                await this.remove(local.id);
+            }
+        }
     }
 
     async updateState(subscriptionId, state) {
@@ -136,6 +162,12 @@ class SubscriptionManager {
     async setDisplayName(subscriptionId, displayName) {
         await db.subscriptions.update(subscriptionId, {
             displayName: displayName
+        });
+    }
+
+    async setRemoteId(subscriptionId, remoteId) {
+        await db.subscriptions.update(subscriptionId, {
+            remoteId: remoteId
         });
     }
 

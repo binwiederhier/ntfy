@@ -72,6 +72,13 @@ const Sound = () => {
     const sound = useLiveQuery(async () => prefs.sound());
     const handleChange = async (ev) => {
         await prefs.setSound(ev.target.value);
+        if (session.exists()) {
+            await api.updateUserAccount("http://localhost:2586", session.token(), {
+                notification: {
+                    sound: ev.target.value
+                }
+            });
+        }
     }
     if (!sound) {
         return null; // While loading
@@ -105,6 +112,13 @@ const MinPriority = () => {
     const minPriority = useLiveQuery(async () => prefs.minPriority());
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
+        if (session.exists()) {
+            await api.updateUserAccount("http://localhost:2586", session.token(), {
+                notification: {
+                    min_priority: ev.target.value
+                }
+            });
+        }
     }
     if (!minPriority) {
         return null; // While loading
@@ -148,6 +162,13 @@ const DeleteAfter = () => {
     const deleteAfter = useLiveQuery(async () => prefs.deleteAfter());
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
+        if (session.exists()) {
+            await api.updateUserAccount("http://localhost:2586", session.token(), {
+                notification: {
+                    delete_after: ev.target.value
+                }
+            });
+        }
     }
     if (deleteAfter === null || deleteAfter === undefined) { // !deleteAfter will not work with "0"
         return null; // While loading
@@ -445,9 +466,11 @@ const Language = () => {
 
     const handleChange = async (ev) => {
         await i18n.changeLanguage(ev.target.value);
-        await api.updateUserAccount("http://localhost:2586", session.token(), {
-            language: ev.target.value
-        });
+        if (session.exists()) {
+            await api.updateUserAccount("http://localhost:2586", session.token(), {
+                language: ev.target.value
+            });
+        }
     };
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.

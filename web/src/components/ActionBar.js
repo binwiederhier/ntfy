@@ -32,7 +32,6 @@ import Button from "@mui/material/Button";
 const ActionBar = (props) => {
     const { t } = useTranslation();
     const location = useLocation();
-    const username = session.username();
     let title = "ntfy";
     if (props.selected) {
         title = topicDisplayName(props.selected);
@@ -112,9 +111,12 @@ const SettingsIcons = (props) => {
     };
 
     const handleUnsubscribe = async (event) => {
-        console.log(`[ActionBar] Unsubscribing from ${props.subscription.id}`);
+        console.log(`[ActionBar] Unsubscribing from ${props.subscription.id}`, props.subscription);
         handleClose(event);
         await subscriptionManager.remove(props.subscription.id);
+        if (session.exists() && props.subscription.remoteId) {
+            await api.userSubscriptionDelete("http://localhost:2586", session.token(), props.subscription.remoteId);
+        }
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {
             navigate(routes.forSubscription(newSelected));

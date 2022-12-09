@@ -28,12 +28,8 @@ const Login = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        console.log({
-            email: data.get('email'),
-            password: data.get('password'),
-        });
         const user = {
-            username: data.get('email'),
+            username: data.get('username'),
             password: data.get('password'),
         }
         const token = await api.login("http://localhost:2586"/*window.location.origin*/, user);
@@ -63,10 +59,9 @@ const Login = () => {
                         margin="normal"
                         required
                         fullWidth
-                        id="email"
-                        label="Email Address"
-                        name="email"
-                        autoComplete="email"
+                        id="username"
+                        label="Username"
+                        name="username"
                         autoFocus
                     />
                     <TextField

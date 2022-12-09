@@ -76,14 +76,15 @@ type UserPrefs struct {
 }
 
 type UserSubscription struct {
+	ID      string `json:"id"`
 	BaseURL string `json:"base_url"`
 	Topic   string `json:"topic"`
 }
 
 type UserNotificationPrefs struct {
-	Sound       string `json:"sound"`
-	MinPriority string `json:"min_priority"`
-	DeleteAfter int    `json:"delete_after"`
+	Sound       string `json:"sound,omitempty"`
+	MinPriority int    `json:"min_priority,omitempty"`
+	DeleteAfter int    `json:"delete_after,omitempty"`
 }
 
 // Grant is a struct that represents an access control entry to a topic

@@ -8,7 +8,7 @@ import {
     topicUrlJsonPollWithSince,
     userAccountUrl,
     userTokenUrl,
-    userStatsUrl
+    userStatsUrl, userSubscriptionUrl, userSubscriptionDeleteUrl
 } from "./utils";
 import userManager from "./UserManager";
 
@@ -181,6 +181,35 @@ class Api {
             method: "POST",
             headers: maybeWithBearerAuth({}, token),
             body: body
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async userSubscriptionAdd(baseUrl, token, payload) {
+        const url = userSubscriptionUrl(baseUrl);
+        const body = JSON.stringify(payload);
+        console.log(`[Api] Adding user subscription ${url}: ${body}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: maybeWithBearerAuth({}, token),
+            body: body
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        const subscription = await response.json();
+        console.log(`[Api] Subscription`, subscription);
+        return subscription;
+    }
+
+    async userSubscriptionDelete(baseUrl, token, remoteId) {
+        const url = userSubscriptionDeleteUrl(baseUrl, remoteId);
+        console.log(`[Api] Removing user subscription ${url}`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: maybeWithBearerAuth({}, token)
         });
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);

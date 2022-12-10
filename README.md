@@ -11,6 +11,8 @@
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
 [![Reddit](https://img.shields.io/reddit/subreddit-subscribers/ntfy?color=%23317f6f&label=-%20r%2Fntfy&style=social)](https://www.reddit.com/r/ntfy/)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
+[![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
+
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
@@ -58,6 +60,12 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <a href="https://hosted.weblate.org/engage/ntfy/">
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
+
+### Quickly getting a development environment setup
+
+To get a quick working development environment you could use Gitpod.
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
 ## Sponsors
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 

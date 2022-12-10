@@ -1,0 +1,28 @@
+tasks:
+  - name: docs
+    before: make docs-deps
+    command: mkdocs serve
+  - name: binary
+    before: |
+      npm install --global nodemon
+      make cli-deps-static-sites
+    command: |
+      nodemon --watch './**/*.go' --ext go --signal SIGTERM --exec "CGO_ENABLED=1 go run main.go serve --listen-http :2586 --debug --base-url $(gp url 2586)"
+    openMode: split-right
+  - name: web
+    before: make web-deps
+    command: cd web && npm start
+    openMode: split-right
+
+vscode:
+  extensions:
+    - golang.go
+    - ms-azuretools.vscode-docker
+
+ports:
+  - name: docs
+    port: 8000
+  - name: binary
+    port: 2586
+  - name: web
+    port: 3000

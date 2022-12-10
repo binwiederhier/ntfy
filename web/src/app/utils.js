@@ -242,7 +242,7 @@ export async function* fetchLinesIterator(fileURL, headers) {
 }
 
 export const randomAlphanumericString = (len) => {
-    const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let id = "";
     for (let i = 0; i < len; i++) {
         id += alphabet[(Math.random() * alphabet.length) | 0];

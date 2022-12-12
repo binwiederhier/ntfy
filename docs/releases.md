@@ -7,10 +7,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Web: Generate random topic name button ([#453](https://github.com/binwiederhier/ntfy/issues/453), thanks to [@yardenshoham](https://github.com/yardenshoham))
+* Add [Gitpod config](https://github.com/binwiederhier/ntfy/blob/main/.gitpod.yml) ([#540](https://github.com/binwiederhier/ntfy/pull/540), thanks to [@yardenshoham](https://github.com/yardenshoham)) 
 
 **Bug fixes + maintenance:**
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
+* Prepared statements for message cache writes ([#542](https://github.com/binwiederhier/ntfy/pull/542), thanks to [@nicois](https://github.com/nicois))
 
 ## ntfy Android app v1.16.0
 Released December 11, 2022

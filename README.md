@@ -61,12 +61,6 @@ Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start im
 <img src="https://hosted.weblate.org/widgets/ntfy/-/multi-blue.svg" alt="Translation status" />
 </a>
 
-### Quickly getting a development environment setup
-
-To get a quick working development environment you could use Gitpod.
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
-
 ## Sponsors
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
 I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
@@ -104,7 +98,8 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/mdlnr"><img src="https://github.com/mdlnr.png" width="40px" /></a>
 <a href="https://github.com/p-samuel"><img src="https://github.com/p-samuel.png" width="40px" /></a>
 
-I'd also like to thank [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
+I'd also like to thank [IntelliJ IDEA](https://www.jetbrains.com/idea/) for providing their awesome IDE to me for free,
+and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
 
 <a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
 

@@ -22,12 +22,6 @@ server consists of three components:
 
 All of these components are built and then **baked into one binary**. 
 
-### Quickly getting a development environment setup
-
-To get a quick working development environment you could use Gitpod.
-
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
-
 ### Navigating the code
 Code:
 
@@ -48,6 +42,13 @@ Build related:
 
 The `web/` and `docs/` folder are the sources for web app and documentation. During the build process,
 the generated output is copied to `server/site` (web app and landing page) and `server/docs` (documentation).
+
+### Build/test on Gitpod
+To get a quick working development environment you can use [Gitpod](https://gitpod.io), an in-browser IDE 
+that makes it easy to develop ntfy without having to set up a desktop IDE. For any real development,
+I do suggest a proper IDE like [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
 ### Build requirements
 

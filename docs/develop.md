@@ -22,6 +22,12 @@ server consists of three components:
 
 All of these components are built and then **baked into one binary**. 
 
+### Quickly getting a development environment setup
+
+To get a quick working development environment you could use Gitpod.
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
+
 ### Navigating the code
 Code:
 

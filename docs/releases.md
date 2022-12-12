@@ -7,33 +7,27 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Web: Generate random topic name button ([#453](https://github.com/binwiederhier/ntfy/issues/453), thanks to [@yardenshoham](https://github.com/yardenshoham))
+* Add [Gitpod config](https://github.com/binwiederhier/ntfy/blob/main/.gitpod.yml) ([#540](https://github.com/binwiederhier/ntfy/pull/540), thanks to [@yardenshoham](https://github.com/yardenshoham)) 
 
 **Bug fixes + maintenance:**
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
+* Prepared statements for message cache writes ([#542](https://github.com/binwiederhier/ntfy/pull/542), thanks to [@nicois](https://github.com/nicois))
 
-## ntfy Android app v1.16.0 (UNRELEASED)
+## ntfy Android app v1.16.0
+Released December 11, 2022
+
+This is a feature and platform/dependency upgrade release. You can now have per-subscription notification settings
+(including sounds, DND, etc.), and you can make notifications continue ringing until they are dismissed. There's also
+support for thematic/adaptive launcher icon for Android 13.
+
+There are a few more Android 13 specific things, as well as many bug fixes: No more crashes from large images, no more
+opening the wrong subscription, and we also fixed the icon color issue.
 
 **Features:**
 
 * Custom per-subscription notification settings incl. sounds, DND, etc. ([#6](https://github.com/binwiederhier/ntfy/issues/6), thanks to [@doits](https://github.com/doits))
 * Insistent notifications that ring until dismissed ([#417](https://github.com/binwiederhier/ntfy/issues/417), thanks to [@danmed](https://github.com/danmed) for reporting)
-
-**Bug fixes:**
-
-* Android 5 (SDK 21): Fix crash on unsubscribing ([#528](https://github.com/binwiederhier/ntfy/issues/528), thanks to Roger M.)
-
-## ntfy Android app v1.15.2 (UNRELEASED)
-
-This release is mainly a platform and dependency upgrade release, sprinkled with lots and lots of bugfixes. This version
-now targets SDK 33 (Android 13), and brings a few Android 13 specific improvements. Most prominently, ntfy now supports 
-thematic/adaptive launcher icons. 
-
-Other than that, the app now doesn't crash anymore when you send large attachment images, and we fixed the notification
-icon color.
-
-**Features:**
-
 * Add thematic/adaptive launcher icon ([#513](https://github.com/binwiederhier/ntfy/issues/513), thanks to [@daedric7](https://github.com/daedric7) for reporting)
 
 **Bug fixes + maintenance:**
@@ -42,6 +36,7 @@ icon color.
 * Simplify F-Droid build: Disable tasks for Google Services ([#516](https://github.com/binwiederhier/ntfy/issues/516), thanks to [@markosopcic](https://github.com/markosopcic))
 * Android 13: Ask for permission to post notifications ([#508](https://github.com/binwiederhier/ntfy/issues/508))
 * Android 13: Do not allow swiping away the foreground notification ([#521](https://github.com/binwiederhier/ntfy/issues/521), thanks to [@alexhorner](https://github.com/alexhorner) for reporting)
+* Android 5 (SDK 21): Fix crash on unsubscribing ([#528](https://github.com/binwiederhier/ntfy/issues/528), thanks to Roger M.)
 * Remove timestamp when copying message text ([#471](https://github.com/binwiederhier/ntfy/issues/471), thanks to [@wunter8](https://github.com/wunter8))
 * Fix auto-delete if some icons do not exist anymore ([#506](https://github.com/binwiederhier/ntfy/issues/506))
 * Fix notification icon color ([#480](https://github.com/binwiederhier/ntfy/issues/480), thanks to [@s-h-a-r-d](https://github.com/s-h-a-r-d) for reporting)

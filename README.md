@@ -11,6 +11,8 @@
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
 [![Reddit](https://img.shields.io/reddit/subreddit-subscribers/ntfy?color=%23317f6f&label=-%20r%2Fntfy&style=social)](https://www.reddit.com/r/ntfy/)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
+[![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
+
 
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
@@ -94,8 +96,12 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/tonyakwei"><img src="https://github.com/tonyakwei.png" width="40px" /></a>
 <a href="https://github.com/crosbyh"><img src="https://github.com/crosbyh.png" width="40px" /></a>
 <a href="https://github.com/mdlnr"><img src="https://github.com/mdlnr.png" width="40px" /></a>
+<a href="https://github.com/p-samuel"><img src="https://github.com/p-samuel.png" width="40px" /></a>
+<a href="https://github.com/zugaldia"><img src="https://github.com/zugaldia.png" width="40px" /></a>
+<a href="https://github.com/NathanSweet"><img src="https://github.com/NathanSweet.png" width="40px" /></a>
 
-I'd also like to thank [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
+I'd also like to thank [IntelliJ IDEA](https://www.jetbrains.com/idea/) for providing their awesome IDE to me for free,
+and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
 
 <a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
 

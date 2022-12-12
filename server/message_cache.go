@@ -258,12 +258,20 @@ func (c *messageCache) addMessages(ms []*message) error {
 	if c.nop {
 		return nil
 	}
+	if len(ms) == 0 {
+		return nil
+	}
 	start := time.Now()
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	stmt, err := tx.Prepare(insertMessageQuery)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
 	for _, m := range ms {
 		if m.Event != messageEvent {
 			return errUnexpectedMessageType
@@ -291,8 +299,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 		if m.Sender.IsValid() {
 			sender = m.Sender.String()
 		}
-		_, err := tx.Exec(
-			insertMessageQuery,
+		_, err := stmt.Exec(
 			m.ID,
 			m.Time,
 			m.Topic,

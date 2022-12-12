@@ -16,12 +16,78 @@ var (
 	exampleIP1234 = netip.MustParseAddr("1.2.3.4")
 )
 
+func TestBufferedSqliteCache_Messages(t *testing.T) {
+	testCacheMessages(t, newBufferedSqliteTestCache(t, 10, 0))
+}
+
 func TestSqliteCache_Messages(t *testing.T) {
 	testCacheMessages(t, newSqliteTestCache(t))
 }
 
 func TestMemCache_Messages(t *testing.T) {
 	testCacheMessages(t, newMemTestCache(t))
+}
+
+func TestBufferedCacheFlushBehaviour(t *testing.T) {
+	cooldown := time.Millisecond * 100
+	queueSize := 3
+	c := newBufferedSqliteTestCache(t, queueSize, cooldown)
+
+	// Add a single message. It should be buffered but not yet processed.
+	require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my example message")))
+	counts, err := c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 0, counts["mytopic"])
+
+	// wait less than cooldown. Because it's the first one,
+	// it should be processed without delay, so should be visible by now.
+	time.Sleep(cooldown / 3)
+	counts, err = c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 1, counts["mytopic"])
+
+	// Add a second message. It should be buffered but not yet processed,
+	// even after waiting
+	require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my example message")))
+	time.Sleep(cooldown / 3)
+	counts, err = c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 1, counts["mytopic"])
+
+	// If we wait a litle longer, enough time for the cooldown to expire, the second
+	// message should be processed
+	time.Sleep(2 * cooldown / 3)
+	counts, err = c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 2, counts["mytopic"])
+
+	// At this point the queue should be empty, and ~1/3 into its cooldown period.
+	// Attempt to send exactly the number of messages our queue has capacity for
+	t1 := time.Now()
+	for i := 0; i < queueSize; i++ {
+		require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my example message")))
+	}
+	// These insertions should not have taken much time at all; they should have completed
+	// well before the cooldown period ends
+	require.Less(t, time.Since(t1), cooldown/3)
+
+	// Assert that none of these messages have been processed
+	counts, err = c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 2, counts["mytopic"])
+
+	// Add an extra message. Because the buffered queue is at capacity, this should block
+	// this goroutine until the cooldown period has expired, and at least one of the pending
+	// messages has been read from the channel.
+	require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my example message")))
+	require.Greater(t, time.Since(t1), cooldown/3)
+
+	// Because the channel was full, there should not be a cooldown, and our new message should
+	// be processed without delay
+	time.Sleep(cooldown / 3)
+	counts, err = c.MessageCounts()
+	require.Nil(t, err)
+	require.Equal(t, 3+queueSize, counts["mytopic"])
 }
 
 func testCacheMessages(t *testing.T, c *messageCache) {
@@ -38,6 +104,11 @@ func testCacheMessages(t *testing.T, c *messageCache) {
 	// Adding invalid
 	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newKeepaliveMessage("mytopic"))) // These should not be added!
 	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example")))      // These should not be added!
+
+	// If a queue is used, allow time for async processing to occur
+	if c.queue != nil {
+		time.Sleep(time.Millisecond * 100)
+	}
 
 	// mytopic: count
 	counts, err := c.MessageCounts()
@@ -161,7 +232,6 @@ func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *messageCache) {
 	m.Priority = 5
 	m.Title = "some title"
 	require.Nil(t, c.AddMessage(m))
-
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
 	require.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
 	require.Equal(t, 5, messages[0].Priority)
@@ -521,6 +591,14 @@ func TestMemCache_NopCache(t *testing.T) {
 	topics, err := c.Topics()
 	assert.Nil(t, err)
 	assert.Empty(t, topics)
+}
+
+func newBufferedSqliteTestCache(t *testing.T, queueSize int, cooldown time.Duration) *messageCache {
+	c, err := newSqliteCache(newSqliteTestCacheFile(t), "", queueSize, cooldown, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }
 
 func newSqliteTestCache(t *testing.T) *messageCache {

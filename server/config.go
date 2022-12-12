@@ -116,7 +116,7 @@ func NewConfig() *Config {
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
-		CacheBatchSize:                       0,
+		CacheBatchSize:                       10,
 		CacheBatchTimeout:                    0,
 		AuthFile:                             "",
 		AuthDefaultRead:                      true,

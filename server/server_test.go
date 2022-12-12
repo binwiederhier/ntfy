@@ -1465,6 +1465,7 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
+	conf.CacheBatchSize = 0
 	conf.BaseURL = "http://127.0.0.1:12345"
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 	conf.AttachmentCacheDir = t.TempDir()

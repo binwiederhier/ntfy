@@ -2,12 +2,13 @@ package test
 
 import (
 	"fmt"
-	"heckel.io/ntfy/server"
 	"math/rand"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"heckel.io/ntfy/server"
 )
 
 func init() {
@@ -24,6 +25,7 @@ func StartServerWithConfig(t *testing.T, conf *server.Config) (*server.Server, i
 	port := 10000 + rand.Intn(20000)
 	conf.ListenHTTP = fmt.Sprintf(":%d", port)
 	conf.AttachmentCacheDir = t.TempDir()
+	conf.CacheBatchSize = 0
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 	s, err := server.New(conf)
 	if err != nil {

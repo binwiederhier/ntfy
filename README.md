@@ -52,9 +52,9 @@ topic. If you'd like to test the iOS app, join [TestFlight](https://testflight.a
 join Discord/Matrix (I'll eventually make a testing channel in Google Play).
 
 ## Contributing
-I welcome any and all contributions. Just create a PR or an issue. To contribute code, check out 
-the [build instructions](https://ntfy.sh/docs/develop/) for the server and the Android app.
-Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
+I welcome any and all contributions. Just create a PR or an issue. For larger features/ideas, please reach out
+on Discord/Matrix first to see if I'd accept them. To contribute code, check out the [build instructions](https://ntfy.sh/docs/develop/) 
+for the server and the Android app. Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
 
 <a href="https://hosted.weblate.org/engage/ntfy/">
@@ -104,6 +104,13 @@ I'd also like to thank [IntelliJ IDEA](https://www.jetbrains.com/idea/) for prov
 and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
 
 <a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
+
+## Code of Conduct
+We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, color, religion, or sexual identity and orientation.
+
+**We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.**
+
+_Please be sure to read the complete [Code of Conduct](CODE_OF_CONDUCT.md)._    
 
 ## License
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   

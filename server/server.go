@@ -42,6 +42,18 @@ import (
 		home page
 		reserve topics
 
+		Pages:
+		- Home
+		- Signup
+		- Sign-in
+		- Password reset
+		- Pricing
+
+		Config flags:
+		-
+		- enable-register: true|false
+		- enable-login: true|false
+		- enable-reset-password: true|false
 
 
 */

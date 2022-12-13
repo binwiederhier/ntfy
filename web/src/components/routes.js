@@ -3,6 +3,7 @@ import {shortUrl} from "../app/utils";
 
 const routes = {
     home: "/",
+    pricing: "/pricing",
     login: "/login",
     signup: "/signup",
     app: config.appRoot,

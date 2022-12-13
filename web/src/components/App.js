@@ -29,6 +29,7 @@ import i18n from "i18next";
 import api from "../app/Api";
 import prefs from "../app/Prefs";
 import session from "../app/Session";
+import Pricing from "./Pricing";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -42,6 +43,7 @@ const App = () => {
                     <ErrorBoundary>
                         <Routes>
                             <Route path={routes.home} element={<Home/>}/>
+                            <Route path={routes.pricing} element={<Pricing/>}/>
                             <Route path={routes.login} element={<Login/>}/>
                             <Route element={<Layout/>}>
                                 <Route path={routes.app} element={<AllSubscriptions/>}/>

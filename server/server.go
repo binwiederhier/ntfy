@@ -48,6 +48,9 @@ import (
 		- Sign-in
 		- Password reset
 		- Pricing
+		- change password
+		- change email
+		-
 
 		Config flags:
 		-

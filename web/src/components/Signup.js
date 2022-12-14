@@ -1,15 +1,17 @@
 import * as React from 'react';
-import {Avatar, Checkbox, FormControlLabel, Grid, Link} from "@mui/material";
+import {Avatar, Checkbox, FormControlLabel, Grid, Link, Stack} from "@mui/material";
 import Typography from "@mui/material/Typography";
+import Container from "@mui/material/Container";
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import api from "../app/Api";
+import {useNavigate} from "react-router-dom";
 import routes from "./routes";
 import session from "../app/Session";
 
-const Login = () => {
+const Signup = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -69,7 +71,7 @@ const Login = () => {
                         variant="contained"
                         sx={{mt: 3, mb: 2}}
                     >
-                        Sign In
+                        Sign up
                     </Button>
                     <Grid container>
                         <Grid item xs>
@@ -89,4 +91,4 @@ const Login = () => {
     );
 }
 
-export default Login;
+export default Signup;

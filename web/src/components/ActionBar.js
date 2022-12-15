@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import * as React from "react";
 import {useEffect, useRef, useState} from "react";
 import Box from "@mui/material/Box";
-import {formatShortDateTime, shuffle, topicDisplayName, topicShortUrl} from "../app/utils";
+import {formatShortDateTime, shuffle, topicDisplayName} from "../app/utils";
 import {useLocation, useNavigate} from "react-router-dom";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -23,11 +23,14 @@ import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
 import {useTranslation} from "react-i18next";
-import {Portal, Snackbar} from "@mui/material";
+import {Menu, Portal, Snackbar} from "@mui/material";
 import SubscriptionSettingsDialog from "./SubscriptionSettingsDialog";
 import session from "../app/Session";
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
+import {Logout, Person, Settings} from "@mui/icons-material";
+import ListItemIcon from "@mui/material/ListItemIcon";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();
@@ -246,32 +249,15 @@ const SettingsIcons = (props) => {
 
 const ProfileIcon = (props) => {
     const { t } = useTranslation();
-    const [open, setOpen] = useState(false);
-    const anchorRef = useRef(null);
+    const [anchorEl, setAnchorEl] = useState(null);
+    const open = Boolean(anchorEl);
     const navigate = useNavigate();
 
-    const handleToggleOpen = () => {
-        setOpen((prevOpen) => !prevOpen);
+    const handleClick = (event) => {
+        setAnchorEl(event.currentTarget);
     };
-
-    const handleClose = (event) => {
-        if (anchorRef.current && anchorRef.current.contains(event.target)) {
-            return;
-        }
-        setOpen(false);
-    };
-
-    const handleListKeyDown = (event) => {
-        if (event.key === 'Tab') {
-            event.preventDefault();
-            setOpen(false);
-        } else if (event.key === 'Escape') {
-            setOpen(false);
-        }
-    }
-
-    const handleUpgrade = () => {
-        // TODO
+    const handleClose = () => {
+        setAnchorEl(null);
     };
 
     const handleLogout = async () => {
@@ -280,19 +266,10 @@ const ProfileIcon = (props) => {
         window.location.href = routes.app;
     };
 
-    // return focus to the button when we transitioned from !open -> open
-    const prevOpen = useRef(open);
-    useEffect(() => {
-        if (prevOpen.current === true && open === false) {
-            anchorRef.current.focus();
-        }
-        prevOpen.current = open;
-    }, [open]);
-
     return (
         <>
             {session.exists() &&
-                <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} sx={{marginRight: 0}} aria-label={t("xxxxxxx")}>
+                <IconButton color="inherit" size="large" edge="end" onClick={handleClick} sx={{marginRight: 0}} aria-label={t("xxxxxxx")}>
                     <AccountCircleIcon/>
                 </IconButton>
             }
@@ -302,30 +279,61 @@ const ProfileIcon = (props) => {
                     <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)}>Sign up</Button>
                 </>
             }
-            <Popper
+            <Menu
+                anchorEl={anchorEl}
+                id="account-menu"
                 open={open}
-                anchorEl={anchorRef.current}
-                role={undefined}
-                placement="bottom-start"
-                transition
-                disablePortal
+                onClose={handleClose}
+                onClick={handleClose}
+                PaperProps={{
+                    elevation: 0,
+                    sx: {
+                        overflow: 'visible',
+                        filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                        mt: 1.5,
+                        '& .MuiAvatar-root': {
+                            width: 32,
+                            height: 32,
+                            ml: -0.5,
+                            mr: 1,
+                        },
+                        '&:before': {
+                            content: '""',
+                            display: 'block',
+                            position: 'absolute',
+                            top: 0,
+                            right: 14,
+                            width: 10,
+                            height: 10,
+                            bgcolor: 'background.paper',
+                            transform: 'translateY(-50%) rotate(45deg)',
+                            zIndex: 0,
+                        },
+                    },
+                }}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-                {({TransitionProps, placement}) => (
-                    <Grow
-                        {...TransitionProps}
-                        style={{transformOrigin: placement === 'bottom-start' ? 'left top' : 'left bottom'}}
-                    >
-                        <Paper>
-                            <ClickAwayListener onClickAway={handleClose}>
-                                <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
-                                    <MenuItem onClick={handleUpgrade}>Upgrade</MenuItem>
-                                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                                </MenuList>
-                            </ClickAwayListener>
-                        </Paper>
-                    </Grow>
-                )}
-            </Popper>
+                <MenuItem>
+                    <ListItemIcon>
+                        <Person />
+                    </ListItemIcon>
+                    <b>{session.username()}</b>
+                </MenuItem>
+                <Divider />
+                <MenuItem>
+                    <ListItemIcon>
+                        <Settings fontSize="small" />
+                    </ListItemIcon>
+                    Settings
+                </MenuItem>
+                <MenuItem onClick={handleLogout}>
+                    <ListItemIcon>
+                        <Logout fontSize="small" />
+                    </ListItemIcon>
+                    Logout
+                </MenuItem>
+            </Menu>
         </>
     );
 };

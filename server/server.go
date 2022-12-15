@@ -38,10 +38,7 @@ import (
 	TODO
 		expire tokens
 		auto-refresh tokens from UI
-		pricing page
-		home page
 		reserve topics
-
 		Pages:
 		- Home
 		- Signup
@@ -52,11 +49,6 @@ import (
 		- change email
 		-
 
-		Config flags:
-		-
-		- enable-register: true|false
-		- enable-login: true|false
-		- enable-reset-password: true|false
 
 
 */
@@ -74,7 +66,7 @@ type Server struct {
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
 	messages          int64
-	auth              auth.Auther
+	auth              auth.Manager
 	messageCache      *messageCache
 	fileCache         *fileCache
 	closeChan         chan bool
@@ -96,18 +88,19 @@ var (
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
-	webConfigPath               = "/config.js"
-	userStatsPath               = "/user/stats" // FIXME get rid of this in favor of /user/account
-	userTokenPath               = "/user/token"
-	userAccountPath             = "/user/account"
-	userSubscriptionPath        = "/user/subscription"
-	userSubscriptionDeleteRegex = regexp.MustCompile(`^/user/subscription/([-_A-Za-z0-9]{16})$`)
-	matrixPushPath              = "/_matrix/push/v1/notify"
-	staticRegex                 = regexp.MustCompile(`^/static/.+`)
-	docsRegex                   = regexp.MustCompile(`^/docs(|/.*)$`)
-	fileRegex                   = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics            = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
-	urlRegex                    = regexp.MustCompile(`^https?://`)
+	webConfigPath                  = "/config.js"
+	userStatsPath                  = "/user/stats" // FIXME get rid of this in favor of /user/account
+	accountPath                    = "/v1/account"
+	accountTokenPath               = "/v1/account/token"
+	accountSettingsPath            = "/v1/account/settings"
+	accountSubscriptionPath        = "/v1/account/subscription"
+	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
+	matrixPushPath                 = "/_matrix/push/v1/notify"
+	staticRegex                    = regexp.MustCompile(`^/static/.+`)
+	docsRegex                      = regexp.MustCompile(`^/docs(|/.*)$`)
+	fileRegex                      = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
+	disallowedTopics               = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
+	urlRegex                       = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -160,9 +153,9 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var auther auth.Auther
+	var auther auth.Manager
 	if conf.AuthFile != "" {
-		auther, err = auth.NewSQLiteAuth(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
+		auther, err = auth.NewSQLiteAuthManager(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -335,18 +328,20 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == userTokenPath {
-		return s.handleUserTokenCreate(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == userTokenPath {
-		return s.handleUserTokenDelete(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == userAccountPath {
-		return s.handleUserAccount(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == userAccountPath {
-		return s.handleUserAccountUpdate(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == userSubscriptionPath {
-		return s.handleUserSubscriptionAdd(w, r, v)
-	} else if r.Method == http.MethodDelete && userSubscriptionDeleteRegex.MatchString(r.URL.Path) {
-		return s.handleUserSubscriptionDelete(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
+		return s.handleUserAccountCreate(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == accountTokenPath {
+		return s.handleAccountTokenGet(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
+		return s.handleAccountTokenDelete(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == accountSettingsPath {
+		return s.handleAccountSettingsGet(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountSettingsPath {
+		return s.handleAccountSettingsPost(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
+		return s.handleAccountSubscriptionAdd(w, r, v)
+	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+		return s.handleAccountSubscriptionDelete(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -441,11 +436,7 @@ func (s *Server) handleUserStats(w http.ResponseWriter, r *http.Request, v *visi
 	return nil
 }
 
-type tokenAuthResponse struct {
-	Token string `json:"token"`
-}
-
-func (s *Server) handleUserTokenCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user == nil {
 		return errHTTPUnauthorized
@@ -456,7 +447,7 @@ func (s *Server) handleUserTokenCreate(w http.ResponseWriter, r *http.Request, v
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	response := &tokenAuthResponse{
+	response := &apiAccountTokenResponse{
 		Token: token,
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -465,7 +456,7 @@ func (s *Server) handleUserTokenCreate(w http.ResponseWriter, r *http.Request, v
 	return nil
 }
 
-func (s *Server) handleUserTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user == nil || v.user.Token == "" {
 		return errHTTPUnauthorized
@@ -477,24 +468,10 @@ func (s *Server) handleUserTokenDelete(w http.ResponseWriter, r *http.Request, v
 	return nil
 }
 
-type userPlanResponse struct {
-	Id   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-type userAccountResponse struct {
-	Username      string                      `json:"username"`
-	Role          string                      `json:"role,omitempty"`
-	Plan          *userPlanResponse           `json:"plan,omitempty"`
-	Language      string                      `json:"language,omitempty"`
-	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
-	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
-}
-
-func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountSettingsGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	response := &userAccountResponse{}
+	response := &apiAccountSettingsResponse{}
 	if v.user != nil {
 		response.Username = v.user.Name
 		response.Role = string(v.user.Role)
@@ -510,7 +487,7 @@ func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *vi
 			}
 		}
 	} else {
-		response = &userAccountResponse{
+		response = &apiAccountSettingsResponse{
 			Username: auth.Everyone,
 			Role:     string(auth.RoleAnonymous),
 		}
@@ -521,7 +498,31 @@ func (s *Server) handleUserAccount(w http.ResponseWriter, r *http.Request, v *vi
 	return nil
 }
 
-func (s *Server) handleUserAccountUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleUserAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	signupAllowed := s.config.EnableSignup
+	admin := v.user != nil && v.user.Role == auth.RoleAdmin
+	if !signupAllowed && !admin {
+		return errHTTPUnauthorized
+	}
+	body, err := util.Peek(r.Body, 4096) // FIXME
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	var newAccount apiAccountCreateRequest
+	if err := json.NewDecoder(body).Decode(&newAccount); err != nil {
+		return err
+	}
+	if err := s.auth.AddUser(newAccount.Username, newAccount.Password, auth.RoleUser); err != nil { // TODO this should return a User
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	// FIXME return something
+	return nil
+}
+
+func (s *Server) handleAccountSettingsPost(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user == nil {
 		return errors.New("no user")
 	}
@@ -560,7 +561,7 @@ func (s *Server) handleUserAccountUpdate(w http.ResponseWriter, r *http.Request,
 	return s.auth.ChangeSettings(v.user)
 }
 
-func (s *Server) handleUserSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user == nil {
 		return errors.New("no user")
 	}
@@ -598,13 +599,13 @@ func (s *Server) handleUserSubscriptionAdd(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
-func (s *Server) handleUserSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user == nil {
 		return errors.New("no user")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	matches := userSubscriptionDeleteRegex.FindStringSubmatch(r.URL.Path)
+	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidFilePath // FIXME
 	}

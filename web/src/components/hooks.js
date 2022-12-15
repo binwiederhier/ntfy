@@ -64,7 +64,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
-                    const remoteSubscription = await api.userSubscriptionAdd("http://localhost:2586", session.token(), {
+                    const remoteSubscription = await api.addAccountSubscription("http://localhost:2586", session.token(), {
                         base_url: baseUrl,
                         topic: params.topic
                     });

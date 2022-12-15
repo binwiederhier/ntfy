@@ -278,7 +278,7 @@ func createAuthManager(c *cli.Context) (auth.Manager, error) {
 	}
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
 	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
-	return auth.NewSQLiteAuth(authFile, authDefaultRead, authDefaultWrite)
+	return auth.NewSQLiteAuthManager(authFile, authDefaultRead, authDefaultWrite)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

@@ -6,8 +6,8 @@ import (
 	"regexp"
 )
 
-// Auther is a generic interface to implement password and token based authentication and authorization
-type Auther interface {
+// Manager is a generic interface to implement password and token based authentication and authorization
+type Manager interface {
 	// Authenticate checks username and password and returns a user if correct. The method
 	// returns in constant-ish time, regardless of whether the user exists or the password is
 	// correct or incorrect.
@@ -21,10 +21,7 @@ type Auther interface {
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
 	Authorize(user *User, topic string, perm Permission) error
-}
 
-// Manager is an interface representing user and access management
-type Manager interface {
 	// AddUser adds a user with the given username, password and role. The password should be hashed
 	// before it is stored in a persistence layer.
 	AddUser(username, password string, role Role) error

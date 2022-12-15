@@ -14,7 +14,7 @@ const SiteLayout = (props) => {
                         <li><NavLink to={routes.home} activeStyle>Features</NavLink></li>
                         <li><NavLink to={routes.pricing} activeStyle>Pricing</NavLink></li>
                         <li><NavLink to="/docs" reloadDocument={true} activeStyle>Docs</NavLink></li>
-                        {session.exists() && <li><NavLink to={routes.signup} activeStyle>Sign up</NavLink></li>}
+                        {!session.exists() && <li><NavLink to={routes.signup} activeStyle>Sign up</NavLink></li>}
                         {!session.exists() && <li><NavLink to={routes.login} activeStyle>Login</NavLink></li>}
                         <li><NavLink to={routes.app} activeStyle>Open app</NavLink></li>
                     </ol>

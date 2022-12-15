@@ -28,7 +28,7 @@ const SubscribeDialog = (props) => {
         const actualBaseUrl = (baseUrl) ? baseUrl : window.location.origin;
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
         if (session.exists()) {
-            const remoteSubscription = await api.userSubscriptionAdd("http://localhost:2586", session.token(), {
+            const remoteSubscription = await api.addAccountSubscription("http://localhost:2586", session.token(), {
                 base_url: actualBaseUrl,
                 topic: topic
             });

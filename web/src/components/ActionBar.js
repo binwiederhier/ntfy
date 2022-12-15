@@ -115,7 +115,7 @@ const SettingsIcons = (props) => {
         handleClose(event);
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
-            await api.userSubscriptionDelete("http://localhost:2586", session.token(), props.subscription.remoteId);
+            await api.deleteAccountSubscription("http://localhost:2586", session.token(), props.subscription.remoteId);
         }
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {

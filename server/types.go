@@ -1,6 +1,7 @@
 package server
 
 import (
+	"heckel.io/ntfy/auth"
 	"net/http"
 	"net/netip"
 	"time"
@@ -212,4 +213,27 @@ func (q *queryFilter) Pass(msg *message) bool {
 		return false
 	}
 	return true
+}
+
+type apiAccountCreateRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type apiAccountTokenResponse struct {
+	Token string `json:"token"`
+}
+
+type apiAccountSettingsPlan struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type apiAccountSettingsResponse struct {
+	Username      string                      `json:"username"`
+	Role          string                      `json:"role,omitempty"`
+	Plan          *apiAccountSettingsPlan     `json:"plan,omitempty"`
+	Language      string                      `json:"language,omitempty"`
+	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
+	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
 }

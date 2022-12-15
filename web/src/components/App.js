@@ -91,7 +91,7 @@ const Layout = () => {
 
     useEffect(() => {
         (async () => {
-            const account = await api.userAccount("http://localhost:2586", session.token());
+            const account = await api.getAccountSettings("http://localhost:2586", session.token());
             if (account) {
                 if (account.language) {
                     await i18n.changeLanguage(account.language);

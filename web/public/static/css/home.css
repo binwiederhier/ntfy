@@ -1,6 +1,6 @@
 /* general styling */
 
-html, body {
+#site {
     font-family: 'Roboto', sans-serif;
     font-weight: 400;
     font-size: 1.1em;
@@ -9,22 +9,16 @@ html, body {
     padding: 0;
 }
 
-html {
-    /* prevent scrollbar from repositioning website:
-     * https://www.w3docs.com/snippets/css/how-to-prevent-scrollbar-from-repositioning-web-page.html */
-    overflow-y: scroll;
-}
-
-a, a:visited {
+#site a, a:visited {
     color: #338574;
 }
 
-a:hover {
+#site a:hover {
     text-decoration: none;
     color: #317f6f;
 }
 
-h1 {
+#site h1 {
     margin-top: 35px;
     margin-bottom: 30px;
     font-size: 2.5em;
@@ -34,7 +28,7 @@ h1 {
     color: #666;
 }
 
-h2 {
+#site h2 {
     margin-top: 30px;
     margin-bottom: 5px;
     font-size: 1.8em;
@@ -42,7 +36,7 @@ h2 {
     color: #333;
 }
 
-h3 {
+#site h3 {
     margin-top: 25px;
     margin-bottom: 5px;
     font-size: 1.3em;
@@ -50,28 +44,28 @@ h3 {
     color: #333;
 }
 
-p {
+#site p {
     margin-top: 10px;
     margin-bottom: 20px;
     line-height: 160%;
     font-weight: 400;
 }
 
-p.smallMarginBottom {
+#site p.smallMarginBottom {
     margin-bottom: 10px;
 }
 
-b {
+#site b {
     font-weight: 500;
 }
 
-tt {
+#site tt {
     background: #eee;
     padding: 2px 7px;
     border-radius: 3px;
 }
 
-code {
+#site code {
     display: block;
     background: #eee;
     font-family: monospace;
@@ -85,18 +79,18 @@ code {
 
 /* Main page */
 
-#main {
+#site #main {
     max-width: 900px;
     margin: 0 auto 50px auto;
     padding: 0 10px;
 }
 
-#error {
+#site #error {
     color: darkred;
     font-style: italic;
 }
 
-#ironicCenterTagDontFreakOut {
+#site #ironicCenterTagDontFreakOut {
     color: #666;
 }
 
@@ -120,22 +114,22 @@ code {
 
 /* Figures */
 
-figure {
+#site figure {
     text-align: center;
 }
 
-figure img, figure video {
+#site figure img, figure video {
     filter: drop-shadow(3px 3px 3px #ccc);
     border-radius: 7px;
     max-width: 100%;
 }
 
-figure video {
+#site figure video {
     width: 100%;
     max-height: 450px;
 }
 
-figcaption {
+#site figcaption {
     text-align: center;
     font-style: italic;
     padding-top: 10px;
@@ -143,18 +137,18 @@ figcaption {
 
 /* Screenshots */
 
-#screenshots {
+#site #screenshots {
     text-align: center;
 }
 
-#screenshots img {
+#site #screenshots img {
     height: 190px;
     margin: 3px;
     border-radius: 5px;
     filter: drop-shadow(2px 2px 2px #ddd);
 }
 
-#screenshots .nowrap {
+#site #screenshots .nowrap {
     white-space: nowrap;
 }
 
@@ -220,23 +214,23 @@ figcaption {
 
 /* Header */
 
-#header {
+#site #header {
     background: #338574;
     height: 130px;
 }
 
-#header #headerBox {
+#site #header #headerBox {
     max-width: 900px;
     margin: 0 auto;
     padding: 0 10px;
 }
 
-#header #logo {
+#site #header #logo {
     margin-top: 23px;
     float: left;
 }
 
-#header #name {
+#site #header #name {
     float: left;
     color: white;
     font-size: 2.6em;
@@ -244,28 +238,28 @@ figcaption {
     margin: 35px 0 0 20px;
 }
 
-#header ol {
+#site #header ol {
     list-style-type: none;
     float: right;
     margin-top: 80px;
 }
 
-#header ol li {
+#site #header ol li {
     display: inline-block;
     margin: 0 10px;
     font-weight: 400;
 }
 
-#header ol li a, nav ol li a:visited {
+#site #header ol li a, nav ol li a:visited {
     color: white;
     text-decoration: none;
 }
 
-#header ol li a:hover {
+#site #header ol li a:hover {
     text-decoration: underline;
 }
 
-li {
+#site li {
     padding: 4px 0;
     margin: 4px 0;
     font-size: 0.9em;

@@ -100,6 +100,10 @@ type Config struct {
 	VisitorEmailLimitReplenish           time.Duration
 	BehindProxy                          bool
 	EnableWeb                            bool
+	EnableSignup                         bool
+	EnableLogin                          bool
+	EnableEmailConfirm                   bool
+	EnableResetPassword                  bool
 	Version                              string // injected by App
 }
 

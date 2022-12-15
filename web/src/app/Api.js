@@ -6,9 +6,9 @@ import {
     topicUrlAuth,
     topicUrlJsonPoll,
     topicUrlJsonPollWithSince,
-    userAccountUrl,
-    userTokenUrl,
-    userStatsUrl, userSubscriptionUrl, userSubscriptionDeleteUrl
+    accountSettingsUrl,
+    accountTokenUrl,
+    userStatsUrl, accountSubscriptionUrl, accountSubscriptionSingleUrl, accountUrl
 } from "./utils";
 import userManager from "./UserManager";
 
@@ -120,7 +120,7 @@ class Api {
     }
 
     async login(baseUrl, user) {
-        const url = userTokenUrl(baseUrl);
+        const url = accountTokenUrl(baseUrl);
         console.log(`[Api] Checking auth for ${url}`);
         const response = await fetch(url, {
             headers: maybeWithBasicAuth({}, user)
@@ -136,7 +136,7 @@ class Api {
     }
 
     async logout(baseUrl, token) {
-        const url = userTokenUrl(baseUrl);
+        const url = accountTokenUrl(baseUrl);
         console.log(`[Api] Logging out from ${url} using token ${token}`);
         const response = await fetch(url, {
             method: "DELETE",
@@ -159,8 +159,24 @@ class Api {
         return stats;
     }
 
-    async userAccount(baseUrl, token) {
-        const url = userAccountUrl(baseUrl);
+    async createAccount(baseUrl, username, password) {
+        const url = accountUrl(baseUrl);
+        const body = JSON.stringify({
+            username: username,
+            password: password
+        });
+        console.log(`[Api] Creating user account ${url}`);
+        const response = await fetch(url, {
+            method: "POST",
+            body: body
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async getAccountSettings(baseUrl, token) {
+        const url = accountSettingsUrl(baseUrl);
         console.log(`[Api] Fetching user account ${url}`);
         const response = await fetch(url, {
             headers: maybeWithBearerAuth({}, token)
@@ -173,8 +189,8 @@ class Api {
         return account;
     }
 
-    async updateUserAccount(baseUrl, token, payload) {
-        const url = userAccountUrl(baseUrl);
+    async updateAccountSettings(baseUrl, token, payload) {
+        const url = accountSettingsUrl(baseUrl);
         const body = JSON.stringify(payload);
         console.log(`[Api] Updating user account ${url}: ${body}`);
         const response = await fetch(url, {
@@ -187,8 +203,8 @@ class Api {
         }
     }
 
-    async userSubscriptionAdd(baseUrl, token, payload) {
-        const url = userSubscriptionUrl(baseUrl);
+    async addAccountSubscription(baseUrl, token, payload) {
+        const url = accountSubscriptionUrl(baseUrl);
         const body = JSON.stringify(payload);
         console.log(`[Api] Adding user subscription ${url}: ${body}`);
         const response = await fetch(url, {
@@ -204,8 +220,8 @@ class Api {
         return subscription;
     }
 
-    async userSubscriptionDelete(baseUrl, token, remoteId) {
-        const url = userSubscriptionDeleteUrl(baseUrl, remoteId);
+    async deleteAccountSubscription(baseUrl, token, remoteId) {
+        const url = accountSubscriptionSingleUrl(baseUrl, remoteId);
         console.log(`[Api] Removing user subscription ${url}`);
         const response = await fetch(url, {
             method: "DELETE",

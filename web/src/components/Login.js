@@ -8,6 +8,8 @@ import Box from "@mui/material/Box";
 import api from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
+import logo from "../img/ntfy2.svg";
+import {NavLink} from "react-router-dom";
 
 const Login = () => {
     const handleSubmit = async (event) => {
@@ -24,68 +26,59 @@ const Login = () => {
     };
 
     return (
-        <>
-            <Box
-                sx={{
-                    marginTop: 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                }}
-            >
-                <Avatar sx={{m: 1, bgcolor: 'secondary.main'}}>
-                    <LockOutlinedIcon/>
-                </Avatar>
-                <Typography component="h1" variant="h5">
+        <Box
+            sx={{
+                display: 'flex',
+                flexGrow: 1,
+                justifyContent: 'center',
+                flexDirection: 'column',
+                alignContent: 'center',
+                alignItems: 'center',
+                height: '100vh'
+            }}
+        >
+            <Avatar
+                sx={{ m: 2, width: 64, height: 64, borderRadius: 3 }}
+                src={logo}
+                variant="rounded"
+            />
+            <Typography sx={{ typography: 'h6' }}>
+                Sign in to your ntfy account
+            </Typography>
+            <Box component="form" onSubmit={handleSubmit} noValidate sx={{mt: 1, maxWidth: 400}}>
+                <TextField
+                    margin="dense"
+                    required
+                    fullWidth
+                    id="username"
+                    label="Username"
+                    name="username"
+                    autoFocus
+                />
+                <TextField
+                    margin="dense"
+                    required
+                    fullWidth
+                    name="password"
+                    label="Password"
+                    type="password"
+                    id="password"
+                    autoComplete="current-password"
+                />
+                <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    sx={{mt: 2, mb: 2}}
+                >
                     Sign in
-                </Typography>
-                <Box component="form" onSubmit={handleSubmit} noValidate sx={{mt: 1}}>
-                    <TextField
-                        margin="normal"
-                        required
-                        fullWidth
-                        id="username"
-                        label="Username"
-                        name="username"
-                        autoFocus
-                    />
-                    <TextField
-                        margin="normal"
-                        required
-                        fullWidth
-                        name="password"
-                        label="Password"
-                        type="password"
-                        id="password"
-                        autoComplete="current-password"
-                    />
-                    <FormControlLabel
-                        control={<Checkbox value="remember" color="primary"/>}
-                        label="Remember me"
-                    />
-                    <Button
-                        type="submit"
-                        fullWidth
-                        variant="contained"
-                        sx={{mt: 3, mb: 2}}
-                    >
-                        Sign In
-                    </Button>
-                    <Grid container>
-                        <Grid item xs>
-                            <Link href="#" variant="body2">
-                                Forgot password?
-                            </Link>
-                        </Grid>
-                        <Grid item>
-                            <Link to={routes.signup} variant="body2">
-                                {"Don't have an account? Sign Up"}
-                            </Link>
-                        </Grid>
-                    </Grid>
+                </Button>
+                <Box sx={{width: "100%"}}>
+                    <NavLink to="#" variant="body1" sx={{float: "left"}}>Reset password</NavLink>
+                    <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">Sign Up</NavLink></div>
                 </Box>
             </Box>
-        </>
+        </Box>
     );
 }
 

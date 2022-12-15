@@ -235,9 +235,9 @@ func TestSQLiteAuth_ChangeRole(t *testing.T) {
 	require.Equal(t, 0, len(ben.Grants))
 }
 
-func newTestAuth(t *testing.T, defaultRead, defaultWrite bool) *auth.SQLiteAuth {
+func newTestAuth(t *testing.T, defaultRead, defaultWrite bool) *auth.SQLiteAuthManager {
 	filename := filepath.Join(t.TempDir(), "user.db")
-	a, err := auth.NewSQLiteAuth(filename, defaultRead, defaultWrite)
+	a, err := auth.NewSQLiteAuthManager(filename, defaultRead, defaultWrite)
 	require.Nil(t, err)
 	return a
 }

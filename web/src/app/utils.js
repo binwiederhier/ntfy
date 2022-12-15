@@ -19,10 +19,11 @@ export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJ
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const userStatsUrl = (baseUrl) => `${baseUrl}/user/stats`;
-export const userTokenUrl = (baseUrl) => `${baseUrl}/user/token`;
-export const userAccountUrl = (baseUrl) => `${baseUrl}/user/account`;
-export const userSubscriptionUrl = (baseUrl) => `${baseUrl}/user/subscription`;
-export const userSubscriptionDeleteUrl = (baseUrl, id) => `${baseUrl}/user/subscription/${id}`;
+export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
+export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
+export const accountSettingsUrl = (baseUrl) => `${baseUrl}/v1/account/settings`;
+export const accountSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/subscription`;
+export const accountSubscriptionSingleUrl = (baseUrl, id) => `${baseUrl}/v1/account/subscription/${id}`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

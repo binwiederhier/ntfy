@@ -31,6 +31,8 @@ import prefs from "../app/Prefs";
 import session from "../app/Session";
 import Pricing from "./Pricing";
 import Signup from "./Signup";
+import Account from "./Account";
+import ResetPassword from "./ResetPassword";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -47,8 +49,10 @@ const App = () => {
                             <Route path={routes.pricing} element={<Pricing/>}/>
                             <Route path={routes.login} element={<Login/>}/>
                             <Route path={routes.signup} element={<Signup/>}/>
+                            <Route path={routes.resetPassword} element={<ResetPassword/>}/>
                             <Route element={<Layout/>}>
                                 <Route path={routes.app} element={<AllSubscriptions/>}/>
+                                <Route path={routes.account} element={<Account/>}/>
                                 <Route path={routes.settings} element={<Preferences/>}/>
                                 <Route path={routes.subscription} element={<SingleSubscription/>}/>
                                 <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>

@@ -302,7 +302,7 @@ const ProfileIcon = (props) => {
                             display: 'block',
                             position: 'absolute',
                             top: 0,
-                            right: 14,
+                            right: 19,
                             width: 10,
                             height: 10,
                             bgcolor: 'background.paper',
@@ -314,14 +314,14 @@ const ProfileIcon = (props) => {
                 transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-                <MenuItem>
+                <MenuItem onClick={() => navigate(routes.account)}>
                     <ListItemIcon>
                         <Person />
                     </ListItemIcon>
                     <b>{session.username()}</b>
                 </MenuItem>
                 <Divider />
-                <MenuItem>
+                <MenuItem onClick={() => navigate(routes.settings)}>
                     <ListItemIcon>
                         <Settings fontSize="small" />
                     </ListItemIcon>

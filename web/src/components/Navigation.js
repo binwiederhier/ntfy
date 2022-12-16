@@ -4,6 +4,7 @@ import {useState} from "react";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import Person from "@mui/icons-material/Person";
 import ListItemText from "@mui/material/ListItemText";
 import Toolbar from "@mui/material/Toolbar";
 import Divider from "@mui/material/Divider";
@@ -25,6 +26,7 @@ import notifier from "../app/Notifier";
 import config from "../app/config";
 import ArticleIcon from '@mui/icons-material/Article';
 import {Trans, useTranslation} from "react-i18next";
+import session from "../app/Session";
 
 const navWidth = 280;
 
@@ -121,6 +123,11 @@ const NavList = (props) => {
                         />
                         <Divider sx={{my: 1}}/>
                     </>}
+                {session.exists() &&
+                        <ListItemButton onClick={() => navigate(routes.account)} selected={location.pathname === routes.account}>
+                        <ListItemIcon><Person/></ListItemIcon>
+                        <ListItemText primary={t("nav_button_account")}/>
+                    </ListItemButton>}
                 <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary={t("nav_button_settings")}/>

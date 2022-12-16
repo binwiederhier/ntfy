@@ -39,13 +39,13 @@ import (
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
+		rate limit for signup (2 per 24h)
+		handle invalid session token
+		update disallowed topics
 		Pages:
 		- Home
-		- Signup
-		- Sign-in
 		- Password reset
 		- Pricing
-		- change password
 		- change email
 		-
 
@@ -92,6 +92,7 @@ var (
 	userStatsPath                  = "/user/stats" // FIXME get rid of this in favor of /user/account
 	accountPath                    = "/v1/account"
 	accountTokenPath               = "/v1/account/token"
+	accountPasswordPath            = "/v1/account/password"
 	accountSettingsPath            = "/v1/account/settings"
 	accountSubscriptionPath        = "/v1/account/subscription"
 	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
@@ -329,7 +330,11 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
 		return s.handleUserStats(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
-		return s.handleUserAccountCreate(w, r, v)
+		return s.handleAccountCreate(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
+		return s.handleAccountDelete(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
+		return s.handleAccountPasswordChange(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == accountTokenPath {
 		return s.handleAccountTokenGet(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
@@ -337,7 +342,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && r.URL.Path == accountSettingsPath {
 		return s.handleAccountSettingsGet(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSettingsPath {
-		return s.handleAccountSettingsPost(w, r, v)
+		return s.handleAccountSettingsChange(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
 		return s.handleAccountSubscriptionAdd(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
@@ -432,198 +437,6 @@ func (s *Server) handleUserStats(w http.ResponseWriter, r *http.Request, v *visi
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(stats); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (s *Server) handleAccountTokenGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	// TODO rate limit
-	if v.user == nil {
-		return errHTTPUnauthorized
-	}
-	token, err := s.auth.CreateToken(v.user)
-	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	response := &apiAccountTokenResponse{
-		Token: token,
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	// TODO rate limit
-	if v.user == nil || v.user.Token == "" {
-		return errHTTPUnauthorized
-	}
-	if err := s.auth.RemoveToken(v.user); err != nil {
-		return err
-	}
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
-}
-
-func (s *Server) handleAccountSettingsGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	response := &apiAccountSettingsResponse{}
-	if v.user != nil {
-		response.Username = v.user.Name
-		response.Role = string(v.user.Role)
-		if v.user.Prefs != nil {
-			if v.user.Prefs.Language != "" {
-				response.Language = v.user.Prefs.Language
-			}
-			if v.user.Prefs.Notification != nil {
-				response.Notification = v.user.Prefs.Notification
-			}
-			if v.user.Prefs.Subscriptions != nil {
-				response.Subscriptions = v.user.Prefs.Subscriptions
-			}
-		}
-	} else {
-		response = &apiAccountSettingsResponse{
-			Username: auth.Everyone,
-			Role:     string(auth.RoleAnonymous),
-		}
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Server) handleUserAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	signupAllowed := s.config.EnableSignup
-	admin := v.user != nil && v.user.Role == auth.RoleAdmin
-	if !signupAllowed && !admin {
-		return errHTTPUnauthorized
-	}
-	body, err := util.Peek(r.Body, 4096) // FIXME
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	var newAccount apiAccountCreateRequest
-	if err := json.NewDecoder(body).Decode(&newAccount); err != nil {
-		return err
-	}
-	if err := s.auth.AddUser(newAccount.Username, newAccount.Password, auth.RoleUser); err != nil { // TODO this should return a User
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	// FIXME return something
-	return nil
-}
-
-func (s *Server) handleAccountSettingsPost(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user == nil {
-		return errors.New("no user")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	body, err := util.Peek(r.Body, 4096)               // FIXME
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	var newPrefs auth.UserPrefs
-	if err := json.NewDecoder(body).Decode(&newPrefs); err != nil {
-		return err
-	}
-	if v.user.Prefs == nil {
-		v.user.Prefs = &auth.UserPrefs{}
-	}
-	prefs := v.user.Prefs
-	if newPrefs.Language != "" {
-		prefs.Language = newPrefs.Language
-	}
-	if newPrefs.Notification != nil {
-		if prefs.Notification == nil {
-			prefs.Notification = &auth.UserNotificationPrefs{}
-		}
-		if newPrefs.Notification.DeleteAfter > 0 {
-			prefs.Notification.DeleteAfter = newPrefs.Notification.DeleteAfter
-		}
-		if newPrefs.Notification.Sound != "" {
-			prefs.Notification.Sound = newPrefs.Notification.Sound
-		}
-		if newPrefs.Notification.MinPriority > 0 {
-			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
-		}
-	}
-	return s.auth.ChangeSettings(v.user)
-}
-
-func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user == nil {
-		return errors.New("no user")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	body, err := util.Peek(r.Body, 4096)               // FIXME
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	var newSubscription auth.UserSubscription
-	if err := json.NewDecoder(body).Decode(&newSubscription); err != nil {
-		return err
-	}
-	if v.user.Prefs == nil {
-		v.user.Prefs = &auth.UserPrefs{}
-	}
-	newSubscription.ID = "" // Client cannot set ID
-	for _, subscription := range v.user.Prefs.Subscriptions {
-		if newSubscription.BaseURL == subscription.BaseURL && newSubscription.Topic == subscription.Topic {
-			newSubscription = *subscription
-			break
-		}
-	}
-	if newSubscription.ID == "" {
-		newSubscription.ID = util.RandomString(16)
-		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, &newSubscription)
-		if err := s.auth.ChangeSettings(v.user); err != nil {
-			return err
-		}
-	}
-	if err := json.NewEncoder(w).Encode(newSubscription); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user == nil {
-		return errors.New("no user")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
-	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidFilePath // FIXME
-	}
-	subscriptionID := matches[1]
-	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
-		return nil
-	}
-	newSubscriptions := make([]*auth.UserSubscription, 0)
-	for _, subscription := range v.user.Prefs.Subscriptions {
-		if subscription.ID != subscriptionID {
-			newSubscriptions = append(newSubscriptions, subscription)
-		}
-	}
-	if len(newSubscriptions) < len(v.user.Prefs.Subscriptions) {
-		v.user.Prefs.Subscriptions = newSubscriptions
-		if err := s.auth.ChangeSettings(v.user); err != nil {
-			return err
-		}
 	}
 	return nil
 }

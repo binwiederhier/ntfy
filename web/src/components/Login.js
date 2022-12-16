@@ -74,8 +74,8 @@ const Login = () => {
                     Sign in
                 </Button>
                 <Box sx={{width: "100%"}}>
-                    <NavLink to="#" variant="body1" sx={{float: "left"}}>Reset password</NavLink>
-                    <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">Sign Up</NavLink></div>
+                    <div style={{float: "left"}}><NavLink to={routes.resetPassword} variant="body1">Reset password</NavLink></div>
+                    <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">Sign up</NavLink></div>
                 </Box>
             </Box>
         </Box>

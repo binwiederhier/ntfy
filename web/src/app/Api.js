@@ -8,7 +8,7 @@ import {
     topicUrlJsonPollWithSince,
     accountSettingsUrl,
     accountTokenUrl,
-    userStatsUrl, accountSubscriptionUrl, accountSubscriptionSingleUrl, accountUrl
+    userStatsUrl, accountSubscriptionUrl, accountSubscriptionSingleUrl, accountUrl, accountPasswordUrl
 } from "./utils";
 import userManager from "./UserManager";
 
@@ -169,6 +169,33 @@ class Api {
         const response = await fetch(url, {
             method: "POST",
             body: body
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async deleteAccount(baseUrl, token) {
+        const url = accountUrl(baseUrl);
+        console.log(`[Api] Deleting user account ${url}`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: maybeWithBearerAuth({}, token)
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async changePassword(baseUrl, token, password) {
+        const url = accountPasswordUrl(baseUrl);
+        console.log(`[Api] Changing account password ${url}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: maybeWithBearerAuth({}, token),
+            body: JSON.stringify({
+                password: password
+            })
         });
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);

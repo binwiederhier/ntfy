@@ -81,11 +81,12 @@ const (
 
 // Manager-related queries
 const (
-	insertUserQuery      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
-	selectUsernamesQuery = `SELECT user FROM user ORDER BY role, user`
-	updateUserPassQuery  = `UPDATE user SET pass = ? WHERE user = ?`
-	updateUserRoleQuery  = `UPDATE user SET role = ? WHERE user = ?`
-	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
+	insertUserQuery         = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	selectUsernamesQuery    = `SELECT user FROM user ORDER BY role, user`
+	updateUserPassQuery     = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRoleQuery     = `UPDATE user SET role = ? WHERE user = ?`
+	updateUserSettingsQuery = `UPDATE user SET settings = ? WHERE user = ?`
+	deleteUserQuery         = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery  = `INSERT INTO user_access (user_id, topic, read, write) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?)`
 	selectUserAccessQuery  = `SELECT topic, read, write FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
@@ -93,9 +94,9 @@ const (
 	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
 
-	insertTokenQuery        = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
-	deleteTokenQuery        = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
-	updateUserSettingsQuery = `UPDATE user SET settings = ? WHERE user = ?`
+	insertTokenQuery     = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
+	deleteTokenQuery     = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
+	deleteUserTokenQuery = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 )
 
 // Schema management queries
@@ -250,10 +251,13 @@ func (a *SQLiteAuthManager) RemoveUser(username string) error {
 	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
-	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
+	if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
+	if _, err := a.db.Exec(deleteUserTokenQuery, username); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
 		return err
 	}
 	return nil

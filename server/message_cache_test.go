@@ -76,18 +76,14 @@ func TestBufferedCacheFlushBehaviour(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, counts["mytopic"])
 
-	// Add an extra message. Because the buffered queue is at capacity, this should block
-	// this goroutine until the cooldown period has expired, and at least one of the pending
-	// messages has been read from the channel.
+	// Add an extra message.
 	require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my example message")))
-	require.Greater(t, time.Since(t1), cooldown/3)
-
-	// Because the channel was full, there should not be a cooldown, and our new message should
-	// be processed without delay
-	time.Sleep(cooldown / 3)
+	// Because we have more than `queueSize` elements in the channel, the processing
+	// goroutine should be immediately woken, processing everything very quickly.
+	time.Sleep(cooldown / 6)
 	counts, err = c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 3+queueSize, counts["mytopic"])
+	require.GreaterOrEqual(t, 2+queueSize, counts["mytopic"])
 }
 
 func testCacheMessages(t *testing.T, c *messageCache) {

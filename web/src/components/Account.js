@@ -1,5 +1,7 @@
 import * as React from 'react';
-import {Stack, useMediaQuery} from "@mui/material";
+import {useState} from 'react';
+import {LinearProgress, Stack, useMediaQuery} from "@mui/material";
+import Tooltip from '@mui/material/Tooltip';
 import Typography from "@mui/material/Typography";
 import EditIcon from '@mui/icons-material/Edit';
 import Container from "@mui/material/Container";
@@ -7,24 +9,26 @@ import Card from "@mui/material/Card";
 import Button from "@mui/material/Button";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
-import {useEffect, useState} from "react";
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import theme from "./theme";
-import {validUrl} from "../app/utils";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
-import userManager from "../app/UserManager";
 import api from "../app/Api";
 import routes from "./routes";
+import IconButton from "@mui/material/IconButton";
+import {NavLink, useOutletContext} from "react-router-dom";
+import Box from "@mui/material/Box";
 
 const Account = () => {
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Basics/>
-
+                <Stats/>
+                <Delete/>
             </Stack>
         </Container>
     );
@@ -38,12 +42,82 @@ const Basics = () => {
                 Account
             </Typography>
             <PrefGroup>
-                <Pref labelId={"username"} title={"Username"}>{session.username()}</Pref>
+                <Username/>
                 <ChangePassword/>
+            </PrefGroup>
+        </Card>
+    );
+};
+
+const Stats = () => {
+    const { t } = useTranslation();
+    const { account } = useOutletContext();
+    return (
+        <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
+            <Typography variant="h5" sx={{marginBottom: 2}}>
+                {t("Usage")}
+            </Typography>
+            <PrefGroup>
+                <Pref labelId={"accountType"} title={t("Account type")}>
+                    <div>
+                        {account?.role === "admin"
+                            ? <>Unlimited <Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
+                            : "Free"}
+                    </div>
+                </Pref>
+                <Pref labelId={"dailyMessages"} title={t("Daily messages")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>123</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>of 1000</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={10} />
+                </Pref>
+                <Pref labelId={"attachmentStorage"} title={t("Attachment storage")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>15 MB used</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>of 150 MB</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={40} />
+                </Pref>
+                <Pref labelId={"emailLimits"} title={t("Emails sent")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>2</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>of 15</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={20} />
+                </Pref>
+            </PrefGroup>
+        </Card>
+    );
+};
+
+const Delete = () => {
+    const { t } = useTranslation();
+    return (
+        <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
+            <Typography variant="h5" sx={{marginBottom: 2}}>
+                {t("Delete account")}
+            </Typography>
+            <PrefGroup>
                 <DeleteAccount/>
             </PrefGroup>
         </Card>
     );
+};
+
+const Username = () => {
+    const { t } = useTranslation();
+    const { account } = useOutletContext();
+    return (
+        <Pref labelId={"username"} title={t("Username")} description={t("Hey, that's you ❤")}>
+            <div>
+                {session.username()}
+                {account?.role === "admin"
+                    ? <>{" "}<Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
+                    : ""}
+            </div>
+        </Pref>
+    )
 };
 
 const ChangePassword = () => {
@@ -69,10 +143,13 @@ const ChangePassword = () => {
         }
     };
     return (
-        <Pref labelId={labelId} title={"Password"}>
-            <Button variant="outlined" startIcon={<EditIcon />} onClick={handleDialogOpen}>
-                Change password
-            </Button>
+        <Pref labelId={labelId} title={t("Password")} description={t("Change your account password")}>
+            <div>
+                <Typography color="gray" sx={{float: "left", fontSize: "0.7rem", lineHeight: "3.5"}}>⬤⬤⬤⬤⬤⬤⬤⬤⬤⬤</Typography>
+                <IconButton onClick={handleDialogOpen} aria-label={t("xxxxxxxx")}>
+                    <EditIcon/>
+                </IconButton>
+            </div>
             <ChangePasswordDialog
                 key={`changePasswordDialog${dialogKey}`}
                 open={dialogOpen}
@@ -152,10 +229,12 @@ const DeleteAccount = () => {
         }
     };
     return (
-        <Pref labelId={labelId} title={t("Delete account")} description={t("This will permanently delete your account, including all data that is stored on the server.")}>
-            <Button variant="outlined" startIcon={<EditIcon />} onClick={handleDialogOpen}>
-                Delete account
-            </Button>
+        <Pref labelId={labelId} title={t("Delete account")} description={t("Permanently delete your account")}>
+            <div>
+                <Button fullWidth={false} variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={handleDialogOpen}>
+                    Delete account
+                </Button>
+            </div>
             <DeleteAccountDialog
                 key={`deleteAccountDialog${dialogKey}`}
                 open={dialogOpen}
@@ -176,12 +255,12 @@ const DeleteAccountDialog = (props) => {
             <DialogTitle>{t("Delete account")}</DialogTitle>
             <DialogContent>
                 <Typography variant="body1">
-                    {t("This will permanently delete your account, including all data that is stored on the server. If you really want to proceed, please type {{username}} in the text box below.")}
+                    {t("This will permanently delete your account, including all data that is stored on the server. If you really want to proceed, please type '{{username}}' in the text box below.", { username: session.username()})}
                 </Typography>
                 <TextField
                     margin="dense"
                     id="account-delete-confirm"
-                    label={t("Type '{{username}}' to delete account")}
+                    label={t("Type '{{username}}' to delete account", { username: session.username()})}
                     aria-label={t("xxxx")}
                     type="text"
                     value={username}

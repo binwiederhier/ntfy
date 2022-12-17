@@ -81,6 +81,7 @@ const Layout = () => {
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
     const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
+    const [account, setAccount] = useState(null);
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
@@ -95,24 +96,25 @@ const Layout = () => {
 
     useEffect(() => {
         (async () => {
-            const account = await api.getAccountSettings("http://localhost:2586", session.token());
-            if (account) {
-                if (account.language) {
-                    await i18n.changeLanguage(account.language);
+            const acc = await api.getAccountSettings("http://localhost:2586", session.token());
+            if (acc) {
+                setAccount(acc);
+                if (acc.language) {
+                    await i18n.changeLanguage(acc.language);
                 }
-                if (account.notification) {
-                    if (account.notification.sound) {
-                        await prefs.setSound(account.notification.sound);
+                if (acc.notification) {
+                    if (acc.notification.sound) {
+                        await prefs.setSound(acc.notification.sound);
                     }
-                    if (account.notification.delete_after) {
-                        await prefs.setDeleteAfter(account.notification.delete_after);
+                    if (acc.notification.delete_after) {
+                        await prefs.setDeleteAfter(acc.notification.delete_after);
                     }
-                    if (account.notification.min_priority) {
-                        await prefs.setMinPriority(account.notification.min_priority);
+                    if (acc.notification.min_priority) {
+                        await prefs.setMinPriority(acc.notification.min_priority);
                     }
                 }
-                if (account.subscriptions) {
-                    await subscriptionManager.syncFromRemote(account.subscriptions);
+                if (acc.subscriptions) {
+                    await subscriptionManager.syncFromRemote(acc.subscriptions);
                 }
             }
         })();
@@ -135,7 +137,7 @@ const Layout = () => {
             />
             <Main>
                 <Toolbar/>
-                <Outlet context={{ subscriptions, selected }}/>
+                <Outlet context={{ account, subscriptions, selected }}/>
             </Main>
             <Messaging
                 selected={selected}

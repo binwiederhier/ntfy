@@ -36,6 +36,7 @@ import (
 
 /*
 	TODO
+		return rate limit information in account stats
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
@@ -48,7 +49,8 @@ import (
 		- Pricing
 		- change email
 		-
-
+		Polishing:
+			aria-label for everything
 
 
 */

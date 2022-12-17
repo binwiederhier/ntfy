@@ -333,6 +333,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleUserStats(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
 		return s.handleAccountCreate(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
+		return s.handleAccountGet(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
 		return s.handleAccountDelete(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
@@ -341,8 +343,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleAccountTokenGet(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
 		return s.handleAccountTokenDelete(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == accountSettingsPath {
-		return s.handleAccountSettingsGet(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSettingsPath {
 		return s.handleAccountSettingsChange(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {

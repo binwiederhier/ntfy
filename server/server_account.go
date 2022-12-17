@@ -32,6 +32,52 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	return nil
 }
 
+func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	stats, err := v.Stats()
+	if err != nil {
+		return err
+	}
+	response := &apiAccountSettingsResponse{
+		Usage: &apiAccountUsageLimits{
+			Basis: "ip",
+		},
+	}
+	if v.user != nil {
+		response.Username = v.user.Name
+		response.Role = string(v.user.Role)
+		if v.user.Prefs != nil {
+			if v.user.Prefs.Language != "" {
+				response.Language = v.user.Prefs.Language
+			}
+			if v.user.Prefs.Notification != nil {
+				response.Notification = v.user.Prefs.Notification
+			}
+			if v.user.Prefs.Subscriptions != nil {
+				response.Subscriptions = v.user.Prefs.Subscriptions
+			}
+		}
+		if v.user.Plan != nil {
+			response.Usage.Basis = "account"
+			response.Plan = &apiAccountSettingsPlan{
+				Name:                  v.user.Plan.Name,
+				MessagesLimit:         v.user.Plan.MessagesLimit,
+				EmailsLimit:           v.user.Plan.EmailsLimit,
+				AttachmentsBytesLimit: v.user.Plan.AttachmentBytesLimit,
+			}
+		}
+	} else {
+		response.Username = auth.Everyone
+		response.Role = string(auth.RoleAnonymous)
+	}
+	response.Usage.AttachmentsBytes = stats.VisitorAttachmentBytesUsed
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user == nil {
 		return errHTTPUnauthorized
@@ -96,36 +142,6 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
-}
-
-func (s *Server) handleAccountSettingsGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	response := &apiAccountSettingsResponse{}
-	if v.user != nil {
-		response.Username = v.user.Name
-		response.Role = string(v.user.Role)
-		if v.user.Prefs != nil {
-			if v.user.Prefs.Language != "" {
-				response.Language = v.user.Prefs.Language
-			}
-			if v.user.Prefs.Notification != nil {
-				response.Notification = v.user.Prefs.Notification
-			}
-			if v.user.Prefs.Subscriptions != nil {
-				response.Subscriptions = v.user.Prefs.Subscriptions
-			}
-		}
-	} else {
-		response = &apiAccountSettingsResponse{
-			Username: auth.Everyone,
-			Role:     string(auth.RoleAnonymous),
-		}
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
 	return nil
 }
 

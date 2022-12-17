@@ -52,6 +52,8 @@ const Basics = () => {
 const Stats = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
+    const admin = account?.role === "admin"
+    const accountType = account?.plan?.name ?? "Free";
     return (
         <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -62,7 +64,7 @@ const Stats = () => {
                     <div>
                         {account?.role === "admin"
                             ? <>Unlimited <Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
-                            : "Free"}
+                            : accountType}
                     </div>
                 </Pref>
                 <Pref labelId={"dailyMessages"} title={t("Daily messages")}>

@@ -64,12 +64,20 @@ type User struct {
 	Role   Role
 	Grants []Grant
 	Prefs  *UserPrefs
+	Plan   *UserPlan
 }
 
 type UserPrefs struct {
 	Language      string                 `json:"language,omitempty"`
 	Notification  *UserNotificationPrefs `json:"notification,omitempty"`
 	Subscriptions []*UserSubscription    `json:"subscriptions,omitempty"`
+}
+
+type UserPlan struct {
+	Name                 string `json:"name"`
+	MessagesLimit        int    `json:"messages_limit"`
+	EmailsLimit          int    `json:"emails_limit"`
+	AttachmentBytesLimit int64  `json:"attachment_bytes_limit"`
 }
 
 type UserSubscription struct {

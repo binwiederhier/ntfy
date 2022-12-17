@@ -23,8 +23,10 @@ const (
 		BEGIN;
 		CREATE TABLE IF NOT EXISTS plan (
 			id INT NOT NULL,		
-			name TEXT NOT NULL,	
-			limit_messages INT,
+			name TEXT NOT NULL,
+			messages_limit INT NOT NULL,
+			emails_limit INT NOT NULL,
+			attachment_bytes_limit INT NOT NULL,
 			PRIMARY KEY (id)
 		);
 		CREATE TABLE IF NOT EXISTS user (
@@ -55,20 +57,21 @@ const (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
-		INSERT INTO plan (id, name) VALUES (1, 'Admin') ON CONFLICT (id) DO NOTHING;
 		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
 		COMMIT;
 	`
 	selectUserByNameQuery = `
-		SELECT user, pass, role, settings 
-		FROM user 
-		WHERE user = ?
+		SELECT u.user, u.pass, u.role, u.settings, p.name, p.messages_limit, p.emails_limit, p.attachment_bytes_limit
+		FROM user u
+		LEFT JOIN plan p on p.id = u.plan_id
+		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT user, pass, role, settings 
-		FROM user
-		JOIN user_token on user.id = user_token.user_id
-		WHERE token = ?
+		SELECT u.user, u.pass, u.role, u.settings, p.name, p.messages_limit, p.emails_limit, p.attachment_bytes_limit
+		FROM user u
+		JOIN user_token t on u.id = t.user_id
+		LEFT JOIN plan p on p.id = u.plan_id
+		WHERE t.token = ?
 	`
 	selectTopicPermsQuery = `
 		SELECT read, write 
@@ -321,11 +324,13 @@ func (a *SQLiteAuthManager) userByToken(token string) (*User, error) {
 func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var prefs sql.NullString
+	var prefs, planName sql.NullString
+	var messagesLimit, emailsLimit sql.NullInt32
+	var attachmentBytesLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &prefs); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs, &planName, &messagesLimit, &emailsLimit, &attachmentBytesLimit); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -344,6 +349,14 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 		user.Prefs = &UserPrefs{}
 		if err := json.Unmarshal([]byte(prefs.String), user.Prefs); err != nil {
 			return nil, err
+		}
+	}
+	if planName.Valid {
+		user.Plan = &UserPlan{
+			Name:                 planName.String,
+			MessagesLimit:        int(messagesLimit.Int32),
+			EmailsLimit:          int(emailsLimit.Int32),
+			AttachmentBytesLimit: attachmentBytesLimit.Int64,
 		}
 	}
 	return user, nil

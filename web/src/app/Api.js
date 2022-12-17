@@ -175,6 +175,20 @@ class Api {
         }
     }
 
+    async getAccount(baseUrl, token) {
+        const url = accountUrl(baseUrl);
+        console.log(`[Api] Fetching user account ${url}`);
+        const response = await fetch(url, {
+            headers: maybeWithBearerAuth({}, token)
+        });
+        if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        const account = await response.json();
+        console.log(`[Api] Account`, account);
+        return account;
+    }
+
     async deleteAccount(baseUrl, token) {
         const url = accountUrl(baseUrl);
         console.log(`[Api] Deleting user account ${url}`);
@@ -200,20 +214,6 @@ class Api {
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-    }
-
-    async getAccountSettings(baseUrl, token) {
-        const url = accountSettingsUrl(baseUrl);
-        console.log(`[Api] Fetching user account ${url}`);
-        const response = await fetch(url, {
-            headers: maybeWithBearerAuth({}, token)
-        });
-        if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const account = await response.json();
-        console.log(`[Api] Account`, account);
-        return account;
     }
 
     async updateAccountSettings(baseUrl, token, payload) {

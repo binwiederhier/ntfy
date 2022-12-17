@@ -33,10 +33,10 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 
 
 ## Low disk space alerts
-Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but 
-effective. 
+Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but
+effective.
 
-``` bash 
+``` bash
 #!/bin/bash
 
 mingigs=10
@@ -78,7 +78,7 @@ to notify yourself on SSH login.
 
 ## Collect data from multiple machines
 The other day I was running tasks on 20 servers, and I wanted to collect the interim results
-as a CSV in one place. Each of the servers was publishing to a topic as the results completed (`publish-result.sh`), 
+as a CSV in one place. Each of the servers was publishing to a topic as the results completed (`publish-result.sh`),
 and I had one central collector to grab the results as they came in (`collect-results.sh`).
 
 It looked something like this:
@@ -89,10 +89,10 @@ It looked something like this:
       [ -n "$result" ] && echo "$result" >> results.csv
     done < <(stdbuf -i0 -o0 curl -s ntfy.sh/results/raw)
     ```
-=== "publish-result.sh" 
+=== "publish-result.sh"
     ```bash
     // This script was run on each of the 20 servers. It was doing heavy processing ...
-    
+
     // Publish script results
     curl -d "$(hostname),$count,$time" ntfy.sh/results
     ```
@@ -136,7 +136,7 @@ You can send a message during a workflow run with curl. Here is an example sendi
 ```
 
 ## Watchtower (shoutrrr)
-You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send 
+You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
 
 Example docker-compose.yml:
@@ -156,7 +156,7 @@ shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUp
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd
 It's possible to use custom scripts for all the *arr services, plus SABnzbd. Notifications for downloads, warnings, grabs etc.
-Some simple bash scripts to achieve this are kindly provided in [nickexyz's repository](https://github.com/nickexyz/ntfy-shellscripts). 
+Some simple bash scripts to achieve this are kindly provided in [nickexyz's repository](https://github.com/nickexyz/ntfy-shellscripts).
 
 ## Node-RED
 You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:
@@ -503,7 +503,7 @@ Select **Alert Contact Type** = Webhook. Then set your desired **Friendly Name**
 {
     "topic":"myTopic",
     "title": "*monitorFriendlyName* *alertTypeFriendlyName*",
-    "message": "*alertDetails*", 
+    "message": "*alertDetails*",
     "tags": ["green_circle"],
     "priority": 3,
     "click": https://uptimerobot.com/dashboard#*monitorID*
@@ -515,7 +515,7 @@ You can create two Alert Contacts each with a different icon and priority, for e
 {
     "topic":"myTopic",
     "title": "*monitorFriendlyName* *alertTypeFriendlyName*",
-    "message": "*alertDetails*", 
+    "message": "*alertDetails*",
     "tags": ["red_circle"],
     "priority": 3,
     "click": https://uptimerobot.com/dashboard#*monitorID*
@@ -529,7 +529,7 @@ You can now add the created Alerts Contact(s) to the monitor(s) and test the not
 
 
 ## Apprise
-ntfy is integrated natively into [Apprise](https://github.com/caronc/apprise) (also check out the 
+ntfy is integrated natively into [Apprise](https://github.com/caronc/apprise) (also check out the
 [Apprise/ntfy wiki page](https://github.com/caronc/apprise/wiki/Notify_ntfy)).
 
 You can use it like this:
@@ -548,7 +548,7 @@ apprise -vv -t "Test Message Title" -b "Test Message Body" \
 
 
 ## Rundeck
-Rundeck by default sends only HTML email which is not processed by ntfy SMTP server. Append following configurations to 
+Rundeck by default sends only HTML email which is not processed by ntfy SMTP server. Append following configurations to
 [rundeck-config.properties](https://docs.rundeck.com/docs/administration/configuration/config-file-reference.html) :
 
 ```
@@ -570,5 +570,3 @@ Example `template.html`:
 
 Add notification on Rundeck (attachment type must be: `Attached as file to email`):
 ![Rundeck](static/img/rundeck.png)
-
-

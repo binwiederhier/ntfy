@@ -3,16 +3,17 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 func init() {
@@ -72,11 +73,11 @@ Examples:
   ntfy pub --wait-pid 1234 mytopic                        # Wait for process 1234 to exit before publishing
   ntfy pub --wait-cmd mytopic rsync -av ./ /tmp/a         # Run command and publish after it completes
   NTFY_USER=phil:mypass ntfy pub secret Psst              # Use env variables to set username/password
-  NTFY_TOPIC=mytopic ntfy pub "some message"              # Use NTFY_TOPIC variable as topic 
+  NTFY_TOPIC=mytopic ntfy pub "some message"              # Use NTFY_TOPIC variable as topic
   cat flower.jpg | ntfy pub --file=- flowers 'Nice!'      # Same as above, send image.jpg as attachment
   ntfy trigger mywebhook                                  # Sending without message, useful for webhooks
- 
-Please also check out the docs on publishing messages. Especially for the --tags and --delay options, 
+
+Please also check out the docs on publishing messages. Especially for the --tags and --delay options,
 it has incredibly useful information: https://ntfy.sh/docs/publish/.
 
 ` + clientCommandDescriptionSuffix,

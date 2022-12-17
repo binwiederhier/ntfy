@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseActions(t *testing.T) {

@@ -172,7 +172,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `html, body {`)
+	require.Contains(t, rr.Body.String(), "html,\nbody {")
 
 	rr = request(t, s, "GET", "/docs", "", nil)
 	require.Equal(t, 301, rr.Code)

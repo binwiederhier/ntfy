@@ -4,14 +4,14 @@ to topics via the ntfy CLI. The CLI is included in the same `ntfy` binary that c
 
 !!! info
     The **ntfy CLI is not required to send or receive messages**. You can instead [send messages with curl](../publish.md),
-    and even use it to [subscribe to topics](api.md). It may be a little more convenient to use the ntfy CLI than writing 
+    and even use it to [subscribe to topics](api.md). It may be a little more convenient to use the ntfy CLI than writing
     your own script. It all depends on the use case. 😀
 
 ## Install + configure
-To install the ntfy CLI, simply **follow the steps outlined on the [install page](../install.md)**. The ntfy server and 
-client are the same binary, so it's all very convenient. After installing, you can (optionally) configure the client 
-by creating `~/.config/ntfy/client.yml` (for the non-root user), or `/etc/ntfy/client.yml` (for the root user). You 
-can find a [skeleton config](https://github.com/binwiederhier/ntfy/blob/main/client/client.yml) on GitHub. 
+To install the ntfy CLI, simply **follow the steps outlined on the [install page](../install.md)**. The ntfy server and
+client are the same binary, so it's all very convenient. After installing, you can (optionally) configure the client
+by creating `~/.config/ntfy/client.yml` (for the non-root user), or `/etc/ntfy/client.yml` (for the root user). You
+can find a [skeleton config](https://github.com/binwiederhier/ntfy/blob/main/client/client.yml) on GitHub.
 
 If you just want to use [ntfy.sh](https://ntfy.sh), you don't have to change anything. If you **self-host your own server**,
 you may want to edit the `default-host` option:
@@ -24,7 +24,7 @@ default-host: https://ntfy.myhost.com
 ```
 
 ## Publish messages
-You can send messages with the ntfy CLI using the `ntfy publish` command (or any of its aliases `pub`, `send` or 
+You can send messages with the ntfy CLI using the `ntfy publish` command (or any of its aliases `pub`, `send` or
 `trigger`). There are a lot of examples on the page about [publishing messages](../publish.md), but here are a few
 quick ones:
 
@@ -32,7 +32,7 @@ quick ones:
     ```
     ntfy publish mytopic This is a message
     ntfy publish mytopic "This is a message"
-    ntfy pub mytopic "This is a message" 
+    ntfy pub mytopic "This is a message"
     ```
 
 === "Send with title, priority, and tags"
@@ -78,7 +78,7 @@ $ ntfy pub --file README.md mytopic | jq .
 ```
 
 ### Wait for PID/command
-If you have a long-running command and want to **publish a notification when the command completes**, 
+If you have a long-running command and want to **publish a notification when the command completes**,
 you may wrap it with `ntfy publish --wait-cmd` (aliases: `--cmd`, `--done`). Or, if you forgot to wrap it, and the
 command is already running, you can wait for the process to complete with `ntfy publish --wait-pid` (alias: `--pid`).
 
@@ -123,15 +123,15 @@ Or, if you already started the long-running process and want to wait for it usin
 
 ## Subscribe to topics
 You can subscribe to topics using `ntfy subscribe`. Depending on how it is called, this command
-will either print or execute a command for every arriving message. There are a few different ways 
+will either print or execute a command for every arriving message. There are a few different ways
 in which the command can be run:
 
 ### Stream messages as JSON
 ```
 ntfy subscribe TOPIC
 ```
-If you run the command like this, it prints the JSON representation of every incoming message. This is useful 
-when you have a command that wants to stream-read incoming JSON messages. Unless `--poll` is passed, this command 
+If you run the command like this, it prints the JSON representation of every incoming message. This is useful
+when you have a command that wants to stream-read incoming JSON messages. Unless `--poll` is passed, this command
 stays open forever.
 
 ```
@@ -152,7 +152,7 @@ ntfy subscribe TOPIC COMMAND
 ```
 If you run it like this, a COMMAND is executed for every incoming messages. Scroll down to see a list of available
 environment variables. Here are a few examples:
- 
+
 ```
 ntfy sub mytopic 'notify-send "$m"'
 ntfy sub topic1 /my/script.sh
@@ -164,7 +164,7 @@ ntfy sub topic1 'echo "Message $m was received. Its title was $t and it had prio
   <figcaption>Execute command on incoming messages</figcaption>
 </figure>
 
-The message fields are passed to the command as environment variables and can be used in scripts. Note that since 
+The message fields are passed to the command as environment variables and can be used in scripts. Note that since
 these are environment variables, you typically don't have to worry about quoting too much, as long as you enclose them
 in double-quotes, you should be fine:
 
@@ -178,7 +178,7 @@ in double-quotes, you should be fine:
 | `$NTFY_PRIORITY` | `$priority`, `$prio`, `$p` | Message priority (1=min, 5=max)        |
 | `$NTFY_TAGS`     | `$tags`, `$tag`, `$ta`     | Message tags (comma separated list)    |
 | `$NTFY_RAW`      | `$raw`                     | Raw JSON message                       |
-   
+
 ### Subscribe to multiple topics
 ```
 ntfy subscribe --from-config
@@ -242,8 +242,8 @@ Here's an example config file that subscribes to three different topics, executi
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out
-* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html) (Linux), 
-  [notifu](https://www.paralint.com/projects/notifu/) (Windows) or `osascript` (macOS) 
+* Messages to `alerts` display as desktop notification for high priority messages using [notify-send](https://manpages.ubuntu.com/manpages/focal/man1/notify-send.1.html) (Linux),
+  [notifu](https://www.paralint.com/projects/notifu/) (Windows) or `osascript` (macOS)
 * Messages to `calc` open the calculator 😀 (*because, why not*)
 * Messages to `print-temp` execute an inline script and print the CPU temperature (Linux version only)
 
@@ -271,8 +271,8 @@ if you install the deb/rpm package. To configure it, simply edit `/etc/ntfy/clie
     The `ntfy-client.service` runs as user `ntfy`, meaning that typical Linux permission restrictions apply. See below
     for how to fix this.
 
-If the service runs on your personal desktop machine, you may want to override the service user/group (`User=` and `Group=`), and 
-adjust the `DISPLAY` and `DBUS_SESSION_BUS_ADDRESS` environment variables. This will allow you to run commands in your X session 
+If the service runs on your personal desktop machine, you may want to override the service user/group (`User=` and `Group=`), and
+adjust the `DISPLAY` and `DBUS_SESSION_BUS_ADDRESS` environment variables. This will allow you to run commands in your X session
 as the primary machine user.
 
 You can either manually override these systemd service entries with `sudo systemctl edit ntfy-client`, and add this
@@ -306,7 +306,7 @@ Depending on whether the server is configured to support [access control](../con
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
 To publish/subscribe to protected topics, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
 with a valid username/password. For your self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing
-your password. 
+your password.
 
 You can either add your username and password to the configuration file:
 === "~/.config/ntfy/client.yml"

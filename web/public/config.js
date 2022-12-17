@@ -4,6 +4,6 @@
 // The actual config is dynamically generated server-side.
 
 var config = {
-    appRoot: "/",
-    disallowedTopics: ["docs", "static", "file", "app", "settings"]
+  appRoot: "/",
+  disallowedTopics: ["docs", "static", "file", "app", "settings"],
 };

@@ -47,13 +47,13 @@ works best for you:
 * [Email](https://heckel.io/about) - reach me directly (_I usually prefer the other methods_)
 
 ## Announcements / beta testers
-For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
+For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements)
 topic. If you'd like to test the iOS app, join [TestFlight](https://testflight.apple.com/join/P1fFnAm9). For Android betas,
 join Discord/Matrix (I'll eventually make a testing channel in Google Play).
 
 ## Contributing
 I welcome any and all contributions. Just create a PR or an issue. For larger features/ideas, please reach out
-on Discord/Matrix first to see if I'd accept them. To contribute code, check out the [build instructions](https://ntfy.sh/docs/develop/) 
+on Discord/Matrix first to see if I'd accept them. To contribute code, check out the [build instructions](https://ntfy.sh/docs/develop/)
 for the server and the Android app. Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
 
@@ -62,8 +62,8 @@ for the server and the Android app. Or, if you'd like to help translate 🇩🇪
 </a>
 
 ## Sponsors
-I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
-I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
+I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier).
+I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much
 appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
@@ -114,10 +114,10 @@ We as members, contributors, and leaders pledge to make participation in our com
 
 **We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.**
 
-_Please be sure to read the complete [Code of Conduct](CODE_OF_CONDUCT.md)._    
+_Please be sure to read the complete [Code of Conduct](CODE_OF_CONDUCT.md)._
 
 ## License
-Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   
+Made with ❤️ by [Philipp C. Heckel](https://heckel.io).
 The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
 Third party libraries and resources:
@@ -135,7 +135,7 @@ Third party libraries and resources:
 * [github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) (MIT) is used to provide the persistent message cache
 * [Firebase Admin SDK](https://github.com/firebase/firebase-admin-go) (Apache 2.0) is used to send FCM messages
 * [github/gemoji](https://github.com/github/gemoji) (MIT) is used for emoji support (specifically the [emoji.json](https://raw.githubusercontent.com/github/gemoji/master/db/emoji.json) file)
-* [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) as a lightbox on the landing page 
+* [Lightbox with vanilla JS](https://yossiabramov.com/blog/vanilla-js-lightbox) as a lightbox on the landing page
 * [HTTP middleware for gzip compression](https://gist.github.com/CJEnright/bc2d8b8dc0c1389a9feeddb110f822d7) (MIT) is used for serving static files
 * [Regex for auto-linking](https://github.com/bryanwoods/autolink-js) (MIT) is used to highlight links (the library is not used)
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)

@@ -2,11 +2,12 @@ package server
 
 import (
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"heckel.io/ntfy/util"
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {

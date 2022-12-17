@@ -50,11 +50,11 @@ granted otherwise by the auth-default-access setting). An admin user has read an
 topics.
 
 Examples:
-  ntfy user add phil                     # Add regular user phil  
+  ntfy user add phil                     # Add regular user phil
   ntfy user add --role=admin phil        # Add admin user phil
   NTFY_PASSWORD=... ntfy user add phil   # Add user, using env variable to set password (for scripts)
 
-You may set the NTFY_PASSWORD environment variable to pass the password. This is useful if 
+You may set the NTFY_PASSWORD environment variable to pass the password. This is useful if
 you are creating users via scripts.
 `,
 		},
@@ -79,13 +79,13 @@ Example:
 			Description: `Change the password for the given user.
 
 The new password will be read from STDIN, and it'll be confirmed by typing
-it twice. 
+it twice.
 
 Example:
   ntfy user change-pass phil
   NTFY_PASSWORD=.. ntfy user change-pass phil
 
-You may set the NTFY_PASSWORD environment variable to pass the new password. This is 
+You may set the NTFY_PASSWORD environment variable to pass the new password. This is
 useful if you are updating users via scripts.
 
 `,
@@ -104,12 +104,12 @@ to an admin user, or the other way around:
 - admin: an admin has read/write access to all topics
 - user: a regular user only has access to what was explicitly granted via 'ntfy access'
 
-When changing the role of a user to "admin", all access control entries for that 
+When changing the role of a user to "admin", all access control entries for that
 user are removed, since they are no longer necessary.
 
 Example:
-  ntfy user change-role phil admin   # Make user phil an admin 
-  ntfy user change-role phil user    # Remove admin role from user phil 
+  ntfy user change-role phil admin   # Make user phil an admin
+  ntfy user change-role phil user    # Remove admin role from user phil
 `,
 		},
 		{
@@ -120,7 +120,7 @@ Example:
 			Description: `Shows a list of all configured users, including the everyone ('*') user.
 
 This is a server-only command. It directly reads from the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined. 
+file server.yml. The command only works if 'auth-file' is properly defined.
 
 This command is an alias to calling 'ntfy access' (display access control list).
 `,
@@ -132,18 +132,18 @@ This is a server-only command. It directly manages the user.db as defined in the
 file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
 to the related command 'ntfy access'.
 
-The command allows you to add/remove/change users in the ntfy user database, as well as change 
+The command allows you to add/remove/change users in the ntfy user database, as well as change
 passwords or roles.
 
 Examples:
-  ntfy user list                               # Shows list of users (alias: 'ntfy access')                      
-  ntfy user add phil                           # Add regular user phil  
+  ntfy user list                               # Shows list of users (alias: 'ntfy access')
+  ntfy user add phil                           # Add regular user phil
   NTFY_PASSWORD=... ntfy user add phil         # As above, using env variable to set password (for scripts)
   ntfy user add --role=admin phil              # Add admin user phil
   ntfy user del phil                           # Delete user phil
   ntfy user change-pass phil                   # Change password for user phil
   NTFY_PASSWORD=.. ntfy user change-pass phil  # As above, using env variable to set password (for scripts)
-  ntfy user change-role phil admin             # Make user phil an admin 
+  ntfy user change-role phil admin             # Make user phil an admin
 
 For the 'ntfy user add' and 'ntfy user change-pass' commands, you may set the NTFY_PASSWORD environment
 variable to pass the new password. This is useful if you are creating/updating users via scripts.

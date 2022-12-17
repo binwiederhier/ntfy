@@ -1,14 +1,14 @@
 # Subscribe from your phone
 You can use the ntfy [Android App](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [iOS app](https://apps.apple.com/us/app/ntfy/id1625396347)
 to receive notifications directly on your phone. Just like the server, this app is also open source, and the code is available
-on GitHub ([Android](https://github.com/binwiederhier/ntfy-android), [iOS](https://github.com/binwiederhier/ntfy-ios)). Feel free to 
+on GitHub ([Android](https://github.com/binwiederhier/ntfy-android), [iOS](https://github.com/binwiederhier/ntfy-ios)). Feel free to
 contribute, or [build your own](../develop.md).
 
 <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="../../static/img/badge-googleplay.png"></a>
 <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="../../static/img/badge-fdroid.png"></a>
 <a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img src="../../static/img/badge-appstore.png"></a>
 
-You can get the Android app from both [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) and 
+You can get the Android app from both [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) and
 from [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/). Both are largely identical, with the one exception that
 the F-Droid flavor does not use Firebase. The iOS app can be downloaded from the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
@@ -65,8 +65,8 @@ setting, and other settings such as popover or notification dot:
 ## Instant delivery
 _Supported on:_ :material-android:
 
-Instant delivery allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e. 
-when the screen turns off, and you leave it on the desk for a while. This is achieved with a foreground service, which 
+Instant delivery allows you to receive messages on your phone instantly, **even when your phone is in doze mode**, i.e.
+when the screen turns off, and you leave it on the desk for a while. This is achieved with a foreground service, which
 you'll see as a permanent notification that looks like this:
 
 <figure markdown>
@@ -75,7 +75,7 @@ you'll see as a permanent notification that looks like this:
 </figure>
 
 Android does not allow you to dismiss this notification, unless you turn off the notification channel in the settings.
-To do so, long-press on the foreground notification (screenshot above) and navigate to the settings. Then toggle the 
+To do so, long-press on the foreground notification (screenshot above) and navigate to the settings. Then toggle the
 "Subscription Service" off:
 
 <figure markdown>
@@ -83,12 +83,12 @@ To do so, long-press on the foreground notification (screenshot above) and navig
   <figcaption>Turning off the persistent instant delivery notification</figcaption>
 </figure>
 
-**Limitations without instant delivery**: Without instant delivery, **messages may arrive with a significant delay** 
-(sometimes many minutes, or even hours later). If you've ever picked up your phone and 
+**Limitations without instant delivery**: Without instant delivery, **messages may arrive with a significant delay**
+(sometimes many minutes, or even hours later). If you've ever picked up your phone and
 suddenly had 10 messages that were sent long before you know what I'm talking about.
 
-The reason for this is [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging). FCM is the 
-*only* Google approved way to send push messages to Android devices, and it's what pretty much all apps use to deliver push 
+The reason for this is [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging). FCM is the
+*only* Google approved way to send push messages to Android devices, and it's what pretty much all apps use to deliver push
 notifications. Firebase is overall pretty bad at delivering messages in time, but on Android, most apps are stuck with it.
 
 The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in the Google Play flavor of the app.
@@ -113,10 +113,10 @@ _Supported on:_ :material-android:
 
 The ntfy Android app supports deep linking directly to topics. This is useful when integrating with [automation apps](#automation-apps)
 such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm),
-or to simply directly link to a topic from a mobile website. 
+or to simply directly link to a topic from a mobile website.
 
 !!! info
-    Android deep linking of http/https links is very brittle and limited, which is why something like `https://<host>/<topic>/subscribe` is 
+    Android deep linking of http/https links is very brittle and limited, which is why something like `https://<host>/<topic>/subscribe` is
     **not possible**, and instead `ntfy://` links have to be used. More details in [issue #20](https://github.com/binwiederhier/ntfy/issues/20).
 
 **Supported link formats:**
@@ -132,10 +132,10 @@ or to simply directly link to a topic from a mobile website.
 _Supported on:_ :material-android:
 
 [UnifiedPush](https://unifiedpush.org) is a standard for receiving push notifications without using the Google-owned
-[Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications 
-in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwarding messages to apps that support it. 
+[Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications
+in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwarding messages to apps that support it.
 
-To use ntfy as a distributor, simply select it in one of the [supported apps](https://unifiedpush.org/users/apps/). 
+To use ntfy as a distributor, simply select it in one of the [supported apps](https://unifiedpush.org/users/apps/).
 That's it. It's a one-step installation 😀. If desired, you can select your own [selfhosted ntfy server](../install.md)
 to handle messages. Here's an example with [FluffyChat](https://fluffychat.im/):
 
@@ -156,7 +156,7 @@ or [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.
 To react on incoming notifications, you have to register to intents with the `io.heckel.ntfy.MESSAGE_RECEIVED` action (see
 [code for details](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/java/io/heckel/ntfy/msg/BroadcastService.kt)).
 Here's an example using [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
-and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), but any app that can catch 
+and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), but any app that can catch
 broadcasts is supported:
 
 <div id="integration-screenshots-receive" class="screenshots">
@@ -170,7 +170,7 @@ broadcasts is supported:
 </div>
 
 For MacroDroid, be sure to type in the package name `io.heckel.ntfy`, otherwise intents may be silently swallowed.
-If you're using topics to drive automation, you'll likely want to mute the topic in the ntfy app. This will prevent 
+If you're using topics to drive automation, you'll likely want to mute the topic in the ntfy app. This will prevent
 notification popups:
 
 <figure markdown>
@@ -204,10 +204,10 @@ Here's a list of extras you can access. Most likely, you'll want to filter for `
 
 #### Send messages using intents
 To send messages from other apps (such as [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid)
-and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm)), you can 
+and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm)), you can
 broadcast an intent with the `io.heckel.ntfy.SEND_MESSAGE` action. The ntfy Android app will forward the intent as a HTTP
 POST request to [publish a message](../publish.md). This is primarily useful for apps that do not support HTTP POST/PUT
-(like MacroDroid). In Tasker, you can simply use the "HTTP Request" action, which is a little easier and also works if 
+(like MacroDroid). In Tasker, you can simply use the "HTTP Request" action, which is a little easier and also works if
 ntfy is not installed.
 
 Here's what that looks like:

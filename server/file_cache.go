@@ -3,13 +3,14 @@ package server
 import (
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/util"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/util"
 )
 
 var (

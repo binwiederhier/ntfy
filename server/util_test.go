@@ -3,11 +3,12 @@ package server
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadBoolParam(t *testing.T) {

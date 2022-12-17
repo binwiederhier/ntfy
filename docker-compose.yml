@@ -6,7 +6,7 @@ services:
     command:
       - serve
     environment:
-      - TZ=UTC    # optional: Change to your desired timezone
+      - TZ=UTC # optional: Change to your desired timezone
     user: UID:GID # optional: Set custom user/group or uid/gid
     volumes:
       - /var/cache/ntfy:/var/cache/ntfy
@@ -14,4 +14,3 @@ services:
     ports:
       - 80:80
     restart: unless-stopped
-

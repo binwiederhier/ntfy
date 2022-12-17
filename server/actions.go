@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/util"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"heckel.io/ntfy/util"
 )
 
 const (

@@ -1,10 +1,11 @@
 package util
 
 import (
-	"github.com/stretchr/testify/require"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPeak_LimitReached(t *testing.T) {

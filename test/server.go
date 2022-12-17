@@ -2,12 +2,13 @@ package test
 
 import (
 	"fmt"
-	"heckel.io/ntfy/server"
 	"math/rand"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"heckel.io/ntfy/server"
 )
 
 func init() {

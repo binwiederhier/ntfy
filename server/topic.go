@@ -1,9 +1,10 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
 	"math/rand"
 	"sync"
+
+	"heckel.io/ntfy/log"
 )
 
 // topic represents a channel to which subscribers can subscribe, and publishers

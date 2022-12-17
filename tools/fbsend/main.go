@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	firebase "firebase.google.com/go/v4"
-	"firebase.google.com/go/v4/messaging"
 	"flag"
 	"fmt"
-	"google.golang.org/api/option"
 	"os"
 	"strings"
+
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/messaging"
+	"google.golang.org/api/option"
 )
 
 func main() {

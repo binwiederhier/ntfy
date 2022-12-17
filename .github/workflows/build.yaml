@@ -4,21 +4,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Install Go
+      - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.18.x'
-      -
-        name: Install node
+          go-version: "1.18.x"
+      - name: Install node
         uses: actions/setup-node@v2
         with:
-          node-version: '17'
-      -
-        name: Checkout code
+          node-version: "17"
+      - name: Checkout code
         uses: actions/checkout@v2
-      -
-        name: Cache Go and npm modules
+      - name: Cache Go and npm modules
         uses: actions/cache@v3
         with:
           path: |
@@ -28,12 +24,9 @@ jobs:
             web/node_modules
           key: ${{ runner.os }}-ntfy-${{ hashFiles('**/go.sum', '**/package.lock') }}
           restore-keys: ${{ runner.os }}-ntfy-
-      -
-        name: Install dependencies
+      - name: Install dependencies
         run: make build-deps-ubuntu
-      -
-        name: Build all the things
+      - name: Build all the things
         run: make build
-      -
-        name: Print build results and checksums
+      - name: Print build results and checksums
         run: make cli-build-results

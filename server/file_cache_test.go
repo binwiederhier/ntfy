@@ -3,12 +3,13 @@ package server
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/util"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/util"
 )
 
 var (

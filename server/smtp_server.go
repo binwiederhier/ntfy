@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"heckel.io/ntfy/log"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -15,6 +13,9 @@ import (
 	"net/mail"
 	"strings"
 	"sync"
+
+	"github.com/emersion/go-smtp"
+	"heckel.io/ntfy/log"
 )
 
 var (

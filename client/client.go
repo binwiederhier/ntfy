@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 // Event type constants

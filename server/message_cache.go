@@ -32,7 +32,7 @@ const (
 			priority INT NOT NULL,
 			tags TEXT NOT NULL,
 			click TEXT NOT NULL,
-			icon TEXT NOT NULL,			
+			icon TEXT NOT NULL,
 			actions TEXT NOT NULL,
 			attachment_name TEXT NOT NULL,
 			attachment_type TEXT NOT NULL,
@@ -56,31 +56,31 @@ const (
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
 	selectMessagesSinceTimeQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
-		FROM messages 
+		FROM messages
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
-		FROM messages 
+		FROM messages
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
-		FROM messages 
-		WHERE topic = ? AND id > ? AND published = 1 
+		FROM messages
+		WHERE topic = ? AND id > ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
-		FROM messages 
+		FROM messages
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
 		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
-		FROM messages 
+		FROM messages
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
 	`
@@ -159,12 +159,12 @@ const (
 		);
 		CREATE INDEX IF NOT EXISTS idx_mid ON messages_new (mid);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages_new (topic);
-		INSERT 
+		INSERT
 			INTO messages_new (
-				mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, 
+				mid, time, topic, message, title, priority, tags, click, attachment_name, attachment_type,
 				attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published)
 			SELECT
-				id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type, 
+				id, time, topic, message, title, priority, tags, click, attachment_name, attachment_type,
 				attachment_size, attachment_expires, attachment_url, attachment_owner, encoding, published
 			FROM messages;
 		DROP TABLE messages;
@@ -189,7 +189,7 @@ const (
 
 	// 8 -> 9
 	migrate8To9AlterMessagesTableQuery = `
-		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);	
+		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);
 	`
 )
 

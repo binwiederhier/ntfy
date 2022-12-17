@@ -1,9 +1,10 @@
 package server_test
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"heckel.io/ntfy/server"
-	"testing"
 )
 
 func TestConfig_New(t *testing.T) {

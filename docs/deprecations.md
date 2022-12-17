@@ -1,5 +1,5 @@
 # Deprecation notices
-This page is used to list deprecation notices for ntfy. Deprecated commands and options will be 
+This page is used to list deprecation notices for ntfy. Deprecated commands and options will be
 **removed after 1-3 months** from the time they were deprecated. How long the feature is deprecated
 before the behavior is changed depends on the severity of the change, and how prominent the feature is.
 
@@ -34,7 +34,7 @@ and add a notice banner in the Android app instead.
 ### Android app: Using `since=<timestamp>` instead of `since=<id>`
 > Active since 2022-02-27, behavior changed with v1.14.0
 
-The Android app started using `since=<id>` instead of `since=<timestamp>`, which means as of Android app v1.14.0, 
+The Android app started using `since=<id>` instead of `since=<timestamp>`, which means as of Android app v1.14.0,
 it will not work with servers older than v1.16.0 anymore. This is to simplify handling of deduplication in the Android app.
 
 The `since=<timestamp>` endpoint will continue to work. This is merely a notice that the Android app behavior will change.
@@ -57,4 +57,3 @@ just the server.
     $ ntfy serve
     2021/12/17 08:16:01 Listening on :80/http
     ```
-

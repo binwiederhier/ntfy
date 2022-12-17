@@ -15,14 +15,14 @@ Please send experienced iOS developers my way to help me figure this out.
 ## iOS app not receiving notifications (anymore)
 If notifications do not show up at all anymore, there are a few causes for it (that I know of):
 
-**Firebase+APNS are being weird and buggy**:    
-If this is the case, usually it helps to **remove the topic/subscription and re-add it**. That will force Firebase to 
+**Firebase+APNS are being weird and buggy**:
+If this is the case, usually it helps to **remove the topic/subscription and re-add it**. That will force Firebase to
 re-subscribe to the Firebase topic.
 
-**Self-hosted only: No `upstream-base-url` set, or `base-url` mismatch**:   
+**Self-hosted only: No `upstream-base-url` set, or `base-url` mismatch**:
 To make self-hosted servers work with the iOS
 app, I had to do some horrible things (see [iOS instant notifications](config.md#ios-instant-notifications) for details).
 Be sure that in your selfhosted server:
 
 * Set `upstream-base-url: "https://ntfy.sh"` (**not your own hostname!**)
-* Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to 
+* Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to

@@ -2,9 +2,10 @@ package util
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFixedLimiter_Add(t *testing.T) {

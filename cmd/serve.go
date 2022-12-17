@@ -86,7 +86,7 @@ var cmdServe = &cli.Command{
 	Before:    initConfigFileInputSourceFunc("config", flagsServe, initLogFunc),
 	Description: `Run the ntfy server and listen for incoming requests
 
-The command will load the configuration from /etc/ntfy/server.yml. Config options can 
+The command will load the configuration from /etc/ntfy/server.yml. Config options can
 be overridden using the command line options.
 
 Examples:

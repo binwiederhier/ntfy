@@ -1,8 +1,9 @@
 repos:
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: "v2.7.1"
+    rev: "v3.0.0-alpha.4"
     hooks:
       - id: prettier
+        exclude_types: [markdown]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
@@ -12,14 +13,13 @@ repos:
         stages: ["commit"]
 
   - repo: https://github.com/Bahjat/pre-commit-golang
-    rev: v1.0.2
+    rev: v1.0.3
     hooks:
       - id: go-fmt-import
       - id: go-vet
       - id: go-lint
       - id: go-unit-tests
         stages: ["push"]
-      - id: gofumpt # requires github.com/mvdan/gofumpt
       - id: golangci-lint # requires github.com/golangci/golangci-lint
         args: [--config=.github/linters/.golangci.yml] # optional
       - id: go-ruleguard # requires https://github.com/quasilyte/go-ruleguard

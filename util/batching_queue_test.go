@@ -1,12 +1,13 @@
 package util_test
 
 import (
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/util"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/util"
 )
 
 func TestBatchingQueue_InfTimeout(t *testing.T) {

@@ -1,12 +1,13 @@
 package server
 
 import (
-	"github.com/emersion/go-smtp"
-	"github.com/stretchr/testify/require"
 	"net"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/emersion/go-smtp"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSmtpBackend_Multipart(t *testing.T) {

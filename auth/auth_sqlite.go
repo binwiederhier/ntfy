@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 			role TEXT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS access (
-			user TEXT NOT NULL,		
+			user TEXT NOT NULL,
 			topic TEXT NOT NULL,
 			read INT NOT NULL,
 			write INT NOT NULL,
@@ -38,8 +39,8 @@ const (
 	`
 	selectUserQuery       = `SELECT pass, role FROM user WHERE user = ?`
 	selectTopicPermsQuery = `
-		SELECT read, write 
-		FROM access 
+		SELECT read, write
+		FROM access
 		WHERE user IN ('*', ?) AND ? LIKE topic
 		ORDER BY user DESC
 	`
@@ -54,7 +55,7 @@ const (
 	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery = `
-		INSERT INTO access (user, topic, read, write) 
+		INSERT INTO access (user, topic, read, write)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (user, topic) DO UPDATE SET read=excluded.read, write=excluded.write
 	`

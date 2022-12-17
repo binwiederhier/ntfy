@@ -4,14 +4,15 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"mime"
 	"net"
 	"net/smtp"
 	"strings"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 type mailer interface {

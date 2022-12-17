@@ -1,10 +1,10 @@
 # Configuring the ntfy server
-The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/server.yml`, 
-see [server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)), via command line arguments 
+The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/server.yml`,
+see [server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)), via command line arguments
 or using environment variables.
 
 ## Quick start
-By default, simply running `ntfy serve` will start the server at port 80. No configuration needed. Batteries included 😀. 
+By default, simply running `ntfy serve` will start the server at port 80. No configuration needed. Batteries included 😀.
 If everything works as it should, you'll see something like this:
 ```
 $ ntfy serve
@@ -12,7 +12,7 @@ $ ntfy serve
 ```
 
 You can immediately start [publishing messages](publish.md), or subscribe via the [Android app](subscribe/phone.md),
-[the web UI](subscribe/web.md), or simply via [curl or your favorite HTTP client](subscribe/api.md). To configure 
+[the web UI](subscribe/web.md), or simply via [curl or your favorite HTTP client](subscribe/api.md). To configure
 the server further, check out the [config options table](#config-options) or simply type `ntfy serve --help` to
 get a list of [command line options](#command-line-options).
 
@@ -46,7 +46,7 @@ Here are a few working sample configs:
 
 === "server.yml (ntfy.sh config)"
     ``` yaml
-    # All the things: Behind a proxy, Firebase, cache, attachments, 
+    # All the things: Behind a proxy, Firebase, cache, attachments,
     # SMTP publishing & receiving
 
     base-url: "https://ntfy.sh"
@@ -68,14 +68,14 @@ Here are a few working sample configs:
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period
 of time is important to allow [phones](subscribe/phone.md) and other devices with brittle Internet connections to be able to retrieve
-notifications that they may have missed. 
+notifications that they may have missed.
 
 By default, ntfy keeps messages **in-memory for 12 hours**, which means that **cached messages do not survive an application
 restart**. You can override this behavior using the following config settings:
 
 * `cache-file`: if set, ntfy will store messages in a SQLite based cache (default is empty, which means in-memory cache).
   **This is required if you'd like messages to be retained across restarts**.
-* `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`). 
+* `cache-duration`: defines the duration for which messages are stored in the cache (default is `12h`).
 
 You can also entirely disable the cache by setting `cache-duration` to `0`. When the cache is disabled, messages are only
 passed on to the connected subscribers, but never stored on disk or even kept in memory longer than is needed to forward
@@ -86,11 +86,11 @@ Subscribers can retrieve cached messaging using the [`poll=1` parameter](subscri
 
 ## Attachments
 If desired, you may allow users to upload and [attach files to notifications](publish.md#attachments). To enable
-this feature, you have to simply configure an attachment cache directory and a base URL (`attachment-cache-dir`, `base-url`). 
+this feature, you have to simply configure an attachment cache directory and a base URL (`attachment-cache-dir`, `base-url`).
 Once these options are set and the directory is writable by the server user, you can upload attachments via PUT.
 
 By default, attachments are stored in the disk-cache **for only 3 hours**. The main reason for this is to avoid legal issues
-and such when hosting user controlled content. Typically, this is more than enough time for the user (or the auto download 
+and such when hosting user controlled content. Typically, this is more than enough time for the user (or the auto download
 feature) to download the file. The following config options are relevant to attachments:
 
 * `base-url` is the root URL for the ntfy server; this is needed for the generated attachment URLs
@@ -99,7 +99,7 @@ feature) to download the file. The following config options are relevant to atta
 * `attachment-file-size-limit` is the per-file attachment size limit (e.g. 300k, 2M, 100M, default: 15M)
 * `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h)
 
-Here's an example config using mostly the defaults (except for the cache directory, which is empty by default): 
+Here's an example config using mostly the defaults (except for the cache directory, which is empty by default):
 
 === "/etc/ntfy/server.yml (minimal)"
     ``` yaml
@@ -123,27 +123,27 @@ and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is 
 
 ## Access control
 By default, the ntfy server is open for everyone, meaning **everyone can read and write to any topic** (this is how
-ntfy.sh is configured). To restrict access to your own server, you can optionally configure authentication and authorization. 
+ntfy.sh is configured). To restrict access to your own server, you can optionally configure authentication and authorization.
 
-ntfy's auth is implemented with a simple [SQLite](https://www.sqlite.org/)-based backend. It implements two roles 
-(`user` and `admin`) and per-topic `read` and `write` permissions using an [access control list (ACL)](https://en.wikipedia.org/wiki/Access-control_list). 
-Access control entries can be applied to users as well as the special everyone user (`*`), which represents anonymous API access. 
+ntfy's auth is implemented with a simple [SQLite](https://www.sqlite.org/)-based backend. It implements two roles
+(`user` and `admin`) and per-topic `read` and `write` permissions using an [access control list (ACL)](https://en.wikipedia.org/wiki/Access-control_list).
+Access control entries can be applied to users as well as the special everyone user (`*`), which represents anonymous API access.
 
 To set up auth, simply **configure the following two options**:
 
-* `auth-file` is the user/access database; it is created automatically if it doesn't already exist; suggested 
+* `auth-file` is the user/access database; it is created automatically if it doesn't already exist; suggested
   location `/var/lib/ntfy/user.db` (easiest if deb/rpm package is used)
 * `auth-default-access` defines the default/fallback access if no access control entry is found; it can be
   set to `read-write` (default), `read-only`, `write-only` or `deny-all`.
 
 Once configured, you can use the `ntfy user` command to [add or modify users](#users-and-roles), and the `ntfy access` command
-lets you [modify the access control list](#access-control-list-acl) for specific users and topic patterns. Both of these 
-commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, and only if the user 
+lets you [modify the access control list](#access-control-list-acl) for specific users and topic patterns. Both of these
+commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, and only if the user
 accessing them has the right permissions.
 
 ### Users and roles
 The `ntfy user` command allows you to add/remove/change users in the ntfy user database, as well as change
-passwords or roles (`user` or `admin`). In practice, you'll often just create one admin 
+passwords or roles (`user` or `admin`). In practice, you'll often just create one admin
 user with `ntfy user add --role=admin ...` and be done with all this (see [example below](#example-private-instance)).
 
 **Roles:**
@@ -156,7 +156,7 @@ user with `ntfy user add --role=admin ...` and be done with all this (see [examp
 
 ```
 ntfy user list                     # Shows list of users (alias: 'ntfy access')
-ntfy user add phil                 # Add regular user phil  
+ntfy user add phil                 # Add regular user phil
 ntfy user add --role=admin phil    # Add admin user phil
 ntfy user del phil                 # Delete user phil
 ntfy user change-pass phil         # Change password for user phil
@@ -165,7 +165,7 @@ ntfy user change-role phil admin   # Make user phil an admin
 
 ### Access control list (ACL)
 The access control list (ACL) **manages access to topics for non-admin users, and for anonymous access (`everyone`/`*`)**.
-Each entry represents the access permissions for a user to a specific topic or topic pattern. 
+Each entry represents the access permissions for a user to a specific topic or topic pattern.
 
 The ACL can be displayed or modified with the `ntfy access` command:
 
@@ -175,20 +175,20 @@ ntfy access USERNAME                   # Shows access control entries for USERNA
 ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
 ```
 
-A `USERNAME` is an existing user, as created with `ntfy user add` (see [users and roles](#users-and-roles)), or the 
+A `USERNAME` is an existing user, as created with `ntfy user add` (see [users and roles](#users-and-roles)), or the
 anonymous user `everyone` or `*`, which represents clients that access the API without username/password.
 
 A `TOPIC` is either a specific topic name (e.g. `mytopic`, or `phil_alerts`), or a wildcard pattern that matches any
-number of topics (e.g. `alerts_*` or `ben-*`). Only the wildcard character `*` is supported. It stands for zero to any 
+number of topics (e.g. `alerts_*` or `ben-*`). Only the wildcard character `*` is supported. It stands for zero to any
 number of characters.
 
 A `PERMISSION` is any of the following supported permissions:
 
-* `read-write` (alias: `rw`): Allows [publishing messages](publish.md) to the given topic, as well as 
+* `read-write` (alias: `rw`): Allows [publishing messages](publish.md) to the given topic, as well as
   [subscribing](subscribe/api.md) and reading messages
 * `read-only` (aliases: `read`, `ro`): Allows only subscribing and reading messages, but not publishing to the topic
 * `write-only` (aliases: `write`, `wo`): Allows only publishing to the topic, but not subscribing to it
-* `deny` (alias: `none`): Allows neither publishing nor subscribing to a topic 
+* `deny` (alias: `none`): Allows neither publishing nor subscribing to a topic
 
 **Example commands** (type `ntfy access --help` for more details):
 ```
@@ -237,10 +237,10 @@ After that, simply create an `admin` user:
 $ ntfy user add --role=admin phil
 password: mypass
 confirm: mypass
-user phil added with role admin 
+user phil added with role admin
 ```
 
-Once you've done that, you can publish and subscribe using [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) 
+Once you've done that, you can publish and subscribe using [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication)
 with the given username/password. Be sure to use HTTPS to avoid eavesdropping and exposing your password. Here's a simple example:
 
 === "Command line (curl)"
@@ -301,7 +301,7 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
-            'header' => 
+            'header' =>
                 'Content-Type: text/plain\r\n' .
                 'Authorization: Basic cGhpbDpteXBhc3M=',
             'content' => 'Look ma, with auth'
@@ -310,12 +310,12 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     ```
 
 ### Example: UnifiedPush
-[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
-has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. 
-The topic names used by UnifiedPush all start with the `up*` prefix. Please refer to the 
+[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …)
+has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages.
+The topic names used by UnifiedPush all start with the `up*` prefix. Please refer to the
 **[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users)** for more details.
 
-To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either 
+To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either
 allow anonymous write access for the entire prefix or explicitly per topic:
 
 === "Prefix"
@@ -329,11 +329,11 @@ allow anonymous write access for the entire prefix or explicitly per topic:
     ```
 
 ## E-mail notifications
-To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 
-you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g. 
+To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured,
+you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail-notifications) (e.g.
 `curl -d "hi there" -H "X-Email: phil@example.com" ntfy.sh/mytopic`).
 
-As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
+As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the
 following settings:
 
 * `base-url` is the root URL for the ntfy server; this is needed for e-mail footer
@@ -341,7 +341,7 @@ following settings:
 * `smtp-sender-user` and `smtp-sender-pass` are the username and password of the SMTP user
 * `smtp-sender-from` is the e-mail address of the sender
 
-Here's an example config using [Amazon SES](https://aws.amazon.com/ses/) for outgoing mail (this is how it is 
+Here's an example config using [Amazon SES](https://aws.amazon.com/ses/) for outgoing mail (this is how it is
 configured for `ntfy.sh`):
 
 === "/etc/ntfy/server.yml"
@@ -353,13 +353,13 @@ configured for `ntfy.sh`):
     smtp-sender-from: "ntfy@ntfy.sh"
     ```
 
-Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-email-limit-burst` 
+Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-email-limit-burst`
 and `visitor-email-limit-burst`. Setting these conservatively is necessary to avoid abuse.
 
 ## E-mail publishing
-To allow publishing messages via e-mail, ntfy can run a lightweight **SMTP server for incoming messages**. Once configured, 
-users can [send emails to a topic e-mail address](publish.md#e-mail-publishing) (e.g. `mytopic@ntfy.sh` or 
-`myprefix-mytopic@ntfy.sh`) to publish messages to a topic. This is useful for e-mail based integrations such as for 
+To allow publishing messages via e-mail, ntfy can run a lightweight **SMTP server for incoming messages**. Once configured,
+users can [send emails to a topic e-mail address](publish.md#e-mail-publishing) (e.g. `mytopic@ntfy.sh` or
+`myprefix-mytopic@ntfy.sh`) to publish messages to a topic. This is useful for e-mail based integrations such as for
 statuspage.io (though these days most services also support webhooks and HTTP calls).
 
 To configure the SMTP server, you must at least set `smtp-server-listen` and `smtp-server-domain`:
@@ -379,8 +379,8 @@ Here's an example config (this is how it is configured for `ntfy.sh`):
     smtp-server-addr-prefix: "ntfy-"
     ```
 
-In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record) 
-and a corresponding A record), so incoming mail will find its way to your server. Here's an example of how `ntfy.sh` is 
+In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record)
+and a corresponding A record), so incoming mail will find its way to your server. Here's an example of how `ntfy.sh` is
 configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
 
 <figure markdown>
@@ -388,7 +388,7 @@ configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
   <figcaption>DNS records for incoming mail</figcaption>
 </figure>
 
-You can check if everything is working correctly by sending an email as raw SMTP via `nc`. Create a text file, e.g. 
+You can check if everything is working correctly by sending an email as raw SMTP via `nc`. Create a text file, e.g.
 `email.txt`
 
 ```
@@ -403,7 +403,7 @@ Hello from 🇩🇪
 .
 ```
 
-And then send the mail via `nc` like this. If you see any lines starting with `451`, those are errors from the 
+And then send the mail via `nc` like this. If you see any lines starting with `451`, those are errors from the
 ntfy server. Read them carefully.
 
 ```
@@ -418,9 +418,9 @@ $ cat email.txt | nc -N ntfy.sh 25
 As for the DNS setup, be sure to verify that `dig MX` and `dig A` are returning results similar to this:
 
 ```
-$ dig MX ntfy.sh +short 
+$ dig MX ntfy.sh +short
 10 mx1.ntfy.sh.
-$ dig A mx1.ntfy.sh +short 
+$ dig A mx1.ntfy.sh +short
 3.139.215.220
 ```
 
@@ -429,12 +429,12 @@ $ dig A mx1.ntfy.sh +short
     If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are
     [rate limited](#rate-limiting) as if they are one.
 
-It may be desirable to run ntfy behind a proxy (e.g. nginx, HAproxy or Apache), so you can provide TLS certificates 
-using Let's Encrypt using certbot, or simply because you'd like to share the ports (80/443) with other services. 
-Whatever your reasons may be, there are a few things to consider. 
+It may be desirable to run ntfy behind a proxy (e.g. nginx, HAproxy or Apache), so you can provide TLS certificates
+using Let's Encrypt using certbot, or simply because you'd like to share the ports (80/443) with other services.
+Whatever your reasons may be, there are a few things to consider.
 
-If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the 
-[rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier for a visitor, 
+If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the
+[rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier for a visitor,
 as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
 be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
 
@@ -445,17 +445,17 @@ be counted as one, because from the perspective of the ntfy server, they all sha
     ```
 
 ### TLS/SSL
-ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
+ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you
 are behind a proxy, it is recommended that TLS/SSL termination is done by the proxy itself (see below).
 
-I highly recommend using [certbot](https://certbot.eff.org/). I use it with the [dns-route53 plugin](https://certbot-dns-route53.readthedocs.io/en/stable/), 
+I highly recommend using [certbot](https://certbot.eff.org/). I use it with the [dns-route53 plugin](https://certbot-dns-route53.readthedocs.io/en/stable/),
 which lets you use [AWS Route 53](https://aws.amazon.com/route53/) as the challenge. That's much easier than using the
 HTTP challenge. I've found [this guide](https://nandovieira.com/using-lets-encrypt-in-development-with-nginx-and-aws-route53) to
 be incredibly helpful.
 
 ### nginx/Apache2/caddy
 For your convenience, here's a working config that'll help configure things behind a proxy. Be sure to **enable WebSockets**
-by forwarding the `Connection` and `Upgrade` headers accordingly. 
+by forwarding the `Connection` and `Upgrade` headers accordingly.
 
 In this example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
@@ -474,7 +474,7 @@ or the root domain:
       server_name ntfy.sh;
 
       location / {
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want
         # it to work with curl without the annoying https:// prefix
         set $redirect_https "";
         if ($request_method = GET) {
@@ -489,16 +489,16 @@ or the root domain:
 
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
-    
+
         proxy_buffering off;
         proxy_request_buffering off;
         proxy_redirect off;
-     
+
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
+
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
@@ -506,19 +506,19 @@ or the root domain:
         client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }
-    
+
     server {
       listen 443 ssl;
       server_name ntfy.sh;
-    
+
       ssl_session_cache builtin:1000 shared:SSL:10m;
       ssl_protocols TLSv1.2 TLSv1.3;
       ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
       ssl_prefer_server_ciphers on;
-    
+
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
-    
+
       location / {
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
@@ -526,16 +526,16 @@ or the root domain:
         proxy_buffering off;
         proxy_request_buffering off;
         proxy_redirect off;
-     
+
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
+
         proxy_connect_timeout 3m;
         proxy_send_timeout 3m;
         proxy_read_timeout 3m;
-        
+
         client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }
@@ -547,7 +547,7 @@ or the root domain:
     #
     # This config requires the use of the -L flag in curl to redirect to HTTPS, and it keeps nginx output buffering
     # enabled. While recommended, I have had issues with that in the past.
-    
+
     server {
       listen 80;
       server_name ntfy.sh;
@@ -570,19 +570,19 @@ or the root domain:
         client_max_body_size 20m; # Must be >= attachment-file-size-limit in /etc/ntfy/server.yml
       }
     }
-    
+
     server {
       listen 443 ssl;
       server_name ntfy.sh;
-    
+
       ssl_session_cache builtin:1000 shared:SSL:10m;
       ssl_protocols TLSv1.2 TLSv1.3;
       ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
       ssl_prefer_server_ciphers on;
-    
+
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
-    
+
       location / {
         proxy_pass http://127.0.0.1:2586;
         proxy_http_version 1.1;
@@ -625,16 +625,16 @@ or the root domain:
         RewriteCond %{HTTP:Upgrade} websocket [NC]
         RewriteCond %{HTTP:Connection} upgrade [NC]
         RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
-        
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix 
+
+        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want
+        # it to work with curl without the annoying https:// prefix
         RewriteCond %{REQUEST_METHOD} GET
         RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
     </VirtualHost>
-    
+
     <VirtualHost *:443>
         ServerName ntfy.sh
-        
+
         SSLEngine on
         SSLCertificateFile /etc/letsencrypt/live/ntfy.sh/fullchain.pem
         SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
@@ -647,7 +647,7 @@ or the root domain:
         SetEnv proxy-nokeepalive 1
         SetEnv proxy-sendchunked 1
 
-        # Higher than the max message size of 4096 bytes 
+        # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
 
         # Enable mod_rewrite (requires "a2enmod rewrite")
@@ -656,7 +656,7 @@ or the root domain:
         # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
         RewriteCond %{HTTP:Upgrade} websocket [NC]
         RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L] 
+        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
     </VirtualHost>
     ```
 
@@ -707,10 +707,10 @@ firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ```
 
 ## iOS instant notifications
-Unlike Android, iOS heavily restricts background processing, which sadly makes it impossible to implement instant 
-push notifications without a central server. 
+Unlike Android, iOS heavily restricts background processing, which sadly makes it impossible to implement instant
+push notifications without a central server.
 
-To still support instant notifications on iOS through your self-hosted ntfy server, you have to forward so called `poll_request` 
+To still support instant notifications on iOS through your self-hosted ntfy server, you have to forward so called `poll_request`
 messages to the main ntfy.sh server (or any upstream server that's APNS/Firebase connected, if you build your own iOS app),
 which will then forward it to Firebase/APNS.
 
@@ -726,12 +726,12 @@ the message ID of the original message, instructing the iOS app to poll this ser
 If `upstream-base-url` is not set, notifications will still eventually get to your device, but delivery can take hours,
 depending on the state of the phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
 
-In case you're curious, here's an example of the entire flow: 
+In case you're curious, here's an example of the entire flow:
 
 - In the iOS app, you subscribe to `https://ntfy.example.com/mytopic`
 - The app subscribes to the Firebase topic `6de73be8dfb7d69e...` (the SHA256 of the topic URL)
-- When you publish a message to `https://ntfy.example.com/mytopic`, your ntfy server will publish a 
-  poll request to `https://ntfy.sh/6de73be8dfb7d69e...`. The request from your server to the upstream server 
+- When you publish a message to `https://ntfy.example.com/mytopic`, your ntfy server will publish a
+  poll request to `https://ntfy.sh/6de73be8dfb7d69e...`. The request from your server to the upstream server
   contains only the message ID (in the `X-Poll-ID` header), and the SHA256 checksum of the topic URL (as upstream topic).
 - The ntfy.sh server publishes the poll request message to Firebase, which forwards it to APNS, which forwards it to your iOS device
 - Your iOS device receives the poll request, and fetches the actual message from your server, and then displays it
@@ -743,21 +743,21 @@ curl -X POST -H "X-Poll-ID: s4PdJozxM8na" https://ntfy.sh/6de73be8dfb7d69e32fb2c
 {"id":"4HsClFEuCIcs","time":1654087955,"event":"poll_request","topic":"6de73be8dfb7d69e32fb2c00c23fe7adbd8b5504406e3068c273aa24cef4055b","message":"New message","poll_id":"s4PdJozxM8na"}
 ```
 
-Note that the self-hosted server literally sends the message `New message` for every message, even if your message 
-may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
+Note that the self-hosted server literally sends the message `New message` for every message, even if your message
+may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all),
 it'll show `New message` as a popup.
 
 ## Rate limiting
 !!! info
-    Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 
+    Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag.
     Otherwise, all visitors are rate limited as if they are one.
 
 By default, ntfy runs without authentication, so it is vitally important that we protect the server from abuse or overload.
 There are various limits and rate limits in place that you can use to configure the server:
 
 * **Global limit**: A global limit applies across all visitors (IPs, clients, users)
-* **Visitor limit**: A visitor limit only applies to a certain visitor. A **visitor** is identified by its IP address 
-  (or the `X-Forwarded-For` header if `behind-proxy` is set). All config options that start with the word `visitor` apply 
+* **Visitor limit**: A visitor limit only applies to a certain visitor. A **visitor** is identified by its IP address
+  (or the `X-Forwarded-For` header if `behind-proxy` is set). All config options that start with the word `visitor` apply
   only on a per-visitor basis.
 
 During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
@@ -773,39 +773,39 @@ Let's do the easy limits first:
 In addition to the limits above, there is a requests/second limit per visitor for all sensitive GET/PUT/POST requests.
 This limit uses a [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (using Go's [rate package](https://pkg.go.dev/golang.org/x/time/rate)):
 
-Each visitor has a bucket of 60 requests they can fire against the server (defined by `visitor-request-limit-burst`). 
+Each visitor has a bucket of 60 requests they can fire against the server (defined by `visitor-request-limit-burst`).
 After the 60, new requests will encounter a `429 Too Many Requests` response. The visitor request bucket is refilled at a rate of one
 request every 5s (defined by `visitor-request-limit-replenish`)
 
 * `visitor-request-limit-burst` is the initial bucket of requests each visitor has. This defaults to 60.
 * `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 5s.
-* `visitor-request-limit-exempt-hosts` is a comma-separated list of hostnames and IPs to be exempt from request rate 
+* `visitor-request-limit-exempt-hosts` is a comma-separated list of hostnames and IPs to be exempt from request rate
   limiting; hostnames are resolved at the time the server is started. Defaults to an empty list.
- 
+
 ### Attachment limits
-Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
+Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant
 per-visitor limits:
 
 * `visitor-attachment-total-size-limit` is the total storage limit used for attachments per visitor. It defaults to 100M.
-  The per-visitor storage is automatically decreased as attachments expire. External attachments (attached via `X-Attach`, 
-  see [publishing docs](publish.md#attachments)) do not count here. 
-* `visitor-attachment-daily-bandwidth-limit` is the total daily attachment download/upload bandwidth limit per visitor, 
+  The per-visitor storage is automatically decreased as attachments expire. External attachments (attached via `X-Attach`,
+  see [publishing docs](publish.md#attachments)) do not count here.
+* `visitor-attachment-daily-bandwidth-limit` is the total daily attachment download/upload bandwidth limit per visitor,
   including PUT and GET requests. This is to protect your precious bandwidth from abuse, since egress costs money in
   most cloud providers. This defaults to 500M.
 
 ### E-mail limits
-Similarly to the request limit, there is also an e-mail limit (only relevant if [e-mail notifications](#e-mail-notifications) 
+Similarly to the request limit, there is also an e-mail limit (only relevant if [e-mail notifications](#e-mail-notifications)
 are enabled):
 
 * `visitor-email-limit-burst` is the initial bucket of emails each visitor has. This defaults to 16.
 * `visitor-email-limit-replenish` is the rate at which the bucket is refilled (one email per x). Defaults to 1h.
 
 ### Firebase limits
-If [Firebase is configured](#firebase-fcm), all messages are also published to a Firebase topic (unless `Firebase: no` 
+If [Firebase is configured](#firebase-fcm), all messages are also published to a Firebase topic (unless `Firebase: no`
 is set). Firebase enforces [its own limits](https://firebase.google.com/docs/cloud-messaging/concept-options#topics_throttling)
-on how many messages can be published. Unfortunately these limits are a little vague and can change depending on the time 
-of day. In practice, I have only ever observed `429 Quota exceeded` responses from Firebase if **too many messages are published to 
-the same topic**. 
+on how many messages can be published. Unfortunately these limits are a little vague and can change depending on the time
+of day. In practice, I have only ever observed `429 Quota exceeded` responses from Firebase if **too many messages are published to
+the same topic**.
 
 In ntfy, if Firebase responds with a 429 after publishing to a topic, the visitor (= IP address) who published the message
 is **banned from publishing to Firebase for 10 minutes** (not configurable). Because publishing to Firebase happens asynchronously,
@@ -828,7 +828,7 @@ Depending on *how you run it*, here are a few limits that are relevant:
 ### Message cache
 By default, the [message cache](#message-cache) (defined by `cache-file`) uses the SQLite default settings, which means it
 syncs to disk on every write. For personal servers, this is perfectly adequate. For larger installations, such as ntfy.sh,
-the [write-ahead log (WAL)](https://sqlite.org/wal.html) should be enabled, and the sync mode should be adjusted. 
+the [write-ahead log (WAL)](https://sqlite.org/wal.html) should be enabled, and the sync mode should be adjusted.
 See [this article](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/) for details.
 
 In addition to that, for very high load servers (such as ntfy.sh), it may be beneficial to write messages to the cache
@@ -900,7 +900,7 @@ If you put stuff on the Internet, bad actors will try to break them or break in.
 and nginx's [ngx_http_limit_req_module module](http://nginx.org/en/docs/http/ngx_http_limit_req_module.html) can be used
 to ban client IPs if they misbehave. This is on top of the [rate limiting](#rate-limiting) inside the ntfy server.
 
-Here's an example for how ntfy.sh is configured, following the instructions from two tutorials ([here](https://easyengine.io/tutorials/nginx/fail2ban/) 
+Here's an example for how ntfy.sh is configured, following the instructions from two tutorials ([here](https://easyengine.io/tutorials/nginx/fail2ban/)
 and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-attack/)):
 
 === "/etc/nginx/nginx.conf"
@@ -933,7 +933,7 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
       location / {
         limit_req zone=one burst=1000 nodelay;
       }
-    }    
+    }
     ```
 
 === "/etc/fail2ban/filter.d/nginx-req-limit.conf"
@@ -957,15 +957,15 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
 
 ## Debugging/tracing
 If something's not working right, you can debug/trace through what the ntfy server is doing by setting the `log-level`
-to `DEBUG` or `TRACE`. The `DEBUG` setting will output information about each published message, but not the message 
-contents. The `TRACE` setting will also print the message contents. 
+to `DEBUG` or `TRACE`. The `DEBUG` setting will output information about each published message, but not the message
+contents. The `TRACE` setting will also print the message contents.
 
 !!! warning
-    Both options are very verbose and should only be enabled in production for short periods of time. Otherwise, 
+    Both options are very verbose and should only be enabled in production for short periods of time. Otherwise,
     you're going to run out of disk space pretty quickly.
 
 You can also hot-reload the `log-level` by sending the `SIGHUP` signal to the process after editing the `server.yml` file.
-You can do so by calling `systemctl reload ntfy` (if ntfy is running inside systemd), or by calling `kill -HUP $(pidof ntfy)`. 
+You can do so by calling `systemctl reload ntfy` (if ntfy is running inside systemd), or by calling `kill -HUP $(pidof ntfy)`.
 If successful, you'll see something like this:
 
 ```
@@ -981,8 +981,8 @@ CLI option (e.g. `--listen-http :80`. Here's a list of all available options. Al
 variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 
 !!! info
-    All config options can also be defined in the `server.yml` file using underscores instead of dashes, e.g. 
-    `cache_duration` and `cache-duration` are both supported. This is to support stricter YAML parsers that do 
+    All config options can also be defined in the `server.yml` file using underscores instead of dashes, e.g.
+    `cache_duration` and `cache-duration` are both supported. This is to support stricter YAML parsers that do
     not support dashes.
 
 | Config option                              | Env variable                                    | Format                                              | Default           | Description                                                                                                                                                                                                                     |
@@ -1028,7 +1028,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*                                            | 30                | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | `app`, `home` or `disable`                          | `app`             | Sets web root to landing page (home), web app (app) or disables the web app entirely (disable)                                                                                                                                  |
 
-The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
+The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
 
 ## Command line options
@@ -1045,10 +1045,10 @@ CATEGORY:
 
 DESCRIPTION:
    Run the ntfy server and listen for incoming requests
-   
-   The command will load the configuration from /etc/ntfy/server.yml. Config options can 
+
+   The command will load the configuration from /etc/ntfy/server.yml. Config options can
    be overridden using the command line options.
-   
+
    Examples:
      ntfy serve                      # Starts server in the foreground (on port 80)
      ntfy serve --listen-http :8080  # Starts server with alternate port
@@ -1065,7 +1065,7 @@ OPTIONS:
    --cache-duration since, --cache_duration since, -b since                                            buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
    --cache-file value, --cache_file value, -C value                                                    cache file used for message caching [$NTFY_CACHE_FILE]
    --cache-batch-size value, --cache_batch_size value                                                  max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]
-   --cache-batch-timeout value, --cache_batch_timeout value                                            timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]   
+   --cache-batch-timeout value, --cache_batch_timeout value                                            timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]
    --cache-startup-queries value, --cache_startup_queries value                                        queries run when the cache database is initialized [$NTFY_CACHE_STARTUP_QUERIES]
    --cert-file value, --cert_file value, -E value                                                      certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --config value, -c value                                                                            config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
@@ -1099,4 +1099,3 @@ OPTIONS:
    --visitor-subscription-limit value, --visitor_subscription_limit value                              number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
    --web-root value, --web_root value                                                                  sets web root to landing page (home), web app (app) or disabled (disable) (default: "app") [$NTFY_WEB_ROOT]
 ```
-

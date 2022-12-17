@@ -15,12 +15,12 @@ theme:
   include_search_page: false
   search_index_only: true
   palette:
-    - media: "(prefers-color-scheme: light)"  # Light mode
+    - media: "(prefers-color-scheme: light)" # Light mode
       scheme: default
       toggle:
         icon: material/lightbulb-outline
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"  # Dark mode
+    - media: "(prefers-color-scheme: dark)" # Dark mode
       scheme: slate
       accent: indigo
       toggle:
@@ -71,26 +71,24 @@ plugins:
       minify_html: true
 
 nav:
-- "Getting started": index.md
-- "Publishing":
-  - "Sending messages": publish.md
-- "Subscribing":
-  - "From your phone": subscribe/phone.md
-  - "From the Web UI": subscribe/web.md
-  - "From the CLI": subscribe/cli.md
-  - "Using the API": subscribe/api.md
-- "Self-hosting":
-  - "Installation": install.md
-  - "Configuration": config.md
-- "Other things":
-  - "FAQs": faq.md
-  - "Examples": examples.md
-  - "Integrations + projects": integrations.md
-  - "Release notes": releases.md
-  - "Emojis 🥳 🎉": emojis.md
-  - "Known issues": known-issues.md
-  - "Deprecation notices": deprecations.md
-  - "Development": develop.md
-  - "Privacy policy": privacy.md
-
-
+  - "Getting started": index.md
+  - "Publishing":
+      - "Sending messages": publish.md
+  - "Subscribing":
+      - "From your phone": subscribe/phone.md
+      - "From the Web UI": subscribe/web.md
+      - "From the CLI": subscribe/cli.md
+      - "Using the API": subscribe/api.md
+  - "Self-hosting":
+      - "Installation": install.md
+      - "Configuration": config.md
+  - "Other things":
+      - "FAQs": faq.md
+      - "Examples": examples.md
+      - "Integrations + projects": integrations.md
+      - "Release notes": releases.md
+      - "Emojis 🥳 🎉": emojis.md
+      - "Known issues": known-issues.md
+      - "Deprecation notices": deprecations.md
+      - "Development": develop.md
+      - "Privacy policy": privacy.md

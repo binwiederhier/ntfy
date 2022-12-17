@@ -6,7 +6,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Public ntfy servers
 
-Here's a list of public ntfy servers. As of right now, there is only one official server. The others are provided by the 
+Here's a list of public ntfy servers. As of right now, there is only one official server. The others are provided by the
 ntfy community. Thanks to everyone running a public server. **You guys rock!**
 
 | URL                                               | Country            |
@@ -43,7 +43,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [FindMyDevice](https://gitlab.com/Nulide/findmydevice/) - Find your Device with an SMS or online with the help of FMDServer
 - [Tox Push Message App](https://github.com/zoff99/tox_push_msg_app) - Tox Push Message App
 
-## Libraries 
+## Libraries
 
 - [ntfy-php-library](https://github.com/VerifiedJoseph/ntfy-php-library) - PHP library for sending messages using a ntfy server (PHP)
 - [ntfy-notifier](https://github.com/DAcodedBEAT/ntfy-notifier) - Symfony Notifier integration for ntfy (PHP)
@@ -65,7 +65,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
 - [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
 
-## Projects + scripts 
+## Projects + scripts
 
 - [Grafana-to-ntfy](https://github.com/kittyandrew/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Rust)
 - [ntfy-long-zsh-command](https://github.com/robfox92/ntfy-long-zsh-command) - Notifies you once a long-running command completes (zsh)
@@ -97,16 +97,16 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy-notification-channel](https://github.com/wijourdil/ntfy-notification-channel) - Laravel Notification channel for ntfy (PHP)
 - [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
 - [ntfy-sdk](https://github.com/yukibtc/ntfy-sdk) - ntfy client library to send notifications (Rust)
-- [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost 
+- [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost
 - [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline
 
 ## Blog + forum posts
 
 - [ntfy setup instructions](https://docs.benjamin-altpeter.de/network/vms/1001029-ntfy/) - benjamin-altpeter.de - 12/2022
-- [Ntfy Self-Hosted Push Notifications](https://lachlanlife.net/posts/2022-12-ntfy/) - lachlanlife.net - 12/2022 
+- [Ntfy Self-Hosted Push Notifications](https://lachlanlife.net/posts/2022-12-ntfy/) - lachlanlife.net - 12/2022
 - [ntfy.sh](https://paramdeo.com/til/ntfy-sh) - paramdeo.com - 11/2022
 - [Using ntfy to warn me when my computer is discharging](https://ulysseszh.github.io/programming/2022/11/28/ntfy-warn-discharge.html) - ulysseszh.github.io - 11/2022
-- [ntfy - Push Notification Service](https://dizzytech.de/posts/ntfy/) - dizzytech.de - 11/2022 
+- [ntfy - Push Notification Service](https://dizzytech.de/posts/ntfy/) - dizzytech.de - 11/2022
 - [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022
 - [MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - youtube.com - 11/2022
 - [Changelog | Tracking layoffs, tech worker demand still high, ntfy, ...](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) ⭐ - changelog.com - 11/2022
@@ -118,11 +118,11 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - lunarok-domotique.com - 11/2022
 - [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - blog.parravidales.es - 11/2022
 - [Zero-cost push notifications to your phone or desktop via PUT/POST ](https://lobste.rs/s/41dq13/zero_cost_push_notifications_your_phone) - lobste.rs - 10/2022
-- [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - jpmens.net - 10/2022 
+- [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - jpmens.net - 10/2022
 - [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - youtube.com - 10/2022
 - [Neue Services: Ntfy, TikTok und RustDesk](https://adminforge.de/tools/neue-services-ntfy-tiktok-und-rustdesk/) - adminforge.de - 9/2022
 - [Ntfy, le service de notifications qu’il vous faut](https://www.cachem.fr/ntfy-le-service-de-notifications-quil-vous-faut/) - cachem.fr - 9/2022
-- [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - cachem.fr - 9/2022 
+- [NAS Synology et notifications avec ntfy](https://www.cachem.fr/synology-notifications-ntfy/) - cachem.fr - 9/2022
 - [Self hosted Mobile Push Notifications using NTFY | Thejesh GN](https://thejeshgn.com/2022/08/23/self-hosted-mobile-push-notifications-using-ntfy/) - thejeshgn.com - 8/2022
 - [Fedora Magazine | 4 cool new projects to try in Copr](https://fedoramagazine.org/4-cool-new-projects-to-try-in-copr-for-august-2022/) - fedoramagazine.org - 8/2022
 - [Docker로 오픈소스 푸시알람 프로젝트 ntfy.sh 설치 및 사용하기.(Feat. Uptimekuma)](https://svrforum.com/svr/398979) - svrforum.com - 8/2022
@@ -131,7 +131,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Install guide (with Docker)](https://chowdera.com/2022/150/202205301257379077.html) - chowdera.com - 5/2022
 - [无需注册的通知服务ntfy](https://blog.csdn.net/wbsu2004/article/details/125040247) - blog.csdn.net - 5/2022
 - [Updated review post (Jan-Lukas Else)](https://jlelse.blog/thoughts/2022/04/ntfy) - jlelse.blog - 4/2022
-- [Using ntfy and Tasker together](https://lachlanlife.net/posts/2022-04-tasker-ntfy/) - lachlanlife.net - 4/2022 
+- [Using ntfy and Tasker together](https://lachlanlife.net/posts/2022-04-tasker-ntfy/) - lachlanlife.net - 4/2022
 - [Reddit feature update post](https://www.reddit.com/r/selfhosted/comments/uetlso/ntfy_is_a_tool_to_send_push_notifications_to_your/) ⭐ - reddit.com - 4/2022
 - [無料で簡単に通知の送受信ができつつオープンソースでセルフホストも可能な「ntfy」を使ってみた](https://gigazine.net/news/20220404-ntfy-push-notification/) - gigazine.net - 4/2022
 - [Pocketmags ntfy review](https://pocketmags.com/us/linux-format-magazine/march-2022/articles/1104187/ntfy) - pocketmags.com - 3/2022

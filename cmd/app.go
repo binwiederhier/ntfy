@@ -2,10 +2,11 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/log"
-	"os"
 )
 
 const (

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/cmd"
 	"os"
 	"runtime"
+
+	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/cmd"
 )
 
 var (

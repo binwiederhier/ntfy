@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/test"
-	"heckel.io/ntfy/util"
 	"os"
 	"os/exec"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/test"
+	"heckel.io/ntfy/util"
 )
 
 func TestCLI_Publish_Subscribe_Poll_Real_Server(t *testing.T) {

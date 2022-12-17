@@ -1,12 +1,13 @@
 package auth_test
 
 import (
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/auth"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/auth"
 )
 
 const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources

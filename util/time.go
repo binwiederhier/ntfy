@@ -2,11 +2,12 @@ package util
 
 import (
 	"errors"
-	"github.com/olebedev/when"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/olebedev/when"
 )
 
 var (

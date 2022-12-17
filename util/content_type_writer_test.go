@@ -2,9 +2,10 @@ package util
 
 import (
 	"crypto/rand"
-	"github.com/stretchr/testify/require"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSniffWriter_WriteHTML(t *testing.T) {

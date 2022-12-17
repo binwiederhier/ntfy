@@ -412,7 +412,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
-		);		
+		);
 		INSERT INTO schemaVersion (id, version) VALUES (1, 1);
 	`)
 	require.Nil(t, err)
@@ -447,8 +447,8 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 
 func TestSqliteCache_StartupQueries_WAL(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
-	startupQueries := `pragma journal_mode = WAL; 
-pragma synchronous = normal; 
+	startupQueries := `pragma journal_mode = WAL;
+pragma synchronous = normal;
 pragma temp_store = memory;`
 	db, err := newSqliteCache(filename, startupQueries, 0, 0, false)
 	require.Nil(t, err)

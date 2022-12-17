@@ -7,4 +7,3 @@ if [ "$1" = "purge" ] || [ "$1" = "0" ]; then
   rm -f /etc/ntfy/server.yml /etc/ntfy/client.yml
   rmdir /etc/ntfy || true
 fi
-

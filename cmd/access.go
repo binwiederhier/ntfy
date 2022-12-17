@@ -5,6 +5,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
@@ -50,7 +51,7 @@ Arguments:
                to define access rules for anonymous/unauthenticated clients
   TOPIC        name of a topic with optional wildcards, e.g. "mytopic*"
   PERMISSION   one of the following:
-               - read-write (alias: rw) 
+               - read-write (alias: rw)
                - read-only (aliases: read, ro)
                - write-only (aliases: write, wo)
                - deny (alias: none)
@@ -60,7 +61,7 @@ Examples:
   ntfy access phil                   # Shows access for user phil
   ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
   ntfy access everyone mytopic rw    # Allow anonymous read-write access to mytopic
-  ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..." 
+  ntfy access everyone "up*" write   # Allow anonymous write-only access to topics "up..."
   ntfy access --reset                # Reset entire access control list
   ntfy access --reset phil           # Reset all access for user phil
   ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopic

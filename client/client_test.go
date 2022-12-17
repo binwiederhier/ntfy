@@ -2,11 +2,12 @@ package client_test
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/client"
 	"heckel.io/ntfy/test"
-	"testing"
-	"time"
 )
 
 func TestClient_Publish_Subscribe(t *testing.T) {

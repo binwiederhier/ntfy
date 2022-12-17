@@ -3,16 +3,17 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 func init() {
@@ -44,20 +45,20 @@ var cmdSubscribe = &cli.Command{
 	Category:  categoryClient,
 	Flags:     flagsSubscribe,
 	Before:    initLogFunc,
-	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for 
+	Description: `Subscribe to a topic from a ntfy server, and either print or execute a command for
 every arriving message. There are 3 modes in which the command can be run:
 
 ntfy subscribe TOPIC
   This prints the JSON representation of every incoming message. It is useful when you
   have a command that wants to stream-read incoming JSON messages. Unless --poll is passed,
-  this command stays open forever. 
+  this command stays open forever.
 
   Examples:
     ntfy subscribe mytopic            # Prints JSON for incoming messages for ntfy.sh/mytopic
     ntfy sub home.lan/backups         # Subscribe to topic on different server
     ntfy sub --poll home.lan/backups  # Just query for latest messages and exit
     ntfy sub -u phil:mypass secret    # Subscribe with username/password
-  
+
 ntfy subscribe TOPIC COMMAND
   This executes COMMAND for every incoming messages. The message fields are passed to the
   command as environment variables:
@@ -78,10 +79,10 @@ ntfy subscribe TOPIC COMMAND
     ntfy sub topic1 myscript.sh            # Execute script for incoming messages
 
 ntfy subscribe --from-config
-  Service mode (used in ntfy-client.service). This reads the config file and sets up 
+  Service mode (used in ntfy-client.service). This reads the config file and sets up
   subscriptions for every topic in the "subscribe:" block (see config file).
 
-  Examples: 
+  Examples:
     ntfy sub --from-config                           # Read topics from config file
     ntfy sub --config=myclient.yml --from-config     # Read topics from alternate config file
 

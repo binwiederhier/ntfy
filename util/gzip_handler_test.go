@@ -2,11 +2,12 @@ package util
 
 import (
 	"compress/gzip"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGzipHandler(t *testing.T) {

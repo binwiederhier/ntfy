@@ -9,8 +9,8 @@ or POST requests. I use it to notify myself when scripts fail, or long-running c
 
 To [receive notifications on your phone](subscribe/phone.md), install the app, either via Google Play or F-Droid.
 Once installed, open it and subscribe to a topic of your choosing. Topics don't have to explicitly be created, so just
-pick a name and use it later when you [publish a message](publish.md). Note that **topic names are public, so it's wise 
-to choose something that cannot be guessed easily.** 
+pick a name and use it later when you [publish a message](publish.md). Note that **topic names are public, so it's wise
+to choose something that cannot be guessed easily.**
 
 For this guide, we'll just use `mytopic` as our topic name:
 
@@ -23,7 +23,7 @@ That's it. After you tap "Subscribe", the app is listening for new messages on t
 
 ## Step 2: Send a message
 Now let's [send a message](publish.md) to our topic. It's easy in every language, since we're just using HTTP PUT/POST,
-or with the [ntfy CLI](install.md). The message is in the request body. Here's an example showing how to publish a 
+or with the [ntfy CLI](install.md). The message is in the request body. Here's an example showing how to publish a
 simple message using a POST request:
 
 === "Command line (curl)"
@@ -40,7 +40,7 @@ simple message using a POST request:
     ``` http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
-    
+
     Backup successful 😀
     ```
 
@@ -91,5 +91,3 @@ Here's another video showing the entire process:
   <video controls muted autoplay loop width="650" src="static/img/android-video-overview.mp4"></video>
   <figcaption>Sending push notifications to your Android phone</figcaption>
 </figure>
-
-

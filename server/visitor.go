@@ -24,17 +24,18 @@ var (
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
-	config        *Config
-	messageCache  *messageCache
-	ip            netip.Addr
-	user          *auth.User
-	requests      *rate.Limiter
-	emails        *rate.Limiter
-	subscriptions util.Limiter
-	bandwidth     util.Limiter
-	firebase      time.Time // Next allowed Firebase message
-	seen          time.Time
-	mu            sync.Mutex
+	config         *Config
+	messageCache   *messageCache
+	ip             netip.Addr
+	user           *auth.User
+	requests       *util.AtomicCounter[int64]
+	requestLimiter *rate.Limiter
+	emails         *rate.Limiter
+	subscriptions  util.Limiter
+	bandwidth      util.Limiter
+	firebase       time.Time // Next allowed Firebase message
+	seen           time.Time
+	mu             sync.Mutex
 }
 
 type visitorStats struct {
@@ -45,28 +46,29 @@ type visitorStats struct {
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
-	var requests *rate.Limiter
+	var requestLimiter *rate.Limiter
 	if user != nil && user.Plan != nil {
-		requests = rate.NewLimiter(rate.Limit(user.Plan.MessagesLimit)*rate.Every(24*time.Hour), user.Plan.MessagesLimit)
+		requestLimiter = rate.NewLimiter(rate.Limit(user.Plan.RequestLimit)*rate.Every(24*time.Hour), conf.VisitorRequestLimitBurst)
 	} else {
-		requests = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
+		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
 	}
 	return &visitor{
-		config:        conf,
-		messageCache:  messageCache,
-		ip:            ip,
-		user:          user,
-		requests:      requests,
-		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
-		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		bandwidth:     util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
-		firebase:      time.Unix(0, 0),
-		seen:          time.Now(),
+		config:         conf,
+		messageCache:   messageCache,
+		ip:             ip,
+		user:           user,
+		requests:       util.NewAtomicCounter[int64](0),
+		requestLimiter: requestLimiter,
+		emails:         rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
+		subscriptions:  util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
+		bandwidth:      util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
+		firebase:       time.Unix(0, 0),
+		seen:           time.Now(),
 	}
 }
 
 func (v *visitor) RequestAllowed() error {
-	if !v.requests.Allow() {
+	if !v.requestLimiter.Allow() {
 		return errVisitorLimitReached
 	}
 	return nil

@@ -23,8 +23,8 @@ const (
 		BEGIN;
 		CREATE TABLE IF NOT EXISTS plan (
 			id INT NOT NULL,		
-			name TEXT NOT NULL,
-			messages_limit INT NOT NULL,
+			code TEXT NOT NULL,
+			request_limit INT NOT NULL,
 			emails_limit INT NOT NULL,
 			attachment_bytes_limit INT NOT NULL,
 			PRIMARY KEY (id)
@@ -61,13 +61,13 @@ const (
 		COMMIT;
 	`
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.name, p.messages_limit, p.emails_limit, p.attachment_bytes_limit
+		SELECT u.user, u.pass, u.role, u.settings, p.code, p.request_limit, p.emails_limit, p.attachment_bytes_limit
 		FROM user u
 		LEFT JOIN plan p on p.id = u.plan_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.name, p.messages_limit, p.emails_limit, p.attachment_bytes_limit
+		SELECT u.user, u.pass, u.role, u.settings, p.code, p.request_limit, p.emails_limit, p.attachment_bytes_limit
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
@@ -324,13 +324,13 @@ func (a *SQLiteAuthManager) userByToken(token string) (*User, error) {
 func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var prefs, planName sql.NullString
-	var messagesLimit, emailsLimit sql.NullInt32
+	var prefs, planCode sql.NullString
+	var requestLimit, emailLimit sql.NullInt32
 	var attachmentBytesLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &prefs, &planName, &messagesLimit, &emailsLimit, &attachmentBytesLimit); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs, &planCode, &requestLimit, &emailLimit, &attachmentBytesLimit); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -351,11 +351,12 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 			return nil, err
 		}
 	}
-	if planName.Valid {
-		user.Plan = &UserPlan{
-			Name:                 planName.String,
-			MessagesLimit:        int(messagesLimit.Int32),
-			EmailsLimit:          int(emailsLimit.Int32),
+	if planCode.Valid {
+		user.Plan = &Plan{
+			Code:                 planCode.String,
+			Upgradable:           true, // FIXME
+			RequestLimit:         int(requestLimit.Int32),
+			EmailsLimit:          int(emailLimit.Int32),
 			AttachmentBytesLimit: attachmentBytesLimit.Int64,
 		}
 	}

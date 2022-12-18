@@ -545,6 +545,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
+	v.requests.Inc()
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()

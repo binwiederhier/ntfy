@@ -64,7 +64,7 @@ type User struct {
 	Role   Role
 	Grants []Grant
 	Prefs  *UserPrefs
-	Plan   *UserPlan
+	Plan   *Plan
 }
 
 type UserPrefs struct {
@@ -73,9 +73,18 @@ type UserPrefs struct {
 	Subscriptions []*UserSubscription    `json:"subscriptions,omitempty"`
 }
 
-type UserPlan struct {
-	Name                 string `json:"name"`
-	MessagesLimit        int    `json:"messages_limit"`
+type PlanCode string
+
+const (
+	PlanUnlimited = PlanCode("unlimited")
+	PlanDefault   = PlanCode("default")
+	PlanNone      = PlanCode("none")
+)
+
+type Plan struct {
+	Code                 string `json:"name"`
+	Upgradable           bool   `json:"upgradable"`
+	RequestLimit         int    `json:"request_limit"`
 	EmailsLimit          int    `json:"emails_limit"`
 	AttachmentBytesLimit int64  `json:"attachment_bytes_limit"`
 }

@@ -59,26 +59,26 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 		if v.user.Plan != nil {
 			response.Usage.Basis = "account"
 			response.Plan = &apiAccountSettingsPlan{
-				Name:                  v.user.Plan.Name,
-				MessagesLimit:         v.user.Plan.MessagesLimit,
-				EmailsLimit:           v.user.Plan.EmailsLimit,
+				Code:                  v.user.Plan.Code,
+				RequestLimit:          v.user.Plan.RequestLimit,
+				EmailLimit:            v.user.Plan.EmailsLimit,
 				AttachmentsBytesLimit: v.user.Plan.AttachmentBytesLimit,
 			}
 		} else {
 			if v.user.Role == auth.RoleAdmin {
 				response.Usage.Basis = "account"
 				response.Plan = &apiAccountSettingsPlan{
-					Name:                  "Unlimited",
-					MessagesLimit:         0,
-					EmailsLimit:           0,
+					Code:                  string(auth.PlanUnlimited),
+					RequestLimit:          0,
+					EmailLimit:            0,
 					AttachmentsBytesLimit: 0,
 				}
 			} else {
 				response.Usage.Basis = "ip"
 				response.Plan = &apiAccountSettingsPlan{
-					Name:                  "Free",
-					MessagesLimit:         s.config.VisitorRequestLimitBurst,
-					EmailsLimit:           s.config.VisitorEmailLimitBurst,
+					Code:                  string(auth.PlanDefault),
+					RequestLimit:          s.config.VisitorRequestLimitBurst,
+					EmailLimit:            s.config.VisitorEmailLimitBurst,
 					AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
 				}
 			}
@@ -88,13 +88,13 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 		response.Role = string(auth.RoleAnonymous)
 		response.Usage.Basis = "account"
 		response.Plan = &apiAccountSettingsPlan{
-			Name:                  "Anonymous",
-			MessagesLimit:         s.config.VisitorRequestLimitBurst,
-			EmailsLimit:           s.config.VisitorEmailLimitBurst,
+			Code:                  string(auth.PlanNone),
+			RequestLimit:          s.config.VisitorRequestLimitBurst,
+			EmailLimit:            s.config.VisitorEmailLimitBurst,
 			AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
 		}
 	}
-	response.Usage.Messages = int(v.requests.Tokens())
+	response.Usage.Requests = v.requests.Value()
 	response.Usage.AttachmentsBytes = stats.VisitorAttachmentBytesUsed
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err

@@ -53,7 +53,9 @@ const Stats = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
     const admin = account?.role === "admin"
-    const accountType = account?.plan?.name ?? "Free";
+    const usage = account?.usage;
+    const plan = account?.plan;
+    const accountType = plan?.code ?? "none";
     return (
         <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -64,13 +66,13 @@ const Stats = () => {
                     <div>
                         {account?.role === "admin"
                             ? <>Unlimited <Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
-                            : accountType}
+                            : t(`account_type_${accountType}`)}
                     </div>
                 </Pref>
                 <Pref labelId={"dailyMessages"} title={t("Daily messages")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>123</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>of 1000</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{usage?.requests ?? 0}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{plan?.request_limit > 0 ? t("of {{limit}}", { limit: plan.request_limit }) : t("Unlimited")}</Typography>
                     </div>
                     <LinearProgress variant="determinate" value={10} />
                 </Pref>

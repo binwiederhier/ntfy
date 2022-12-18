@@ -225,15 +225,16 @@ type apiAccountTokenResponse struct {
 }
 
 type apiAccountSettingsPlan struct {
-	Name                  string `json:"name"`
-	MessagesLimit         int    `json:"messages_limit"`
-	EmailsLimit           int    `json:"emails_limit"`
+	Code                  string `json:"code"`
+	Upgradable            bool   `json:"upgradable"`
+	RequestLimit          int    `json:"request_limit"`
+	EmailLimit            int    `json:"email_limit"`
 	AttachmentsBytesLimit int64  `json:"attachments_bytes_limit"`
 }
 
 type apiAccountUsageLimits struct {
 	Basis            string `json:"basis"` // "ip" or "account"
-	Messages         int    `json:"messages"`
+	Requests         int64  `json:"requests"`
 	Emails           int    `json:"emails"`
 	AttachmentsBytes int64  `json:"attachments_bytes"`
 }

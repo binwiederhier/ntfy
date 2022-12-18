@@ -40,9 +40,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 		return err
 	}
 	response := &apiAccountSettingsResponse{
-		Usage: &apiAccountUsageLimits{
-			Basis: "ip",
-		},
+		Usage: &apiAccountUsageLimits{},
 	}
 	if v.user != nil {
 		response.Username = v.user.Name
@@ -66,11 +64,37 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				EmailsLimit:           v.user.Plan.EmailsLimit,
 				AttachmentsBytesLimit: v.user.Plan.AttachmentBytesLimit,
 			}
+		} else {
+			if v.user.Role == auth.RoleAdmin {
+				response.Usage.Basis = "account"
+				response.Plan = &apiAccountSettingsPlan{
+					Name:                  "Unlimited",
+					MessagesLimit:         0,
+					EmailsLimit:           0,
+					AttachmentsBytesLimit: 0,
+				}
+			} else {
+				response.Usage.Basis = "ip"
+				response.Plan = &apiAccountSettingsPlan{
+					Name:                  "Free",
+					MessagesLimit:         s.config.VisitorRequestLimitBurst,
+					EmailsLimit:           s.config.VisitorEmailLimitBurst,
+					AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
+				}
+			}
 		}
 	} else {
 		response.Username = auth.Everyone
 		response.Role = string(auth.RoleAnonymous)
+		response.Usage.Basis = "account"
+		response.Plan = &apiAccountSettingsPlan{
+			Name:                  "Anonymous",
+			MessagesLimit:         s.config.VisitorRequestLimitBurst,
+			EmailsLimit:           s.config.VisitorEmailLimitBurst,
+			AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
+		}
 	}
+	response.Usage.Messages = int(v.requests.Tokens())
 	response.Usage.AttachmentsBytes = stats.VisitorAttachmentBytesUsed
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err

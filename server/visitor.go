@@ -45,12 +45,18 @@ type visitorStats struct {
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
+	var requests *rate.Limiter
+	if user != nil && user.Plan != nil {
+		requests = rate.NewLimiter(rate.Limit(user.Plan.MessagesLimit)*rate.Every(24*time.Hour), user.Plan.MessagesLimit)
+	} else {
+		requests = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
+	}
 	return &visitor{
 		config:        conf,
 		messageCache:  messageCache,
 		ip:            ip,
 		user:          user,
-		requests:      rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst),
+		requests:      requests,
 		emails:        rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
 		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 		bandwidth:     util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),

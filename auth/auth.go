@@ -84,7 +84,7 @@ const (
 type Plan struct {
 	Code                     string `json:"name"`
 	Upgradable               bool   `json:"upgradable"`
-	MessageLimit             int64  `json:"messages_limit"`
+	MessagesLimit            int64  `json:"messages_limit"`
 	EmailsLimit              int64  `json:"emails_limit"`
 	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`

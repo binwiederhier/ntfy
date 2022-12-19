@@ -40,17 +40,27 @@ type visitor struct {
 }
 
 type visitorStats struct {
-	Messages        int64
-	Emails          int64
-	AttachmentBytes int64
+	Basis                        string // "ip", "role" or "plan"
+	Messages                     int64
+	MessagesLimit                int64
+	MessagesRemaining            int64
+	Emails                       int64
+	EmailsLimit                  int64
+	EmailsRemaining              int64
+	AttachmentTotalSize          int64
+	AttachmentTotalSizeLimit     int64
+	AttachmentTotalSizeRemaining int64
+	AttachmentFileSizeLimit      int64
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
-	var requestLimiter *rate.Limiter
+	var requestLimiter, emailsLimiter *rate.Limiter
 	if user != nil && user.Plan != nil {
-		requestLimiter = rate.NewLimiter(rate.Limit(user.Plan.MessageLimit)*rate.Every(24*time.Hour), conf.VisitorRequestLimitBurst)
+		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.MessagesLimit), conf.VisitorRequestLimitBurst)
+		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.EmailsLimit), conf.VisitorEmailLimitBurst)
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
+		emailsLimiter = rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst)
 	}
 	return &visitor{
 		config:              conf,
@@ -60,7 +70,7 @@ func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *a
 		messages:            0, // TODO
 		emails:              0, // TODO
 		requestLimiter:      requestLimiter,
-		emailsLimiter:       rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
+		emailsLimiter:       emailsLimiter,
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 		bandwidthLimiter:    util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
 		firebase:            time.Unix(0, 0),
@@ -147,9 +157,46 @@ func (v *visitor) Stats() (*visitorStats, error) {
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return &visitorStats{
-		Messages:        v.messages,
-		Emails:          v.emails,
-		AttachmentBytes: attachmentsBytesUsed,
-	}, nil
+	stats := &visitorStats{}
+	if v.user != nil && v.user.Role == auth.RoleAdmin {
+		stats.Basis = "role"
+		stats.MessagesLimit = 0
+		stats.EmailsLimit = 0
+		stats.AttachmentTotalSizeLimit = 0
+		stats.AttachmentFileSizeLimit = 0
+	} else if v.user != nil && v.user.Plan != nil {
+		stats.Basis = "plan"
+		stats.MessagesLimit = v.user.Plan.MessagesLimit
+		stats.EmailsLimit = v.user.Plan.EmailsLimit
+		stats.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
+		stats.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
+	} else {
+		stats.Basis = "ip"
+		stats.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
+		stats.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
+		stats.AttachmentTotalSizeLimit = v.config.AttachmentTotalSizeLimit
+		stats.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
+	}
+	stats.Messages = v.messages
+	stats.MessagesRemaining = zeroIfNegative(stats.MessagesLimit - stats.MessagesLimit)
+	stats.Emails = v.emails
+	stats.EmailsRemaining = zeroIfNegative(stats.EmailsLimit - stats.EmailsRemaining)
+	stats.AttachmentTotalSize = attachmentsBytesUsed
+	stats.AttachmentTotalSizeRemaining = zeroIfNegative(stats.AttachmentTotalSizeLimit - stats.AttachmentTotalSize)
+	return stats, nil
+}
+
+func zeroIfNegative(value int64) int64 {
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func replenishDurationToDailyLimit(duration time.Duration) int64 {
+	return int64(24 * time.Hour / duration)
+}
+
+func dailyLimitToRate(limit int64) rate.Limit {
+	return rate.Limit(limit) * rate.Every(24*time.Hour)
 }

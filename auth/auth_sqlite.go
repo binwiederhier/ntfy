@@ -110,7 +110,7 @@ const (
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
 )
 
-// SQLiteAuthManager is an implementation of Manager and Manager. It stores users and access control list
+// SQLiteAuthManager is an implementation of Manager. It stores users and access control list
 // in a SQLite database.
 type SQLiteAuthManager struct {
 	db           *sql.DB
@@ -355,7 +355,7 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 		user.Plan = &Plan{
 			Code:                     planCode.String,
 			Upgradable:               true, // FIXME
-			MessageLimit:             messagesLimit.Int64,
+			MessagesLimit:            messagesLimit.Int64,
 			EmailsLimit:              emailsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,

@@ -224,23 +224,26 @@ type apiAccountTokenResponse struct {
 	Token string `json:"token"`
 }
 
-type apiAccountSettingsPlan struct {
+type apiAccountPlan struct {
 	Code       string `json:"code"`
 	Upgradable bool   `json:"upgradable"`
 }
 
 type apiAccountLimits struct {
-	MessagesLimit            int64 `json:"messages"`
-	EmailsLimit              int64 `json:"emails"`
-	AttachmentFileSizeLimit  int64 `json:"attachment_file_size"`
-	AttachmentTotalSizeLimit int64 `json:"attachment_total_size"`
+	Basis               string `json:"basis"` // "ip", "role" or "plan"
+	Messages            int64  `json:"messages"`
+	Emails              int64  `json:"emails"`
+	AttachmentTotalSize int64  `json:"attachment_total_size"`
+	AttachmentFileSize  int64  `json:"attachment_file_size"`
 }
 
 type apiAccountStats struct {
-	Basis           string `json:"basis"` // "ip" or "account"
-	Messages        int64  `json:"messages"`
-	Emails          int64  `json:"emails"`
-	AttachmentsSize int64  `json:"attachments_size"`
+	Messages                     int64 `json:"messages"`
+	MessagesRemaining            int64 `json:"messages_remaining"`
+	Emails                       int64 `json:"emails"`
+	EmailsRemaining              int64 `json:"emails_remaining"`
+	AttachmentTotalSize          int64 `json:"attachment_total_size"`
+	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
 }
 
 type apiAccountSettingsResponse struct {
@@ -249,7 +252,7 @@ type apiAccountSettingsResponse struct {
 	Language      string                      `json:"language,omitempty"`
 	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
 	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
-	Plan          *apiAccountSettingsPlan     `json:"plan,omitempty"`
+	Plan          *apiAccountPlan             `json:"plan,omitempty"`
 	Limits        *apiAccountLimits           `json:"limits,omitempty"`
-	Usage         *apiAccountStats            `json:"usage,omitempty"`
+	Stats         *apiAccountStats            `json:"stats,omitempty"`
 }

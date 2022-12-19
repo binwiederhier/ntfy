@@ -60,8 +60,6 @@ const Stats = () => {
         return <></>; // TODO loading
     }
     const accountType = account.plan.code ?? "none";
-    const limits = account.limits;
-    const usage = account.usage;
     const normalize = (value, max) => (value / max * 100);
     return (
         <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
@@ -78,24 +76,24 @@ const Stats = () => {
                 </Pref>
                 <Pref labelId={"messages"} title={t("Published messages")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{usage.messages}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{limits.messages > 0 ? t("of {{limit}}", { limit: limits.messages }) : t("Unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("of {{limit}}", { limit: account.limits.messages }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={limits.messages > 0 ? normalize(usage.messages, limits.messages) : 100} />
+                    <LinearProgress variant="determinate" value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100} />
                 </Pref>
                 <Pref labelId={"emails"} title={t("Emails sent")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{usage.emails}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{limits.emails > 0 ? t("of {{limit}}", { limit: limits.emails }) : t("Unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("of {{limit}}", { limit: account.limits.emails }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={limits.emails > 0 ? normalize(usage.emails, limits.emails) : 100} />
+                    <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
                 </Pref>
                 <Pref labelId={"attachments"} title={t("Attachment storage")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{formatBytes(usage.attachments_size)}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(limits.attachment_total_size) }) : t("Unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(account.limits.attachment_total_size) }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={limits.attachment_total_size > 0 ? normalize(usage.attachments_size, limits.attachment_total_size) : 100} />
+                    <LinearProgress variant="determinate" value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100} />
                 </Pref>
             </PrefGroup>
         </Card>

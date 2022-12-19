@@ -773,7 +773,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
-		if err == nil && (contentLength > visitorStats.VisitorAttachmentBytesRemaining || contentLength > s.config.AttachmentFileSizeLimit) {
+		if err == nil && (contentLength > visitorStats.AttachmentTotalSizeRemaining || contentLength > s.config.AttachmentFileSizeLimit) {
 			return errHTTPEntityTooLargeAttachmentTooLarge
 		}
 	}
@@ -791,7 +791,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(visitorStats.VisitorAttachmentBytesRemaining))
+	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(visitorStats.AttachmentTotalSizeRemaining))
 	if err == util.ErrLimitReached {
 		return errHTTPEntityTooLargeAttachmentTooLarge
 	} else if err != nil {

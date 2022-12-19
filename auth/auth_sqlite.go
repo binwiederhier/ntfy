@@ -24,9 +24,10 @@ const (
 		CREATE TABLE IF NOT EXISTS plan (
 			id INT NOT NULL,		
 			code TEXT NOT NULL,
-			request_limit INT NOT NULL,
+			messages_limit INT NOT NULL,
 			emails_limit INT NOT NULL,
-			attachment_bytes_limit INT NOT NULL,
+			attachment_file_size_limit INT NOT NULL,
+			attachment_total_size_limit INT NOT NULL,
 			PRIMARY KEY (id)
 		);
 		CREATE TABLE IF NOT EXISTS user (
@@ -61,13 +62,13 @@ const (
 		COMMIT;
 	`
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.code, p.request_limit, p.emails_limit, p.attachment_bytes_limit
+		SELECT u.user, u.pass, u.role, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		LEFT JOIN plan p on p.id = u.plan_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.code, p.request_limit, p.emails_limit, p.attachment_bytes_limit
+		SELECT u.user, u.pass, u.role, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
@@ -325,12 +326,11 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
 	var prefs, planCode sql.NullString
-	var requestLimit, emailLimit sql.NullInt32
-	var attachmentBytesLimit sql.NullInt64
+	var messagesLimit, emailsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &prefs, &planCode, &requestLimit, &emailLimit, &attachmentBytesLimit); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs, &planCode, &messagesLimit, &emailsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -353,11 +353,12 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 	}
 	if planCode.Valid {
 		user.Plan = &Plan{
-			Code:                 planCode.String,
-			Upgradable:           true, // FIXME
-			RequestLimit:         int(requestLimit.Int32),
-			EmailsLimit:          int(emailLimit.Int32),
-			AttachmentBytesLimit: attachmentBytesLimit.Int64,
+			Code:                     planCode.String,
+			Upgradable:               true, // FIXME
+			MessageLimit:             messagesLimit.Int64,
+			EmailsLimit:              emailsLimit.Int64,
+			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
+			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 		}
 	}
 	return user, nil

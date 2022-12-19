@@ -24,46 +24,47 @@ var (
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
-	config         *Config
-	messageCache   *messageCache
-	ip             netip.Addr
-	user           *auth.User
-	requests       *util.AtomicCounter[int64]
-	requestLimiter *rate.Limiter
-	emails         *rate.Limiter
-	subscriptions  util.Limiter
-	bandwidth      util.Limiter
-	firebase       time.Time // Next allowed Firebase message
-	seen           time.Time
-	mu             sync.Mutex
+	config              *Config
+	messageCache        *messageCache
+	ip                  netip.Addr
+	user                *auth.User
+	messages            int64
+	emails              int64
+	requestLimiter      *rate.Limiter
+	emailsLimiter       *rate.Limiter
+	subscriptionLimiter util.Limiter
+	bandwidthLimiter    util.Limiter
+	firebase            time.Time // Next allowed Firebase message
+	seen                time.Time
+	mu                  sync.Mutex
 }
 
 type visitorStats struct {
-	AttachmentFileSizeLimit         int64 `json:"attachmentFileSizeLimit"`
-	VisitorAttachmentBytesTotal     int64 `json:"visitorAttachmentBytesTotal"`
-	VisitorAttachmentBytesUsed      int64 `json:"visitorAttachmentBytesUsed"`
-	VisitorAttachmentBytesRemaining int64 `json:"visitorAttachmentBytesRemaining"`
+	Messages        int64
+	Emails          int64
+	AttachmentBytes int64
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
 	var requestLimiter *rate.Limiter
 	if user != nil && user.Plan != nil {
-		requestLimiter = rate.NewLimiter(rate.Limit(user.Plan.RequestLimit)*rate.Every(24*time.Hour), conf.VisitorRequestLimitBurst)
+		requestLimiter = rate.NewLimiter(rate.Limit(user.Plan.MessageLimit)*rate.Every(24*time.Hour), conf.VisitorRequestLimitBurst)
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
 	}
 	return &visitor{
-		config:         conf,
-		messageCache:   messageCache,
-		ip:             ip,
-		user:           user,
-		requests:       util.NewAtomicCounter[int64](0),
-		requestLimiter: requestLimiter,
-		emails:         rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
-		subscriptions:  util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		bandwidth:      util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
-		firebase:       time.Unix(0, 0),
-		seen:           time.Now(),
+		config:              conf,
+		messageCache:        messageCache,
+		ip:                  ip,
+		user:                user,
+		messages:            0, // TODO
+		emails:              0, // TODO
+		requestLimiter:      requestLimiter,
+		emailsLimiter:       rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst),
+		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
+		bandwidthLimiter:    util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
+		firebase:            time.Unix(0, 0),
+		seen:                time.Now(),
 	}
 }
 
@@ -90,7 +91,7 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 }
 
 func (v *visitor) EmailAllowed() error {
-	if !v.emails.Allow() {
+	if !v.emailsLimiter.Allow() {
 		return errVisitorLimitReached
 	}
 	return nil
@@ -99,7 +100,7 @@ func (v *visitor) EmailAllowed() error {
 func (v *visitor) SubscriptionAllowed() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if err := v.subscriptions.Allow(1); err != nil {
+	if err := v.subscriptionLimiter.Allow(1); err != nil {
 		return errVisitorLimitReached
 	}
 	return nil
@@ -108,7 +109,7 @@ func (v *visitor) SubscriptionAllowed() error {
 func (v *visitor) RemoveSubscription() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.subscriptions.Allow(-1)
+	v.subscriptionLimiter.Allow(-1)
 }
 
 func (v *visitor) Keepalive() {
@@ -118,7 +119,7 @@ func (v *visitor) Keepalive() {
 }
 
 func (v *visitor) BandwidthLimiter() util.Limiter {
-	return v.bandwidth
+	return v.bandwidthLimiter
 }
 
 func (v *visitor) Stale() bool {
@@ -127,19 +128,28 @@ func (v *visitor) Stale() bool {
 	return time.Since(v.seen) > visitorExpungeAfter
 }
 
+func (v *visitor) IncrMessages() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.messages++
+}
+
+func (v *visitor) IncrEmails() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.emails++
+}
+
 func (v *visitor) Stats() (*visitorStats, error) {
 	attachmentsBytesUsed, err := v.messageCache.AttachmentBytesUsed(v.ip.String())
 	if err != nil {
 		return nil, err
 	}
-	attachmentsBytesRemaining := v.config.VisitorAttachmentTotalSizeLimit - attachmentsBytesUsed
-	if attachmentsBytesRemaining < 0 {
-		attachmentsBytesRemaining = 0
-	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	return &visitorStats{
-		AttachmentFileSizeLimit:         v.config.AttachmentFileSizeLimit,
-		VisitorAttachmentBytesTotal:     v.config.VisitorAttachmentTotalSizeLimit,
-		VisitorAttachmentBytesUsed:      attachmentsBytesUsed,
-		VisitorAttachmentBytesRemaining: attachmentsBytesRemaining,
+		Messages:        v.messages,
+		Emails:          v.emails,
+		AttachmentBytes: attachmentsBytesUsed,
 	}, nil
 }

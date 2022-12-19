@@ -19,10 +19,14 @@ import DialogActions from "@mui/material/DialogActions";
 import api from "../app/Api";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {NavLink, useOutletContext} from "react-router-dom";
-import Box from "@mui/material/Box";
+import {useNavigate, useOutletContext} from "react-router-dom";
+import {formatBytes} from "../app/utils";
 
 const Account = () => {
+    if (!session.exists()) {
+        window.location.href = routes.app;
+        return <></>;
+    }
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
@@ -52,10 +56,13 @@ const Basics = () => {
 const Stats = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
-    const admin = account?.role === "admin"
-    const usage = account?.usage;
-    const plan = account?.plan;
-    const accountType = plan?.code ?? "none";
+    if (!account) {
+        return <></>; // TODO loading
+    }
+    const accountType = account.plan.code ?? "none";
+    const limits = account.limits;
+    const usage = account.usage;
+    const normalize = (value, max) => (value / max * 100);
     return (
         <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -69,26 +76,26 @@ const Stats = () => {
                             : t(`account_type_${accountType}`)}
                     </div>
                 </Pref>
-                <Pref labelId={"dailyMessages"} title={t("Daily messages")}>
+                <Pref labelId={"messages"} title={t("Published messages")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{usage?.requests ?? 0}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{plan?.request_limit > 0 ? t("of {{limit}}", { limit: plan.request_limit }) : t("Unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{usage.messages}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{limits.messages > 0 ? t("of {{limit}}", { limit: limits.messages }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={10} />
+                    <LinearProgress variant="determinate" value={limits.messages > 0 ? normalize(usage.messages, limits.messages) : 100} />
                 </Pref>
-                <Pref labelId={"attachmentStorage"} title={t("Attachment storage")}>
+                <Pref labelId={"emails"} title={t("Emails sent")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>15 MB used</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>of 150 MB</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{usage.emails}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{limits.emails > 0 ? t("of {{limit}}", { limit: limits.emails }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={40} />
+                    <LinearProgress variant="determinate" value={limits.emails > 0 ? normalize(usage.emails, limits.emails) : 100} />
                 </Pref>
-                <Pref labelId={"emailLimits"} title={t("Emails sent")}>
+                <Pref labelId={"attachments"} title={t("Attachment storage")}>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>2</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>of 15</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{formatBytes(usage.attachments_size)}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(limits.attachment_total_size) }) : t("Unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={20} />
+                    <LinearProgress variant="determinate" value={limits.attachment_total_size > 0 ? normalize(usage.attachments_size, limits.attachment_total_size) : 100} />
                 </Pref>
             </PrefGroup>
         </Card>

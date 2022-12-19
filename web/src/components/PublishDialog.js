@@ -26,6 +26,7 @@ import api from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
 import {Trans, useTranslation} from "react-i18next";
+import session from "../app/Session";
 
 const PublishDialog = (props) => {
     const { t } = useTranslation();
@@ -159,9 +160,11 @@ const PublishDialog = (props) => {
 
     const checkAttachmentLimits = async (file) => {
         try {
-            const stats = await api.userStats(baseUrl);
-            const fileSizeLimit = stats.attachmentFileSizeLimit ?? 0;
-            const remainingBytes = stats.visitorAttachmentBytesRemaining ?? 0;
+            const account = await api.getAccount(baseUrl, session.token());
+            const fileSizeLimit = account.limits.attachment_file_size ?? 0;
+            const totalSizeLimit = account.limits.attachment_total_size ?? 0;
+            const usedSize = account.usage.attachments_size ?? 0;
+            const remainingBytes = (totalSizeLimit > 0) ? totalSizeLimit - usedSize : 0;
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
             const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
             if (fileSizeLimitReached && quotaReached) {

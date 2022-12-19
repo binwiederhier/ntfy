@@ -40,7 +40,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 		return err
 	}
 	response := &apiAccountSettingsResponse{
-		Usage: &apiAccountUsageLimits{},
+		Usage: &apiAccountStats{},
 	}
 	if v.user != nil {
 		response.Username = v.user.Name
@@ -59,43 +59,60 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 		if v.user.Plan != nil {
 			response.Usage.Basis = "account"
 			response.Plan = &apiAccountSettingsPlan{
-				Code:                  v.user.Plan.Code,
-				RequestLimit:          v.user.Plan.RequestLimit,
-				EmailLimit:            v.user.Plan.EmailsLimit,
-				AttachmentsBytesLimit: v.user.Plan.AttachmentBytesLimit,
+				Code:       v.user.Plan.Code,
+				Upgradable: v.user.Plan.Upgradable,
+			}
+			response.Limits = &apiAccountLimits{
+				MessagesLimit:            v.user.Plan.MessageLimit,
+				EmailsLimit:              v.user.Plan.EmailsLimit,
+				AttachmentFileSizeLimit:  v.user.Plan.AttachmentFileSizeLimit,
+				AttachmentTotalSizeLimit: v.user.Plan.AttachmentTotalSizeLimit,
 			}
 		} else {
 			if v.user.Role == auth.RoleAdmin {
 				response.Usage.Basis = "account"
 				response.Plan = &apiAccountSettingsPlan{
-					Code:                  string(auth.PlanUnlimited),
-					RequestLimit:          0,
-					EmailLimit:            0,
-					AttachmentsBytesLimit: 0,
+					Code:       string(auth.PlanUnlimited),
+					Upgradable: false,
+				}
+				response.Limits = &apiAccountLimits{
+					MessagesLimit:            0,
+					EmailsLimit:              0,
+					AttachmentFileSizeLimit:  0,
+					AttachmentTotalSizeLimit: 0,
 				}
 			} else {
 				response.Usage.Basis = "ip"
 				response.Plan = &apiAccountSettingsPlan{
-					Code:                  string(auth.PlanDefault),
-					RequestLimit:          s.config.VisitorRequestLimitBurst,
-					EmailLimit:            s.config.VisitorEmailLimitBurst,
-					AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
+					Code:       string(auth.PlanDefault),
+					Upgradable: true,
+				}
+				response.Limits = &apiAccountLimits{
+					MessagesLimit:            int64(s.config.VisitorRequestLimitBurst),
+					EmailsLimit:              int64(s.config.VisitorEmailLimitBurst),
+					AttachmentFileSizeLimit:  s.config.AttachmentFileSizeLimit,
+					AttachmentTotalSizeLimit: s.config.VisitorAttachmentTotalSizeLimit,
 				}
 			}
 		}
 	} else {
 		response.Username = auth.Everyone
 		response.Role = string(auth.RoleAnonymous)
-		response.Usage.Basis = "account"
+		response.Usage.Basis = "ip"
 		response.Plan = &apiAccountSettingsPlan{
-			Code:                  string(auth.PlanNone),
-			RequestLimit:          s.config.VisitorRequestLimitBurst,
-			EmailLimit:            s.config.VisitorEmailLimitBurst,
-			AttachmentsBytesLimit: s.config.VisitorAttachmentTotalSizeLimit,
+			Code:       string(auth.PlanNone),
+			Upgradable: true,
+		}
+		response.Limits = &apiAccountLimits{
+			MessagesLimit:            int64(s.config.VisitorRequestLimitBurst),
+			EmailsLimit:              int64(s.config.VisitorEmailLimitBurst),
+			AttachmentFileSizeLimit:  s.config.AttachmentFileSizeLimit,
+			AttachmentTotalSizeLimit: s.config.VisitorAttachmentTotalSizeLimit,
 		}
 	}
-	response.Usage.Requests = v.requests.Value()
-	response.Usage.AttachmentsBytes = stats.VisitorAttachmentBytesUsed
+	response.Usage.Messages = stats.Messages
+	response.Usage.Emails = stats.Emails
+	response.Usage.AttachmentsSize = stats.AttachmentBytes
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err
 	}

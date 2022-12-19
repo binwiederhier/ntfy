@@ -1381,7 +1381,7 @@ func TestServer_PublishAttachmentUserStats(t *testing.T) {
 	require.Nil(t, json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&stats))
 	require.Equal(t, int64(5000), stats.AttachmentFileSizeLimit)
 	require.Equal(t, int64(6000), stats.VisitorAttachmentBytesTotal)
-	require.Equal(t, int64(4999), stats.VisitorAttachmentBytesUsed)
+	require.Equal(t, int64(4999), stats.AttachmentBytes)
 	require.Equal(t, int64(1001), stats.VisitorAttachmentBytesRemaining)
 }
 

@@ -225,26 +225,31 @@ type apiAccountTokenResponse struct {
 }
 
 type apiAccountSettingsPlan struct {
-	Code                  string `json:"code"`
-	Upgradable            bool   `json:"upgradable"`
-	RequestLimit          int    `json:"request_limit"`
-	EmailLimit            int    `json:"email_limit"`
-	AttachmentsBytesLimit int64  `json:"attachments_bytes_limit"`
+	Code       string `json:"code"`
+	Upgradable bool   `json:"upgradable"`
 }
 
-type apiAccountUsageLimits struct {
-	Basis            string `json:"basis"` // "ip" or "account"
-	Requests         int64  `json:"requests"`
-	Emails           int    `json:"emails"`
-	AttachmentsBytes int64  `json:"attachments_bytes"`
+type apiAccountLimits struct {
+	MessagesLimit            int64 `json:"messages"`
+	EmailsLimit              int64 `json:"emails"`
+	AttachmentFileSizeLimit  int64 `json:"attachment_file_size"`
+	AttachmentTotalSizeLimit int64 `json:"attachment_total_size"`
+}
+
+type apiAccountStats struct {
+	Basis           string `json:"basis"` // "ip" or "account"
+	Messages        int64  `json:"messages"`
+	Emails          int64  `json:"emails"`
+	AttachmentsSize int64  `json:"attachments_size"`
 }
 
 type apiAccountSettingsResponse struct {
 	Username      string                      `json:"username"`
 	Role          string                      `json:"role,omitempty"`
-	Plan          *apiAccountSettingsPlan     `json:"plan,omitempty"`
 	Language      string                      `json:"language,omitempty"`
 	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
 	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
-	Usage         *apiAccountUsageLimits      `json:"usage,omitempty"`
+	Plan          *apiAccountSettingsPlan     `json:"plan,omitempty"`
+	Limits        *apiAccountLimits           `json:"limits,omitempty"`
+	Usage         *apiAccountStats            `json:"usage,omitempty"`
 }

@@ -91,7 +91,6 @@ var (
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
 	webConfigPath                  = "/config.js"
-	userStatsPath                  = "/user/stats" // FIXME get rid of this in favor of /user/account
 	accountPath                    = "/v1/account"
 	accountTokenPath               = "/v1/account/token"
 	accountPasswordPath            = "/v1/account/password"
@@ -329,8 +328,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == userStatsPath {
-		return s.handleUserStats(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
 		return s.handleAccountCreate(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
@@ -430,19 +427,6 @@ var config = {
 	return err
 }
 
-func (s *Server) handleUserStats(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	stats, err := v.Stats()
-	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "text/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	if err := json.NewEncoder(w).Encode(stats); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	r.URL.Path = webSiteDir + r.URL.Path
 	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
@@ -531,6 +515,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			go s.sendToFirebase(v, m)
 		}
 		if s.smtpSender != nil && email != "" {
+			v.IncrEmails()
 			go s.sendEmail(v, m, email)
 		}
 		if s.config.UpstreamBaseURL != "" {
@@ -545,7 +530,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
-	v.requests.Inc()
+	v.IncrMessages()
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()

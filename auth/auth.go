@@ -82,11 +82,12 @@ const (
 )
 
 type Plan struct {
-	Code                 string `json:"name"`
-	Upgradable           bool   `json:"upgradable"`
-	RequestLimit         int    `json:"request_limit"`
-	EmailsLimit          int    `json:"emails_limit"`
-	AttachmentBytesLimit int64  `json:"attachment_bytes_limit"`
+	Code                     string `json:"name"`
+	Upgradable               bool   `json:"upgradable"`
+	MessageLimit             int64  `json:"messages_limit"`
+	EmailsLimit              int64  `json:"emails_limit"`
+	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
+	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
 }
 
 type UserSubscription struct {

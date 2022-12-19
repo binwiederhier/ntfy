@@ -98,6 +98,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
 - [ntfy-sdk](https://github.com/yukibtc/ntfy-sdk) - ntfy client library to send notifications (Rust)
 - [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost 
+- [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline
 
 ## Blog + forum posts
 

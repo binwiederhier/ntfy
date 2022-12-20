@@ -75,19 +75,18 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				Code:       v.user.Plan.Code,
 				Upgradable: v.user.Plan.Upgradable,
 			}
+		} else if v.user.Role == auth.RoleAdmin {
+			response.Plan = &apiAccountPlan{
+				Code:       string(auth.PlanUnlimited),
+				Upgradable: false,
+			}
 		} else {
-			if v.user.Role == auth.RoleAdmin {
-				response.Plan = &apiAccountPlan{
-					Code:       string(auth.PlanUnlimited),
-					Upgradable: false,
-				}
-			} else {
-				response.Plan = &apiAccountPlan{
-					Code:       string(auth.PlanDefault),
-					Upgradable: true,
-				}
+			response.Plan = &apiAccountPlan{
+				Code:       string(auth.PlanDefault),
+				Upgradable: true,
 			}
 		}
+
 	} else {
 		response.Username = auth.Everyone
 		response.Role = string(auth.RoleAnonymous)

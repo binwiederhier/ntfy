@@ -40,6 +40,7 @@ const (
 			attachment_expires INT NOT NULL,
 			attachment_url TEXT NOT NULL,
 			sender TEXT NOT NULL,
+			user TEXT NOT NULL,		
 			encoding TEXT NOT NULL,
 			published INT NOT NULL
 		);
@@ -49,46 +50,47 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding, published)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding, published)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	pruneMessagesQuery           = `DELETE FROM messages WHERE time < ? AND published = 1`
 	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
 	selectMessagesSinceTimeQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, encoding
+		SELECT mid, time, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
 	`
-	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
-	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
-	selectMessageCountPerTopicQuery = `SELECT topic, COUNT(*) FROM messages GROUP BY topic`
-	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
-	selectAttachmentsSizeQuery      = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
+	updateMessagePublishedQuery        = `UPDATE messages SET published = 1 WHERE mid = ?`
+	selectMessagesCountQuery           = `SELECT COUNT(*) FROM messages`
+	selectMessageCountPerTopicQuery    = `SELECT topic, COUNT(*) FROM messages GROUP BY topic`
+	selectTopicsQuery                  = `SELECT topic FROM messages GROUP BY topic`
+	selectAttachmentsSizeBySenderQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
+	selectAttachmentsSizeByUserQuery   = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = ? AND attachment_expires >= ?`
 )
 
 // Schema management queries
@@ -316,6 +318,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 			attachmentExpires,
 			attachmentURL,
 			sender,
+			m.User,
 			m.Encoding,
 			published,
 		)
@@ -442,11 +445,23 @@ func (c *messageCache) Prune(olderThan time.Time) error {
 	return nil
 }
 
-func (c *messageCache) AttachmentBytesUsed(sender string) (int64, error) {
-	rows, err := c.db.Query(selectAttachmentsSizeQuery, sender, time.Now().Unix())
+func (c *messageCache) AttachmentBytesUsedBySender(sender string) (int64, error) {
+	rows, err := c.db.Query(selectAttachmentsSizeBySenderQuery, sender, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
+	return c.readAttachmentBytesUsed(rows)
+}
+
+func (c *messageCache) AttachmentBytesUsedByUser(user string) (int64, error) {
+	rows, err := c.db.Query(selectAttachmentsSizeByUserQuery, user, time.Now().Unix())
+	if err != nil {
+		return 0, err
+	}
+	return c.readAttachmentBytesUsed(rows)
+}
+
+func (c *messageCache) readAttachmentBytesUsed(rows *sql.Rows) (int64, error) {
 	defer rows.Close()
 	var size int64
 	if !rows.Next() {
@@ -477,7 +492,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	for rows.Next() {
 		var timestamp, attachmentSize, attachmentExpires int64
 		var priority int
-		var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, encoding string
+		var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, encoding string
 		err := rows.Scan(
 			&id,
 			&timestamp,
@@ -495,6 +510,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			&attachmentExpires,
 			&attachmentURL,
 			&sender,
+			&user,
 			&encoding,
 		)
 		if err != nil {
@@ -538,6 +554,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 			Actions:    actions,
 			Attachment: att,
 			Sender:     senderIP, // Must parse assuming database must be correct
+			User:       user,
 			Encoding:   encoding,
 		})
 	}
@@ -598,6 +615,7 @@ func setupCacheDB(db *sql.DB, startupQueries string) error {
 	} else if schemaVersion == 8 {
 		return migrateFrom8(db)
 	}
+	// TODO add user column
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
 

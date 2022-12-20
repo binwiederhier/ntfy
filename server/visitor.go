@@ -151,12 +151,10 @@ func (v *visitor) IncrEmails() {
 }
 
 func (v *visitor) Stats() (*visitorStats, error) {
-	attachmentsBytesUsed, err := v.messageCache.AttachmentBytesUsed(v.ip.String())
-	if err != nil {
-		return nil, err
-	}
 	v.mu.Lock()
-	defer v.mu.Unlock()
+	messages := v.messages
+	emails := v.emails
+	v.mu.Unlock()
 	stats := &visitorStats{}
 	if v.user != nil && v.user.Role == auth.RoleAdmin {
 		stats.Basis = "role"
@@ -174,12 +172,22 @@ func (v *visitor) Stats() (*visitorStats, error) {
 		stats.Basis = "ip"
 		stats.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
 		stats.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
-		stats.AttachmentTotalSizeLimit = v.config.AttachmentTotalSizeLimit
+		stats.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
 		stats.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
 	}
-	stats.Messages = v.messages
+	var attachmentsBytesUsed int64
+	var err error
+	if v.user != nil {
+		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(v.user.Name)
+	} else {
+		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.ip.String())
+	}
+	if err != nil {
+		return nil, err
+	}
+	stats.Messages = messages
 	stats.MessagesRemaining = zeroIfNegative(stats.MessagesLimit - stats.MessagesLimit)
-	stats.Emails = v.emails
+	stats.Emails = emails
 	stats.EmailsRemaining = zeroIfNegative(stats.EmailsLimit - stats.EmailsRemaining)
 	stats.AttachmentTotalSize = attachmentsBytesUsed
 	stats.AttachmentTotalSizeRemaining = zeroIfNegative(stats.AttachmentTotalSizeLimit - stats.AttachmentTotalSize)

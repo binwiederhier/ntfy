@@ -495,6 +495,10 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
+	if v.user != nil {
+		log.Info("user is %s", v.user.Name)
+		m.User = v.user.Name
+	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
 	}
@@ -502,8 +506,8 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
-	log.Debug("%s Received message: event=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
-		logMessagePrefix(v, m), m.Event, len(m.Message), delayed, firebase, cache, unifiedpush, email)
+	log.Debug("%s Received message: event=%s, user=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
+		logMessagePrefix(v, m), m.Event, m.User, len(m.Message), delayed, firebase, cache, unifiedpush, email)
 	if log.IsTrace() {
 		log.Trace("%s Message body: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(m))
 	}

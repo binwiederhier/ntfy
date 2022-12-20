@@ -36,8 +36,9 @@ type message struct {
 	Actions    []*action   `json:"actions,omitempty"`
 	Attachment *attachment `json:"attachment,omitempty"`
 	PollID     string      `json:"poll_id,omitempty"`
-	Sender     netip.Addr  `json:"-"`                  // IP address of uploader, used for rate limiting
 	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
+	Sender     netip.Addr  `json:"-"`                  // IP address of uploader, used for rate limiting
+	User       string      `json:"-"`                  // Username of the uploader, used to associated attachments
 }
 
 type attachment struct {

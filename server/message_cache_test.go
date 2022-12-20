@@ -343,11 +343,11 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	require.Equal(t, "https://ntfy.sh/file/aCaRURL.jpg", messages[1].Attachment.URL)
 	require.Equal(t, "1.2.3.4", messages[1].Sender.String())
 
-	size, err := c.AttachmentBytesUsed("1.2.3.4")
+	size, err := c.AttachmentBytesUsedBySender("1.2.3.4")
 	require.Nil(t, err)
 	require.Equal(t, int64(30000), size)
 
-	size, err = c.AttachmentBytesUsed("5.6.7.8")
+	size, err = c.AttachmentBytesUsedBySender("5.6.7.8")
 	require.Nil(t, err)
 	require.Equal(t, int64(0), size)
 }

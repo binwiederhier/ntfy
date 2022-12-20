@@ -88,7 +88,7 @@ const Stats = () => {
                     </div>
                     <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
                 </Pref>
-                <Pref labelId={"attachments"} title={t("Attachment storage")}>
+                <Pref labelId={"attachments"} title={t("Attachment storage")} subtitle={t("5 MB per file")}>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(account.limits.attachment_total_size) }) : t("Unlimited")}</Typography>
@@ -96,6 +96,10 @@ const Stats = () => {
                     <LinearProgress variant="determinate" value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100} />
                 </Pref>
             </PrefGroup>
+            {account.limits.basis === "ip" && <Typography variant="body1">
+                <em>Usage stats and limits for this account are based on your IP address, so they may be shared
+                    with other users.</em>
+            </Typography>}
         </Card>
     );
 };
@@ -320,7 +324,7 @@ const Pref = (props) => {
                     paddingRight: '30px'
                 }}
             >
-                <div><b>{props.title}</b></div>
+                <div><b>{props.title}</b>{props.subtitle && <em> ({props.subtitle})</em>}</div>
                 {props.description && <div><em>{props.description}</em></div>}
             </div>
             <div

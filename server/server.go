@@ -36,13 +36,15 @@ import (
 
 /*
 	TODO
-		return rate limit information in account stats
+		persist user stats in user table
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
 		rate limit for signup (2 per 24h)
 		handle invalid session token
 		update disallowed topics
+		purge accounts that were not logged into in X
+		sync subscription display name
 		Pages:
 		- Home
 		- Password reset

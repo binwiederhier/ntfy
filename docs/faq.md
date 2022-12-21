@@ -4,11 +4,20 @@
 Who knows. I didn't do a lot of research before making this. It was fun making it.
 
 ## Can I use this in my app? Will it stay free?
-Yes. As long as you don't abuse it, it'll be available and free of charge. I do not plan on monetizing
-the service.
+Yes. As long as you don't abuse it, it'll be available and free of charge. While I will always allow usage of the ntfy.sh
+server without signup and free of charge, I may also offer paid plans in the future.
 
 ## What are the uptime guarantees?
-Best effort.
+Best effort. 
+
+ntfy currently runs on a single DigitalOcean droplet, without any scale out strategy or redundancies. When the time comes,
+I'll add scale out features, but for now it is what it is.
+
+In the first year of its life, and to this day (Dec'22), ntfy had **no outages** that I can remember. Other than short 
+blips and some HTTP 500 spikes, it has been rock solid.   
+
+There is a [status page](https://ntfy.statuspage.io/) which is updated based on some automated checks via the amazingly 
+awesome [healthchecks.io](https://healthchecks.io/) (_no affiliation, just a fan_).
 
 ## What happens if there are multiple subscribers to the same topic?
 As per usual with pub-sub, all subscribers receive notifications if they are subscribed to a topic.
@@ -42,6 +51,15 @@ decent now.
 [Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the
 server and listens for incoming notifications. This consumes additional battery (see above),
 but delivers notifications instantly.
+
+## Can you implement feature X?
+Yes, maybe. Check out [existing GitHub issues](https://github.com/binwiederhier/ntfy/issues) to see if somebody else had
+the same idea before you, or file a new issue. I'll likely get back to you within a few days.
+
+## I'm having issues with iOS, can you help? The iOS app is behind compared to the Android app, can you fix that?
+The iOS is very bare bones and quite frankly a little buggy. I wanted to get something out the door to make the iOS users
+happy, but halfway through I got frustrated with iOS development and paused development. I will eventually get back to
+it, or hopefully, somebody else will come along and help out. Please review the [known issues](known-issues.md) for details.
 
 ## Can I disable the web app? Can I protect it with a login screen?
 The web app is a static website without a backend (other than the ntfy API). All data is stored locally in the browser

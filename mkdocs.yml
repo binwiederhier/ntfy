@@ -87,8 +87,9 @@ nav:
   - "Examples": examples.md
   - "Integrations + projects": integrations.md
   - "Release notes": releases.md
-  - "Deprecation notices": deprecations.md
   - "Emojis 🥳 🎉": emojis.md
+  - "Known issues": known-issues.md
+  - "Deprecation notices": deprecations.md
   - "Development": develop.md
   - "Privacy policy": privacy.md
 

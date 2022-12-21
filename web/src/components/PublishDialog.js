@@ -162,9 +162,7 @@ const PublishDialog = (props) => {
         try {
             const account = await api.getAccount(baseUrl, session.token());
             const fileSizeLimit = account.limits.attachment_file_size ?? 0;
-            const totalSizeLimit = account.limits.attachment_total_size ?? 0;
-            const usedSize = account.usage.attachments_size ?? 0;
-            const remainingBytes = (totalSizeLimit > 0) ? totalSizeLimit - usedSize : 0;
+            const remainingBytes = account.stats.attachment_total_size_remaining;
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
             const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
             if (fileSizeLimitReached && quotaReached) {
@@ -179,7 +177,7 @@ const PublishDialog = (props) => {
             }
             setAttachFileError("");
         } catch (e) {
-            console.log(`[SendDialog] Retrieving attachment limits failed`, e);
+            console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
             setAttachFileError(""); // Reset error (rely on server-side checking)
         }
     };

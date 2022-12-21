@@ -36,7 +36,7 @@ import (
 
 /*
 	TODO
-		persist user stats in user table
+		publishXHR + poll should pick current user, not from userManager
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
@@ -498,7 +498,6 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
 	if v.user != nil {
-		log.Info("user is %s", v.user.Name)
 		m.User = v.user.Name
 	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
@@ -537,6 +536,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		}
 	}
 	v.IncrMessages()
+	if v.user != nil {
+		s.auth.EnqueueUpdateStats(v.user)
+	}
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
@@ -772,14 +774,14 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	} else if m.Time > time.Now().Add(s.config.AttachmentExpiryDuration).Unix() {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
-	visitorStats, err := v.Stats()
+	stats, err := v.Stats()
 	if err != nil {
 		return err
 	}
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
-		if err == nil && (contentLength > visitorStats.AttachmentTotalSizeRemaining || contentLength > s.config.AttachmentFileSizeLimit) {
+		if err == nil && (contentLength > stats.AttachmentTotalSizeRemaining || contentLength > stats.AttachmentFileSizeLimit) {
 			return errHTTPEntityTooLargeAttachmentTooLarge
 		}
 	}
@@ -797,7 +799,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(visitorStats.AttachmentTotalSizeRemaining))
+	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(stats.AttachmentTotalSizeRemaining))
 	if err == util.ErrLimitReached {
 		return errHTTPEntityTooLargeAttachmentTooLarge
 	} else if err != nil {
@@ -1446,33 +1448,11 @@ func (s *Server) autorizeTopic(next handleFunc, perm auth.Permission) handleFunc
 	}
 }
 
-// extractUserPass reads the username/password from the basic auth header (Authorization: Basic ...),
-// or from the ?auth=... query param. The latter is required only to support the WebSocket JavaScript
-// class, which does not support passing headers during the initial request. The auth query param
-// is effectively double base64 encoded. Its format is base64(Basic base64(user:pass)).
-func extractUserPass(r *http.Request) (username string, password string, ok bool) {
-	username, password, ok = r.BasicAuth()
-	if ok {
-		return
-	}
-	authParam := readQueryParam(r, "authorization", "auth")
-	if authParam != "" {
-		a, err := base64.RawURLEncoding.DecodeString(authParam)
-		if err != nil {
-			return
-		}
-		r.Header.Set("Authorization", string(a))
-		return r.BasicAuth()
-	}
-	return
-}
-
 // visitor creates or retrieves a rate.Limiter for the given visitor.
 // Note that this function will always return a visitor, even if an error occurs.
 func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 	ip := s.extractIPAddress(r)
 	visitorID := fmt.Sprintf("ip:%s", ip.String())
-
 	var user *auth.User // may stay nil if no auth header!
 	if user, err = s.authenticate(r); err != nil {
 		log.Debug("authentication failed: %s", err.Error())
@@ -1486,6 +1466,10 @@ func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 	return v, err // Always return visitor, even when error occurs!
 }
 
+// authenticate a user based on basic auth username/password (Authorization: Basic ...), or token auth (Authorization: Bearer ...).
+// The Authorization header can be passed as a header or the ?auth=... query param. The latter is required only to
+// support the WebSocket JavaScript class, which does not support passing headers during the initial request. The auth
+// query param is effectively double base64 encoded. Its format is base64(Basic base64(user:pass)).
 func (s *Server) authenticate(r *http.Request) (user *auth.User, err error) {
 	value := r.Header.Get("Authorization")
 	queryParam := readQueryParam(r, "authorization", "auth")

@@ -17,6 +17,7 @@ type Manager interface {
 	CreateToken(user *User) (string, error)
 	RemoveToken(user *User) error
 	ChangeSettings(user *User) error
+	EnqueueUpdateStats(user *User)
 
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
@@ -65,6 +66,7 @@ type User struct {
 	Grants []Grant
 	Prefs  *UserPrefs
 	Plan   *Plan
+	Stats  *Stats
 }
 
 type UserPrefs struct {
@@ -100,6 +102,11 @@ type UserNotificationPrefs struct {
 	Sound       string `json:"sound,omitempty"`
 	MinPriority int    `json:"min_priority,omitempty"`
 	DeleteAfter int    `json:"delete_after,omitempty"`
+}
+
+type Stats struct {
+	Messages int64
+	Emails   int64
 }
 
 // Grant is a struct that represents an access control entry to a topic

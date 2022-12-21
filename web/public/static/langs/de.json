@@ -62,7 +62,7 @@
     "publish_dialog_progress_uploading_detail": "Hochladen {{loaded}}/{{total}} ({{percent}} %) …",
     "publish_dialog_priority_max": "Max. Priorität",
     "publish_dialog_topic_placeholder": "Thema, z.B. phil_alerts",
-    "publish_dialog_attachment_limits_file_reached": "überschreitet das Dateigrößen-Limit {{filesizeLimit}}",
+    "publish_dialog_attachment_limits_file_reached": "überschreitet das Dateigrößen-Limit {{fileSizeLimit}}",
     "publish_dialog_topic_label": "Thema",
     "publish_dialog_priority_default": "Standard-Priorität",
     "publish_dialog_base_url_placeholder": "Service-URL, z.B. https://example.com",

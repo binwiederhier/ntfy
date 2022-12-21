@@ -7,14 +7,18 @@ import (
 	"fmt"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"strings"
+	"sync"
+	"time"
 )
 
 const (
 	tokenLength             = 32
 	bcryptCost              = 10
 	intentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match bcryptCost
+	statsWriterInterval     = 10 * time.Second
 )
 
 // Manager-related queries
@@ -36,6 +40,8 @@ const (
 			user TEXT NOT NULL,
 			pass TEXT NOT NULL,
 			role TEXT NOT NULL,
+			messages INT NOT NULL DEFAULT (0),
+			emails INT NOT NULL DEFAULT (0),			
 			settings JSON,
 		    FOREIGN KEY (plan_id) REFERENCES plan (id)
 		);
@@ -46,13 +52,14 @@ const (
 			read INT NOT NULL,
 			write INT NOT NULL,
 			PRIMARY KEY (user_id, topic),
-			FOREIGN KEY (user_id) REFERENCES user (id)
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);		
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id INT NOT NULL,
 			token TEXT NOT NULL,
 			expires INT NOT NULL,
-			PRIMARY KEY (user_id, token)
+			PRIMARY KEY (user_id, token),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -62,13 +69,13 @@ const (
 		COMMIT;
 	`
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		LEFT JOIN plan p on p.id = u.plan_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
@@ -90,6 +97,7 @@ const (
 	updateUserPassQuery     = `UPDATE user SET pass = ? WHERE user = ?`
 	updateUserRoleQuery     = `UPDATE user SET role = ? WHERE user = ?`
 	updateUserSettingsQuery = `UPDATE user SET settings = ? WHERE user = ?`
+	updateUserStatsQuery    = `UPDATE user SET messages = ?, emails = ? WHERE user = ?`
 	deleteUserQuery         = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery  = `INSERT INTO user_access (user_id, topic, read, write) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?)`
@@ -116,6 +124,8 @@ type SQLiteAuthManager struct {
 	db           *sql.DB
 	defaultRead  bool
 	defaultWrite bool
+	statsQueue   map[string]*Stats // Username -> Stats
+	mu           sync.Mutex
 }
 
 var _ Manager = (*SQLiteAuthManager)(nil)
@@ -129,11 +139,14 @@ func NewSQLiteAuthManager(filename string, defaultRead, defaultWrite bool) (*SQL
 	if err := setupAuthDB(db); err != nil {
 		return nil, err
 	}
-	return &SQLiteAuthManager{
+	manager := &SQLiteAuthManager{
 		db:           db,
 		defaultRead:  defaultRead,
 		defaultWrite: defaultWrite,
-	}, nil
+		statsQueue:   make(map[string]*Stats),
+	}
+	go manager.statsWriter()
+	return manager, nil
 }
 
 // Authenticate checks username and password and returns a user if correct. The method
@@ -192,6 +205,39 @@ func (a *SQLiteAuthManager) ChangeSettings(user *User) error {
 		return err
 	}
 	return nil
+}
+
+func (a *SQLiteAuthManager) EnqueueUpdateStats(user *User) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.statsQueue[user.Name] = user.Stats
+}
+
+func (a *SQLiteAuthManager) statsWriter() {
+	ticker := time.NewTicker(statsWriterInterval)
+	for range ticker.C {
+		if err := a.writeStats(); err != nil {
+			log.Warn("UserManager: Writing user stats failed: %s", err.Error())
+		}
+	}
+}
+
+func (a *SQLiteAuthManager) writeStats() error {
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	a.mu.Lock()
+	statsQueue := a.statsQueue
+	a.statsQueue = make(map[string]*Stats)
+	a.mu.Unlock()
+	for username, stats := range statsQueue {
+		if _, err := tx.Exec(updateUserStatsQuery, stats.Messages, stats.Emails, username); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // Authorize returns nil if the given user has access to the given topic using the desired
@@ -325,12 +371,13 @@ func (a *SQLiteAuthManager) userByToken(token string) (*User, error) {
 func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var prefs, planCode sql.NullString
+	var settings, planCode sql.NullString
+	var messages, emails int64
 	var messagesLimit, emailsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &prefs, &planCode, &messagesLimit, &emailsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &emailsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -344,10 +391,14 @@ func (a *SQLiteAuthManager) readUser(rows *sql.Rows) (*User, error) {
 		Hash:   hash,
 		Role:   Role(role),
 		Grants: grants,
+		Stats: &Stats{
+			Messages: messages,
+			Emails:   emails,
+		},
 	}
-	if prefs.Valid {
+	if settings.Valid {
 		user.Prefs = &UserPrefs{}
-		if err := json.Unmarshal([]byte(prefs.String), user.Prefs); err != nil {
+		if err := json.Unmarshal([]byte(settings.String), user.Prefs); err != nil {
 			return nil, err
 		}
 	}

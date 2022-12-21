@@ -28,11 +28,11 @@ type visitor struct {
 	messageCache        *messageCache
 	ip                  netip.Addr
 	user                *auth.User
-	messages            int64
-	emails              int64
-	requestLimiter      *rate.Limiter
-	emailsLimiter       *rate.Limiter
-	subscriptionLimiter util.Limiter
+	messages            int64         // Number of messages sent
+	emails              int64         // Number of emails sent
+	requestLimiter      *rate.Limiter // Rate limiter for (almost) all requests (including messages)
+	emailsLimiter       *rate.Limiter // Rate limiter for emails
+	subscriptionLimiter util.Limiter  // Fixed limiter for active subscriptions (ongoing connections)
 	bandwidthLimiter    util.Limiter
 	firebase            time.Time // Next allowed Firebase message
 	seen                time.Time
@@ -55,6 +55,11 @@ type visitorStats struct {
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
 	var requestLimiter, emailsLimiter *rate.Limiter
+	var messages, emails int64
+	if user != nil {
+		messages = user.Stats.Messages
+		emails = user.Stats.Emails
+	}
 	if user != nil && user.Plan != nil {
 		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.MessagesLimit), conf.VisitorRequestLimitBurst)
 		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.EmailsLimit), conf.VisitorEmailLimitBurst)
@@ -67,8 +72,8 @@ func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *a
 		messageCache:        messageCache,
 		ip:                  ip,
 		user:                user,
-		messages:            0, // TODO
-		emails:              0, // TODO
+		messages:            messages,
+		emails:              emails,
 		requestLimiter:      requestLimiter,
 		emailsLimiter:       emailsLimiter,
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
@@ -142,12 +147,18 @@ func (v *visitor) IncrMessages() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.messages++
+	if v.user != nil {
+		v.user.Stats.Messages = v.messages
+	}
 }
 
 func (v *visitor) IncrEmails() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.emails++
+	if v.user != nil {
+		v.user.Stats.Emails = v.emails
+	}
 }
 
 func (v *visitor) Stats() (*visitorStats, error) {
@@ -186,9 +197,9 @@ func (v *visitor) Stats() (*visitorStats, error) {
 		return nil, err
 	}
 	stats.Messages = messages
-	stats.MessagesRemaining = zeroIfNegative(stats.MessagesLimit - stats.MessagesLimit)
+	stats.MessagesRemaining = zeroIfNegative(stats.MessagesLimit - stats.Messages)
 	stats.Emails = emails
-	stats.EmailsRemaining = zeroIfNegative(stats.EmailsLimit - stats.EmailsRemaining)
+	stats.EmailsRemaining = zeroIfNegative(stats.EmailsLimit - stats.Emails)
 	stats.AttachmentTotalSize = attachmentsBytesUsed
 	stats.AttachmentTotalSizeRemaining = zeroIfNegative(stats.AttachmentTotalSizeLimit - stats.AttachmentTotalSize)
 	return stats, nil

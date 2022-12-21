@@ -125,7 +125,9 @@ class Api {
         const response = await fetch(url, {
             headers: maybeWithBasicAuth({}, user)
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            return false;
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         const json = await response.json();

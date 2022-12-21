@@ -25,10 +25,10 @@ const SubscribeDialog = (props) => {
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSuccess = async () => {
-        const actualBaseUrl = (baseUrl) ? baseUrl : window.location.origin;
+        const actualBaseUrl = (baseUrl) ? baseUrl : config.baseUrl;
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
         if (session.exists()) {
-            const remoteSubscription = await api.addAccountSubscription("http://localhost:2586", session.token(), {
+            const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
                 base_url: actualBaseUrl,
                 topic: topic
             });
@@ -63,11 +63,11 @@ const SubscribePage = (props) => {
     const { t } = useTranslation();
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
-    const baseUrl = (anotherServerVisible) ? props.baseUrl : window.location.origin;
+    const baseUrl = (anotherServerVisible) ? props.baseUrl : config.baseUrl;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
     const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
-        .filter(s => s !== window.location.origin);
+        .filter(s => s !== config.baseUrl);
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
         const username = (user) ? user.username : t("subscribe_dialog_error_user_anonymous");
@@ -94,7 +94,7 @@ const SubscribePage = (props) => {
             const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
             return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
         } else {
-            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(window.location.origin, topic));
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.baseUrl, topic));
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();
@@ -152,7 +152,7 @@ const SubscribePage = (props) => {
                     renderInput={ (params) =>
                         <TextField
                             {...params}
-                            placeholder={window.location.origin}
+                            placeholder={config.baseUrl}
                             variant="standard"
                             aria-label={t("subscribe_dialog_subscribe_base_url_label")}
                         />
@@ -172,7 +172,7 @@ const LoginPage = (props) => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
-    const baseUrl = (props.baseUrl) ? props.baseUrl : window.location.origin;
+    const baseUrl = (props.baseUrl) ? props.baseUrl : config.baseUrl;
     const topic = props.topic;
     const handleLogin = async () => {
         const user = {baseUrl, username, password};

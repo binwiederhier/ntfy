@@ -47,7 +47,7 @@ export const disallowedTopic = (topic) => {
 export const topicDisplayName = (subscription) => {
     if (subscription.displayName) {
         return subscription.displayName;
-    } else if (subscription.baseUrl === window.location.origin) {
+    } else if (subscription.baseUrl === config.baseUrl) {
         return subscription.topic;
     }
     return topicShortUrl(subscription.baseUrl, subscription.topic);

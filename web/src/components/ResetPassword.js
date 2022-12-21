@@ -1,14 +1,11 @@
 import * as React from 'react';
-import {Avatar, Link} from "@mui/material";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api from "../app/Api";
 import routes from "./routes";
-import session from "../app/Session";
-import logo from "../img/ntfy2.svg";
 import Typography from "@mui/material/Typography";
 import {NavLink} from "react-router-dom";
+import AvatarBox from "./AvatarBox";
 
 const ResetPassword = () => {
     const handleSubmit = async (event) => {
@@ -16,22 +13,7 @@ const ResetPassword = () => {
     };
 
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                flexGrow: 1,
-                justifyContent: 'center',
-                flexDirection: 'column',
-                alignContent: 'center',
-                alignItems: 'center',
-                height: '100vh'
-            }}
-        >
-            <Avatar
-                sx={{ m: 2, width: 64, height: 64, borderRadius: 3 }}
-                src={logo}
-                variant="rounded"
-            />
+        <AvatarBox>
             <Typography sx={{ typography: 'h6' }}>
                 Reset password
             </Typography>
@@ -59,7 +41,7 @@ const ResetPassword = () => {
                     &lt; Return to sign in
                 </NavLink>
             </Typography>
-        </Box>
+        </AvatarBox>
     );
 }
 

@@ -26,7 +26,7 @@ type fileCache struct {
 	mu               sync.Mutex
 }
 
-func newFileCache(dir string, totalSizeLimit int64, fileSizeLimit int64) (*fileCache, error) {
+func newFileCache(dir string, totalSizeLimit int64) (*fileCache, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
 	}
@@ -38,7 +38,6 @@ func newFileCache(dir string, totalSizeLimit int64, fileSizeLimit int64) (*fileC
 		dir:              dir,
 		totalSizeCurrent: size,
 		totalSizeLimit:   totalSizeLimit,
-		fileSizeLimit:    fileSizeLimit,
 	}, nil
 }
 
@@ -55,7 +54,7 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...util.Limiter) (in
 		return 0, err
 	}
 	defer f.Close()
-	limiters = append(limiters, util.NewFixedLimiter(c.Remaining()), util.NewFixedLimiter(c.fileSizeLimit))
+	limiters = append(limiters, util.NewFixedLimiter(c.Remaining()))
 	limitWriter := util.NewLimitWriter(f, limiters...)
 	size, err := io.Copy(limitWriter, in)
 	if err != nil {

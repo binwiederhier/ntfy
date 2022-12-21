@@ -87,7 +87,7 @@ const Layout = () => {
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
     const [selected] = (subscriptions || []).filter(s => {
         return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
-            || (window.location.origin === s.baseUrl && params.topic === s.topic)
+            || (config.baseUrl === s.baseUrl && params.topic === s.topic)
     });
 
     useConnectionListeners(subscriptions, users);
@@ -96,7 +96,7 @@ const Layout = () => {
 
     useEffect(() => {
         (async () => {
-            const acc = await api.getAccount("http://localhost:2586", session.token());
+            const acc = await api.getAccount(config.baseUrl, session.token());
             if (acc) {
                 setAccount(acc);
                 if (acc.language) {

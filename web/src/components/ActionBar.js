@@ -118,7 +118,7 @@ const SettingsIcons = (props) => {
         handleClose(event);
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
-            await api.deleteAccountSubscription("http://localhost:2586", session.token(), props.subscription.remoteId);
+            await api.deleteAccountSubscription(config.baseUrl, session.token(), props.subscription.remoteId);
         }
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {
@@ -259,9 +259,8 @@ const ProfileIcon = (props) => {
     const handleClose = () => {
         setAnchorEl(null);
     };
-
     const handleLogout = async () => {
-        await api.logout("http://localhost:2586"/*window.location.origin*/, session.token());
+        await api.logout(config.baseUrl, session.token());
         session.reset();
         window.location.href = routes.app;
     };
@@ -273,11 +272,11 @@ const ProfileIcon = (props) => {
                     <AccountCircleIcon/>
                 </IconButton>
             }
-            {!session.exists() &&
-                <>
-                    <Button color="inherit" variant="outlined" onClick={() => navigate(routes.login)}>Sign in</Button>
-                    <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)}>Sign up</Button>
-                </>
+            {!session.exists() && config.enableLogin &&
+                <Button color="inherit" variant="text" onClick={() => navigate(routes.login)} sx={{m: 1}}>Sign in</Button>
+            }
+            {!session.exists() && config.enableSignup &&
+                <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)}>Sign up</Button>
             }
             <Menu
                 anchorEl={anchorEl}

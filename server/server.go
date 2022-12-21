@@ -36,15 +36,17 @@ import (
 
 /*
 	TODO
+		use token auth in "SubscribeDialog"
+		upload files based on user limit
 		publishXHR + poll should pick current user, not from userManager
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
 		rate limit for signup (2 per 24h)
 		handle invalid session token
-		update disallowed topics
 		purge accounts that were not logged into in X
 		sync subscription display name
+		store users
 		Pages:
 		- Home
 		- Password reset
@@ -103,7 +105,7 @@ var (
 	staticRegex                    = regexp.MustCompile(`^/static/.+`)
 	docsRegex                      = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                      = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics               = []string{"docs", "static", "file", "app", "settings"} // If updated, also update in Android app
+	disallowedTopics               = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
 	urlRegex                       = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
@@ -152,7 +154,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var fileCache *fileCache
 	if conf.AttachmentCacheDir != "" {
-		fileCache, err = newFileCache(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit, conf.AttachmentFileSizeLimit)
+		fileCache, err = newFileCache(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit)
 		if err != nil {
 			return nil, err
 		}
@@ -423,9 +425,13 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "text/javascript")
 	_, err := io.WriteString(w, fmt.Sprintf(`// Generated server configuration
 var config = {
+  baseUrl: window.location.origin,
   appRoot: "%s",
-  disallowedTopics: [%s]
-};`, appRoot, disallowedTopicsStr))
+  enableLogin: %t,
+  enableSignup: %t,
+  enableResetPassword: %t,
+  disallowedTopics: [%s], 
+};`, appRoot, s.config.EnableLogin, s.config.EnableSignup, s.config.EnableResetPassword, disallowedTopicsStr))
 	return err
 }
 
@@ -799,7 +805,12 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Message == "" {
 		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, v.BandwidthLimiter(), util.NewFixedLimiter(stats.AttachmentTotalSizeRemaining))
+	limiters := []util.Limiter{
+		v.BandwidthLimiter(),
+		util.NewFixedLimiter(stats.AttachmentFileSizeLimit),
+		util.NewFixedLimiter(stats.AttachmentTotalSizeRemaining),
+	}
+	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {
 		return errHTTPEntityTooLargeAttachmentTooLarge
 	} else if err != nil {

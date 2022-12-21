@@ -38,7 +38,7 @@ const Messaging = (props) => {
             <PublishDialog
                 key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
                 openMode={dialogOpenMode}
-                baseUrl={subscription?.baseUrl ?? window.location.origin}
+                baseUrl={subscription?.baseUrl ?? config.baseUrl}
                 topic={subscription?.topic ?? ""}
                 message={message}
                 onClose={handleDialogClose}
@@ -83,7 +83,7 @@ const MessageBar = (props) => {
                 margin="dense"
                 placeholder={t("message_bar_type_message")}
                 aria-label={t("message_bar_type_message")}
-                role="textbox" 
+                role="textbox"
                 type="text"
                 fullWidth
                 variant="standard"

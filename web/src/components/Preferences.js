@@ -73,7 +73,7 @@ const Sound = () => {
     const handleChange = async (ev) => {
         await prefs.setSound(ev.target.value);
         if (session.exists()) {
-            await api.updateAccountSettings("http://localhost:2586", session.token(), {
+            await api.updateAccountSettings(config.baseUrl, session.token(), {
                 notification: {
                     sound: ev.target.value
                 }
@@ -113,7 +113,7 @@ const MinPriority = () => {
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
         if (session.exists()) {
-            await api.updateAccountSettings("http://localhost:2586", session.token(), {
+            await api.updateAccountSettings(config.baseUrl, session.token(), {
                 notification: {
                     min_priority: ev.target.value
                 }
@@ -163,7 +163,7 @@ const DeleteAfter = () => {
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
         if (session.exists()) {
-            await api.updateAccountSettings("http://localhost:2586", session.token(), {
+            await api.updateAccountSettings(config.baseUrl, session.token(), {
                 notification: {
                     delete_after: ev.target.value
                 }
@@ -467,7 +467,7 @@ const Language = () => {
     const handleChange = async (ev) => {
         await i18n.changeLanguage(ev.target.value);
         if (session.exists()) {
-            await api.updateAccountSettings("http://localhost:2586", session.token(), {
+            await api.updateAccountSettings(config.baseUrl, session.token(), {
                 language: ev.target.value
             });
         }

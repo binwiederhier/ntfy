@@ -147,7 +147,7 @@ const ChangePassword = () => {
     };
     const handleDialogSubmit = async (newPassword) => {
         try {
-            await api.changePassword("http://localhost:2586", session.token(), newPassword);
+            await api.changePassword(config.baseUrl, session.token(), newPassword);
             setDialogOpen(false);
             console.debug(`[Account] Password changed`);
         } catch (e) {
@@ -230,7 +230,7 @@ const DeleteAccount = () => {
     };
     const handleDialogSubmit = async (newPassword) => {
         try {
-            await api.deleteAccount("http://localhost:2586", session.token());
+            await api.deleteAccount(config.baseUrl, session.token());
             setDialogOpen(false);
             console.debug(`[Account] Account deleted`);
             // TODO delete local storage

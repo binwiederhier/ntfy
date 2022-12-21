@@ -59,12 +59,12 @@ export const useAutoSubscribe = (subscriptions, selected) => {
         setHasRun(true);
         const eligible = params.topic && !selected && !disallowedTopic(params.topic);
         if (eligible) {
-            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : window.location.origin;
+            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : config.baseUrl;
             console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
-                    const remoteSubscription = await api.addAccountSubscription("http://localhost:2586", session.token(), {
+                    const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
                         base_url: baseUrl,
                         topic: params.topic
                     });

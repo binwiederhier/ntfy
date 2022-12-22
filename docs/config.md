@@ -471,6 +471,7 @@ or the root domain:
 
     server {
       listen 80;
+      listen [::]:80;
       server_name ntfy.sh;
 
       location / {
@@ -554,6 +555,7 @@ or the root domain:
     
     server {
       listen 80;
+      listen [::]:80;
       server_name ntfy.sh;
 
       location / {

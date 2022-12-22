@@ -508,13 +508,17 @@ or the root domain:
     }
     
     server {
-      listen 443 ssl;
+      listen 443 ssl http2;
+      listen [::]:443 ssl http2;
       server_name ntfy.sh;
     
       ssl_session_cache builtin:1000 shared:SSL:10m;
+      ssl_session_timeout 1d;
+      ssl_session_tickets off;
+      
       ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
-      ssl_prefer_server_ciphers on;
+      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+      ssl_prefer_server_ciphers off;
     
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
@@ -572,13 +576,17 @@ or the root domain:
     }
     
     server {
-      listen 443 ssl;
+      listen 443 ssl http2;
+      listen [::]:443 ssl http2;
       server_name ntfy.sh;
     
       ssl_session_cache builtin:1000 shared:SSL:10m;
+      ssl_session_timeout 1d;
+      ssl_session_tickets off;
+      
       ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
-      ssl_prefer_server_ciphers on;
+      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+      ssl_prefer_server_ciphers off;
     
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;

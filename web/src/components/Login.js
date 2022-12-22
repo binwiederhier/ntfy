@@ -15,13 +15,11 @@ import {useState} from "react";
 const Login = () => {
     const { t } = useTranslation();
     const [error, setError] = useState("");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
     const handleSubmit = async (event) => {
         event.preventDefault();
-        const data = new FormData(event.currentTarget);
-        const user = {
-            username: data.get('username'),
-            password: data.get('password'),
-        }
+        const user = { username, password };
         try {
             const token = await api.login(config.baseUrl, user);
             if (token) {
@@ -61,6 +59,8 @@ const Login = () => {
                     id="username"
                     label={t("Username")}
                     name="username"
+                    value={username}
+                    onChange={ev => setUsername(ev.target.value.trim())}
                     autoFocus
                 />
                 <TextField
@@ -71,12 +71,15 @@ const Login = () => {
                     label={t("Password")}
                     type="password"
                     id="password"
+                    value={password}
+                    onChange={ev => setPassword(ev.target.value.trim())}
                     autoComplete="current-password"
                 />
                 <Button
                     type="submit"
                     fullWidth
                     variant="contained"
+                    disabled={username === "" || password === ""}
                     sx={{mt: 2, mb: 2}}
                 >
                     {t("Sign in")}

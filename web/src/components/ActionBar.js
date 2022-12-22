@@ -264,11 +264,10 @@ const ProfileIcon = (props) => {
         session.reset();
         window.location.href = routes.app;
     };
-
     return (
         <>
             {session.exists() &&
-                <IconButton color="inherit" size="large" edge="end" onClick={handleClick} sx={{marginRight: 0}} aria-label={t("xxxxxxx")}>
+                <IconButton color="inherit" size="large" edge="end" onClick={handleClick} aria-label={t("xxxxxxx")}>
                     <AccountCircleIcon/>
                 </IconButton>
             }

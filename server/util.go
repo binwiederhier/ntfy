@@ -3,8 +3,10 @@ package server
 import (
 	"fmt"
 	"github.com/emersion/go-smtp"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"net/http"
+	"net/netip"
 	"strings"
 	"unicode/utf8"
 )
@@ -88,4 +90,32 @@ func renderHTTPRequest(r *http.Request) string {
 	}
 	r.Body = body // Important: Reset body, so it can be re-read
 	return strings.TrimSpace(lines)
+}
+
+func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
+	remoteAddr := r.RemoteAddr
+	addrPort, err := netip.ParseAddrPort(remoteAddr)
+	ip := addrPort.Addr()
+	if err != nil {
+		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
+		ip, err = netip.ParseAddr(remoteAddr)
+		if err != nil {
+			ip = netip.IPv4Unspecified()
+			log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+		}
+	}
+	if behindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
+		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
+		// only the right-most address can be trusted (as this is the one added by our proxy server).
+		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
+		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
+		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
+		if err != nil {
+			log.Error("invalid IP address %s received in X-Forwarded-For header: %s", ip, err.Error())
+			// Fall back to regular remote address if X-Forwarded-For is damaged
+		} else {
+			ip = realIP
+		}
+	}
+	return ip
 }

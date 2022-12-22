@@ -149,18 +149,6 @@ class Api {
         }
     }
 
-    async userStats(baseUrl) {
-        const url = userStatsUrl(baseUrl);
-        console.log(`[Api] Fetching user stats ${url}`);
-        const response = await fetch(url);
-        if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const stats = await response.json();
-        console.log(`[Api] Stats`, stats);
-        return stats;
-    }
-
     async createAccount(baseUrl, username, password) {
         const url = accountUrl(baseUrl);
         const body = JSON.stringify({

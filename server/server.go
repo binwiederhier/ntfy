@@ -47,6 +47,7 @@ import (
 		purge accounts that were not logged into in X
 		sync subscription display name
 		store users
+		signup: check unique user
 		Pages:
 		- Home
 		- Password reset
@@ -1307,7 +1308,17 @@ func (s *Server) sendDelayedMessages() error {
 		return err
 	}
 	for _, m := range messages {
-		v := s.visitorFromID(fmt.Sprintf("ip:%s", m.Sender.String()), m.Sender, nil) // FIXME: This is wrong wrong wrong
+		var v *visitor
+		if m.User != "" {
+			user, err := s.auth.User(m.User)
+			if err != nil {
+				log.Warn("%s Error sending delayed message: %s", logMessagePrefix(v, m), err.Error())
+				continue
+			}
+			v = s.visitorFromUser(user, m.Sender)
+		} else {
+			v = s.visitorFromIP(m.Sender)
+		}
 		if err := s.sendDelayedMessage(v, m); err != nil {
 			log.Warn("%s Error sending delayed message: %s", logMessagePrefix(v, m), err.Error())
 		}
@@ -1462,18 +1473,18 @@ func (s *Server) autorizeTopic(next handleFunc, perm auth.Permission) handleFunc
 // visitor creates or retrieves a rate.Limiter for the given visitor.
 // Note that this function will always return a visitor, even if an error occurs.
 func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
-	ip := s.extractIPAddress(r)
-	visitorID := fmt.Sprintf("ip:%s", ip.String())
+	ip := extractIPAddress(r, s.config.BehindProxy)
 	var user *auth.User // may stay nil if no auth header!
 	if user, err = s.authenticate(r); err != nil {
 		log.Debug("authentication failed: %s", err.Error())
 		err = errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
 	if user != nil {
-		visitorID = fmt.Sprintf("user:%s", user.Name)
+		v = s.visitorFromUser(user, ip)
+	} else {
+		v = s.visitorFromIP(ip)
 	}
-	v = s.visitorFromID(visitorID, ip, user)
-	v.user = user // Update user -- FIXME this is ugly, do "newVisitorFromUser" instead
+	v.user = user // Update user -- FIXME race?
 	return v, err // Always return visitor, even when error occurs!
 }
 
@@ -1526,30 +1537,10 @@ func (s *Server) visitorFromID(visitorID string, ip netip.Addr, user *auth.User)
 	return v
 }
 
-func (s *Server) extractIPAddress(r *http.Request) netip.Addr {
-	remoteAddr := r.RemoteAddr
-	addrPort, err := netip.ParseAddrPort(remoteAddr)
-	ip := addrPort.Addr()
-	if err != nil {
-		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
-		ip, err = netip.ParseAddr(remoteAddr)
-		if err != nil {
-			ip = netip.IPv4Unspecified()
-			log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
-		}
-	}
-	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
-		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
-		// only the right-most address can be trusted (as this is the one added by our proxy server).
-		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
-		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
-		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
-		if err != nil {
-			log.Error("invalid IP address %s received in X-Forwarded-For header: %s", ip, err.Error())
-			// Fall back to regular remote address if X-Forwarded-For is damaged
-		} else {
-			ip = realIP
-		}
-	}
-	return ip
+func (s *Server) visitorFromIP(ip netip.Addr) *visitor {
+	return s.visitorFromID(fmt.Sprintf("ip:%s", ip.String()), ip, nil)
+}
+
+func (s *Server) visitorFromUser(user *auth.User, ip netip.Addr) *visitor {
+	return s.visitorFromID(fmt.Sprintf("user:%s", user.Name), ip, user)
 }

@@ -9,21 +9,37 @@ import Typography from "@mui/material/Typography";
 import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
+import {useState} from "react";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 const Signup = () => {
     const { t } = useTranslation();
+    const [error, setError] = useState("");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
     const handleSubmit = async (event) => {
         event.preventDefault();
-        const data = new FormData(event.currentTarget);
-        const user = {
-            username: data.get('username'),
-            password: data.get('password')
-        };
-        await api.createAccount(config.baseUrl, user.username, user.password);
-        const token = await api.login(config.baseUrl, user);
-        console.log(`[Api] User auth for user ${user.username} successful, token is ${token}`);
-        session.store(user.username, token);
-        window.location.href = routes.app;
+        const user = { username, password };
+        try {
+            await api.createAccount(config.baseUrl, user.username, user.password);
+            const token = await api.login(config.baseUrl, user);
+            if (token) {
+                console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
+                session.store(user.username, token);
+                window.location.href = routes.app;
+            } else {
+                console.log(`[Signup] Signup for user ${user.username} failed, access denied`);
+                setError(t("Login failed: Invalid username or password"));
+            }
+        } catch (e) {
+            console.log(`[Signup] Signup for user ${user.username} failed`, e);
+            if (e && e.message) {
+                setError(e.message);
+            } else {
+                setError(t("Unknown error. Check logs for details."))
+            }
+        }
     };
     if (!config.enableSignup) {
         return (
@@ -45,6 +61,8 @@ const Signup = () => {
                     id="username"
                     label="Username"
                     name="username"
+                    value={username}
+                    onChange={ev => setUsername(ev.target.value.trim())}
                     autoFocus
                 />
                 <TextField
@@ -56,6 +74,8 @@ const Signup = () => {
                     type="password"
                     id="password"
                     autoComplete="current-password"
+                    value={password}
+                    onChange={ev => setPassword(ev.target.value.trim())}
                 />
                 <TextField
                     margin="dense"
@@ -65,15 +85,30 @@ const Signup = () => {
                     label="Confirm password"
                     type="password"
                     id="confirm-password"
+                    value={confirm}
+                    onChange={ev => setConfirm(ev.target.value.trim())}
+
                 />
                 <Button
                     type="submit"
                     fullWidth
                     variant="contained"
+                    disabled={username === "" || password === "" || password !== confirm}
                     sx={{mt: 2, mb: 2}}
                 >
                     {t("Sign up")}
                 </Button>
+                {error &&
+                    <Box sx={{
+                        mb: 1,
+                        display: 'flex',
+                        flexGrow: 1,
+                        justifyContent: 'center',
+                    }}>
+                        <WarningAmberIcon color="error" sx={{mr: 1}}/>
+                        <Typography sx={{color: 'error.main'}}>{error}</Typography>
+                    </Box>
+                }
             </Box>
             {config.enableLogin &&
                 <Typography sx={{mb: 4}}>

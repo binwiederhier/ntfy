@@ -12,7 +12,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	signupAllowed := s.config.EnableSignup
 	admin := v.user != nil && v.user.Role == auth.RoleAdmin
 	if !signupAllowed && !admin {
-		return errHTTPUnauthorized
+		return errHTTPBadRequestSignupNotEnabled
 	}
 	body, err := util.Peek(r.Body, 4096) // FIXME
 	if err != nil {
@@ -22,6 +22,9 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	var newAccount apiAccountCreateRequest
 	if err := json.NewDecoder(body).Decode(&newAccount); err != nil {
 		return err
+	}
+	if existingUser, _ := s.auth.User(newAccount.Username); existingUser != nil {
+		return errHTTPConflictUserExists
 	}
 	if err := s.auth.AddUser(newAccount.Username, newAccount.Password, auth.RoleUser); err != nil { // TODO this should return a User
 		return err

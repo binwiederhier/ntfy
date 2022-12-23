@@ -9,7 +9,7 @@ _No active deprecations_
 ## Previous deprecations
 
 ### ntfy CLI: `ntfy publish --env-topic` will be removed
-> Active since 2022-06-20, behavior changed with v1.30.0
+> Active since 2022-06-20, behavior changed with v1.30.1
 
 The `ntfy publish --env-topic` option will be removed. It'll still be possible to specify a topic via the
 `NTFY_TOPIC` environment variable, but it won't be necessary anymore to specify the `--env-topic` flag.

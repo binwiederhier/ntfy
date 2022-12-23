@@ -2,7 +2,8 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v1.30.0 (UNRELEASED)
+## ntfy server v1.30.0
+Released December 23, 2022 🎅
 
 **Features:**
 
@@ -13,6 +14,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
 * Prepared statements for message cache writes ([#542](https://github.com/binwiederhier/ntfy/pull/542), thanks to [@nicois](https://github.com/nicois))
+* Do not warn about invalid IP address when behind proxy in unix socket mode (relates to [#552](https://github.com/binwiederhier/ntfy/issues/552))
 
 ## ntfy Android app v1.16.0
 Released December 11, 2022

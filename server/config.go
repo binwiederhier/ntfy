@@ -44,6 +44,8 @@ const (
 	DefaultVisitorRequestLimitReplenish         = 5 * time.Second
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
+	DefaultVisitorAccountCreateLimitBurst       = 2
+	DefaultVisitorAccountCreateLimitReplenish   = 24 * time.Hour
 	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB
 	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB
 )
@@ -98,6 +100,8 @@ type Config struct {
 	VisitorRequestExemptIPAddrs          []netip.Prefix
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
+	VisitorAccountCreateLimitBurst       int
+	VisitorAccountCreateLimitReplenish   time.Duration
 	BehindProxy                          bool
 	EnableWeb                            bool
 	EnableSignup                         bool
@@ -147,6 +151,8 @@ func NewConfig() *Config {
 		VisitorRequestExemptIPAddrs:          make([]netip.Prefix, 0),
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
+		VisitorAccountCreateLimitBurst:       DefaultVisitorAccountCreateLimitBurst,
+		VisitorAccountCreateLimitReplenish:   DefaultVisitorAccountCreateLimitReplenish,
 		BehindProxy:                          false,
 		EnableWeb:                            true,
 		Version:                              "",

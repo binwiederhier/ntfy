@@ -161,9 +161,10 @@ class Api {
             body: body
         });
         if (response.status === 409) {
-            throw new UsernameTakenError(username)
-        }
-        if (response.status !== 200) {
+            throw new UsernameTakenError(username);
+        } else if (response.status === 429) {
+            throw new AccountCreateLimitReachedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -258,6 +259,10 @@ export class UsernameTakenError extends Error {
         super();
         this.username = username;
     }
+}
+
+export class AccountCreateLimitReachedError extends Error {
+    // Nothing
 }
 
 const api = new Api();

@@ -34,7 +34,8 @@ type visitor struct {
 	emailsLimiter       *rate.Limiter // Rate limiter for emails
 	subscriptionLimiter util.Limiter  // Fixed limiter for active subscriptions (ongoing connections)
 	bandwidthLimiter    util.Limiter
-	firebase            time.Time // Next allowed Firebase message
+	accountLimiter      *rate.Limiter // Rate limiter for account creation
+	firebase            time.Time     // Next allowed Firebase message
 	seen                time.Time
 	mu                  sync.Mutex
 }
@@ -54,11 +55,13 @@ type visitorStats struct {
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
-	var requestLimiter, emailsLimiter *rate.Limiter
+	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
 		messages = user.Stats.Messages
 		emails = user.Stats.Emails
+	} else {
+		accountLimiter = rate.NewLimiter(rate.Every(conf.VisitorAccountCreateLimitReplenish), conf.VisitorAccountCreateLimitBurst)
 	}
 	if user != nil && user.Plan != nil {
 		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.MessagesLimit), conf.VisitorRequestLimitBurst)
@@ -78,6 +81,7 @@ func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *a
 		emailsLimiter:       emailsLimiter,
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 		bandwidthLimiter:    util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
+		accountLimiter:      accountLimiter, // May be nil
 		firebase:            time.Unix(0, 0),
 		seen:                time.Now(),
 	}

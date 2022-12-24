@@ -9,10 +9,13 @@ import (
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	signupAllowed := s.config.EnableSignup
 	admin := v.user != nil && v.user.Role == auth.RoleAdmin
-	if !signupAllowed && !admin {
-		return errHTTPBadRequestSignupNotEnabled
+	if !admin {
+		if !s.config.EnableSignup {
+			return errHTTPBadRequestSignupNotEnabled
+		} else if v.user != nil {
+			return errHTTPUnauthorized // Cannot create account from user context
+		}
 	}
 	body, err := util.Peek(r.Body, 4096) // FIXME
 	if err != nil {
@@ -25,6 +28,9 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	}
 	if existingUser, _ := s.auth.User(newAccount.Username); existingUser != nil {
 		return errHTTPConflictUserExists
+	}
+	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
+		return errHTTPTooManyRequestsAccountCreateLimit
 	}
 	if err := s.auth.AddUser(newAccount.Username, newAccount.Password, auth.RoleUser); err != nil { // TODO this should return a User
 		return err

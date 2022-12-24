@@ -2,7 +2,7 @@ import * as React from 'react';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api, {UsernameTakenError} from "../app/Api";
+import api, {AccountCreateLimitReachedError, UsernameTakenError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import Typography from "@mui/material/Typography";
@@ -36,6 +36,8 @@ const Signup = () => {
             console.log(`[Signup] Signup for user ${user.username} failed`, e);
             if ((e instanceof UsernameTakenError)) {
                 setError(t("Username {{username}} is already taken", { username: e.username }));
+            } else if ((e instanceof AccountCreateLimitReachedError)) {
+                setError(t("Account creation limit reached"));
             } else if (e.message) {
                 setError(e.message);
             } else {

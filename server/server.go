@@ -42,10 +42,10 @@ import (
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
-		rate limit for signup (2 per 24h)
 		handle invalid session token
 		purge accounts that were not logged into in X
 		sync subscription display name
+		reset daily limits for users
 		store users
 		Pages:
 		- Home

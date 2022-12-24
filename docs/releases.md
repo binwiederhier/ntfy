@@ -5,6 +5,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅
 
+This is a special holiday edition version of ntfy, with all sorts of holiday fun and games, and hidden quests.
+Nahh, just kidding. This release is an intermediate release mainly to eliminate warnings in the logs, so I can
+roll out the TLSv1.3, HTTP/2 and Unix mode changes on ntfy.sh (see [#552](https://github.com/binwiederhier/ntfy/issues/552)).
+
 **Features:**
 
 * Web: Generate random topic name button ([#453](https://github.com/binwiederhier/ntfy/issues/453), thanks to [@yardenshoham](https://github.com/yardenshoham))
@@ -15,6 +19,7 @@ Released December 23, 2022 🎅
 * Remove `--env-topic` option from `ntfy publish` as per [deprecation](deprecations.md) (no ticket)
 * Prepared statements for message cache writes ([#542](https://github.com/binwiederhier/ntfy/pull/542), thanks to [@nicois](https://github.com/nicois))
 * Do not warn about invalid IP address when behind proxy in unix socket mode (relates to [#552](https://github.com/binwiederhier/ntfy/issues/552))
+* Upgrade nginx/ntfy config on ntfy.sh to work with TLSv1.3, HTTP/2 ([#552](https://github.com/binwiederhier/ntfy/issues/552), thanks to [bt90](https://github.com/bt90))
 
 ## ntfy Android app v1.16.0
 Released December 11, 2022

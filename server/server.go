@@ -95,6 +95,7 @@ var (
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
 	webConfigPath                  = "/config.js"
+	healthPath                     = "/v1/health"
 	accountPath                    = "/v1/account"
 	accountTokenPath               = "/v1/account/token"
 	accountPasswordPath            = "/v1/account/password"
@@ -330,6 +331,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleHome)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == healthPath {
+		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
@@ -414,6 +417,18 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
 	_, err := io.WriteString(w, `{"success":true}`+"\n")
 	return err
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	response := &apiHealthResponse{
+		Healthy: true,
+	}
+	w.Header().Set("Content-Type", "text/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {

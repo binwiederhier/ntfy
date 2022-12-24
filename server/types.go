@@ -216,6 +216,10 @@ func (q *queryFilter) Pass(msg *message) bool {
 	return true
 }
 
+type apiHealthResponse struct {
+	Healthy bool `json:"healthy"`
+}
+
 type apiAccountCreateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

@@ -160,6 +160,9 @@ class Api {
             method: "POST",
             body: body
         });
+        if (response.status === 409) {
+            throw new UsernameTakenError(username)
+        }
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
@@ -247,6 +250,13 @@ class Api {
         if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+    }
+}
+
+export class UsernameTakenError extends Error {
+    constructor(username) {
+        super();
+        this.username = username;
     }
 }
 

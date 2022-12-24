@@ -47,7 +47,6 @@ import (
 		purge accounts that were not logged into in X
 		sync subscription display name
 		store users
-		signup: check unique user
 		Pages:
 		- Home
 		- Password reset

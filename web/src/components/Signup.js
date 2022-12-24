@@ -2,7 +2,7 @@ import * as React from 'react';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api from "../app/Api";
+import api, {UsernameTakenError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import Typography from "@mui/material/Typography";
@@ -34,7 +34,9 @@ const Signup = () => {
             }
         } catch (e) {
             console.log(`[Signup] Signup for user ${user.username} failed`, e);
-            if (e && e.message) {
+            if ((e instanceof UsernameTakenError)) {
+                setError(t("Username {{username}} is already taken", { username: e.username }));
+            } else if (e.message) {
                 setError(e.message);
             } else {
                 setError(t("Unknown error. Check logs for details."))

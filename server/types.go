@@ -213,3 +213,7 @@ func (q *queryFilter) Pass(msg *message) bool {
 	}
 	return true
 }
+
+type apiHealthResponse struct {
+	Healthy bool `json:"healthy"`
+}

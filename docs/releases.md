@@ -2,6 +2,12 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v1.31.0 (UNRELEASED)
+
+**Documentation:**
+
+* Add HTTP/2 and TLSv1.3 support to nginx docs ([#553](https://github.com/binwiederhier/ntfy/issues/553), thanks to [bt90](https://github.com/bt90))
+
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅
 

@@ -1445,7 +1445,9 @@ func (s *Server) visitor(r *http.Request) *visitor {
 		ip, err = netip.ParseAddr(remoteAddr)
 		if err != nil {
 			ip = netip.IPv4Unspecified()
-			log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+			if remoteAddr != "@" || !s.config.BehindProxy { // RemoteAddr is @ when unix socket is used
+				log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+			}
 		}
 	}
 	if s.config.BehindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {

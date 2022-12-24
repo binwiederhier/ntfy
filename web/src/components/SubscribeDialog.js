@@ -8,7 +8,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
@@ -16,6 +16,7 @@ import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
+import routes from "./routes";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -25,14 +26,23 @@ const SubscribeDialog = (props) => {
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSuccess = async () => {
+        console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
         const actualBaseUrl = (baseUrl) ? baseUrl : config.baseUrl;
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
         if (session.exists()) {
-            const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
-                base_url: actualBaseUrl,
-                topic: topic
-            });
-            await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+            try {
+                const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
+                    base_url: actualBaseUrl,
+                    topic: topic
+                });
+                await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+            } catch (e) {
+                console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
+                if ((e instanceof UnauthorizedError)) {
+                    session.reset();
+                    window.location.href = routes.login;
+                }
+            }
         }
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);

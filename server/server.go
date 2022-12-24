@@ -42,7 +42,6 @@ import (
 		expire tokens
 		auto-refresh tokens from UI
 		reserve topics
-		handle invalid session token
 		purge accounts that were not logged into in X
 		sync subscription display name
 		reset daily limits for users

@@ -26,7 +26,7 @@ import {Backdrop, CircularProgress} from "@mui/material";
 import Home from "./Home";
 import Login from "./Login";
 import i18n from "i18next";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import prefs from "../app/Prefs";
 import session from "../app/Session";
 import Pricing from "./Pricing";
@@ -96,8 +96,12 @@ const Layout = () => {
 
     useEffect(() => {
         (async () => {
-            const acc = await api.getAccount(config.baseUrl, session.token());
-            if (acc) {
+            // TODO this should not live here
+            try {
+                if (!session.token()) {
+                    return;
+                }
+                const acc = await api.getAccount(config.baseUrl, session.token());
                 setAccount(acc);
                 if (acc.language) {
                     await i18n.changeLanguage(acc.language);
@@ -115,6 +119,12 @@ const Layout = () => {
                 }
                 if (acc.subscriptions) {
                     await subscriptionManager.syncFromRemote(acc.subscriptions);
+                }
+            } catch (e) {
+                console.log(`[App] Error fetching account`, e);
+                if ((e instanceof UnauthorizedError)) {
+                    session.reset();
+                    window.location.href = routes.login;
                 }
             }
         })();

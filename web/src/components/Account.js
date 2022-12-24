@@ -16,7 +16,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
 import {useNavigate, useOutletContext} from "react-router-dom";
@@ -152,6 +152,10 @@ const ChangePassword = () => {
             console.debug(`[Account] Password changed`);
         } catch (e) {
             console.log(`[Account] Error changing password`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.reset();
+                window.location.href = routes.login;
+            }
             // TODO show error
         }
     };
@@ -238,6 +242,10 @@ const DeleteAccount = () => {
             window.location.href = routes.app;
         } catch (e) {
             console.log(`[Account] Error deleting account`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.reset();
+                window.location.href = routes.login;
+            }
             // TODO show error
         }
     };

@@ -126,7 +126,7 @@ class Api {
             headers: maybeWithBasicAuth({}, user)
         });
         if (response.status === 401 || response.status === 403) {
-            return false;
+            throw new UnauthorizedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
@@ -144,7 +144,9 @@ class Api {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, token)
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -175,7 +177,9 @@ class Api {
         const response = await fetch(url, {
             headers: maybeWithBearerAuth({}, token)
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         const account = await response.json();
@@ -190,7 +194,9 @@ class Api {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, token)
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -205,7 +211,9 @@ class Api {
                 password: password
             })
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -219,7 +227,9 @@ class Api {
             headers: maybeWithBearerAuth({}, token),
             body: body
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -233,7 +243,9 @@ class Api {
             headers: maybeWithBearerAuth({}, token),
             body: body
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         const subscription = await response.json();
@@ -248,7 +260,9 @@ class Api {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, token)
         });
-        if (response.status !== 200) {
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
     }
@@ -256,13 +270,21 @@ class Api {
 
 export class UsernameTakenError extends Error {
     constructor(username) {
-        super();
+        super("Username taken");
         this.username = username;
     }
 }
 
 export class AccountCreateLimitReachedError extends Error {
-    // Nothing
+    constructor() {
+        super("Account creation limit reached");
+    }
+}
+
+export class UnauthorizedError extends Error {
+    constructor() {
+        super("Unauthorized");
+    }
 }
 
 const api = new Api();

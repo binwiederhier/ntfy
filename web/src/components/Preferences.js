@@ -34,8 +34,9 @@ import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import session from "../app/Session";
+import routes from "./routes";
 
 const Preferences = () => {
     return (
@@ -72,13 +73,11 @@ const Sound = () => {
     const sound = useLiveQuery(async () => prefs.sound());
     const handleChange = async (ev) => {
         await prefs.setSound(ev.target.value);
-        if (session.exists()) {
-            await api.updateAccountSettings(config.baseUrl, session.token(), {
-                notification: {
-                    sound: ev.target.value
-                }
-            });
-        }
+        await maybeUpdateAccountSettings({
+            notification: {
+                sound: ev.target.value
+            }
+        });
     }
     if (!sound) {
         return null; // While loading
@@ -112,13 +111,11 @@ const MinPriority = () => {
     const minPriority = useLiveQuery(async () => prefs.minPriority());
     const handleChange = async (ev) => {
         await prefs.setMinPriority(ev.target.value);
-        if (session.exists()) {
-            await api.updateAccountSettings(config.baseUrl, session.token(), {
-                notification: {
-                    min_priority: ev.target.value
-                }
-            });
-        }
+        await maybeUpdateAccountSettings({
+            notification: {
+                min_priority: ev.target.value
+            }
+        });
     }
     if (!minPriority) {
         return null; // While loading
@@ -162,13 +159,11 @@ const DeleteAfter = () => {
     const deleteAfter = useLiveQuery(async () => prefs.deleteAfter());
     const handleChange = async (ev) => {
         await prefs.setDeleteAfter(ev.target.value);
-        if (session.exists()) {
-            await api.updateAccountSettings(config.baseUrl, session.token(), {
-                notification: {
-                    delete_after: ev.target.value
-                }
-            });
-        }
+        await maybeUpdateAccountSettings({
+            notification: {
+                delete_after: ev.target.value
+            }
+        });
     }
     if (deleteAfter === null || deleteAfter === undefined) { // !deleteAfter will not work with "0"
         return null; // While loading
@@ -466,11 +461,9 @@ const Language = () => {
 
     const handleChange = async (ev) => {
         await i18n.changeLanguage(ev.target.value);
-        if (session.exists()) {
-            await api.updateAccountSettings(config.baseUrl, session.token(), {
-                language: ev.target.value
-            });
-        }
+        await maybeUpdateAccountSettings({
+            language: ev.target.value
+        });
     };
 
     // Remember: Flags are not languages. Don't put flags next to the language in the list.
@@ -669,5 +662,20 @@ const AccessControlDialog = (props) => {
     );
 };
 */
+
+const maybeUpdateAccountSettings = async (payload) => {
+    if (!session.exists()) {
+        return;
+    }
+    try {
+        await api.updateAccountSettings(config.baseUrl, session.token(), payload);
+    } catch (e) {
+        console.log(`[Preferences] Error updating account settings`, e);
+        if ((e instanceof UnauthorizedError)) {
+            session.reset();
+            window.location.href = routes.login;
+        }
+    }
+};
 
 export default Preferences;

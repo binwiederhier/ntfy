@@ -2,7 +2,7 @@ import * as React from 'react';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api, {AccountCreateLimitReachedError, UsernameTakenError} from "../app/Api";
+import api, {AccountCreateLimitReachedError, UnauthorizedError, UsernameTakenError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import Typography from "@mui/material/Typography";
@@ -24,14 +24,9 @@ const Signup = () => {
         try {
             await api.createAccount(config.baseUrl, user.username, user.password);
             const token = await api.login(config.baseUrl, user);
-            if (token) {
-                console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
-                session.store(user.username, token);
-                window.location.href = routes.app;
-            } else {
-                console.log(`[Signup] Signup for user ${user.username} failed, access denied`);
-                setError(t("Login failed: Invalid username or password"));
-            }
+            console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
+            session.store(user.username, token);
+            window.location.href = routes.app;
         } catch (e) {
             console.log(`[Signup] Signup for user ${user.username} failed`, e);
             if ((e instanceof UsernameTakenError)) {

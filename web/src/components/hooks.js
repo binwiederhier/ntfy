@@ -8,7 +8,7 @@ import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import session from "../app/Session";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -64,11 +64,19 @@ export const useAutoSubscribe = (subscriptions, selected) => {
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
-                    const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
-                        base_url: baseUrl,
-                        topic: params.topic
-                    });
-                    await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+                    try {
+                        const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
+                            base_url: baseUrl,
+                            topic: params.topic
+                        });
+                        await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+                    } catch (e) {
+                        console.log(`[App] Auto-subscribing failed`, e);
+                        if ((e instanceof UnauthorizedError)) {
+                            session.reset();
+                            window.location.href = routes.login;
+                        }
+                    }
                 }
                 poller.pollInBackground(subscription); // Dangle!
             })();

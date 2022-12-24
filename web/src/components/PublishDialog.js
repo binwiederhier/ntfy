@@ -22,11 +22,12 @@ import {basicAuth, formatBytes, maybeWithBasicAuth, topicShortUrl, topicUrl, val
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
+import routes from "./routes";
 
 const PublishDialog = (props) => {
     const { t } = useTranslation();
@@ -178,7 +179,12 @@ const PublishDialog = (props) => {
             setAttachFileError("");
         } catch (e) {
             console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
-            setAttachFileError(""); // Reset error (rely on server-side checking)
+            if ((e instanceof UnauthorizedError)) {
+                session.reset();
+                window.location.href = routes.login;
+            } else {
+                setAttachFileError(""); // Reset error (rely on server-side checking)
+            }
         }
     };
 

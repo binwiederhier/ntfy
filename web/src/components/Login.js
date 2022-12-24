@@ -4,7 +4,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import {NavLink} from "react-router-dom";
@@ -22,17 +22,14 @@ const Login = () => {
         const user = { username, password };
         try {
             const token = await api.login(config.baseUrl, user);
-            if (token) {
-                console.log(`[Login] User auth for user ${user.username} successful, token is ${token}`);
-                session.store(user.username, token);
-                window.location.href = routes.app;
-            } else {
-                console.log(`[Login] User auth for user ${user.username} failed, access denied`);
-                setError(t("Login failed: Invalid username or password"));
-            }
+            console.log(`[Login] User auth for user ${user.username} successful, token is ${token}`);
+            session.store(user.username, token);
+            window.location.href = routes.app;
         } catch (e) {
             console.log(`[Login] User auth for user ${user.username} failed`, e);
-            if (e && e.message) {
+            if ((e instanceof UnauthorizedError)) {
+                setError(t("Login failed: Invalid username or password"));
+            } else if (e.message) {
                 setError(e.message);
             } else {
                 setError(t("Unknown error. Check logs for details."))

@@ -18,7 +18,7 @@ import MenuList from '@mui/material/MenuList';
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import api from "../app/Api";
+import api, {UnauthorizedError} from "../app/Api";
 import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
@@ -118,7 +118,15 @@ const SettingsIcons = (props) => {
         handleClose(event);
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
-            await api.deleteAccountSubscription(config.baseUrl, session.token(), props.subscription.remoteId);
+            try {
+                await api.deleteAccountSubscription(config.baseUrl, session.token(), props.subscription.remoteId);
+            } catch (e) {
+                console.log(`[ActionBar] Error unsubscribing`, e);
+                if ((e instanceof UnauthorizedError)) {
+                    session.reset();
+                    window.location.href = routes.login;
+                }
+            }
         }
         const newSelected = await subscriptionManager.first(); // May be undefined
         if (newSelected) {

@@ -467,7 +467,8 @@ or the root domain:
     # This config allows insecure HTTP POST/PUT requests against topics to allow a short curl syntax (without -L
     # and "https://" prefix). It also disables output buffering, which has worked well for the ntfy.sh server.
     #
-    # This is how ntfy.sh is configured.
+    # This is pretty much how ntfy.sh is configured. To see the exact configuration,
+    # see https://github.com/binwiederhier/ntfy-ansible/
 
     server {
       listen 80;
@@ -508,14 +509,17 @@ or the root domain:
     }
     
     server {
-      listen 443 ssl;
+      listen 443 ssl http2;
       server_name ntfy.sh;
     
-      ssl_session_cache builtin:1000 shared:SSL:10m;
+      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6see https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+      ssl_session_timeout 1d;
+      ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+      ssl_session_tickets off;
       ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
-      ssl_prefer_server_ciphers on;
-    
+      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+      ssl_prefer_server_ciphers off;
+ 
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
     
@@ -572,13 +576,16 @@ or the root domain:
     }
     
     server {
-      listen 443 ssl;
+      listen 443 ssl http2;
       server_name ntfy.sh;
     
-      ssl_session_cache builtin:1000 shared:SSL:10m;
+      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6see https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+      ssl_session_timeout 1d;
+      ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+      ssl_session_tickets off;
       ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
-      ssl_prefer_server_ciphers on;
+      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+      ssl_prefer_server_ciphers off;
     
       ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;

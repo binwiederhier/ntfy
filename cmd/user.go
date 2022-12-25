@@ -6,12 +6,12 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/user"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
 )
 
@@ -41,7 +41,7 @@ var cmdUser = &cli.Command{
 			UsageText: "ntfy user add [--role=admin|user] USERNAME\nNTFY_PASSWORD=... ntfy user add [--role=admin|user] USERNAME",
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
-				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(auth.RoleUser), Usage: "user role"},
+				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(user.RoleUser), Usage: "user role"},
 			},
 			Description: `Add a new user to the ntfy user database.
 
@@ -152,13 +152,13 @@ variable to pass the new password. This is useful if you are creating/updating u
 
 func execUserAdd(c *cli.Context) error {
 	username := c.Args().Get(0)
-	role := auth.Role(c.String("role"))
+	role := user.Role(c.String("role"))
 	password := os.Getenv("NTFY_PASSWORD")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
-	} else if !auth.AllowedRole(role) {
+	} else if !user.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
 	manager, err := createAuthManager(c)
@@ -194,7 +194,7 @@ func execUserDel(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == auth.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.RemoveUser(username); err != nil {
@@ -216,7 +216,7 @@ func execUserChangePass(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == auth.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if password == "" {
@@ -234,8 +234,8 @@ func execUserChangePass(c *cli.Context) error {
 
 func execUserChangeRole(c *cli.Context) error {
 	username := c.Args().Get(0)
-	role := auth.Role(c.Args().Get(1))
-	if username == "" || !auth.AllowedRole(role) {
+	role := user.Role(c.Args().Get(1))
+	if username == "" || !user.AllowedRole(role) {
 		return errors.New("username and new role expected, type 'ntfy user change-role --help' for help")
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
@@ -244,7 +244,7 @@ func execUserChangeRole(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == auth.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.ChangeRole(username, role); err != nil {
@@ -266,7 +266,7 @@ func execUserList(c *cli.Context) error {
 	return showUsers(c, manager, users)
 }
 
-func createAuthManager(c *cli.Context) (auth.Manager, error) {
+func createAuthManager(c *cli.Context) (user.Manager, error) {
 	authFile := c.String("auth-file")
 	authDefaultAccess := c.String("auth-default-access")
 	if authFile == "" {
@@ -278,7 +278,7 @@ func createAuthManager(c *cli.Context) (auth.Manager, error) {
 	}
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
 	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
-	return auth.NewSQLiteAuthManager(authFile, authDefaultRead, authDefaultWrite)
+	return user.NewSQLiteAuthManager(authFile, authDefaultRead, authDefaultWrite)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

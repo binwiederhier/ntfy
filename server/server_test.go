@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/auth"
 	"heckel.io/ntfy/util"
 )
 
@@ -626,8 +625,8 @@ func TestServer_Auth_Success_Admin(t *testing.T) {
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("phil:phil"),
@@ -643,8 +642,8 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -660,8 +659,8 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
 	require.Nil(t, manager.AllowAccess("ben", "anothertopic", true, true))
 
@@ -683,8 +682,8 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("phil:INVALID"),
@@ -699,8 +698,8 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", auth.RoleUser))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, manager.AllowAccess("ben", "sometopic", true, true)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -716,10 +715,10 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	c.AuthDefaultWrite = true // Open by default
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", auth.RoleAdmin))
-	require.Nil(t, manager.AllowAccess(auth.Everyone, "private", false, false))
-	require.Nil(t, manager.AllowAccess(auth.Everyone, "announcements", true, false))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, manager.AllowAccess(user.Everyone, "private", false, false))
+	require.Nil(t, manager.AllowAccess(user.Everyone, "announcements", true, false))
 
 	response := request(t, s, "PUT", "/mytopic", "test", nil)
 	require.Equal(t, 200, response.Code)
@@ -749,8 +748,8 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.auth.(auth.Manager)
-	require.Nil(t, manager.AddUser("ben", "some pass", auth.RoleAdmin))
+	manager := s.userManager.(user.Manager)
+	require.Nil(t, manager.AddUser("ben", "some pass", user.RoleAdmin))
 
 	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:some pass"))))
 	response := request(t, s, "GET", u, "", nil)

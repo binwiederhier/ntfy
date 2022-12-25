@@ -1,14 +1,18 @@
 import {
+    accountPasswordUrl,
+    accountSettingsUrl,
+    accountSubscriptionSingleUrl,
+    accountSubscriptionUrl,
+    accountTokenUrl,
+    accountUrl,
     fetchLinesIterator,
-    maybeWithBasicAuth, maybeWithBearerAuth,
+    maybeWithBasicAuth,
+    maybeWithBearerAuth,
     topicShortUrl,
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince,
-    accountSettingsUrl,
-    accountTokenUrl,
-    userStatsUrl, accountSubscriptionUrl, accountSubscriptionSingleUrl, accountUrl, accountPasswordUrl
+    topicUrlJsonPollWithSince
 } from "./utils";
 import userManager from "./UserManager";
 
@@ -74,7 +78,7 @@ class Api {
                 xhr.setRequestHeader(key, value);
             }
             xhr.upload.addEventListener("progress", onProgress);
-            xhr.addEventListener('readystatechange', (ev) => {
+            xhr.addEventListener('readystatechange', () => {
                 if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
                     console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
                     resolve(xhr.response);
@@ -123,6 +127,7 @@ class Api {
         const url = accountTokenUrl(baseUrl);
         console.log(`[Api] Checking auth for ${url}`);
         const response = await fetch(url, {
+            method: "POST",
             headers: maybeWithBasicAuth({}, user)
         });
         if (response.status === 401 || response.status === 403) {
@@ -218,12 +223,26 @@ class Api {
         }
     }
 
+    async extendToken(baseUrl, token) {
+        const url = accountTokenUrl(baseUrl);
+        console.log(`[Api] Extending user access token ${url}`);
+        const response = await fetch(url, {
+            method: "PATCH",
+            headers: maybeWithBearerAuth({}, token)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
     async updateAccountSettings(baseUrl, token, payload) {
         const url = accountSettingsUrl(baseUrl);
         const body = JSON.stringify(payload);
         console.log(`[Api] Updating user account ${url}: ${body}`);
         const response = await fetch(url, {
-            method: "POST",
+            method: "PATCH",
             headers: maybeWithBearerAuth({}, token),
             body: body
         });

@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/user"
 	"net/netip"
 	"sync"
 	"time"
@@ -27,7 +27,7 @@ type visitor struct {
 	config              *Config
 	messageCache        *messageCache
 	ip                  netip.Addr
-	user                *auth.User
+	user                *user.User
 	messages            int64         // Number of messages sent
 	emails              int64         // Number of emails sent
 	requestLimiter      *rate.Limiter // Rate limiter for (almost) all requests (including messages)
@@ -54,7 +54,7 @@ type visitorStats struct {
 	AttachmentFileSizeLimit      int64
 }
 
-func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *auth.User) *visitor {
+func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *user.User) *visitor {
 	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
@@ -171,7 +171,7 @@ func (v *visitor) Stats() (*visitorStats, error) {
 	emails := v.emails
 	v.mu.Unlock()
 	stats := &visitorStats{}
-	if v.user != nil && v.user.Role == auth.RoleAdmin {
+	if v.user != nil && v.user.Role == user.RoleAdmin {
 		stats.Basis = "role"
 		stats.MessagesLimit = 0
 		stats.EmailsLimit = 0

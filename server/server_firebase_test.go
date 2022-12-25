@@ -11,18 +11,17 @@ import (
 
 	"firebase.google.com/go/v4/messaging"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/auth"
 )
 
 type testAuther struct {
 	Allow bool
 }
 
-func (t testAuther) AuthenticateUser(_, _ string) (*auth.User, error) {
+func (t testAuther) AuthenticateUser(_, _ string) (*user.User, error) {
 	return nil, errors.New("not used")
 }
 
-func (t testAuther) Authorize(_ *auth.User, _ string, _ auth.Permission) error {
+func (t testAuther) Authorize(_ *user.User, _ string, _ user.Permission) error {
 	if t.Allow {
 		return nil
 	}

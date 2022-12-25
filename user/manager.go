@@ -1,5 +1,5 @@
 // Package auth deals with authentication and authorization against topics
-package auth
+package user
 
 import (
 	"errors"
@@ -14,10 +14,12 @@ type Manager interface {
 	Authenticate(username, password string) (*User, error)
 
 	AuthenticateToken(token string) (*User, error)
-	CreateToken(user *User) (string, error)
+	CreateToken(user *User) (*Token, error)
+	ExtendToken(user *User) (*Token, error)
 	RemoveToken(user *User) error
+	RemoveExpiredTokens() error
 	ChangeSettings(user *User) error
-	EnqueueUpdateStats(user *User)
+	EnqueueStats(user *User)
 
 	// Authorize returns nil if the given user has access to the given topic using the desired
 	// permission. The user param may be nil to signal an anonymous user.
@@ -64,15 +66,20 @@ type User struct {
 	Token  string // Only set if token was used to log in
 	Role   Role
 	Grants []Grant
-	Prefs  *UserPrefs
+	Prefs  *Prefs
 	Plan   *Plan
 	Stats  *Stats
 }
 
-type UserPrefs struct {
-	Language      string                 `json:"language,omitempty"`
-	Notification  *UserNotificationPrefs `json:"notification,omitempty"`
-	Subscriptions []*UserSubscription    `json:"subscriptions,omitempty"`
+type Token struct {
+	Value   string
+	Expires int64
+}
+
+type Prefs struct {
+	Language      string             `json:"language,omitempty"`
+	Notification  *NotificationPrefs `json:"notification,omitempty"`
+	Subscriptions []*Subscription    `json:"subscriptions,omitempty"`
 }
 
 type PlanCode string
@@ -92,13 +99,13 @@ type Plan struct {
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
 }
 
-type UserSubscription struct {
+type Subscription struct {
 	ID      string `json:"id"`
 	BaseURL string `json:"base_url"`
 	Topic   string `json:"topic"`
 }
 
-type UserNotificationPrefs struct {
+type NotificationPrefs struct {
 	Sound       string `json:"sound,omitempty"`
 	MinPriority int    `json:"min_priority,omitempty"`
 	DeleteAfter int    `json:"delete_after,omitempty"`

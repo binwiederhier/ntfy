@@ -1,7 +1,7 @@
 package server
 
 import (
-	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/user"
 	"net/http"
 	"net/netip"
 	"time"
@@ -226,7 +226,8 @@ type apiAccountCreateRequest struct {
 }
 
 type apiAccountTokenResponse struct {
-	Token string `json:"token"`
+	Token   string `json:"token"`
+	Expires int64  `json:"expires"`
 }
 
 type apiAccountPlan struct {
@@ -252,12 +253,12 @@ type apiAccountStats struct {
 }
 
 type apiAccountSettingsResponse struct {
-	Username      string                      `json:"username"`
-	Role          string                      `json:"role,omitempty"`
-	Language      string                      `json:"language,omitempty"`
-	Notification  *auth.UserNotificationPrefs `json:"notification,omitempty"`
-	Subscriptions []*auth.UserSubscription    `json:"subscriptions,omitempty"`
-	Plan          *apiAccountPlan             `json:"plan,omitempty"`
-	Limits        *apiAccountLimits           `json:"limits,omitempty"`
-	Stats         *apiAccountStats            `json:"stats,omitempty"`
+	Username      string                  `json:"username"`
+	Role          string                  `json:"role,omitempty"`
+	Language      string                  `json:"language,omitempty"`
+	Notification  *user.NotificationPrefs `json:"notification,omitempty"`
+	Subscriptions []*user.Subscription    `json:"subscriptions,omitempty"`
+	Plan          *apiAccountPlan         `json:"plan,omitempty"`
+	Limits        *apiAccountLimits       `json:"limits,omitempty"`
+	Stats         *apiAccountStats        `json:"stats,omitempty"`
 }

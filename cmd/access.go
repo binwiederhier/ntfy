@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 )
 
@@ -77,7 +77,7 @@ func execUserAccess(c *cli.Context) error {
 	}
 	username := c.Args().Get(0)
 	if username == userEveryone {
-		username = auth.Everyone
+		username = user.Everyone
 	}
 	topic := c.Args().Get(1)
 	perms := c.Args().Get(2)
@@ -96,16 +96,16 @@ func execUserAccess(c *cli.Context) error {
 	return changeAccess(c, manager, username, topic, perms)
 }
 
-func changeAccess(c *cli.Context, manager auth.Manager, username string, topic string, perms string) error {
+func changeAccess(c *cli.Context, manager user.Manager, username string, topic string, perms string) error {
 	if !util.Contains([]string{"", "read-write", "rw", "read-only", "read", "ro", "write-only", "write", "wo", "none", "deny"}, perms) {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	}
 	read := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
 	write := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
-	user, err := manager.User(username)
-	if err == auth.ErrNotFound {
+	u, err := manager.User(username)
+	if err == user.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
-	} else if user.Role == auth.RoleAdmin {
+	} else if u.Role == user.RoleAdmin {
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
 	}
 	if err := manager.AllowAccess(username, topic, read, write); err != nil {
@@ -123,7 +123,7 @@ func changeAccess(c *cli.Context, manager auth.Manager, username string, topic s
 	return showUserAccess(c, manager, username)
 }
 
-func resetAccess(c *cli.Context, manager auth.Manager, username, topic string) error {
+func resetAccess(c *cli.Context, manager user.Manager, username, topic string) error {
 	if username == "" {
 		return resetAllAccess(c, manager)
 	} else if topic == "" {
@@ -132,7 +132,7 @@ func resetAccess(c *cli.Context, manager auth.Manager, username, topic string) e
 	return resetUserTopicAccess(c, manager, username, topic)
 }
 
-func resetAllAccess(c *cli.Context, manager auth.Manager) error {
+func resetAllAccess(c *cli.Context, manager user.Manager) error {
 	if err := manager.ResetAccess("", ""); err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func resetAllAccess(c *cli.Context, manager auth.Manager) error {
 	return nil
 }
 
-func resetUserAccess(c *cli.Context, manager auth.Manager, username string) error {
+func resetUserAccess(c *cli.Context, manager user.Manager, username string) error {
 	if err := manager.ResetAccess(username, ""); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func resetUserAccess(c *cli.Context, manager auth.Manager, username string) erro
 	return showUserAccess(c, manager, username)
 }
 
-func resetUserTopicAccess(c *cli.Context, manager auth.Manager, username string, topic string) error {
+func resetUserTopicAccess(c *cli.Context, manager user.Manager, username string, topic string) error {
 	if err := manager.ResetAccess(username, topic); err != nil {
 		return err
 	}
@@ -156,14 +156,14 @@ func resetUserTopicAccess(c *cli.Context, manager auth.Manager, username string,
 	return showUserAccess(c, manager, username)
 }
 
-func showAccess(c *cli.Context, manager auth.Manager, username string) error {
+func showAccess(c *cli.Context, manager user.Manager, username string) error {
 	if username == "" {
 		return showAllAccess(c, manager)
 	}
 	return showUserAccess(c, manager, username)
 }
 
-func showAllAccess(c *cli.Context, manager auth.Manager) error {
+func showAllAccess(c *cli.Context, manager user.Manager) error {
 	users, err := manager.Users()
 	if err != nil {
 		return err
@@ -171,23 +171,23 @@ func showAllAccess(c *cli.Context, manager auth.Manager) error {
 	return showUsers(c, manager, users)
 }
 
-func showUserAccess(c *cli.Context, manager auth.Manager, username string) error {
+func showUserAccess(c *cli.Context, manager user.Manager, username string) error {
 	users, err := manager.User(username)
-	if err == auth.ErrNotFound {
+	if err == user.ErrNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	} else if err != nil {
 		return err
 	}
-	return showUsers(c, manager, []*auth.User{users})
+	return showUsers(c, manager, []*user.User{users})
 }
 
-func showUsers(c *cli.Context, manager auth.Manager, users []*auth.User) error {
-	for _, user := range users {
-		fmt.Fprintf(c.App.ErrWriter, "user %s (%s)\n", user.Name, user.Role)
-		if user.Role == auth.RoleAdmin {
+func showUsers(c *cli.Context, manager user.Manager, users []*user.User) error {
+	for _, u := range users {
+		fmt.Fprintf(c.App.ErrWriter, "user %s (%s)\n", u.Name, u.Role)
+		if u.Role == user.RoleAdmin {
 			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
-		} else if len(user.Grants) > 0 {
-			for _, grant := range user.Grants {
+		} else if len(u.Grants) > 0 {
+			for _, grant := range u.Grants {
 				if grant.AllowRead && grant.AllowWrite {
 					fmt.Fprintf(c.App.ErrWriter, "- read-write access to topic %s\n", grant.TopicPattern)
 				} else if grant.AllowRead {
@@ -201,7 +201,7 @@ func showUsers(c *cli.Context, manager auth.Manager, users []*auth.User) error {
 		} else {
 			fmt.Fprintf(c.App.ErrWriter, "- no topic-specific permissions\n")
 		}
-		if user.Name == auth.Everyone {
+		if u.Name == user.Everyone {
 			defaultRead, defaultWrite := manager.DefaultAccess()
 			if defaultRead && defaultWrite {
 				fmt.Fprintln(c.App.ErrWriter, "- read-write access to all (other) topics (server config)")

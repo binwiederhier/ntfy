@@ -3,13 +3,13 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"heckel.io/ntfy/auth"
+	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	admin := v.user != nil && v.user.Role == auth.RoleAdmin
+	admin := v.user != nil && v.user.Role == user.RoleAdmin
 	if !admin {
 		if !s.config.EnableSignup {
 			return errHTTPBadRequestSignupNotEnabled
@@ -26,13 +26,13 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if err := json.NewDecoder(body).Decode(&newAccount); err != nil {
 		return err
 	}
-	if existingUser, _ := s.auth.User(newAccount.Username); existingUser != nil {
+	if existingUser, _ := s.userManager.User(newAccount.Username); existingUser != nil {
 		return errHTTPConflictUserExists
 	}
 	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
 		return errHTTPTooManyRequestsAccountCreateLimit
 	}
-	if err := s.auth.AddUser(newAccount.Username, newAccount.Password, auth.RoleUser); err != nil { // TODO this should return a User
+	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -84,23 +84,23 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				Code:       v.user.Plan.Code,
 				Upgradable: v.user.Plan.Upgradable,
 			}
-		} else if v.user.Role == auth.RoleAdmin {
+		} else if v.user.Role == user.RoleAdmin {
 			response.Plan = &apiAccountPlan{
-				Code:       string(auth.PlanUnlimited),
+				Code:       string(user.PlanUnlimited),
 				Upgradable: false,
 			}
 		} else {
 			response.Plan = &apiAccountPlan{
-				Code:       string(auth.PlanDefault),
+				Code:       string(user.PlanDefault),
 				Upgradable: true,
 			}
 		}
 
 	} else {
-		response.Username = auth.Everyone
-		response.Role = string(auth.RoleAnonymous)
+		response.Username = user.Everyone
+		response.Role = string(user.RoleAnonymous)
 		response.Plan = &apiAccountPlan{
-			Code:       string(auth.PlanNone),
+			Code:       string(user.PlanNone),
 			Upgradable: true,
 		}
 	}
@@ -114,7 +114,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if v.user == nil {
 		return errHTTPUnauthorized
 	}
-	if err := s.auth.RemoveUser(v.user.Name); err != nil {
+	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -136,7 +136,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	if err := json.NewDecoder(body).Decode(&newPassword); err != nil {
 		return err
 	}
-	if err := s.auth.ChangePassword(v.user.Name, newPassword.Password); err != nil {
+	if err := s.userManager.ChangePassword(v.user.Name, newPassword.Password); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -145,19 +145,43 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (s *Server) handleAccountTokenGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user == nil {
 		return errHTTPUnauthorized
 	}
-	token, err := s.auth.CreateToken(v.user)
+	token, err := s.userManager.CreateToken(v.user)
 	if err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &apiAccountTokenResponse{
-		Token: token,
+		Token:   token.Value,
+		Expires: token.Expires,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	// TODO rate limit
+	if v.user == nil {
+		return errHTTPUnauthorized
+	} else if v.user.Token == "" {
+		return errHTTPBadRequestNoTokenProvided
+	}
+	token, err := s.userManager.ExtendToken(v.user)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	response := &apiAccountTokenResponse{
+		Token:   token.Value,
+		Expires: token.Expires,
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err
@@ -170,7 +194,7 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request
 	if v.user == nil || v.user.Token == "" {
 		return errHTTPUnauthorized
 	}
-	if err := s.auth.RemoveToken(v.user); err != nil {
+	if err := s.userManager.RemoveToken(v.user); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
@@ -188,12 +212,12 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 		return err
 	}
 	defer r.Body.Close()
-	var newPrefs auth.UserPrefs
+	var newPrefs user.Prefs
 	if err := json.NewDecoder(body).Decode(&newPrefs); err != nil {
 		return err
 	}
 	if v.user.Prefs == nil {
-		v.user.Prefs = &auth.UserPrefs{}
+		v.user.Prefs = &user.Prefs{}
 	}
 	prefs := v.user.Prefs
 	if newPrefs.Language != "" {
@@ -201,7 +225,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 	}
 	if newPrefs.Notification != nil {
 		if prefs.Notification == nil {
-			prefs.Notification = &auth.UserNotificationPrefs{}
+			prefs.Notification = &user.NotificationPrefs{}
 		}
 		if newPrefs.Notification.DeleteAfter > 0 {
 			prefs.Notification.DeleteAfter = newPrefs.Notification.DeleteAfter
@@ -213,7 +237,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
 		}
 	}
-	return s.auth.ChangeSettings(v.user)
+	return s.userManager.ChangeSettings(v.user)
 }
 
 func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -227,12 +251,12 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 		return err
 	}
 	defer r.Body.Close()
-	var newSubscription auth.UserSubscription
+	var newSubscription user.Subscription
 	if err := json.NewDecoder(body).Decode(&newSubscription); err != nil {
 		return err
 	}
 	if v.user.Prefs == nil {
-		v.user.Prefs = &auth.UserPrefs{}
+		v.user.Prefs = &user.Prefs{}
 	}
 	newSubscription.ID = "" // Client cannot set ID
 	for _, subscription := range v.user.Prefs.Subscriptions {
@@ -244,7 +268,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	if newSubscription.ID == "" {
 		newSubscription.ID = util.RandomString(16)
 		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, &newSubscription)
-		if err := s.auth.ChangeSettings(v.user); err != nil {
+		if err := s.userManager.ChangeSettings(v.user); err != nil {
 			return err
 		}
 	}
@@ -268,7 +292,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
 		return nil
 	}
-	newSubscriptions := make([]*auth.UserSubscription, 0)
+	newSubscriptions := make([]*user.Subscription, 0)
 	for _, subscription := range v.user.Prefs.Subscriptions {
 		if subscription.ID != subscriptionID {
 			newSubscriptions = append(newSubscriptions, subscription)
@@ -276,7 +300,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	}
 	if len(newSubscriptions) < len(v.user.Prefs.Subscriptions) {
 		v.user.Prefs.Subscriptions = newSubscriptions
-		if err := s.auth.ChangeSettings(v.user); err != nil {
+		if err := s.userManager.ChangeSettings(v.user); err != nil {
 			return err
 		}
 	}

@@ -34,9 +34,9 @@ import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
 import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
-import api, {UnauthorizedError} from "../app/Api";
 import session from "../app/Session";
 import routes from "./routes";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const Preferences = () => {
     return (
@@ -668,7 +668,7 @@ const maybeUpdateAccountSettings = async (payload) => {
         return;
     }
     try {
-        await api.updateAccountSettings(config.baseUrl, session.token(), payload);
+        await accountApi.updateSettings(payload);
     } catch (e) {
         console.log(`[Preferences] Error updating account settings`, e);
         if ((e instanceof UnauthorizedError)) {

@@ -16,11 +16,11 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
-import api, {UnauthorizedError} from "../app/Api";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {useNavigate, useOutletContext} from "react-router-dom";
+import {useOutletContext} from "react-router-dom";
 import {formatBytes} from "../app/utils";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const Account = () => {
     if (!session.exists()) {
@@ -147,7 +147,7 @@ const ChangePassword = () => {
     };
     const handleDialogSubmit = async (newPassword) => {
         try {
-            await api.changePassword(config.baseUrl, session.token(), newPassword);
+            await accountApi.changePassword(newPassword);
             setDialogOpen(false);
             console.debug(`[Account] Password changed`);
         } catch (e) {
@@ -234,7 +234,7 @@ const DeleteAccount = () => {
     };
     const handleDialogSubmit = async (newPassword) => {
         try {
-            await api.deleteAccount(config.baseUrl, session.token());
+            await accountApi.delete();
             setDialogOpen(false);
             console.debug(`[Account] Account deleted`);
             // TODO delete local storage

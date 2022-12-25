@@ -1,16 +1,16 @@
 import * as React from 'react';
+import {useState} from 'react';
 import Typography from "@mui/material/Typography";
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api, {UnauthorizedError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
-import {useState} from "react";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const Login = () => {
     const { t } = useTranslation();
@@ -21,7 +21,7 @@ const Login = () => {
         event.preventDefault();
         const user = { username, password };
         try {
-            const token = await api.login(config.baseUrl, user);
+            const token = await accountApi.login(user);
             console.log(`[Login] User auth for user ${user.username} successful, token is ${token}`);
             session.store(user.username, token);
             window.location.href = routes.app;

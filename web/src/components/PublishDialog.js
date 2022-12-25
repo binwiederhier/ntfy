@@ -1,6 +1,5 @@
 import * as React from 'react';
 import {useEffect, useRef, useState} from 'react';
-import {NotificationItem} from "./Notifications";
 import theme from "./theme";
 import {Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
 import TextField from "@mui/material/TextField";
@@ -18,16 +17,17 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {basicAuth, formatBytes, maybeWithBasicAuth, topicShortUrl, topicUrl, validTopic, validUrl} from "../app/utils";
+import {formatBytes, maybeWithBasicAuth, topicShortUrl, topicUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
-import api, {UnauthorizedError} from "../app/Api";
+import api from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const PublishDialog = (props) => {
     const { t } = useTranslation();
@@ -161,7 +161,7 @@ const PublishDialog = (props) => {
 
     const checkAttachmentLimits = async (file) => {
         try {
-            const account = await api.getAccount(baseUrl, session.token());
+            const account = await accountApi.get();
             const fileSizeLimit = account.limits.attachment_file_size ?? 0;
             const remainingBytes = account.stats.attachment_total_size_remaining;
             const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;

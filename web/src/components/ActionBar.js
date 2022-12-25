@@ -18,7 +18,7 @@ import MenuList from '@mui/material/MenuList';
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import api, {UnauthorizedError} from "../app/Api";
+import api from "../app/Api";
 import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
@@ -31,6 +31,7 @@ import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import {Logout, Person, Settings} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();
@@ -119,7 +120,7 @@ const SettingsIcons = (props) => {
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
             try {
-                await api.deleteAccountSubscription(config.baseUrl, session.token(), props.subscription.remoteId);
+                await accountApi.deleteSubscription(props.subscription.remoteId);
             } catch (e) {
                 console.log(`[ActionBar] Error unsubscribing`, e);
                 if ((e instanceof UnauthorizedError)) {
@@ -268,9 +269,12 @@ const ProfileIcon = (props) => {
         setAnchorEl(null);
     };
     const handleLogout = async () => {
-        await api.logout(config.baseUrl, session.token());
-        session.reset();
-        window.location.href = routes.app;
+        try {
+            await accountApi.logout();
+        } finally {
+            session.reset();
+            window.location.href = routes.app;
+        }
     };
     return (
         <>

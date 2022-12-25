@@ -1,16 +1,16 @@
 import * as React from 'react';
+import {useState} from 'react';
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
-import api, {AccountCreateLimitReachedError, UnauthorizedError, UsernameTakenError} from "../app/Api";
 import routes from "./routes";
 import session from "../app/Session";
 import Typography from "@mui/material/Typography";
 import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
-import {useState} from "react";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import accountApi, {AccountCreateLimitReachedError, UsernameTakenError} from "../app/AccountApi";
 
 const Signup = () => {
     const { t } = useTranslation();
@@ -22,8 +22,8 @@ const Signup = () => {
         event.preventDefault();
         const user = { username, password };
         try {
-            await api.createAccount(config.baseUrl, user.username, user.password);
-            const token = await api.login(config.baseUrl, user);
+            await accountApi.create(user.username, user.password);
+            const token = await accountApi.login(user);
             console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
             session.store(user.username, token);
             window.location.href = routes.app;

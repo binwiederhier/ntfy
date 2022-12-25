@@ -8,7 +8,8 @@ import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import session from "../app/Session";
-import api, {UnauthorizedError} from "../app/Api";
+import {UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -65,7 +66,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
                     try {
-                        const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
+                        const remoteSubscription = await accountApi.addSubscription({
                             base_url: baseUrl,
                             topic: params.topic
                         });

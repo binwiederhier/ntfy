@@ -8,7 +8,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
-import api, {UnauthorizedError} from "../app/Api";
+import api from "../app/Api";
 import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
 import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
@@ -17,6 +17,7 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -31,7 +32,7 @@ const SubscribeDialog = (props) => {
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
         if (session.exists()) {
             try {
-                const remoteSubscription = await api.addAccountSubscription(config.baseUrl, session.token(), {
+                const remoteSubscription = await accountApi.addSubscription({
                     base_url: actualBaseUrl,
                     topic: topic
                 });

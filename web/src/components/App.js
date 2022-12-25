@@ -26,13 +26,13 @@ import {Backdrop, CircularProgress} from "@mui/material";
 import Home from "./Home";
 import Login from "./Login";
 import i18n from "i18next";
-import api, {UnauthorizedError} from "../app/Api";
 import prefs from "../app/Prefs";
 import session from "../app/Session";
 import Pricing from "./Pricing";
 import Signup from "./Signup";
 import Account from "./Account";
 import ResetPassword from "./ResetPassword";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 // TODO races when two tabs are open
 // TODO investigate service workers
@@ -101,24 +101,24 @@ const Layout = () => {
                 if (!session.token()) {
                     return;
                 }
-                const acc = await api.getAccount(config.baseUrl, session.token());
-                setAccount(acc);
-                if (acc.language) {
-                    await i18n.changeLanguage(acc.language);
+                const remoteAccount = await accountApi.get();
+                setAccount(remoteAccount);
+                if (remoteAccount.language) {
+                    await i18n.changeLanguage(remoteAccount.language);
                 }
-                if (acc.notification) {
-                    if (acc.notification.sound) {
-                        await prefs.setSound(acc.notification.sound);
+                if (remoteAccount.notification) {
+                    if (remoteAccount.notification.sound) {
+                        await prefs.setSound(remoteAccount.notification.sound);
                     }
-                    if (acc.notification.delete_after) {
-                        await prefs.setDeleteAfter(acc.notification.delete_after);
+                    if (remoteAccount.notification.delete_after) {
+                        await prefs.setDeleteAfter(remoteAccount.notification.delete_after);
                     }
-                    if (acc.notification.min_priority) {
-                        await prefs.setMinPriority(acc.notification.min_priority);
+                    if (remoteAccount.notification.min_priority) {
+                        await prefs.setMinPriority(remoteAccount.notification.min_priority);
                     }
                 }
-                if (acc.subscriptions) {
-                    await subscriptionManager.syncFromRemote(acc.subscriptions);
+                if (remoteAccount.subscriptions) {
+                    await subscriptionManager.syncFromRemote(remoteAccount.subscriptions);
                 }
             } catch (e) {
                 console.log(`[App] Error fetching account`, e);

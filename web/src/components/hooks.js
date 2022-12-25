@@ -94,5 +94,6 @@ export const useBackgroundProcesses = () => {
     useEffect(() => {
         poller.startWorker();
         pruner.startWorker();
+        accountApi.startWorker();
     }, []);
 }

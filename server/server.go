@@ -36,8 +36,6 @@ import (
 
 /*
 	TODO
-		expire tokens
-		auto-extend tokens from UI
 		use token auth in "SubscribeDialog"
 		upload files based on user limit
 		database migration

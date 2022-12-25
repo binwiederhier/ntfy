@@ -16,11 +16,19 @@ import {
 } from "./utils";
 import userManager from "./UserManager";
 import session from "./Session";
+import subscriptionManager from "./SubscriptionManager";
+
+const delayMillis = 45000; // 45 seconds
+const intervalMillis = 900000; // 15 minutes
 
 class AccountApi {
+    constructor() {
+        this.timer = null;
+    }
+
     async login(user) {
         const url = accountTokenUrl(config.baseUrl);
-        console.log(`[Api] Checking auth for ${url}`);
+        console.log(`[AccountApi] Checking auth for ${url}`);
         const response = await fetch(url, {
             method: "POST",
             headers: maybeWithBasicAuth({}, user)
@@ -39,7 +47,7 @@ class AccountApi {
 
     async logout(token) {
         const url = accountTokenUrl(config.baseUrl);
-        console.log(`[Api] Logging out from ${url} using token ${token}`);
+        console.log(`[AccountApi] Logging out from ${url} using token ${token}`);
         const response = await fetch(url, {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, token)
@@ -57,7 +65,7 @@ class AccountApi {
             username: username,
             password: password
         });
-        console.log(`[Api] Creating user account ${url}`);
+        console.log(`[AccountApi] Creating user account ${url}`);
         const response = await fetch(url, {
             method: "POST",
             body: body
@@ -73,7 +81,7 @@ class AccountApi {
 
     async get() {
         const url = accountUrl(config.baseUrl);
-        console.log(`[Api] Fetching user account ${url}`);
+        console.log(`[AccountApi] Fetching user account ${url}`);
         const response = await fetch(url, {
             headers: maybeWithBearerAuth({}, session.token())
         });
@@ -83,13 +91,13 @@ class AccountApi {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         const account = await response.json();
-        console.log(`[Api] Account`, account);
+        console.log(`[AccountApi] Account`, account);
         return account;
     }
 
     async delete() {
         const url = accountUrl(config.baseUrl);
-        console.log(`[Api] Deleting user account ${url}`);
+        console.log(`[AccountApi] Deleting user account ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, session.token())
@@ -103,7 +111,7 @@ class AccountApi {
 
     async changePassword(newPassword) {
         const url = accountPasswordUrl(config.baseUrl);
-        console.log(`[Api] Changing account password ${url}`);
+        console.log(`[AccountApi] Changing account password ${url}`);
         const response = await fetch(url, {
             method: "POST",
             headers: maybeWithBearerAuth({}, session.token()),
@@ -120,7 +128,7 @@ class AccountApi {
 
     async extendToken() {
         const url = accountTokenUrl(config.baseUrl);
-        console.log(`[Api] Extending user access token ${url}`);
+        console.log(`[AccountApi] Extending user access token ${url}`);
         const response = await fetch(url, {
             method: "PATCH",
             headers: maybeWithBearerAuth({}, session.token())
@@ -135,7 +143,7 @@ class AccountApi {
     async updateSettings(payload) {
         const url = accountSettingsUrl(config.baseUrl);
         const body = JSON.stringify(payload);
-        console.log(`[Api] Updating user account ${url}: ${body}`);
+        console.log(`[AccountApi] Updating user account ${url}: ${body}`);
         const response = await fetch(url, {
             method: "PATCH",
             headers: maybeWithBearerAuth({}, session.token()),
@@ -151,7 +159,7 @@ class AccountApi {
     async addSubscription(payload) {
         const url = accountSubscriptionUrl(config.baseUrl);
         const body = JSON.stringify(payload);
-        console.log(`[Api] Adding user subscription ${url}: ${body}`);
+        console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
         const response = await fetch(url, {
             method: "POST",
             headers: maybeWithBearerAuth({}, session.token()),
@@ -163,13 +171,13 @@ class AccountApi {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         const subscription = await response.json();
-        console.log(`[Api] Subscription`, subscription);
+        console.log(`[AccountApi] Subscription`, subscription);
         return subscription;
     }
 
     async deleteSubscription(remoteId) {
         const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
-        console.log(`[Api] Removing user subscription ${url}`);
+        console.log(`[AccountApi] Removing user subscription ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
             headers: maybeWithBearerAuth({}, session.token())
@@ -178,6 +186,27 @@ class AccountApi {
             throw new UnauthorizedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    startWorker() {
+        if (this.timer !== null) {
+            return;
+        }
+        console.log(`[AccountApi] Starting worker`);
+        this.timer = setInterval(() => this.runWorker(), intervalMillis);
+        setTimeout(() => this.runWorker(), delayMillis);
+    }
+
+    async runWorker() {
+        if (!session.token()) {
+            return;
+        }
+        console.log(`[AccountApi] Extending user access token`);
+        try {
+            await this.extendToken();
+        } catch (e) {
+            console.log(`[AccountApi] Error extending user access token`, e);
         }
     }
 }

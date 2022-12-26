@@ -84,9 +84,10 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Bettarr Notifications](https://github.com/NiNiyas/Bettarr-Notifications) - Better Notifications for Sonarr and Radarr (Python)
 - [Notify me the intruders](https://github.com/nothingbutlucas/notify_me_the_intruders) - Notify you if they are intruders or new connections on your network (Shell)
 - [Send GitHub Action to ntfy](https://github.com/NiNiyas/ntfy-action) - Send GitHub Action workflow notifications to ntfy (JS)
-- [ntfy alertmanager bridge](https://github.com/aTable/ntfy_alertmanager_bridge) - Basic alertmanager bridge to ntfy (JS)
-- [ntfy-alertmanager](https://hub.xenrox.net/~xenrox/ntfy-alertmanager) - A bridge between ntfy and Alertmanager (Go)
-- [alertmanager-ntfy](https://github.com/pinpox/alertmanager-ntfy) - Relay prometheus alertmanager alerts to ntfy (Go)
+- [aTable/ntfy alertmanager bridge](https://github.com/aTable/ntfy_alertmanager_bridge) - Basic alertmanager bridge to ntfy (JS)
+- [~xenrox/ntfy-alertmanager](https://hub.xenrox.net/~xenrox/ntfy-alertmanager) - A bridge between ntfy and Alertmanager (Go)
+- [pinpox/alertmanager-ntfy](https://github.com/pinpox/alertmanager-ntfy) - Relay prometheus alertmanager alerts to ntfy (Go)
+- [alexbakker/alertmanager-ntfy](https://github.com/alexbakker/alertmanager-ntfy) - Service that forwards Prometheus Alertmanager notifications to ntfy (Go)
 - [restreamchat2ntfy](https://github.com/kurohuku7/restreamchat2ntfy) - Send restream.io chat to ntfy to check on the Meta Quest (JS)
 - [k8s-ntfy-deployment-service](https://github.com/Christian42/k8s-ntfy-deployment-service) - Automatic Kubernetes (k8s) ntfy deployment
 - [huginn-global-entry-notif](https://github.com/kylezoa/huginn-global-entry-notif) - Checks CBP API for available appointments with Huginn (JSON)

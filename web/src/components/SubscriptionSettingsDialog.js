@@ -15,6 +15,9 @@ import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import session from "../app/Session";
+import routes from "./routes";
 
 const SubscriptionSettingsDialog = (props) => {
     const { t } = useTranslation();
@@ -23,6 +26,17 @@ const SubscriptionSettingsDialog = (props) => {
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const handleSave = async () => {
         await subscriptionManager.setDisplayName(subscription.id, displayName);
+        if (session.exists() && subscription.remoteId) {
+            try {
+                console.log(`[SubscriptionSettingsDialog] Updating subscription display name to ${displayName}`);
+                await accountApi.updateSubscription(subscription.remoteId, { display_name: displayName });
+            } catch (e) {
+                console.log(`[SubscriptionSettingsDialog] Error updating subscription`, e);
+                if ((e instanceof UnauthorizedError)) {
+                    session.resetAndRedirect(routes.login);
+                }
+            }
+        }
         props.onClose();
     }
     return (

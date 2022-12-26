@@ -319,42 +319,52 @@ const UserTable = (props) => {
         }
     };
     return (
-        <Table size="small" aria-label={t("prefs_users_table")}>
-            <TableHead>
-                <TableRow>
-                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
-                    <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
-                    <TableCell/>
-                </TableRow>
-            </TableHead>
-            <TableBody>
-                {props.users?.map(user => (
-                    <TableRow
-                        key={user.baseUrl}
-                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                    >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
-                        <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
-                        <TableCell align="right">
-                            <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
-                                <EditIcon/>
-                            </IconButton>
-                            <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
-                                <CloseIcon />
-                            </IconButton>
-                        </TableCell>
+        <div>
+            <Table size="small" aria-label={t("prefs_users_table")}>
+                <TableHead>
+                    <TableRow>
+                        <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
+                        <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
+                        <TableCell/>
                     </TableRow>
-                ))}
-            </TableBody>
-            <UserDialog
-                key={`userEditDialog${dialogKey}`}
-                open={dialogOpen}
-                user={dialogUser}
-                users={props.users}
-                onCancel={handleDialogCancel}
-                onSubmit={handleDialogSubmit}
-            />
-        </Table>
+                </TableHead>
+                <TableBody>
+                    {props.users?.map(user => (
+                        <TableRow
+                            key={user.baseUrl}
+                            sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                        >
+                            <TableCell component="th" scope="row" sx={{paddingLeft: 0}}
+                                       aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
+                            <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
+                            <TableCell align="right">
+                                <IconButton onClick={() => handleEditClick(user)}
+                                            aria-label={t("prefs_users_edit_button")}>
+                                    <EditIcon/>
+                                </IconButton>
+                                <IconButton onClick={() => handleDeleteClick(user)}
+                                            aria-label={t("prefs_users_delete_button")}>
+                                    <CloseIcon/>
+                                </IconButton>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+                <UserDialog
+                    key={`userEditDialog${dialogKey}`}
+                    open={dialogOpen}
+                    user={dialogUser}
+                    users={props.users}
+                    onCancel={handleDialogCancel}
+                    onSubmit={handleDialogSubmit}
+                />
+            </Table>
+            {session.exists() &&
+                <Typography>
+                    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                </Typography>
+            }
+        </div>
     );
 };
 
@@ -672,8 +682,7 @@ const maybeUpdateAccountSettings = async (payload) => {
     } catch (e) {
         console.log(`[Preferences] Error updating account settings`, e);
         if ((e instanceof UnauthorizedError)) {
-            session.reset();
-            window.location.href = routes.login;
+            session.resetAndRedirect(routes.login);
         }
     }
 };

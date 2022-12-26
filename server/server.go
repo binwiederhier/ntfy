@@ -355,6 +355,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleAccountSettingsChange(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
 		return s.handleAccountSubscriptionAdd(w, r, v)
+	} else if r.Method == http.MethodPatch && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+		return s.handleAccountSubscriptionChange(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
 		return s.handleAccountSubscriptionDelete(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {

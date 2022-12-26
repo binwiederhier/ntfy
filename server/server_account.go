@@ -5,6 +5,7 @@ import (
 	"errors"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
+	"io"
 	"net/http"
 )
 
@@ -244,15 +245,8 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	if v.user == nil {
 		return errors.New("no user")
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	body, err := util.Peek(r.Body, 4096)               // FIXME
+	newSubscription, err := readJSONBody[user.Subscription](r.Body)
 	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	var newSubscription user.Subscription
-	if err := json.NewDecoder(body).Decode(&newSubscription); err != nil {
 		return err
 	}
 	if v.user.Prefs == nil {
@@ -261,18 +255,60 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	newSubscription.ID = "" // Client cannot set ID
 	for _, subscription := range v.user.Prefs.Subscriptions {
 		if newSubscription.BaseURL == subscription.BaseURL && newSubscription.Topic == subscription.Topic {
-			newSubscription = *subscription
+			newSubscription = subscription
 			break
 		}
 	}
 	if newSubscription.ID == "" {
 		newSubscription.ID = util.RandomString(16)
-		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, &newSubscription)
+		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, newSubscription)
 		if err := s.userManager.ChangeSettings(v.user); err != nil {
 			return err
 		}
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	if err := json.NewEncoder(w).Encode(newSubscription); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	if v.user == nil {
+		return errors.New("no user") // FIXME s.ensureUser
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
+	if len(matches) != 2 {
+		return errHTTPInternalErrorInvalidFilePath // FIXME
+	}
+	updatedSubscription, err := readJSONBody[user.Subscription](r.Body)
+	if err != nil {
+		return err
+	}
+	subscriptionID := matches[1]
+	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
+		return errHTTPNotFound
+	}
+	var subscription *user.Subscription
+	for _, sub := range v.user.Prefs.Subscriptions {
+		if sub.ID == subscriptionID {
+			sub.DisplayName = updatedSubscription.DisplayName
+			subscription = sub
+			break
+		}
+	}
+	if subscription == nil {
+		return errHTTPNotFound
+	}
+	if err := s.userManager.ChangeSettings(v.user); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	if err := json.NewEncoder(w).Encode(subscription); err != nil {
 		return err
 	}
 	return nil
@@ -305,4 +341,17 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 		}
 	}
 	return nil
+}
+
+func readJSONBody[T any](body io.ReadCloser) (*T, error) {
+	body, err := util.Peek(body, 4096)
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+	var obj T
+	if err := json.NewDecoder(body).Decode(&obj); err != nil {
+		return nil, err
+	}
+	return &obj, nil
 }

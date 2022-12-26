@@ -1,3 +1,5 @@
+import routes from "../components/routes";
+
 class Session {
     store(username, token) {
         localStorage.setItem("user", username);
@@ -7,6 +9,11 @@ class Session {
     reset() {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
+    }
+
+    resetAndRedirect(url) {
+        this.reset();
+        window.location.href = url;
     }
 
     exists() {

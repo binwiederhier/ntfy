@@ -175,6 +175,25 @@ class AccountApi {
         return subscription;
     }
 
+    async updateSubscription(remoteId, payload) {
+        const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
+        const body = JSON.stringify(payload);
+        console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
+        const response = await fetch(url, {
+            method: "PATCH",
+            headers: maybeWithBearerAuth({}, session.token()),
+            body: body
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        const subscription = await response.json();
+        console.log(`[AccountApi] Subscription`, subscription);
+        return subscription;
+    }
+
     async deleteSubscription(remoteId) {
         const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
         console.log(`[AccountApi] Removing user subscription ${url}`);

@@ -204,7 +204,7 @@ const SettingsIcons = (props) => {
 
     return (
         <>
-            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} sx={{marginRight: 0}} aria-label={t("action_bar_toggle_mute")}>
+            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} aria-label={t("action_bar_toggle_mute")}>
                 {subscription.mutedUntil ? <NotificationsOffIcon/> : <NotificationsIcon/>}
             </IconButton>
             <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} aria-label={t("action_bar_toggle_action_menu")}>

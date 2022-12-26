@@ -42,7 +42,6 @@ import (
 		publishXHR + poll should pick current user, not from userManager
 		reserve topics
 		purge accounts that were not logged into in X
-		sync subscription display name
 		reset daily limits for users
 		store users
 		Pages:

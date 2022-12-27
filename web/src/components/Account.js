@@ -88,7 +88,7 @@ const Stats = () => {
                     </div>
                     <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
                 </Pref>
-                <Pref labelId={"attachments"} title={t("Attachment storage")} subtitle={t("5 MB per file")}>
+                <Pref labelId={"attachments"} title={t("Attachment storage")} subtitle={t("{{filesize}} per file", { filesize: formatBytes(account.limits.attachment_file_size) })}>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(account.limits.attachment_total_size) }) : t("Unlimited")}</Typography>
@@ -153,8 +153,7 @@ const ChangePassword = () => {
         } catch (e) {
             console.log(`[Account] Error changing password`, e);
             if ((e instanceof UnauthorizedError)) {
-                session.reset();
-                window.location.href = routes.login;
+                session.resetAndRedirect(routes.login);
             }
             // TODO show error
         }
@@ -238,13 +237,11 @@ const DeleteAccount = () => {
             setDialogOpen(false);
             console.debug(`[Account] Account deleted`);
             // TODO delete local storage
-            session.reset();
-            window.location.href = routes.app;
+            session.resetAndRedirect(routes.app);
         } catch (e) {
             console.log(`[Account] Error deleting account`, e);
             if ((e instanceof UnauthorizedError)) {
-                session.reset();
-                window.location.href = routes.login;
+                session.resetAndRedirect(routes.login);
             }
             // TODO show error
         }

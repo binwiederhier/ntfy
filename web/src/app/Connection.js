@@ -1,4 +1,4 @@
-import {basicAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
+import {basicAuth, bearerAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 
 const retryBackoffSeconds = [5, 10, 15, 20, 30];
 
@@ -96,11 +96,17 @@ class Connection {
             params.push(`since=${this.since}`);
         }
         if (this.user) {
-            const auth = encodeBase64Url(basicAuth(this.user.username, this.user.password));
-            params.push(`auth=${auth}`);
+            params.push(`auth=${this.authParam()}`);
         }
         const wsUrl = topicUrlWs(this.baseUrl, this.topic);
         return (params.length === 0) ? wsUrl : `${wsUrl}?${params.join('&')}`;
+    }
+
+    authParam() {
+        if (this.user.password) {
+            return encodeBase64Url(basicAuth(this.user.username, this.user.password));
+        }
+        return encodeBase64Url(bearerAuth(this.user.token));
     }
 }
 

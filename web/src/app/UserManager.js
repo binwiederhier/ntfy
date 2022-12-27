@@ -1,20 +1,45 @@
 import db from "./db";
+import session from "./Session";
 
 class UserManager {
     async all() {
-        return db.users.toArray();
+        const users = await db.users.toArray();
+        if (session.exists()) {
+            users.unshift(this.localUser());
+        }
+        return users;
     }
 
     async get(baseUrl) {
+        if (session.exists() && baseUrl === config.baseUrl) {
+            return this.localUser();
+        }
         return db.users.get(baseUrl);
     }
 
     async save(user) {
+        if (user.baseUrl === config.baseUrl) {
+            return;
+        }
         await db.users.put(user);
     }
 
     async delete(baseUrl) {
+        if (session.exists() && baseUrl === config.baseUrl) {
+            return;
+        }
         await db.users.delete(baseUrl);
+    }
+
+    localUser() {
+        if (!session.exists()) {
+            return null;
+        }
+        return {
+            baseUrl: config.baseUrl,
+            username: session.username(),
+            token: session.token() // Not "password"!
+        };
     }
 }
 

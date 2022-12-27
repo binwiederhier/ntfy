@@ -5,9 +5,9 @@ import {
     accountSubscriptionUrl,
     accountTokenUrl,
     accountUrl,
-    fetchLinesIterator,
-    maybeWithBasicAuth,
-    maybeWithBearerAuth,
+    fetchLinesIterator, maybeWithAuth,
+    withBasicAuth,
+    withBearerAuth,
     topicShortUrl,
     topicUrl,
     topicUrlAuth,
@@ -24,7 +24,7 @@ class Api {
             ? topicUrlJsonPollWithSince(baseUrl, topic, since)
             : topicUrlJsonPoll(baseUrl, topic);
         const messages = [];
-        const headers = maybeWithBasicAuth({}, user);
+        const headers = maybeWithAuth({}, user);
         console.log(`[Api] Polling ${url}`);
         for await (let line of fetchLinesIterator(url, headers)) {
             console.log(`[Api, ${shortUrl}] Received message ${line}`);
@@ -45,7 +45,7 @@ class Api {
         const response = await fetch(baseUrl, {
             method: 'PUT',
             body: JSON.stringify(body),
-            headers: maybeWithBasicAuth(headers, user)
+            headers: maybeWithAuth(headers, user)
         });
         if (response.status < 200 || response.status > 299) {
             throw new Error(`Unexpected response: ${response.status}`);
@@ -111,7 +111,7 @@ class Api {
         const url = topicUrlAuth(baseUrl, topic);
         console.log(`[Api] Checking auth for ${url}`);
         const response = await fetch(url, {
-            headers: maybeWithBasicAuth({}, user)
+            headers: maybeWithAuth({}, user)
         });
         if (response.status >= 200 && response.status <= 299) {
             return true;

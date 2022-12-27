@@ -109,7 +109,7 @@ class ConnectionManager {
 
 const makeConnectionId = async (subscription, user) => {
     return (user)
-        ? hashCode(`${subscription.id}|${user.username}|${user.password}`)
+        ? hashCode(`${subscription.id}|${user.username}|${user.password ?? ""}|${user.token ?? ""}`)
         : hashCode(`${subscription.id}`);
 }
 

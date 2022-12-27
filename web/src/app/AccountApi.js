@@ -6,8 +6,8 @@ import {
     accountTokenUrl,
     accountUrl,
     fetchLinesIterator,
-    maybeWithBasicAuth,
-    maybeWithBearerAuth,
+    withBasicAuth,
+    withBearerAuth,
     topicShortUrl,
     topicUrl,
     topicUrlAuth,
@@ -31,7 +31,7 @@ class AccountApi {
         console.log(`[AccountApi] Checking auth for ${url}`);
         const response = await fetch(url, {
             method: "POST",
-            headers: maybeWithBasicAuth({}, user)
+            headers: withBasicAuth({}, user.username, user.password)
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
@@ -50,7 +50,7 @@ class AccountApi {
         console.log(`[AccountApi] Logging out from ${url} using token ${token}`);
         const response = await fetch(url, {
             method: "DELETE",
-            headers: maybeWithBearerAuth({}, token)
+            headers: withBearerAuth({}, token)
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
@@ -83,7 +83,7 @@ class AccountApi {
         const url = accountUrl(config.baseUrl);
         console.log(`[AccountApi] Fetching user account ${url}`);
         const response = await fetch(url, {
-            headers: maybeWithBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
@@ -100,7 +100,7 @@ class AccountApi {
         console.log(`[AccountApi] Deleting user account ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
-            headers: maybeWithBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
@@ -114,7 +114,7 @@ class AccountApi {
         console.log(`[AccountApi] Changing account password ${url}`);
         const response = await fetch(url, {
             method: "POST",
-            headers: maybeWithBearerAuth({}, session.token()),
+            headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
                 password: newPassword
             })
@@ -131,7 +131,7 @@ class AccountApi {
         console.log(`[AccountApi] Extending user access token ${url}`);
         const response = await fetch(url, {
             method: "PATCH",
-            headers: maybeWithBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
@@ -146,7 +146,7 @@ class AccountApi {
         console.log(`[AccountApi] Updating user account ${url}: ${body}`);
         const response = await fetch(url, {
             method: "PATCH",
-            headers: maybeWithBearerAuth({}, session.token()),
+            headers: withBearerAuth({}, session.token()),
             body: body
         });
         if (response.status === 401 || response.status === 403) {
@@ -162,7 +162,7 @@ class AccountApi {
         console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
         const response = await fetch(url, {
             method: "POST",
-            headers: maybeWithBearerAuth({}, session.token()),
+            headers: withBearerAuth({}, session.token()),
             body: body
         });
         if (response.status === 401 || response.status === 403) {
@@ -181,7 +181,7 @@ class AccountApi {
         console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
         const response = await fetch(url, {
             method: "PATCH",
-            headers: maybeWithBearerAuth({}, session.token()),
+            headers: withBearerAuth({}, session.token()),
             body: body
         });
         if (response.status === 401 || response.status === 403) {
@@ -199,13 +199,17 @@ class AccountApi {
         console.log(`[AccountApi] Removing user subscription ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
-            headers: maybeWithBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+    }
+
+    sync() {
+        // TODO
     }
 
     startWorker() {

@@ -175,6 +175,7 @@
   "prefs_notifications_delete_after_one_month_description": "Notifications are auto-deleted after one month",
   "prefs_users_title": "Manage users",
   "prefs_users_description": "Add/remove users for your protected topics here. Please note that username and password are stored in the browser's local storage.",
+  "prefs_users_description_no_sync": "Users and passwords are not synchronized to your account.",
   "prefs_users_table": "Users table",
   "prefs_users_add_button": "Add user",
   "prefs_users_edit_button": "Edit user",

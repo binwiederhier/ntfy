@@ -99,22 +99,31 @@ export const unmatchedTags = (tags) => {
     else return tags.filter(tag => !(tag in emojis));
 }
 
-export const maybeWithBasicAuth = (headers, user) => {
-    if (user) {
-        headers['Authorization'] = `Basic ${encodeBase64(`${user.username}:${user.password}`)}`;
+export const maybeWithAuth = (headers, user) => {
+    if (user && user.password) {
+        return withBasicAuth(headers, user.username, user.password);
+    } else if (user && user.token) {
+        return withBearerAuth(headers, user.token);
     }
     return headers;
 }
 
-export const maybeWithBearerAuth = (headers, token) => {
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+export const withBasicAuth = (headers, username, password) => {
+    headers['Authorization'] = basicAuth(username, password);
     return headers;
 }
 
 export const basicAuth = (username, password) => {
     return `Basic ${encodeBase64(`${username}:${password}`)}`;
+}
+
+export const withBearerAuth = (headers, token) => {
+    headers['Authorization'] = bearerAuth(token);
+    return headers;
+}
+
+export const bearerAuth = (token) => {
+    return `Bearer ${token}`;
 }
 
 export const encodeBase64 = (s) => {

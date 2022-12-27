@@ -123,8 +123,7 @@ const Layout = () => {
             } catch (e) {
                 console.log(`[App] Error fetching account`, e);
                 if ((e instanceof UnauthorizedError)) {
-                    session.reset();
-                    window.location.href = routes.login;
+                    session.resetAndRedirect(routes.login);
                 }
             }
         })();

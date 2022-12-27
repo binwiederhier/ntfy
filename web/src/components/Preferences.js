@@ -270,6 +270,7 @@ const Users = () => {
                 </Typography>
                 <Paragraph>
                     {t("prefs_users_description")}
+                    {session.exists() && <>{" " + t("prefs_users_description_no_sync")}</>}
                 </Paragraph>
                 {users?.length > 0 && <UserTable users={users}/>}
             </CardContent>
@@ -319,52 +320,49 @@ const UserTable = (props) => {
         }
     };
     return (
-        <div>
-            <Table size="small" aria-label={t("prefs_users_table")}>
-                <TableHead>
-                    <TableRow>
-                        <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
-                        <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
-                        <TableCell/>
+        <Table size="small" aria-label={t("prefs_users_table")}>
+            <TableHead>
+                <TableRow>
+                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_users_table_user_header")}</TableCell>
+                    <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
+                    <TableCell/>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+                {props.users?.map(user => (
+                    <TableRow
+                        key={user.baseUrl}
+                        sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                    >
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}}
+                                   aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
+                        <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
+                        <TableCell align="right">
+                            {user.baseUrl !== config.baseUrl &&
+                                <>
+                                    <IconButton onClick={() => handleEditClick(user)}
+                                                aria-label={t("prefs_users_edit_button")}>
+                                        <EditIcon/>
+                                    </IconButton>
+                                    <IconButton onClick={() => handleDeleteClick(user)}
+                                                aria-label={t("prefs_users_delete_button")}>
+                                        <CloseIcon/>
+                                    </IconButton>
+                                </>
+                            }
+                        </TableCell>
                     </TableRow>
-                </TableHead>
-                <TableBody>
-                    {props.users?.map(user => (
-                        <TableRow
-                            key={user.baseUrl}
-                            sx={{'&:last-child td, &:last-child th': {border: 0}}}
-                        >
-                            <TableCell component="th" scope="row" sx={{paddingLeft: 0}}
-                                       aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
-                            <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
-                            <TableCell align="right">
-                                <IconButton onClick={() => handleEditClick(user)}
-                                            aria-label={t("prefs_users_edit_button")}>
-                                    <EditIcon/>
-                                </IconButton>
-                                <IconButton onClick={() => handleDeleteClick(user)}
-                                            aria-label={t("prefs_users_delete_button")}>
-                                    <CloseIcon/>
-                                </IconButton>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-                <UserDialog
-                    key={`userEditDialog${dialogKey}`}
-                    open={dialogOpen}
-                    user={dialogUser}
-                    users={props.users}
-                    onCancel={handleDialogCancel}
-                    onSubmit={handleDialogSubmit}
-                />
-            </Table>
-            {session.exists() &&
-                <Typography>
-                    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                </Typography>
-            }
-        </div>
+                ))}
+            </TableBody>
+            <UserDialog
+                key={`userEditDialog${dialogKey}`}
+                open={dialogOpen}
+                user={dialogUser}
+                users={props.users}
+                onCancel={handleDialogCancel}
+                onSubmit={handleDialogSubmit}
+            />
+        </Table>
     );
 };
 

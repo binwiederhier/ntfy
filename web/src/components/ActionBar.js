@@ -124,8 +124,7 @@ const SettingsIcons = (props) => {
             } catch (e) {
                 console.log(`[ActionBar] Error unsubscribing`, e);
                 if ((e instanceof UnauthorizedError)) {
-                    session.reset();
-                    window.location.href = routes.login;
+                    session.resetAndRedirect(routes.login);
                 }
             }
         }
@@ -272,8 +271,7 @@ const ProfileIcon = (props) => {
         try {
             await accountApi.logout();
         } finally {
-            session.reset();
-            window.location.href = routes.app;
+            session.resetAndRedirect(routes.app);
         }
     };
     return (

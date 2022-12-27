@@ -74,8 +74,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
                     } catch (e) {
                         console.log(`[App] Auto-subscribing failed`, e);
                         if ((e instanceof UnauthorizedError)) {
-                            session.reset();
-                            window.location.href = routes.login;
+                            session.resetAndRedirect(routes.login);
                         }
                     }
                 }

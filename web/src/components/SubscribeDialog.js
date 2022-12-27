@@ -40,8 +40,7 @@ const SubscribeDialog = (props) => {
             } catch (e) {
                 console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
                 if ((e instanceof UnauthorizedError)) {
-                    session.reset();
-                    window.location.href = routes.login;
+                    session.resetAndRedirect(routes.login);
                 }
             }
         }

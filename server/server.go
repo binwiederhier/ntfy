@@ -36,14 +36,19 @@ import (
 
 /*
 	TODO
-		use token auth in "SubscribeDialog"
-		upload files based on user limit
 		database migration
-		publishXHR + poll should pick current user, not from userManager
 		reserve topics
 		purge accounts that were not logged into in X
 		reset daily limits for users
-		store users
+		"user list" shows * twice
+		"ntfy access everyone user4topic <bla>" twice -> UNIQUE constraint error
+		Account usage not updated "in real time"
+		Sync:
+			- "mute" setting
+			- figure out what settings are "web" or "phone"
+		UI:
+		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
+		- "Logout and delete local storage" option
 		Pages:
 		- Home
 		- Password reset
@@ -52,7 +57,6 @@ import (
 		-
 		Polishing:
 			aria-label for everything
-
 		Tests:
 		- APIs
 		- CRUD tokens

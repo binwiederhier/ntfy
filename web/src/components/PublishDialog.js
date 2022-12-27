@@ -17,7 +17,15 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {formatBytes, maybeWithBasicAuth, topicShortUrl, topicUrl, validTopic, validUrl} from "../app/utils";
+import {
+    formatBytes,
+    maybeWithAuth,
+    withBasicAuth,
+    topicShortUrl,
+    topicUrl,
+    validTopic,
+    validUrl
+} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
@@ -132,7 +140,7 @@ const PublishDialog = (props) => {
         const body = (attachFile) ? attachFile : message;
         try {
             const user = await userManager.get(baseUrl);
-            const headers = maybeWithBasicAuth({}, user);
+            const headers = maybeWithAuth({}, user);
             const progressFn = (ev) => {
                 if (ev.loaded > 0 && ev.total > 0) {
                     setStatus(t("publish_dialog_progress_uploading_detail", {
@@ -180,8 +188,7 @@ const PublishDialog = (props) => {
         } catch (e) {
             console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
             if ((e instanceof UnauthorizedError)) {
-                session.reset();
-                window.location.href = routes.login;
+                session.resetAndRedirect(routes.login);
             } else {
                 setAttachFileError(""); // Reset error (rely on server-side checking)
             }

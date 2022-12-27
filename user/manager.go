@@ -83,11 +83,11 @@ const (
 		WHERE t.token = ?
 	`
 	selectTopicPermsQuery = `
-		SELECT read, write 
-		FROM user_access
-		JOIN user ON user.user = '*' OR user.user = ?
-		WHERE ? LIKE user_access.topic
-		ORDER BY user.user DESC
+		SELECT read, write
+		FROM user_access a
+		JOIN user u ON u.id = a.user_id
+		WHERE (u.user = '*' OR u.user = ?) AND ? LIKE a.topic
+		ORDER BY u.user DESC
 	`
 )
 

@@ -8,6 +8,7 @@ import * as React from "react";
 import {useEffect, useRef, useState} from "react";
 import Box from "@mui/material/Box";
 import {formatShortDateTime, shuffle, topicDisplayName} from "../app/utils";
+import db from "../app/db";
 import {useLocation, useNavigate} from "react-router-dom";
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Grow from '@mui/material/Grow';
@@ -270,6 +271,7 @@ const ProfileIcon = (props) => {
     const handleLogout = async () => {
         try {
             await accountApi.logout();
+            await db.delete();
         } finally {
             session.resetAndRedirect(routes.app);
         }

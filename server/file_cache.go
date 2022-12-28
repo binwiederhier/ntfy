@@ -22,7 +22,6 @@ type fileCache struct {
 	dir              string
 	totalSizeCurrent int64
 	totalSizeLimit   int64
-	fileSizeLimit    int64
 	mu               sync.Mutex
 }
 

@@ -45,12 +45,12 @@ class AccountApi {
         return json.token;
     }
 
-    async logout(token) {
+    async logout() {
         const url = accountTokenUrl(config.baseUrl);
-        console.log(`[AccountApi] Logging out from ${url} using token ${token}`);
+        console.log(`[AccountApi] Logging out from ${url} using token ${session.token()}`);
         const response = await fetch(url, {
             method: "DELETE",
-            headers: withBearerAuth({}, token)
+            headers: withBearerAuth({}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();

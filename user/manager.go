@@ -243,6 +243,7 @@ func (a *Manager) RemoveExpiredTokens() error {
 	return nil
 }
 
+// ChangeSettings persists the user settings
 func (a *Manager) ChangeSettings(user *User) error {
 	settings, err := json.Marshal(user.Prefs)
 	if err != nil {
@@ -254,6 +255,8 @@ func (a *Manager) ChangeSettings(user *User) error {
 	return nil
 }
 
+// EnqueueStats adds the user to a queue which writes out user stats (messages, emails, ..) in
+// batches at a regular interval
 func (a *Manager) EnqueueStats(user *User) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

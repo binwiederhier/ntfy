@@ -244,6 +244,7 @@ func TestManager_Token_Valid(t *testing.T) {
 
 	// Create token for user
 	token, err := a.CreateToken(u)
+	require.Nil(t, err)
 	require.NotEmpty(t, token.Value)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires.Unix())
 

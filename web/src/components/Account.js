@@ -57,7 +57,7 @@ const Stats = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
     if (!account) {
-        return <></>; // TODO loading
+        return <></>;
     }
     const accountType = account.plan.code ?? "none";
     const normalize = (value, max) => (value / max * 100);
@@ -234,9 +234,9 @@ const DeleteAccount = () => {
     const handleDialogSubmit = async (newPassword) => {
         try {
             await accountApi.delete();
+            await db.delete();
             setDialogOpen(false);
             console.debug(`[Account] Account deleted`);
-            // TODO delete local storage
             session.resetAndRedirect(routes.app);
         } catch (e) {
             console.log(`[Account] Error deleting account`, e);

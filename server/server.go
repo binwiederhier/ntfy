@@ -50,14 +50,11 @@ import (
 			- figure out what settings are "web" or "phone"
 		UI:
 		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
-		- "Logout and delete local storage" option
-		- Delete local storage when deleting account
 		Pages:
 		- Home
 		- Password reset
 		- Pricing
 		- change email
-		-
 		Polishing:
 			aria-label for everything
 		Tests:
@@ -345,6 +342,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
+		return s.ensureAccountsEnabled(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
 		return s.ensureAccountsEnabled(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
@@ -353,8 +352,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWithAccount(s.handleAccountDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
 		return s.ensureWithAccount(s.handleAccountPasswordChange)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
-		return s.ensureWithAccount(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountTokenPath {
 		return s.ensureWithAccount(s.handleAccountTokenExtend)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
@@ -1408,7 +1405,7 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 
 func (s *Server) ensureAccountsEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if s.userManager != nil {
+		if s.userManager == nil {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)
@@ -1417,7 +1414,7 @@ func (s *Server) ensureAccountsEnabled(next handleFunc) handleFunc {
 
 func (s *Server) ensureWithAccount(next handleFunc) handleFunc {
 	return s.ensureAccountsEnabled(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if v.user != nil {
+		if v.user == nil {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)

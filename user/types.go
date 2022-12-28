@@ -4,6 +4,7 @@ package user
 import (
 	"errors"
 	"regexp"
+	"time"
 )
 
 type Auther interface {
@@ -31,7 +32,7 @@ type User struct {
 
 type Token struct {
 	Value   string
-	Expires int64
+	Expires time.Time
 }
 
 type Prefs struct {

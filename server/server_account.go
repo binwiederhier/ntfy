@@ -159,7 +159,7 @@ func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, r *http.Request,
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
-		Expires: token.Expires,
+		Expires: token.Expires.Unix(),
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err
@@ -182,7 +182,7 @@ func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
-		Expires: token.Expires,
+		Expires: token.Expires.Unix(),
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		return err

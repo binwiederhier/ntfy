@@ -188,6 +188,9 @@ func (a *Manager) Authenticate(username, password string) (*User, error) {
 // AuthenticateToken checks if the token exists and returns the associated User if it does.
 // The method sets the User.Token value to the token that was used for authentication.
 func (a *Manager) AuthenticateToken(token string) (*User, error) {
+	if len(token) != tokenLength {
+		return nil, ErrUnauthenticated
+	}
 	user, err := a.userByToken(token)
 	if err != nil {
 		return nil, ErrUnauthenticated
@@ -205,7 +208,7 @@ func (a *Manager) CreateToken(user *User) (*Token, error) {
 	}
 	return &Token{
 		Value:   token,
-		Expires: expires.Unix(),
+		Expires: expires,
 	}, nil
 }
 
@@ -217,7 +220,7 @@ func (a *Manager) ExtendToken(user *User) (*Token, error) {
 	}
 	return &Token{
 		Value:   user.Token,
-		Expires: newExpires.Unix(),
+		Expires: newExpires,
 	}, nil
 }
 
@@ -390,17 +393,6 @@ func (a *Manager) Users() ([]*User, error) {
 		}
 		users = append(users, user)
 	}
-	/*sort.Slice(users, func(i, j int) bool {
-		if users[i].Role != users[j].Role {
-			return true
-		}
-		if users[i].Name == Everyone || users[j].Name == Everyone {
-			return users[i].Name != Everyone
-		} else if string(users[i].Role) < string(users[j].Role) {
-			return true
-		}
-		return users[i].Name < users[j].Name
-	})*/
 	return users, nil
 }
 

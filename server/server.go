@@ -36,13 +36,15 @@ import (
 
 /*
 	TODO
+		limits:
+			message cache duration
+			Keep 10000 messages or keep X days?
+			Attachment expiration based on plan
 		database migration
 		reserve topics
 		purge accounts that were not logged into in X
 		reset daily limits for users
 		Account usage not updated "in real time"
-		Attachment expiration based on plan
-		Plan: Keep 10000 messages or keep X days?
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"

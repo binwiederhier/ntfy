@@ -11,8 +11,8 @@ import (
 
 const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
 
-func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", user.RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
@@ -84,21 +84,21 @@ func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Nil(t, a.Authorize(nil, "up5678", user.PermissionWrite))
 }
 
-func TestSQLiteAuth_AddUser_Invalid(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_AddUser_Invalid(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Equal(t, user.ErrInvalidArgument, a.AddUser("  invalid  ", "pass", user.RoleAdmin))
 	require.Equal(t, user.ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role"))
 }
 
-func TestSQLiteAuth_AddUser_Timing(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_AddUser_Timing(t *testing.T) {
+	a := newTestManager(t, false, false)
 	start := time.Now().UnixMilli()
 	require.Nil(t, a.AddUser("user", "pass", user.RoleAdmin))
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
-func TestSQLiteAuth_Authenticate_Timing(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_Authenticate_Timing(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("user", "pass", user.RoleAdmin))
 
 	// Timing a correct attempt
@@ -120,8 +120,8 @@ func TestSQLiteAuth_Authenticate_Timing(t *testing.T) {
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
-func TestSQLiteAuth_UserManagement(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_UserManagement(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", user.RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
@@ -202,8 +202,8 @@ func TestSQLiteAuth_UserManagement(t *testing.T) {
 	require.Equal(t, "*", users[1].Name)
 }
 
-func TestSQLiteAuth_ChangePassword(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_ChangePassword(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", user.RoleAdmin))
 
 	_, err := a.Authenticate("phil", "phil")
@@ -216,8 +216,8 @@ func TestSQLiteAuth_ChangePassword(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestSQLiteAuth_ChangeRole(t *testing.T) {
-	a := newTestAuth(t, false, false)
+func TestManager_ChangeRole(t *testing.T) {
+	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
@@ -235,7 +235,44 @@ func TestSQLiteAuth_ChangeRole(t *testing.T) {
 	require.Equal(t, 0, len(ben.Grants))
 }
 
-func newTestAuth(t *testing.T, defaultRead, defaultWrite bool) *user.Manager {
+func TestManager_Token_Valid(t *testing.T) {
+	a := newTestManager(t, false, false)
+	require.Nil(t, a.AddUser("ben", "ben", user.RoleUser))
+
+	u, err := a.User("ben")
+	require.Nil(t, err)
+
+	// Create token for user
+	token, err := a.CreateToken(u)
+	require.NotEmpty(t, token.Value)
+	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires.Unix())
+
+	u2, err := a.AuthenticateToken(token.Value)
+	require.Nil(t, err)
+	require.Equal(t, u.Name, u2.Name)
+	require.Equal(t, token.Value, u2.Token)
+
+	// Remove token and auth again
+	require.Nil(t, a.RemoveToken(u2))
+	u3, err := a.AuthenticateToken(token.Value)
+	require.Equal(t, user.ErrUnauthenticated, err)
+	require.Nil(t, u3)
+}
+
+func TestManager_Token_Invalid(t *testing.T) {
+	a := newTestManager(t, false, false)
+	require.Nil(t, a.AddUser("ben", "ben", user.RoleUser))
+
+	u, err := a.AuthenticateToken(strings.Repeat("x", 32)) // 32 == token length
+	require.Nil(t, u)
+	require.Equal(t, user.ErrUnauthenticated, err)
+
+	u, err = a.AuthenticateToken("not long enough anyway")
+	require.Nil(t, u)
+	require.Equal(t, user.ErrUnauthenticated, err)
+}
+
+func newTestManager(t *testing.T, defaultRead, defaultWrite bool) *user.Manager {
 	filename := filepath.Join(t.TempDir(), "user.db")
 	a, err := user.NewManager(filename, defaultRead, defaultWrite)
 	require.Nil(t, err)

@@ -161,7 +161,7 @@ func execUserAdd(c *cli.Context) error {
 	} else if !user.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-	manager, err := createAuthManager(c)
+	manager, err := createUserManager(c)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func execUserDel(c *cli.Context) error {
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createAuthManager(c)
+	manager, err := createUserManager(c)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func execUserChangePass(c *cli.Context) error {
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createAuthManager(c)
+	manager, err := createUserManager(c)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func execUserChangeRole(c *cli.Context) error {
 	} else if username == userEveryone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createAuthManager(c)
+	manager, err := createUserManager(c)
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func execUserChangeRole(c *cli.Context) error {
 }
 
 func execUserList(c *cli.Context) error {
-	manager, err := createAuthManager(c)
+	manager, err := createUserManager(c)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func execUserList(c *cli.Context) error {
 	return showUsers(c, manager, users)
 }
 
-func createAuthManager(c *cli.Context) (user.Manager, error) {
+func createUserManager(c *cli.Context) (*user.Manager, error) {
 	authFile := c.String("auth-file")
 	authDefaultAccess := c.String("auth-default-access")
 	if authFile == "" {
@@ -278,7 +278,7 @@ func createAuthManager(c *cli.Context) (user.Manager, error) {
 	}
 	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
 	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
-	return user.NewSQLiteAuthManager(authFile, authDefaultRead, authDefaultWrite)
+	return user.NewManager(authFile, authDefaultRead, authDefaultWrite)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

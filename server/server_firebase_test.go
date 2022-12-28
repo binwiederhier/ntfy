@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/user"
 	"net/netip"
 	"strings"
 	"sync"
@@ -17,7 +18,9 @@ type testAuther struct {
 	Allow bool
 }
 
-func (t testAuther) AuthenticateUser(_, _ string) (*user.User, error) {
+var _ user.Auther = (*testAuther)(nil)
+
+func (t testAuther) Authenticate(_, _ string) (*user.User, error) {
 	return nil, errors.New("not used")
 }
 
@@ -323,7 +326,7 @@ func TestMaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 func TestToFirebaseSender_Abuse(t *testing.T) {
 	sender := &testFirebaseSender{allowed: 2}
 	client := newFirebaseClient(sender, &testAuther{})
-	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), netip.MustParseAddr("1.2.3.4"))
+	visitor := newVisitor(newTestConfig(t), newMemTestCache(t), netip.MustParseAddr("1.2.3.4"), nil)
 
 	require.Nil(t, client.Send(visitor, &message{Topic: "mytopic"}))
 	require.Equal(t, 1, len(sender.Messages()))

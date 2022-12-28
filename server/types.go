@@ -252,7 +252,7 @@ type apiAccountStats struct {
 	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
 }
 
-type apiAccountSettingsResponse struct {
+type apiAccountResponse struct {
 	Username      string                  `json:"username"`
 	Role          string                  `json:"role,omitempty"`
 	Language      string                  `json:"language,omitempty"`

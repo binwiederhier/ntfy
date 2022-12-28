@@ -28,10 +28,10 @@ var (
 // The actual Firebase implementation is implemented in firebaseSenderImpl, to make it testable.
 type firebaseClient struct {
 	sender firebaseSender
-	auther user.Manager
+	auther user.Auther
 }
 
-func newFirebaseClient(sender firebaseSender, auther user.Manager) *firebaseClient {
+func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClient {
 	return &firebaseClient{
 		sender: sender,
 		auther: auther,
@@ -112,7 +112,7 @@ func (c *firebaseSenderImpl) Send(m *messaging.Message) error {
 //     On Android, this will trigger the app to poll the topic and thereby displaying new messages.
 //   - If UpstreamBaseURL is set, messages are forwarded as poll requests to an upstream server and then forwarded
 //     to Firebase here. This is mainly for iOS to support self-hosted servers.
-func toFirebaseMessage(m *message, auther user.Manager) (*messaging.Message, error) {
+func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, error) {
 	var data map[string]string // Mostly matches https://ntfy.sh/docs/subscribe/api/#json-message-format
 	var apnsConfig *messaging.APNSConfig
 	switch m.Event {

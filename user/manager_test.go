@@ -2,6 +2,7 @@ package user_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -234,9 +235,9 @@ func TestSQLiteAuth_ChangeRole(t *testing.T) {
 	require.Equal(t, 0, len(ben.Grants))
 }
 
-func newTestAuth(t *testing.T, defaultRead, defaultWrite bool) *user.SQLiteAuthManager {
+func newTestAuth(t *testing.T, defaultRead, defaultWrite bool) *user.Manager {
 	filename := filepath.Join(t.TempDir(), "user.db")
-	a, err := user.NewSQLiteAuthManager(filename, defaultRead, defaultWrite)
+	a, err := user.NewManager(filename, defaultRead, defaultWrite)
 	require.Nil(t, err)
 	return a
 }

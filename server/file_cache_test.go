@@ -56,13 +56,6 @@ func TestFileCache_Write_FailedTotalSizeLimit(t *testing.T) {
 	require.NoFileExists(t, dir+"/abcdefghijkX")
 }
 
-func TestFileCache_Write_FailedFileSizeLimit(t *testing.T) {
-	dir, c := newTestFileCache(t)
-	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1025)))
-	require.Equal(t, util.ErrLimitReached, err)
-	require.NoFileExists(t, dir+"/abcdefghijkl")
-}
-
 func TestFileCache_Write_FailedAdditionalLimiter(t *testing.T) {
 	dir, c := newTestFileCache(t)
 	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1001)), util.NewFixedLimiter(1000))
@@ -95,7 +88,7 @@ func TestFileCache_RemoveExpired(t *testing.T) {
 
 func newTestFileCache(t *testing.T) (dir string, cache *fileCache) {
 	dir = t.TempDir()
-	cache, err := newFileCache(dir, 10*1024, 1*1024)
+	cache, err := newFileCache(dir, 10*1024)
 	require.Nil(t, err)
 	return dir, cache
 }

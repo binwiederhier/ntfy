@@ -121,9 +121,9 @@ const (
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
 )
 
-// SQLiteManager is an implementation of Manager. It stores users and access control list
+// Manager is an implementation of Manager. It stores users and access control list
 // in a SQLite database.
-type SQLiteManager struct {
+type Manager struct {
 	db           *sql.DB
 	defaultRead  bool
 	defaultWrite bool
@@ -131,10 +131,10 @@ type SQLiteManager struct {
 	mu           sync.Mutex
 }
 
-var _ Manager = (*SQLiteManager)(nil)
+var _ Auther = (*Manager)(nil)
 
-// NewSQLiteAuthManager creates a new SQLiteManager instance
-func NewSQLiteAuthManager(filename string, defaultRead, defaultWrite bool) (*SQLiteManager, error) {
+// NewManager creates a new Manager instance
+func NewManager(filename string, defaultRead, defaultWrite bool) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func NewSQLiteAuthManager(filename string, defaultRead, defaultWrite bool) (*SQL
 	if err := setupAuthDB(db); err != nil {
 		return nil, err
 	}
-	manager := &SQLiteManager{
+	manager := &Manager{
 		db:           db,
 		defaultRead:  defaultRead,
 		defaultWrite: defaultWrite,
@@ -155,7 +155,7 @@ func NewSQLiteAuthManager(filename string, defaultRead, defaultWrite bool) (*SQL
 // Authenticate checks username and password and returns a user if correct. The method
 // returns in constant-ish time, regardless of whether the user exists or the password is
 // correct or incorrect.
-func (a *SQLiteManager) Authenticate(username, password string) (*User, error) {
+func (a *Manager) Authenticate(username, password string) (*User, error) {
 	if username == Everyone {
 		return nil, ErrUnauthenticated
 	}
@@ -171,7 +171,7 @@ func (a *SQLiteManager) Authenticate(username, password string) (*User, error) {
 	return user, nil
 }
 
-func (a *SQLiteManager) AuthenticateToken(token string) (*User, error) {
+func (a *Manager) AuthenticateToken(token string) (*User, error) {
 	user, err := a.userByToken(token)
 	if err != nil {
 		return nil, ErrUnauthenticated
@@ -180,7 +180,7 @@ func (a *SQLiteManager) AuthenticateToken(token string) (*User, error) {
 	return user, nil
 }
 
-func (a *SQLiteManager) CreateToken(user *User) (*Token, error) {
+func (a *Manager) CreateToken(user *User) (*Token, error) {
 	token := util.RandomString(tokenLength)
 	expires := time.Now().Add(userTokenExpiryDuration)
 	if _, err := a.db.Exec(insertTokenQuery, user.Name, token, expires.Unix()); err != nil {
@@ -192,7 +192,7 @@ func (a *SQLiteManager) CreateToken(user *User) (*Token, error) {
 	}, nil
 }
 
-func (a *SQLiteManager) ExtendToken(user *User) (*Token, error) {
+func (a *Manager) ExtendToken(user *User) (*Token, error) {
 	newExpires := time.Now().Add(userTokenExpiryDuration)
 	if _, err := a.db.Exec(updateTokenExpiryQuery, newExpires.Unix(), user.Name, user.Token); err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (a *SQLiteManager) ExtendToken(user *User) (*Token, error) {
 	}, nil
 }
 
-func (a *SQLiteManager) RemoveToken(user *User) error {
+func (a *Manager) RemoveToken(user *User) error {
 	if user.Token == "" {
 		return ErrUnauthorized
 	}
@@ -213,14 +213,14 @@ func (a *SQLiteManager) RemoveToken(user *User) error {
 	return nil
 }
 
-func (a *SQLiteManager) RemoveExpiredTokens() error {
+func (a *Manager) RemoveExpiredTokens() error {
 	if _, err := a.db.Exec(deleteExpiredTokensQuery, time.Now().Unix()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *SQLiteManager) ChangeSettings(user *User) error {
+func (a *Manager) ChangeSettings(user *User) error {
 	settings, err := json.Marshal(user.Prefs)
 	if err != nil {
 		return err
@@ -231,13 +231,13 @@ func (a *SQLiteManager) ChangeSettings(user *User) error {
 	return nil
 }
 
-func (a *SQLiteManager) EnqueueStats(user *User) {
+func (a *Manager) EnqueueStats(user *User) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.statsQueue[user.Name] = user
 }
 
-func (a *SQLiteManager) userStatsQueueWriter() {
+func (a *Manager) userStatsQueueWriter() {
 	ticker := time.NewTicker(userStatsQueueWriterInterval)
 	for range ticker.C {
 		if err := a.writeUserStatsQueue(); err != nil {
@@ -246,7 +246,7 @@ func (a *SQLiteManager) userStatsQueueWriter() {
 	}
 }
 
-func (a *SQLiteManager) writeUserStatsQueue() error {
+func (a *Manager) writeUserStatsQueue() error {
 	a.mu.Lock()
 	if len(a.statsQueue) == 0 {
 		a.mu.Unlock()
@@ -273,7 +273,7 @@ func (a *SQLiteManager) writeUserStatsQueue() error {
 
 // Authorize returns nil if the given user has access to the given topic using the desired
 // permission. The user param may be nil to signal an anonymous user.
-func (a *SQLiteManager) Authorize(user *User, topic string, perm Permission) error {
+func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	if user != nil && user.Role == RoleAdmin {
 		return nil // Admin can do everything
 	}
@@ -301,7 +301,7 @@ func (a *SQLiteManager) Authorize(user *User, topic string, perm Permission) err
 	return a.resolvePerms(read, write, perm)
 }
 
-func (a *SQLiteManager) resolvePerms(read, write bool, perm Permission) error {
+func (a *Manager) resolvePerms(read, write bool, perm Permission) error {
 	if perm == PermissionRead && read {
 		return nil
 	} else if perm == PermissionWrite && write {
@@ -312,7 +312,7 @@ func (a *SQLiteManager) resolvePerms(read, write bool, perm Permission) error {
 
 // AddUser adds a user with the given username, password and role. The password should be hashed
 // before it is stored in a persistence layer.
-func (a *SQLiteManager) AddUser(username, password string, role Role) error {
+func (a *Manager) AddUser(username, password string, role Role) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
@@ -328,7 +328,7 @@ func (a *SQLiteManager) AddUser(username, password string, role Role) error {
 
 // RemoveUser deletes the user with the given username. The function returns nil on success, even
 // if the user did not exist in the first place.
-func (a *SQLiteManager) RemoveUser(username string) error {
+func (a *Manager) RemoveUser(username string) error {
 	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
@@ -345,7 +345,7 @@ func (a *SQLiteManager) RemoveUser(username string) error {
 }
 
 // Users returns a list of users. It always also returns the Everyone user ("*").
-func (a *SQLiteManager) Users() ([]*User, error) {
+func (a *Manager) Users() ([]*User, error) {
 	rows, err := a.db.Query(selectUsernamesQuery)
 	if err != nil {
 		return nil, err
@@ -380,7 +380,7 @@ func (a *SQLiteManager) Users() ([]*User, error) {
 
 // User returns the user with the given username if it exists, or ErrNotFound otherwise.
 // You may also pass Everyone to retrieve the anonymous user and its Grant list.
-func (a *SQLiteManager) User(username string) (*User, error) {
+func (a *Manager) User(username string) (*User, error) {
 	if username == Everyone {
 		return a.everyoneUser()
 	}
@@ -391,7 +391,7 @@ func (a *SQLiteManager) User(username string) (*User, error) {
 	return a.readUser(rows)
 }
 
-func (a *SQLiteManager) userByToken(token string) (*User, error) {
+func (a *Manager) userByToken(token string) (*User, error) {
 	rows, err := a.db.Query(selectUserByTokenQuery, token)
 	if err != nil {
 		return nil, err
@@ -399,7 +399,7 @@ func (a *SQLiteManager) userByToken(token string) (*User, error) {
 	return a.readUser(rows)
 }
 
-func (a *SQLiteManager) readUser(rows *sql.Rows) (*User, error) {
+func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
 	var settings, planCode sql.NullString
@@ -446,7 +446,7 @@ func (a *SQLiteManager) readUser(rows *sql.Rows) (*User, error) {
 	return user, nil
 }
 
-func (a *SQLiteManager) everyoneUser() (*User, error) {
+func (a *Manager) everyoneUser() (*User, error) {
 	grants, err := a.readGrants(Everyone)
 	if err != nil {
 		return nil, err
@@ -459,7 +459,7 @@ func (a *SQLiteManager) everyoneUser() (*User, error) {
 	}, nil
 }
 
-func (a *SQLiteManager) readGrants(username string) ([]Grant, error) {
+func (a *Manager) readGrants(username string) ([]Grant, error) {
 	rows, err := a.db.Query(selectUserAccessQuery, username)
 	if err != nil {
 		return nil, err
@@ -484,7 +484,7 @@ func (a *SQLiteManager) readGrants(username string) ([]Grant, error) {
 }
 
 // ChangePassword changes a user's password
-func (a *SQLiteManager) ChangePassword(username, password string) error {
+func (a *Manager) ChangePassword(username, password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return err
@@ -497,7 +497,7 @@ func (a *SQLiteManager) ChangePassword(username, password string) error {
 
 // ChangeRole changes a user's role. When a role is changed from RoleUser to RoleAdmin,
 // all existing access control entries (Grant) are removed, since they are no longer needed.
-func (a *SQLiteManager) ChangeRole(username string, role Role) error {
+func (a *Manager) ChangeRole(username string, role Role) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
@@ -514,7 +514,7 @@ func (a *SQLiteManager) ChangeRole(username string, role Role) error {
 
 // AllowAccess adds or updates an entry in th access control list for a specific user. It controls
 // read/write access to a topic. The parameter topicPattern may include wildcards (*).
-func (a *SQLiteManager) AllowAccess(username string, topicPattern string, read bool, write bool) error {
+func (a *Manager) AllowAccess(username string, topicPattern string, read bool, write bool) error {
 	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopicPattern(topicPattern) {
 		return ErrInvalidArgument
 	}
@@ -526,7 +526,7 @@ func (a *SQLiteManager) AllowAccess(username string, topicPattern string, read b
 
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
 // empty) for an entire user. The parameter topicPattern may include wildcards (*).
-func (a *SQLiteManager) ResetAccess(username string, topicPattern string) error {
+func (a *Manager) ResetAccess(username string, topicPattern string) error {
 	if !AllowedUsername(username) && username != Everyone && username != "" {
 		return ErrInvalidArgument
 	} else if !AllowedTopicPattern(topicPattern) && topicPattern != "" {
@@ -544,7 +544,7 @@ func (a *SQLiteManager) ResetAccess(username string, topicPattern string) error 
 }
 
 // DefaultAccess returns the default read/write access if no access control entry matches
-func (a *SQLiteManager) DefaultAccess() (read bool, write bool) {
+func (a *Manager) DefaultAccess() (read bool, write bool) {
 	return a.defaultRead, a.defaultWrite
 }
 

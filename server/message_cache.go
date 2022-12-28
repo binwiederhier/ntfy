@@ -40,7 +40,7 @@ const (
 			attachment_expires INT NOT NULL,
 			attachment_url TEXT NOT NULL,
 			sender TEXT NOT NULL,
-			user TEXT NOT NULL,		
+			user TEXT NOT NULL,
 			encoding TEXT NOT NULL,
 			published INT NOT NULL
 		);
@@ -95,7 +95,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 9
+	currentSchemaVersion          = 10
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -192,6 +192,11 @@ const (
 	// 8 -> 9
 	migrate8To9AlterMessagesTableQuery = `
 		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);	
+	`
+
+	// 9 -> 10
+	migrate9To10AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN user TEXT NOT NULL DEFAULT('');
 	`
 )
 
@@ -614,8 +619,9 @@ func setupCacheDB(db *sql.DB, startupQueries string) error {
 		return migrateFrom7(db)
 	} else if schemaVersion == 8 {
 		return migrateFrom8(db)
+	} else if schemaVersion == 9 {
+		return migrateFrom9(db)
 	}
-	// TODO add user column
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
 
@@ -729,6 +735,17 @@ func migrateFrom8(db *sql.DB) error {
 		return err
 	}
 	if _, err := db.Exec(updateSchemaVersion, 9); err != nil {
+		return err
+	}
+	return migrateFrom9(db)
+}
+
+func migrateFrom9(db *sql.DB) error {
+	log.Info("Migrating cache database schema: from 9 to 10")
+	if _, err := db.Exec(migrate9To10AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(updateSchemaVersion, 10); err != nil {
 		return err
 	}
 	return nil // Update this when a new version is added

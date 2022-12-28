@@ -45,11 +45,11 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	stats, err := v.Stats()
+	stats, err := v.Info()
 	if err != nil {
 		return err
 	}
-	response := &apiAccountSettingsResponse{
+	response := &apiAccountResponse{
 		Stats: &apiAccountStats{
 			Messages:                     stats.Messages,
 			MessagesRemaining:            stats.MessagesRemaining,

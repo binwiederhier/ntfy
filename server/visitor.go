@@ -40,7 +40,7 @@ type visitor struct {
 	mu                  sync.Mutex
 }
 
-type visitorStats struct {
+type visitorInfo struct {
 	Basis                        string // "ip", "role" or "plan"
 	Messages                     int64
 	MessagesLimit                int64
@@ -165,30 +165,30 @@ func (v *visitor) IncrEmails() {
 	}
 }
 
-func (v *visitor) Stats() (*visitorStats, error) {
+func (v *visitor) Info() (*visitorInfo, error) {
 	v.mu.Lock()
 	messages := v.messages
 	emails := v.emails
 	v.mu.Unlock()
-	stats := &visitorStats{}
+	info := &visitorInfo{}
 	if v.user != nil && v.user.Role == user.RoleAdmin {
-		stats.Basis = "role"
-		stats.MessagesLimit = 0
-		stats.EmailsLimit = 0
-		stats.AttachmentTotalSizeLimit = 0
-		stats.AttachmentFileSizeLimit = 0
+		info.Basis = "role"
+		info.MessagesLimit = 0
+		info.EmailsLimit = 0
+		info.AttachmentTotalSizeLimit = 0
+		info.AttachmentFileSizeLimit = 0
 	} else if v.user != nil && v.user.Plan != nil {
-		stats.Basis = "plan"
-		stats.MessagesLimit = v.user.Plan.MessagesLimit
-		stats.EmailsLimit = v.user.Plan.EmailsLimit
-		stats.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
-		stats.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
+		info.Basis = "plan"
+		info.MessagesLimit = v.user.Plan.MessagesLimit
+		info.EmailsLimit = v.user.Plan.EmailsLimit
+		info.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
+		info.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
 	} else {
-		stats.Basis = "ip"
-		stats.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
-		stats.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
-		stats.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
-		stats.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
+		info.Basis = "ip"
+		info.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
+		info.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
+		info.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
+		info.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
 	}
 	var attachmentsBytesUsed int64
 	var err error
@@ -200,13 +200,13 @@ func (v *visitor) Stats() (*visitorStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	stats.Messages = messages
-	stats.MessagesRemaining = zeroIfNegative(stats.MessagesLimit - stats.Messages)
-	stats.Emails = emails
-	stats.EmailsRemaining = zeroIfNegative(stats.EmailsLimit - stats.Emails)
-	stats.AttachmentTotalSize = attachmentsBytesUsed
-	stats.AttachmentTotalSizeRemaining = zeroIfNegative(stats.AttachmentTotalSizeLimit - stats.AttachmentTotalSize)
-	return stats, nil
+	info.Messages = messages
+	info.MessagesRemaining = zeroIfNegative(info.MessagesLimit - info.Messages)
+	info.Emails = emails
+	info.EmailsRemaining = zeroIfNegative(info.EmailsLimit - info.Emails)
+	info.AttachmentTotalSize = attachmentsBytesUsed
+	info.AttachmentTotalSizeRemaining = zeroIfNegative(info.AttachmentTotalSizeLimit - info.AttachmentTotalSize)
+	return info, nil
 }
 
 func zeroIfNegative(value int64) int64 {

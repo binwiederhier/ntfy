@@ -43,12 +43,15 @@ import (
 		"user list" shows * twice
 		"ntfy access everyone user4topic <bla>" twice -> UNIQUE constraint error
 		Account usage not updated "in real time"
+		Attachment expiration based on plan
+		Plan: Keep 10000 messages or keep X days?
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
 		UI:
 		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
 		- "Logout and delete local storage" option
+		- Delete local storage when deleting account
 		Pages:
 		- Home
 		- Password reset
@@ -61,7 +64,8 @@ import (
 		- APIs
 		- CRUD tokens
 		- Expire tokens
-		-
+		- userManager can be nil
+		- visitor with/without user
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -77,7 +81,7 @@ type Server struct {
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
 	messages          int64
-	userManager       user.Manager
+	userManager       *user.Manager // Might be nil!
 	messageCache      *messageCache
 	fileCache         *fileCache
 	closeChan         chan bool
@@ -165,9 +169,9 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
-	var auther user.Manager
+	var userManager *user.Manager
 	if conf.AuthFile != "" {
-		auther, err = user.NewSQLiteAuthManager(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
+		userManager, err = user.NewManager(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +182,7 @@ func New(conf *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		firebaseClient = newFirebaseClient(sender, auther)
+		firebaseClient = newFirebaseClient(sender, userManager)
 	}
 	return &Server{
 		config:         conf,
@@ -187,7 +191,7 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient: firebaseClient,
 		smtpSender:     mailer,
 		topics:         topics,
-		userManager:    auther,
+		userManager:    userManager,
 		visitors:       make(map[string]*visitor),
 	}, nil
 }
@@ -341,27 +345,27 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
-		return s.handleAccountCreate(w, r, v)
+		return s.ensureAccountsEnabled(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
-		return s.handleAccountGet(w, r, v)
+		return s.handleAccountGet(w, r, v) // Allowed by anonymous
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
-		return s.handleAccountDelete(w, r, v)
+		return s.ensureWithAccount(s.handleAccountDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
-		return s.handleAccountPasswordChange(w, r, v)
+		return s.ensureWithAccount(s.handleAccountPasswordChange)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
-		return s.handleAccountTokenIssue(w, r, v)
+		return s.ensureWithAccount(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountTokenPath {
-		return s.handleAccountTokenExtend(w, r, v)
+		return s.ensureWithAccount(s.handleAccountTokenExtend)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
-		return s.handleAccountTokenDelete(w, r, v)
+		return s.ensureWithAccount(s.handleAccountTokenDelete)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountSettingsPath {
-		return s.handleAccountSettingsChange(w, r, v)
+		return s.ensureWithAccount(s.handleAccountSettingsChange)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
-		return s.handleAccountSubscriptionAdd(w, r, v)
+		return s.ensureWithAccount(s.handleAccountSubscriptionAdd)(w, r, v)
 	} else if r.Method == http.MethodPatch && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.handleAccountSubscriptionChange(w, r, v)
+		return s.ensureWithAccount(s.handleAccountSubscriptionChange)(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.handleAccountSubscriptionDelete(w, r, v)
+		return s.ensureWithAccount(s.handleAccountSubscriptionDelete)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -804,7 +808,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	} else if m.Time > time.Now().Add(s.config.AttachmentExpiryDuration).Unix() {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
-	stats, err := v.Stats()
+	stats, err := v.Info()
 	if err != nil {
 		return err
 	}
@@ -1182,7 +1186,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	return topics, nil
 }
 
-func (s *Server) updateStatsAndPrune() {
+func (s *Server) execManager() {
 	log.Debug("Manager: Starting")
 	defer log.Debug("Manager: Finished")
 
@@ -1203,8 +1207,10 @@ func (s *Server) updateStatsAndPrune() {
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired user tokens
-	if err := s.userManager.RemoveExpiredTokens(); err != nil {
-		log.Warn("Error expiring user tokens: %s", err.Error())
+	if s.userManager != nil {
+		if err := s.userManager.RemoveExpiredTokens(); err != nil {
+			log.Warn("Error expiring user tokens: %s", err.Error())
+		}
 	}
 
 	// Delete expired attachments
@@ -1293,7 +1299,7 @@ func (s *Server) runManager() {
 	for {
 		select {
 		case <-time.After(s.config.ManagerInterval):
-			s.updateStatsAndPrune()
+			s.execManager()
 		case <-s.closeChan:
 			return
 		}
@@ -1399,6 +1405,24 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	}
 }
 
+func (s *Server) ensureAccountsEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.userManager != nil {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
+}
+
+func (s *Server) ensureWithAccount(next handleFunc) handleFunc {
+	return s.ensureAccountsEnabled(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if v.user != nil {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	})
+}
+
 // transformBodyJSON peeks the request body, reads the JSON, and converts it to headers
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
@@ -1502,17 +1526,17 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // Note that this function will always return a visitor, even if an error occurs.
 func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 	ip := extractIPAddress(r, s.config.BehindProxy)
-	var user *user.User // may stay nil if no auth header!
-	if user, err = s.authenticate(r); err != nil {
+	var u *user.User // may stay nil if no auth header!
+	if u, err = s.authenticate(r); err != nil {
 		log.Debug("authentication failed: %s", err.Error())
 		err = errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
-	if user != nil {
-		v = s.visitorFromUser(user, ip)
+	if u != nil {
+		v = s.visitorFromUser(u, ip)
 	} else {
 		v = s.visitorFromIP(ip)
 	}
-	v.user = user // Update user -- FIXME race?
+	v.user = u    // Update user -- FIXME race?
 	return v, err // Always return visitor, even when error occurs!
 }
 
@@ -1521,17 +1545,19 @@ func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 // support the WebSocket JavaScript class, which does not support passing headers during the initial request. The auth
 // query param is effectively double base64 encoded. Its format is base64(Basic base64(user:pass)).
 func (s *Server) authenticate(r *http.Request) (user *user.User, err error) {
-	value := r.Header.Get("Authorization")
+	value := strings.TrimSpace(r.Header.Get("Authorization"))
 	queryParam := readQueryParam(r, "authorization", "auth")
 	if queryParam != "" {
 		a, err := base64.RawURLEncoding.DecodeString(queryParam)
 		if err != nil {
 			return nil, err
 		}
-		value = string(a)
+		value = strings.TrimSpace(string(a))
 	}
 	if value == "" {
 		return nil, nil
+	} else if s.userManager == nil {
+		return nil, errHTTPUnauthorized
 	}
 	if strings.HasPrefix(value, "Bearer") {
 		return s.authenticateBearerAuth(value)

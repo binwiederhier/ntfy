@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/user"
 	"io"
 	"log"
 	"math/rand"
@@ -171,7 +172,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `html, body {`)
+	require.Contains(t, rr.Body.String(), `/* general styling */`)
 
 	rr = request(t, s, "GET", "/docs", "", nil)
 	require.Equal(t, 301, rr.Code)
@@ -353,7 +354,7 @@ func TestServer_PublishAtAndPrune(t *testing.T) {
 		"In": "1h",
 	})
 	require.Equal(t, 200, response.Code)
-	s.updateStatsAndPrune() // Fire pruning
+	s.execManager() // Fire pruning
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1&scheduled=1", "", nil)
 	messages := toMessages(t, response.Body.String())
@@ -625,8 +626,7 @@ func TestServer_Auth_Success_Admin(t *testing.T) {
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("phil:phil"),
@@ -642,9 +642,8 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -659,10 +658,9 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, manager.AllowAccess("ben", "mytopic", true, true))
-	require.Nil(t, manager.AllowAccess("ben", "anothertopic", true, true))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("ben", "anothertopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic,anothertopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -682,8 +680,7 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("phil:INVALID"),
@@ -698,9 +695,8 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, manager.AllowAccess("ben", "sometopic", true, true)) // Not mytopic!
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", true, true)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -715,10 +711,9 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	c.AuthDefaultWrite = true // Open by default
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, manager.AllowAccess(user.Everyone, "private", false, false))
-	require.Nil(t, manager.AllowAccess(user.Everyone, "announcements", true, false))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "private", false, false))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", true, false))
 
 	response := request(t, s, "PUT", "/mytopic", "test", nil)
 	require.Equal(t, 200, response.Code)
@@ -748,8 +743,7 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	c.AuthDefaultWrite = false
 	s := newTestServer(t, c)
 
-	manager := s.userManager.(user.Manager)
-	require.Nil(t, manager.AddUser("ben", "some pass", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin))
 
 	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:some pass"))))
 	response := request(t, s, "GET", u, "", nil)
@@ -759,27 +753,6 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	response = request(t, s, "GET", u, "", nil)
 	require.Equal(t, 401, response.Code)
 }
-
-/*
-func TestServer_Curl_Publish_Poll(t *testing.T) {
-	s, port := test.StartServer(t)
-	defer test.StopServer(t, s, port)
-
-	cmd := exec.Command("sh", "-c", fmt.Sprintf(`curl -sd "This is a test" localhost:%d/mytopic`, port))
-	require.Nil(t, cmd.Run())
-	b, err := cmd.CombinedOutput()
-	require.Nil(t, err)
-	msg := toMessage(t, string(b))
-	require.Equal(t, "This is a test", msg.Message)
-
-	cmd = exec.Command("sh", "-c", fmt.Sprintf(`curl "localhost:%d/mytopic?poll=1"`, port))
-	require.Nil(t, cmd.Run())
-	b, err = cmd.CombinedOutput()
-	require.Nil(t, err)
-	msg = toMessage(t, string(b))
-	require.Equal(t, "This is a test", msg.Message)
-}
-*/
 
 type testMailer struct {
 	count int
@@ -1306,7 +1279,7 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 
 	// Prune and makes sure it's gone
 	time.Sleep(time.Second) // Sigh ...
-	s.updateStatsAndPrune()
+	s.execManager()
 	require.NoFileExists(t, file)
 	response = request(t, s, "GET", path, "", nil)
 	require.Equal(t, 404, response.Code)
@@ -1360,7 +1333,7 @@ func TestServer_PublishAttachmentBandwidthLimitUploadOnly(t *testing.T) {
 	require.Equal(t, 41301, err.Code)
 }
 
-func TestServer_PublishAttachmentUserStats(t *testing.T) {
+func TestServer_PublishAttachmentAccountStats(t *testing.T) {
 	content := util.RandomString(4999) // > 4096
 
 	c := newTestConfig(t)
@@ -1374,14 +1347,14 @@ func TestServer_PublishAttachmentUserStats(t *testing.T) {
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
 
 	// User stats
-	response = request(t, s, "GET", "/user/stats", "", nil)
+	response = request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, response.Code)
-	var stats visitorStats
-	require.Nil(t, json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&stats))
-	require.Equal(t, int64(5000), stats.AttachmentFileSizeLimit)
-	require.Equal(t, int64(6000), stats.VisitorAttachmentBytesTotal)
-	require.Equal(t, int64(4999), stats.AttachmentBytes)
-	require.Equal(t, int64(1001), stats.VisitorAttachmentBytesRemaining)
+	var account *apiAccountResponse
+	require.Nil(t, json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&account))
+	require.Equal(t, int64(5000), account.Limits.AttachmentFileSize)
+	require.Equal(t, int64(6000), account.Limits.AttachmentTotalSize)
+	require.Equal(t, int64(4999), account.Stats.AttachmentTotalSize)
+	require.Equal(t, int64(1001), account.Stats.AttachmentTotalSizeRemaining)
 }
 
 func TestServer_Visitor_XForwardedFor_None(t *testing.T) {
@@ -1391,7 +1364,8 @@ func TestServer_Visitor_XForwardedFor_None(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11"
 	r.Header.Set("X-Forwarded-For", "  ") // Spaces, not empty!
-	v := s.visitor(r)
+	v, err := s.visitor(r)
+	require.Nil(t, err)
 	require.Equal(t, "8.9.10.11", v.ip.String())
 }
 
@@ -1402,7 +1376,8 @@ func TestServer_Visitor_XForwardedFor_Single(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11"
 	r.Header.Set("X-Forwarded-For", "1.1.1.1")
-	v := s.visitor(r)
+	v, err := s.visitor(r)
+	require.Nil(t, err)
 	require.Equal(t, "1.1.1.1", v.ip.String())
 }
 
@@ -1413,7 +1388,8 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11"
 	r.Header.Set("X-Forwarded-For", "1.2.3.4 , 2.4.4.2,234.5.2.1 ")
-	v := s.visitor(r)
+	v, err := s.visitor(r)
+	require.Nil(t, err)
 	require.Equal(t, "234.5.2.1", v.ip.String())
 }
 
@@ -1442,7 +1418,7 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	go func() {
 		log.Printf("Updating stats")
 		start := time.Now()
-		s.updateStatsAndPrune()
+		s.execManager()
 		log.Printf("Done: Updating stats; took %s", time.Since(start).Round(time.Millisecond))
 		statsChan <- true
 	}()

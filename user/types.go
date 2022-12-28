@@ -96,7 +96,7 @@ type Role string
 
 // User roles
 const (
-	RoleAdmin     = Role("admin")
+	RoleAdmin     = Role("admin") // Some queries have these values hardcoded!
 	RoleUser      = Role("user")
 	RoleAnonymous = Role("anonymous")
 )

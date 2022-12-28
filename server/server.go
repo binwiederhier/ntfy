@@ -40,8 +40,6 @@ import (
 		reserve topics
 		purge accounts that were not logged into in X
 		reset daily limits for users
-		"user list" shows * twice
-		"ntfy access everyone user4topic <bla>" twice -> UNIQUE constraint error
 		Account usage not updated "in real time"
 		Attachment expiration based on plan
 		Plan: Keep 10000 messages or keep X days?
@@ -66,6 +64,7 @@ import (
 		- Expire tokens
 		- userManager can be nil
 		- visitor with/without user
+		- userManager.<NEWSTUFF>
 */
 
 // Server is the main server, providing the UI and API for ntfy

@@ -37,8 +37,8 @@ func TestSQLiteAuth_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Equal(t, user.RoleUser, ben.Role)
 	require.Equal(t, []user.Grant{
 		{"mytopic", true, true},
-		{"readme", true, false},
 		{"writeme", false, true},
+		{"readme", true, false},
 		{"everyonewrite", false, false},
 	}, ben.Grants)
 
@@ -146,8 +146,8 @@ func TestSQLiteAuth_UserManagement(t *testing.T) {
 	require.Equal(t, user.RoleUser, ben.Role)
 	require.Equal(t, []user.Grant{
 		{"mytopic", true, true},
-		{"readme", true, false},
 		{"writeme", false, true},
+		{"readme", true, false},
 		{"everyonewrite", false, false},
 	}, ben.Grants)
 
@@ -157,12 +157,12 @@ func TestSQLiteAuth_UserManagement(t *testing.T) {
 	require.Equal(t, "", everyone.Hash)
 	require.Equal(t, user.RoleAnonymous, everyone.Role)
 	require.Equal(t, []user.Grant{
-		{"announcements", true, false},
 		{"everyonewrite", true, true},
+		{"announcements", true, false},
 	}, everyone.Grants)
 
 	// Ben: Before revoking
-	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
+	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true)) // Overwrite!
 	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
 	require.Nil(t, a.AllowAccess("ben", "writeme", false, true))
 	require.Nil(t, a.Authorize(ben, "mytopic", user.PermissionRead))

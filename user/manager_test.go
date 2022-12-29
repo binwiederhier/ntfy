@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"strings"
@@ -350,8 +351,95 @@ func TestManager_EnqueueStats(t *testing.T) {
 	require.Equal(t, int64(2), u.Stats.Emails)
 }
 
+func TestSqliteCache_Migration_From1(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	db, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+
+	// Create "version 1" schema
+	_, err = db.Exec(`
+		BEGIN;
+		CREATE TABLE IF NOT EXISTS user (
+			user TEXT NOT NULL PRIMARY KEY,
+			pass TEXT NOT NULL,
+			role TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS access (
+			user TEXT NOT NULL,		
+			topic TEXT NOT NULL,
+			read INT NOT NULL,
+			write INT NOT NULL,
+			PRIMARY KEY (topic, user)
+		);
+		CREATE TABLE IF NOT EXISTS schemaVersion (
+			id INT PRIMARY KEY,
+			version INT NOT NULL
+		);
+		INSERT INTO schemaVersion (id, version) VALUES (1, 1);
+		COMMIT;	
+	`)
+	require.Nil(t, err)
+
+	// Insert a bunch of users and ACL entries
+	_, err = db.Exec(`
+		BEGIN;
+		INSERT INTO user (user, pass, role) VALUES ('ben', '$2a$10$EEp6gBheOsqEFsXlo523E.gBVoeg1ytphXiEvTPlNzkenBlHZBPQy', 'user');
+		INSERT INTO user (user, pass, role) VALUES ('phil', '$2a$10$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C', 'admin');
+		INSERT INTO access (user, topic, read, write) VALUES ('ben', 'stats', 1, 1);
+		INSERT INTO access (user, topic, read, write) VALUES ('ben', 'secret', 1, 0);
+		INSERT INTO access (user, topic, read, write) VALUES ('*', 'stats', 1, 0);
+		COMMIT;	
+	`)
+	require.Nil(t, err)
+
+	// Create manager to trigger migration
+	a := newTestManagerFromFile(t, filename, false, false, userTokenExpiryDuration, userStatsQueueWriterInterval)
+	checkSchemaVersion(t, a.db)
+
+	users, err := a.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	phil, ben, everyone := users[0], users[1], users[2]
+
+	require.Equal(t, "phil", phil.Name)
+	require.Equal(t, RoleAdmin, phil.Role)
+	require.Equal(t, 0, len(phil.Grants))
+
+	require.Equal(t, "ben", ben.Name)
+	require.Equal(t, RoleUser, ben.Role)
+	require.Equal(t, 2, len(ben.Grants))
+	require.Equal(t, "stats", ben.Grants[0].TopicPattern)
+	require.Equal(t, true, ben.Grants[0].AllowRead)
+	require.Equal(t, true, ben.Grants[0].AllowWrite)
+	require.Equal(t, "secret", ben.Grants[1].TopicPattern)
+	require.Equal(t, true, ben.Grants[1].AllowRead)
+	require.Equal(t, false, ben.Grants[1].AllowWrite)
+
+	require.Equal(t, Everyone, everyone.Name)
+	require.Equal(t, RoleAnonymous, everyone.Role)
+	require.Equal(t, 1, len(everyone.Grants))
+	require.Equal(t, "stats", everyone.Grants[0].TopicPattern)
+	require.Equal(t, true, everyone.Grants[0].AllowRead)
+	require.Equal(t, false, everyone.Grants[0].AllowWrite)
+}
+
+func checkSchemaVersion(t *testing.T, db *sql.DB) {
+	rows, err := db.Query(`SELECT version FROM schemaVersion`)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+
+	var schemaVersion int
+	require.Nil(t, rows.Scan(&schemaVersion))
+	require.Equal(t, currentSchemaVersion, schemaVersion)
+	require.Nil(t, rows.Close())
+}
+
 func newTestManager(t *testing.T, defaultRead, defaultWrite bool) *Manager {
-	a, err := NewManager(filepath.Join(t.TempDir(), "db"), defaultRead, defaultWrite)
+	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), defaultRead, defaultWrite, userTokenExpiryDuration, userStatsQueueWriterInterval)
+}
+
+func newTestManagerFromFile(t *testing.T, filename string, defaultRead, defaultWrite bool, tokenExpiryDuration, statsWriterInterval time.Duration) *Manager {
+	a, err := newManager(filename, defaultRead, defaultWrite, tokenExpiryDuration, statsWriterInterval)
 	require.Nil(t, err)
 	return a
 }

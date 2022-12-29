@@ -24,8 +24,7 @@ const (
 
 // Manager-related queries
 const (
-	createAuthTablesQueries = `
-		BEGIN;
+	createTablesQueriesNoTx = `
 		CREATE TABLE IF NOT EXISTS plan (
 			id INT NOT NULL,		
 			code TEXT NOT NULL,
@@ -67,8 +66,8 @@ const (
 			version INT NOT NULL
 		);
 		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
-		COMMIT;
 	`
+	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
 	selectUserByNameQuery = `
 		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
@@ -130,9 +129,27 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion     = 1
+	currentSchemaVersion     = 2
 	insertSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
+	updateSchemaVersion      = `UPDATE schemaVersion SET version = ? WHERE id = 1`
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
+
+	// 1 -> 2 (complex migration!)
+	migrate1To2RenameUserTableQueryNoTx = `
+		ALTER TABLE user RENAME TO user_old;
+	`
+	migrate1To2InsertFromOldTablesAndDropNoTx = `
+		INSERT INTO user (user, pass, role) 
+		SELECT user, pass, role FROM user_old;
+
+		INSERT INTO user_access (user_id, topic, read, write)
+		SELECT u.id, a.topic, a.read, a.write
+		FROM user u
+	 	JOIN access a ON u.user = a.user;
+
+		DROP TABLE access;
+		DROP TABLE user_old;
+	`
 )
 
 // Manager is an implementation of Manager. It stores users and access control list
@@ -159,7 +176,7 @@ func newManager(filename string, defaultRead, defaultWrite bool, tokenExpiryDura
 	if err != nil {
 		return nil, err
 	}
-	if err := setupAuthDB(db); err != nil {
+	if err := setupDB(db); err != nil {
 		return nil, err
 	}
 	manager := &Manager{
@@ -364,16 +381,21 @@ func (a *Manager) RemoveUser(username string) error {
 	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
-	if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
+	tx, err := a.db.Begin()
+	if err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteUserTokensQuery, username); err != nil {
+	defer tx.Rollback()
+	if _, err := tx.Exec(deleteUserAccessQuery, username); err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
+	if _, err := tx.Exec(deleteUserTokensQuery, username); err != nil {
 		return err
 	}
-	return nil
+	if _, err := tx.Exec(deleteUserQuery, username); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Users returns a list of users. It always also returns the Everyone user ("*").
@@ -567,11 +589,11 @@ func fromSQLWildcard(s string) string {
 	return strings.ReplaceAll(s, "%", "*")
 }
 
-func setupAuthDB(db *sql.DB) error {
+func setupDB(db *sql.DB) error {
 	// If 'schemaVersion' table does not exist, this must be a new database
 	rowsSV, err := db.Query(selectSchemaVersionQuery)
 	if err != nil {
-		return setupNewAuthDB(db)
+		return setupNewDB(db)
 	}
 	defer rowsSV.Close()
 
@@ -588,16 +610,43 @@ func setupAuthDB(db *sql.DB) error {
 	// Do migrations
 	if schemaVersion == currentSchemaVersion {
 		return nil
+	} else if schemaVersion == 1 {
+		return migrateFrom1(db)
 	}
 	return fmt.Errorf("unexpected schema version found: %d", schemaVersion)
 }
 
-func setupNewAuthDB(db *sql.DB) error {
-	if _, err := db.Exec(createAuthTablesQueries); err != nil {
+func setupNewDB(db *sql.DB) error {
+	if _, err := db.Exec(createTablesQueries); err != nil {
 		return err
 	}
 	if _, err := db.Exec(insertSchemaVersion, currentSchemaVersion); err != nil {
 		return err
 	}
 	return nil
+}
+
+func migrateFrom1(db *sql.DB) error {
+	log.Info("Migrating user database schema: from 1 to 2")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate1To2RenameUserTableQueryNoTx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(createTablesQueriesNoTx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(migrate1To2InsertFromOldTablesAndDropNoTx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 2); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil // Update this when a new version is added
 }

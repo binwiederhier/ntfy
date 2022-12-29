@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	jsonBodyBytesLimit = 4096
+	jsonBodyBytesLimit   = 4096
+	subscriptionIDLength = 16
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -232,7 +233,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if newSubscription.ID == "" {
-		newSubscription.ID = util.RandomString(16)
+		newSubscription.ID = util.RandomString(subscriptionIDLength)
 		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, newSubscription)
 		if err := s.userManager.ChangeSettings(v.user); err != nil {
 			return err

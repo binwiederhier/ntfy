@@ -31,6 +31,7 @@ var (
 	noQuotesRegex      = regexp.MustCompile(`^[-_./:@a-zA-Z0-9]+$`)
 )
 
+// Errors for ReadJSON and ReadJSONWithLimit functions
 var (
 	ErrInvalidJSON  = errors.New("invalid JSON")
 	ErrTooLargeJSON = errors.New("too large JSON")

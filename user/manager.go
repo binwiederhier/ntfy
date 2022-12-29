@@ -80,7 +80,7 @@ const (
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
-		WHERE t.token = ?
+		WHERE t.token = ? AND t.expires >= ?
 	`
 	selectTopicPermsQuery = `
 		SELECT read, write
@@ -138,17 +138,23 @@ const (
 // Manager is an implementation of Manager. It stores users and access control list
 // in a SQLite database.
 type Manager struct {
-	db           *sql.DB
-	defaultRead  bool
-	defaultWrite bool
-	statsQueue   map[string]*User // Username -> User, for "unimportant" user updates
-	mu           sync.Mutex
+	db                  *sql.DB
+	defaultRead         bool             // Default read permission if no ACL matches
+	defaultWrite        bool             // Default write permission if no ACL matches
+	statsQueue          map[string]*User // Username -> User, for "unimportant" user updates
+	tokenExpiryInterval time.Duration    // Duration after which tokens expire, and by which tokens are extended
+	mu                  sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
 func NewManager(filename string, defaultRead, defaultWrite bool) (*Manager, error) {
+	return newManager(filename, defaultRead, defaultWrite, userTokenExpiryDuration, userStatsQueueWriterInterval)
+}
+
+// NewManager creates a new Manager instance
+func newManager(filename string, defaultRead, defaultWrite bool, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -157,12 +163,13 @@ func NewManager(filename string, defaultRead, defaultWrite bool) (*Manager, erro
 		return nil, err
 	}
 	manager := &Manager{
-		db:           db,
-		defaultRead:  defaultRead,
-		defaultWrite: defaultWrite,
-		statsQueue:   make(map[string]*User),
+		db:                  db,
+		defaultRead:         defaultRead,
+		defaultWrite:        defaultWrite,
+		statsQueue:          make(map[string]*User),
+		tokenExpiryInterval: tokenExpiryDuration,
 	}
-	go manager.userStatsQueueWriter()
+	go manager.userStatsQueueWriter(statsWriterInterval)
 	return manager, nil
 }
 
@@ -263,8 +270,8 @@ func (a *Manager) EnqueueStats(user *User) {
 	a.statsQueue[user.Name] = user
 }
 
-func (a *Manager) userStatsQueueWriter() {
-	ticker := time.NewTicker(userStatsQueueWriterInterval)
+func (a *Manager) userStatsQueueWriter(interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		if err := a.writeUserStatsQueue(); err != nil {
 			log.Warn("UserManager: Writing user stats queue failed: %s", err.Error())
@@ -409,7 +416,7 @@ func (a *Manager) User(username string) (*User, error) {
 }
 
 func (a *Manager) userByToken(token string) (*User, error) {
-	rows, err := a.db.Query(selectUserByTokenQuery, token)
+	rows, err := a.db.Query(selectUserByTokenQuery, token, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}

@@ -53,13 +53,7 @@ import (
 		rate limiting:
 		- login/account endpoints
 		Tests:
-		- APIs
-		- CRUD tokens
-		- Expire tokens
-		- userManager can be nil
 		- visitor with/without user
-		- userManager.<NEWSTUFF>
-
 		Later:
 		- Password reset
 		- Pricing
@@ -569,7 +563,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		}
 	}
 	v.IncrMessages()
-	if v.user != nil {
+	if s.userManager != nil && v.user != nil {
 		s.userManager.EnqueueStats(v.user)
 	}
 	s.mu.Lock()
@@ -1342,7 +1336,7 @@ func (s *Server) sendDelayedMessages() error {
 	}
 	for _, m := range messages {
 		var v *visitor
-		if m.User != "" {
+		if s.userManager != nil && m.User != "" {
 			user, err := s.userManager.User(m.User)
 			if err != nil {
 				log.Warn("%s Error sending delayed message: %s", logMessagePrefix(v, m), err.Error())

@@ -41,9 +41,9 @@ const Account = () => {
 const Basics = () => {
     const { t } = useTranslation();
     return (
-        <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
+        <Card sx={{p: 3}} aria-label={t("account_basics_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
-                Account
+                {t("account_basics_title")}
             </Typography>
             <PrefGroup>
                 <Username/>
@@ -53,80 +53,15 @@ const Basics = () => {
     );
 };
 
-const Stats = () => {
-    const { t } = useTranslation();
-    const { account } = useOutletContext();
-    if (!account) {
-        return <></>;
-    }
-    const accountType = account.plan.code ?? "none";
-    const normalize = (value, max) => (value / max * 100);
-    return (
-        <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
-            <Typography variant="h5" sx={{marginBottom: 2}}>
-                {t("Usage")}
-            </Typography>
-            <PrefGroup>
-                <Pref labelId={"accountType"} title={t("Account type")}>
-                    <div>
-                        {account?.role === "admin"
-                            ? <>Unlimited <Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
-                            : t(`account_type_${accountType}`)}
-                    </div>
-                </Pref>
-                <Pref labelId={"messages"} title={t("Published messages")}>
-                    <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("of {{limit}}", { limit: account.limits.messages }) : t("Unlimited")}</Typography>
-                    </div>
-                    <LinearProgress variant="determinate" value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100} />
-                </Pref>
-                <Pref labelId={"emails"} title={t("Emails sent")}>
-                    <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("of {{limit}}", { limit: account.limits.emails }) : t("Unlimited")}</Typography>
-                    </div>
-                    <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
-                </Pref>
-                <Pref labelId={"attachments"} title={t("Attachment storage")} subtitle={t("{{filesize}} per file", { filesize: formatBytes(account.limits.attachment_file_size) })}>
-                    <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("of {{limit}}", { limit: formatBytes(account.limits.attachment_total_size) }) : t("Unlimited")}</Typography>
-                    </div>
-                    <LinearProgress variant="determinate" value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100} />
-                </Pref>
-            </PrefGroup>
-            {account.limits.basis === "ip" && <Typography variant="body1">
-                <em>Usage stats and limits for this account are based on your IP address, so they may be shared
-                    with other users.</em>
-            </Typography>}
-        </Card>
-    );
-};
-
-const Delete = () => {
-    const { t } = useTranslation();
-    return (
-        <Card sx={{p: 3}} aria-label={t("xxxxxxxxx")}>
-            <Typography variant="h5" sx={{marginBottom: 2}}>
-                {t("Delete account")}
-            </Typography>
-            <PrefGroup>
-                <DeleteAccount/>
-            </PrefGroup>
-        </Card>
-    );
-};
-
 const Username = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
     return (
-        <Pref labelId={"username"} title={t("Username")} description={t("Hey, that's you ❤")}>
+        <Pref title={t("account_basics_username_title")} description={t("account_basics_username_description")}>
             <div>
                 {session.username()}
                 {account?.role === "admin"
-                    ? <>{" "}<Tooltip title={"You are Admin"}><span style={{cursor: "default"}}>👑</span></Tooltip></>
+                    ? <>{" "}<Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
                     : ""}
             </div>
         </Pref>
@@ -137,14 +72,16 @@ const ChangePassword = () => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const labelId = "prefChangePassword";
+
     const handleDialogOpen = () => {
         setDialogKey(prev => prev+1);
         setDialogOpen(true);
     };
+
     const handleDialogCancel = () => {
         setDialogOpen(false);
     };
+
     const handleDialogSubmit = async (newPassword) => {
         try {
             await accountApi.changePassword(newPassword);
@@ -158,11 +95,12 @@ const ChangePassword = () => {
             // TODO show error
         }
     };
+
     return (
-        <Pref labelId={labelId} title={t("Password")} description={t("Change your account password")}>
+        <Pref title={t("account_basics_password_title")} description={t("account_basics_password_description")}>
             <div>
                 <Typography color="gray" sx={{float: "left", fontSize: "0.7rem", lineHeight: "3.5"}}>⬤⬤⬤⬤⬤⬤⬤⬤⬤⬤</Typography>
-                <IconButton onClick={handleDialogOpen} aria-label={t("xxxxxxxx")}>
+                <IconButton onClick={handleDialogOpen} aria-label={t("account_basics_password_description")}>
                     <EditIcon/>
                 </IconButton>
             </div>
@@ -186,13 +124,13 @@ const ChangePasswordDialog = (props) => {
     })();
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-            <DialogTitle>Change password</DialogTitle>
+            <DialogTitle>{t("account_basics_password_dialog_title")}</DialogTitle>
             <DialogContent>
                 <TextField
                     margin="dense"
                     id="new-password"
-                    label={t("New password")}
-                    aria-label={t("xxxx")}
+                    label={t("account_basics_password_dialog_new_password_label")}
+                    aria-label={t("account_basics_password_dialog_new_password_label")}
                     type="password"
                     value={newPassword}
                     onChange={ev => setNewPassword(ev.target.value)}
@@ -202,8 +140,8 @@ const ChangePasswordDialog = (props) => {
                 <TextField
                     margin="dense"
                     id="confirm"
-                    label={t("Confirm password")}
-                    aria-label={t("xxx")}
+                    label={t("account_basics_password_dialog_confirm_password_label")}
+                    aria-label={t("account_basics_password_dialog_confirm_password_label")}
                     type="password"
                     value={confirmPassword}
                     onChange={ev => setConfirmPassword(ev.target.value)}
@@ -212,10 +150,76 @@ const ChangePasswordDialog = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onCancel}>{t("Cancel")}</Button>
-                <Button onClick={() => props.onSubmit(newPassword)} disabled={!changeButtonEnabled}>{t("Change password")}</Button>
+                <Button onClick={props.onCancel}>{t("account_basics_password_dialog_button_cancel")}</Button>
+                <Button onClick={() => props.onSubmit(newPassword)} disabled={!changeButtonEnabled}>{t("account_basics_password_dialog_button_submit")}</Button>
             </DialogActions>
         </Dialog>
+    );
+};
+
+const Stats = () => {
+    const { t } = useTranslation();
+    const { account } = useOutletContext();
+    if (!account) {
+        return <></>;
+    }
+    const planCode = account.plan.code ?? "none";
+    const normalize = (value, max) => (value / max * 100);
+    return (
+        <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
+            <Typography variant="h5" sx={{marginBottom: 2}}>
+                {t("account_usage_title")}
+            </Typography>
+            <PrefGroup>
+                <Pref title={t("account_usage_plan_title")}>
+                    <div>
+                        {account?.role === "admin"
+                            ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
+                            : t(`account_usage_plan_code_${planCode}`)}
+                    </div>
+                </Pref>
+                <Pref title={t("account_usage_messages_title")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100} />
+                </Pref>
+                <Pref title={t("account_usage_emails_title")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
+                </Pref>
+                <Pref title={t("account_usage_attachment_storage_title")} subtitle={t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) })}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100} />
+                </Pref>
+            </PrefGroup>
+            {account.limits.basis === "ip" &&
+                <Typography variant="body1">
+                    <em>{t("account_usage_basis_ip_description")}</em>
+                </Typography>
+            }
+        </Card>
+    );
+};
+
+const Delete = () => {
+    const { t } = useTranslation();
+    return (
+        <Card sx={{p: 3}} aria-label={t("account_delete_title")}>
+            <Typography variant="h5" sx={{marginBottom: 2}}>
+                {t("account_delete_title")}
+            </Typography>
+            <PrefGroup>
+                <DeleteAccount/>
+            </PrefGroup>
+        </Card>
     );
 };
 
@@ -223,15 +227,17 @@ const DeleteAccount = () => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const labelId = "prefDeleteAccount";
+
     const handleDialogOpen = () => {
         setDialogKey(prev => prev+1);
         setDialogOpen(true);
     };
+
     const handleDialogCancel = () => {
         setDialogOpen(false);
     };
-    const handleDialogSubmit = async (newPassword) => {
+
+    const handleDialogSubmit = async () => {
         try {
             await accountApi.delete();
             await db.delete();
@@ -246,11 +252,12 @@ const DeleteAccount = () => {
             // TODO show error
         }
     };
+
     return (
-        <Pref labelId={labelId} title={t("Delete account")} description={t("Permanently delete your account")}>
+        <Pref title={t("account_delete_title")} description={t("account_delete_description")}>
             <div>
                 <Button fullWidth={false} variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={handleDialogOpen}>
-                    Delete account
+                    {t("account_delete_title")}
                 </Button>
             </div>
             <DeleteAccountDialog
@@ -270,16 +277,16 @@ const DeleteAccountDialog = (props) => {
     const buttonEnabled = username === session.username();
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-            <DialogTitle>{t("Delete account")}</DialogTitle>
+            <DialogTitle>{t("account_delete_title")}</DialogTitle>
             <DialogContent>
                 <Typography variant="body1">
-                    {t("This will permanently delete your account, including all data that is stored on the server. If you really want to proceed, please type '{{username}}' in the text box below.", { username: session.username()})}
+                    {t("account_delete_dialog_description", { username: session.username()})}
                 </Typography>
                 <TextField
                     margin="dense"
                     id="account-delete-confirm"
-                    label={t("Type '{{username}}' to delete account", { username: session.username()})}
-                    aria-label={t("xxxx")}
+                    label={t("account_delete_dialog_label", { username: session.username()})}
+                    aria-label={t("account_delete_dialog_label", { username: session.username()})}
                     type="text"
                     value={username}
                     onChange={ev => setUsername(ev.target.value)}
@@ -288,8 +295,8 @@ const DeleteAccountDialog = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>
-                <Button onClick={props.onSubmit} color="error" disabled={!buttonEnabled}>{t("Permanently delete account")}</Button>
+                <Button onClick={props.onCancel}>{t("account_delete_dialog_button_cancel")}</Button>
+                <Button onClick={props.onSubmit} color="error" disabled={!buttonEnabled}>{t("account_delete_dialog_button_submit")}</Button>
             </DialogActions>
         </Dialog>
     );
@@ -319,7 +326,6 @@ const Pref = (props) => {
         >
             <div
                 role="cell"
-                id={props.labelId}
                 aria-label={props.title}
                 style={{
                     flex: '1 0 40%',

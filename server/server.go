@@ -49,7 +49,6 @@ import (
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
 		UI:
-		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
 		- Translations
 		- aria-labels
 		- Home UI sign-in/login to top right

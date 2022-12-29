@@ -124,10 +124,11 @@ const NavList = (props) => {
                         <Divider sx={{my: 1}}/>
                     </>}
                 {session.exists() &&
-                        <ListItemButton onClick={() => navigate(routes.account)} selected={location.pathname === routes.account}>
+                    <ListItemButton onClick={() => navigate(routes.account)} selected={location.pathname === routes.account}>
                         <ListItemIcon><Person/></ListItemIcon>
                         <ListItemText primary={t("nav_button_account")}/>
-                    </ListItemButton>}
+                    </ListItemButton>
+                }
                 <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
                     <ListItemIcon><SettingsIcon/></ListItemIcon>
                     <ListItemText primary={t("nav_button_settings")}/>

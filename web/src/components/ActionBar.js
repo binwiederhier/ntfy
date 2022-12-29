@@ -83,18 +83,17 @@ const ActionBar = (props) => {
     );
 };
 
-// Originally from https://mui.com/components/menus/#MenuListComposition.js
 const SettingsIcons = (props) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [open, setOpen] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
     const [snackOpen, setSnackOpen] = useState(false);
     const [subscriptionSettingsOpen, setSubscriptionSettingsOpen] = useState(false);
-    const anchorRef = useRef(null);
     const subscription = props.subscription;
+    const open = Boolean(anchorEl);
 
-    const handleToggleOpen = () => {
-        setOpen((prevOpen) => !prevOpen);
+    const handleToggleOpen = (event) => {
+        setAnchorEl(event.currentTarget);
     };
 
     const handleToggleMute = async () => {
@@ -102,22 +101,17 @@ const SettingsIcons = (props) => {
         await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
     }
 
-    const handleClose = (event) => {
-        if (anchorRef.current && anchorRef.current.contains(event.target)) {
-            return;
-        }
-        setOpen(false);
+    const handleClose = () => {
+        setAnchorEl(null);
     };
 
     const handleClearAll = async (event) => {
-        handleClose(event);
         console.log(`[ActionBar] Deleting all notifications from ${props.subscription.id}`);
         await subscriptionManager.deleteNotifications(props.subscription.id);
     };
 
     const handleUnsubscribe = async (event) => {
         console.log(`[ActionBar] Unsubscribing from ${props.subscription.id}`, props.subscription);
-        handleClose(event);
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
             try {
@@ -181,61 +175,26 @@ const SettingsIcons = (props) => {
             console.log(`[ActionBar] Error publishing message`, e);
             setSnackOpen(true);
         }
-        setOpen(false);
     }
-
-    const handleListKeyDown = (event) => {
-        if (event.key === 'Tab') {
-            event.preventDefault();
-            setOpen(false);
-        } else if (event.key === 'Escape') {
-            setOpen(false);
-        }
-    }
-
-    // return focus to the button when we transitioned from !open -> open
-    const prevOpen = useRef(open);
-    useEffect(() => {
-        if (prevOpen.current === true && open === false) {
-            anchorRef.current.focus();
-        }
-        prevOpen.current = open;
-    }, [open]);
 
     return (
         <>
             <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} aria-label={t("action_bar_toggle_mute")}>
                 {subscription.mutedUntil ? <NotificationsOffIcon/> : <NotificationsIcon/>}
             </IconButton>
-            <IconButton color="inherit" size="large" edge="end" ref={anchorRef} onClick={handleToggleOpen} aria-label={t("action_bar_toggle_action_menu")}>
+            <IconButton color="inherit" size="large" edge="end" onClick={handleToggleOpen} aria-label={t("action_bar_toggle_action_menu")}>
                 <MoreVertIcon/>
             </IconButton>
-            <Popper
+            <PopupMenu
+                anchorEl={anchorEl}
                 open={open}
-                anchorEl={anchorRef.current}
-                role={undefined}
-                placement="bottom-start"
-                transition
-                disablePortal
+                onClose={handleClose}
             >
-                {({TransitionProps, placement}) => (
-                    <Grow
-                        {...TransitionProps}
-                        style={{transformOrigin: placement === 'bottom-start' ? 'left top' : 'left bottom'}}
-                    >
-                        <Paper>
-                            <ClickAwayListener onClickAway={handleClose}>
-                                <MenuList autoFocusItem={open} onKeyDown={handleListKeyDown}>
-                                    <MenuItem onClick={handleSubscriptionSettings}>{t("action_bar_subscription_settings")}</MenuItem>
-                                    <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
-                                    <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
-                                    <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
-                                </MenuList>
-                            </ClickAwayListener>
-                        </Paper>
-                    </Grow>
-                )}
-            </Popper>
+                <MenuItem onClick={handleSubscriptionSettings}>{t("action_bar_subscription_settings")}</MenuItem>
+                <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
+                <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
+                <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
+            </PopupMenu>
             <Portal>
                 <Snackbar
                     open={snackOpen}
@@ -256,7 +215,7 @@ const SettingsIcons = (props) => {
     );
 };
 
-const ProfileIcon = (props) => {
+const ProfileIcon = () => {
     const { t } = useTranslation();
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
@@ -265,9 +224,11 @@ const ProfileIcon = (props) => {
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
     };
+
     const handleClose = () => {
         setAnchorEl(null);
     };
+
     const handleLogout = async () => {
         try {
             await accountApi.logout();
@@ -276,53 +237,28 @@ const ProfileIcon = (props) => {
             session.resetAndRedirect(routes.app);
         }
     };
+
     return (
         <>
             {session.exists() &&
-                <IconButton color="inherit" size="large" edge="end" onClick={handleClick} aria-label={t("xxxxxxx")}>
+                <IconButton color="inherit" size="large" edge="end" onClick={handleClick} aria-label={t("action_bar_profile_title")}>
                     <AccountCircleIcon/>
                 </IconButton>
             }
             {!session.exists() && config.enableLogin &&
-                <Button color="inherit" variant="text" onClick={() => navigate(routes.login)} sx={{m: 1}}>Sign in</Button>
+                <Button color="inherit" variant="text" onClick={() => navigate(routes.login)} sx={{m: 1}} aria-label={t("action_bar_sign_in")}>
+                    {t("action_bar_sign_in")}
+                </Button>
             }
             {!session.exists() && config.enableSignup &&
-                <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)}>Sign up</Button>
+                <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)} aria-label={t("action_bar_sign_up")}>
+                    {t("action_bar_sign_up")}
+                </Button>
             }
-            <Menu
+            <PopupMenu
                 anchorEl={anchorEl}
-                id="account-menu"
                 open={open}
                 onClose={handleClose}
-                onClick={handleClose}
-                PaperProps={{
-                    elevation: 0,
-                    sx: {
-                        overflow: 'visible',
-                        filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                        mt: 1.5,
-                        '& .MuiAvatar-root': {
-                            width: 32,
-                            height: 32,
-                            ml: -0.5,
-                            mr: 1,
-                        },
-                        '&:before': {
-                            content: '""',
-                            display: 'block',
-                            position: 'absolute',
-                            top: 0,
-                            right: 19,
-                            width: 10,
-                            height: 10,
-                            bgcolor: 'background.paper',
-                            transform: 'translateY(-50%) rotate(45deg)',
-                            zIndex: 0,
-                        },
-                    },
-                }}
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
                 <MenuItem onClick={() => navigate(routes.account)}>
                     <ListItemIcon>
@@ -335,18 +271,58 @@ const ProfileIcon = (props) => {
                     <ListItemIcon>
                         <Settings fontSize="small" />
                     </ListItemIcon>
-                    Settings
+                    {t("action_bar_profile_settings")}
                 </MenuItem>
                 <MenuItem onClick={handleLogout}>
                     <ListItemIcon>
                         <Logout fontSize="small" />
                     </ListItemIcon>
-                    Logout
+                    {t("action_bar_profile_logout")}
                 </MenuItem>
-            </Menu>
+            </PopupMenu>
         </>
     );
 };
 
+const PopupMenu = (props) => {
+    return (
+        <Menu
+            anchorEl={props.anchorEl}
+            open={props.open}
+            onClose={props.onClose}
+            onClick={props.onClose}
+            PaperProps={{
+                elevation: 0,
+                sx: {
+                    overflow: 'visible',
+                    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                    mt: 1.5,
+                    '& .MuiAvatar-root': {
+                        width: 32,
+                        height: 32,
+                        ml: -0.5,
+                        mr: 1,
+                    },
+                    '&:before': {
+                        content: '""',
+                        display: 'block',
+                        position: 'absolute',
+                        top: 0,
+                        right: 19,
+                        width: 10,
+                        height: 10,
+                        bgcolor: 'background.paper',
+                        transform: 'translateY(-50%) rotate(45deg)',
+                        zIndex: 0,
+                    },
+                },
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        >
+            {props.children}
+        </Menu>
+    );
+};
 
 export default ActionBar;

@@ -21,6 +21,7 @@ import IconButton from "@mui/material/IconButton";
 import {useOutletContext} from "react-router-dom";
 import {formatBytes} from "../app/utils";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import {Pref, PrefGroup} from "./Pref";
 
 const Account = () => {
     if (!session.exists()) {
@@ -56,9 +57,11 @@ const Basics = () => {
 const Username = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
+    const labelId = "prefUsername";
+
     return (
-        <Pref title={t("account_basics_username_title")} description={t("account_basics_username_description")}>
-            <div>
+        <Pref labelId={labelId} title={t("account_basics_username_title")} description={t("account_basics_username_description")}>
+            <div aria-labelledby={labelId}>
                 {session.username()}
                 {account?.role === "admin"
                     ? <>{" "}<Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
@@ -72,6 +75,7 @@ const ChangePassword = () => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const labelId = "prefChangePassword";
 
     const handleDialogOpen = () => {
         setDialogKey(prev => prev+1);
@@ -97,8 +101,8 @@ const ChangePassword = () => {
     };
 
     return (
-        <Pref title={t("account_basics_password_title")} description={t("account_basics_password_description")}>
-            <div>
+        <Pref labelId={labelId} title={t("account_basics_password_title")} description={t("account_basics_password_description")}>
+            <div aria-labelledby={labelId}>
                 <Typography color="gray" sx={{float: "left", fontSize: "0.7rem", lineHeight: "3.5"}}>⬤⬤⬤⬤⬤⬤⬤⬤⬤⬤</Typography>
                 <IconButton onClick={handleDialogOpen} aria-label={t("account_basics_password_description")}>
                     <EditIcon/>
@@ -299,57 +303,6 @@ const DeleteAccountDialog = (props) => {
                 <Button onClick={props.onSubmit} color="error" disabled={!buttonEnabled}>{t("account_delete_dialog_button_submit")}</Button>
             </DialogActions>
         </Dialog>
-    );
-};
-
-
-// FIXME duplicate code
-
-const PrefGroup = (props) => {
-    return (
-        <div role="table">
-            {props.children}
-        </div>
-    )
-};
-
-const Pref = (props) => {
-    return (
-        <div
-            role="row"
-            style={{
-                display: "flex",
-                flexDirection: "row",
-                marginTop: "10px",
-                marginBottom: "20px",
-            }}
-        >
-            <div
-                role="cell"
-                aria-label={props.title}
-                style={{
-                    flex: '1 0 40%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    paddingRight: '30px'
-                }}
-            >
-                <div><b>{props.title}</b>{props.subtitle && <em> ({props.subtitle})</em>}</div>
-                {props.description && <div><em>{props.description}</em></div>}
-            </div>
-            <div
-                role="cell"
-                style={{
-                    flex: '1 0 calc(60% - 50px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center'
-                }}
-            >
-                {props.children}
-            </div>
-        </div>
     );
 };
 

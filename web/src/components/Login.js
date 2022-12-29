@@ -46,7 +46,7 @@ const Login = () => {
     return (
         <AvatarBox>
             <Typography sx={{ typography: 'h6' }}>
-                {t("Sign in to your ntfy account")}
+                {t("login_title")}
             </Typography>
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{mt: 1, maxWidth: 400}}>
                 <TextField
@@ -54,7 +54,7 @@ const Login = () => {
                     required
                     fullWidth
                     id="username"
-                    label={t("Username")}
+                    label={t("signup_form_username")}
                     name="username"
                     value={username}
                     onChange={ev => setUsername(ev.target.value.trim())}
@@ -65,7 +65,7 @@ const Login = () => {
                     required
                     fullWidth
                     name="password"
-                    label={t("Password")}
+                    label={t("signup_form_password")}
                     type="password"
                     id="password"
                     value={password}
@@ -79,7 +79,7 @@ const Login = () => {
                     disabled={username === "" || password === ""}
                     sx={{mt: 2, mb: 2}}
                 >
-                    {t("Sign in")}
+                    {t("login_form_button_submit")}
                 </Button>
                 {error &&
                     <Box sx={{
@@ -94,7 +94,7 @@ const Login = () => {
                 }
                 <Box sx={{width: "100%"}}>
                     {config.enableResetPassword && <div style={{float: "left"}}><NavLink to={routes.resetPassword} variant="body1">{t("Reset password")}</NavLink></div>}
-                    {config.enableSignup && <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">{t("Sign up")}</NavLink></div>}
+                    {config.enableSignup && <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">{t("login_link_signup")}</NavLink></div>}
                 </Box>
             </Box>
         </AvatarBox>

@@ -30,27 +30,27 @@ const Signup = () => {
         } catch (e) {
             console.log(`[Signup] Signup for user ${user.username} failed`, e);
             if ((e instanceof UsernameTakenError)) {
-                setError(t("Username {{username}} is already taken", { username: e.username }));
+                setError(t("signup_error_username_taken", { username: e.username }));
             } else if ((e instanceof AccountCreateLimitReachedError)) {
-                setError(t("Account creation limit reached"));
+                setError(t("signup_error_creation_limit_reached"));
             } else if (e.message) {
                 setError(e.message);
             } else {
-                setError(t("Unknown error. Check logs for details."))
+                setError(t("signup_error_unknown"))
             }
         }
     };
     if (!config.enableSignup) {
         return (
             <AvatarBox>
-                <Typography sx={{ typography: 'h6' }}>{t("Signup is disabled")}</Typography>
+                <Typography sx={{ typography: 'h6' }}>{t("signup_disabled")}</Typography>
             </AvatarBox>
         );
     }
     return (
         <AvatarBox>
             <Typography sx={{ typography: 'h6' }}>
-                {t("Create a ntfy account")}
+                {t("signup_title")}
             </Typography>
             <Box component="form" onSubmit={handleSubmit} noValidate sx={{mt: 1, maxWidth: 400}}>
                 <TextField
@@ -58,7 +58,7 @@ const Signup = () => {
                     required
                     fullWidth
                     id="username"
-                    label="Username"
+                    label={t("signup_form_username")}
                     name="username"
                     value={username}
                     onChange={ev => setUsername(ev.target.value.trim())}
@@ -69,7 +69,7 @@ const Signup = () => {
                     required
                     fullWidth
                     name="password"
-                    label="Password"
+                    label={t("signup_form_password")}
                     type="password"
                     id="password"
                     autoComplete="current-password"
@@ -81,7 +81,7 @@ const Signup = () => {
                     required
                     fullWidth
                     name="confirm-password"
-                    label="Confirm password"
+                    label={t("signup_form_confirm_password")}
                     type="password"
                     id="confirm-password"
                     value={confirm}
@@ -95,7 +95,7 @@ const Signup = () => {
                     disabled={username === "" || password === "" || password !== confirm}
                     sx={{mt: 2, mb: 2}}
                 >
-                    {t("Sign up")}
+                    {t("signup_form_button_submit")}
                 </Button>
                 {error &&
                     <Box sx={{
@@ -112,7 +112,7 @@ const Signup = () => {
             {config.enableLogin &&
                 <Typography sx={{mb: 4}}>
                     <NavLink to={routes.login} variant="body1">
-                        {t("Already have an account? Sign in!")}
+                        {t("signup_already_have_account")}
                     </NavLink>
                 </Typography>
             }

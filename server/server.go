@@ -49,10 +49,7 @@ import (
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
 		UI:
-		- Translations
-		- aria-labels
 		- Home UI sign-in/login to top right
-		-
 		rate limiting:
 		- login/account endpoints
 		Tests:

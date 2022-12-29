@@ -62,6 +62,25 @@ func TestAccount_Signup_LimitReached(t *testing.T) {
 	require.Equal(t, 42906, toHTTPError(t, rr.Body.String()).Code)
 }
 
+func TestAccount_Signup_AsUser(t *testing.T) {
+	conf := newTestConfigWithUsers(t)
+	conf.EnableSignup = true
+	s := newTestServer(t, conf)
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+
+	rr := request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"emma"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "POST", "/v1/account", `{"username":"marian", "password":"marian"}`, map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 401, rr.Code)
+}
+
 func TestAccount_Signup_Disabled(t *testing.T) {
 	conf := newTestConfigWithUsers(t)
 	conf.EnableSignup = false
@@ -110,6 +129,144 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 	require.Equal(t, int64(1002), account.Stats.MessagesRemaining)
 	require.Equal(t, int64(1), account.Stats.Emails)
 	require.Equal(t, int64(23), account.Stats.EmailsRemaining)
+}
+
+func TestAccount_ChangeSettings(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	user, _ := s.userManager.User("phil")
+	token, _ := s.userManager.CreateToken(user)
+
+	rr := request(t, s, "PATCH", "/v1/account/settings", `{"notification": {"sound": "juntos"},"ignored": true}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "PATCH", "/v1/account/settings", `{"notification": {"delete_after": 86400}, "language": "de"}`, map[string]string{
+		"Authorization": util.BearerAuth(token.Value),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", `{"username":"marian", "password":"marian"}`, map[string]string{
+		"Authorization": util.BearerAuth(token.Value),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, "de", account.Language)
+	require.Equal(t, 86400, account.Notification.DeleteAfter)
+	require.Equal(t, "juntos", account.Notification.Sound)
+	require.Equal(t, 0, account.Notification.MinPriority) // Not set
+}
+
+func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	rr := request(t, s, "POST", "/v1/account/subscription", `{"base_url": "http://abc.com", "topic": "def"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, 1, len(account.Subscriptions))
+	require.NotEmpty(t, account.Subscriptions[0].ID)
+	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
+	require.Equal(t, "def", account.Subscriptions[0].Topic)
+	require.Equal(t, "", account.Subscriptions[0].DisplayName)
+
+	subscriptionID := account.Subscriptions[0].ID
+	rr = request(t, s, "PATCH", "/v1/account/subscription/"+subscriptionID, `{"display_name": "ding dong"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ = util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, 1, len(account.Subscriptions))
+	require.Equal(t, subscriptionID, account.Subscriptions[0].ID)
+	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
+	require.Equal(t, "def", account.Subscriptions[0].Topic)
+	require.Equal(t, "ding dong", account.Subscriptions[0].DisplayName)
+
+	rr = request(t, s, "DELETE", "/v1/account/subscription/"+subscriptionID, "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ = util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, 0, len(account.Subscriptions))
+}
+
+func TestAccount_ChangePassword(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	rr := request(t, s, "POST", "/v1/account/password", `{"password": "new password"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 401, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "new password"),
+	})
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestAccount_ChangePassword_NoAccount(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+
+	rr := request(t, s, "POST", "/v1/account/password", `{"password": "new password"}`, nil)
+	require.Equal(t, 401, rr.Code)
+}
+
+func TestAccount_ExtendToken(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	token, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+
+	time.Sleep(time.Second)
+
+	rr = request(t, s, "PATCH", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BearerAuth(token.Token),
+	})
+	require.Equal(t, 200, rr.Code)
+	extendedToken, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+	require.Equal(t, token.Token, extendedToken.Token)
+	require.True(t, token.Expires < extendedToken.Expires)
+}
+
+func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	rr := request(t, s, "PATCH", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"), // Not Bearer!
+	})
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40023, toHTTPError(t, rr.Body.String()).Code)
 }
 
 func TestAccount_Delete_Success(t *testing.T) {

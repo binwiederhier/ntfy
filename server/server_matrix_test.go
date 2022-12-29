@@ -29,7 +29,7 @@ func TestMatrix_NewRequestFromMatrixJSON_TooLarge(t *testing.T) {
 	body := `{"notification":{"content":{"body":"I'm floating in a most peculiar way.","msgtype":"m.text"},"counts":{"missed_calls":1,"unread":2},"devices":[{"app_id":"org.matrix.matrixConsole.ios","data":{},"pushkey":"https://ntfy.sh/upABCDEFGHI?up=1","pushkey_ts":12345678,"tweaks":{"sound":"bing"}}],"event_id":"$3957tyerfgewrf384","prio":"high","room_alias":"#exampleroom:matrix.org","room_id":"!slw48wfj34rtnrf:example.com","room_name":"Mission Control","sender":"@exampleuser:matrix.org","sender_display_name":"Major Tom","type":"m.room.message"}}`
 	r, _ := http.NewRequest("POST", "http://ntfy.example.com/_matrix/push/v1/notify", strings.NewReader(body))
 	_, err := newRequestFromMatrixJSON(r, baseURL, maxLength)
-	require.Equal(t, errHTTPEntityTooLargeMatrixRequestTooLarge, err)
+	require.Equal(t, errHTTPEntityTooLargeMatrixRequest, err)
 }
 
 func TestMatrix_NewRequestFromMatrixJSON_InvalidJSON(t *testing.T) {

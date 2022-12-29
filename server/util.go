@@ -5,6 +5,7 @@ import (
 	"github.com/emersion/go-smtp"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
+	"io"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -120,4 +121,16 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 		}
 	}
 	return ip
+}
+
+func readJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
+	obj, err := util.ReadJSONWithLimit[T](r, limit)
+	if err == util.ErrInvalidJSON {
+		return nil, errHTTPBadRequestJSONInvalid
+	} else if err == util.ErrTooLargeJSON {
+		return nil, errHTTPEntityTooLargeJSONBody
+	} else if err != nil {
+		return nil, err
+	}
+	return obj, nil
 }

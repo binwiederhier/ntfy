@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -21,7 +20,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
 	}
-	newAccount, err := util.ReadJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit)
+	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}
@@ -118,7 +117,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPassword, err := util.ReadJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
+	newPassword, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}
@@ -174,7 +173,7 @@ func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user.Token == "" {
-		return errHTTPUnauthorized
+		return errHTTPBadRequestNoTokenProvided
 	}
 	if err := s.userManager.RemoveToken(v.user); err != nil {
 		return err
@@ -184,7 +183,7 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPrefs, err := util.ReadJSONWithLimit[user.Prefs](r.Body, jsonBodyBytesLimit)
+	newPrefs, err := readJSONWithLimit[user.Prefs](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}
@@ -218,7 +217,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newSubscription, err := util.ReadJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
+	newSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}
@@ -250,13 +249,13 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidFilePath // FIXME
+		return errHTTPInternalErrorInvalidPath
 	}
-	updatedSubscription, err := util.ReadJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
+	subscriptionID := matches[1]
+	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}
-	subscriptionID := matches[1]
 	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
 		return errHTTPNotFound
 	}
@@ -283,14 +282,9 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user == nil {
-		return errors.New("no user")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidFilePath // FIXME
+		return errHTTPInternalErrorInvalidPath
 	}
 	subscriptionID := matches[1]
 	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
@@ -308,5 +302,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 			return err
 		}
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	return nil
 }

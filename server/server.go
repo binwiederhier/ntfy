@@ -479,7 +479,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	}
 	matches := fileRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidFilePath
+		return errHTTPInternalErrorInvalidPath
 	}
 	messageID := matches[1]
 	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
@@ -815,7 +815,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
 		if err == nil && (contentLength > stats.AttachmentTotalSizeRemaining || contentLength > stats.AttachmentFileSizeLimit) {
-			return errHTTPEntityTooLargeAttachmentTooLarge
+			return errHTTPEntityTooLargeAttachment
 		}
 	}
 	if m.Attachment == nil {
@@ -839,7 +839,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {
-		return errHTTPEntityTooLargeAttachmentTooLarge
+		return errHTTPEntityTooLargeAttachment
 	} else if err != nil {
 		return err
 	}
@@ -1426,14 +1426,9 @@ func (s *Server) ensureUser(next handleFunc) handleFunc {
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		body, err := util.Peek(r.Body, s.config.MessageLimit)
+		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit)
 		if err != nil {
 			return err
-		}
-		defer r.Body.Close()
-		var m publishMessage
-		if err := json.NewDecoder(body).Decode(&m); err != nil {
-			return errHTTPBadRequestJSONInvalid
 		}
 		if !topicRegex.MatchString(m.Topic) {
 			return errHTTPBadRequestTopicInvalid
@@ -1467,7 +1462,7 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if len(m.Actions) > 0 {
 			actionsStr, err := json.Marshal(m.Actions)
 			if err != nil {
-				return errHTTPBadRequestJSONInvalid
+				return errHTTPBadRequestMessageJSONInvalid
 			}
 			r.Header.Set("X-Actions", string(actionsStr))
 		}
@@ -1535,7 +1530,9 @@ func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 	} else {
 		v = s.visitorFromIP(ip)
 	}
-	v.user = u    // Update user -- FIXME race?
+	v.mu.Lock()
+	v.user = u
+	v.mu.Unlock()
 	return v, err // Always return visitor, even when error occurs!
 }
 

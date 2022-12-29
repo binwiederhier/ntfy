@@ -31,6 +31,11 @@ var (
 	noQuotesRegex      = regexp.MustCompile(`^[-_./:@a-zA-Z0-9]+$`)
 )
 
+var (
+	ErrInvalidJSON  = errors.New("invalid JSON")
+	ErrTooLargeJSON = errors.New("too large JSON")
+)
+
 // FileExists checks if a file exists, and returns true if it does
 func FileExists(filename string) bool {
 	stat, _ := os.Stat(filename)
@@ -293,21 +298,23 @@ func QuoteCommand(command []string) string {
 func ReadJSON[T any](body io.ReadCloser) (*T, error) {
 	var obj T
 	if err := json.NewDecoder(body).Decode(&obj); err != nil {
-		return nil, err
+		return nil, ErrInvalidJSON
 	}
 	return &obj, nil
 }
 
 // ReadJSONWithLimit reads the given io.ReadCloser into a struct, but only until limit is reached
 func ReadJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
-	r, err := Peek(r, limit)
+	defer r.Close()
+	p, err := Peek(r, limit)
 	if err != nil {
 		return nil, err
+	} else if p.LimitReached {
+		return nil, ErrTooLargeJSON
 	}
-	defer r.Close()
 	var obj T
-	if err := json.NewDecoder(r).Decode(&obj); err != nil {
-		return nil, err
+	if err := json.NewDecoder(p).Decode(&obj); err != nil {
+		return nil, ErrInvalidJSON
 	}
 	return &obj, nil
 }

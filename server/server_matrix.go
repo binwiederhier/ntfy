@@ -113,7 +113,7 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	}
 	defer r.Body.Close()
 	if body.LimitReached {
-		return nil, errHTTPEntityTooLargeMatrixRequestTooLarge
+		return nil, errHTTPEntityTooLargeMatrixRequest
 	}
 	var m matrixRequest
 	if err := json.Unmarshal(body.PeekedBytes, &m); err != nil {

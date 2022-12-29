@@ -109,20 +109,16 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user == nil {
-		return errHTTPUnauthorized
-	}
 	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	// FIXME return something
 	return nil
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPassword, err := util.ReadJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit)
+	newPassword, err := util.ReadJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}

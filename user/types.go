@@ -7,17 +7,6 @@ import (
 	"time"
 )
 
-type Auther interface {
-	// Authenticate checks username and password and returns a user if correct. The method
-	// returns in constant-ish time, regardless of whether the user exists or the password is
-	// correct or incorrect.
-	Authenticate(username, password string) (*User, error)
-
-	// Authorize returns nil if the given user has access to the given topic using the desired
-	// permission. The user param may be nil to signal an anonymous user.
-	Authorize(user *User, topic string, perm Permission) error
-}
-
 // User is a struct that represents a user
 type User struct {
 	Name   string
@@ -30,25 +19,42 @@ type User struct {
 	Stats  *Stats
 }
 
+// Auther is an interface for authentication and authorization
+type Auther interface {
+	// Authenticate checks username and password and returns a user if correct. The method
+	// returns in constant-ish time, regardless of whether the user exists or the password is
+	// correct or incorrect.
+	Authenticate(username, password string) (*User, error)
+
+	// Authorize returns nil if the given user has access to the given topic using the desired
+	// permission. The user param may be nil to signal an anonymous user.
+	Authorize(user *User, topic string, perm Permission) error
+}
+
+// Token represents a user token, including expiry date
 type Token struct {
 	Value   string
 	Expires time.Time
 }
 
+// Prefs represents a user's configuration settings
 type Prefs struct {
 	Language      string             `json:"language,omitempty"`
 	Notification  *NotificationPrefs `json:"notification,omitempty"`
 	Subscriptions []*Subscription    `json:"subscriptions,omitempty"`
 }
 
+// PlanCode is code identifying a user's plan
 type PlanCode string
 
+// Default plan codes
 const (
 	PlanUnlimited = PlanCode("unlimited")
 	PlanDefault   = PlanCode("default")
 	PlanNone      = PlanCode("none")
 )
 
+// Plan represents a user's account type, including its account limits
 type Plan struct {
 	Code                     string `json:"name"`
 	Upgradable               bool   `json:"upgradable"`
@@ -58,6 +64,7 @@ type Plan struct {
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
 }
 
+// Subscription represents a user's topic subscription
 type Subscription struct {
 	ID          string `json:"id"`
 	BaseURL     string `json:"base_url"`
@@ -65,12 +72,14 @@ type Subscription struct {
 	DisplayName string `json:"display_name"`
 }
 
+// NotificationPrefs represents the user's notification settings
 type NotificationPrefs struct {
 	Sound       string `json:"sound,omitempty"`
 	MinPriority int    `json:"min_priority,omitempty"`
 	DeleteAfter int    `json:"delete_after,omitempty"`
 }
 
+// Stats is a struct holding daily user statistics
 type Stats struct {
 	Messages int64
 	Emails   int64

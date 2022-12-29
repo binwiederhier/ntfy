@@ -50,15 +50,12 @@ import (
 			- figure out what settings are "web" or "phone"
 		UI:
 		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
+		- Translations
+		- aria-labels
+		- Home UI sign-in/login to top right
+		-
 		rate limiting:
 		- login/account endpoints
-		Pages:
-		- Home
-		- Password reset
-		- Pricing
-		- change email
-		Polishing:
-			aria-label for everything
 		Tests:
 		- APIs
 		- CRUD tokens
@@ -66,6 +63,12 @@ import (
 		- userManager can be nil
 		- visitor with/without user
 		- userManager.<NEWSTUFF>
+
+		Later:
+		- Password reset
+		- Pricing
+		- change email
+
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -1417,7 +1420,7 @@ func (s *Server) ensureUserManager(next handleFunc) handleFunc {
 func (s *Server) ensureUser(next handleFunc) handleFunc {
 	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if v.user == nil {
-			return errHTTPNotFound
+			return errHTTPUnauthorized
 		}
 		return next(w, r, v)
 	})

@@ -336,8 +336,7 @@ func (a *Manager) resolvePerms(read, write bool, perm Permission) error {
 	return ErrUnauthorized
 }
 
-// AddUser adds a user with the given username, password and role. The password should be hashed
-// before it is stored in a persistence layer.
+// AddUser adds a user with the given username, password and role
 func (a *Manager) AddUser(username, password string, role Role) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument

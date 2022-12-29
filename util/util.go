@@ -251,6 +251,11 @@ func BasicAuth(user, pass string) string {
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, pass))))
 }
 
+// BearerAuth encodes the Authorization header value for a bearer/token auth
+func BearerAuth(token string) string {
+	return fmt.Sprintf("Bearer %s", token)
+}
+
 // MaybeMarshalJSON returns a JSON string of the given object, or "<cannot serialize>" if serialization failed.
 // This is useful for logging purposes where a failure doesn't matter that much.
 func MaybeMarshalJSON(v any) string {
@@ -282,4 +287,27 @@ func QuoteCommand(command []string) string {
 		}
 	}
 	return strings.Join(quoted, " ")
+}
+
+// ReadJSON reads the given io.ReadCloser into a struct
+func ReadJSON[T any](body io.ReadCloser) (*T, error) {
+	var obj T
+	if err := json.NewDecoder(body).Decode(&obj); err != nil {
+		return nil, err
+	}
+	return &obj, nil
+}
+
+// ReadJSONWithLimit reads the given io.ReadCloser into a struct, but only until limit is reached
+func ReadJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
+	r, err := Peek(r, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	var obj T
+	if err := json.NewDecoder(r).Decode(&obj); err != nil {
+		return nil, err
+	}
+	return &obj, nil
 }

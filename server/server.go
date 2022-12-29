@@ -50,6 +50,8 @@ import (
 			- figure out what settings are "web" or "phone"
 		UI:
 		- Subscription dotmenu dropdown: Move to nav bar, or make same as profile dropdown
+		rate limiting:
+		- login/account endpoints
 		Pages:
 		- Home
 		- Password reset
@@ -342,28 +344,28 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
-		return s.ensureAccountsEnabled(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
-		return s.ensureAccountsEnabled(s.handleAccountCreate)(w, r, v)
+		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
+		return s.ensureUser(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
 		return s.handleAccountGet(w, r, v) // Allowed by anonymous
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
-		return s.ensureWithAccount(s.handleAccountDelete)(w, r, v)
+		return s.ensureUser(s.handleAccountDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
-		return s.ensureWithAccount(s.handleAccountPasswordChange)(w, r, v)
+		return s.ensureUser(s.handleAccountPasswordChange)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountTokenPath {
-		return s.ensureWithAccount(s.handleAccountTokenExtend)(w, r, v)
+		return s.ensureUser(s.handleAccountTokenExtend)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
-		return s.ensureWithAccount(s.handleAccountTokenDelete)(w, r, v)
+		return s.ensureUser(s.handleAccountTokenDelete)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountSettingsPath {
-		return s.ensureWithAccount(s.handleAccountSettingsChange)(w, r, v)
+		return s.ensureUser(s.handleAccountSettingsChange)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
-		return s.ensureWithAccount(s.handleAccountSubscriptionAdd)(w, r, v)
+		return s.ensureUser(s.handleAccountSubscriptionAdd)(w, r, v)
 	} else if r.Method == http.MethodPatch && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureWithAccount(s.handleAccountSubscriptionChange)(w, r, v)
+		return s.ensureUser(s.handleAccountSubscriptionChange)(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureWithAccount(s.handleAccountSubscriptionDelete)(w, r, v)
+		return s.ensureUser(s.handleAccountSubscriptionDelete)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -1403,7 +1405,7 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	}
 }
 
-func (s *Server) ensureAccountsEnabled(next handleFunc) handleFunc {
+func (s *Server) ensureUserManager(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.userManager == nil {
 			return errHTTPNotFound
@@ -1412,8 +1414,8 @@ func (s *Server) ensureAccountsEnabled(next handleFunc) handleFunc {
 	}
 }
 
-func (s *Server) ensureWithAccount(next handleFunc) handleFunc {
-	return s.ensureAccountsEnabled(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) ensureUser(next handleFunc) handleFunc {
+	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if v.user == nil {
 			return errHTTPNotFound
 		}

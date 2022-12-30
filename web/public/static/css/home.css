@@ -216,7 +216,8 @@
 
 #site #header {
     background: #338574;
-    height: 130px;
+    background: linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%);     filter: drop-shadow(0 5px 10px #ccc);
+    height: 70px;
 }
 
 #site #header #headerBox {
@@ -226,37 +227,44 @@
 }
 
 #site #header #logo {
-    margin-top: 23px;
+    margin-top: 14px;
+    width: 48px;
     float: left;
 }
 
 #site #header #name {
     float: left;
     color: white;
-    font-size: 2.6em;
-    font-weight: 300;
-    margin: 35px 0 0 20px;
+    font-size: 1.7em;
+    font-weight: 400;
+    margin: 12px 0 0 10px;
 }
 
-#site #header ol {
+#site #header #menu {
     list-style-type: none;
     float: right;
-    margin-top: 80px;
+    margin-top: 16px;
 }
 
-#site #header ol li {
+#site #header #menu li {
     display: inline-block;
-    margin: 0 10px;
+    padding: 3px 10px;
     font-weight: 400;
+    border-radius: 5px;
 }
 
-#site #header ol li a, nav ol li a:visited {
+#site #header #menu li {
+    font-size: 1em;
+}
+
+#site #header #menu li a,
+#site #header #menu li a:visited {
     color: white;
     text-decoration: none;
 }
 
-#site #header ol li a:hover {
-    text-decoration: underline;
+#site #header #menu li:hover {
+    background: #3f9a86;
 }
 
 #site li {
@@ -268,7 +276,7 @@
 
 /* Hide top menu SMALL SCREEN */
 @media only screen and (max-width: 780px) {
-    #header ol {
+    #header #menu {
         display: none;
     }
 }

@@ -47,8 +47,6 @@ import (
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
-		UI:
-		- Home UI sign-in/login to top right
 		rate limiting:
 		- login/account endpoints
 		Tests:

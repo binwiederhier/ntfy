@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { Suspense } from "react";
-import {useEffect, useState} from 'react';
+import {Suspense, useEffect, useState} from 'react';
 import Box from '@mui/material/Box';
 import {ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';

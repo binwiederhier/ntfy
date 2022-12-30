@@ -49,7 +49,10 @@ const ActionBar = (props) => {
             zIndex: { sm: 1250 }, // > Navigation (1200), but < Dialog (1300)
             ml: { sm: `${Navigation.width}px` }
         }}>
-            <Toolbar sx={{pr: '24px'}}>
+            <Toolbar sx={{
+                pr: '24px',
+                background: "linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%)"
+            }}>
                 <IconButton
                     color="inherit"
                     edge="start"

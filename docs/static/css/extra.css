@@ -8,6 +8,10 @@
     width: unset !important;
 }
 
+header {
+    background: linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%);     filter: drop-shadow(0 5px 10px #ccc);
+}
+
 .md-header__topic:first-child {
     font-weight: 400;
 }

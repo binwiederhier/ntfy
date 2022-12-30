@@ -307,3 +307,22 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	return nil
 }
+
+func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	req, err := readJSONWithLimit[apiAccountAccessRequest](r.Body, jsonBodyBytesLimit)
+	if err != nil {
+		return err
+	}
+	if !topicRegex.MatchString(req.Topic) {
+		return errHTTPBadRequestTopicInvalid
+	}
+	if err := s.userManager.AllowAccess(v.user.Name, req.Topic, true, true); err != nil {
+		return err
+	}
+	if err := s.userManager.AllowAccess(user.Everyone, req.Topic, false, false); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	return nil
+}

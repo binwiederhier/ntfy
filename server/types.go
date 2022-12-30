@@ -266,3 +266,8 @@ type apiAccountResponse struct {
 	Limits        *apiAccountLimits       `json:"limits,omitempty"`
 	Stats         *apiAccountStats        `json:"stats,omitempty"`
 }
+
+type apiAccountAccessRequest struct {
+	Topic  string `json:"topic"`
+	Access string `json:"access"`
+}

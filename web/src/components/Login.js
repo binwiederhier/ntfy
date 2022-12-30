@@ -11,12 +11,17 @@ import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import IconButton from "@mui/material/IconButton";
+import {InputAdornment} from "@mui/material";
+import {Visibility, VisibilityOff} from "@mui/icons-material";
 
 const Login = () => {
     const { t } = useTranslation();
     const [error, setError] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         const user = { username, password };
@@ -66,11 +71,25 @@ const Login = () => {
                     fullWidth
                     name="password"
                     label={t("signup_form_password")}
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     id="password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value.trim())}
                     autoComplete="current-password"
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    aria-label={t("signup_form_toggle_password_visibility")}
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    onMouseDown={(ev) => ev.preventDefault()}
+                                    edge="end"
+                                >
+                                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                            </InputAdornment>
+                        )
+                    }}
                 />
                 <Button
                     type="submit"

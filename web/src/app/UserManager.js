@@ -18,7 +18,7 @@ class UserManager {
     }
 
     async save(user) {
-        if (user.baseUrl === config.baseUrl) {
+        if (session.exists() && user.baseUrl === config.baseUrl) {
             return;
         }
         await db.users.put(user);

@@ -18,6 +18,8 @@ import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import IconButton from "@mui/material/IconButton";
+import PublicIcon from '@mui/icons-material/Public';
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -123,6 +125,9 @@ const SubscribePage = (props) => {
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
                 <div style={{display: 'flex'}} role="row">
+                    <IconButton color="inherit" size="large" edge="start" sx={{height: "45px", marginTop: "5px", color: "grey"}}>
+                        <PublicIcon/>
+                    </IconButton>
                     <TextField
                         autoFocus
                         margin="dense"

@@ -11,13 +11,16 @@ import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import accountApi, {AccountCreateLimitReachedError, UsernameTakenError} from "../app/AccountApi";
+import {InputAdornment} from "@mui/material";
+import IconButton from "@mui/material/IconButton";
+import {Visibility, VisibilityOff} from "@mui/icons-material";
 
 const Signup = () => {
     const { t } = useTranslation();
     const [error, setError] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [confirm, setConfirm] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const handleSubmit = async (event) => {
         event.preventDefault();
         const user = { username, password };
@@ -70,29 +73,31 @@ const Signup = () => {
                     fullWidth
                     name="password"
                     label={t("signup_form_password")}
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     id="password"
                     autoComplete="current-password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value.trim())}
-                />
-                <TextField
-                    margin="dense"
-                    required
-                    fullWidth
-                    name="confirm-password"
-                    label={t("signup_form_confirm_password")}
-                    type="password"
-                    id="confirm-password"
-                    value={confirm}
-                    onChange={ev => setConfirm(ev.target.value.trim())}
-
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    aria-label={t("signup_form_toggle_password_visibility")}
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    onMouseDown={(ev) => ev.preventDefault()}
+                                    edge="end"
+                                >
+                                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                            </InputAdornment>
+                        )
+                    }}
                 />
                 <Button
                     type="submit"
                     fullWidth
                     variant="contained"
-                    disabled={username === "" || password === "" || password !== confirm}
+                    disabled={username === "" || password === ""}
                     sx={{mt: 2, mb: 2}}
                 >
                     {t("signup_form_button_submit")}

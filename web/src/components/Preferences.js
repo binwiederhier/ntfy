@@ -10,7 +10,7 @@ import {
     TableBody,
     TableCell,
     TableHead,
-    TableRow,
+    TableRow, Tooltip,
     useMediaQuery
 } from "@mui/material";
 import Typography from "@mui/material/Typography";
@@ -38,6 +38,8 @@ import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
+import InfoIcon from '@mui/icons-material/Info';
+import {useNavigate} from "react-router-dom";
 
 const Preferences = () => {
     return (
@@ -245,14 +247,17 @@ const UserTable = (props) => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogUser, setDialogUser] = useState(null);
+
     const handleEditClick = (user) => {
         setDialogKey(prev => prev+1);
         setDialogUser(user);
         setDialogOpen(true);
     };
+
     const handleDialogCancel = () => {
         setDialogOpen(false);
     };
+
     const handleDialogSubmit = async (user) => {
         setDialogOpen(false);
         try {
@@ -262,6 +267,7 @@ const UserTable = (props) => {
             console.log(`[Preferences] Error updating user.`, e);
         }
     };
+
     const handleDeleteClick = async (user) => {
         try {
             await userManager.delete(user.baseUrl);
@@ -270,6 +276,7 @@ const UserTable = (props) => {
             console.error(`[Preferences] Error deleting user for ${user.baseUrl}`, e);
         }
     };
+
     return (
         <Table size="small" aria-label={t("prefs_users_table")}>
             <TableHead>
@@ -289,17 +296,23 @@ const UserTable = (props) => {
                                    aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
                         <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
                         <TableCell align="right">
-                            {user.baseUrl !== config.baseUrl &&
+                            {(!session.exists() || user.baseUrl !== config.baseUrl) &&
                                 <>
-                                    <IconButton onClick={() => handleEditClick(user)}
-                                                aria-label={t("prefs_users_edit_button")}>
+                                    <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
                                         <EditIcon/>
                                     </IconButton>
-                                    <IconButton onClick={() => handleDeleteClick(user)}
-                                                aria-label={t("prefs_users_delete_button")}>
+                                    <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
                                         <CloseIcon/>
                                     </IconButton>
                                 </>
+                            }
+                            {session.exists() && user.baseUrl === config.baseUrl &&
+                                <Tooltip title={t("prefs_users_table_cannot_delete_or_edit")}>
+                                    <span>
+                                        <IconButton disabled><EditIcon/></IconButton>
+                                        <IconButton disabled><CloseIcon/></IconButton>
+                                    </span>
+                                </Tooltip>
                             }
                         </TableCell>
                     </TableRow>

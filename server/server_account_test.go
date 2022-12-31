@@ -269,6 +269,43 @@ func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 	require.Equal(t, 40023, toHTTPError(t, rr.Body.String()).Code)
 }
 
+func TestAccount_DeleteToken(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithUsers(t))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	token, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+
+	// Delete token failure (using basic auth)
+	rr = request(t, s, "DELETE", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"), // Not Bearer!
+	})
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40023, toHTTPError(t, rr.Body.String()).Code)
+
+	// Delete token with wrong token
+	rr = request(t, s, "DELETE", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BearerAuth("invalidtoken"),
+	})
+	require.Equal(t, 401, rr.Code)
+
+	// Delete token with correct token
+	rr = request(t, s, "DELETE", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BearerAuth(token.Token),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Cannot get account anymore
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BearerAuth(token.Token),
+	})
+	require.Equal(t, 401, rr.Code)
+}
+
 func TestAccount_Delete_Success(t *testing.T) {
 	conf := newTestConfigWithUsers(t)
 	conf.EnableSignup = true

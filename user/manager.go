@@ -22,6 +22,10 @@ const (
 	userTokenExpiryDuration      = 72 * time.Hour
 )
 
+var (
+	errNoTokenProvided = errors.New("no token provided")
+)
+
 // Manager-related queries
 const (
 	createTablesQueriesNoTx = `
@@ -239,6 +243,9 @@ func (a *Manager) CreateToken(user *User) (*Token, error) {
 
 // ExtendToken sets the new expiry date for a token, thereby extending its use further into the future.
 func (a *Manager) ExtendToken(user *User) (*Token, error) {
+	if user.Token == "" {
+		return nil, errNoTokenProvided
+	}
 	newExpires := time.Now().Add(userTokenExpiryDuration)
 	if _, err := a.db.Exec(updateTokenExpiryQuery, newExpires.Unix(), user.Name, user.Token); err != nil {
 		return nil, err

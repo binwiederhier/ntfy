@@ -321,6 +321,33 @@ func TestManager_Token_Expire(t *testing.T) {
 	require.Nil(t, result.Close())
 }
 
+func TestManager_Token_Extend(t *testing.T) {
+	a := newTestManager(t, false, false)
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+
+	// Try to extend token for user without token
+	u, err := a.User("ben")
+	require.Nil(t, err)
+
+	_, err = a.ExtendToken(u)
+	require.Equal(t, errNoTokenProvided, err)
+
+	// Create token for user
+	token, err := a.CreateToken(u)
+	require.Nil(t, err)
+	require.NotEmpty(t, token.Value)
+
+	userWithToken, err := a.AuthenticateToken(token.Value)
+	require.Nil(t, err)
+
+	time.Sleep(1100 * time.Millisecond)
+
+	extendedToken, err := a.ExtendToken(userWithToken)
+	require.Nil(t, err)
+	require.Equal(t, token.Value, extendedToken.Value)
+	require.True(t, token.Expires.Unix() < extendedToken.Expires.Unix())
+}
+
 func TestManager_EnqueueStats(t *testing.T) {
 	a, err := newManager(filepath.Join(t.TempDir(), "db"), true, true, time.Hour, 1500*time.Millisecond)
 	require.Nil(t, err)
@@ -349,6 +376,47 @@ func TestManager_EnqueueStats(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(11), u.Stats.Messages)
 	require.Equal(t, int64(2), u.Stats.Emails)
+}
+
+func TestManager_ChangeSettings(t *testing.T) {
+	a, err := newManager(filepath.Join(t.TempDir(), "db"), true, true, time.Hour, 1500*time.Millisecond)
+	require.Nil(t, err)
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+
+	// No settings
+	u, err := a.User("ben")
+	require.Nil(t, err)
+	require.Nil(t, u.Prefs)
+
+	// Save with new settings
+	u.Prefs = &Prefs{
+		Language: "de",
+		Notification: &NotificationPrefs{
+			Sound:       "ding",
+			MinPriority: 2,
+		},
+		Subscriptions: []*Subscription{
+			{
+				ID:          "someID",
+				BaseURL:     "https://ntfy.sh",
+				Topic:       "mytopic",
+				DisplayName: "My Topic",
+			},
+		},
+	}
+	require.Nil(t, a.ChangeSettings(u))
+
+	// Read again
+	u, err = a.User("ben")
+	require.Nil(t, err)
+	require.Equal(t, "de", u.Prefs.Language)
+	require.Equal(t, "ding", u.Prefs.Notification.Sound)
+	require.Equal(t, 2, u.Prefs.Notification.MinPriority)
+	require.Equal(t, 0, u.Prefs.Notification.DeleteAfter)
+	require.Equal(t, "someID", u.Prefs.Subscriptions[0].ID)
+	require.Equal(t, "https://ntfy.sh", u.Prefs.Subscriptions[0].BaseURL)
+	require.Equal(t, "mytopic", u.Prefs.Subscriptions[0].Topic)
+	require.Equal(t, "My Topic", u.Prefs.Subscriptions[0].DisplayName)
 }
 
 func TestSqliteCache_Migration_From1(t *testing.T) {

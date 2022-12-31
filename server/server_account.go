@@ -316,10 +316,13 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	if !topicRegex.MatchString(req.Topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
+	// FIXME authorize: how do I know if v.user (= auth'd user) is allowed to write the ACL entries
+	everyoneRead := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, req.Everyone)
+	everyoneWrite := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, req.Everyone)
 	if err := s.userManager.AllowAccess(v.user.Name, req.Topic, true, true); err != nil {
 		return err
 	}
-	if err := s.userManager.AllowAccess(user.Everyone, req.Topic, false, false); err != nil {
+	if err := s.userManager.AllowAccess(user.Everyone, req.Topic, everyoneRead, everyoneWrite); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")

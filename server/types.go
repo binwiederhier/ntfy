@@ -268,6 +268,6 @@ type apiAccountResponse struct {
 }
 
 type apiAccountAccessRequest struct {
-	Topic  string `json:"topic"`
-	Access string `json:"access"`
+	Topic    string `json:"topic"`
+	Everyone string `json:"everyone"`
 }

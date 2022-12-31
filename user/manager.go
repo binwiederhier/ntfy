@@ -47,7 +47,8 @@ const (
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
 		CREATE TABLE IF NOT EXISTS user_access (
-			user_id INT NOT NULL,		
+			user_id INT NOT NULL,
+			owner_user_id INT,			
 			topic TEXT NOT NULL,
 			read INT NOT NULL,
 			write INT NOT NULL,

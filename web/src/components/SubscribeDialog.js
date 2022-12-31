@@ -20,6 +20,11 @@ import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import IconButton from "@mui/material/IconButton";
 import PublicIcon from '@mui/icons-material/Public';
+import LockIcon from '@mui/icons-material/Lock';
+import PublicOffIcon from '@mui/icons-material/PublicOff';
+import MenuItem from "@mui/material/MenuItem";
+import PopupMenu from "./PopupMenu";
+import ListItemIcon from "@mui/material/ListItemIcon";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -75,11 +80,15 @@ const SubscribePage = (props) => {
     const { t } = useTranslation();
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
+    const [accessAnchorEl, setAccessAnchorEl] = useState(null);
+    const [access, setAccess] = useState("public");
     const baseUrl = (anotherServerVisible) ? props.baseUrl : config.baseUrl;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
-    const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
+    const existingBaseUrls = Array
+        .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.baseUrl);
+
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
         const username = (user) ? user.username : t("subscribe_dialog_error_user_anonymous");
@@ -97,10 +106,12 @@ const SubscribePage = (props) => {
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         props.onSuccess();
     };
+
     const handleUseAnotherChanged = (e) => {
         props.setBaseUrl("");
         setAnotherServerVisible(e.target.checked);
     };
+
     const subscribeButtonEnabled = (() => {
         if (anotherServerVisible) {
             const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
@@ -110,6 +121,7 @@ const SubscribePage = (props) => {
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();
+
     const updateBaseUrl = (ev, newVal) => {
         if (validUrl(newVal)) {
           props.setBaseUrl(newVal.replace(/\/$/, '')); // strip trailing slash after https?://
@@ -117,6 +129,7 @@ const SubscribePage = (props) => {
           props.setBaseUrl(newVal);
         }
     };
+
     return (
         <>
             <DialogTitle>{t("subscribe_dialog_subscribe_title")}</DialogTitle>
@@ -125,9 +138,13 @@ const SubscribePage = (props) => {
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
                 <div style={{display: 'flex'}} role="row">
-                    <IconButton color="inherit" size="large" edge="start" sx={{height: "45px", marginTop: "5px", color: "grey"}}>
-                        <PublicIcon/>
-                    </IconButton>
+                    {session.exists() &&
+                        <IconButton onClick={(ev) => setAccessAnchorEl(ev.currentTarget)} color="inherit" size="large" edge="start" sx={{height: "45px", marginTop: "5px", color: "grey"}}>
+                            {access === "public" && <PublicIcon/>}
+                            {access === "public-read" && <PublicOffIcon/>}
+                            {access === "private" && <LockIcon/>}
+                        </IconButton>
+                    }
                     <TextField
                         autoFocus
                         margin="dense"
@@ -142,10 +159,34 @@ const SubscribePage = (props) => {
                             maxLength: 64,
                             "aria-label": t("subscribe_dialog_subscribe_topic_placeholder")
                         }}
-                        />
-                        <Button onClick={() => {props.setTopic(randomAlphanumericString(16))}} style={{flexShrink: "0", marginTop: "0.5em"}}>
-                            {t("subscribe_dialog_subscribe_button_generate_topic_name")}
-                        </Button>
+                    />
+                    <Button onClick={() => {props.setTopic(randomAlphanumericString(16))}} style={{flexShrink: "0", marginTop: "0.5em"}}>
+                        {t("subscribe_dialog_subscribe_button_generate_topic_name")}
+                    </Button>
+                    <PopupMenu
+                        anchorEl={accessAnchorEl}
+                        open={!!accessAnchorEl}
+                        onClose={() => setAccessAnchorEl(null)}
+                    >
+                        <MenuItem onClick={() => setAccess("private")} selected={access === "private"}>
+                            <ListItemIcon>
+                                <LockIcon fontSize="small" />
+                            </ListItemIcon>
+                            Only I can publish and subscribe
+                        </MenuItem>
+                        <MenuItem onClick={() => setAccess("public-read")} selected={access === "public-read"}>
+                            <ListItemIcon>
+                                <PublicOffIcon fontSize="small" />
+                            </ListItemIcon>
+                            I can publish, everyone can subscribe
+                        </MenuItem>
+                        <MenuItem onClick={() => setAccess("public")} selected={access === "public"}>
+                            <ListItemIcon>
+                                <PublicIcon fontSize="small" />
+                            </ListItemIcon>
+                            Everyone can publish and subscribe
+                        </MenuItem>
+                    </PopupMenu>
                 </div>
                 <FormControlLabel
                     sx={{pt: 1}}

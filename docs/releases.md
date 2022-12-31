@@ -8,6 +8,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Preliminary `/v1/health` API endpoint for service monitoring (no ticket)
 
+**Bug fixes:**
+
+* Fix `chown` issues with RHEL-like based systems ([#566](https://github.com/binwiederhier/ntfy/issues/566)/[#565](https://github.com/binwiederhier/ntfy/pull/565), thanks to [danieldemus](https://github.com/danieldemus))
+
 **Documentation:**
 
 * Add HTTP/2 and TLSv1.3 support to nginx docs ([#553](https://github.com/binwiederhier/ntfy/issues/553), thanks to [bt90](https://github.com/bt90))

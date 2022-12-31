@@ -13,7 +13,6 @@
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 [![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
-
 **ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
 It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
 It's also open source (as you can plainly see) if you want to run your own.
@@ -105,6 +104,7 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/Terrormixer3000"><img src="https://github.com/Terrormixer3000.png" width="40px" /></a>
 <a href="https://github.com/voroskoi"><img src="https://github.com/voroskoi.png" width="40px" /></a>
 <a href="https://github.com/Nickwasused"><img src="https://github.com/Nickwasused.png" width="40px" /></a>
+<a href="https://github.com/bahur142"><img src="https://github.com/bahur142.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:

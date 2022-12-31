@@ -1,9 +1,11 @@
 package util
 
 import (
+	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -160,4 +162,41 @@ func TestQuoteCommand(t *testing.T) {
 	require.Equal(t, `ls -al "Document Folder"`, QuoteCommand([]string{"ls", "-al", "Document Folder"}))
 	require.Equal(t, `rsync -av /home/phil/ root@example.com:/home/phil/`, QuoteCommand([]string{"rsync", "-av", "/home/phil/", "root@example.com:/home/phil/"}))
 	require.Equal(t, `/home/sweet/home "Äöü this is a test" "\a\b"`, QuoteCommand([]string{"/home/sweet/home", "Äöü this is a test", "\\a\\b"}))
+}
+
+func TestBasicAuth(t *testing.T) {
+	require.Equal(t, "Basic cGhpbDpwaGls", BasicAuth("phil", "phil"))
+}
+
+func TestBearerAuth(t *testing.T) {
+	require.Equal(t, "Bearer sometoken", BearerAuth("sometoken"))
+}
+
+type testJSON struct {
+	Name      string `json:"name"`
+	Something int    `json:"something"`
+}
+
+func TestReadJSON_Success(t *testing.T) {
+	v, err := UnmarshalJSON[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)))
+	require.Nil(t, err)
+	require.Equal(t, "some name", v.Name)
+	require.Equal(t, 99, v.Something)
+}
+
+func TestReadJSON_Failure(t *testing.T) {
+	_, err := UnmarshalJSON[testJSON](io.NopCloser(strings.NewReader(`{"na`)))
+	require.Equal(t, ErrUnmarshalJSON, err)
+}
+
+func TestReadJSONWithLimit_Success(t *testing.T) {
+	v, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 100)
+	require.Nil(t, err)
+	require.Equal(t, "some name", v.Name)
+	require.Equal(t, 99, v.Something)
+}
+
+func TestReadJSONWithLimit_FailureTooLong(t *testing.T) {
+	_, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 10)
+	require.Equal(t, ErrTooLargeJSON, err)
 }

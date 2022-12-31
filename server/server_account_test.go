@@ -22,7 +22,7 @@ func TestAccount_Signup_Success(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
-	token, _ := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	token, _ := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.NotEmpty(t, token.Token)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires)
 
@@ -30,7 +30,7 @@ func TestAccount_Signup_Success(t *testing.T) {
 		"Authorization": util.BearerAuth(token.Token),
 	})
 	require.Equal(t, 200, rr.Code)
-	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, "phil", account.Username)
 	require.Equal(t, "user", account.Role)
 }
@@ -102,7 +102,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 
 	rr := request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, rr.Code)
-	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, "*", account.Username)
 	require.Equal(t, string(user.RoleAnonymous), account.Role)
 	require.Equal(t, "ip", account.Limits.Basis)
@@ -124,7 +124,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 
 	rr = request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, rr.Code)
-	account, _ = util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, int64(2), account.Stats.Messages)
 	require.Equal(t, int64(1002), account.Stats.MessagesRemaining)
 	require.Equal(t, int64(1), account.Stats.Emails)
@@ -151,7 +151,7 @@ func TestAccount_ChangeSettings(t *testing.T) {
 		"Authorization": util.BearerAuth(token.Value),
 	})
 	require.Equal(t, 200, rr.Code)
-	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, "de", account.Language)
 	require.Equal(t, 86400, account.Notification.DeleteAfter)
 	require.Equal(t, "juntos", account.Notification.Sound)
@@ -171,7 +171,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-	account, _ := util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, 1, len(account.Subscriptions))
 	require.NotEmpty(t, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
@@ -188,7 +188,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-	account, _ = util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, 1, len(account.Subscriptions))
 	require.Equal(t, subscriptionID, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
@@ -204,7 +204,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-	account, _ = util.ReadJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, 0, len(account.Subscriptions))
 }
 
@@ -243,7 +243,7 @@ func TestAccount_ExtendToken(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-	token, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
 
 	time.Sleep(time.Second)
@@ -252,7 +252,7 @@ func TestAccount_ExtendToken(t *testing.T) {
 		"Authorization": util.BearerAuth(token.Token),
 	})
 	require.Equal(t, 200, rr.Code)
-	extendedToken, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	extendedToken, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
 	require.Equal(t, token.Token, extendedToken.Token)
 	require.True(t, token.Expires < extendedToken.Expires)
@@ -277,7 +277,7 @@ func TestAccount_DeleteToken(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-	token, err := util.ReadJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
 
 	// Delete token failure (using basic auth)

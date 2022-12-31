@@ -31,10 +31,10 @@ var (
 	noQuotesRegex      = regexp.MustCompile(`^[-_./:@a-zA-Z0-9]+$`)
 )
 
-// Errors for ReadJSON and ReadJSONWithLimit functions
+// Errors for UnmarshalJSON and UnmarshalJSONWithLimit functions
 var (
-	ErrInvalidJSON  = errors.New("invalid JSON")
-	ErrTooLargeJSON = errors.New("too large JSON")
+	ErrUnmarshalJSON = errors.New("unmarshalling JSON failed")
+	ErrTooLargeJSON  = errors.New("too large JSON")
 )
 
 // FileExists checks if a file exists, and returns true if it does
@@ -295,17 +295,17 @@ func QuoteCommand(command []string) string {
 	return strings.Join(quoted, " ")
 }
 
-// ReadJSON reads the given io.ReadCloser into a struct
-func ReadJSON[T any](body io.ReadCloser) (*T, error) {
+// UnmarshalJSON reads the given io.ReadCloser into a struct
+func UnmarshalJSON[T any](body io.ReadCloser) (*T, error) {
 	var obj T
 	if err := json.NewDecoder(body).Decode(&obj); err != nil {
-		return nil, ErrInvalidJSON
+		return nil, ErrUnmarshalJSON
 	}
 	return &obj, nil
 }
 
-// ReadJSONWithLimit reads the given io.ReadCloser into a struct, but only until limit is reached
-func ReadJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
+// UnmarshalJSONWithLimit reads the given io.ReadCloser into a struct, but only until limit is reached
+func UnmarshalJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
 	defer r.Close()
 	p, err := Peek(r, limit)
 	if err != nil {
@@ -315,7 +315,7 @@ func ReadJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
 	}
 	var obj T
 	if err := json.NewDecoder(p).Decode(&obj); err != nil {
-		return nil, ErrInvalidJSON
+		return nil, ErrUnmarshalJSON
 	}
 	return &obj, nil
 }

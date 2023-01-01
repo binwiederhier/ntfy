@@ -108,7 +108,7 @@ func changeAccess(c *cli.Context, manager *user.Manager, username string, topic 
 	} else if u.Role == user.RoleAdmin {
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
 	}
-	if err := manager.AllowAccess(username, topic, read, write); err != nil {
+	if err := manager.AllowAccess("", username, topic, read, write); err != nil {
 		return err
 	}
 	if read && write {

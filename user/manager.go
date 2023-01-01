@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	errNoTokenProvided = errors.New("no token provided")
+	errNoTokenProvided    = errors.New("no token provided")
+	errTopicOwnedByOthers = errors.New("topic owned by others")
 )
 
 // Manager-related queries
@@ -52,13 +53,13 @@ const (
 		CREATE UNIQUE INDEX idx_user ON user (user);
 		CREATE TABLE IF NOT EXISTS user_access (
 			user_id INT NOT NULL,
-			owner_user_id INT,			
 			topic TEXT NOT NULL,
 			read INT NOT NULL,
 			write INT NOT NULL,
+			owner_user_id INT,			
 			PRIMARY KEY (user_id, topic),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
-		);		
+		);
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id INT NOT NULL,
 			token TEXT NOT NULL,
@@ -115,12 +116,23 @@ const (
 	deleteUserQuery         = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery = `
-		INSERT INTO user_access (user_id, topic, read, write) 
-		VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?)
+		INSERT INTO user_access (user_id, topic, read, write, owner_user_id) 
+		VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?, (SELECT IIF(?='',NULL,(SELECT id FROM user WHERE user=?))))
 		ON CONFLICT (user_id, topic) 
-		DO UPDATE SET read=excluded.read, write=excluded.write
+		DO UPDATE SET read=excluded.read, write=excluded.write, owner_user_id=excluded.owner_user_id
 	`
-	selectUserAccessQuery  = `SELECT topic, read, write FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) ORDER BY write DESC, read DESC, topic`
+	selectUserAccessQuery = `
+		SELECT topic, read, write, IIF(owner_user_id IS NOT NULL AND user_id = owner_user_id,1,0) AS owner
+		FROM user_access 
+		WHERE user_id = (SELECT id FROM user WHERE user = ?) 
+		ORDER BY write DESC, read DESC, topic
+	`
+	selectOtherAccessCountQuery = `
+		SELECT count(*)
+		FROM user_access
+		WHERE (topic = ? OR ? LIKE topic)
+		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM user WHERE user = ?))
+	`
 	deleteAllAccessQuery   = `DELETE FROM user_access`
 	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
@@ -340,8 +352,7 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 		username = user.Name
 	}
 	// Select the read/write permissions for this user/topic combo. The query may return two
-	// rows (one for everyone, and one for the user), but prioritizes the user. The value for
-	// user.Name may be empty (= everyone).
+	// rows (one for everyone, and one for the user), but prioritizes the user.
 	rows, err := a.db.Query(selectTopicPermsQuery, username, topic)
 	if err != nil {
 		return err
@@ -509,8 +520,8 @@ func (a *Manager) readGrants(username string) ([]Grant, error) {
 	grants := make([]Grant, 0)
 	for rows.Next() {
 		var topic string
-		var read, write bool
-		if err := rows.Scan(&topic, &read, &write); err != nil {
+		var read, write, owner bool
+		if err := rows.Scan(&topic, &read, &write, &owner); err != nil {
 			return nil, err
 		} else if err := rows.Err(); err != nil {
 			return nil, err
@@ -519,6 +530,7 @@ func (a *Manager) readGrants(username string) ([]Grant, error) {
 			TopicPattern: fromSQLWildcard(topic),
 			AllowRead:    read,
 			AllowWrite:   write,
+			Owner:        owner,
 		})
 	}
 	return grants, nil
@@ -553,13 +565,42 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 	return nil
 }
 
-// AllowAccess adds or updates an entry in th access control list for a specific user. It controls
-// read/write access to a topic. The parameter topicPattern may include wildcards (*).
-func (a *Manager) AllowAccess(username string, topicPattern string, read bool, write bool) error {
-	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopicPattern(topicPattern) {
+// CheckAllowAccess tests if a user may create an access control entry for the given topic.
+// If there are any ACL entries that are not owned by the user, an error is returned.
+func (a *Manager) CheckAllowAccess(username string, topic string) error {
+	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopic(topic) {
 		return ErrInvalidArgument
 	}
-	if _, err := a.db.Exec(upsertUserAccessQuery, username, toSQLWildcard(topicPattern), read, write); err != nil {
+	rows, err := a.db.Query(selectOtherAccessCountQuery, topic, topic, username)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return errors.New("no rows found")
+	}
+	var otherCount int
+	if err := rows.Scan(&otherCount); err != nil {
+		return err
+	}
+	if otherCount > 0 {
+		return errTopicOwnedByOthers
+	}
+	return nil
+}
+
+// AllowAccess adds or updates an entry in th access control list for a specific user. It controls
+// read/write access to a topic. The parameter topicPattern may include wildcards (*). The ACL entry
+// owner may either be a user (username), or the system (empty).
+func (a *Manager) AllowAccess(owner, username string, topicPattern string, read bool, write bool) error {
+	if !AllowedUsername(username) && username != Everyone {
+		return ErrInvalidArgument
+	} else if owner != "" && !AllowedUsername(owner) {
+		return ErrInvalidArgument
+	} else if !AllowedTopicPattern(topicPattern) {
+		return ErrInvalidArgument
+	}
+	if _, err := a.db.Exec(upsertUserAccessQuery, username, toSQLWildcard(topicPattern), read, write, owner, owner); err != nil {
 		return err
 	}
 	return nil

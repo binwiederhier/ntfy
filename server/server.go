@@ -103,6 +103,7 @@ var (
 	accountSettingsPath            = "/v1/account/settings"
 	accountSubscriptionPath        = "/v1/account/subscription"
 	accountAccessPath              = "/v1/account/access"
+	accountAccessSingleRegex       = regexp.MustCompile(`/v1/account/access/([-_A-Za-z0-9]{1,64})$`)
 	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
 	matrixPushPath                 = "/_matrix/push/v1/notify"
 	staticRegex                    = regexp.MustCompile(`^/static/.+`)
@@ -361,6 +362,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.handleAccountSubscriptionDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountAccessPath {
 		return s.ensureUser(s.handleAccountAccessAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && accountAccessSingleRegex.MatchString(r.URL.Path) {
+		return s.ensureUser(s.handleAccountAccessDelete)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {

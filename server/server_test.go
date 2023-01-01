@@ -643,7 +643,7 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("", "ben", "mytopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -659,8 +659,8 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", true, true))
-	require.Nil(t, s.userManager.AllowAccess("ben", "anothertopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("", "ben", "mytopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("", "ben", "anothertopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic,anothertopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -696,7 +696,7 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", true, true)) // Not mytopic!
+	require.Nil(t, s.userManager.AllowAccess("", "ben", "sometopic", true, true)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": basicAuth("ben:ben"),
@@ -712,8 +712,8 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "private", false, false))
-	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", true, false))
+	require.Nil(t, s.userManager.AllowAccess("", user.Everyone, "private", false, false))
+	require.Nil(t, s.userManager.AllowAccess("", user.Everyone, "announcements", true, false))
 
 	response := request(t, s, "PUT", "/mytopic", "test", nil)
 	require.Equal(t, 200, response.Code)

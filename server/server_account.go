@@ -91,7 +91,18 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				Upgradable: true,
 			}
 		}
-
+		if len(v.user.Grants) > 0 {
+			response.Access = make([]*apiAccountGrant, 0)
+			for _, grant := range v.user.Grants {
+				if grant.Owner {
+					response.Access = append(response.Access, &apiAccountGrant{
+						Topic: grant.TopicPattern,
+						Read:  grant.AllowRead,
+						Write: grant.AllowWrite,
+					})
+				}
+			}
+		}
 	} else {
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
@@ -316,13 +327,46 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	if !topicRegex.MatchString(req.Topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
-	// FIXME authorize: how do I know if v.user (= auth'd user) is allowed to write the ACL entries
+	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
+		return errHTTPConflictTopicReserved
+	}
+	owner, username := v.user.Name, v.user.Name
 	everyoneRead := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, req.Everyone)
 	everyoneWrite := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, req.Everyone)
-	if err := s.userManager.AllowAccess(v.user.Name, req.Topic, true, true); err != nil {
+	if err := s.userManager.AllowAccess(owner, username, req.Topic, true, true); err != nil {
 		return err
 	}
-	if err := s.userManager.AllowAccess(user.Everyone, req.Topic, everyoneRead, everyoneWrite); err != nil {
+	if err := s.userManager.AllowAccess(owner, user.Everyone, req.Topic, everyoneRead, everyoneWrite); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	return nil
+}
+
+func (s *Server) handleAccountAccessDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	matches := accountAccessSingleRegex.FindStringSubmatch(r.URL.Path)
+	if len(matches) != 2 {
+		return errHTTPInternalErrorInvalidPath
+	}
+	topic := matches[1]
+	if !topicRegex.MatchString(topic) {
+		return errHTTPBadRequestTopicInvalid
+	}
+	authorized := false
+	for _, grant := range v.user.Grants {
+		if grant.TopicPattern == topic && grant.Owner {
+			authorized = true
+			break
+		}
+	}
+	if !authorized {
+		return errHTTPUnauthorized
+	}
+	if err := s.userManager.ResetAccess(v.user.Name, topic); err != nil {
+		return err
+	}
+	if err := s.userManager.ResetAccess(user.Everyone, topic); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")

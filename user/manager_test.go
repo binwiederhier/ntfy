@@ -15,13 +15,13 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
-	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
-	require.Nil(t, a.AllowAccess("ben", "writeme", false, true))
-	require.Nil(t, a.AllowAccess("ben", "everyonewrite", false, false)) // How unfair!
-	require.Nil(t, a.AllowAccess(Everyone, "announcements", true, false))
-	require.Nil(t, a.AllowAccess(Everyone, "everyonewrite", true, true))
-	require.Nil(t, a.AllowAccess(Everyone, "up*", false, true)) // Everyone can write to /up*
+	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
+	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
+	require.Nil(t, a.AllowAccess("", "ben", "writeme", false, true))
+	require.Nil(t, a.AllowAccess("", "ben", "everyonewrite", false, false)) // How unfair!
+	require.Nil(t, a.AllowAccess("", Everyone, "announcements", true, false))
+	require.Nil(t, a.AllowAccess("", Everyone, "everyonewrite", true, true))
+	require.Nil(t, a.AllowAccess("", Everyone, "up*", false, true)) // Everyone can write to /up*
 
 	phil, err := a.Authenticate("phil", "phil")
 	require.Nil(t, err)
@@ -36,10 +36,10 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, RoleUser, ben.Role)
 	require.Equal(t, []Grant{
-		{"mytopic", true, true},
-		{"writeme", false, true},
-		{"readme", true, false},
-		{"everyonewrite", false, false},
+		{"mytopic", true, true, false},
+		{"writeme", false, true, false},
+		{"readme", true, false, false},
+		{"everyonewrite", false, false, false},
 	}, ben.Grants)
 
 	notben, err := a.Authenticate("ben", "this is wrong")
@@ -124,12 +124,12 @@ func TestManager_UserManagement(t *testing.T) {
 	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
-	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
-	require.Nil(t, a.AllowAccess("ben", "writeme", false, true))
-	require.Nil(t, a.AllowAccess("ben", "everyonewrite", false, false)) // How unfair!
-	require.Nil(t, a.AllowAccess(Everyone, "announcements", true, false))
-	require.Nil(t, a.AllowAccess(Everyone, "everyonewrite", true, true))
+	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
+	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
+	require.Nil(t, a.AllowAccess("", "ben", "writeme", false, true))
+	require.Nil(t, a.AllowAccess("", "ben", "everyonewrite", false, false)) // How unfair!
+	require.Nil(t, a.AllowAccess("", Everyone, "announcements", true, false))
+	require.Nil(t, a.AllowAccess("", Everyone, "everyonewrite", true, true))
 
 	// Query user details
 	phil, err := a.User("phil")
@@ -145,10 +145,10 @@ func TestManager_UserManagement(t *testing.T) {
 	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, RoleUser, ben.Role)
 	require.Equal(t, []Grant{
-		{"mytopic", true, true},
-		{"writeme", false, true},
-		{"readme", true, false},
-		{"everyonewrite", false, false},
+		{"mytopic", true, true, false},
+		{"writeme", false, true, false},
+		{"readme", true, false, false},
+		{"everyonewrite", false, false, false},
 	}, ben.Grants)
 
 	everyone, err := a.User(Everyone)
@@ -157,14 +157,14 @@ func TestManager_UserManagement(t *testing.T) {
 	require.Equal(t, "", everyone.Hash)
 	require.Equal(t, RoleAnonymous, everyone.Role)
 	require.Equal(t, []Grant{
-		{"everyonewrite", true, true},
-		{"announcements", true, false},
+		{"everyonewrite", true, true, false},
+		{"announcements", true, false, false},
 	}, everyone.Grants)
 
 	// Ben: Before revoking
-	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true)) // Overwrite!
-	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
-	require.Nil(t, a.AllowAccess("ben", "writeme", false, true))
+	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true)) // Overwrite!
+	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
+	require.Nil(t, a.AllowAccess("", "ben", "writeme", false, true))
 	require.Nil(t, a.Authorize(ben, "mytopic", PermissionRead))
 	require.Nil(t, a.Authorize(ben, "mytopic", PermissionWrite))
 	require.Nil(t, a.Authorize(ben, "readme", PermissionRead))
@@ -219,8 +219,8 @@ func TestManager_ChangePassword(t *testing.T) {
 func TestManager_ChangeRole(t *testing.T) {
 	a := newTestManager(t, false, false)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AllowAccess("ben", "mytopic", true, true))
-	require.Nil(t, a.AllowAccess("ben", "readme", true, false))
+	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
+	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
 
 	ben, err := a.User("ben")
 	require.Nil(t, err)

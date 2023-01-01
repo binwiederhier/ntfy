@@ -90,6 +90,7 @@ type Grant struct {
 	TopicPattern string // May include wildcard (*)
 	AllowRead    bool
 	AllowWrite   bool
+	Owner        bool // This user owns this ACL entry
 }
 
 // Permission represents a read or write permission to a topic
@@ -118,6 +119,7 @@ const (
 
 var (
 	allowedUsernameRegex     = regexp.MustCompile(`^[-_.@a-zA-Z0-9]+$`)     // Does not include Everyone (*)
+	allowedTopicRegex        = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No '*'
 	allowedTopicPatternRegex = regexp.MustCompile(`^[-_*A-Za-z0-9]{1,64}$`) // Adds '*' for wildcards!
 )
 
@@ -129,6 +131,11 @@ func AllowedRole(role Role) bool {
 // AllowedUsername returns true if the given username is valid
 func AllowedUsername(username string) bool {
 	return allowedUsernameRegex.MatchString(username)
+}
+
+// AllowedTopic returns true if the given topic name is valid
+func AllowedTopic(username string) bool {
+	return allowedTopicRegex.MatchString(username)
 }
 
 // AllowedTopicPattern returns true if the given topic pattern is valid; this includes the wildcard character (*)

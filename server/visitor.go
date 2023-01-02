@@ -48,6 +48,9 @@ type visitorInfo struct {
 	Emails                       int64
 	EmailsLimit                  int64
 	EmailsRemaining              int64
+	Topics                       int64
+	TopicsLimit                  int64
+	TopicsRemaining              int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeLimit     int64
 	AttachmentTotalSizeRemaining int64
@@ -173,20 +176,19 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	info := &visitorInfo{}
 	if v.user != nil && v.user.Role == user.RoleAdmin {
 		info.Basis = "role"
-		info.MessagesLimit = 0
-		info.EmailsLimit = 0
-		info.AttachmentTotalSizeLimit = 0
-		info.AttachmentFileSizeLimit = 0
+		// All limits are zero!
 	} else if v.user != nil && v.user.Plan != nil {
 		info.Basis = "plan"
 		info.MessagesLimit = v.user.Plan.MessagesLimit
 		info.EmailsLimit = v.user.Plan.EmailsLimit
+		info.TopicsLimit = v.user.Plan.TopicsLimit
 		info.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
 	} else {
 		info.Basis = "ip"
 		info.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
 		info.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
+		info.TopicsLimit = 0 // FIXME
 		info.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
 	}
@@ -200,10 +202,20 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	var topics int64
+	if v.user != nil {
+		for _, grant := range v.user.Grants {
+			if grant.Owner {
+				topics++
+			}
+		}
+	}
 	info.Messages = messages
 	info.MessagesRemaining = zeroIfNegative(info.MessagesLimit - info.Messages)
 	info.Emails = emails
 	info.EmailsRemaining = zeroIfNegative(info.EmailsLimit - info.Emails)
+	info.Topics = topics
+	info.TopicsRemaining = zeroIfNegative(info.TopicsLimit - info.Topics)
 	info.AttachmentTotalSize = attachmentsBytesUsed
 	info.AttachmentTotalSizeRemaining = zeroIfNegative(info.AttachmentTotalSizeLimit - info.AttachmentTotalSize)
 	return info, nil

@@ -39,7 +39,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	return nil
 }
 
-func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	stats, err := v.Info()
 	if err != nil {
 		return err
@@ -50,6 +50,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			MessagesRemaining:            stats.MessagesRemaining,
 			Emails:                       stats.Emails,
 			EmailsRemaining:              stats.EmailsRemaining,
+			Topics:                       stats.Topics,
+			TopicsRemaining:              stats.TopicsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
 		},
@@ -57,6 +59,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			Basis:               stats.Basis,
 			Messages:            stats.MessagesLimit,
 			Emails:              stats.EmailsLimit,
+			Topics:              stats.TopicsLimit,
 			AttachmentTotalSize: stats.AttachmentTotalSizeLimit,
 			AttachmentFileSize:  stats.AttachmentFileSizeLimit,
 		},
@@ -119,7 +122,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 	return nil
 }
 
-func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
 		return err
 	}
@@ -141,7 +144,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	// TODO rate limit
 	token, err := s.userManager.CreateToken(v.user)
 	if err != nil {
@@ -159,7 +162,7 @@ func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, r *http.Request,
 	return nil
 }
 
-func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user == nil {
 		return errHTTPUnauthorized
@@ -182,7 +185,7 @@ func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	// TODO rate limit
 	if v.user.Token == "" {
 		return errHTTPBadRequestNoTokenProvided

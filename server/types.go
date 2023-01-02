@@ -243,6 +243,7 @@ type apiAccountLimits struct {
 	Basis               string `json:"basis"` // "ip", "role" or "plan"
 	Messages            int64  `json:"messages"`
 	Emails              int64  `json:"emails"`
+	Topics              int64  `json:"topics"`
 	AttachmentTotalSize int64  `json:"attachment_total_size"`
 	AttachmentFileSize  int64  `json:"attachment_file_size"`
 }
@@ -252,6 +253,8 @@ type apiAccountStats struct {
 	MessagesRemaining            int64 `json:"messages_remaining"`
 	Emails                       int64 `json:"emails"`
 	EmailsRemaining              int64 `json:"emails_remaining"`
+	Topics                       int64 `json:"topics"`
+	TopicsRemaining              int64 `json:"topics_remaining"`
 	AttachmentTotalSize          int64 `json:"attachment_total_size"`
 	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
 }

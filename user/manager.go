@@ -35,6 +35,7 @@ const (
 			code TEXT NOT NULL,
 			messages_limit INT NOT NULL,
 			emails_limit INT NOT NULL,
+			topics_limit INT NOT NULL,
 			attachment_file_size_limit INT NOT NULL,
 			attachment_total_size_limit INT NOT NULL,
 			PRIMARY KEY (id)
@@ -75,13 +76,13 @@ const (
 	`
 	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		LEFT JOIN plan p on p.id = u.plan_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
@@ -469,11 +470,11 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	var username, hash, role string
 	var settings, planCode sql.NullString
 	var messages, emails int64
-	var messagesLimit, emailsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit sql.NullInt64
+	var messagesLimit, emailsLimit, topicsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &emailsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &emailsLimit, &topicsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -504,6 +505,7 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			Upgradable:               true, // FIXME
 			MessagesLimit:            messagesLimit.Int64,
 			EmailsLimit:              emailsLimit.Int64,
+			TopicsLimit:              topicsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 		}

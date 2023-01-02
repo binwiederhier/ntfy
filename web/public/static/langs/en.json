@@ -183,6 +183,7 @@
   "account_usage_plan_code_business_plus": "Business Plus",
   "account_usage_messages_title": "Published messages",
   "account_usage_emails_title": "Emails sent",
+  "account_usage_topics_title": "Topics reserved",
   "account_usage_attachment_storage_title": "Attachment storage",
   "account_usage_attachment_storage_subtitle": "{{filesize}} per file",
   "account_usage_basis_ip_description": "Usage stats and limits for this account are based on your IP address, so they may be shared with other users.",

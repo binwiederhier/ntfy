@@ -60,6 +60,7 @@ type Plan struct {
 	Upgradable               bool   `json:"upgradable"`
 	MessagesLimit            int64  `json:"messages_limit"`
 	EmailsLimit              int64  `json:"emails_limit"`
+	TopicsLimit              int64  `json:"topics_limit"`
 	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
 }

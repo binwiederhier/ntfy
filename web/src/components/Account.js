@@ -168,7 +168,7 @@ const Stats = () => {
         return <></>;
     }
     const planCode = account.plan.code ?? "none";
-    const normalize = (value, max) => (value / max * 100);
+    const normalize = (value, max) => Math.min(value / max * 100, 100);
     return (
         <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -181,6 +181,13 @@ const Stats = () => {
                             ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
                             : t(`account_usage_plan_code_${planCode}`)}
                     </div>
+                </Pref>
+                <Pref title={t("account_usage_topics_title")}>
+                    <div>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.topics}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.topics > 0 ? t("account_usage_of_limit", { limit: account.limits.topics }) : t("account_usage_unlimited")}</Typography>
+                    </div>
+                    <LinearProgress variant="determinate" value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100} />
                 </Pref>
                 <Pref title={t("account_usage_messages_title")}>
                     <div>

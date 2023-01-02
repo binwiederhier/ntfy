@@ -10,7 +10,8 @@ import {
     TableBody,
     TableCell,
     TableHead,
-    TableRow, Tooltip,
+    TableRow,
+    Tooltip,
     useMediaQuery
 } from "@mui/material";
 import Typography from "@mui/material/Typography";
@@ -32,22 +33,23 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
-import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
+import {playSound, shuffle, sounds, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
-import InfoIcon from '@mui/icons-material/Info';
-import {useNavigate} from "react-router-dom";
+import {useOutletContext} from "react-router-dom";
+import LockIcon from "@mui/icons-material/Lock";
 
 const Preferences = () => {
     return (
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Notifications/>
-                <Appearance/>
+                <Access/>
                 <Users/>
+                <Appearance/>
             </Stack>
         </Container>
     );
@@ -469,6 +471,129 @@ const Language = () => {
             </FormControl>
         </Pref>
     )
+};
+
+const Access = () => {
+    const { t } = useTranslation();
+    const { account } = useOutletContext();
+    const [dialogKey, setDialogKey] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+
+    const handleAddClick = () => {
+        setDialogKey(prev => prev+1);
+        setDialogOpen(true);
+    };
+
+    const handleDialogCancel = () => {
+        setDialogOpen(false);
+    };
+
+    const handleDialogSubmit = async (entry) => {
+        setDialogOpen(false);
+        try {
+            await accountApi.addAccessEntry();
+            console.debug(`[Preferences] Added entry ${entry.topic}`);
+        } catch (e) {
+            console.log(`[Preferences] Error adding access entry.`, e);
+        }
+    };
+
+    if (!session.exists() || !account) {
+        return <></>;
+    }
+
+    return (
+        <Card sx={{ padding: 1 }} aria-label={t("prefs_access_title")}>
+            <CardContent sx={{ paddingBottom: 1 }}>
+                <Typography variant="h5" sx={{marginBottom: 2}}>
+                    {t("prefs_access_title")}
+                </Typography>
+                <Paragraph>
+                    {t("prefs_access_description")}
+                </Paragraph>
+                {account.access.length > 0 && <AccessTable entries={account.access}/>}
+            </CardContent>
+            <CardActions>
+                <Button onClick={handleAddClick}>{t("prefs_access_add_button")}</Button>
+                {/*<UserDialog
+                key={`userEditDialog${dialogKey}`}
+                open={dialogOpen}
+                user={dialogUser}
+                users={props.users}
+                onCancel={handleDialogCancel}
+                onSubmit={handleDialogSubmit}
+            />*/}
+            </CardActions>
+        </Card>
+    );
+};
+
+const AccessTable = (props) => {
+    const { t } = useTranslation();
+    const [dialogKey, setDialogKey] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogUser, setDialogUser] = useState(null);
+
+    const handleEditClick = (user) => {
+        setDialogKey(prev => prev+1);
+        setDialogUser(user);
+        setDialogOpen(true);
+    };
+
+    const handleDialogCancel = () => {
+        setDialogOpen(false);
+    };
+
+    const handleDialogSubmit = async (user) => {
+        setDialogOpen(false);
+        // FIXME
+    };
+
+    const handleDeleteClick = async (user) => {
+        // FIXME
+    };
+
+    return (
+        <Table size="small" aria-label={t("prefs_access_table")}>
+            <TableHead>
+                <TableRow>
+                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_access_table_topic_header")}</TableCell>
+                    <TableCell>{t("prefs_access_table_access_header")}</TableCell>
+                    <TableCell/>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+                {props.entries.map(entry => (
+                    <TableRow
+                        key={entry.topic}
+                        sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                    >
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_access_table_topic_header")}>{entry.topic}</TableCell>
+                        <TableCell aria-label={t("prefs_access_table_access_header")}>
+                            <LockIcon fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                            {t("prefs_access_table_perms_private")}
+                        </TableCell>
+                        <TableCell align="right">
+                            <IconButton onClick={() => handleEditClick(entry)} aria-label={t("prefs_access_edit_button")}>
+                                <EditIcon/>
+                            </IconButton>
+                            <IconButton onClick={() => handleDeleteClick(entry)} aria-label={t("prefs_access_delete_button")}>
+                                <CloseIcon/>
+                            </IconButton>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+            {/*<UserDialog
+                key={`userEditDialog${dialogKey}`}
+                open={dialogOpen}
+                user={dialogUser}
+                users={props.users}
+                onCancel={handleDialogCancel}
+                onSubmit={handleDialogSubmit}
+            />*/}
+        </Table>
+    );
 };
 
 const maybeUpdateAccountSettings = async (payload) => {

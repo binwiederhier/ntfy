@@ -5,7 +5,7 @@ import {
     CardContent,
     FormControl,
     Select,
-    Stack,
+    Stack, styled,
     Table,
     TableBody,
     TableCell,
@@ -41,6 +41,9 @@ import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
 import {useOutletContext} from "react-router-dom";
 import LockIcon from "@mui/icons-material/Lock";
+import {Public, PublicOff} from "@mui/icons-material";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 
 const Preferences = () => {
     return (
@@ -515,14 +518,14 @@ const Access = () => {
             </CardContent>
             <CardActions>
                 <Button onClick={handleAddClick}>{t("prefs_access_add_button")}</Button>
-                {/*<UserDialog
-                key={`userEditDialog${dialogKey}`}
-                open={dialogOpen}
-                user={dialogUser}
-                users={props.users}
-                onCancel={handleDialogCancel}
-                onSubmit={handleDialogSubmit}
-            />*/}
+                <AccessDialog
+                    key={`accessAddDialog${dialogKey}`}
+                    open={dialogOpen}
+                    entry={null}
+                    entries={account.access}
+                    onCancel={handleDialogCancel}
+                    onSubmit={handleDialogSubmit}
+                />
             </CardActions>
         </Card>
     );
@@ -532,11 +535,11 @@ const AccessTable = (props) => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogUser, setDialogUser] = useState(null);
+    const [dialogEntry, setDialogEntry] = useState(null);
 
-    const handleEditClick = (user) => {
+    const handleEditClick = (entry) => {
         setDialogKey(prev => prev+1);
-        setDialogUser(user);
+        setDialogEntry(entry);
         setDialogOpen(true);
     };
 
@@ -584,15 +587,88 @@ const AccessTable = (props) => {
                     </TableRow>
                 ))}
             </TableBody>
-            {/*<UserDialog
-                key={`userEditDialog${dialogKey}`}
+            <AccessDialog
+                key={`accessEditDialog${dialogKey}`}
                 open={dialogOpen}
-                user={dialogUser}
-                users={props.users}
+                entry={dialogEntry}
+                entries={props.entries}
                 onCancel={handleDialogCancel}
                 onSubmit={handleDialogSubmit}
-            />*/}
+            />
         </Table>
+    );
+};
+
+const AccessDialog = (props) => {
+    const { t } = useTranslation();
+    const [topic, setTopic] = useState("");
+    const [access, setAccess] = useState("private");
+    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+    const editMode = props.entry !== null;
+    const addButtonEnabled = (() => {
+        // FIXME
+    })();
+    const handleSubmit = async () => {
+        props.onSubmit({
+            topic: topic,
+            // FIXME
+        })
+    };
+    useEffect(() => {
+        if (editMode) {
+            setTopic(props.topic);
+            //setAccess(props.access);
+        }
+    }, [editMode, props]);
+    return (
+        <Dialog open={props.open} onClose={props.onCancel} maxWidth="xs" fullWidth fullScreen={fullScreen}>
+            <DialogTitle>{editMode ? t("prefs_access_dialog_title_edit") : t("prefs_access_dialog_title_add")}</DialogTitle>
+            <DialogContent>
+                {!editMode && <TextField
+                    autoFocus
+                    margin="dense"
+                    id="topic"
+                    label={t("prefs_access_dialog_topic_label")}
+                    aria-label={t("prefs_access_dialog_topic_label")}
+                    value={topic}
+                    onChange={ev => setTopic(ev.target.value)}
+                    type="url"
+                    fullWidth
+                    variant="standard"
+                />}
+                <FormControl fullWidth variant="standard">
+                    <Select
+                        value={access}
+                        onChange={(ev) => setAccess(ev.target.value)}
+                        aria-label={t("prefs_access_dialog_access_label")}
+                        sx={{
+                            marginTop: 1,
+                            "& .MuiSelect-select": {
+                                display: 'flex',
+                                alignItems: 'center'
+                            }
+                        }}
+                    >
+                        <MenuItem value="private">
+                            <ListItemIcon><LockIcon /></ListItemIcon>
+                            <ListItemText primary={t("prefs_access_table_perms_private")} />
+                        </MenuItem>
+                        <MenuItem value="public-read">
+                            <ListItemIcon><PublicOff /></ListItemIcon>
+                            <ListItemText primary={t("prefs_access_table_perms_public_read")} />
+                        </MenuItem>
+                        <MenuItem value="public">
+                            <ListItemIcon><Public /></ListItemIcon>
+                            <ListItemText primary={t("prefs_access_table_perms_public")} />
+                        </MenuItem>
+                    </Select>
+                </FormControl>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>
+                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? t("prefs_users_dialog_button_save") : t("prefs_users_dialog_button_add")}</Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 

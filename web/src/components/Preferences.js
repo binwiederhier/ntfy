@@ -50,7 +50,7 @@ const Preferences = () => {
         <Container maxWidth="md" sx={{marginTop: 3, marginBottom: 3}}>
             <Stack spacing={3}>
                 <Notifications/>
-                <Access/>
+                <Reservations/>
                 <Users/>
                 <Appearance/>
             </Stack>
@@ -476,7 +476,7 @@ const Language = () => {
     )
 };
 
-const Access = () => {
+const Reservations = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
     const [dialogKey, setDialogKey] = useState(0);
@@ -506,19 +506,19 @@ const Access = () => {
     }
 
     return (
-        <Card sx={{ padding: 1 }} aria-label={t("prefs_access_title")}>
+        <Card sx={{ padding: 1 }} aria-label={t("prefs_reservations_title")}>
             <CardContent sx={{ paddingBottom: 1 }}>
                 <Typography variant="h5" sx={{marginBottom: 2}}>
-                    {t("prefs_access_title")}
+                    {t("prefs_reservations_title")}
                 </Typography>
                 <Paragraph>
-                    {t("prefs_access_description")}
+                    {t("prefs_reservations_description")}
                 </Paragraph>
-                {account.access.length > 0 && <AccessTable entries={account.access}/>}
+                {account.reservations.length > 0 && <ReservationsTable reservations={account.reservations}/>}
             </CardContent>
             <CardActions>
-                <Button onClick={handleAddClick}>{t("prefs_access_add_button")}</Button>
-                <AccessDialog
+                <Button onClick={handleAddClick}>{t("prefs_reservations_add_button")}</Button>
+                <ReservationsDialog
                     key={`accessAddDialog${dialogKey}`}
                     open={dialogOpen}
                     entry={null}
@@ -531,7 +531,7 @@ const Access = () => {
     );
 };
 
-const AccessTable = (props) => {
+const ReservationsTable = (props) => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -557,37 +557,59 @@ const AccessTable = (props) => {
     };
 
     return (
-        <Table size="small" aria-label={t("prefs_access_table")}>
+        <Table size="small" aria-label={t("prefs_reservations_table")}>
             <TableHead>
                 <TableRow>
-                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_access_table_topic_header")}</TableCell>
-                    <TableCell>{t("prefs_access_table_access_header")}</TableCell>
+                    <TableCell sx={{paddingLeft: 0}}>{t("prefs_reservations_table_topic_header")}</TableCell>
+                    <TableCell>{t("prefs_reservations_table_access_header")}</TableCell>
                     <TableCell/>
                 </TableRow>
             </TableHead>
             <TableBody>
-                {props.entries.map(entry => (
+                {props.reservations.map(reservation => (
                     <TableRow
-                        key={entry.topic}
+                        key={reservation.topic}
                         sx={{'&:last-child td, &:last-child th': {border: 0}}}
                     >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_access_table_topic_header")}>{entry.topic}</TableCell>
-                        <TableCell aria-label={t("prefs_access_table_access_header")}>
-                            <LockIcon fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
-                            {t("prefs_access_table_perms_private")}
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_reservations_table_topic_header")}>{reservation.topic}</TableCell>
+                        <TableCell aria-label={t("prefs_reservations_table_access_header")}>
+                            {reservation.everyone === "read-write" &&
+                                <>
+                                    <Public fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    {t("prefs_reservations_table_everyone_read_write")}
+                                </>
+                            }
+                            {reservation.everyone === "read-only" &&
+                                <>
+                                    <PublicOff fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    {t("prefs_reservations_table_everyone_read_only")}
+                                </>
+                            }
+                            {reservation.everyone === "write-only" &&
+                                <>
+                                    <PublicOff fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    {t("prefs_reservations_table_everyone_write_only")}
+                                </>
+                            }
+                            {reservation.everyone === "deny-all" &&
+                                <>
+                                    <LockIcon fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    {t("prefs_reservations_table_everyone_deny_all")}
+                                </>
+                            }
                         </TableCell>
                         <TableCell align="right">
-                            <IconButton onClick={() => handleEditClick(entry)} aria-label={t("prefs_access_edit_button")}>
+                            <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
                                 <EditIcon/>
                             </IconButton>
-                            <IconButton onClick={() => handleDeleteClick(entry)} aria-label={t("prefs_access_delete_button")}>
+                            <IconButton onClick={() => handleDeleteClick(reservation)} aria-label={t("prefs_reservations_delete_button")}>
                                 <CloseIcon/>
                             </IconButton>
                         </TableCell>
                     </TableRow>
                 ))}
             </TableBody>
-            <AccessDialog
+            <ReservationsDialog
                 key={`accessEditDialog${dialogKey}`}
                 open={dialogOpen}
                 entry={dialogEntry}
@@ -599,7 +621,7 @@ const AccessTable = (props) => {
     );
 };
 
-const AccessDialog = (props) => {
+const ReservationsDialog = (props) => {
     const { t } = useTranslation();
     const [topic, setTopic] = useState("");
     const [access, setAccess] = useState("private");
@@ -621,15 +643,15 @@ const AccessDialog = (props) => {
         }
     }, [editMode, props]);
     return (
-        <Dialog open={props.open} onClose={props.onCancel} maxWidth="xs" fullWidth fullScreen={fullScreen}>
-            <DialogTitle>{editMode ? t("prefs_access_dialog_title_edit") : t("prefs_access_dialog_title_add")}</DialogTitle>
+        <Dialog open={props.open} onClose={props.onCancel} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+            <DialogTitle>{editMode ? t("prefs_reservations_dialog_title_edit") : t("prefs_reservations_dialog_title_add")}</DialogTitle>
             <DialogContent>
                 {!editMode && <TextField
                     autoFocus
                     margin="dense"
                     id="topic"
-                    label={t("prefs_access_dialog_topic_label")}
-                    aria-label={t("prefs_access_dialog_topic_label")}
+                    label={t("prefs_reservations_dialog_topic_label")}
+                    aria-label={t("prefs_reservations_dialog_topic_label")}
                     value={topic}
                     onChange={ev => setTopic(ev.target.value)}
                     type="url"
@@ -640,7 +662,7 @@ const AccessDialog = (props) => {
                     <Select
                         value={access}
                         onChange={(ev) => setAccess(ev.target.value)}
-                        aria-label={t("prefs_access_dialog_access_label")}
+                        aria-label={t("prefs_reservations_dialog_access_label")}
                         sx={{
                             marginTop: 1,
                             "& .MuiSelect-select": {
@@ -649,17 +671,21 @@ const AccessDialog = (props) => {
                             }
                         }}
                     >
-                        <MenuItem value="private">
+                        <MenuItem value="deny-all">
                             <ListItemIcon><LockIcon /></ListItemIcon>
-                            <ListItemText primary={t("prefs_access_table_perms_private")} />
+                            <ListItemText primary={t("prefs_reservations_table_everyone_deny_all")} />
                         </MenuItem>
-                        <MenuItem value="public-read">
+                        <MenuItem value="read-only">
                             <ListItemIcon><PublicOff /></ListItemIcon>
-                            <ListItemText primary={t("prefs_access_table_perms_public_read")} />
+                            <ListItemText primary={t("prefs_reservations_table_everyone_read_only")} />
                         </MenuItem>
-                        <MenuItem value="public">
+                        <MenuItem value="write-only">
+                            <ListItemIcon><PublicOff /></ListItemIcon>
+                            <ListItemText primary={t("prefs_reservations_table_everyone_write_only")} />
+                        </MenuItem>
+                        <MenuItem value="read-write">
                             <ListItemIcon><Public /></ListItemIcon>
-                            <ListItemText primary={t("prefs_access_table_perms_public")} />
+                            <ListItemText primary={t("prefs_reservations_table_everyone_read_write")} />
                         </MenuItem>
                     </Select>
                 </FormControl>

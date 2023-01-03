@@ -92,7 +92,7 @@ const (
 		SELECT read, write
 		FROM user_access a
 		JOIN user u ON u.id = a.user_id
-		WHERE (u.user = '*' OR u.user = ?) AND ? LIKE a.topic
+		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic
 		ORDER BY u.user DESC
 	`
 )
@@ -123,10 +123,18 @@ const (
 		DO UPDATE SET read=excluded.read, write=excluded.write, owner_user_id=excluded.owner_user_id
 	`
 	selectUserAccessQuery = `
-		SELECT topic, read, write, IIF(owner_user_id IS NOT NULL AND user_id = owner_user_id,1,0) AS owner
+		SELECT topic, read, write
 		FROM user_access 
 		WHERE user_id = (SELECT id FROM user WHERE user = ?) 
 		ORDER BY write DESC, read DESC, topic
+	`
+	selectUserReservationsQuery = `
+		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write
+		FROM user_access a_user
+		LEFT JOIN  user_access a_everyone ON a_user.topic = a_everyone.topic AND a_everyone.user_id = (SELECT id FROM user WHERE user = ?)
+		WHERE a_user.user_id = a_user.owner_user_id
+		  AND a_user.owner_user_id = (SELECT id FROM user WHERE user = ?)
+		ORDER BY a_user.topic
 	`
 	selectOtherAccessCountQuery = `
 		SELECT count(*)
@@ -354,7 +362,7 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	}
 	// Select the read/write permissions for this user/topic combo. The query may return two
 	// rows (one for everyone, and one for the user), but prioritizes the user.
-	rows, err := a.db.Query(selectTopicPermsQuery, username, topic)
+	rows, err := a.db.Query(selectTopicPermsQuery, Everyone, username, topic)
 	if err != nil {
 		return err
 	}
@@ -479,15 +487,10 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	} else if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	grants, err := a.readGrants(username)
-	if err != nil {
-		return nil, err
-	}
 	user := &User{
-		Name:   username,
-		Hash:   hash,
-		Role:   Role(role),
-		Grants: grants,
+		Name: username,
+		Hash: hash,
+		Role: Role(role),
 		Stats: &Stats{
 			Messages: messages,
 			Emails:   emails,
@@ -513,7 +516,8 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	return user, nil
 }
 
-func (a *Manager) readGrants(username string) ([]Grant, error) {
+// Grants returns all user-specific access control entries
+func (a *Manager) Grants(username string) ([]Grant, error) {
 	rows, err := a.db.Query(selectUserAccessQuery, username)
 	if err != nil {
 		return nil, err
@@ -522,8 +526,8 @@ func (a *Manager) readGrants(username string) ([]Grant, error) {
 	grants := make([]Grant, 0)
 	for rows.Next() {
 		var topic string
-		var read, write, owner bool
-		if err := rows.Scan(&topic, &read, &write, &owner); err != nil {
+		var read, write bool
+		if err := rows.Scan(&topic, &read, &write); err != nil {
 			return nil, err
 		} else if err := rows.Err(); err != nil {
 			return nil, err
@@ -532,10 +536,37 @@ func (a *Manager) readGrants(username string) ([]Grant, error) {
 			TopicPattern: fromSQLWildcard(topic),
 			AllowRead:    read,
 			AllowWrite:   write,
-			Owner:        owner,
 		})
 	}
 	return grants, nil
+}
+
+// Reservations returns all user-owned topics, and the associated everyone-access
+func (a *Manager) Reservations(username string) ([]Reservation, error) {
+	rows, err := a.db.Query(selectUserReservationsQuery, Everyone, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	reservations := make([]Reservation, 0)
+	for rows.Next() {
+		var topic string
+		var read, write bool
+		var everyoneRead, everyoneWrite sql.NullBool
+		if err := rows.Scan(&topic, &read, &write, &everyoneRead, &everyoneWrite); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		reservations = append(reservations, Reservation{
+			TopicPattern:       topic,
+			AllowRead:          read,
+			AllowWrite:         write,
+			AllowEveryoneRead:  everyoneRead.Bool,  // false if null
+			AllowEveryoneWrite: everyoneWrite.Bool, // false if null
+		})
+	}
+	return reservations, nil
 }
 
 // ChangePassword changes a user's password

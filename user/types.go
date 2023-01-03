@@ -9,14 +9,13 @@ import (
 
 // User is a struct that represents a user
 type User struct {
-	Name   string
-	Hash   string // password hash (bcrypt)
-	Token  string // Only set if token was used to log in
-	Role   Role
-	Grants []Grant
-	Prefs  *Prefs
-	Plan   *Plan
-	Stats  *Stats
+	Name  string
+	Hash  string // password hash (bcrypt)
+	Token string // Only set if token was used to log in
+	Role  Role
+	Prefs *Prefs
+	Plan  *Plan
+	Stats *Stats
 }
 
 // Auther is an interface for authentication and authorization
@@ -91,7 +90,15 @@ type Grant struct {
 	TopicPattern string // May include wildcard (*)
 	AllowRead    bool
 	AllowWrite   bool
-	Owner        bool // This user owns this ACL entry
+}
+
+// Reservation is a struct that represents the ownership over a topic by a user
+type Reservation struct {
+	TopicPattern       string
+	AllowRead          bool
+	AllowWrite         bool
+	AllowEveryoneRead  bool
+	AllowEveryoneWrite bool
 }
 
 // Permission represents a read or write permission to a topic

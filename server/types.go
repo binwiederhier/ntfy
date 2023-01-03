@@ -259,22 +259,21 @@ type apiAccountStats struct {
 	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
 }
 
-type apiAccountGrant struct {
-	Topic string `json:"topic"`
-	Read  bool   `json:"read"`
-	Write bool   `json:"write"`
+type apiAccountReservation struct {
+	Topic    string `json:"topic"`
+	Everyone string `json:"everyone"`
 }
 
 type apiAccountResponse struct {
-	Username      string                  `json:"username"`
-	Role          string                  `json:"role,omitempty"`
-	Language      string                  `json:"language,omitempty"`
-	Notification  *user.NotificationPrefs `json:"notification,omitempty"`
-	Subscriptions []*user.Subscription    `json:"subscriptions,omitempty"`
-	Access        []*apiAccountGrant      `json:"access,omitempty"`
-	Plan          *apiAccountPlan         `json:"plan,omitempty"`
-	Limits        *apiAccountLimits       `json:"limits,omitempty"`
-	Stats         *apiAccountStats        `json:"stats,omitempty"`
+	Username      string                   `json:"username"`
+	Role          string                   `json:"role,omitempty"`
+	Language      string                   `json:"language,omitempty"`
+	Notification  *user.NotificationPrefs  `json:"notification,omitempty"`
+	Subscriptions []*user.Subscription     `json:"subscriptions,omitempty"`
+	Reservations  []*apiAccountReservation `json:"reservations,omitempty"`
+	Plan          *apiAccountPlan          `json:"plan,omitempty"`
+	Limits        *apiAccountLimits        `json:"limits,omitempty"`
+	Stats         *apiAccountStats         `json:"stats,omitempty"`
 }
 
 type apiAccountAccessRequest struct {

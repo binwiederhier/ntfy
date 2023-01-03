@@ -1308,7 +1308,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.config, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -1579,7 +1579,7 @@ func (s *Server) visitorFromID(visitorID string, ip netip.Addr, user *user.User)
 	defer s.mu.Unlock()
 	v, exists := s.visitors[visitorID]
 	if !exists {
-		s.visitors[visitorID] = newVisitor(s.config, s.messageCache, ip, user)
+		s.visitors[visitorID] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
 		return s.visitors[visitorID]
 	}
 	v.Keepalive()

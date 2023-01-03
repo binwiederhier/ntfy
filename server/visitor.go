@@ -26,6 +26,7 @@ var (
 type visitor struct {
 	config              *Config
 	messageCache        *messageCache
+	userManager         *user.Manager // May be nil!
 	ip                  netip.Addr
 	user                *user.User
 	messages            int64         // Number of messages sent
@@ -57,7 +58,7 @@ type visitorInfo struct {
 	AttachmentFileSizeLimit      int64
 }
 
-func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *user.User) *visitor {
+func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
 	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
@@ -76,6 +77,7 @@ func newVisitor(conf *Config, messageCache *messageCache, ip netip.Addr, user *u
 	return &visitor{
 		config:              conf,
 		messageCache:        messageCache,
+		userManager:         userManager, // May be nil!
 		ip:                  ip,
 		user:                user,
 		messages:            messages,
@@ -192,7 +194,7 @@ func (v *visitor) Info() (*visitorInfo, error) {
 		info.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
 	}
-	var attachmentsBytesUsed int64
+	var attachmentsBytesUsed int64 // FIXME Maybe move this to endpoint?
 	var err error
 	if v.user != nil {
 		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(v.user.Name)
@@ -203,12 +205,12 @@ func (v *visitor) Info() (*visitorInfo, error) {
 		return nil, err
 	}
 	var topics int64
-	if v.user != nil {
-		for _, grant := range v.user.Grants {
-			if grant.Owner {
-				topics++
-			}
+	if v.user != nil && v.userManager != nil {
+		reservations, err := v.userManager.Reservations(v.user.Name) // FIXME dup call, move this to endpoint?
+		if err != nil {
+			return nil, err
 		}
+		topics = int64(len(reservations))
 	}
 	info.Messages = messages
 	info.MessagesRemaining = zeroIfNegative(info.MessagesLimit - info.Messages)

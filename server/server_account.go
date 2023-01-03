@@ -94,16 +94,27 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 				Upgradable: true,
 			}
 		}
-		if len(v.user.Grants) > 0 {
-			response.Access = make([]*apiAccountGrant, 0)
-			for _, grant := range v.user.Grants {
-				if grant.Owner {
-					response.Access = append(response.Access, &apiAccountGrant{
-						Topic: grant.TopicPattern,
-						Read:  grant.AllowRead,
-						Write: grant.AllowWrite,
-					})
+		reservations, err := s.userManager.Reservations(v.user.Name)
+		if err != nil {
+			return err
+		}
+		if len(reservations) > 0 {
+			response.Reservations = make([]*apiAccountReservation, 0)
+			for _, r := range reservations {
+				var everyone string
+				if r.AllowEveryoneRead && r.AllowEveryoneWrite {
+					everyone = "read-write"
+				} else if r.AllowEveryoneRead && !r.AllowEveryoneWrite {
+					everyone = "read-only"
+				} else if !r.AllowEveryoneRead && r.AllowEveryoneWrite {
+					everyone = "write-only"
+				} else {
+					everyone = "deny-all"
 				}
+				response.Reservations = append(response.Reservations, &apiAccountReservation{
+					Topic:    r.TopicPattern,
+					Everyone: everyone,
+				})
 			}
 		}
 	} else {
@@ -356,9 +367,13 @@ func (s *Server) handleAccountAccessDelete(w http.ResponseWriter, r *http.Reques
 	if !topicRegex.MatchString(topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
+	reservations, err := s.userManager.Reservations(v.user.Name) // FIXME replace with HasReservation
+	if err != nil {
+		return err
+	}
 	authorized := false
-	for _, grant := range v.user.Grants {
-		if grant.TopicPattern == topic && grant.Owner {
+	for _, r := range reservations {
+		if r.TopicPattern == topic {
 			authorized = true
 			break
 		}

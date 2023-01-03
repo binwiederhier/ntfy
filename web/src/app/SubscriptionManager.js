@@ -35,7 +35,7 @@ class SubscriptionManager {
         return subscription;
     }
 
-    async syncFromRemote(remoteSubscriptions) {
+    async syncFromRemote(remoteSubscriptions, remoteReservations) {
         console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
         // Add remote subscriptions
@@ -43,8 +43,10 @@ class SubscriptionManager {
         for (let i = 0; i < remoteSubscriptions.length; i++) {
             const remote = remoteSubscriptions[i];
             const local = await this.add(remote.base_url, remote.topic);
+            const reservation = remoteReservations?.find(r => remote.base_url === config.baseUrl && remote.topic === r.topic) || null;
             await this.setRemoteId(local.id, remote.id);
             await this.setDisplayName(local.id, remote.display_name);
+            await this.setReservation(local.id, reservation); // May be null!
             remoteIds.push(remote.id);
         }
 
@@ -171,6 +173,12 @@ class SubscriptionManager {
     async setRemoteId(subscriptionId, remoteId) {
         await db.subscriptions.update(subscriptionId, {
             remoteId: remoteId
+        });
+    }
+
+    async setReservation(subscriptionId, reservation) {
+        await db.subscriptions.update(subscriptionId, {
+            reservation: reservation
         });
     }
 

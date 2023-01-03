@@ -256,25 +256,25 @@ class AccountApi {
                 return null;
             }
             console.log(`[AccountApi] Syncing account`);
-            const remoteAccount = await this.get();
-            if (remoteAccount.language) {
-                await i18n.changeLanguage(remoteAccount.language);
+            const account = await this.get();
+            if (account.language) {
+                await i18n.changeLanguage(account.language);
             }
-            if (remoteAccount.notification) {
-                if (remoteAccount.notification.sound) {
-                    await prefs.setSound(remoteAccount.notification.sound);
+            if (account.notification) {
+                if (account.notification.sound) {
+                    await prefs.setSound(account.notification.sound);
                 }
-                if (remoteAccount.notification.delete_after) {
-                    await prefs.setDeleteAfter(remoteAccount.notification.delete_after);
+                if (account.notification.delete_after) {
+                    await prefs.setDeleteAfter(account.notification.delete_after);
                 }
-                if (remoteAccount.notification.min_priority) {
-                    await prefs.setMinPriority(remoteAccount.notification.min_priority);
+                if (account.notification.min_priority) {
+                    await prefs.setMinPriority(account.notification.min_priority);
                 }
             }
-            if (remoteAccount.subscriptions) {
-                await subscriptionManager.syncFromRemote(remoteAccount.subscriptions);
+            if (account.subscriptions) {
+                await subscriptionManager.syncFromRemote(account.subscriptions, account.reservations);
             }
-            return remoteAccount;
+            return account;
         } catch (e) {
             console.log(`[AccountApi] Error fetching account`, e);
             if ((e instanceof UnauthorizedError)) {

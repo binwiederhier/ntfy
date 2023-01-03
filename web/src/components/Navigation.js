@@ -12,15 +12,24 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader} from "@mui/material";
+import {
+    Alert,
+    AlertTitle,
+    Badge,
+    CircularProgress,
+    Link,
+    ListItem,
+    ListItemSecondaryAction,
+    ListSubheader, Tooltip
+} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {openUrl, topicDisplayName, topicUrl} from "../app/utils";
 import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
-import {useLocation, useNavigate} from "react-router-dom";
+import {useLocation, useNavigate, useOutletContext} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {ChatBubble, NotificationsOffOutlined, Send} from "@mui/icons-material";
+import {ChatBubble, Lock, MoreVert, NotificationsOffOutlined, Public, PublicOff, Send} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -28,6 +37,8 @@ import ArticleIcon from '@mui/icons-material/Article';
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from "@mui/icons-material/Close";
 
 const navWidth = 280;
 
@@ -198,9 +209,28 @@ const SubscriptionItem = (props) => {
     return (
         <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
             <ListItemIcon>{icon}</ListItemIcon>
-            <ListItemText primary={displayName}/>
+            <ListItemText primary={displayName} primaryTypographyProps={{ style: { overflow: "hidden", textOverflow: "ellipsis" } }}/>
+            {subscription.reservation?.everyone &&
+                <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
+                    {subscription.reservation?.everyone === "read-write" &&
+                        <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><Public fontSize="small"/></Tooltip>
+                    }
+                    {subscription.reservation?.everyone === "read-only" &&
+                        <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PublicOff fontSize="small"/></Tooltip>
+                    }
+                    {subscription.reservation?.everyone === "write-only" &&
+                        <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PublicOff fontSize="small"/></Tooltip>
+                    }
+                    {subscription.reservation?.everyone === "deny-all" &&
+                        <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><Lock fontSize="small"/></Tooltip>
+                    }
+                </ListItemIcon>
+            }
             {subscription.mutedUntil > 0 &&
-                <ListItemIcon edge="end" aria-label={t("nav_button_muted")}><NotificationsOffOutlined /></ListItemIcon>}
+                <ListItemIcon edge="end" sx={{ minWidth: "26px" }} aria-label={t("nav_button_muted")}>
+                    <Tooltip title={t("nav_button_muted")}><NotificationsOffOutlined /></Tooltip>
+                </ListItemIcon>
+            }
         </ListItemButton>
     );
 };

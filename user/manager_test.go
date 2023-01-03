@@ -12,7 +12,7 @@ import (
 const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
 
 func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
@@ -28,19 +28,25 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Equal(t, "phil", phil.Name)
 	require.True(t, strings.HasPrefix(phil.Hash, "$2a$10$"))
 	require.Equal(t, RoleAdmin, phil.Role)
-	require.Equal(t, []Grant{}, phil.Grants)
+
+	philGrants, err := a.Grants("phil")
+	require.Nil(t, err)
+	require.Equal(t, []Grant{}, philGrants)
 
 	ben, err := a.Authenticate("ben", "ben")
 	require.Nil(t, err)
 	require.Equal(t, "ben", ben.Name)
 	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, RoleUser, ben.Role)
+
+	benGrants, err := a.Grants("ben")
+	require.Nil(t, err)
 	require.Equal(t, []Grant{
-		{"mytopic", true, true, false},
-		{"writeme", false, true, false},
-		{"readme", true, false, false},
-		{"everyonewrite", false, false, false},
-	}, ben.Grants)
+		{"mytopic", PermissionReadWrite},
+		{"writeme", PermissionWrite},
+		{"readme", PermissionRead},
+		{"everyonewrite", PermissionDenyAll},
+	}, benGrants)
 
 	notben, err := a.Authenticate("ben", "this is wrong")
 	require.Nil(t, notben)
@@ -85,20 +91,20 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 }
 
 func TestManager_AddUser_Invalid(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Equal(t, ErrInvalidArgument, a.AddUser("  invalid  ", "pass", RoleAdmin))
 	require.Equal(t, ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role"))
 }
 
 func TestManager_AddUser_Timing(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	start := time.Now().UnixMilli()
 	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestManager_Authenticate_Timing(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
 
 	// Timing a correct attempt
@@ -121,7 +127,7 @@ func TestManager_Authenticate_Timing(t *testing.T) {
 }
 
 func TestManager_UserManagement(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
@@ -137,29 +143,38 @@ func TestManager_UserManagement(t *testing.T) {
 	require.Equal(t, "phil", phil.Name)
 	require.True(t, strings.HasPrefix(phil.Hash, "$2a$10$"))
 	require.Equal(t, RoleAdmin, phil.Role)
-	require.Equal(t, []Grant{}, phil.Grants)
+
+	philGrants, err := a.Grants("phil")
+	require.Nil(t, err)
+	require.Equal(t, []Grant{}, philGrants)
 
 	ben, err := a.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, "ben", ben.Name)
 	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
 	require.Equal(t, RoleUser, ben.Role)
+
+	benGrants, err := a.Grants("ben")
+	require.Nil(t, err)
 	require.Equal(t, []Grant{
-		{"mytopic", true, true, false},
-		{"writeme", false, true, false},
-		{"readme", true, false, false},
-		{"everyonewrite", false, false, false},
-	}, ben.Grants)
+		{"mytopic", PermissionReadWrite},
+		{"writeme", PermissionWrite},
+		{"readme", PermissionRead},
+		{"everyonewrite", PermissionDenyAll},
+	}, benGrants)
 
 	everyone, err := a.User(Everyone)
 	require.Nil(t, err)
 	require.Equal(t, "*", everyone.Name)
 	require.Equal(t, "", everyone.Hash)
 	require.Equal(t, RoleAnonymous, everyone.Role)
+
+	everyoneGrants, err := a.Grants(Everyone)
+	require.Nil(t, err)
 	require.Equal(t, []Grant{
-		{"everyonewrite", true, true, false},
-		{"announcements", true, false, false},
-	}, everyone.Grants)
+		{"everyonewrite", PermissionReadWrite},
+		{"announcements", PermissionRead},
+	}, everyoneGrants)
 
 	// Ben: Before revoking
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true)) // Overwrite!
@@ -203,7 +218,7 @@ func TestManager_UserManagement(t *testing.T) {
 }
 
 func TestManager_ChangePassword(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 
 	_, err := a.Authenticate("phil", "phil")
@@ -217,7 +232,7 @@ func TestManager_ChangePassword(t *testing.T) {
 }
 
 func TestManager_ChangeRole(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
@@ -225,18 +240,24 @@ func TestManager_ChangeRole(t *testing.T) {
 	ben, err := a.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, RoleUser, ben.Role)
-	require.Equal(t, 2, len(ben.Grants))
+
+	benGrants, err := a.Grants("ben")
+	require.Nil(t, err)
+	require.Equal(t, 2, len(benGrants))
 
 	require.Nil(t, a.ChangeRole("ben", RoleAdmin))
 
 	ben, err = a.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, RoleAdmin, ben.Role)
-	require.Equal(t, 0, len(ben.Grants))
+
+	benGrants, err = a.Grants("ben")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(benGrants))
 }
 
 func TestManager_Token_Valid(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
 	u, err := a.User("ben")
@@ -261,7 +282,7 @@ func TestManager_Token_Valid(t *testing.T) {
 }
 
 func TestManager_Token_Invalid(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
 	u, err := a.AuthenticateToken(strings.Repeat("x", 32)) // 32 == token length
@@ -274,7 +295,7 @@ func TestManager_Token_Invalid(t *testing.T) {
 }
 
 func TestManager_Token_Expire(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
 	u, err := a.User("ben")
@@ -322,7 +343,7 @@ func TestManager_Token_Expire(t *testing.T) {
 }
 
 func TestManager_Token_Extend(t *testing.T) {
-	a := newTestManager(t, false, false)
+	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
 	// Try to extend token for user without token
@@ -349,7 +370,7 @@ func TestManager_Token_Extend(t *testing.T) {
 }
 
 func TestManager_EnqueueStats(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), true, true, time.Hour, 1500*time.Millisecond)
+	a, err := newManager(filepath.Join(t.TempDir(), "db"), PermissionReadWrite, time.Hour, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -379,7 +400,7 @@ func TestManager_EnqueueStats(t *testing.T) {
 }
 
 func TestManager_ChangeSettings(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), true, true, time.Hour, 1500*time.Millisecond)
+	a, err := newManager(filepath.Join(t.TempDir(), "db"), PermissionReadWrite, time.Hour, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -461,7 +482,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create manager to trigger migration
-	a := newTestManagerFromFile(t, filename, false, false, userTokenExpiryDuration, userStatsQueueWriterInterval)
+	a := newTestManagerFromFile(t, filename, PermissionDenyAll, userTokenExpiryDuration, userStatsQueueWriterInterval)
 	checkSchemaVersion(t, a.db)
 
 	users, err := a.Users()
@@ -469,26 +490,32 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Equal(t, 3, len(users))
 	phil, ben, everyone := users[0], users[1], users[2]
 
+	philGrants, err := a.Grants("phil")
+	require.Nil(t, err)
+
+	benGrants, err := a.Grants("ben")
+	require.Nil(t, err)
+
+	everyoneGrants, err := a.Grants(Everyone)
+	require.Nil(t, err)
+
 	require.Equal(t, "phil", phil.Name)
 	require.Equal(t, RoleAdmin, phil.Role)
-	require.Equal(t, 0, len(phil.Grants))
+	require.Equal(t, 0, len(philGrants))
 
 	require.Equal(t, "ben", ben.Name)
 	require.Equal(t, RoleUser, ben.Role)
-	require.Equal(t, 2, len(ben.Grants))
-	require.Equal(t, "stats", ben.Grants[0].TopicPattern)
-	require.Equal(t, true, ben.Grants[0].AllowRead)
-	require.Equal(t, true, ben.Grants[0].AllowWrite)
-	require.Equal(t, "secret", ben.Grants[1].TopicPattern)
-	require.Equal(t, true, ben.Grants[1].AllowRead)
-	require.Equal(t, false, ben.Grants[1].AllowWrite)
+	require.Equal(t, 2, len(benGrants))
+	require.Equal(t, "stats", benGrants[0].TopicPattern)
+	require.Equal(t, PermissionReadWrite, benGrants[0].Allow)
+	require.Equal(t, "secret", benGrants[1].TopicPattern)
+	require.Equal(t, PermissionRead, benGrants[1].Allow)
 
 	require.Equal(t, Everyone, everyone.Name)
 	require.Equal(t, RoleAnonymous, everyone.Role)
-	require.Equal(t, 1, len(everyone.Grants))
-	require.Equal(t, "stats", everyone.Grants[0].TopicPattern)
-	require.Equal(t, true, everyone.Grants[0].AllowRead)
-	require.Equal(t, false, everyone.Grants[0].AllowWrite)
+	require.Equal(t, 1, len(everyoneGrants))
+	require.Equal(t, "stats", everyoneGrants[0].TopicPattern)
+	require.Equal(t, PermissionRead, everyoneGrants[0].Allow)
 }
 
 func checkSchemaVersion(t *testing.T, db *sql.DB) {
@@ -502,12 +529,12 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 	require.Nil(t, rows.Close())
 }
 
-func newTestManager(t *testing.T, defaultRead, defaultWrite bool) *Manager {
-	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), defaultRead, defaultWrite, userTokenExpiryDuration, userStatsQueueWriterInterval)
+func newTestManager(t *testing.T, defaultAccess Permission) *Manager {
+	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
 }
 
-func newTestManagerFromFile(t *testing.T, filename string, defaultRead, defaultWrite bool, tokenExpiryDuration, statsWriterInterval time.Duration) *Manager {
-	a, err := newManager(filename, defaultRead, defaultWrite, tokenExpiryDuration, statsWriterInterval)
+func newTestManagerFromFile(t *testing.T, filename string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) *Manager {
+	a, err := newManager(filename, defaultAccess, tokenExpiryDuration, statsWriterInterval)
 	require.Nil(t, err)
 	return a
 }

@@ -101,19 +101,9 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		if len(reservations) > 0 {
 			response.Reservations = make([]*apiAccountReservation, 0)
 			for _, r := range reservations {
-				var everyone string
-				if r.AllowEveryoneRead && r.AllowEveryoneWrite {
-					everyone = "read-write"
-				} else if r.AllowEveryoneRead && !r.AllowEveryoneWrite {
-					everyone = "read-only"
-				} else if !r.AllowEveryoneRead && r.AllowEveryoneWrite {
-					everyone = "write-only"
-				} else {
-					everyone = "deny-all"
-				}
 				response.Reservations = append(response.Reservations, &apiAccountReservation{
-					Topic:    r.TopicPattern,
-					Everyone: everyone,
+					Topic:    r.Topic,
+					Everyone: r.Everyone.String(),
 				})
 			}
 		}
@@ -345,12 +335,14 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 		return errHTTPConflictTopicReserved
 	}
 	owner, username := v.user.Name, v.user.Name
-	everyoneRead := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, req.Everyone)
-	everyoneWrite := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, req.Everyone)
+	everyone, err := user.ParsePermission(req.Everyone)
+	if err != nil {
+		return errHTTPBadRequestPermissionInvalid
+	}
 	if err := s.userManager.AllowAccess(owner, username, req.Topic, true, true); err != nil {
 		return err
 	}
-	if err := s.userManager.AllowAccess(owner, user.Everyone, req.Topic, everyoneRead, everyoneWrite); err != nil {
+	if err := s.userManager.AllowAccess(owner, user.Everyone, req.Topic, everyone.IsRead(), everyone.IsWrite()); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -373,7 +365,7 @@ func (s *Server) handleAccountAccessDelete(w http.ResponseWriter, r *http.Reques
 	}
 	authorized := false
 	for _, r := range reservations {
-		if r.TopicPattern == topic {
+		if r.Topic == topic {
 			authorized = true
 			break
 		}

@@ -192,11 +192,11 @@ func showUsers(c *cli.Context, manager *user.Manager, users []*user.User) error 
 			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
 		} else if len(grants) > 0 {
 			for _, grant := range grants {
-				if grant.AllowRead && grant.AllowWrite {
+				if grant.Allow.IsReadWrite() {
 					fmt.Fprintf(c.App.ErrWriter, "- read-write access to topic %s\n", grant.TopicPattern)
-				} else if grant.AllowRead {
+				} else if grant.Allow.IsRead() {
 					fmt.Fprintf(c.App.ErrWriter, "- read-only access to topic %s\n", grant.TopicPattern)
-				} else if grant.AllowWrite {
+				} else if grant.Allow.IsWrite() {
 					fmt.Fprintf(c.App.ErrWriter, "- write-only access to topic %s\n", grant.TopicPattern)
 				} else {
 					fmt.Fprintf(c.App.ErrWriter, "- no access to topic %s\n", grant.TopicPattern)
@@ -206,12 +206,12 @@ func showUsers(c *cli.Context, manager *user.Manager, users []*user.User) error 
 			fmt.Fprintf(c.App.ErrWriter, "- no topic-specific permissions\n")
 		}
 		if u.Name == user.Everyone {
-			defaultRead, defaultWrite := manager.DefaultAccess()
-			if defaultRead && defaultWrite {
+			access := manager.DefaultAccess()
+			if access.IsReadWrite() {
 				fmt.Fprintln(c.App.ErrWriter, "- read-write access to all (other) topics (server config)")
-			} else if defaultRead {
+			} else if access.IsRead() {
 				fmt.Fprintln(c.App.ErrWriter, "- read-only access to all (other) topics (server config)")
-			} else if defaultWrite {
+			} else if access.IsWrite() {
 				fmt.Fprintln(c.App.ErrWriter, "- write-only access to all (other) topics (server config)")
 			} else {
 				fmt.Fprintln(c.App.ErrWriter, "- no access to any (other) topics (server config)")

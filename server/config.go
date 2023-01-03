@@ -1,6 +1,7 @@
 package server
 
 import (
+	"heckel.io/ntfy/user"
 	"io/fs"
 	"net/netip"
 	"time"
@@ -66,8 +67,7 @@ type Config struct {
 	CacheBatchSize                       int
 	CacheBatchTimeout                    time.Duration
 	AuthFile                             string
-	AuthDefaultRead                      bool
-	AuthDefaultWrite                     bool
+	AuthDefault                          user.Permission
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
@@ -127,8 +127,7 @@ func NewConfig() *Config {
 		CacheBatchSize:                       0,
 		CacheBatchTimeout:                    0,
 		AuthFile:                             "",
-		AuthDefaultRead:                      true,
-		AuthDefaultWrite:                     true,
+		AuthDefault:                          user.NewPermission(true, true),
 		AttachmentCacheDir:                   "",
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,

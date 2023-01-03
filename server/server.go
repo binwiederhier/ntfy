@@ -165,7 +165,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var userManager *user.Manager
 	if conf.AuthFile != "" {
-		userManager, err = user.NewManager(conf.AuthFile, conf.AuthDefaultRead, conf.AuthDefaultWrite)
+		userManager, err = user.NewManager(conf.AuthFile, conf.AuthDefault)
 		if err != nil {
 			return nil, err
 		}

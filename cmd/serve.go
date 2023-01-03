@@ -5,6 +5,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/user"
 	"io/fs"
 	"math"
 	"net"
@@ -171,8 +172,6 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, base-url must start with http:// or https://")
 	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
 		return errors.New("if set, base-url must not end with a slash (/)")
-	} else if !util.Contains([]string{"read-write", "read-only", "write-only", "deny-all"}, authDefaultAccess) {
-		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	} else if !util.Contains([]string{"app", "home", "disable"}, webRoot) {
 		return errors.New("if set, web-root must be 'home' or 'app'")
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
@@ -189,8 +188,10 @@ func execServe(c *cli.Context) error {
 	enableWeb := webRoot != "disable"
 
 	// Default auth permissions
-	authDefaultRead := authDefaultAccess == "read-write" || authDefaultAccess == "read-only"
-	authDefaultWrite := authDefaultAccess == "read-write" || authDefaultAccess == "write-only"
+	authDefault, err := user.ParsePermission(authDefaultAccess)
+	if err != nil {
+		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
+	}
 
 	// Special case: Unset default
 	if listenHTTP == "-" {
@@ -244,8 +245,7 @@ func execServe(c *cli.Context) error {
 	conf.CacheBatchSize = cacheBatchSize
 	conf.CacheBatchTimeout = cacheBatchTimeout
 	conf.AuthFile = authFile
-	conf.AuthDefaultRead = authDefaultRead
-	conf.AuthDefaultWrite = authDefaultWrite
+	conf.AuthDefault = authDefault
 	conf.AttachmentCacheDir = attachmentCacheDir
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
 	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit

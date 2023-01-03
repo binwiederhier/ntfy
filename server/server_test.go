@@ -638,8 +638,7 @@ func TestServer_Auth_Success_Admin(t *testing.T) {
 func TestServer_Auth_Success_User(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = false
-	c.AuthDefaultWrite = false
+	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
@@ -654,8 +653,7 @@ func TestServer_Auth_Success_User(t *testing.T) {
 func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = false
-	c.AuthDefaultWrite = false
+	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
@@ -676,8 +674,7 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = false
-	c.AuthDefaultWrite = false
+	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
@@ -691,8 +688,7 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = false
-	c.AuthDefaultWrite = false
+	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
@@ -707,8 +703,7 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = true  // Open by default
-	c.AuthDefaultWrite = true // Open by default
+	c.AuthDefault = user.PermissionReadWrite // Open by default
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
@@ -739,8 +734,7 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 func TestServer_Auth_ViaQuery(t *testing.T) {
 	c := newTestConfig(t)
 	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	c.AuthDefaultRead = false
-	c.AuthDefaultWrite = false
+	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin))

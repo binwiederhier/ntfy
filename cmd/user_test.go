@@ -5,6 +5,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/server"
 	"heckel.io/ntfy/test"
+	"heckel.io/ntfy/user"
 	"path/filepath"
 	"testing"
 )
@@ -114,8 +115,7 @@ func TestCLI_User_Delete(t *testing.T) {
 func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config, port int) {
 	conf = server.NewConfig()
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	conf.AuthDefaultRead = false
-	conf.AuthDefaultWrite = false
+	conf.AuthDefault = user.PermissionDenyAll
 	s, port = test.StartServerWithConfig(t, conf)
 	return
 }
@@ -125,21 +125,7 @@ func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"ntfy",
 		"user",
 		"--auth-file=" + conf.AuthFile,
-		"--auth-default-access=" + confToDefaultAccess(conf),
+		"--auth-default-access=" + conf.AuthDefault.String(),
 	}
 	return app.Run(append(userArgs, args...))
-}
-
-func confToDefaultAccess(conf *server.Config) string {
-	var defaultAccess string
-	if conf.AuthDefaultRead && conf.AuthDefaultWrite {
-		defaultAccess = "read-write"
-	} else if conf.AuthDefaultRead && !conf.AuthDefaultWrite {
-		defaultAccess = "read-only"
-	} else if !conf.AuthDefaultRead && conf.AuthDefaultWrite {
-		defaultAccess = "write-only"
-	} else if !conf.AuthDefaultRead && !conf.AuthDefaultWrite {
-		defaultAccess = "deny-all"
-	}
-	return defaultAccess
 }

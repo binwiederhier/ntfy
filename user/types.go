@@ -85,30 +85,78 @@ type Stats struct {
 	Emails   int64
 }
 
-// Grant is a struct that represents an access control entry to a topic
+// Grant is a struct that represents an access control entry to a topic by a user
 type Grant struct {
 	TopicPattern string // May include wildcard (*)
-	AllowRead    bool
-	AllowWrite   bool
+	Allow        Permission
 }
 
 // Reservation is a struct that represents the ownership over a topic by a user
 type Reservation struct {
-	TopicPattern       string
-	AllowRead          bool
-	AllowWrite         bool
-	AllowEveryoneRead  bool
-	AllowEveryoneWrite bool
+	Topic    string
+	Owner    Permission
+	Everyone Permission
 }
 
 // Permission represents a read or write permission to a topic
-type Permission int
+type Permission uint8
 
 // Permissions to a topic
 const (
-	PermissionRead  = Permission(1)
-	PermissionWrite = Permission(2)
+	PermissionDenyAll Permission = iota
+	PermissionRead
+	PermissionWrite
+	PermissionReadWrite // 3!
 )
+
+func NewPermission(read, write bool) Permission {
+	p := uint8(0)
+	if read {
+		p |= uint8(PermissionRead)
+	}
+	if write {
+		p |= uint8(PermissionWrite)
+	}
+	return Permission(p)
+}
+
+func ParsePermission(s string) (Permission, error) {
+	switch s {
+	case "read-write", "rw":
+		return NewPermission(true, true), nil
+	case "read-only", "read", "ro":
+		return NewPermission(true, false), nil
+	case "write-only", "write", "wo":
+		return NewPermission(false, true), nil
+	case "deny-all", "deny", "none":
+		return NewPermission(false, false), nil
+	default:
+		return NewPermission(false, false), errors.New("invalid permission")
+	}
+}
+
+func (p Permission) IsRead() bool {
+	return p&PermissionRead != 0
+}
+
+func (p Permission) IsWrite() bool {
+	return p&PermissionWrite != 0
+}
+
+func (p Permission) IsReadWrite() bool {
+	return p.IsRead() && p.IsWrite()
+}
+
+func (p Permission) String() string {
+	if p.IsReadWrite() {
+		return "read-write"
+	} else if p.IsRead() {
+		return "read-only"
+	} else if p.IsWrite() {
+		return "write-only"
+	}
+	return "deny-all"
+}
 
 // Role represents a user's role, either admin or regular user
 type Role string

@@ -81,7 +81,7 @@ func runAccessCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"ntfy",
 		"access",
 		"--auth-file=" + conf.AuthFile,
-		"--auth-default-access=" + confToDefaultAccess(conf),
+		"--auth-default-access=" + conf.AuthDefault.String(),
 	}
 	return app.Run(append(userArgs, args...))
 }

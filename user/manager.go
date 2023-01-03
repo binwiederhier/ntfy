@@ -182,8 +182,7 @@ const (
 // in a SQLite database.
 type Manager struct {
 	db                  *sql.DB
-	defaultRead         bool             // Default read permission if no ACL matches
-	defaultWrite        bool             // Default write permission if no ACL matches
+	defaultAccess       Permission       // Default permission if no ACL matches
 	statsQueue          map[string]*User // Username -> User, for "unimportant" user updates
 	tokenExpiryInterval time.Duration    // Duration after which tokens expire, and by which tokens are extended
 	mu                  sync.Mutex
@@ -192,12 +191,12 @@ type Manager struct {
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
-func NewManager(filename string, defaultRead, defaultWrite bool) (*Manager, error) {
-	return newManager(filename, defaultRead, defaultWrite, userTokenExpiryDuration, userStatsQueueWriterInterval)
+func NewManager(filename string, defaultAccess Permission) (*Manager, error) {
+	return newManager(filename, defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
 }
 
 // NewManager creates a new Manager instance
-func newManager(filename string, defaultRead, defaultWrite bool, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
+func newManager(filename string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -207,8 +206,7 @@ func newManager(filename string, defaultRead, defaultWrite bool, tokenExpiryDura
 	}
 	manager := &Manager{
 		db:                  db,
-		defaultRead:         defaultRead,
-		defaultWrite:        defaultWrite,
+		defaultAccess:       defaultAccess,
 		statsQueue:          make(map[string]*User),
 		tokenExpiryInterval: tokenExpiryDuration,
 	}
@@ -368,7 +366,7 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return a.resolvePerms(a.defaultRead, a.defaultWrite, perm)
+		return a.resolvePerms(a.defaultAccess, perm)
 	}
 	var read, write bool
 	if err := rows.Scan(&read, &write); err != nil {
@@ -376,13 +374,13 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	} else if err := rows.Err(); err != nil {
 		return err
 	}
-	return a.resolvePerms(read, write, perm)
+	return a.resolvePerms(NewPermission(read, write), perm)
 }
 
-func (a *Manager) resolvePerms(read, write bool, perm Permission) error {
-	if perm == PermissionRead && read {
+func (a *Manager) resolvePerms(base, perm Permission) error {
+	if perm == PermissionRead && base.IsRead() {
 		return nil
-	} else if perm == PermissionWrite && write {
+	} else if perm == PermissionWrite && base.IsWrite() {
 		return nil
 	}
 	return ErrUnauthorized
@@ -534,8 +532,7 @@ func (a *Manager) Grants(username string) ([]Grant, error) {
 		}
 		grants = append(grants, Grant{
 			TopicPattern: fromSQLWildcard(topic),
-			AllowRead:    read,
-			AllowWrite:   write,
+			Allow:        NewPermission(read, write),
 		})
 	}
 	return grants, nil
@@ -551,19 +548,17 @@ func (a *Manager) Reservations(username string) ([]Reservation, error) {
 	reservations := make([]Reservation, 0)
 	for rows.Next() {
 		var topic string
-		var read, write bool
+		var ownerRead, ownerWrite bool
 		var everyoneRead, everyoneWrite sql.NullBool
-		if err := rows.Scan(&topic, &read, &write, &everyoneRead, &everyoneWrite); err != nil {
+		if err := rows.Scan(&topic, &ownerRead, &ownerWrite, &everyoneRead, &everyoneWrite); err != nil {
 			return nil, err
 		} else if err := rows.Err(); err != nil {
 			return nil, err
 		}
 		reservations = append(reservations, Reservation{
-			TopicPattern:       topic,
-			AllowRead:          read,
-			AllowWrite:         write,
-			AllowEveryoneRead:  everyoneRead.Bool,  // false if null
-			AllowEveryoneWrite: everyoneWrite.Bool, // false if null
+			Topic:    topic,
+			Owner:    NewPermission(ownerRead, ownerWrite),
+			Everyone: NewPermission(everyoneRead.Bool, everyoneWrite.Bool), // false if null
 		})
 	}
 	return reservations, nil
@@ -659,8 +654,8 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 }
 
 // DefaultAccess returns the default read/write access if no access control entry matches
-func (a *Manager) DefaultAccess() (read bool, write bool) {
-	return a.defaultRead, a.defaultWrite
+func (a *Manager) DefaultAccess() Permission {
+	return a.defaultAccess
 }
 
 func toSQLWildcard(s string) string {

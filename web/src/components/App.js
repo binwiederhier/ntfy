@@ -17,21 +17,17 @@ import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from 
 import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
+import {useAccountListener, useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
 import {Backdrop, CircularProgress} from "@mui/material";
 import Home from "./Home";
 import Login from "./Login";
-import i18n from "i18next";
-import prefs from "../app/Prefs";
-import session from "../app/Session";
 import Pricing from "./Pricing";
 import Signup from "./Signup";
 import Account from "./Account";
 import ResetPassword from "./ResetPassword";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 const App = () => {
     return (
@@ -87,43 +83,10 @@ const Layout = () => {
     });
 
     useConnectionListeners(subscriptions, users);
+    useAccountListener(setAccount)
     useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
 
-    useEffect(() => {
-        (async () => {
-            // TODO this should not live here
-            try {
-                if (!session.token()) {
-                    return;
-                }
-                const remoteAccount = await accountApi.get();
-                setAccount(remoteAccount);
-                if (remoteAccount.language) {
-                    await i18n.changeLanguage(remoteAccount.language);
-                }
-                if (remoteAccount.notification) {
-                    if (remoteAccount.notification.sound) {
-                        await prefs.setSound(remoteAccount.notification.sound);
-                    }
-                    if (remoteAccount.notification.delete_after) {
-                        await prefs.setDeleteAfter(remoteAccount.notification.delete_after);
-                    }
-                    if (remoteAccount.notification.min_priority) {
-                        await prefs.setMinPriority(remoteAccount.notification.min_priority);
-                    }
-                }
-                if (remoteAccount.subscriptions) {
-                    await subscriptionManager.syncFromRemote(remoteAccount.subscriptions);
-                }
-            } catch (e) {
-                console.log(`[App] Error fetching account`, e);
-                if ((e instanceof UnauthorizedError)) {
-                    session.resetAndRedirect(routes.login);
-                }
-            }
-        })();
-    }, []);
     return (
         <Box sx={{display: 'flex'}}>
             <CssBaseline/>

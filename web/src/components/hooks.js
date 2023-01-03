@@ -96,3 +96,15 @@ export const useBackgroundProcesses = () => {
         accountApi.startWorker();
     }, []);
 }
+
+export const useAccountListener = (setAccount) => {
+    useEffect(() => {
+        accountApi.registerListener(setAccount);
+        (async () => {
+            await accountApi.sync();
+        })();
+        return () => {
+            accountApi.registerListener();
+        }
+    }, []);
+}

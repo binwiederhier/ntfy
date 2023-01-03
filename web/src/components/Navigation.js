@@ -27,6 +27,7 @@ import config from "../app/config";
 import ArticleIcon from '@mui/icons-material/Article';
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
+import accountApi from "../app/AccountApi";
 
 const navWidth = 280;
 
@@ -92,6 +93,11 @@ const NavList = (props) => {
        notifier.maybeRequestPermission(granted => props.onNotificationGranted(granted))
     };
 
+    const handleAccountClick = () => {
+        accountApi.sync(); // Dangle!
+        navigate(routes.account);
+    };
+
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
     const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
@@ -124,7 +130,7 @@ const NavList = (props) => {
                         <Divider sx={{my: 1}}/>
                     </>}
                 {session.exists() &&
-                    <ListItemButton onClick={() => navigate(routes.account)} selected={location.pathname === routes.account}>
+                    <ListItemButton onClick={handleAccountClick} selected={location.pathname === routes.account}>
                         <ListItemIcon><Person/></ListItemIcon>
                         <ListItemText primary={t("nav_button_account")}/>
                     </ListItemButton>

@@ -1,22 +1,20 @@
 import {
+    accountAccessSingleUrl,
+    accountAccessUrl,
     accountPasswordUrl,
     accountSettingsUrl,
     accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
     accountUrl,
-    fetchLinesIterator,
     withBasicAuth,
-    withBearerAuth,
-    topicShortUrl,
-    topicUrl,
-    topicUrlAuth,
-    topicUrlJsonPoll,
-    topicUrlJsonPollWithSince, accountAccessUrl, accountAccessSingleUrl
+    withBearerAuth
 } from "./utils";
-import userManager from "./UserManager";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
+import i18n from "i18next";
+import prefs from "./Prefs";
+import routes from "../components/routes";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes
@@ -24,6 +22,15 @@ const intervalMillis = 900000; // 15 minutes
 class AccountApi {
     constructor() {
         this.timer = null;
+        this.listener = null; // Fired when account is fetched from remote
+    }
+
+    registerListener(listener) {
+        this.listener = listener;
+    }
+
+    resetListener() {
+        this.listener = null;
     }
 
     async login(user) {
@@ -92,6 +99,9 @@ class AccountApi {
         }
         const account = await response.json();
         console.log(`[AccountApi] Account`, account);
+        if (this.listener) {
+            this.listener(account);
+        }
         return account;
     }
 
@@ -240,8 +250,37 @@ class AccountApi {
         }
     }
 
-    sync() {
-        // TODO
+    async sync() {
+        try {
+            if (!session.token()) {
+                return null;
+            }
+            console.log(`[AccountApi] Syncing account`);
+            const remoteAccount = await this.get();
+            if (remoteAccount.language) {
+                await i18n.changeLanguage(remoteAccount.language);
+            }
+            if (remoteAccount.notification) {
+                if (remoteAccount.notification.sound) {
+                    await prefs.setSound(remoteAccount.notification.sound);
+                }
+                if (remoteAccount.notification.delete_after) {
+                    await prefs.setDeleteAfter(remoteAccount.notification.delete_after);
+                }
+                if (remoteAccount.notification.min_priority) {
+                    await prefs.setMinPriority(remoteAccount.notification.min_priority);
+                }
+            }
+            if (remoteAccount.subscriptions) {
+                await subscriptionManager.syncFromRemote(remoteAccount.subscriptions);
+            }
+            return remoteAccount;
+        } catch (e) {
+            console.log(`[AccountApi] Error fetching account`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+        }
     }
 
     startWorker() {

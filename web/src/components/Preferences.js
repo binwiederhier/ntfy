@@ -5,7 +5,7 @@ import {
     CardContent,
     FormControl,
     Select,
-    Stack, styled,
+    Stack,
     Table,
     TableBody,
     TableCell,
@@ -482,6 +482,11 @@ const Reservations = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
+    if (!session.exists() || !account) {
+        return <></>;
+    }
+    const reservations = account.reservations || [];
+
     const handleAddClick = () => {
         setDialogKey(prev => prev+1);
         setDialogOpen(true);
@@ -495,16 +500,13 @@ const Reservations = () => {
         setDialogOpen(false);
         try {
             await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            await accountApi.sync();
             console.debug(`[Preferences] Added topic reservation`, reservation);
         } catch (e) {
             console.log(`[Preferences] Error topic reservation.`, e);
         }
         // FIXME handle 401/403
     };
-
-    if (!session.exists() || !account) {
-        return <></>;
-    }
 
     return (
         <Card sx={{ padding: 1 }} aria-label={t("prefs_reservations_title")}>
@@ -515,7 +517,7 @@ const Reservations = () => {
                 <Paragraph>
                     {t("prefs_reservations_description")}
                 </Paragraph>
-                {account.reservations.length > 0 && <ReservationsTable reservations={account.reservations}/>}
+                {reservations.length > 0 && <ReservationsTable reservations={reservations}/>}
             </CardContent>
             <CardActions>
                 <Button onClick={handleAddClick}>{t("prefs_reservations_add_button")}</Button>
@@ -523,7 +525,7 @@ const Reservations = () => {
                     key={`reservationAddDialog${dialogKey}`}
                     open={dialogOpen}
                     reservation={null}
-                    reservations={account.reservations}
+                    reservations={reservations}
                     onCancel={handleDialogCancel}
                     onSubmit={handleDialogSubmit}
                 />
@@ -552,6 +554,7 @@ const ReservationsTable = (props) => {
         setDialogOpen(false);
         try {
             await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            await accountApi.sync();
             console.debug(`[Preferences] Added topic reservation`, reservation);
         } catch (e) {
             console.log(`[Preferences] Error topic reservation.`, e);
@@ -562,6 +565,7 @@ const ReservationsTable = (props) => {
     const handleDeleteClick = async (reservation) => {
         try {
             await accountApi.deleteAccess(reservation.topic);
+            await accountApi.sync();
             console.debug(`[Preferences] Deleted topic reservation`, reservation);
         } catch (e) {
             console.log(`[Preferences] Error topic reservation.`, e);

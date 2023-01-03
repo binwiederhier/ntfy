@@ -105,6 +105,8 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/voroskoi"><img src="https://github.com/voroskoi.png" width="40px" /></a>
 <a href="https://github.com/Nickwasused"><img src="https://github.com/Nickwasused.png" width="40px" /></a>
 <a href="https://github.com/bahur142"><img src="https://github.com/bahur142.png" width="40px" /></a>
+<a href="https://github.com/vinhdizzo"><img src="https://github.com/vinhdizzo.png" width="40px" /></a>
+<a href="https://github.com/Ge0rg3"><img src="https://github.com/Ge0rg3.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:

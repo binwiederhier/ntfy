@@ -12,7 +12,7 @@ import {
     topicUrl,
     topicUrlAuth,
     topicUrlJsonPoll,
-    topicUrlJsonPollWithSince
+    topicUrlJsonPollWithSince, accountAccessUrl, accountAccessSingleUrl
 } from "./utils";
 import userManager from "./UserManager";
 import session from "./Session";
@@ -197,6 +197,38 @@ class AccountApi {
     async deleteSubscription(remoteId) {
         const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
         console.log(`[AccountApi] Removing user subscription ${url}`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: withBearerAuth({}, session.token())
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async upsertAccess(topic, everyone) {
+        const url = accountAccessUrl(config.baseUrl);
+        console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                topic: topic,
+                everyone: everyone
+            })
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async deleteAccess(topic) {
+        const url = accountAccessSingleUrl(config.baseUrl, topic);
+        console.log(`[AccountApi] Removing topic reservation ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token())

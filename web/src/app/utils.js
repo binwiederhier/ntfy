@@ -24,6 +24,8 @@ export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
 export const accountSettingsUrl = (baseUrl) => `${baseUrl}/v1/account/settings`;
 export const accountSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/subscription`;
 export const accountSubscriptionSingleUrl = (baseUrl, id) => `${baseUrl}/v1/account/subscription/${id}`;
+export const accountAccessUrl = (baseUrl) => `${baseUrl}/v1/account/access`;
+export const accountAccessSingleUrl = (baseUrl, topic) => `${baseUrl}/v1/account/access/${topic}`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

@@ -33,7 +33,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
-import {playSound, shuffle, sounds, validUrl} from "../app/utils";
+import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
@@ -491,14 +491,15 @@ const Reservations = () => {
         setDialogOpen(false);
     };
 
-    const handleDialogSubmit = async (entry) => {
+    const handleDialogSubmit = async (reservation) => {
         setDialogOpen(false);
         try {
-            await accountApi.addAccessEntry();
-            console.debug(`[Preferences] Added entry ${entry.topic}`);
+            await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            console.debug(`[Preferences] Added topic reservation`, reservation);
         } catch (e) {
-            console.log(`[Preferences] Error adding access entry.`, e);
+            console.log(`[Preferences] Error topic reservation.`, e);
         }
+        // FIXME handle 401/403
     };
 
     if (!session.exists() || !account) {
@@ -519,10 +520,10 @@ const Reservations = () => {
             <CardActions>
                 <Button onClick={handleAddClick}>{t("prefs_reservations_add_button")}</Button>
                 <ReservationsDialog
-                    key={`accessAddDialog${dialogKey}`}
+                    key={`reservationAddDialog${dialogKey}`}
                     open={dialogOpen}
-                    entry={null}
-                    entries={account.access}
+                    reservation={null}
+                    reservations={account.reservations}
                     onCancel={handleDialogCancel}
                     onSubmit={handleDialogSubmit}
                 />
@@ -535,11 +536,11 @@ const ReservationsTable = (props) => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogEntry, setDialogEntry] = useState(null);
+    const [dialogReservation, setDialogReservation] = useState(null);
 
-    const handleEditClick = (entry) => {
+    const handleEditClick = (reservation) => {
         setDialogKey(prev => prev+1);
-        setDialogEntry(entry);
+        setDialogReservation(reservation);
         setDialogOpen(true);
     };
 
@@ -547,13 +548,25 @@ const ReservationsTable = (props) => {
         setDialogOpen(false);
     };
 
-    const handleDialogSubmit = async (user) => {
+    const handleDialogSubmit = async (reservation) => {
         setDialogOpen(false);
-        // FIXME
+        try {
+            await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            console.debug(`[Preferences] Added topic reservation`, reservation);
+        } catch (e) {
+            console.log(`[Preferences] Error topic reservation.`, e);
+        }
+        // FIXME handle 401/403
     };
 
-    const handleDeleteClick = async (user) => {
-        // FIXME
+    const handleDeleteClick = async (reservation) => {
+        try {
+            await accountApi.deleteAccess(reservation.topic);
+            console.debug(`[Preferences] Deleted topic reservation`, reservation);
+        } catch (e) {
+            console.log(`[Preferences] Error topic reservation.`, e);
+        }
+        // FIXME handle 401/403
     };
 
     return (
@@ -575,25 +588,25 @@ const ReservationsTable = (props) => {
                         <TableCell aria-label={t("prefs_reservations_table_access_header")}>
                             {reservation.everyone === "read-write" &&
                                 <>
-                                    <Public fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    <Public fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_read_write")}
                                 </>
                             }
                             {reservation.everyone === "read-only" &&
                                 <>
-                                    <PublicOff fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_read_only")}
                                 </>
                             }
                             {reservation.everyone === "write-only" &&
                                 <>
-                                    <PublicOff fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_write_only")}
                                 </>
                             }
                             {reservation.everyone === "deny-all" &&
                                 <>
-                                    <LockIcon fontSize="small" sx={{verticalAlign: "bottom", mr: 0.5}}/>
+                                    <LockIcon fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_deny_all")}
                                 </>
                             }
@@ -610,10 +623,10 @@ const ReservationsTable = (props) => {
                 ))}
             </TableBody>
             <ReservationsDialog
-                key={`accessEditDialog${dialogKey}`}
+                key={`reservationEditDialog${dialogKey}`}
                 open={dialogOpen}
-                entry={dialogEntry}
-                entries={props.entries}
+                reservation={dialogReservation}
+                reservations={props.reservations}
                 onCancel={handleDialogCancel}
                 onSubmit={handleDialogSubmit}
             />
@@ -624,24 +637,31 @@ const ReservationsTable = (props) => {
 const ReservationsDialog = (props) => {
     const { t } = useTranslation();
     const [topic, setTopic] = useState("");
-    const [access, setAccess] = useState("private");
+    const [everyone, setEveryone] = useState("deny-all");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const editMode = props.entry !== null;
+    const editMode = props.reservation !== null;
     const addButtonEnabled = (() => {
-        // FIXME
+        if (editMode) {
+            return true;
+        } else if (!validTopic(topic)) {
+            return false;
+        }
+        return props.reservations
+            .filter(r => r.topic === topic)
+            .length === 0;
     })();
     const handleSubmit = async () => {
         props.onSubmit({
-            topic: topic,
-            // FIXME
+            topic: (editMode) ? props.reservation.topic : topic,
+            everyone: everyone
         })
     };
     useEffect(() => {
         if (editMode) {
-            setTopic(props.topic);
-            //setAccess(props.access);
+            setTopic(props.reservation.topic);
+            setEveryone(props.reservation.everyone);
         }
-    }, [editMode, props]);
+    }, [editMode, props.reservation]);
     return (
         <Dialog open={props.open} onClose={props.onCancel} maxWidth="sm" fullWidth fullScreen={fullScreen}>
             <DialogTitle>{editMode ? t("prefs_reservations_dialog_title_edit") : t("prefs_reservations_dialog_title_add")}</DialogTitle>
@@ -660,8 +680,8 @@ const ReservationsDialog = (props) => {
                 />}
                 <FormControl fullWidth variant="standard">
                     <Select
-                        value={access}
-                        onChange={(ev) => setAccess(ev.target.value)}
+                        value={everyone}
+                        onChange={(ev) => setEveryone(ev.target.value)}
                         aria-label={t("prefs_reservations_dialog_access_label")}
                         sx={{
                             marginTop: 1,

@@ -33,9 +33,6 @@ import Account from "./Account";
 import ResetPassword from "./ResetPassword";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
-// TODO races when two tabs are open
-// TODO investigate service workers
-
 const App = () => {
     return (
         <Suspense fallback={<Loader />}>

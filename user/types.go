@@ -109,6 +109,7 @@ const (
 	PermissionReadWrite // 3!
 )
 
+// NewPermission is a helper to create a Permission based on read/write bool values
 func NewPermission(read, write bool) Permission {
 	p := uint8(0)
 	if read {
@@ -120,6 +121,7 @@ func NewPermission(read, write bool) Permission {
 	return Permission(p)
 }
 
+// ParsePermission parses the string representation and returns a Permission
 func ParsePermission(s string) (Permission, error) {
 	switch s {
 	case "read-write", "rw":
@@ -135,18 +137,22 @@ func ParsePermission(s string) (Permission, error) {
 	}
 }
 
+// IsRead returns true if readable
 func (p Permission) IsRead() bool {
 	return p&PermissionRead != 0
 }
 
+// IsWrite returns true if writable
 func (p Permission) IsWrite() bool {
 	return p&PermissionWrite != 0
 }
 
+// IsReadWrite returns true if readable and writable
 func (p Permission) IsReadWrite() bool {
 	return p.IsRead() && p.IsWrite()
 }
 
+// String returns a string representation of the permission
 func (p Permission) String() string {
 	if p.IsReadWrite() {
 		return "read-write"

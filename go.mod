@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/storage v1.28.1 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/emersion/go-smtp v0.16.0
+	github.com/emersion/go-smtp v0.15.0
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/mattn/go-sqlite3 v1.14.16

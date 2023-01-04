@@ -34,8 +34,8 @@ Content-Type: text/html; charset="UTF-8"
 		require.Equal(t, "and one more", r.Header.Get("Title"))
 		require.Equal(t, "what's up", readAll(t, r.Body))
 	})
-	session, _ := backend.AnonymousLogin(fakeConnState(t, "1.2.3.4"))
-	require.Nil(t, session.Mail("phil@example.com", smtp.MailOptions{}))
+	session, _ := backend.NewSession(fakeConnState(t, "1.2.3.4"))
+	require.Nil(t, session.Mail("phil@example.com", &smtp.MailOptions{}))
 	require.Nil(t, session.Rcpt("ntfy-mytopic@ntfy.sh"))
 	require.Nil(t, session.Data(strings.NewReader(email)))
 }
@@ -303,12 +303,12 @@ func newTestBackend(t *testing.T, handler func(http.ResponseWriter, *http.Reques
 	return conf, backend
 }
 
-func fakeConnState(t *testing.T, remoteAddr string) *smtp.ConnectionState {
+func fakeConnState(t *testing.T, remoteAddr string) *smtp.Conn {
 	ip, err := net.ResolveIPAddr("ip", remoteAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &smtp.ConnectionState{
+	return &smtp.Conn{
 		Hostname:   "myhostname",
 		LocalAddr:  ip,
 		RemoteAddr: ip,

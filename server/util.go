@@ -57,8 +57,8 @@ func logHTTPPrefix(v *visitor, r *http.Request) string {
 	return fmt.Sprintf("%s HTTP %s %s", v.ip, r.Method, requestURI)
 }
 
-func logSMTPPrefix(state *smtp.ConnectionState) string {
-	return fmt.Sprintf("%s/%s SMTP", state.Hostname, state.RemoteAddr.String())
+func logSMTPPrefix(conn *smtp.Conn) string {
+	return fmt.Sprintf("%s/%s SMTP", conn.Hostname(), conn.Conn().RemoteAddr().String())
 }
 
 func renderHTTPRequest(r *http.Request) string {

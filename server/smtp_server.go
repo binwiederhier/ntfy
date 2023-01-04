@@ -34,6 +34,9 @@ type smtpBackend struct {
 	mu      sync.Mutex
 }
 
+var _ smtp.Backend = (*smtpBackend)(nil)
+var _ smtp.Session = (*smtpSession)(nil)
+
 func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Request)) *smtpBackend {
 	return &smtpBackend{
 		config:  conf,
@@ -41,14 +44,9 @@ func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Reques
 	}
 }
 
-func (b *smtpBackend) Login(state *smtp.ConnectionState, username, password string) (smtp.Session, error) {
-	log.Debug("%s Incoming mail, login with user %s", logSMTPPrefix(state), username)
-	return &smtpSession{backend: b, state: state}, nil
-}
-
-func (b *smtpBackend) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	log.Debug("%s Incoming mail, anonymous login", logSMTPPrefix(state))
-	return &smtpSession{backend: b, state: state}, nil
+func (b *smtpBackend) NewSession(conn *smtp.Conn) (smtp.Session, error) {
+	log.Debug("%s Incoming mail", logSMTPPrefix(conn))
+	return &smtpSession{backend: b, conn: conn}, nil
 }
 
 func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
@@ -60,23 +58,23 @@ func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
 // smtpSession is returned after EHLO.
 type smtpSession struct {
 	backend *smtpBackend
-	state   *smtp.ConnectionState
+	conn    *smtp.Conn
 	topic   string
 	mu      sync.Mutex
 }
 
-func (s *smtpSession) AuthPlain(username, password string) error {
-	log.Debug("%s AUTH PLAIN (with username %s)", logSMTPPrefix(s.state), username)
+func (s *smtpSession) AuthPlain(username, _ string) error {
+	log.Debug("%s AUTH PLAIN (with username %s)", logSMTPPrefix(s.conn), username)
 	return nil
 }
 
-func (s *smtpSession) Mail(from string, opts smtp.MailOptions) error {
-	log.Debug("%s MAIL FROM: %s (with options: %#v)", logSMTPPrefix(s.state), from, opts)
+func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
+	log.Debug("%s MAIL FROM: %s (with options: %#v)", logSMTPPrefix(s.conn), from, opts)
 	return nil
 }
 
 func (s *smtpSession) Rcpt(to string) error {
-	log.Debug("%s RCPT TO: %s", logSMTPPrefix(s.state), to)
+	log.Debug("%s RCPT TO: %s", logSMTPPrefix(s.conn), to)
 	return s.withFailCount(func() error {
 		conf := s.backend.config
 		addressList, err := mail.ParseAddressList(to)
@@ -114,9 +112,9 @@ func (s *smtpSession) Data(r io.Reader) error {
 			return err
 		}
 		if log.IsTrace() {
-			log.Trace("%s DATA: %s", logSMTPPrefix(s.state), string(b))
+			log.Trace("%s DATA: %s", logSMTPPrefix(s.conn), string(b))
 		} else if log.IsDebug() {
-			log.Debug("%s DATA: %d byte(s)", logSMTPPrefix(s.state), len(b))
+			log.Debug("%s DATA: %d byte(s)", logSMTPPrefix(s.conn), len(b))
 		}
 		msg, err := mail.ReadMessage(bytes.NewReader(b))
 		if err != nil {
@@ -156,9 +154,9 @@ func (s *smtpSession) Data(r io.Reader) error {
 
 func (s *smtpSession) publishMessage(m *message) error {
 	// Extract remote address (for rate limiting)
-	remoteAddr, _, err := net.SplitHostPort(s.state.RemoteAddr.String())
+	remoteAddr, _, err := net.SplitHostPort(s.conn.Conn().RemoteAddr().String())
 	if err != nil {
-		remoteAddr = s.state.RemoteAddr.String()
+		remoteAddr = s.conn.Conn().RemoteAddr().String()
 	}
 
 	// Call HTTP handler with fake HTTP request
@@ -198,7 +196,7 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	if err != nil {
 		// Almost all of these errors are parse errors, and user input errors.
 		// We do not want to spam the log with WARN messages.
-		log.Debug("%s Incoming mail error: %s", logSMTPPrefix(s.state), err.Error())
+		log.Debug("%s Incoming mail error: %s", logSMTPPrefix(s.conn), err.Error())
 		s.backend.failure++
 	}
 	return err

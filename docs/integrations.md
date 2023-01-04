@@ -81,6 +81,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [send_to_phone](https://github.com/whipped-cream/send_to_phone) - Scripts to upload a file to Transfer.sh and ping ntfy with the download link (Python)
 - [ntfy Discord bot](https://github.com/R0dn3yS/ntfy-bot) - WIP ntfy discord bot (TypeScript)
 - [ntfy Discord bot](https://github.com/binwiederhier/ntfy-bot) - ntfy Discord bot (Go)
+- [ntfy Discord bot](https://github.com/jr1221/ntfy_discord_bot) - An advanced modal-based bot for interacting with the ntfy.sh API (Dart)
 - [Bettarr Notifications](https://github.com/NiNiyas/Bettarr-Notifications) - Better Notifications for Sonarr and Radarr (Python)
 - [Notify me the intruders](https://github.com/nothingbutlucas/notify_me_the_intruders) - Notify you if they are intruders or new connections on your network (Shell)
 - [Send GitHub Action to ntfy](https://github.com/NiNiyas/ntfy-action) - Send GitHub Action workflow notifications to ntfy (JS)
@@ -99,7 +100,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
 - [ntfy-sdk](https://github.com/yukibtc/ntfy-sdk) - ntfy client library to send notifications (Rust)
 - [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost 
-- [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline
+- [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline (Shell)
+- [ignition-ntfy-module](https://github.com/Kyvis-Labs/ignition-ntfy-module) - Adds support for sending notifications via a ntfy server to Ignition (Java)
 
 ## Blog + forum posts
 

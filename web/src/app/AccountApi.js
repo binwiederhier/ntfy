@@ -231,6 +231,8 @@ class AccountApi {
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
+        } else if (response.status === 409) {
+            throw new TopicReservedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
@@ -309,6 +311,13 @@ export class UsernameTakenError extends Error {
     constructor(username) {
         super("Username taken");
         this.username = username;
+    }
+}
+
+export class TopicReservedError extends Error {
+    constructor(topic) {
+        super("Topic already reserved");
+        this.topic = topic;
     }
 }
 

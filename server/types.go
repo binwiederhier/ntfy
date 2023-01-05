@@ -280,3 +280,12 @@ type apiAccountAccessRequest struct {
 	Topic    string `json:"topic"`
 	Everyone string `json:"everyone"`
 }
+
+type apiConfigResponse struct {
+	BaseURL             string   `json:"base_url"`
+	AppRoot             string   `json:"app_root"`
+	EnableLogin         bool     `json:"enable_login"`
+	EnableSignup        bool     `json:"enable_signup"`
+	EnableResetPassword bool     `json:"enable_reset_password"`
+	DisallowedTopics    []string `json:"disallowed_topics"`
+}

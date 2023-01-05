@@ -177,7 +177,7 @@ const Stats = () => {
             <PrefGroup>
                 <Pref title={t("account_usage_plan_title")}>
                     <div>
-                        {account?.role === "admin"
+                        {account.role === "admin"
                             ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
                             : t(`account_usage_plan_code_${planCode}`)}
                     </div>
@@ -187,28 +187,44 @@ const Stats = () => {
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.topics}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.topics > 0 ? t("account_usage_of_limit", { limit: account.limits.topics }) : t("account_usage_unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100} />
+                    <LinearProgress
+                        variant="determinate"
+                        value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100}
+                        color={account?.role !== "admin" && account.stats.topics_remaining === 0 ? 'error' : 'primary'}
+                    />
                 </Pref>
                 <Pref title={t("account_usage_messages_title")}>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100} />
+                    <LinearProgress
+                        variant="determinate"
+                        value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100}
+                        color={account?.role !== "admin" && account.stats.messages_remaining === 0 ? 'error' : 'primary'}
+                    />
                 </Pref>
                 <Pref title={t("account_usage_emails_title")}>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100} />
+                    <LinearProgress
+                        variant="determinate"
+                        value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100}
+                        color={account?.role !== "admin" && account.stats.emails_remaining === 0 ? 'error' : 'primary'}
+                    />
                 </Pref>
-                <Pref title={t("account_usage_attachment_storage_title")} subtitle={t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) })}>
+                <Pref title={t("account_usage_attachment_storage_title")} subtitle={account.role !== "admin" ? t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) }) : null}>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
                     </div>
-                    <LinearProgress variant="determinate" value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100} />
+                    <LinearProgress
+                        variant="determinate"
+                        value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
+                        color={account.role !== "admin" && account.stats.attachment_total_size_remaining === 0 ? 'error' : 'primary'}
+                    />
                 </Pref>
             </PrefGroup>
             {account.limits.basis === "ip" &&

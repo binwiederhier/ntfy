@@ -40,12 +40,12 @@ import (
 			message cache duration
 			Keep 10000 messages or keep X days?
 			Attachment expiration based on plan
-		reserve topics
 		purge accounts that were not logged into in X
 		reset daily limits for users
-		Account usage not updated "in real time"
 		max token issue limit
 		user db startup queries -> foreign keys
+		UI
+		- Feature flag for "reserve topic" feature
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
@@ -447,17 +447,20 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	if !s.config.WebRootIsApp {
 		appRoot = "/app"
 	}
-	disallowedTopicsStr := `"` + strings.Join(disallowedTopics, `", "`) + `"`
+	response := &apiConfigResponse{
+		BaseURL:             "", // Will translate to window.location.origin
+		AppRoot:             appRoot,
+		EnableLogin:         s.config.EnableLogin,
+		EnableSignup:        s.config.EnableSignup,
+		EnableResetPassword: s.config.EnableResetPassword,
+		DisallowedTopics:    disallowedTopics,
+	}
+	b, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
 	w.Header().Set("Content-Type", "text/javascript")
-	_, err := io.WriteString(w, fmt.Sprintf(`// Generated server configuration
-var config = {
-  baseUrl: window.location.origin,
-  appRoot: "%s",
-  enableLogin: %t,
-  enableSignup: %t,
-  enableResetPassword: %t,
-  disallowedTopics: [%s], 
-};`, appRoot, s.config.EnableLogin, s.config.EnableSignup, s.config.EnableResetPassword, disallowedTopicsStr))
+	_, err = io.WriteString(w, fmt.Sprintf("// Generated server configuration\nvar config = %s;\n", string(b)))
 	return err
 }
 

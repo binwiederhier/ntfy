@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Checkbox, FormControl, FormControlLabel, Select, useMediaQuery} from "@mui/material";
+import {Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
@@ -14,11 +14,7 @@ import {useTranslation} from "react-i18next";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
-import MenuItem from "@mui/material/MenuItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import LockIcon from "@mui/icons-material/Lock";
-import ListItemText from "@mui/material/ListItemText";
-import {Public, PublicOff} from "@mui/icons-material";
+import ReserveTopicSelect from "./ReserveTopicSelect";
 
 const SubscriptionSettingsDialog = (props) => {
     const { t } = useTranslation();
@@ -53,6 +49,8 @@ const SubscriptionSettingsDialog = (props) => {
                 if ((e instanceof UnauthorizedError)) {
                     session.resetAndRedirect(routes.login);
                 }
+
+                // FIXME handle 409
             }
         }
         props.onClose();
@@ -80,7 +78,6 @@ const SubscriptionSettingsDialog = (props) => {
                         "aria-label": t("subscription_settings_dialog_display_name_placeholder")
                     }}
                 />
-
                 <FormControlLabel
                     fullWidth
                     variant="standard"
@@ -90,45 +87,17 @@ const SubscriptionSettingsDialog = (props) => {
                             checked={reserveTopicVisible}
                             onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                             inputProps={{
-                                "aria-label": t("xxxxxxxxxxxxxxxxxx")
+                                "aria-label": t("subscription_settings_dialog_reserve_topic_label")
                             }}
                         />
                     }
-                    label={t("Reserve topic and configure custom access:")}
+                    label={t("subscription_settings_dialog_reserve_topic_label")}
                 />
                 {reserveTopicVisible &&
-                    <FormControl variant="standard">
-                        <Select
-                            value={everyone}
-                            onChange={(ev) => setEveryone(ev.target.value)}
-                            aria-label={t("prefs_reservations_dialog_access_label")}
-                            sx={{
-                                "& .MuiSelect-select": {
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    paddingTop: "4px",
-                                    paddingBottom: "4px",
-                                }
-                            }}
-                        >
-                            <MenuItem value="deny-all">
-                                <ListItemIcon><LockIcon/></ListItemIcon>
-                                <ListItemText primary={t("prefs_reservations_table_everyone_deny_all")}/>
-                            </MenuItem>
-                            <MenuItem value="read-only">
-                                <ListItemIcon><PublicOff/></ListItemIcon>
-                                <ListItemText primary={t("prefs_reservations_table_everyone_read_only")}/>
-                            </MenuItem>
-                            <MenuItem value="write-only">
-                                <ListItemIcon><PublicOff/></ListItemIcon>
-                                <ListItemText primary={t("prefs_reservations_table_everyone_write_only")}/>
-                            </MenuItem>
-                            <MenuItem value="read-write">
-                                <ListItemIcon><Public/></ListItemIcon>
-                                <ListItemText primary={t("prefs_reservations_table_everyone_read_write")}/>
-                            </MenuItem>
-                        </Select>
-                    </FormControl>
+                    <ReserveTopicSelect
+                        value={everyone}
+                        onChange={setEveryone}
+                    />
                 }
             </DialogContent>
             <DialogFooter>

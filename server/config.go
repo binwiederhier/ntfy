@@ -108,6 +108,7 @@ type Config struct {
 	EnableLogin                          bool
 	EnableEmailConfirm                   bool
 	EnableResetPassword                  bool
+	EnableAccountUpgrades                bool
 	Version                              string // injected by App
 }
 

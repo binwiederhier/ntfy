@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Autocomplete, Checkbox, FormControlLabel, useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, FormControlLabel, FormGroup, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
@@ -17,14 +17,14 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
-import IconButton from "@mui/material/IconButton";
+import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
 import PublicIcon from '@mui/icons-material/Public';
 import LockIcon from '@mui/icons-material/Lock';
 import PublicOffIcon from '@mui/icons-material/PublicOff';
 import MenuItem from "@mui/material/MenuItem";
 import PopupMenu from "./PopupMenu";
 import ListItemIcon from "@mui/material/ListItemIcon";
+import ReserveTopicSelect from "./ReserveTopicSelect";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -33,6 +33,7 @@ const SubscribeDialog = (props) => {
     const [topic, setTopic] = useState("");
     const [showLoginPage, setShowLoginPage] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
     const handleSuccess = async () => {
         console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
         const actualBaseUrl = (baseUrl) ? baseUrl : config.baseUrl;
@@ -44,6 +45,7 @@ const SubscribeDialog = (props) => {
                     topic: topic
                 });
                 await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+                await accountApi.sync();
             } catch (e) {
                 console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
                 if ((e instanceof UnauthorizedError)) {
@@ -54,6 +56,7 @@ const SubscribeDialog = (props) => {
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }
+
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
             {!showLoginPage && <SubscribePage
@@ -78,10 +81,11 @@ const SubscribeDialog = (props) => {
 
 const SubscribePage = (props) => {
     const { t } = useTranslation();
+    const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
     const [accessAnchorEl, setAccessAnchorEl] = useState(null);
-    const [access, setAccess] = useState("public");
+    const [everyone, setEveryone] = useState("deny-all");
     const baseUrl = (anotherServerVisible) ? props.baseUrl : config.baseUrl;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
@@ -92,6 +96,8 @@ const SubscribePage = (props) => {
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
         const username = (user) ? user.username : t("subscribe_dialog_error_user_anonymous");
+
+        // Check read access to topic
         const success = await api.topicAuth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
@@ -103,6 +109,24 @@ const SubscribePage = (props) => {
                 return;
             }
         }
+
+        // Reserve topic (if requested)
+        if (session.exists() && baseUrl === config.baseUrl && reserveTopicVisible) {
+            console.log(`[SubscribeDialog] Reserving topic ${topic} with everyone access ${everyone}`);
+            try {
+                await accountApi.upsertAccess(topic, everyone);
+                // Account sync later after it was added
+            } catch (e) {
+                console.log(`[SubscribeDialog] Error reserving topic`, e);
+                if ((e instanceof UnauthorizedError)) {
+                    session.resetAndRedirect(routes.login);
+                } else if ((e instanceof TopicReservedError)) {
+                    setErrorText(t("subscribe_dialog_error_topic_already_reserved"));
+                    return;
+                }
+            }
+        }
+
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         props.onSuccess();
     };
@@ -137,14 +161,7 @@ const SubscribePage = (props) => {
                 <DialogContentText>
                     {t("subscribe_dialog_subscribe_description")}
                 </DialogContentText>
-                <div style={{display: 'flex'}} role="row">
-                    {session.exists() &&
-                        <IconButton onClick={(ev) => setAccessAnchorEl(ev.currentTarget)} color="inherit" size="large" edge="start" sx={{height: "45px", marginTop: "5px", color: "grey"}}>
-                            {access === "public" && <PublicIcon/>}
-                            {access === "public-read" && <PublicOffIcon/>}
-                            {access === "private" && <LockIcon/>}
-                        </IconButton>
-                    }
+                <div style={{display: 'flex', paddingBottom: "8px"}} role="row">
                     <TextField
                         autoFocus
                         margin="dense"
@@ -168,19 +185,19 @@ const SubscribePage = (props) => {
                         open={!!accessAnchorEl}
                         onClose={() => setAccessAnchorEl(null)}
                     >
-                        <MenuItem onClick={() => setAccess("private")} selected={access === "private"}>
+                        <MenuItem onClick={() => setEveryone("private")} selected={everyone === "private"}>
                             <ListItemIcon>
                                 <LockIcon fontSize="small" />
                             </ListItemIcon>
                             Only I can publish and subscribe
                         </MenuItem>
-                        <MenuItem onClick={() => setAccess("public-read")} selected={access === "public-read"}>
+                        <MenuItem onClick={() => setEveryone("public-read")} selected={everyone === "public-read"}>
                             <ListItemIcon>
                                 <PublicOffIcon fontSize="small" />
                             </ListItemIcon>
                             I can publish, everyone can subscribe
                         </MenuItem>
-                        <MenuItem onClick={() => setAccess("public")} selected={access === "public"}>
+                        <MenuItem onClick={() => setEveryone("public")} selected={everyone === "public"}>
                             <ListItemIcon>
                                 <PublicIcon fontSize="small" />
                             </ListItemIcon>
@@ -188,32 +205,58 @@ const SubscribePage = (props) => {
                         </MenuItem>
                     </PopupMenu>
                 </div>
-                <FormControlLabel
-                    sx={{pt: 1}}
-                    control={
-                        <Checkbox
-                            onChange={handleUseAnotherChanged}
-                            inputProps={{
-                                "aria-label": t("subscribe_dialog_subscribe_use_another_label")
-                            }}
-                        />
-                    }
-                    label={t("subscribe_dialog_subscribe_use_another_label")} />
-                {anotherServerVisible && <Autocomplete
-                    freeSolo
-                    options={existingBaseUrls}
-                    sx={{ maxWidth: 400 }}
-                    inputValue={props.baseUrl}
-                    onInputChange={updateBaseUrl}
-                    renderInput={ (params) =>
-                        <TextField
-                            {...params}
-                            placeholder={config.baseUrl}
+                {session.exists() && !anotherServerVisible &&
+                    <FormGroup>
+                        <FormControlLabel
                             variant="standard"
-                            aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                            control={
+                                <Checkbox
+                                    fullWidth
+                                    checked={reserveTopicVisible}
+                                    onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
+                                    inputProps={{
+                                        "aria-label": t("subscription_settings_dialog_reserve_topic_label")
+                                    }}
+                                />
+                            }
+                            label={t("subscription_settings_dialog_reserve_topic_label")}
                         />
-                    }
-                />}
+                        {reserveTopicVisible &&
+                            <ReserveTopicSelect
+                                value={everyone}
+                                onChange={setEveryone}
+                            />
+                        }
+                    </FormGroup>
+                }
+                {!reserveTopicVisible &&
+                    <FormGroup>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    onChange={handleUseAnotherChanged}
+                                    inputProps={{
+                                        "aria-label": t("subscribe_dialog_subscribe_use_another_label")
+                                    }}
+                                />
+                            }
+                            label={t("subscribe_dialog_subscribe_use_another_label")}/>
+                        {anotherServerVisible && <Autocomplete
+                            freeSolo
+                            options={existingBaseUrls}
+                            inputValue={props.baseUrl}
+                            onInputChange={updateBaseUrl}
+                            renderInput={(params) =>
+                                <TextField
+                                    {...params}
+                                    placeholder={config.baseUrl}
+                                    variant="standard"
+                                    aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                                />
+                            }
+                        />}
+                    </FormGroup>
+                }
             </DialogContent>
             <DialogFooter status={errorText}>
                 <Button onClick={props.onCancel}>{t("subscribe_dialog_subscribe_button_cancel")}</Button>

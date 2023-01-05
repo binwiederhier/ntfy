@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {useEffect, useState} from 'react';
 import {
+    Alert,
     CardActions,
     CardContent,
     FormControl,
@@ -44,6 +45,8 @@ import LockIcon from "@mui/icons-material/Lock";
 import {Public, PublicOff} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
+import DialogContentText from "@mui/material/DialogContentText";
+import ReserveTopicSelect from "./ReserveTopicSelect";
 
 const Preferences = () => {
     return (
@@ -482,10 +485,11 @@ const Reservations = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    if (!session.exists() || !account) {
+    if (!session.exists() || !account || account.role === "admin") {
         return <></>;
     }
     const reservations = account.reservations || [];
+    const limitReached = account.role === "user" && account.stats.topics_remaining === 0;
 
     const handleAddClick = () => {
         setDialogKey(prev => prev+1);
@@ -505,7 +509,7 @@ const Reservations = () => {
         } catch (e) {
             console.log(`[Preferences] Error topic reservation.`, e);
         }
-        // FIXME handle 401/403
+        // FIXME handle 401/403/409
     };
 
     return (
@@ -518,9 +522,15 @@ const Reservations = () => {
                     {t("prefs_reservations_description")}
                 </Paragraph>
                 {reservations.length > 0 && <ReservationsTable reservations={reservations}/>}
+                {limitReached &&
+                    <Alert severity="info">
+                        You reached your reserved topics limit.
+                    </Alert>
+                }
             </CardContent>
             <CardActions>
-                <Button onClick={handleAddClick}>{t("prefs_reservations_add_button")}</Button>
+                <Button onClick={handleAddClick} disabled={limitReached}>{t("prefs_reservations_add_button")}</Button>
+
                 <ReservationsDialog
                     key={`reservationAddDialog${dialogKey}`}
                     open={dialogOpen}
@@ -559,7 +569,7 @@ const ReservationsTable = (props) => {
         } catch (e) {
             console.log(`[Preferences] Error topic reservation.`, e);
         }
-        // FIXME handle 401/403
+        // FIXME handle 401/403/409
     };
 
     const handleDeleteClick = async (reservation) => {
@@ -670,6 +680,9 @@ const ReservationsDialog = (props) => {
         <Dialog open={props.open} onClose={props.onCancel} maxWidth="sm" fullWidth fullScreen={fullScreen}>
             <DialogTitle>{editMode ? t("prefs_reservations_dialog_title_edit") : t("prefs_reservations_dialog_title_add")}</DialogTitle>
             <DialogContent>
+                <DialogContentText>
+                    {t("prefs_reservations_dialog_description")}
+                </DialogContentText>
                 {!editMode && <TextField
                     autoFocus
                     margin="dense"
@@ -682,37 +695,11 @@ const ReservationsDialog = (props) => {
                     fullWidth
                     variant="standard"
                 />}
-                <FormControl fullWidth variant="standard">
-                    <Select
-                        value={everyone}
-                        onChange={(ev) => setEveryone(ev.target.value)}
-                        aria-label={t("prefs_reservations_dialog_access_label")}
-                        sx={{
-                            marginTop: 1,
-                            "& .MuiSelect-select": {
-                                display: 'flex',
-                                alignItems: 'center'
-                            }
-                        }}
-                    >
-                        <MenuItem value="deny-all">
-                            <ListItemIcon><LockIcon /></ListItemIcon>
-                            <ListItemText primary={t("prefs_reservations_table_everyone_deny_all")} />
-                        </MenuItem>
-                        <MenuItem value="read-only">
-                            <ListItemIcon><PublicOff /></ListItemIcon>
-                            <ListItemText primary={t("prefs_reservations_table_everyone_read_only")} />
-                        </MenuItem>
-                        <MenuItem value="write-only">
-                            <ListItemIcon><PublicOff /></ListItemIcon>
-                            <ListItemText primary={t("prefs_reservations_table_everyone_write_only")} />
-                        </MenuItem>
-                        <MenuItem value="read-write">
-                            <ListItemIcon><Public /></ListItemIcon>
-                            <ListItemText primary={t("prefs_reservations_table_everyone_read_write")} />
-                        </MenuItem>
-                    </Select>
-                </FormControl>
+                <ReserveTopicSelect
+                    value={everyone}
+                    onChange={setEveryone}
+                    sx={{mt: 1}}
+                />
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>

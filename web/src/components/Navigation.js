@@ -12,24 +12,15 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {
-    Alert,
-    AlertTitle,
-    Badge,
-    CircularProgress,
-    Link,
-    ListItem,
-    ListItemSecondaryAction,
-    ListSubheader, Tooltip
-} from "@mui/material";
+import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Tooltip} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {openUrl, topicDisplayName, topicUrl} from "../app/utils";
 import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
-import {useLocation, useNavigate, useOutletContext} from "react-router-dom";
+import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {ChatBubble, Lock, MoreVert, NotificationsOffOutlined, Public, PublicOff, Send} from "@mui/icons-material";
+import {ChatBubble, Lock, NotificationsOffOutlined, Public, PublicOff, Send} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -37,8 +28,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
-import IconButton from "@mui/material/IconButton";
-import CloseIcon from "@mui/icons-material/Close";
+import CelebrationIcon from '@mui/icons-material/Celebration';
 
 const navWidth = 280;
 
@@ -109,6 +99,7 @@ const NavList = (props) => {
         navigate(routes.account);
     };
 
+    const showUpgradeBanner = config.enable_payments && (!props.account || props.account.plan.upgradeable);
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
     const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
@@ -123,14 +114,14 @@ const NavList = (props) => {
                 {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert/>}
                 {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission}/>}
                 {!showSubscriptionsList &&
-                    <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.appRoot}>
+                    <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
                         <ListItemIcon><ChatBubble/></ListItemIcon>
                         <ListItemText primary={t("nav_button_all_notifications")}/>
                     </ListItemButton>}
                 {showSubscriptionsList &&
                     <>
                         <ListSubheader>{t("nav_topics_title")}</ListSubheader>
-                        <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.appRoot}>
+                        <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
                             <ListItemIcon><ChatBubble/></ListItemIcon>
                             <ListItemText primary={t("nav_button_all_notifications")}/>
                         </ListItemButton>
@@ -162,6 +153,34 @@ const NavList = (props) => {
                     <ListItemIcon><AddIcon/></ListItemIcon>
                     <ListItemText primary={t("nav_button_subscribe")}/>
                 </ListItemButton>
+                {showUpgradeBanner &&
+                    <Box sx={{
+                        position: "fixed",
+                        width: `${Navigation.width - 1}px`,
+                        bottom: 0,
+                        mt: 'auto',
+                        background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
+                    }}>
+                        <Divider/>
+                        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+                            <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
+                            <ListItemText
+                                sx={{ ml: 1 }}
+                                primary={"Upgrade to ntfy Pro"}
+                                secondary={"Reserve topics, more messages & emails, bigger attachments"}
+                                primaryTypographyProps={{
+                                    style: {
+                                        fontWeight: 500,
+                                        background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
+                                        WebkitBackgroundClip: "text",
+                                        WebkitTextFillColor: "transparent"
+                                    }
+                                }}
+                            />
+                        </ListItemButton>
+                    </Box>
+
+                }
             </List>
             <SubscribeDialog
                 key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed

@@ -60,7 +60,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
         setHasRun(true);
         const eligible = params.topic && !selected && !disallowedTopic(params.topic);
         if (eligible) {
-            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : config.baseUrl;
+            const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : config.base_url;
             console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);

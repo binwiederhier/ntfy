@@ -6,10 +6,11 @@
 // During web development, you may change values here for rapid testing.
 
 var config = {
-    baseUrl: "http://localhost:2586", // window.location.origin FIXME update before merging
-    appRoot: "/app",
-    enableLogin: true,
-    enableSignup: true,
-    enableResetPassword: false,
-    disallowedTopics: ["docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"]
+    base_url: "http://localhost:2586", // window.location.origin FIXME update before merging
+    app_root: "/app",
+    enable_login: true,
+    enable_signup: true,
+    enable_password_reset: false,
+    enable_payments: true,
+    disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"]
 };

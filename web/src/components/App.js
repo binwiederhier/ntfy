@@ -79,7 +79,7 @@ const Layout = () => {
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
     const [selected] = (subscriptions || []).filter(s => {
         return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
-            || (config.baseUrl === s.baseUrl && params.topic === s.topic)
+            || (config.base_url === s.baseUrl && params.topic === s.topic)
     });
 
     useConnectionListeners(subscriptions, users);
@@ -95,6 +95,7 @@ const Layout = () => {
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
             <Navigation
+                account={account}
                 subscriptions={subscriptions}
                 selectedSubscription={selected}
                 notificationsGranted={notificationsGranted}

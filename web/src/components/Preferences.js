@@ -304,7 +304,7 @@ const UserTable = (props) => {
                                    aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
                         <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
                         <TableCell align="right">
-                            {(!session.exists() || user.baseUrl !== config.baseUrl) &&
+                            {(!session.exists() || user.baseUrl !== config.base_url) &&
                                 <>
                                     <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
                                         <EditIcon/>
@@ -314,7 +314,7 @@ const UserTable = (props) => {
                                     </IconButton>
                                 </>
                             }
-                            {session.exists() && user.baseUrl === config.baseUrl &&
+                            {session.exists() && user.baseUrl === config.base_url &&
                                 <Tooltip title={t("prefs_users_table_cannot_delete_or_edit")}>
                                     <span>
                                         <IconButton disabled><EditIcon/></IconButton>
@@ -525,6 +525,9 @@ const Reservations = () => {
                 {limitReached &&
                     <Alert severity="info">
                         You reached your reserved topics limit.
+                        {config.enable_payments &&
+                            <>{" "}<b>Upgrade</b></>
+                        }
                     </Alert>
                 }
             </CardContent>

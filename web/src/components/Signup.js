@@ -43,7 +43,7 @@ const Signup = () => {
             }
         }
     };
-    if (!config.enableSignup) {
+    if (!config.enable_signup) {
         return (
             <AvatarBox>
                 <Typography sx={{ typography: 'h6' }}>{t("signup_disabled")}</Typography>
@@ -114,7 +114,7 @@ const Signup = () => {
                     </Box>
                 }
             </Box>
-            {config.enableLogin &&
+            {config.enable_login &&
                 <Typography sx={{mb: 4}}>
                     <NavLink to={routes.login} variant="body1">
                         {t("signup_already_have_account")}

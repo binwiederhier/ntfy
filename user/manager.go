@@ -503,7 +503,7 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	if planCode.Valid {
 		user.Plan = &Plan{
 			Code:                     planCode.String,
-			Upgradable:               true, // FIXME
+			Upgradeable:              false,
 			MessagesLimit:            messagesLimit.Int64,
 			EmailsLimit:              emailsLimit.Int64,
 			TopicsLimit:              topicsLimit.Int64,

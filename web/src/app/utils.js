@@ -42,13 +42,13 @@ export const validTopic = (topic) => {
 }
 
 export const disallowedTopic = (topic) => {
-    return config.disallowedTopics.includes(topic);
+    return config.disallowed_topics.includes(topic);
 }
 
 export const topicDisplayName = (subscription) => {
     if (subscription.displayName) {
         return subscription.displayName;
-    } else if (subscription.baseUrl === config.baseUrl) {
+    } else if (subscription.baseUrl === config.base_url) {
         return subscription.topic;
     }
     return topicShortUrl(subscription.baseUrl, subscription.topic);

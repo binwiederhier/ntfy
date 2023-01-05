@@ -18,13 +18,8 @@ import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
-import PublicIcon from '@mui/icons-material/Public';
-import LockIcon from '@mui/icons-material/Lock';
-import PublicOffIcon from '@mui/icons-material/PublicOff';
-import MenuItem from "@mui/material/MenuItem";
-import PopupMenu from "./PopupMenu";
-import ListItemIcon from "@mui/material/ListItemIcon";
 import ReserveTopicSelect from "./ReserveTopicSelect";
+import {useOutletContext} from "react-router-dom";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -36,7 +31,7 @@ const SubscribeDialog = (props) => {
 
     const handleSuccess = async () => {
         console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
-        const actualBaseUrl = (baseUrl) ? baseUrl : config.baseUrl;
+        const actualBaseUrl = (baseUrl) ? baseUrl : config.base_url;
         const subscription = await subscriptionManager.add(actualBaseUrl, topic);
         if (session.exists()) {
             try {
@@ -81,17 +76,18 @@ const SubscribeDialog = (props) => {
 
 const SubscribePage = (props) => {
     const { t } = useTranslation();
+    const { account } = useOutletContext();
     const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
-    const [accessAnchorEl, setAccessAnchorEl] = useState(null);
     const [everyone, setEveryone] = useState("deny-all");
-    const baseUrl = (anotherServerVisible) ? props.baseUrl : config.baseUrl;
+    const baseUrl = (anotherServerVisible) ? props.baseUrl : config.base_url;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
-        .filter(s => s !== config.baseUrl);
+        .filter(s => s !== config.base_url);
+    const reserveTopicEnabled = session.exists() && (account?.stats.topics_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
@@ -111,7 +107,7 @@ const SubscribePage = (props) => {
         }
 
         // Reserve topic (if requested)
-        if (session.exists() && baseUrl === config.baseUrl && reserveTopicVisible) {
+        if (session.exists() && baseUrl === config.base_url && reserveTopicVisible) {
             console.log(`[SubscribeDialog] Reserving topic ${topic} with everyone access ${everyone}`);
             try {
                 await accountApi.upsertAccess(topic, everyone);
@@ -141,7 +137,7 @@ const SubscribePage = (props) => {
             const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
             return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
         } else {
-            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.baseUrl, topic));
+            const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.base_url, topic));
             return validTopic(topic) && !isExistingTopicUrl;
         }
     })();
@@ -180,30 +176,6 @@ const SubscribePage = (props) => {
                     <Button onClick={() => {props.setTopic(randomAlphanumericString(16))}} style={{flexShrink: "0", marginTop: "0.5em"}}>
                         {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                     </Button>
-                    <PopupMenu
-                        anchorEl={accessAnchorEl}
-                        open={!!accessAnchorEl}
-                        onClose={() => setAccessAnchorEl(null)}
-                    >
-                        <MenuItem onClick={() => setEveryone("private")} selected={everyone === "private"}>
-                            <ListItemIcon>
-                                <LockIcon fontSize="small" />
-                            </ListItemIcon>
-                            Only I can publish and subscribe
-                        </MenuItem>
-                        <MenuItem onClick={() => setEveryone("public-read")} selected={everyone === "public-read"}>
-                            <ListItemIcon>
-                                <PublicOffIcon fontSize="small" />
-                            </ListItemIcon>
-                            I can publish, everyone can subscribe
-                        </MenuItem>
-                        <MenuItem onClick={() => setEveryone("public")} selected={everyone === "public"}>
-                            <ListItemIcon>
-                                <PublicIcon fontSize="small" />
-                            </ListItemIcon>
-                            Everyone can publish and subscribe
-                        </MenuItem>
-                    </PopupMenu>
                 </div>
                 {session.exists() && !anotherServerVisible &&
                     <FormGroup>
@@ -212,6 +184,7 @@ const SubscribePage = (props) => {
                             control={
                                 <Checkbox
                                     fullWidth
+                                    disabled={account.stats.topics_remaining}
                                     checked={reserveTopicVisible}
                                     onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                                     inputProps={{
@@ -249,7 +222,7 @@ const SubscribePage = (props) => {
                             renderInput={(params) =>
                                 <TextField
                                     {...params}
-                                    placeholder={config.baseUrl}
+                                    placeholder={config.base_url}
                                     variant="standard"
                                     aria-label={t("subscribe_dialog_subscribe_base_url_label")}
                                 />
@@ -271,7 +244,7 @@ const LoginPage = (props) => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorText, setErrorText] = useState("");
-    const baseUrl = (props.baseUrl) ? props.baseUrl : config.baseUrl;
+    const baseUrl = (props.baseUrl) ? props.baseUrl : config.base_url;
     const topic = props.topic;
     const handleLogin = async () => {
         const user = {baseUrl, username, password};

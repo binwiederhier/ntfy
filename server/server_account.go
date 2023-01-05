@@ -80,18 +80,18 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		}
 		if v.user.Plan != nil {
 			response.Plan = &apiAccountPlan{
-				Code:       v.user.Plan.Code,
-				Upgradable: v.user.Plan.Upgradable,
+				Code:        v.user.Plan.Code,
+				Upgradeable: v.user.Plan.Upgradeable,
 			}
 		} else if v.user.Role == user.RoleAdmin {
 			response.Plan = &apiAccountPlan{
-				Code:       string(user.PlanUnlimited),
-				Upgradable: false,
+				Code:        string(user.PlanUnlimited),
+				Upgradeable: false,
 			}
 		} else {
 			response.Plan = &apiAccountPlan{
-				Code:       string(user.PlanDefault),
-				Upgradable: true,
+				Code:        string(user.PlanDefault),
+				Upgradeable: true,
 			}
 		}
 		reservations, err := s.userManager.Reservations(v.user.Name)
@@ -111,8 +111,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
 		response.Plan = &apiAccountPlan{
-			Code:       string(user.PlanNone),
-			Upgradable: true,
+			Code:        string(user.PlanNone),
+			Upgradeable: true,
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

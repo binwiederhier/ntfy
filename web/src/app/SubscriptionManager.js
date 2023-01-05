@@ -43,7 +43,7 @@ class SubscriptionManager {
         for (let i = 0; i < remoteSubscriptions.length; i++) {
             const remote = remoteSubscriptions[i];
             const local = await this.add(remote.base_url, remote.topic);
-            const reservation = remoteReservations?.find(r => remote.base_url === config.baseUrl && remote.topic === r.topic) || null;
+            const reservation = remoteReservations?.find(r => remote.base_url === config.base_url && remote.topic === r.topic) || null;
             await this.setRemoteId(local.id, remote.id);
             await this.setDisplayName(local.id, remote.display_name);
             await this.setReservation(local.id, reservation); // May be null!

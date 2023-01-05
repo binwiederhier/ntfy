@@ -38,7 +38,7 @@ const Messaging = (props) => {
             <PublishDialog
                 key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
                 openMode={dialogOpenMode}
-                baseUrl={subscription?.baseUrl ?? config.baseUrl}
+                baseUrl={subscription?.baseUrl ?? config.base_url}
                 topic={subscription?.topic ?? ""}
                 message={message}
                 onClose={handleDialogClose}

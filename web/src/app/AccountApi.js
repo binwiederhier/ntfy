@@ -34,7 +34,7 @@ class AccountApi {
     }
 
     async login(user) {
-        const url = accountTokenUrl(config.baseUrl);
+        const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Checking auth for ${url}`);
         const response = await fetch(url, {
             method: "POST",
@@ -53,7 +53,7 @@ class AccountApi {
     }
 
     async logout() {
-        const url = accountTokenUrl(config.baseUrl);
+        const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Logging out from ${url} using token ${session.token()}`);
         const response = await fetch(url, {
             method: "DELETE",
@@ -67,7 +67,7 @@ class AccountApi {
     }
 
     async create(username, password) {
-        const url = accountUrl(config.baseUrl);
+        const url = accountUrl(config.base_url);
         const body = JSON.stringify({
             username: username,
             password: password
@@ -87,7 +87,7 @@ class AccountApi {
     }
 
     async get() {
-        const url = accountUrl(config.baseUrl);
+        const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Fetching user account ${url}`);
         const response = await fetch(url, {
             headers: withBearerAuth({}, session.token())
@@ -106,7 +106,7 @@ class AccountApi {
     }
 
     async delete() {
-        const url = accountUrl(config.baseUrl);
+        const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Deleting user account ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
@@ -120,7 +120,7 @@ class AccountApi {
     }
 
     async changePassword(newPassword) {
-        const url = accountPasswordUrl(config.baseUrl);
+        const url = accountPasswordUrl(config.base_url);
         console.log(`[AccountApi] Changing account password ${url}`);
         const response = await fetch(url, {
             method: "POST",
@@ -137,7 +137,7 @@ class AccountApi {
     }
 
     async extendToken() {
-        const url = accountTokenUrl(config.baseUrl);
+        const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Extending user access token ${url}`);
         const response = await fetch(url, {
             method: "PATCH",
@@ -151,7 +151,7 @@ class AccountApi {
     }
 
     async updateSettings(payload) {
-        const url = accountSettingsUrl(config.baseUrl);
+        const url = accountSettingsUrl(config.base_url);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Updating user account ${url}: ${body}`);
         const response = await fetch(url, {
@@ -167,7 +167,7 @@ class AccountApi {
     }
 
     async addSubscription(payload) {
-        const url = accountSubscriptionUrl(config.baseUrl);
+        const url = accountSubscriptionUrl(config.base_url);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
         const response = await fetch(url, {
@@ -186,7 +186,7 @@ class AccountApi {
     }
 
     async updateSubscription(remoteId, payload) {
-        const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
+        const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
         const response = await fetch(url, {
@@ -205,7 +205,7 @@ class AccountApi {
     }
 
     async deleteSubscription(remoteId) {
-        const url = accountSubscriptionSingleUrl(config.baseUrl, remoteId);
+        const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
         console.log(`[AccountApi] Removing user subscription ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
@@ -219,7 +219,7 @@ class AccountApi {
     }
 
     async upsertAccess(topic, everyone) {
-        const url = accountAccessUrl(config.baseUrl);
+        const url = accountAccessUrl(config.base_url);
         console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
         const response = await fetch(url, {
             method: "POST",
@@ -239,7 +239,7 @@ class AccountApi {
     }
 
     async deleteAccess(topic) {
-        const url = accountAccessSingleUrl(config.baseUrl, topic);
+        const url = accountAccessSingleUrl(config.base_url, topic);
         console.log(`[AccountApi] Removing topic reservation ${url}`);
         const response = await fetch(url, {
             method: "DELETE",

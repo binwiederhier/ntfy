@@ -11,21 +11,21 @@ class UserManager {
     }
 
     async get(baseUrl) {
-        if (session.exists() && baseUrl === config.baseUrl) {
+        if (session.exists() && baseUrl === config.base_url) {
             return this.localUser();
         }
         return db.users.get(baseUrl);
     }
 
     async save(user) {
-        if (session.exists() && user.baseUrl === config.baseUrl) {
+        if (session.exists() && user.baseUrl === config.base_url) {
             return;
         }
         await db.users.put(user);
     }
 
     async delete(baseUrl) {
-        if (session.exists() && baseUrl === config.baseUrl) {
+        if (session.exists() && baseUrl === config.base_url) {
             return;
         }
         await db.users.delete(baseUrl);
@@ -36,7 +36,7 @@ class UserManager {
             return null;
         }
         return {
-            baseUrl: config.baseUrl,
+            baseUrl: config.base_url,
             username: session.username(),
             token: session.token() // Not "password"!
         };

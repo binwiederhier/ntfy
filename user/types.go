@@ -56,7 +56,7 @@ const (
 // Plan represents a user's account type, including its account limits
 type Plan struct {
 	Code                     string `json:"name"`
-	Upgradable               bool   `json:"upgradable"`
+	Upgradeable              bool   `json:"upgradeable"`
 	MessagesLimit            int64  `json:"messages_limit"`
 	EmailsLimit              int64  `json:"emails_limit"`
 	TopicsLimit              int64  `json:"topics_limit"`

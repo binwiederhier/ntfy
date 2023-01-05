@@ -41,7 +41,7 @@ const Login = () => {
             }
         }
     };
-    if (!config.enableLogin) {
+    if (!config.enable_login) {
         return (
             <AvatarBox>
                 <Typography sx={{ typography: 'h6' }}>{t("Login is disabled")}</Typography>
@@ -112,8 +112,8 @@ const Login = () => {
                     </Box>
                 }
                 <Box sx={{width: "100%"}}>
-                    {config.enableResetPassword && <div style={{float: "left"}}><NavLink to={routes.resetPassword} variant="body1">{t("Reset password")}</NavLink></div>}
-                    {config.enableSignup && <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">{t("login_link_signup")}</NavLink></div>}
+                    {config.enable_password_reset && <div style={{float: "left"}}><NavLink to={routes.resetPassword} variant="body1">{t("Reset password")}</NavLink></div>}
+                    {config.enable_signup && <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">{t("login_link_signup")}</NavLink></div>}
                 </Box>
             </Box>
         </AvatarBox>

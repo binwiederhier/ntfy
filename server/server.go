@@ -452,7 +452,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		AppRoot:             appRoot,
 		EnableLogin:         s.config.EnableLogin,
 		EnableSignup:        s.config.EnableSignup,
-		EnableResetPassword: s.config.EnableResetPassword,
+		EnablePasswordReset: s.config.EnablePasswordReset,
 		DisallowedTopics:    disallowedTopics,
 	}
 	b, err := json.Marshal(response)

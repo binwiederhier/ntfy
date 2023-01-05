@@ -235,8 +235,8 @@ type apiAccountTokenResponse struct {
 }
 
 type apiAccountPlan struct {
-	Code       string `json:"code"`
-	Upgradable bool   `json:"upgradable"`
+	Code        string `json:"code"`
+	Upgradeable bool   `json:"upgradeable"`
 }
 
 type apiAccountLimits struct {
@@ -286,6 +286,7 @@ type apiConfigResponse struct {
 	AppRoot             string   `json:"app_root"`
 	EnableLogin         bool     `json:"enable_login"`
 	EnableSignup        bool     `json:"enable_signup"`
-	EnableResetPassword bool     `json:"enable_reset_password"`
+	EnablePasswordReset bool     `json:"enable_password_reset"`
+	EnablePayments      bool     `json:"enable_payments"`
 	DisallowedTopics    []string `json:"disallowed_topics"`
 }

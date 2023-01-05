@@ -5,17 +5,12 @@ import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
-import {useEffect, useRef, useState} from "react";
+import {useState} from "react";
 import Box from "@mui/material/Box";
 import {formatShortDateTime, shuffle, topicDisplayName} from "../app/utils";
 import db from "../app/db";
 import {useLocation, useNavigate} from "react-router-dom";
-import ClickAwayListener from '@mui/material/ClickAwayListener';
-import Grow from '@mui/material/Grow';
-import Paper from '@mui/material/Paper';
-import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
-import MenuList from '@mui/material/MenuList';
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
@@ -24,7 +19,7 @@ import routes from "./routes";
 import subscriptionManager from "../app/SubscriptionManager";
 import logo from "../img/ntfy.svg";
 import {useTranslation} from "react-i18next";
-import {Menu, Portal, Snackbar} from "@mui/material";
+import {Portal, Snackbar} from "@mui/material";
 import SubscriptionSettingsDialog from "./SubscriptionSettingsDialog";
 import session from "../app/Session";
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -41,8 +36,10 @@ const ActionBar = (props) => {
     let title = "ntfy";
     if (props.selected) {
         title = topicDisplayName(props.selected);
-    } else if (location.pathname === "/settings") {
+    } else if (location.pathname === routes.settings) {
         title = t("action_bar_settings");
+    } else if (location.pathname === routes.account) {
+        title = t("action_bar_account");
     }
     return (
         <AppBar position="fixed" sx={{
@@ -250,12 +247,12 @@ const ProfileIcon = () => {
                     <AccountCircleIcon/>
                 </IconButton>
             }
-            {!session.exists() && config.enableLogin &&
+            {!session.exists() && config.enable_login &&
                 <Button color="inherit" variant="text" onClick={() => navigate(routes.login)} sx={{m: 1}} aria-label={t("action_bar_sign_in")}>
                     {t("action_bar_sign_in")}
                 </Button>
             }
-            {!session.exists() && config.enableSignup &&
+            {!session.exists() && config.enable_signup &&
                 <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)} aria-label={t("action_bar_sign_up")}>
                     {t("action_bar_sign_up")}
                 </Button>

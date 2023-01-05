@@ -1,5 +1,3 @@
-import routes from "../components/routes";
-
 class Session {
     store(username, token) {
         localStorage.setItem("user", username);

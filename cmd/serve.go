@@ -49,6 +49,7 @@ var flagsServe = append(
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-startup-queries", Aliases: []string{"cache_startup_queries"}, EnvVars: []string{"NTFY_CACHE_STARTUP_QUERIES"}, Usage: "queries run when the cache database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-startup-queries", Aliases: []string{"auth_startup_queries"}, EnvVars: []string{"NTFY_AUTH_STARTUP_QUERIES"}, Usage: "queries run when the auth database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"auth_default_access", "p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
@@ -77,6 +78,8 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "xxx"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-login", Aliases: []string{"enable_login"}, EnvVars: []string{"NTFY_ENABLE_LOGIN"}, Value: false, Usage: "xxx"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-payments", Aliases: []string{"enable_payments"}, EnvVars: []string{"NTFY_ENABLE_PAYMENTS"}, Value: false, Usage: "xxx"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-reserve-topics", Aliases: []string{"enable_reserve_topics"}, EnvVars: []string{"NTFY_ENABLE_RESERVE_TOPICS"}, Value: false, Usage: "xxx"}),
 )
 
 var cmdServe = &cli.Command{
@@ -118,6 +121,7 @@ func execServe(c *cli.Context) error {
 	cacheBatchSize := c.Int("cache-batch-size")
 	cacheBatchTimeout := c.Duration("cache-batch-timeout")
 	authFile := c.String("auth-file")
+	authStartupQueries := c.String("auth-startup-queries")
 	authDefaultAccess := c.String("auth-default-access")
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
@@ -146,6 +150,8 @@ func execServe(c *cli.Context) error {
 	behindProxy := c.Bool("behind-proxy")
 	enableSignup := c.Bool("enable-signup")
 	enableLogin := c.Bool("enable-login")
+	enablePayments := c.Bool("enable-payments")
+	enableReserveTopics := c.Bool("enable-reserve-topics")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -182,6 +188,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if upstream-base-url is set, base-url must also be set")
 	} else if upstreamBaseURL != "" && baseURL != "" && baseURL == upstreamBaseURL {
 		return errors.New("base-url and upstream-base-url cannot be identical, you'll likely want to set upstream-base-url to https://ntfy.sh, see https://ntfy.sh/docs/config/#ios-instant-notifications")
+	} else if authFile == "" && (enableSignup || enableLogin || enableReserveTopics || enablePayments) {
+		return errors.New("cannot set enable-signup, enable-login, enable-reserve-topics, or enable-payments if auth-file is not set")
 	}
 
 	webRootIsApp := webRoot == "app"
@@ -245,6 +253,7 @@ func execServe(c *cli.Context) error {
 	conf.CacheBatchSize = cacheBatchSize
 	conf.CacheBatchTimeout = cacheBatchTimeout
 	conf.AuthFile = authFile
+	conf.AuthStartupQueries = authStartupQueries
 	conf.AuthDefault = authDefault
 	conf.AttachmentCacheDir = attachmentCacheDir
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
@@ -274,6 +283,8 @@ func execServe(c *cli.Context) error {
 	conf.EnableWeb = enableWeb
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
+	conf.EnablePayments = enablePayments
+	conf.EnableReserveTopics = enableReserveTopics
 	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config

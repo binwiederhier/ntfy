@@ -89,7 +89,6 @@ const Layout = () => {
 
     return (
         <Box sx={{display: 'flex'}}>
-            <CssBaseline/>
             <ActionBar
                 selected={selected}
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}

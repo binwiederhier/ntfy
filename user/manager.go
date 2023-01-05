@@ -59,7 +59,8 @@ const (
 			write INT NOT NULL,
 			owner_user_id INT,			
 			PRIMARY KEY (user_id, topic),
-			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+		    FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id INT NOT NULL,
@@ -75,6 +76,10 @@ const (
 		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
 	`
 	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
+	builtinStartupQueries = `
+		PRAGMA foreign_keys = ON;
+	`
+
 	selectUserByNameQuery = `
 		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
 		FROM user u
@@ -95,10 +100,7 @@ const (
 		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic
 		ORDER BY u.user DESC
 	`
-)
 
-// Manager-related queries
-const (
 	insertUserQuery      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
 	selectUsernamesQuery = `
 		SELECT user 
@@ -150,7 +152,6 @@ const (
 	updateTokenExpiryQuery   = `UPDATE user_token SET expires = ? WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
 	deleteTokenQuery         = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
 	deleteExpiredTokensQuery = `DELETE FROM user_token WHERE expires < ?`
-	deleteUserTokensQuery    = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 )
 
 // Schema management queries
@@ -191,17 +192,20 @@ type Manager struct {
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
-func NewManager(filename string, defaultAccess Permission) (*Manager, error) {
-	return newManager(filename, defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
+func NewManager(filename, startupQueries string, defaultAccess Permission) (*Manager, error) {
+	return newManager(filename, startupQueries, defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
 }
 
 // NewManager creates a new Manager instance
-func newManager(filename string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
+func newManager(filename, startupQueries string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
 	}
 	if err := setupDB(db); err != nil {
+		return nil, err
+	}
+	if err := runStartupQueries(db, startupQueries); err != nil {
 		return nil, err
 	}
 	manager := &Manager{
@@ -223,11 +227,12 @@ func (a *Manager) Authenticate(username, password string) (*User, error) {
 	}
 	user, err := a.User(username)
 	if err != nil {
-		bcrypt.CompareHashAndPassword([]byte(intentionalSlowDownHash),
-			[]byte("intentional slow-down to avoid timing attacks"))
+		log.Trace("authentication of user %s failed (1): %s", username, err.Error())
+		bcrypt.CompareHashAndPassword([]byte(intentionalSlowDownHash), []byte("intentional slow-down to avoid timing attacks"))
 		return nil, ErrUnauthenticated
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
+		log.Trace("authentication of user %s failed (2): %s", username, err.Error())
 		return nil, ErrUnauthenticated
 	}
 	return user, nil
@@ -407,21 +412,11 @@ func (a *Manager) RemoveUser(username string) error {
 	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
-	tx, err := a.db.Begin()
-	if err != nil {
+	// Rows in user_access, user_token, etc. are deleted via foreign keys
+	if _, err := a.db.Exec(deleteUserQuery, username); err != nil {
 		return err
 	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(deleteUserAccessQuery, username); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(deleteUserTokensQuery, username); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(deleteUserQuery, username); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 // Users returns a list of users. It always also returns the Everyone user ("*").
@@ -664,6 +659,16 @@ func toSQLWildcard(s string) string {
 
 func fromSQLWildcard(s string) string {
 	return strings.ReplaceAll(s, "%", "*")
+}
+
+func runStartupQueries(db *sql.DB, startupQueries string) error {
+	if _, err := db.Exec(startupQueries); err != nil {
+		return err
+	}
+	if _, err := db.Exec(builtinStartupQueries); err != nil {
+		return err
+	}
+	return nil
 }
 
 func setupDB(db *sql.DB) error {

@@ -40,6 +40,9 @@ import (
 			message cache duration
 			Keep 10000 messages or keep X days?
 			Attachment expiration based on plan
+		plan:
+			weirdness with admin and "default" account
+		"account topic" sync mechanism
 		purge accounts that were not logged into in X
 		reset daily limits for users
 		max token issue limit
@@ -165,7 +168,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var userManager *user.Manager
 	if conf.AuthFile != "" {
-		userManager, err = user.NewManager(conf.AuthFile, conf.AuthDefault)
+		userManager, err = user.NewManager(conf.AuthFile, conf.AuthStartupQueries, conf.AuthDefault)
 		if err != nil {
 			return nil, err
 		}
@@ -453,6 +456,8 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableLogin:         s.config.EnableLogin,
 		EnableSignup:        s.config.EnableSignup,
 		EnablePasswordReset: s.config.EnablePasswordReset,
+		EnablePayments:      s.config.EnablePayments,
+		EnableReserveTopics: s.config.EnableReserveTopics,
 		DisallowedTopics:    disallowedTopics,
 	}
 	b, err := json.Marshal(response)

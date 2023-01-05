@@ -76,7 +76,7 @@ const SubscribeDialog = (props) => {
 
 const SubscribePage = (props) => {
     const { t } = useTranslation();
-    const { account } = useOutletContext();
+    //const { account } = useOutletContext();
     const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
@@ -87,7 +87,7 @@ const SubscribePage = (props) => {
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
-    const reserveTopicEnabled = session.exists() && (account?.stats.topics_remaining || 0) > 0;
+    //const reserveTopicEnabled = session.exists() && (account?.stats.topics_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
@@ -177,14 +177,14 @@ const SubscribePage = (props) => {
                         {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                     </Button>
                 </div>
-                {session.exists() && !anotherServerVisible &&
+                {config.enable_reserve_topics && session.exists() && !anotherServerVisible &&
                     <FormGroup>
                         <FormControlLabel
                             variant="standard"
                             control={
                                 <Checkbox
                                     fullWidth
-                                    disabled={account.stats.topics_remaining}
+                                    // disabled={account.stats.topics_remaining}
                                     checked={reserveTopicVisible}
                                     onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                                     inputProps={{

@@ -485,7 +485,7 @@ const Reservations = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    if (!session.exists() || !account || account.role === "admin") {
+    if (!config.enable_reserve_topics || !session.exists() || !account || account.role === "admin") {
         return <></>;
     }
     const reservations = account.reservations || [];

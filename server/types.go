@@ -288,5 +288,6 @@ type apiConfigResponse struct {
 	EnableSignup        bool     `json:"enable_signup"`
 	EnablePasswordReset bool     `json:"enable_password_reset"`
 	EnablePayments      bool     `json:"enable_payments"`
+	EnableReserveTopics bool     `json:"enable_reserve_topics"`
 	DisallowedTopics    []string `json:"disallowed_topics"`
 }

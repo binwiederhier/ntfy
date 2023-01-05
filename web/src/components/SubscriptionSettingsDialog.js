@@ -78,26 +78,30 @@ const SubscriptionSettingsDialog = (props) => {
                         "aria-label": t("subscription_settings_dialog_display_name_placeholder")
                     }}
                 />
-                <FormControlLabel
-                    fullWidth
-                    variant="standard"
-                    sx={{pt: 1}}
-                    control={
-                        <Checkbox
-                            checked={reserveTopicVisible}
-                            onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
-                            inputProps={{
-                                "aria-label": t("subscription_settings_dialog_reserve_topic_label")
-                            }}
+                {config.enable_reserve_topics && session.exists() &&
+                    <>
+                        <FormControlLabel
+                            fullWidth
+                            variant="standard"
+                            sx={{pt: 1}}
+                            control={
+                                <Checkbox
+                                    checked={reserveTopicVisible}
+                                    onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
+                                    inputProps={{
+                                        "aria-label": t("subscription_settings_dialog_reserve_topic_label")
+                                    }}
+                                />
+                            }
+                            label={t("subscription_settings_dialog_reserve_topic_label")}
                         />
-                    }
-                    label={t("subscription_settings_dialog_reserve_topic_label")}
-                />
-                {reserveTopicVisible &&
-                    <ReserveTopicSelect
-                        value={everyone}
-                        onChange={setEveryone}
-                    />
+                        {reserveTopicVisible &&
+                            <ReserveTopicSelect
+                                value={everyone}
+                                onChange={setEveryone}
+                            />
+                        }
+                    </>
                 }
             </DialogContent>
             <DialogFooter>

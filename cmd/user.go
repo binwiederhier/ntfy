@@ -268,6 +268,7 @@ func execUserList(c *cli.Context) error {
 
 func createUserManager(c *cli.Context) (*user.Manager, error) {
 	authFile := c.String("auth-file")
+	authStartupQueries := c.String("auth-startup-queries")
 	authDefaultAccess := c.String("auth-default-access")
 	if authFile == "" {
 		return nil, errors.New("option auth-file not set; auth is unconfigured for this server")
@@ -278,7 +279,7 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 	if err != nil {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	}
-	return user.NewManager(authFile, authDefault)
+	return user.NewManager(authFile, authStartupQueries, authDefault)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

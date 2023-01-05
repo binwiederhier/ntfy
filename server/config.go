@@ -67,6 +67,7 @@ type Config struct {
 	CacheBatchSize                       int
 	CacheBatchTimeout                    time.Duration
 	AuthFile                             string
+	AuthStartupQueries                   string
 	AuthDefault                          user.Permission
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
@@ -104,11 +105,12 @@ type Config struct {
 	VisitorAccountCreateLimitReplenish   time.Duration
 	BehindProxy                          bool
 	EnableWeb                            bool
-	EnableSignup                         bool
+	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
 	EnableEmailConfirm                   bool
 	EnablePasswordReset                  bool
 	EnablePayments                       bool
+	EnableReserveTopics                  bool   // Allow users with role "user" to own/reserve topics
 	Version                              string // injected by App
 }
 

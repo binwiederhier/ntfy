@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {useState} from 'react';
-import {LinearProgress, Stack, useMediaQuery} from "@mui/material";
+import {LinearProgress, Link, Stack, useMediaQuery} from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import Typography from "@mui/material/Typography";
 import EditIcon from '@mui/icons-material/Edit';
@@ -21,7 +21,9 @@ import IconButton from "@mui/material/IconButton";
 import {useOutletContext} from "react-router-dom";
 import {formatBytes} from "../app/utils";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
+import db from "../app/db";
 
 const Account = () => {
     if (!session.exists()) {
@@ -169,6 +171,15 @@ const Stats = () => {
     }
     const planCode = account.plan.code ?? "none";
     const normalize = (value, max) => Math.min(value / max * 100, 100);
+    const barColor = (remaining, limit) => {
+        if (account.role === "admin") {
+            return "primary";
+        } else if (limit > 0 && remaining === 0) {
+            return "error";
+        }
+        return "primary";
+    };
+
     return (
         <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -180,20 +191,37 @@ const Stats = () => {
                         {account.role === "admin"
                             ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
                             : t(`account_usage_plan_code_${planCode}`)}
+                        {config.enable_payments && account.plan.upgradeable &&
+                            <em>{" "}
+                                <Link onClick={() => {}}>Upgrade</Link>
+                            </em>
+                        }
                     </div>
                 </Pref>
                 <Pref title={t("account_usage_topics_title")}>
-                    <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.topics}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.topics > 0 ? t("account_usage_of_limit", { limit: account.limits.topics }) : t("account_usage_unlimited")}</Typography>
-                    </div>
-                    <LinearProgress
-                        variant="determinate"
-                        value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100}
-                        color={account?.role !== "admin" && account.stats.topics_remaining === 0 ? 'error' : 'primary'}
-                    />
+                    {account.limits.topics > 0 &&
+                        <>
+                            <div>
+                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.topics}</Typography>
+                                <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.topics }) : t("account_usage_unlimited")}</Typography>
+                            </div>
+                            <LinearProgress
+                                variant="determinate"
+                                value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100}
+                                color={barColor(account.stats.topics_remaining, account.limits.topics)}
+                            />
+                        </>
+                    }
+                    {account.limits.topics === 0 &&
+                        <em>No reserved topics for this account</em>
+                    }
                 </Pref>
-                <Pref title={t("account_usage_messages_title")}>
+                <Pref title={
+                    <>
+                        {t("account_usage_messages_title")}
+                        <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
+                    </>
+                }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
@@ -201,10 +229,15 @@ const Stats = () => {
                     <LinearProgress
                         variant="determinate"
                         value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100}
-                        color={account?.role !== "admin" && account.stats.messages_remaining === 0 ? 'error' : 'primary'}
+                        color={account.role === "user" && account.stats.messages_remaining === 0 ? 'error' : 'primary'}
                     />
                 </Pref>
-                <Pref title={t("account_usage_emails_title")}>
+                <Pref title={
+                    <>
+                        {t("account_usage_emails_title")}
+                        <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
+                    </>
+                }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
@@ -215,7 +248,14 @@ const Stats = () => {
                         color={account?.role !== "admin" && account.stats.emails_remaining === 0 ? 'error' : 'primary'}
                     />
                 </Pref>
-                <Pref title={t("account_usage_attachment_storage_title")} subtitle={account.role !== "admin" ? t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) }) : null}>
+                <Pref title={
+                    <>
+                        {t("account_usage_attachment_storage_title")}
+                        {account.role === "user" &&
+                            <Tooltip title={t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) })}><span><InfoIcon/></span></Tooltip>
+                        }
+                    </>
+                }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
@@ -235,6 +275,17 @@ const Stats = () => {
         </Card>
     );
 };
+
+const InfoIcon = () => {
+    return (
+        <InfoOutlinedIcon sx={{
+            verticalAlign: "bottom",
+            width: "18px",
+            marginLeft: "4px",
+            color: "gray"
+        }}/>
+    );
+}
 
 const Delete = () => {
     const { t } = useTranslation();

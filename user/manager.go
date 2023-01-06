@@ -15,16 +15,18 @@ import (
 )
 
 const (
-	tokenLength                  = 32
 	bcryptCost                   = 10
 	intentionalSlowDownHash      = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match bcryptCost
 	userStatsQueueWriterInterval = 33 * time.Second
-	userTokenExpiryDuration      = 72 * time.Hour
+	tokenLength                  = 32
+	tokenExpiryDuration          = 72 * time.Hour // Extend tokens by this much
+	tokenMaxCount                = 10             // Only keep this many tokens in the table per user
 )
 
 var (
 	errNoTokenProvided    = errors.New("no token provided")
 	errTopicOwnedByOthers = errors.New("topic owned by others")
+	errNoRows             = errors.New("no rows found")
 )
 
 // Manager-related queries
@@ -139,7 +141,7 @@ const (
 		ORDER BY a_user.topic
 	`
 	selectOtherAccessCountQuery = `
-		SELECT count(*)
+		SELECT COUNT(*)
 		FROM user_access
 		WHERE (topic = ? OR ? LIKE topic)
 		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM user WHERE user = ?))
@@ -148,10 +150,22 @@ const (
 	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
 	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
 
+	selectTokenCountQuery    = `SELECT COUNT(*) FROM user_token WHERE (SELECT id FROM user WHERE user = ?)`
 	insertTokenQuery         = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
 	updateTokenExpiryQuery   = `UPDATE user_token SET expires = ? WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
 	deleteTokenQuery         = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
 	deleteExpiredTokensQuery = `DELETE FROM user_token WHERE expires < ?`
+	deleteExcessTokensQuery  = `
+		DELETE FROM user_token
+		WHERE (user_id, token) NOT IN (
+			SELECT user_id, token
+			FROM user_token
+			WHERE user_id = (SELECT id FROM user WHERE user = ?)
+			ORDER BY expires DESC 
+			LIMIT ?
+		)
+;
+	`
 )
 
 // Schema management queries
@@ -182,22 +196,21 @@ const (
 // Manager is an implementation of Manager. It stores users and access control list
 // in a SQLite database.
 type Manager struct {
-	db                  *sql.DB
-	defaultAccess       Permission       // Default permission if no ACL matches
-	statsQueue          map[string]*User // Username -> User, for "unimportant" user updates
-	tokenExpiryInterval time.Duration    // Duration after which tokens expire, and by which tokens are extended
-	mu                  sync.Mutex
+	db            *sql.DB
+	defaultAccess Permission       // Default permission if no ACL matches
+	statsQueue    map[string]*User // Username -> User, for "unimportant" user updates
+	mu            sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
 func NewManager(filename, startupQueries string, defaultAccess Permission) (*Manager, error) {
-	return newManager(filename, startupQueries, defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
+	return newManager(filename, startupQueries, defaultAccess, userStatsQueueWriterInterval)
 }
 
 // NewManager creates a new Manager instance
-func newManager(filename, startupQueries string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) (*Manager, error) {
+func newManager(filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -209,10 +222,9 @@ func newManager(filename, startupQueries string, defaultAccess Permission, token
 		return nil, err
 	}
 	manager := &Manager{
-		db:                  db,
-		defaultAccess:       defaultAccess,
-		statsQueue:          make(map[string]*User),
-		tokenExpiryInterval: tokenExpiryDuration,
+		db:            db,
+		defaultAccess: defaultAccess,
+		statsQueue:    make(map[string]*User),
 	}
 	go manager.userStatsQueueWriter(statsWriterInterval)
 	return manager, nil
@@ -253,10 +265,38 @@ func (a *Manager) AuthenticateToken(token string) (*User, error) {
 }
 
 // CreateToken generates a random token for the given user and returns it. The token expires
-// after a fixed duration unless ExtendToken is called.
+// after a fixed duration unless ExtendToken is called. This function also prunes tokens for the
+// given user, if there are too many of them.
 func (a *Manager) CreateToken(user *User) (*Token, error) {
-	token, expires := util.RandomString(tokenLength), time.Now().Add(userTokenExpiryDuration)
-	if _, err := a.db.Exec(insertTokenQuery, user.Name, token, expires.Unix()); err != nil {
+	token, expires := util.RandomString(tokenLength), time.Now().Add(tokenExpiryDuration)
+	tx, err := a.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(insertTokenQuery, user.Name, token, expires.Unix()); err != nil {
+		return nil, err
+	}
+	rows, err := tx.Query(selectTokenCountQuery, user.Name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, errNoRows
+	}
+	var tokenCount int
+	if err := rows.Scan(&tokenCount); err != nil {
+		return nil, err
+	}
+	if tokenCount >= tokenMaxCount {
+		// This pruning logic is done in two queries for efficiency. The SELECT above is a lookup
+		// on two indices, whereas the query below is a full table scan.
+		if _, err := tx.Exec(deleteExcessTokensQuery, user.Name, tokenMaxCount); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &Token{
@@ -270,7 +310,7 @@ func (a *Manager) ExtendToken(user *User) (*Token, error) {
 	if user.Token == "" {
 		return nil, errNoTokenProvided
 	}
-	newExpires := time.Now().Add(userTokenExpiryDuration)
+	newExpires := time.Now().Add(tokenExpiryDuration)
 	if _, err := a.db.Exec(updateTokenExpiryQuery, newExpires.Unix(), user.Name, user.Token); err != nil {
 		return nil, err
 	}
@@ -600,7 +640,7 @@ func (a *Manager) CheckAllowAccess(username string, topic string) error {
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return errors.New("no rows found")
+		return errNoRows
 	}
 	var otherCount int
 	if err := rows.Scan(&otherCount); err != nil {

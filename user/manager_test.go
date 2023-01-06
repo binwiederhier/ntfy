@@ -369,8 +369,51 @@ func TestManager_Token_Extend(t *testing.T) {
 	require.True(t, token.Expires.Unix() < extendedToken.Expires.Unix())
 }
 
+func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+
+	// Try to extend token for user without token
+	u, err := a.User("ben")
+	require.Nil(t, err)
+
+	// Tokens
+	baseTime := time.Now().Add(24 * time.Hour)
+	tokens := make([]string, 0)
+	for i := 0; i < 12; i++ {
+		token, err := a.CreateToken(u)
+		require.Nil(t, err)
+		require.NotEmpty(t, token.Value)
+		tokens = append(tokens, token.Value)
+
+		// Manually modify expiry date to avoid sorting issues (this is a hack)
+		_, err = a.db.Exec(`UPDATE user_token SET expires=? WHERE token=?`, baseTime.Add(time.Duration(i)*time.Minute).Unix(), token.Value)
+		require.Nil(t, err)
+	}
+
+	_, err = a.AuthenticateToken(tokens[0])
+	require.Equal(t, ErrUnauthenticated, err)
+
+	_, err = a.AuthenticateToken(tokens[1])
+	require.Equal(t, ErrUnauthenticated, err)
+
+	for i := 2; i < 12; i++ {
+		userWithToken, err := a.AuthenticateToken(tokens[i])
+		require.Nil(t, err, "token[%d]=%s failed", i, tokens[i])
+		require.Equal(t, "ben", userWithToken.Name)
+		require.Equal(t, tokens[i], userWithToken.Token)
+	}
+
+	var count int
+	rows, err := a.db.Query(`SELECT COUNT(*) FROM user_token`)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+	require.Nil(t, rows.Scan(&count))
+	require.Equal(t, 10, count)
+}
+
 func TestManager_EnqueueStats(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), PermissionReadWrite, time.Hour, 1500*time.Millisecond)
+	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -400,7 +443,7 @@ func TestManager_EnqueueStats(t *testing.T) {
 }
 
 func TestManager_ChangeSettings(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), PermissionReadWrite, time.Hour, 1500*time.Millisecond)
+	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -482,7 +525,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create manager to trigger migration
-	a := newTestManagerFromFile(t, filename, PermissionDenyAll, userTokenExpiryDuration, userStatsQueueWriterInterval)
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, userStatsQueueWriterInterval)
 	checkSchemaVersion(t, a.db)
 
 	users, err := a.Users()
@@ -530,11 +573,11 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 }
 
 func newTestManager(t *testing.T, defaultAccess Permission) *Manager {
-	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), defaultAccess, userTokenExpiryDuration, userStatsQueueWriterInterval)
+	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", defaultAccess, userStatsQueueWriterInterval)
 }
 
-func newTestManagerFromFile(t *testing.T, filename string, defaultAccess Permission, tokenExpiryDuration, statsWriterInterval time.Duration) *Manager {
-	a, err := newManager(filename, defaultAccess, tokenExpiryDuration, statsWriterInterval)
+func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) *Manager {
+	a, err := newManager(filename, startupQueries, defaultAccess, statsWriterInterval)
 	require.Nil(t, err)
 	return a
 }

@@ -45,10 +45,6 @@ import (
 		"account topic" sync mechanism
 		purge accounts that were not logged into in X
 		reset daily limits for users
-		max token issue limit
-		user db startup queries -> foreign keys
-		UI
-		- Feature flag for "reserve topic" feature
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"

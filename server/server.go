@@ -43,8 +43,12 @@ import (
 		plan:
 			weirdness with admin and "default" account
 		"account topic" sync mechanism
+		v.Info() endpoint double selects from DB
+		JS constants
 		purge accounts that were not logged into in X
 		reset daily limits for users
+		UI:
+		- flicker of upgrade banner
 		Sync:
 			- "mute" setting
 			- figure out what settings are "web" or "phone"

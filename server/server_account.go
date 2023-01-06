@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -29,7 +30,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		return errHTTPConflictUserExists
 	}
 	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
-		return errHTTPTooManyRequestsAccountCreateLimit
+		return errHTTPTooManyRequestsLimitAccountCreation
 	}
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
 		return err
@@ -330,6 +331,15 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	}
 	if !topicRegex.MatchString(req.Topic) {
 		return errHTTPBadRequestTopicInvalid
+	}
+	if v.user.Plan == nil {
+		return errors.New("no plan") // FIXME there should always be a plan!
+	}
+	reservations, err := s.userManager.ReservationsCount(v.user.Name)
+	if err != nil {
+		return err
+	} else if reservations >= v.user.Plan.TopicsLimit {
+		return errHTTPTooManyRequestsLimitReservations // FIXME test this
 	}
 	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved

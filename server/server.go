@@ -36,26 +36,31 @@ import (
 
 /*
 	TODO
-		limits:
+		limits & rate limiting:
 			message cache duration
 			Keep 10000 messages or keep X days?
 			Attachment expiration based on plan
+			login/account endpoints
 		plan:
 			weirdness with admin and "default" account
-		"account topic" sync mechanism
 		v.Info() endpoint double selects from DB
-		JS constants
 		purge accounts that were not logged into in X
 		reset daily limits for users
+		Make sure account endpoints make sense for admins
 		UI:
 		- flicker of upgrade banner
+		- JS constants
+		- useContext for account
 		Sync:
+			- "account topic" sync mechanism
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
-		rate limiting:
-		- login/account endpoints
 		Tests:
+		- /access endpoints
 		- visitor with/without user
+		Refactor:
+		- rename TopicsLimit -> ReservationsLimit
+		- rename /access -> /reservation
 		Later:
 		- Password reset
 		- Pricing
@@ -496,7 +501,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	}
 	if r.Method == http.MethodGet {
 		if err := v.BandwidthLimiter().Allow(stat.Size()); err != nil {
-			return errHTTPTooManyRequestsAttachmentBandwidthLimit
+			return errHTTPTooManyRequestsLimitAttachmentBandwidth
 		}
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))

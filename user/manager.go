@@ -140,6 +140,11 @@ const (
 		  AND a_user.owner_user_id = (SELECT id FROM user WHERE user = ?)
 		ORDER BY a_user.topic
 	`
+	selectUserReservationsCountQuery = `
+		SELECT COUNT(*)
+		FROM user_access
+		WHERE user_id = owner_user_id AND owner_user_id = (SELECT id FROM user WHERE user = ?)
+	`
 	selectOtherAccessCountQuery = `
 		SELECT COUNT(*)
 		FROM user_access
@@ -597,6 +602,23 @@ func (a *Manager) Reservations(username string) ([]Reservation, error) {
 		})
 	}
 	return reservations, nil
+}
+
+// ReservationsCount returns the number of reservations owned by this user
+func (a *Manager) ReservationsCount(username string) (int64, error) {
+	rows, err := a.db.Query(selectUserReservationsCountQuery, username)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, errNoRows
+	}
+	var count int64
+	if err := rows.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // ChangePassword changes a user's password

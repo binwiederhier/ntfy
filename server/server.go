@@ -56,7 +56,6 @@ import (
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
 		Tests:
-		- /access endpoints
 		- visitor with/without user
 		Refactor:
 		- rename TopicsLimit -> ReservationsLimit

@@ -1440,7 +1440,7 @@ func newTestConfig(t *testing.T) *Config {
 	return conf
 }
 
-func newTestConfigWithUsers(t *testing.T) *Config {
+func newTestConfigWithAuthFile(t *testing.T) *Config {
 	conf := newTestConfig(t)
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	return conf

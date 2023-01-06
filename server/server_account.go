@@ -332,23 +332,29 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	if !topicRegex.MatchString(req.Topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
-	if v.user.Plan == nil {
-		return errors.New("no plan") // FIXME there should always be a plan!
-	}
-	reservations, err := s.userManager.ReservationsCount(v.user.Name)
-	if err != nil {
-		return err
-	} else if reservations >= v.user.Plan.TopicsLimit {
-		return errHTTPTooManyRequestsLimitReservations // FIXME test this
-	}
-	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
-		return errHTTPConflictTopicReserved
-	}
-	owner, username := v.user.Name, v.user.Name
 	everyone, err := user.ParsePermission(req.Everyone)
 	if err != nil {
 		return errHTTPBadRequestPermissionInvalid
 	}
+	if v.user.Plan == nil {
+		return errors.New("no plan") // FIXME there should always be a plan!
+	}
+	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
+		return errHTTPConflictTopicReserved
+	}
+	hasReservation, err := s.userManager.HasReservation(v.user.Name, req.Topic)
+	if err != nil {
+		return err
+	}
+	if !hasReservation {
+		reservations, err := s.userManager.ReservationsCount(v.user.Name)
+		if err != nil {
+			return err
+		} else if reservations >= v.user.Plan.TopicsLimit {
+			return errHTTPTooManyRequestsLimitReservations
+		}
+	}
+	owner, username := v.user.Name, v.user.Name
 	if err := s.userManager.AllowAccess(owner, username, req.Topic, true, true); err != nil {
 		return err
 	}
@@ -369,18 +375,10 @@ func (s *Server) handleAccountAccessDelete(w http.ResponseWriter, r *http.Reques
 	if !topicRegex.MatchString(topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
-	reservations, err := s.userManager.Reservations(v.user.Name) // FIXME replace with HasReservation
+	authorized, err := s.userManager.HasReservation(v.user.Name, topic)
 	if err != nil {
 		return err
-	}
-	authorized := false
-	for _, r := range reservations {
-		if r.Topic == topic {
-			authorized = true
-			break
-		}
-	}
-	if !authorized {
+	} else if !authorized {
 		return errHTTPUnauthorized
 	}
 	if err := s.userManager.ResetAccess(v.user.Name, topic); err != nil {

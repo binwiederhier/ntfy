@@ -145,6 +145,13 @@ const (
 		FROM user_access
 		WHERE user_id = owner_user_id AND owner_user_id = (SELECT id FROM user WHERE user = ?)
 	`
+	selectUserHasReservationQuery = `
+		SELECT COUNT(*)
+		FROM user_access
+		WHERE user_id = owner_user_id 
+		  AND owner_user_id = (SELECT id FROM user WHERE user = ?)
+		  AND topic = ?	
+	`
 	selectOtherAccessCountQuery = `
 		SELECT COUNT(*)
 		FROM user_access
@@ -602,6 +609,23 @@ func (a *Manager) Reservations(username string) ([]Reservation, error) {
 		})
 	}
 	return reservations, nil
+}
+
+// HasReservation returns true if the given topic access is owned by the user
+func (a *Manager) HasReservation(username, topic string) (bool, error) {
+	rows, err := a.db.Query(selectUserHasReservationQuery, username, topic)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return false, errNoRows
+	}
+	var count int64
+	if err := rows.Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // ReservationsCount returns the number of reservations owned by this user

@@ -54,6 +54,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy-dotnet](https://github.com/nwithan8/ntfy-dotnet) - .NET client library to interact with a ntfy server (C# / .NET)
 - [node-ntfy-publish](https://github.com/cityssm/node-ntfy-publish) - A Node package to publish notifications to an ntfy server (Node)
 - [ntfy](https://github.com/jonocarroll/ntfy) - Wraps the ntfy API with pipe-friendly tooling (R)
+- [ntfy-for-delphi](https://github.com/hazzelnuts/ntfy-for-delphi) - A friendly library to push instant notifications ntfy (Delphi)
+- [ntfy](https://github.com/ffflorian/ntfy) - Send notifications over ntfy (JS)
 
 ## CLIs + GUIs
 

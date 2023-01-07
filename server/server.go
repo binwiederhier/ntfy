@@ -44,6 +44,7 @@ import (
 		purge accounts that were not logged into in X
 		reset daily limits for users
 		Make sure account endpoints make sense for admins
+		add logic to set "expires" column (this is gonna be dirty)
 		UI:
 		- flicker of upgrade banner
 		- JS constants

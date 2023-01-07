@@ -351,7 +351,7 @@ func TestAccount_Reservation_Add_User_No_Plan_Failure(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	rr = request(t, s, "POST", "/v1/account/access", `{"everyone":"deny-all"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/access", `{"topic":"mytopic", "everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 401, rr.Code)
@@ -363,10 +363,11 @@ func TestAccount_Reservation_Add_Admin_Success(t *testing.T) {
 	s := newTestServer(t, conf)
 	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin))
 
-	rr := request(t, s, "POST", "/v1/account/access", `{"everyone":"deny-all"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/account/access", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "adminpass"),
 	})
-	require.Equal(t, 200, rr.Code)
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
 }
 
 func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
@@ -383,8 +384,8 @@ func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
 	require.Nil(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO plan (id, code, messages_limit, emails_limit, attachment_file_size_limit, attachment_total_size_limit, topics_limit)
-		VALUES (1, 'testplan', 10, 10, 10, 10, 2);
+		INSERT INTO plan (id, code, messages_limit, messages_expiry_duration, emails_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, topics_limit)
+		VALUES (1, 'testplan', 10, 86400, 10, 10, 10, 10800, 2);
 
 		UPDATE user SET plan_id = 1 WHERE user = 'phil';
 	`)
@@ -455,8 +456,8 @@ func TestAccount_Reservation_Add_Access_By_Anonymous_Fails(t *testing.T) {
 	require.Nil(t, err)
 
 	_, err = db.Exec(`
-		INSERT INTO plan (id, code, messages_limit, emails_limit, attachment_file_size_limit, attachment_total_size_limit, topics_limit)
-		VALUES (1, 'testplan', 10, 10, 10, 10, 2);
+		INSERT INTO plan (id, code, messages_limit, messages_expiry_duration, emails_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, topics_limit)
+		VALUES (1, 'testplan', 10, 86400, 10, 10, 10, 10800, 2);
 
 		UPDATE user SET plan_id = 1 WHERE user = 'phil';
 	`)

@@ -247,26 +247,40 @@ func TestMemCache_Prune(t *testing.T) {
 }
 
 func testCachePrune(t *testing.T, c *messageCache) {
+	now := time.Now().Unix()
+
 	m1 := newDefaultMessage("mytopic", "my message")
-	m1.Time = 1
+	m1.Time = now - 10
+	m1.Expires = now - 5
 
 	m2 := newDefaultMessage("mytopic", "my other message")
-	m2.Time = 2
+	m2.Time = now - 5
+	m2.Expires = now + 5 // In the future
 
 	m3 := newDefaultMessage("another_topic", "and another one")
-	m3.Time = 1
+	m3.Time = now - 12
+	m3.Expires = now - 2
 
 	require.Nil(t, c.AddMessage(m1))
 	require.Nil(t, c.AddMessage(m2))
 	require.Nil(t, c.AddMessage(m3))
-	require.Nil(t, c.Prune(time.Unix(2, 0)))
 
 	counts, err := c.MessageCounts()
 	require.Nil(t, err)
-	require.Equal(t, 1, counts["mytopic"])
+	require.Equal(t, 2, counts["mytopic"])
+	require.Equal(t, 1, counts["another_topic"])
+
+	expiredMessages, err := c.MessagesExpired()
+	require.Nil(t, err)
+	ids := make([]string, 0)
+	for _, m := range expiredMessages {
+		ids = append(ids, m.ID)
+	}
+	require.Nil(t, c.DeleteMessages(ids...))
 
 	counts, err = c.MessageCounts()
 	require.Nil(t, err)
+	require.Equal(t, 1, counts["mytopic"])
 	require.Equal(t, 0, counts["another_topic"])
 
 	messages, err := c.Messages("mytopic", sinceAllMessages, false)

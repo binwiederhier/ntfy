@@ -58,10 +58,12 @@ type Plan struct {
 	Code                     string `json:"name"`
 	Upgradeable              bool   `json:"upgradeable"`
 	MessagesLimit            int64  `json:"messages_limit"`
+	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	EmailsLimit              int64  `json:"emails_limit"`
 	TopicsLimit              int64  `json:"topics_limit"`
 	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
+	AttachmentExpiryDuration int64  `json:"attachment_expiry_seconds"`
 }
 
 // Subscription represents a user's topic subscription

@@ -23,9 +23,10 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID         string      `json:"id"`    // Random message ID
-	Time       int64       `json:"time"`  // Unix time in seconds
-	Event      string      `json:"event"` // One of the above
+	ID         string      `json:"id"`      // Random message ID
+	Time       int64       `json:"time"`    // Unix time in seconds
+	Expires    int64       `json:"expires"` // Unix time in seconds
+	Event      string      `json:"event"`   // One of the above
 	Topic      string      `json:"topic"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
@@ -240,12 +241,14 @@ type apiAccountPlan struct {
 }
 
 type apiAccountLimits struct {
-	Basis               string `json:"basis"` // "ip", "role" or "plan"
-	Messages            int64  `json:"messages"`
-	Emails              int64  `json:"emails"`
-	Topics              int64  `json:"topics"`
-	AttachmentTotalSize int64  `json:"attachment_total_size"`
-	AttachmentFileSize  int64  `json:"attachment_file_size"`
+	Basis                    string `json:"basis"` // "ip", "role" or "plan"
+	Messages                 int64  `json:"messages"`
+	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
+	Emails                   int64  `json:"emails"`
+	Topics                   int64  `json:"topics"`
+	AttachmentTotalSize      int64  `json:"attachment_total_size"`
+	AttachmentFileSize       int64  `json:"attachment_file_size"`
+	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
 }
 
 type apiAccountStats struct {

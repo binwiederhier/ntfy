@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 )
 
 var (
@@ -61,29 +60,6 @@ func TestFileCache_Write_FailedAdditionalLimiter(t *testing.T) {
 	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1001)), util.NewFixedLimiter(1000))
 	require.Equal(t, util.ErrLimitReached, err)
 	require.NoFileExists(t, dir+"/abcdefghijkl")
-}
-
-func TestFileCache_RemoveExpired(t *testing.T) {
-	dir, c := newTestFileCache(t)
-	_, err := c.Write("abcdefghijkl", bytes.NewReader(make([]byte, 1001)))
-	require.Nil(t, err)
-	_, err = c.Write("notdeleted12", bytes.NewReader(make([]byte, 1001)))
-	require.Nil(t, err)
-
-	modTime := time.Now().Add(-1 * 4 * time.Hour)
-	require.Nil(t, os.Chtimes(dir+"/abcdefghijkl", modTime, modTime))
-
-	olderThan := time.Now().Add(-1 * 3 * time.Hour)
-	ids, err := c.Expired(olderThan)
-	require.Nil(t, err)
-	require.Equal(t, []string{"abcdefghijkl"}, ids)
-	require.Nil(t, c.Remove(ids...))
-	require.NoFileExists(t, dir+"/abcdefghijkl")
-	require.FileExists(t, dir+"/notdeleted12")
-
-	ids, err = c.Expired(olderThan)
-	require.Nil(t, err)
-	require.Empty(t, ids)
 }
 
 func newTestFileCache(t *testing.T) (dir string, cache *fileCache) {

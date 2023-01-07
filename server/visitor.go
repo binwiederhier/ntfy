@@ -46,6 +46,7 @@ type visitorInfo struct {
 	Messages                     int64
 	MessagesLimit                int64
 	MessagesRemaining            int64
+	MessagesExpiryDuration       int64
 	Emails                       int64
 	EmailsLimit                  int64
 	EmailsRemaining              int64
@@ -56,6 +57,7 @@ type visitorInfo struct {
 	AttachmentTotalSizeLimit     int64
 	AttachmentTotalSizeRemaining int64
 	AttachmentFileSizeLimit      int64
+	AttachmentExpiryDuration     int64
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
@@ -179,20 +181,26 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if v.user != nil && v.user.Role == user.RoleAdmin {
 		info.Basis = "role"
 		// All limits are zero!
+		info.MessagesExpiryDuration = 24 * 3600   // FIXME this is awful. Should be from the Unlimited plan
+		info.AttachmentExpiryDuration = 24 * 3600 // FIXME this is awful. Should be from the Unlimited plan
 	} else if v.user != nil && v.user.Plan != nil {
 		info.Basis = "plan"
 		info.MessagesLimit = v.user.Plan.MessagesLimit
+		info.MessagesExpiryDuration = v.user.Plan.MessagesExpiryDuration
 		info.EmailsLimit = v.user.Plan.EmailsLimit
 		info.TopicsLimit = v.user.Plan.TopicsLimit
 		info.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
+		info.AttachmentExpiryDuration = v.user.Plan.AttachmentExpiryDuration
 	} else {
 		info.Basis = "ip"
 		info.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
+		info.MessagesExpiryDuration = int64(v.config.CacheDuration.Seconds())
 		info.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
 		info.TopicsLimit = 0 // FIXME
 		info.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
+		info.AttachmentExpiryDuration = int64(v.config.AttachmentExpiryDuration.Seconds())
 	}
 	var attachmentsBytesUsed int64 // FIXME Maybe move this to endpoint?
 	var err error

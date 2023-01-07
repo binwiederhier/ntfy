@@ -1271,7 +1271,7 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, content, response.Body.String())
 
-	// Prune and makes sure it's gone
+	// DeleteMessages and makes sure it's gone
 	time.Sleep(time.Second) // Sigh ...
 	s.execManager()
 	require.NoFileExists(t, file)

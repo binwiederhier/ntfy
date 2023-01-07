@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -57,12 +56,14 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
 		},
 		Limits: &apiAccountLimits{
-			Basis:               stats.Basis,
-			Messages:            stats.MessagesLimit,
-			Emails:              stats.EmailsLimit,
-			Topics:              stats.TopicsLimit,
-			AttachmentTotalSize: stats.AttachmentTotalSizeLimit,
-			AttachmentFileSize:  stats.AttachmentFileSizeLimit,
+			Basis:                    stats.Basis,
+			Messages:                 stats.MessagesLimit,
+			MessagesExpiryDuration:   stats.MessagesExpiryDuration,
+			Emails:                   stats.EmailsLimit,
+			Topics:                   stats.TopicsLimit,
+			AttachmentTotalSize:      stats.AttachmentTotalSizeLimit,
+			AttachmentFileSize:       stats.AttachmentFileSizeLimit,
+			AttachmentExpiryDuration: stats.AttachmentExpiryDuration,
 		},
 	}
 	if v.user != nil {
@@ -325,6 +326,9 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	if v.user != nil && v.user.Role == user.RoleAdmin {
+		return errHTTPBadRequestMakesNoSenseForAdmin
+	}
 	req, err := readJSONWithLimit[apiAccountAccessRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
@@ -337,7 +341,7 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 		return errHTTPBadRequestPermissionInvalid
 	}
 	if v.user.Plan == nil {
-		return errors.New("no plan") // FIXME there should always be a plan!
+		return errHTTPUnauthorized // FIXME there should always be a plan!
 	}
 	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved

@@ -37,9 +37,6 @@ import (
 /*
 	TODO
 		limits & rate limiting:
-			message cache duration
-			Keep 10000 messages or keep X days?
-			Attachment expiration based on plan
 			login/account endpoints
 		plan:
 			weirdness with admin and "default" account
@@ -57,6 +54,8 @@ import (
 			- figure out what settings are "web" or "phone"
 		Tests:
 		- visitor with/without user
+		- plan-based message expiry
+		- plan-based attachment expiry
 		Refactor:
 		- rename TopicsLimit -> ReservationsLimit
 		- rename /access -> /reservation
@@ -544,6 +543,11 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if v.user != nil {
 		m.User = v.user.Name
 	}
+	if v.user != nil && v.user.Plan != nil {
+		m.Expires = time.Now().Unix() + v.user.Plan.MessagesExpiryDuration
+	} else {
+		m.Expires = time.Now().Add(s.config.CacheDuration).Unix()
+	}
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
 	}
@@ -815,7 +819,15 @@ func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser) error {
 	if s.fileCache == nil || s.config.BaseURL == "" || s.config.AttachmentCacheDir == "" {
 		return errHTTPBadRequestAttachmentsDisallowed
-	} else if m.Time > time.Now().Add(s.config.AttachmentExpiryDuration).Unix() {
+	}
+	var attachmentExpiryDuration time.Duration
+	if v.user != nil && v.user.Plan != nil {
+		attachmentExpiryDuration = time.Duration(v.user.Plan.AttachmentExpiryDuration) * time.Second
+	} else {
+		attachmentExpiryDuration = s.config.AttachmentExpiryDuration
+	}
+	attachmentExpiry := time.Now().Add(attachmentExpiryDuration).Unix()
+	if m.Time > attachmentExpiry {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
 	stats, err := v.Info()
@@ -834,7 +846,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	var ext string
 	m.Sender = v.ip // Important for attachment rate limiting
-	m.Attachment.Expires = time.Now().Add(s.config.AttachmentExpiryDuration).Unix()
+	m.Attachment.Expires = attachmentExpiry
 	m.Attachment.Type, ext = util.DetectContentType(body.PeekedBytes, m.Attachment.Name)
 	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
 	if m.Attachment.Name == "" {
@@ -1224,26 +1236,40 @@ func (s *Server) execManager() {
 	}
 
 	// Delete expired attachments
-	if s.fileCache != nil && s.config.AttachmentExpiryDuration > 0 {
-		olderThan := time.Now().Add(-1 * s.config.AttachmentExpiryDuration)
-		ids, err := s.fileCache.Expired(olderThan)
+	if s.fileCache != nil {
+		ids, err := s.messageCache.AttachmentsExpired()
 		if err != nil {
 			log.Warn("Error retrieving expired attachments: %s", err.Error())
 		} else if len(ids) > 0 {
-			log.Debug("Manager: Deleting expired attachments: %v", ids)
 			if err := s.fileCache.Remove(ids...); err != nil {
 				log.Warn("Error deleting attachments: %s", err.Error())
+			}
+			if err := s.messageCache.MarkAttachmentsDeleted(ids); err != nil {
+				log.Warn("Error marking attachments deleted: %s", err.Error())
 			}
 		} else {
 			log.Debug("Manager: No expired attachments to delete")
 		}
 	}
 
-	// Prune message cache
-	olderThan := time.Now().Add(-1 * s.config.CacheDuration)
-	log.Debug("Manager: Pruning messages older than %s", olderThan.Format("2006-01-02 15:04:05"))
-	if err := s.messageCache.Prune(olderThan); err != nil {
-		log.Warn("Manager: Error pruning cache: %s", err.Error())
+	// DeleteMessages message cache
+	log.Debug("Manager: Pruning messages")
+	expiredMessages, err := s.messageCache.MessagesExpired()
+	if err != nil {
+		log.Warn("Manager: Error retrieving expired messages: %s", err.Error())
+	} else if len(expiredMessages) > 0 {
+		ids := make([]string, 0)
+		for _, m := range expiredMessages {
+			ids = append(ids, m.ID)
+		}
+		if err := s.fileCache.Remove(ids...); err != nil {
+			log.Warn("Manager: Error deleting attachments for expired messages: %s", err.Error())
+		}
+		if err := s.messageCache.DeleteMessages(ids...); err != nil {
+			log.Warn("Manager: Error marking attachments deleted: %s", err.Error())
+		}
+	} else {
+		log.Debug("Manager: No expired messages to delete")
 	}
 
 	// Message count per topic

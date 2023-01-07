@@ -3,13 +3,13 @@ package server
 import (
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
-	"time"
 )
 
 var (
@@ -75,8 +75,11 @@ func (c *fileCache) Remove(ids ...string) error {
 		if !fileIDRegex.MatchString(id) {
 			return errInvalidFileID
 		}
+		log.Debug("File Cache: Deleting attachment %s", id)
 		file := filepath.Join(c.dir, id)
-		_ = os.Remove(file) // Best effort delete
+		if err := os.Remove(file); err != nil {
+			log.Debug("File Cache: Error deleting attachment %s: %s", id, err.Error())
+		}
 	}
 	size, err := dirSize(c.dir)
 	if err != nil {
@@ -86,25 +89,6 @@ func (c *fileCache) Remove(ids ...string) error {
 	c.totalSizeCurrent = size
 	c.mu.Unlock()
 	return nil
-}
-
-// Expired returns a list of file IDs for expired files
-func (c *fileCache) Expired(olderThan time.Time) ([]string, error) {
-	entries, err := os.ReadDir(c.dir)
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		if info.ModTime().Before(olderThan) && fileIDRegex.MatchString(e.Name()) {
-			ids = append(ids, e.Name())
-		}
-	}
-	return ids, nil
 }
 
 func (c *fileCache) Size() int64 {

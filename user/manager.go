@@ -36,10 +36,12 @@ const (
 			id INT NOT NULL,		
 			code TEXT NOT NULL,
 			messages_limit INT NOT NULL,
+			messages_expiry_duration INT NOT NULL,
 			emails_limit INT NOT NULL,
 			topics_limit INT NOT NULL,
 			attachment_file_size_limit INT NOT NULL,
 			attachment_total_size_limit INT NOT NULL,
+			attachment_expiry_duration INT NOT NULL,
 			PRIMARY KEY (id)
 		);
 		CREATE TABLE IF NOT EXISTS user (
@@ -83,13 +85,13 @@ const (
 	`
 
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		LEFT JOIN plan p on p.id = u.plan_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN plan p on p.id = u.plan_id
@@ -375,7 +377,7 @@ func (a *Manager) userStatsQueueWriter(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		if err := a.writeUserStatsQueue(); err != nil {
-			log.Warn("UserManager: Writing user stats queue failed: %s", err.Error())
+			log.Warn("User Manager: Writing user stats queue failed: %s", err.Error())
 		}
 	}
 }
@@ -384,7 +386,7 @@ func (a *Manager) writeUserStatsQueue() error {
 	a.mu.Lock()
 	if len(a.statsQueue) == 0 {
 		a.mu.Unlock()
-		log.Trace("UserManager: No user stats updates to commit")
+		log.Trace("User Manager: No user stats updates to commit")
 		return nil
 	}
 	statsQueue := a.statsQueue
@@ -395,9 +397,9 @@ func (a *Manager) writeUserStatsQueue() error {
 		return err
 	}
 	defer tx.Rollback()
-	log.Debug("UserManager: Writing user stats queue for %d user(s)", len(statsQueue))
+	log.Debug("User Manager: Writing user stats queue for %d user(s)", len(statsQueue))
 	for username, u := range statsQueue {
-		log.Trace("UserManager: Updating stats for user %s: messages=%d, emails=%d", username, u.Stats.Messages, u.Stats.Emails)
+		log.Trace("User Manager: Updating stats for user %s: messages=%d, emails=%d", username, u.Stats.Messages, u.Stats.Emails)
 		if _, err := tx.Exec(updateUserStatsQuery, u.Stats.Messages, u.Stats.Emails, username); err != nil {
 			return err
 		}
@@ -523,11 +525,11 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	var username, hash, role string
 	var settings, planCode sql.NullString
 	var messages, emails int64
-	var messagesLimit, emailsLimit, topicsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit sql.NullInt64
+	var messagesLimit, messagesExpiryDuration, emailsLimit, topicsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &emailsLimit, &topicsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &topicsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -552,10 +554,12 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			Code:                     planCode.String,
 			Upgradeable:              false,
 			MessagesLimit:            messagesLimit.Int64,
+			MessagesExpiryDuration:   messagesExpiryDuration.Int64,
 			EmailsLimit:              emailsLimit.Int64,
 			TopicsLimit:              topicsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
+			AttachmentExpiryDuration: attachmentExpiryDuration.Int64,
 		}
 	}
 	return user, nil

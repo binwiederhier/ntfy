@@ -57,8 +57,9 @@ import (
 		- visitor with/without user
 		- plan-based message expiry
 		- plan-based attachment expiry
+		Docs:
+		- "expires" field in message
 		Refactor:
-		- rename TopicsLimit -> ReservationsLimit
 		- rename /access -> /reservation
 		Later:
 		- Password reset
@@ -544,8 +545,8 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if v.user != nil {
 		m.User = v.user.Name
 	}
-	if v.user != nil && v.user.Plan != nil {
-		m.Expires = time.Now().Unix() + v.user.Plan.MessagesExpiryDuration
+	if v.user != nil && v.user.Tier != nil {
+		m.Expires = time.Now().Unix() + v.user.Tier.MessagesExpiryDuration
 	} else {
 		m.Expires = time.Now().Add(s.config.CacheDuration).Unix()
 	}
@@ -822,8 +823,8 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		return errHTTPBadRequestAttachmentsDisallowed
 	}
 	var attachmentExpiryDuration time.Duration
-	if v.user != nil && v.user.Plan != nil {
-		attachmentExpiryDuration = time.Duration(v.user.Plan.AttachmentExpiryDuration) * time.Second
+	if v.user != nil && v.user.Tier != nil {
+		attachmentExpiryDuration = time.Duration(v.user.Tier.AttachmentExpiryDuration) * time.Second
 	} else {
 		attachmentExpiryDuration = s.config.AttachmentExpiryDuration
 	}
@@ -1240,13 +1241,16 @@ func (s *Server) execManager() {
 	if s.fileCache != nil {
 		ids, err := s.messageCache.AttachmentsExpired()
 		if err != nil {
-			log.Warn("Error retrieving expired attachments: %s", err.Error())
+			log.Warn("Manager: Error retrieving expired attachments: %s", err.Error())
 		} else if len(ids) > 0 {
-			if err := s.fileCache.Remove(ids...); err != nil {
-				log.Warn("Error deleting attachments: %s", err.Error())
+			if log.IsDebug() {
+				log.Debug("Manager: Deleting attachments %s", strings.Join(ids, ", "))
 			}
-			if err := s.messageCache.MarkAttachmentsDeleted(ids); err != nil {
-				log.Warn("Error marking attachments deleted: %s", err.Error())
+			if err := s.fileCache.Remove(ids...); err != nil {
+				log.Warn("Manager: Error deleting attachments: %s", err.Error())
+			}
+			if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
+				log.Warn("Manager: Error marking attachments deleted: %s", err.Error())
 			}
 		} else {
 			log.Debug("Manager: No expired attachments to delete")

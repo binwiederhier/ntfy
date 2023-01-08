@@ -1090,6 +1090,34 @@ func TestServer_PublishAsJSON_Invalid(t *testing.T) {
 	require.Equal(t, 400, response.Code)
 }
 
+func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+
+	// Create tier with certain limits
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                   "test",
+		MessagesLimit:          5,
+		MessagesExpiryDuration: 1, // Second
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+
+	// Publish to reach message limit
+	for i := 0; i < 5; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("this is message %d", i+1), map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.True(t, msg.Expires < time.Now().Unix()+5)
+	}
+	response := request(t, s, "PUT", "/mytopic", "this is too much", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 413, response.Code)
+}
+
 func TestServer_PublishAttachment(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 	s := newTestServer(t, newTestConfig(t))
@@ -1271,12 +1299,105 @@ func TestServer_PublishAttachmentAndPrune(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, content, response.Body.String())
 
-	// DeleteMessages and makes sure it's gone
+	// Prune and makes sure it's gone
 	time.Sleep(time.Second) // Sigh ...
 	s.execManager()
 	require.NoFileExists(t, file)
 	response = request(t, s, "GET", path, "", nil)
 	require.Equal(t, 404, response.Code)
+}
+
+func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+
+	c := newTestConfigWithAuthFile(t)
+	c.AttachmentExpiryDuration = time.Millisecond // Hack
+	s := newTestServer(t, c)
+
+	// Create tier with certain limits
+	sevenDaysInSeconds := int64(604800)
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                     "test",
+		MessagesExpiryDuration:   sevenDaysInSeconds,
+		AttachmentFileSizeLimit:  50_000,
+		AttachmentTotalSizeLimit: 200_000,
+		AttachmentExpiryDuration: sevenDaysInSeconds, // 7 days
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+
+	// Publish and make sure we can retrieve it
+	response := request(t, s, "PUT", "/mytopic", content, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	msg := toMessage(t, response.Body.String())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	require.True(t, msg.Attachment.Expires > time.Now().Unix()+sevenDaysInSeconds-30)
+	require.True(t, msg.Expires > time.Now().Unix()+sevenDaysInSeconds-30)
+	file := filepath.Join(s.config.AttachmentCacheDir, msg.ID)
+	require.FileExists(t, file)
+
+	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, content, response.Body.String())
+
+	// Prune and makes sure it's still there
+	time.Sleep(time.Second) // Sigh ...
+	s.execManager()
+	require.FileExists(t, file)
+	response = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
+	smallFile := util.RandomString(20_000)
+	largeFile := util.RandomString(50_000)
+
+	c := newTestConfigWithAuthFile(t)
+	c.AttachmentFileSizeLimit = 20_000
+	c.VisitorAttachmentTotalSizeLimit = 40_000
+	s := newTestServer(t, c)
+
+	// Create tier with certain limits
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                     "test",
+		AttachmentFileSizeLimit:  50_000,
+		AttachmentTotalSizeLimit: 200_000,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+
+	// Publish small file as anonymous
+	response := request(t, s, "PUT", "/mytopic", smallFile, nil)
+	msg := toMessage(t, response.Body.String())
+	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
+
+	// Publish large file as anonymous
+	response = request(t, s, "PUT", "/mytopic", largeFile, nil)
+	require.Equal(t, 413, response.Code)
+
+	// Publish too large file as phil
+	response = request(t, s, "PUT", "/mytopic", largeFile+" a few more bytes", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 413, response.Code)
+
+	// Publish large file as phil (4x)
+	for i := 0; i < 4; i++ {
+		response = request(t, s, "PUT", "/mytopic", largeFile, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
+		require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, msg.ID))
+	}
+	response = request(t, s, "PUT", "/mytopic", largeFile, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 413, response.Code)
 }
 
 func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {

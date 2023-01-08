@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/user"
@@ -343,7 +342,7 @@ func TestAccount_Delete_Not_Allowed(t *testing.T) {
 	require.Equal(t, 401, rr.Code)
 }
 
-func TestAccount_Reservation_Add_User_No_Plan_Failure(t *testing.T) {
+func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
@@ -357,7 +356,7 @@ func TestAccount_Reservation_Add_User_No_Plan_Failure(t *testing.T) {
 	require.Equal(t, 401, rr.Code)
 }
 
-func TestAccount_Reservation_Add_Admin_Success(t *testing.T) {
+func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
@@ -370,7 +369,7 @@ func TestAccount_Reservation_Add_Admin_Success(t *testing.T) {
 	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
 }
 
-func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
+func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
@@ -379,17 +378,19 @@ func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	// Create a plan (hack!)
-	db, err := sql.Open("sqlite3", conf.AuthFile)
-	require.Nil(t, err)
-
-	_, err = db.Exec(`
-		INSERT INTO plan (id, code, messages_limit, messages_expiry_duration, emails_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, topics_limit)
-		VALUES (1, 'testplan', 10, 86400, 10, 10, 10, 10800, 2);
-
-		UPDATE user SET plan_id = 1 WHERE user = 'phil';
-	`)
-	require.Nil(t, err)
+	// Create a tier
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                     "pro",
+		Upgradeable:              false,
+		MessagesLimit:            123,
+		MessagesExpiryDuration:   86400,
+		EmailsLimit:              32,
+		ReservationsLimit:        2,
+		AttachmentFileSizeLimit:  1231231,
+		AttachmentTotalSizeLimit: 123123,
+		AttachmentExpiryDuration: 10800,
+	}))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Reserve two topics
 	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
@@ -420,6 +421,14 @@ func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, "pro", account.Tier.Code)
+	require.Equal(t, int64(123), account.Limits.Messages)
+	require.Equal(t, int64(86400), account.Limits.MessagesExpiryDuration)
+	require.Equal(t, int64(32), account.Limits.Emails)
+	require.Equal(t, int64(2), account.Limits.Reservations)
+	require.Equal(t, int64(1231231), account.Limits.AttachmentFileSize)
+	require.Equal(t, int64(123123), account.Limits.AttachmentTotalSize)
+	require.Equal(t, int64(10800), account.Limits.AttachmentExpiryDuration)
 	require.Equal(t, 2, len(account.Reservations))
 	require.Equal(t, "another", account.Reservations[0].Topic)
 	require.Equal(t, "write-only", account.Reservations[0].Everyone)
@@ -441,27 +450,21 @@ func TestAccount_Reservation_Add_Remove_User_With_Plan_Success(t *testing.T) {
 	require.Equal(t, "mytopic", account.Reservations[0].Topic)
 }
 
-func TestAccount_Reservation_Add_Access_By_Anonymous_Fails(t *testing.T) {
+func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
 
-	// Create user
+	// Create user with tier
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	// Create a plan (hack!)
-	db, err := sql.Open("sqlite3", conf.AuthFile)
-	require.Nil(t, err)
-
-	_, err = db.Exec(`
-		INSERT INTO plan (id, code, messages_limit, messages_expiry_duration, emails_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, topics_limit)
-		VALUES (1, 'testplan', 10, 86400, 10, 10, 10, 10800, 2);
-
-		UPDATE user SET plan_id = 1 WHERE user = 'phil';
-	`)
-	require.Nil(t, err)
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:              "pro",
+		ReservationsLimit: 2,
+	}))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Reserve a topic
 	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{

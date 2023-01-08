@@ -99,7 +99,7 @@ const NavList = (props) => {
         navigate(routes.account);
     };
 
-    const showUpgradeBanner = config.enable_payments && (!props.account || props.account.plan.upgradeable);
+    const showUpgradeBanner = config.enable_payments && (!props.account || props.account.tier.upgradeable);
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
     const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser

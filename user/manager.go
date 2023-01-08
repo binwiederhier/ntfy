@@ -32,28 +32,27 @@ var (
 // Manager-related queries
 const (
 	createTablesQueriesNoTx = `
-		CREATE TABLE IF NOT EXISTS plan (
-			id INT NOT NULL,		
+		CREATE TABLE IF NOT EXISTS tier (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,		
 			code TEXT NOT NULL,
 			messages_limit INT NOT NULL,
 			messages_expiry_duration INT NOT NULL,
 			emails_limit INT NOT NULL,
-			topics_limit INT NOT NULL,
+			reservations_limit INT NOT NULL,
 			attachment_file_size_limit INT NOT NULL,
 			attachment_total_size_limit INT NOT NULL,
-			attachment_expiry_duration INT NOT NULL,
-			PRIMARY KEY (id)
+			attachment_expiry_duration INT NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS user (
 		    id INTEGER PRIMARY KEY AUTOINCREMENT,
-			plan_id INT,
+			tier_id INT,
 			user TEXT NOT NULL,
 			pass TEXT NOT NULL,
 			role TEXT NOT NULL,
 			messages INT NOT NULL DEFAULT (0),
 			emails INT NOT NULL DEFAULT (0),			
 			settings JSON,
-		    FOREIGN KEY (plan_id) REFERENCES plan (id)
+		    FOREIGN KEY (tier_id) REFERENCES tier (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
 		CREATE TABLE IF NOT EXISTS user_access (
@@ -85,16 +84,16 @@ const (
 	`
 
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
-		LEFT JOIN plan p on p.id = u.plan_id
+		LEFT JOIN tier p on p.id = u.tier_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.topics_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
-		LEFT JOIN plan p on p.id = u.plan_id
+		LEFT JOIN tier p on p.id = u.tier_id
 		WHERE t.token = ? AND t.expires >= ?
 	`
 	selectTopicPermsQuery = `
@@ -178,8 +177,14 @@ const (
 			ORDER BY expires DESC 
 			LIMIT ?
 		)
-;
 	`
+
+	insertTierQuery = `
+		INSERT INTO tier (code, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	selectTierIDQuery   = `SELECT id FROM tier WHERE code = ?`
+	updateUserTierQuery = `UPDATE user SET tier_id = ? WHERE user = ?`
 )
 
 // Schema management queries
@@ -523,13 +528,13 @@ func (a *Manager) userByToken(token string) (*User, error) {
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var settings, planCode sql.NullString
+	var settings, tierCode sql.NullString
 	var messages, emails int64
-	var messagesLimit, messagesExpiryDuration, emailsLimit, topicsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
+	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &planCode, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &topicsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &tierCode, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -549,14 +554,14 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			return nil, err
 		}
 	}
-	if planCode.Valid {
-		user.Plan = &Plan{
-			Code:                     planCode.String,
+	if tierCode.Valid {
+		user.Tier = &Tier{
+			Code:                     tierCode.String,
 			Upgradeable:              false,
 			MessagesLimit:            messagesLimit.Int64,
 			MessagesExpiryDuration:   messagesExpiryDuration.Int64,
 			EmailsLimit:              emailsLimit.Int64,
-			TopicsLimit:              topicsLimit.Int64,
+			ReservationsLimit:        reservationsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 			AttachmentExpiryDuration: attachmentExpiryDuration.Int64,
@@ -678,6 +683,30 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 	return nil
 }
 
+// ChangeTier changes a user's tier using the tier code
+func (a *Manager) ChangeTier(username, tier string) error {
+	if !AllowedUsername(username) {
+		return ErrInvalidArgument
+	}
+	rows, err := a.db.Query(selectTierIDQuery, tier)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return ErrInvalidArgument
+	}
+	var tierID int64
+	if err := rows.Scan(&tierID); err != nil {
+		return err
+	}
+	rows.Close()
+	if _, err := a.db.Exec(updateUserTierQuery, tierID, username); err != nil {
+		return err
+	}
+	return nil
+}
+
 // CheckAllowAccess tests if a user may create an access control entry for the given topic.
 // If there are any ACL entries that are not owned by the user, an error is returned.
 func (a *Manager) CheckAllowAccess(username string, topic string) error {
@@ -741,6 +770,14 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 // DefaultAccess returns the default read/write access if no access control entry matches
 func (a *Manager) DefaultAccess() Permission {
 	return a.defaultAccess
+}
+
+// CreateTier creates a new tier in the database
+func (a *Manager) CreateTier(tier *Tier) error {
+	if _, err := a.db.Exec(insertTierQuery, tier.Code, tier.MessagesLimit, tier.MessagesExpiryDuration, tier.EmailsLimit, tier.ReservationsLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, tier.AttachmentExpiryDuration); err != nil {
+		return err
+	}
+	return nil
 }
 
 func toSQLWildcard(s string) string {

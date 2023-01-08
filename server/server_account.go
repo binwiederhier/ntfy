@@ -50,8 +50,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			MessagesRemaining:            stats.MessagesRemaining,
 			Emails:                       stats.Emails,
 			EmailsRemaining:              stats.EmailsRemaining,
-			Topics:                       stats.Topics,
-			TopicsRemaining:              stats.TopicsRemaining,
+			Reservations:                 stats.Reservations,
+			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
 		},
@@ -60,7 +60,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			Messages:                 stats.MessagesLimit,
 			MessagesExpiryDuration:   stats.MessagesExpiryDuration,
 			Emails:                   stats.EmailsLimit,
-			Topics:                   stats.TopicsLimit,
+			Reservations:             stats.ReservationsLimit,
 			AttachmentTotalSize:      stats.AttachmentTotalSizeLimit,
 			AttachmentFileSize:       stats.AttachmentFileSizeLimit,
 			AttachmentExpiryDuration: stats.AttachmentExpiryDuration,
@@ -80,19 +80,19 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 				response.Subscriptions = v.user.Prefs.Subscriptions
 			}
 		}
-		if v.user.Plan != nil {
-			response.Plan = &apiAccountPlan{
-				Code:        v.user.Plan.Code,
-				Upgradeable: v.user.Plan.Upgradeable,
+		if v.user.Tier != nil {
+			response.Tier = &apiAccountTier{
+				Code:        v.user.Tier.Code,
+				Upgradeable: v.user.Tier.Upgradeable,
 			}
 		} else if v.user.Role == user.RoleAdmin {
-			response.Plan = &apiAccountPlan{
-				Code:        string(user.PlanUnlimited),
+			response.Tier = &apiAccountTier{
+				Code:        string(user.TierUnlimited),
 				Upgradeable: false,
 			}
 		} else {
-			response.Plan = &apiAccountPlan{
-				Code:        string(user.PlanDefault),
+			response.Tier = &apiAccountTier{
+				Code:        string(user.TierDefault),
 				Upgradeable: true,
 			}
 		}
@@ -112,8 +112,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 	} else {
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
-		response.Plan = &apiAccountPlan{
-			Code:        string(user.PlanNone),
+		response.Tier = &apiAccountTier{
+			Code:        string(user.TierNone),
 			Upgradeable: true,
 		}
 	}
@@ -340,7 +340,7 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	if err != nil {
 		return errHTTPBadRequestPermissionInvalid
 	}
-	if v.user.Plan == nil {
+	if v.user.Tier == nil {
 		return errHTTPUnauthorized // FIXME there should always be a plan!
 	}
 	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
@@ -354,7 +354,7 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 		reservations, err := s.userManager.ReservationsCount(v.user.Name)
 		if err != nil {
 			return err
-		} else if reservations >= v.user.Plan.TopicsLimit {
+		} else if reservations >= v.user.Tier.ReservationsLimit {
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}

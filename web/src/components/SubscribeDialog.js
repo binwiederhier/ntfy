@@ -87,7 +87,7 @@ const SubscribePage = (props) => {
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
-    //const reserveTopicEnabled = session.exists() && (account?.stats.topics_remaining || 0) > 0;
+    //const reserveTopicEnabled = session.exists() && (account?.stats.reservations_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
@@ -184,7 +184,7 @@ const SubscribePage = (props) => {
                             control={
                                 <Checkbox
                                     fullWidth
-                                    // disabled={account.stats.topics_remaining}
+                                    // disabled={account.stats.reservations_remaining}
                                     checked={reserveTopicVisible}
                                     onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                                     inputProps={{

@@ -235,17 +235,17 @@ type apiAccountTokenResponse struct {
 	Expires int64  `json:"expires"`
 }
 
-type apiAccountPlan struct {
+type apiAccountTier struct {
 	Code        string `json:"code"`
 	Upgradeable bool   `json:"upgradeable"`
 }
 
 type apiAccountLimits struct {
-	Basis                    string `json:"basis"` // "ip", "role" or "plan"
+	Basis                    string `json:"basis"` // "ip", "role" or "tier"
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
-	Topics                   int64  `json:"topics"`
+	Reservations             int64  `json:"reservations"`
 	AttachmentTotalSize      int64  `json:"attachment_total_size"`
 	AttachmentFileSize       int64  `json:"attachment_file_size"`
 	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
@@ -256,8 +256,8 @@ type apiAccountStats struct {
 	MessagesRemaining            int64 `json:"messages_remaining"`
 	Emails                       int64 `json:"emails"`
 	EmailsRemaining              int64 `json:"emails_remaining"`
-	Topics                       int64 `json:"topics"`
-	TopicsRemaining              int64 `json:"topics_remaining"`
+	Reservations                 int64 `json:"reservations"`
+	ReservationsRemaining        int64 `json:"reservations_remaining"`
 	AttachmentTotalSize          int64 `json:"attachment_total_size"`
 	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
 }
@@ -274,7 +274,7 @@ type apiAccountResponse struct {
 	Notification  *user.NotificationPrefs  `json:"notification,omitempty"`
 	Subscriptions []*user.Subscription     `json:"subscriptions,omitempty"`
 	Reservations  []*apiAccountReservation `json:"reservations,omitempty"`
-	Plan          *apiAccountPlan          `json:"plan,omitempty"`
+	Tier          *apiAccountTier          `json:"tier,omitempty"`
 	Limits        *apiAccountLimits        `json:"limits,omitempty"`
 	Stats         *apiAccountStats         `json:"stats,omitempty"`
 }

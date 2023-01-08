@@ -489,7 +489,7 @@ const Reservations = () => {
         return <></>;
     }
     const reservations = account.reservations || [];
-    const limitReached = account.role === "user" && account.stats.topics_remaining === 0;
+    const limitReached = account.role === "user" && account.stats.reservations_remaining === 0;
 
     const handleAddClick = () => {
         setDialogKey(prev => prev+1);

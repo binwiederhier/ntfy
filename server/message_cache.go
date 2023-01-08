@@ -502,7 +502,7 @@ func (c *messageCache) AttachmentsExpired() ([]string, error) {
 	return ids, nil
 }
 
-func (c *messageCache) MarkAttachmentsDeleted(ids []string) error {
+func (c *messageCache) MarkAttachmentsDeleted(ids ...string) error {
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err

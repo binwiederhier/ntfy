@@ -14,7 +14,7 @@ type User struct {
 	Token string // Only set if token was used to log in
 	Role  Role
 	Prefs *Prefs
-	Plan  *Plan
+	Tier  *Tier
 	Stats *Stats
 }
 
@@ -43,27 +43,27 @@ type Prefs struct {
 	Subscriptions []*Subscription    `json:"subscriptions,omitempty"`
 }
 
-// PlanCode is code identifying a user's plan
-type PlanCode string
+// TierCode is code identifying a user's tier
+type TierCode string
 
-// Default plan codes
+// Default tier codes
 const (
-	PlanUnlimited = PlanCode("unlimited")
-	PlanDefault   = PlanCode("default")
-	PlanNone      = PlanCode("none")
+	TierUnlimited = TierCode("unlimited")
+	TierDefault   = TierCode("default")
+	TierNone      = TierCode("none")
 )
 
-// Plan represents a user's account type, including its account limits
-type Plan struct {
+// Tier represents a user's account type, including its account limits
+type Tier struct {
 	Code                     string `json:"name"`
 	Upgradeable              bool   `json:"upgradeable"`
 	MessagesLimit            int64  `json:"messages_limit"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	EmailsLimit              int64  `json:"emails_limit"`
-	TopicsLimit              int64  `json:"topics_limit"`
+	ReservationsLimit        int64  `json:"reservations_limit"`
 	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
 	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
-	AttachmentExpiryDuration int64  `json:"attachment_expiry_seconds"`
+	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
 }
 
 // Subscription represents a user's topic subscription

@@ -169,7 +169,7 @@ const Stats = () => {
     if (!account) {
         return <></>;
     }
-    const planCode = account.plan.code ?? "none";
+    const tierCode = account.tier.code ?? "none";
     const normalize = (value, max) => Math.min(value / max * 100, 100);
     const barColor = (remaining, limit) => {
         if (account.role === "admin") {
@@ -186,12 +186,12 @@ const Stats = () => {
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                <Pref title={t("account_usage_plan_title")}>
+                <Pref title={t("account_usage_tier_title")}>
                     <div>
                         {account.role === "admin"
                             ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
-                            : t(`account_usage_plan_code_${planCode}`)}
-                        {config.enable_payments && account.plan.upgradeable &&
+                            : t(`account_usage_tier_code_${tierCode}`)}
+                        {config.enable_payments && account.tier.upgradeable &&
                             <em>{" "}
                                 <Link onClick={() => {}}>Upgrade</Link>
                             </em>
@@ -199,20 +199,20 @@ const Stats = () => {
                     </div>
                 </Pref>
                 <Pref title={t("account_usage_topics_title")}>
-                    {account.limits.topics > 0 &&
+                    {account.limits.reservations > 0 &&
                         <>
                             <div>
-                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.topics}</Typography>
-                                <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.topics }) : t("account_usage_unlimited")}</Typography>
+                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.reservations}</Typography>
+                                <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.reservations }) : t("account_usage_unlimited")}</Typography>
                             </div>
                             <LinearProgress
                                 variant="determinate"
-                                value={account.limits.topics > 0 ? normalize(account.stats.topics, account.limits.topics) : 100}
-                                color={barColor(account.stats.topics_remaining, account.limits.topics)}
+                                value={account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
+                                color={barColor(account.stats.reservations_remaining, account.limits.reservations)}
                             />
                         </>
                     }
-                    {account.limits.topics === 0 &&
+                    {account.limits.reservations === 0 &&
                         <em>No reserved topics for this account</em>
                     }
                 </Pref>

@@ -42,7 +42,7 @@ type visitor struct {
 }
 
 type visitorInfo struct {
-	Basis                        string // "ip", "role" or "plan"
+	Basis                        string // "ip", "role" or "tier"
 	Messages                     int64
 	MessagesLimit                int64
 	MessagesRemaining            int64
@@ -50,9 +50,9 @@ type visitorInfo struct {
 	Emails                       int64
 	EmailsLimit                  int64
 	EmailsRemaining              int64
-	Topics                       int64
-	TopicsLimit                  int64
-	TopicsRemaining              int64
+	Reservations                 int64
+	ReservationsLimit            int64
+	ReservationsRemaining        int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeLimit     int64
 	AttachmentTotalSizeRemaining int64
@@ -69,9 +69,9 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 	} else {
 		accountLimiter = rate.NewLimiter(rate.Every(conf.VisitorAccountCreateLimitReplenish), conf.VisitorAccountCreateLimitBurst)
 	}
-	if user != nil && user.Plan != nil {
-		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.MessagesLimit), conf.VisitorRequestLimitBurst)
-		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Plan.EmailsLimit), conf.VisitorEmailLimitBurst)
+	if user != nil && user.Tier != nil {
+		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.MessagesLimit), conf.VisitorRequestLimitBurst)
+		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.EmailsLimit), conf.VisitorEmailLimitBurst)
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
 		emailsLimiter = rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst)
@@ -183,21 +183,21 @@ func (v *visitor) Info() (*visitorInfo, error) {
 		// All limits are zero!
 		info.MessagesExpiryDuration = 24 * 3600   // FIXME this is awful. Should be from the Unlimited plan
 		info.AttachmentExpiryDuration = 24 * 3600 // FIXME this is awful. Should be from the Unlimited plan
-	} else if v.user != nil && v.user.Plan != nil {
-		info.Basis = "plan"
-		info.MessagesLimit = v.user.Plan.MessagesLimit
-		info.MessagesExpiryDuration = v.user.Plan.MessagesExpiryDuration
-		info.EmailsLimit = v.user.Plan.EmailsLimit
-		info.TopicsLimit = v.user.Plan.TopicsLimit
-		info.AttachmentTotalSizeLimit = v.user.Plan.AttachmentTotalSizeLimit
-		info.AttachmentFileSizeLimit = v.user.Plan.AttachmentFileSizeLimit
-		info.AttachmentExpiryDuration = v.user.Plan.AttachmentExpiryDuration
+	} else if v.user != nil && v.user.Tier != nil {
+		info.Basis = "tier"
+		info.MessagesLimit = v.user.Tier.MessagesLimit
+		info.MessagesExpiryDuration = v.user.Tier.MessagesExpiryDuration
+		info.EmailsLimit = v.user.Tier.EmailsLimit
+		info.ReservationsLimit = v.user.Tier.ReservationsLimit
+		info.AttachmentTotalSizeLimit = v.user.Tier.AttachmentTotalSizeLimit
+		info.AttachmentFileSizeLimit = v.user.Tier.AttachmentFileSizeLimit
+		info.AttachmentExpiryDuration = v.user.Tier.AttachmentExpiryDuration
 	} else {
 		info.Basis = "ip"
 		info.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
 		info.MessagesExpiryDuration = int64(v.config.CacheDuration.Seconds())
 		info.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
-		info.TopicsLimit = 0 // FIXME
+		info.ReservationsLimit = 0 // FIXME
 		info.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
 		info.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
 		info.AttachmentExpiryDuration = int64(v.config.AttachmentExpiryDuration.Seconds())
@@ -212,20 +212,19 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	var topics int64
+	var reservations int64
 	if v.user != nil && v.userManager != nil {
-		reservations, err := v.userManager.Reservations(v.user.Name) // FIXME dup call, move this to endpoint?
+		reservations, err = v.userManager.ReservationsCount(v.user.Name) // FIXME dup call, move this to endpoint?
 		if err != nil {
 			return nil, err
 		}
-		topics = int64(len(reservations))
 	}
 	info.Messages = messages
 	info.MessagesRemaining = zeroIfNegative(info.MessagesLimit - info.Messages)
 	info.Emails = emails
 	info.EmailsRemaining = zeroIfNegative(info.EmailsLimit - info.Emails)
-	info.Topics = topics
-	info.TopicsRemaining = zeroIfNegative(info.TopicsLimit - info.Topics)
+	info.Reservations = reservations
+	info.ReservationsRemaining = zeroIfNegative(info.ReservationsLimit - info.Reservations)
 	info.AttachmentTotalSize = attachmentsBytesUsed
 	info.AttachmentTotalSizeRemaining = zeroIfNegative(info.AttachmentTotalSizeLimit - info.AttachmentTotalSize)
 	return info, nil

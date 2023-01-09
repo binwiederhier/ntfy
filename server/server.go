@@ -41,7 +41,6 @@ import (
 		purge accounts that were not logged int o in X
 		reset daily Limits for users
 		Make sure account endpoints make sense for admins
-		add logic to set "expires" column (this is gonna be dirty)
 		UI:
 		- Align size of message bar and upgrade banner
 		- flicker of upgrade banner
@@ -199,7 +198,7 @@ func createMessageCache(conf *Config) (*messageCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
+		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
 	}
 	return newMemCache()
 }

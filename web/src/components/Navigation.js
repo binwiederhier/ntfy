@@ -182,18 +182,24 @@ const UpgradeBanner = () => {
             background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
         }}>
             <Divider/>
-            <ListItemButton onClick={() => setDialogOpen(true)}>
+            <ListItemButton onClick={() => setDialogOpen(true)} sx={{pt: 2, pb: 2}}>
                 <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
                 <ListItemText
                     sx={{ ml: 1 }}
                     primary={"Upgrade to ntfy Pro"}
-                    secondary={"Reserve topics, more messages & emails, bigger attachments"}
+                    secondary={"Reserve topics, more messages & emails, and larger attachments"}
                     primaryTypographyProps={{
                         style: {
                             fontWeight: 500,
+                            fontSize: "1.1rem",
                             background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
                             WebkitBackgroundClip: "text",
                             WebkitTextFillColor: "transparent"
+                        }
+                    }}
+                    secondaryTypographyProps={{
+                        style: {
+                            fontSize: "1rem"
                         }
                     }}
                 />

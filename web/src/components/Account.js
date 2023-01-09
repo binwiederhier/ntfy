@@ -200,12 +200,8 @@ const Stats = () => {
                                 {" "}{account.tier ? `(with ${account.tier.name} tier)` : `(no tier)`}
                             </>
                         }
-                        {account.role === "user" && account.tier &&
-                            <>{account.tier.name}</>
-                        }
-                        {account.role === "user" && !account.tier &&
-                            t("account_usage_tier_none")
-                        }
+                        {account.role === "user" && account.tier && account.tier.name}
+                        {account.role === "user" && !account.tier && t("account_usage_tier_none")}
                         {config.enable_payments && account.role === "user" && (!account.tier || !account.tier.paid) &&
                             <Button
                                 variant="outlined"

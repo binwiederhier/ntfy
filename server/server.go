@@ -42,7 +42,6 @@ import (
 		reset daily Limits for users
 		Make sure account endpoints make sense for admins
 		UI:
-		- Align size of message bar and upgrade banner
 		- flicker of upgrade banner
 		- JS constants
 		- useContext for account

@@ -41,7 +41,7 @@ import (
 		plan:
 			weirdness with admin and "default" account
 		v.Info() endpoint double selects from DB
-		purge accounts that were not logged into in X
+		purge accounts that were not logged int o in X
 		reset daily limits for users
 		Make sure account endpoints make sense for admins
 		add logic to set "expires" column (this is gonna be dirty)
@@ -55,8 +55,6 @@ import (
 			- figure out what settings are "web" or "phone"
 		Tests:
 		- visitor with/without user
-		- plan-based message expiry
-		- plan-based attachment expiry
 		Docs:
 		- "expires" field in message
 		Refactor:
@@ -65,7 +63,6 @@ import (
 		- Password reset
 		- Pricing
 		- change email
-
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -529,6 +526,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	t, err := s.topicFromPath(r.URL.Path)
 	if err != nil {
 		return nil, err
+	}
+	if err := v.MessageAllowed(); err != nil {
+		return nil, errHTTPTooManyRequestsLimitRequests // FIXME make one for messages
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {

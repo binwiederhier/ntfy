@@ -29,12 +29,13 @@ type visitor struct {
 	userManager         *user.Manager // May be nil!
 	ip                  netip.Addr
 	user                *user.User
-	messages            int64         // Number of messages sent
-	emails              int64         // Number of emails sent
+	messages            int64         // Number of messages sent, reset every day
+	emails              int64         // Number of emails sent, reset every day
 	requestLimiter      *rate.Limiter // Rate limiter for (almost) all requests (including messages)
+	messagesLimiter     util.Limiter  // Rate limiter for messages, may be nil
 	emailsLimiter       *rate.Limiter // Rate limiter for emails
 	subscriptionLimiter util.Limiter  // Fixed limiter for active subscriptions (ongoing connections)
-	bandwidthLimiter    util.Limiter
+	bandwidthLimiter    util.Limiter  // Limiter for attachment bandwidth downloads
 	accountLimiter      *rate.Limiter // Rate limiter for account creation
 	firebase            time.Time     // Next allowed Firebase message
 	seen                time.Time
@@ -61,6 +62,7 @@ type visitorInfo struct {
 }
 
 func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
+	var messagesLimiter util.Limiter
 	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
@@ -71,6 +73,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 	}
 	if user != nil && user.Tier != nil {
 		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.MessagesLimit), conf.VisitorRequestLimitBurst)
+		messagesLimiter = util.NewFixedLimiter(user.Tier.MessagesLimit)
 		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.EmailsLimit), conf.VisitorEmailLimitBurst)
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
@@ -85,6 +88,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		messages:            messages,
 		emails:              emails,
 		requestLimiter:      requestLimiter,
+		messagesLimiter:     messagesLimiter,
 		emailsLimiter:       emailsLimiter,
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 		bandwidthLimiter:    util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
@@ -114,6 +118,13 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.firebase = time.Now().Add(v.config.FirebaseQuotaExceededPenaltyDuration)
+}
+
+func (v *visitor) MessageAllowed() error {
+	if v.messagesLimiter != nil && v.messagesLimiter.Allow(1) != nil {
+		return errVisitorLimitReached
+	}
+	return nil
 }
 
 func (v *visitor) EmailAllowed() error {

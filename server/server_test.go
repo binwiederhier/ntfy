@@ -1098,7 +1098,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                   "test",
 		MessagesLimit:          5,
-		MessagesExpiryDuration: 1, // Second
+		MessagesExpiryDuration: -5, // Second, what a hack!
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -1115,7 +1115,15 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 	response := request(t, s, "PUT", "/mytopic", "this is too much", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
-	require.Equal(t, 413, response.Code)
+	require.Equal(t, 429, response.Code)
+
+	// Run pruning and see if they are gone
+	s.execManager()
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	require.Empty(t, response.Body)
 }
 
 func TestServer_PublishAttachment(t *testing.T) {
@@ -1318,6 +1326,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 	sevenDaysInSeconds := int64(604800)
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "test",
+		MessagesLimit:            10,
 		MessagesExpiryDuration:   sevenDaysInSeconds,
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
@@ -1362,8 +1371,10 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 	// Create tier with certain limits
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "test",
+		MessagesLimit:            100,
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
+		AttachmentExpiryDuration: 30,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -1377,12 +1388,14 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 	// Publish large file as anonymous
 	response = request(t, s, "PUT", "/mytopic", largeFile, nil)
 	require.Equal(t, 413, response.Code)
+	require.Equal(t, 41301, toHTTPError(t, response.Body.String()).Code)
 
 	// Publish too large file as phil
 	response = request(t, s, "PUT", "/mytopic", largeFile+" a few more bytes", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 413, response.Code)
+	require.Equal(t, 41301, toHTTPError(t, response.Body.String()).Code)
 
 	// Publish large file as phil (4x)
 	for i := 0; i < 4; i++ {
@@ -1398,6 +1411,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 413, response.Code)
+	require.Equal(t, 41301, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {

@@ -462,6 +462,7 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:              "pro",
+		MessagesLimit:     20,
 		ReservationsLimit: 2,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))

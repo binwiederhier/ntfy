@@ -381,14 +381,14 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	// Create a tier
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "pro",
-		Upgradeable:              false,
+		Paid:                     false,
 		MessagesLimit:            123,
-		MessagesExpiryDuration:   86400,
+		MessagesExpiryDuration:   86400 * time.Second,
 		EmailsLimit:              32,
 		ReservationsLimit:        2,
 		AttachmentFileSizeLimit:  1231231,
 		AttachmentTotalSizeLimit: 123123,
-		AttachmentExpiryDuration: 10800,
+		AttachmentExpiryDuration: 10800 * time.Second,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 

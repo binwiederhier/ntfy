@@ -256,6 +256,60 @@ func TestManager_ChangeRole(t *testing.T) {
 	require.Equal(t, 0, len(benGrants))
 }
 
+func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+	require.Nil(t, a.CreateTier(&Tier{
+		Code:                     "pro",
+		Name:                     "ntfy Pro",
+		Paid:                     true,
+		MessagesLimit:            5_000,
+		MessagesExpiryDuration:   3 * 24 * time.Hour,
+		EmailsLimit:              50,
+		ReservationsLimit:        5,
+		AttachmentFileSizeLimit:  52428800,
+		AttachmentTotalSizeLimit: 524288000,
+		AttachmentExpiryDuration: 24 * time.Hour,
+	}))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.ChangeTier("ben", "pro"))
+	require.Nil(t, a.AllowAccess("ben", "ben", "mytopic", true, true))
+	require.Nil(t, a.AllowAccess("ben", Everyone, "mytopic", false, false))
+
+	ben, err := a.User("ben")
+	require.Nil(t, err)
+	require.Equal(t, RoleUser, ben.Role)
+	require.Equal(t, "pro", ben.Tier.Code)
+	require.Equal(t, true, ben.Tier.Paid)
+	require.Equal(t, int64(5000), ben.Tier.MessagesLimit)
+	require.Equal(t, 3*24*time.Hour, ben.Tier.MessagesExpiryDuration)
+	require.Equal(t, int64(50), ben.Tier.EmailsLimit)
+	require.Equal(t, int64(5), ben.Tier.ReservationsLimit)
+	require.Equal(t, int64(52428800), ben.Tier.AttachmentFileSizeLimit)
+	require.Equal(t, int64(524288000), ben.Tier.AttachmentTotalSizeLimit)
+	require.Equal(t, 24*time.Hour, ben.Tier.AttachmentExpiryDuration)
+
+	benGrants, err := a.Grants("ben")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(benGrants))
+	require.Equal(t, PermissionReadWrite, benGrants[0].Allow)
+
+	everyoneGrants, err := a.Grants(Everyone)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(everyoneGrants))
+	require.Equal(t, PermissionDenyAll, everyoneGrants[0].Allow)
+
+	// Switch to admin, this should remove all grants and owned ACL entries
+	require.Nil(t, a.ChangeRole("ben", RoleAdmin))
+
+	benGrants, err = a.Grants("ben")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(benGrants))
+
+	everyoneGrants, err = a.Grants(Everyone)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(everyoneGrants))
+}
+
 func TestManager_Token_Valid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))

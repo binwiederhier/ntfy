@@ -29,6 +29,7 @@ import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import CelebrationIcon from '@mui/icons-material/Celebration';
+import UpgradeDialog from "./UpgradeDialog";
 
 const navWidth = 280;
 
@@ -99,7 +100,9 @@ const NavList = (props) => {
         navigate(routes.account);
     };
 
-    const showUpgradeBanner = config.enable_payments && (!props.account || props.account.tier.upgradeable);
+    const isAdmin = props.account?.role === "admin";
+    const isPaid = props.account?.tier?.paid;
+    const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;// && (!props.account || !props.account.tier || !props.account.tier.paid || props.account);
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
     const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
@@ -154,32 +157,7 @@ const NavList = (props) => {
                     <ListItemText primary={t("nav_button_subscribe")}/>
                 </ListItemButton>
                 {showUpgradeBanner &&
-                    <Box sx={{
-                        position: "fixed",
-                        width: `${Navigation.width - 1}px`,
-                        bottom: 0,
-                        mt: 'auto',
-                        background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
-                    }}>
-                        <Divider/>
-                        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
-                            <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
-                            <ListItemText
-                                sx={{ ml: 1 }}
-                                primary={"Upgrade to ntfy Pro"}
-                                secondary={"Reserve topics, more messages & emails, bigger attachments"}
-                                primaryTypographyProps={{
-                                    style: {
-                                        fontWeight: 500,
-                                        background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
-                                        WebkitBackgroundClip: "text",
-                                        WebkitTextFillColor: "transparent"
-                                    }
-                                }}
-                            />
-                        </ListItemButton>
-                    </Box>
-
+                    <UpgradeBanner/>
                 }
             </List>
             <SubscribeDialog
@@ -190,6 +168,41 @@ const NavList = (props) => {
                 onSuccess={handleSubscribeSubmit}
             />
         </>
+    );
+};
+
+const UpgradeBanner = () => {
+    const [dialogOpen, setDialogOpen] = useState(false);
+    return (
+        <Box sx={{
+            position: "fixed",
+            width: `${Navigation.width - 1}px`,
+            bottom: 0,
+            mt: 'auto',
+            background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
+        }}>
+            <Divider/>
+            <ListItemButton onClick={() => setDialogOpen(true)}>
+                <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
+                <ListItemText
+                    sx={{ ml: 1 }}
+                    primary={"Upgrade to ntfy Pro"}
+                    secondary={"Reserve topics, more messages & emails, bigger attachments"}
+                    primaryTypographyProps={{
+                        style: {
+                            fontWeight: 500,
+                            background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent"
+                        }
+                    }}
+                />
+            </ListItemButton>
+            <UpgradeDialog
+                open={dialogOpen}
+                onCancel={() => setDialogOpen(false)}
+            />
+        </Box>
     );
 };
 

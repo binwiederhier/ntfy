@@ -9,6 +9,7 @@ export const PrefGroup = (props) => {
 };
 
 export const Pref = (props) => {
+    const justifyContent = (props.alignTop) ? "normal" : "center";
     return (
         <div
             role="row"
@@ -27,7 +28,7 @@ export const Pref = (props) => {
                     flex: '1 0 40%',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'center',
+                    justifyContent: justifyContent,
                     paddingRight: '30px'
                 }}
             >
@@ -40,7 +41,7 @@ export const Pref = (props) => {
                     flex: '1 0 calc(60% - 50px)',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'center'
+                    justifyContent: justifyContent
                 }}
             >
                 {props.children}

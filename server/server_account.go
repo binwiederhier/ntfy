@@ -40,11 +40,22 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *visitor) error {
-	stats, err := v.Info()
+	info, err := v.Info()
 	if err != nil {
 		return err
 	}
+	limits, stats := info.Limits, info.Stats
 	response := &apiAccountResponse{
+		Limits: &apiAccountLimits{
+			Basis:                    string(limits.Basis),
+			Messages:                 limits.MessagesLimit,
+			MessagesExpiryDuration:   int64(limits.MessagesExpiryDuration.Seconds()),
+			Emails:                   limits.EmailsLimit,
+			Reservations:             limits.ReservationsLimit,
+			AttachmentTotalSize:      limits.AttachmentTotalSizeLimit,
+			AttachmentFileSize:       limits.AttachmentFileSizeLimit,
+			AttachmentExpiryDuration: int64(limits.AttachmentExpiryDuration.Seconds()),
+		},
 		Stats: &apiAccountStats{
 			Messages:                     stats.Messages,
 			MessagesRemaining:            stats.MessagesRemaining,
@@ -54,16 +65,6 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
-		},
-		Limits: &apiAccountLimits{
-			Basis:                    stats.Basis,
-			Messages:                 stats.MessagesLimit,
-			MessagesExpiryDuration:   stats.MessagesExpiryDuration,
-			Emails:                   stats.EmailsLimit,
-			Reservations:             stats.ReservationsLimit,
-			AttachmentTotalSize:      stats.AttachmentTotalSizeLimit,
-			AttachmentFileSize:       stats.AttachmentFileSizeLimit,
-			AttachmentExpiryDuration: stats.AttachmentExpiryDuration,
 		},
 	}
 	if v.user != nil {
@@ -82,18 +83,9 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		}
 		if v.user.Tier != nil {
 			response.Tier = &apiAccountTier{
-				Code:        v.user.Tier.Code,
-				Upgradeable: v.user.Tier.Upgradeable,
-			}
-		} else if v.user.Role == user.RoleAdmin {
-			response.Tier = &apiAccountTier{
-				Code:        string(user.TierUnlimited),
-				Upgradeable: false,
-			}
-		} else {
-			response.Tier = &apiAccountTier{
-				Code:        string(user.TierDefault),
-				Upgradeable: true,
+				Code: v.user.Tier.Code,
+				Name: v.user.Tier.Name,
+				Paid: v.user.Tier.Paid,
 			}
 		}
 		reservations, err := s.userManager.Reservations(v.user.Name)
@@ -112,10 +104,6 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 	} else {
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
-		response.Tier = &apiAccountTier{
-			Code:        string(user.TierNone),
-			Upgradeable: true,
-		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this

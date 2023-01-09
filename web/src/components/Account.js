@@ -24,6 +24,10 @@ import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
+import i18n from "i18next";
+import humanizeDuration from "humanize-duration";
+import UpgradeDialog from "./UpgradeDialog";
+import CelebrationIcon from "@mui/icons-material/Celebration";
 
 const Account = () => {
     if (!session.exists()) {
@@ -166,10 +170,12 @@ const ChangePasswordDialog = (props) => {
 const Stats = () => {
     const { t } = useTranslation();
     const { account } = useOutletContext();
+    const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+
     if (!account) {
         return <></>;
     }
-    const tierCode = account.tier.code ?? "none";
+
     const normalize = (value, max) => Math.min(value / max * 100, 100);
     const barColor = (remaining, limit) => {
         if (account.role === "admin") {
@@ -188,34 +194,63 @@ const Stats = () => {
             <PrefGroup>
                 <Pref title={t("account_usage_tier_title")}>
                     <div>
-                        {account.role === "admin"
-                            ? <>{t("account_usage_unlimited")} <Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
-                            : t(`account_usage_tier_code_${tierCode}`)}
-                        {config.enable_payments && account.tier.upgradeable &&
-                            <em>{" "}
-                                <Link onClick={() => {}}>Upgrade</Link>
-                            </em>
+                        {account.role === "admin" &&
+                            <>
+                                {t("account_usage_tier_admin")}
+                                {" "}{account.tier ? `(with ${account.tier.name} tier)` : `(no tier)`}
+                            </>
                         }
+                        {account.role === "user" && account.tier &&
+                            <>{account.tier.name}</>
+                        }
+                        {account.role === "user" && !account.tier &&
+                            t("account_usage_tier_none")
+                        }
+                        {config.enable_payments && account.role === "user" && (!account.tier || !account.tier.paid) &&
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<CelebrationIcon sx={{ color: "#55b86e" }}/>}
+                                onClick={() => setUpgradeDialogOpen(true)}
+                                sx={{ml: 1}}
+                            >{t("account_usage_tier_upgrade_button")}</Button>
+                        }
+                        {config.enable_payments && account.role === "user" && account.tier?.paid &&
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => setUpgradeDialogOpen(true)}
+                                sx={{ml: 1}}
+                            >{t("account_usage_tier_change_button")}</Button>
+                        }
+                        <UpgradeDialog
+                            open={upgradeDialogOpen}
+                            onCancel={() => setUpgradeDialogOpen(false)}
+                        />
                     </div>
                 </Pref>
-                <Pref title={t("account_usage_topics_title")}>
-                    {account.limits.reservations > 0 &&
-                        <>
-                            <div>
-                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.reservations}</Typography>
-                                <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.reservations }) : t("account_usage_unlimited")}</Typography>
-                            </div>
-                            <LinearProgress
-                                variant="determinate"
-                                value={account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
-                                color={barColor(account.stats.reservations_remaining, account.limits.reservations)}
-                            />
-                        </>
-                    }
-                    {account.limits.reservations === 0 &&
-                        <em>No reserved topics for this account</em>
-                    }
-                </Pref>
+                {account.role !== "admin" &&
+                    <Pref title={t("account_usage_reservations_title")}>
+                        {account.limits.reservations > 0 &&
+                            <>
+                                <div>
+                                    <Typography variant="body2"
+                                                sx={{float: "left"}}>{account.stats.reservations}</Typography>
+                                    <Typography variant="body2"
+                                                sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
+                                </div>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
+                                    color={barColor(account.stats.reservations_remaining, account.limits.reservations)}
+                                />
+                            </>
+                        }
+                        {account.limits.reservations === 0 &&
+                            <em>No reserved topics for this account</em>
+                        }
+                    </Pref>
+                }
                 <Pref title={
                     <>
                         {t("account_usage_messages_title")}
@@ -224,11 +259,11 @@ const Stats = () => {
                 }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.messages > 0 ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.limits.messages > 0 ? normalize(account.stats.messages, account.limits.messages) : 100}
+                        value={account.role === "user" ? normalize(account.stats.messages, account.limits.messages) : 100}
                         color={account.role === "user" && account.stats.messages_remaining === 0 ? 'error' : 'primary'}
                     />
                 </Pref>
@@ -248,14 +283,17 @@ const Stats = () => {
                         color={account?.role !== "admin" && account.stats.emails_remaining === 0 ? 'error' : 'primary'}
                     />
                 </Pref>
-                <Pref title={
-                    <>
-                        {t("account_usage_attachment_storage_title")}
-                        {account.role === "user" &&
-                            <Tooltip title={t("account_usage_attachment_storage_subtitle", { filesize: formatBytes(account.limits.attachment_file_size) })}><span><InfoIcon/></span></Tooltip>
-                        }
-                    </>
-                }>
+                <Pref
+                    alignTop
+                    title={t("account_usage_attachment_storage_title")}
+                    description={t("account_usage_attachment_storage_description", {
+                        filesize: formatBytes(account.limits.attachment_file_size),
+                        expiry: humanizeDuration(account.limits.attachment_expiry_duration * 1000, {
+                            language: i18n.language,
+                            fallbacks: ["en"]
+                        })
+                    })}
+                >
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
                         <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
@@ -269,7 +307,7 @@ const Stats = () => {
             </PrefGroup>
             {account.limits.basis === "ip" &&
                 <Typography variant="body1">
-                    <em>{t("account_usage_basis_ip_description")}</em>
+                    {t("account_usage_basis_ip_description")}
                 </Typography>
             }
         </Card>

@@ -35,6 +35,8 @@ const (
 		CREATE TABLE IF NOT EXISTS tier (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,		
 			code TEXT NOT NULL,
+			name TEXT NOT NULL,
+			paid INT NOT NULL,
 			messages_limit INT NOT NULL,
 			messages_expiry_duration INT NOT NULL,
 			emails_limit INT NOT NULL,
@@ -84,13 +86,13 @@ const (
 	`
 
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		LEFT JOIN tier p on p.id = u.tier_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN tier p on p.id = u.tier_id
@@ -159,9 +161,17 @@ const (
 		WHERE (topic = ? OR ? LIKE topic)
 		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM user WHERE user = ?))
 	`
-	deleteAllAccessQuery   = `DELETE FROM user_access`
-	deleteUserAccessQuery  = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?)`
-	deleteTopicAccessQuery = `DELETE FROM user_access WHERE user_id = (SELECT id FROM user WHERE user = ?) AND topic = ?`
+	deleteAllAccessQuery  = `DELETE FROM user_access`
+	deleteUserAccessQuery = `
+		DELETE FROM user_access 
+		WHERE user_id = (SELECT id FROM user WHERE user = ?)
+		   OR owner_user_id = (SELECT id FROM user WHERE user = ?)
+	`
+	deleteTopicAccessQuery = `
+		DELETE FROM user_access 
+	   	WHERE (user_id = (SELECT id FROM user WHERE user = ?) OR owner_user_id = (SELECT id FROM user WHERE user = ?)) 
+	   	  AND topic = ?
+  	`
 
 	selectTokenCountQuery    = `SELECT COUNT(*) FROM user_token WHERE (SELECT id FROM user WHERE user = ?)`
 	insertTokenQuery         = `INSERT INTO user_token (user_id, token, expires) VALUES ((SELECT id FROM user WHERE user = ?), ?, ?)`
@@ -180,11 +190,12 @@ const (
 	`
 
 	insertTierQuery = `
-		INSERT INTO tier (code, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO tier (code, name, paid, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	selectTierIDQuery   = `SELECT id FROM tier WHERE code = ?`
 	updateUserTierQuery = `UPDATE user SET tier_id = ? WHERE user = ?`
+	deleteUserTierQuery = `UPDATE user SET tier_id = null WHERE user = ?`
 )
 
 // Schema management queries
@@ -528,13 +539,14 @@ func (a *Manager) userByToken(token string) (*User, error) {
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role string
-	var settings, tierCode sql.NullString
+	var settings, tierCode, tierName sql.NullString
+	var paid sql.NullBool
 	var messages, emails int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &tierCode, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &tierCode, &tierName, &paid, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -557,14 +569,15 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	if tierCode.Valid {
 		user.Tier = &Tier{
 			Code:                     tierCode.String,
-			Upgradeable:              false,
+			Name:                     tierName.String,
+			Paid:                     paid.Bool,
 			MessagesLimit:            messagesLimit.Int64,
-			MessagesExpiryDuration:   messagesExpiryDuration.Int64,
+			MessagesExpiryDuration:   time.Duration(messagesExpiryDuration.Int64) * time.Second,
 			EmailsLimit:              emailsLimit.Int64,
 			ReservationsLimit:        reservationsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
-			AttachmentExpiryDuration: attachmentExpiryDuration.Int64,
+			AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
 		}
 	}
 	return user, nil
@@ -676,7 +689,7 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 		return err
 	}
 	if role == RoleAdmin {
-		if _, err := a.db.Exec(deleteUserAccessQuery, username); err != nil {
+		if _, err := a.db.Exec(deleteUserAccessQuery, username, username); err != nil {
 			return err
 		}
 	}
@@ -760,10 +773,19 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 		_, err := a.db.Exec(deleteAllAccessQuery, username)
 		return err
 	} else if topicPattern == "" {
-		_, err := a.db.Exec(deleteUserAccessQuery, username)
+		_, err := a.db.Exec(deleteUserAccessQuery, username, username)
 		return err
 	}
-	_, err := a.db.Exec(deleteTopicAccessQuery, username, toSQLWildcard(topicPattern))
+	_, err := a.db.Exec(deleteTopicAccessQuery, username, username, toSQLWildcard(topicPattern))
+	return err
+}
+
+// ResetTier removes the tier from the given user
+func (a *Manager) ResetTier(username string) error {
+	if !AllowedUsername(username) && username != Everyone && username != "" {
+		return ErrInvalidArgument
+	}
+	_, err := a.db.Exec(deleteUserTierQuery, username)
 	return err
 }
 
@@ -774,7 +796,7 @@ func (a *Manager) DefaultAccess() Permission {
 
 // CreateTier creates a new tier in the database
 func (a *Manager) CreateTier(tier *Tier) error {
-	if _, err := a.db.Exec(insertTierQuery, tier.Code, tier.MessagesLimit, tier.MessagesExpiryDuration, tier.EmailsLimit, tier.ReservationsLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, tier.AttachmentExpiryDuration); err != nil {
+	if _, err := a.db.Exec(insertTierQuery, tier.Code, tier.Name, tier.Paid, tier.MessagesLimit, int64(tier.MessagesExpiryDuration.Seconds()), tier.EmailsLimit, tier.ReservationsLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds())); err != nil {
 		return err
 	}
 	return nil

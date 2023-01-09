@@ -36,16 +36,14 @@ import (
 
 /*
 	TODO
-		limits & rate limiting:
+		Limits & rate limiting:
 			login/account endpoints
-		plan:
-			weirdness with admin and "default" account
-		v.Info() endpoint double selects from DB
 		purge accounts that were not logged int o in X
-		reset daily limits for users
+		reset daily Limits for users
 		Make sure account endpoints make sense for admins
 		add logic to set "expires" column (this is gonna be dirty)
 		UI:
+		- Align size of message bar and upgrade banner
 		- flicker of upgrade banner
 		- JS constants
 		- useContext for account
@@ -53,8 +51,10 @@ import (
 			- "account topic" sync mechanism
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
+		Delete visitor when tier is changed to refresh rate limiters
 		Tests:
-		- visitor with/without user
+		- Change tier from higher to lower tier (delete reservations)
+		- Message rate limiting and reset tests
 		Docs:
 		- "expires" field in message
 		Refactor:
@@ -528,7 +528,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		return nil, err
 	}
 	if err := v.MessageAllowed(); err != nil {
-		return nil, errHTTPTooManyRequestsLimitRequests // FIXME make one for messages
+		return nil, errHTTPTooManyRequestsLimitMessages
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {
@@ -545,11 +545,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if v.user != nil {
 		m.User = v.user.Name
 	}
-	if v.user != nil && v.user.Tier != nil {
-		m.Expires = time.Now().Unix() + v.user.Tier.MessagesExpiryDuration
-	} else {
-		m.Expires = time.Now().Add(s.config.CacheDuration).Unix()
-	}
+	m.Expires = time.Now().Add(v.Limits().MessagesExpiryDuration).Unix()
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
 	}
@@ -822,24 +818,18 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if s.fileCache == nil || s.config.BaseURL == "" || s.config.AttachmentCacheDir == "" {
 		return errHTTPBadRequestAttachmentsDisallowed
 	}
-	var attachmentExpiryDuration time.Duration
-	if v.user != nil && v.user.Tier != nil {
-		attachmentExpiryDuration = time.Duration(v.user.Tier.AttachmentExpiryDuration) * time.Second
-	} else {
-		attachmentExpiryDuration = s.config.AttachmentExpiryDuration
-	}
-	attachmentExpiry := time.Now().Add(attachmentExpiryDuration).Unix()
-	if m.Time > attachmentExpiry {
-		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
-	}
-	stats, err := v.Info()
+	vinfo, err := v.Info()
 	if err != nil {
 		return err
+	}
+	attachmentExpiry := time.Now().Add(vinfo.Limits.AttachmentExpiryDuration).Unix()
+	if m.Time > attachmentExpiry {
+		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
-		if err == nil && (contentLength > stats.AttachmentTotalSizeRemaining || contentLength > stats.AttachmentFileSizeLimit) {
+		if err == nil && (contentLength > vinfo.Stats.AttachmentTotalSizeRemaining || contentLength > vinfo.Limits.AttachmentFileSizeLimit) {
 			return errHTTPEntityTooLargeAttachment
 		}
 	}
@@ -859,8 +849,8 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	limiters := []util.Limiter{
 		v.BandwidthLimiter(),
-		util.NewFixedLimiter(stats.AttachmentFileSizeLimit),
-		util.NewFixedLimiter(stats.AttachmentTotalSizeRemaining),
+		util.NewFixedLimiter(vinfo.Limits.AttachmentFileSizeLimit),
+		util.NewFixedLimiter(vinfo.Stats.AttachmentTotalSizeRemaining),
 	}
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {

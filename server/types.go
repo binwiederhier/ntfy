@@ -236,8 +236,9 @@ type apiAccountTokenResponse struct {
 }
 
 type apiAccountTier struct {
-	Code        string `json:"code"`
-	Upgradeable bool   `json:"upgradeable"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+	Paid bool   `json:"paid"`
 }
 
 type apiAccountLimits struct {

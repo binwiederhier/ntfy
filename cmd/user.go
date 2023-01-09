@@ -15,6 +15,10 @@ import (
 	"heckel.io/ntfy/util"
 )
 
+const (
+	tierReset = "-"
+)
+
 func init() {
 	commands = append(commands, cmdUser)
 }
@@ -110,6 +114,22 @@ user are removed, since they are no longer necessary.
 Example:
   ntfy user change-role phil admin   # Make user phil an admin 
   ntfy user change-role phil user    # Remove admin role from user phil 
+`,
+		},
+		{
+			Name:      "change-tier",
+			Aliases:   []string{"cht"},
+			Usage:     "Changes the tier of a user",
+			UsageText: "ntfy user change-tier USERNAME (TIER|-)",
+			Action:    execUserChangeTier,
+			Description: `Change the tier for the given user.
+
+This command can be used to change the tier of a user. Tiers define usage limits, such
+as messages per day, attachment file sizes, etc.
+
+Example:
+  ntfy user change-tier phil pro   # Change tier to "pro" for user "phil"  
+  ntfy user change-tier phil -     # Remove tier from user "phil" entirely 
 `,
 		},
 		{
@@ -251,6 +271,37 @@ func execUserChangeRole(c *cli.Context) error {
 		return err
 	}
 	fmt.Fprintf(c.App.ErrWriter, "changed role for user %s to %s\n", username, role)
+	return nil
+}
+
+func execUserChangeTier(c *cli.Context) error {
+	username := c.Args().Get(0)
+	tier := c.Args().Get(1)
+	if username == "" {
+		return errors.New("username and new tier expected, type 'ntfy user change-tier --help' for help")
+	} else if !user.AllowedTier(tier) && tier != tierReset {
+		return errors.New("invalid tier, must be tier code, or - to reset")
+	} else if username == userEveryone {
+		return errors.New("username not allowed")
+	}
+	manager, err := createUserManager(c)
+	if err != nil {
+		return err
+	}
+	if _, err := manager.User(username); err == user.ErrNotFound {
+		return fmt.Errorf("user %s does not exist", username)
+	}
+	if tier == tierReset {
+		if err := manager.ResetTier(username); err != nil {
+			return err
+		}
+		fmt.Fprintf(c.App.ErrWriter, "removed tier from user %s\n", username)
+	} else {
+		if err := manager.ChangeTier(username, tier); err != nil {
+			return err
+		}
+		fmt.Fprintf(c.App.ErrWriter, "changed tier for user %s to %s\n", username, tier)
+	}
 	return nil
 }
 

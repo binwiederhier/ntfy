@@ -43,27 +43,18 @@ type Prefs struct {
 	Subscriptions []*Subscription    `json:"subscriptions,omitempty"`
 }
 
-// TierCode is code identifying a user's tier
-type TierCode string
-
-// Default tier codes
-const (
-	TierUnlimited = TierCode("unlimited")
-	TierDefault   = TierCode("default")
-	TierNone      = TierCode("none")
-)
-
 // Tier represents a user's account type, including its account limits
 type Tier struct {
-	Code                     string `json:"name"`
-	Upgradeable              bool   `json:"upgradeable"`
-	MessagesLimit            int64  `json:"messages_limit"`
-	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
-	EmailsLimit              int64  `json:"emails_limit"`
-	ReservationsLimit        int64  `json:"reservations_limit"`
-	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
-	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
-	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
+	Code                     string
+	Name                     string
+	Paid                     bool
+	MessagesLimit            int64
+	MessagesExpiryDuration   time.Duration
+	EmailsLimit              int64
+	ReservationsLimit        int64
+	AttachmentFileSizeLimit  int64
+	AttachmentTotalSizeLimit int64
+	AttachmentExpiryDuration time.Duration
 }
 
 // Subscription represents a user's topic subscription
@@ -185,6 +176,7 @@ var (
 	allowedUsernameRegex     = regexp.MustCompile(`^[-_.@a-zA-Z0-9]+$`)     // Does not include Everyone (*)
 	allowedTopicRegex        = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)  // No '*'
 	allowedTopicPatternRegex = regexp.MustCompile(`^[-_*A-Za-z0-9]{1,64}$`) // Adds '*' for wildcards!
+	allowedTierRegex         = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)
 )
 
 // AllowedRole returns true if the given role can be used for new users
@@ -198,13 +190,18 @@ func AllowedUsername(username string) bool {
 }
 
 // AllowedTopic returns true if the given topic name is valid
-func AllowedTopic(username string) bool {
-	return allowedTopicRegex.MatchString(username)
+func AllowedTopic(topic string) bool {
+	return allowedTopicRegex.MatchString(topic)
 }
 
 // AllowedTopicPattern returns true if the given topic pattern is valid; this includes the wildcard character (*)
-func AllowedTopicPattern(username string) bool {
-	return allowedTopicPatternRegex.MatchString(username)
+func AllowedTopicPattern(topic string) bool {
+	return allowedTopicPatternRegex.MatchString(topic)
+}
+
+// AllowedTier returns true if the given tier name is valid
+func AllowedTier(tier string) bool {
+	return allowedTierRegex.MatchString(tier)
 }
 
 // Error constants used by the package

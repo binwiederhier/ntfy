@@ -1098,7 +1098,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                   "test",
 		MessagesLimit:          5,
-		MessagesExpiryDuration: -5, // Second, what a hack!
+		MessagesExpiryDuration: -5 * time.Second, // Second, what a hack!
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -1323,14 +1323,14 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 	s := newTestServer(t, c)
 
 	// Create tier with certain limits
-	sevenDaysInSeconds := int64(604800)
+	sevenDays := time.Duration(604800) * time.Second
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "test",
 		MessagesLimit:            10,
-		MessagesExpiryDuration:   sevenDaysInSeconds,
+		MessagesExpiryDuration:   sevenDays,
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
-		AttachmentExpiryDuration: sevenDaysInSeconds, // 7 days
+		AttachmentExpiryDuration: sevenDays, // 7 days
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -1341,8 +1341,8 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 	})
 	msg := toMessage(t, response.Body.String())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
-	require.True(t, msg.Attachment.Expires > time.Now().Unix()+sevenDaysInSeconds-30)
-	require.True(t, msg.Expires > time.Now().Unix()+sevenDaysInSeconds-30)
+	require.True(t, msg.Attachment.Expires > time.Now().Add(sevenDays-30*time.Second).Unix())
+	require.True(t, msg.Expires > time.Now().Add(sevenDays-30*time.Second).Unix())
 	file := filepath.Join(s.config.AttachmentCacheDir, msg.ID)
 	require.FileExists(t, file)
 
@@ -1374,7 +1374,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 		MessagesLimit:            100,
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
-		AttachmentExpiryDuration: 30,
+		AttachmentExpiryDuration: 30 * time.Second,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))

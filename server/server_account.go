@@ -10,6 +10,7 @@ import (
 const (
 	jsonBodyBytesLimit   = 4096
 	subscriptionIDLength = 16
+	createdByAPI         = "api"
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -31,7 +32,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
 		return errHTTPTooManyRequestsLimitAccountCreation
 	}
-	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
+	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser, createdByAPI); err != nil { // TODO this should return a User
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -70,6 +71,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 	if v.user != nil {
 		response.Username = v.user.Name
 		response.Role = string(v.user.Role)
+		response.SyncTopic = v.user.SyncTopic
 		if v.user.Prefs != nil {
 			if v.user.Prefs.Language != "" {
 				response.Language = v.user.Prefs.Language

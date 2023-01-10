@@ -9,13 +9,16 @@ import (
 
 // User is a struct that represents a user
 type User struct {
-	Name  string
-	Hash  string // password hash (bcrypt)
-	Token string // Only set if token was used to log in
-	Role  Role
-	Prefs *Prefs
-	Tier  *Tier
-	Stats *Stats
+	Name      string
+	Hash      string // password hash (bcrypt)
+	Token     string // Only set if token was used to log in
+	Role      Role
+	Prefs     *Prefs
+	Tier      *Tier
+	Stats     *Stats
+	SyncTopic string
+	Created   time.Time
+	LastSeen  time.Time
 }
 
 // Auther is an interface for authentication and authorization

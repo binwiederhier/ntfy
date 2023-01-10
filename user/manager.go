@@ -20,7 +20,8 @@ const (
 	userStatsQueueWriterInterval = 33 * time.Second
 	tokenLength                  = 32
 	tokenExpiryDuration          = 72 * time.Hour // Extend tokens by this much
-	tokenMaxCount                = 10             // Only keep this many tokens in the table per user
+	syncTopicLength              = 16
+	tokenMaxCount                = 10 // Only keep this many tokens in the table per user
 )
 
 var (
@@ -50,10 +51,15 @@ const (
 			tier_id INT,
 			user TEXT NOT NULL,
 			pass TEXT NOT NULL,
-			role TEXT NOT NULL,
-			messages INT NOT NULL DEFAULT (0),
-			emails INT NOT NULL DEFAULT (0),			
-			settings JSON,
+			role TEXT CHECK (role IN ('anonymous', 'admin', 'user')) NOT NULL,
+			prefs JSON NOT NULL DEFAULT '{}',
+			sync_topic TEXT NOT NULL,
+			stats_messages INT NOT NULL DEFAULT (0),
+			stats_emails INT NOT NULL DEFAULT (0),
+			created_by TEXT NOT NULL,
+			created_at INT NOT NULL,
+			last_seen INT NOT NULL,
+			last_stats_reset INT NOT NULL DEFAULT (0),
 		    FOREIGN KEY (tier_id) REFERENCES tier (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
@@ -78,7 +84,9 @@ const (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
-		INSERT INTO user (id, user, pass, role) VALUES (1, '*', '', 'anonymous') ON CONFLICT (id) DO NOTHING;
+		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at, last_seen)
+		VALUES (1, '*', '', 'anonymous', '', 'system', UNIXEPOCH(), 0) 
+		ON CONFLICT (id) DO NOTHING;
 	`
 	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
 	builtinStartupQueries = `
@@ -86,13 +94,13 @@ const (
 	`
 
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		LEFT JOIN tier p on p.id = u.tier_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.messages, u.emails, u.settings, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
+		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, p.code, p.name, p.paid, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN tier p on p.id = u.tier_id
@@ -106,7 +114,10 @@ const (
 		ORDER BY u.user DESC
 	`
 
-	insertUserQuery      = `INSERT INTO user (user, pass, role) VALUES (?, ?, ?)`
+	insertUserQuery = `
+		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen) 
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
 	selectUsernamesQuery = `
 		SELECT user 
 		FROM user 
@@ -117,11 +128,11 @@ const (
 				ELSE 2
 			END, user
 	`
-	updateUserPassQuery     = `UPDATE user SET pass = ? WHERE user = ?`
-	updateUserRoleQuery     = `UPDATE user SET role = ? WHERE user = ?`
-	updateUserSettingsQuery = `UPDATE user SET settings = ? WHERE user = ?`
-	updateUserStatsQuery    = `UPDATE user SET messages = ?, emails = ? WHERE user = ?`
-	deleteUserQuery         = `DELETE FROM user WHERE user = ?`
+	updateUserPassQuery  = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRoleQuery  = `UPDATE user SET role = ? WHERE user = ?`
+	updateUserPrefsQuery = `UPDATE user SET prefs = ? WHERE user = ?`
+	updateUserStatsQuery = `UPDATE user SET stats_messages = ?, stats_emails = ? WHERE user = ?`
+	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery = `
 		INSERT INTO user_access (user_id, topic, read, write, owner_user_id) 
@@ -210,8 +221,8 @@ const (
 		ALTER TABLE user RENAME TO user_old;
 	`
 	migrate1To2InsertFromOldTablesAndDropNoTx = `
-		INSERT INTO user (user, pass, role) 
-		SELECT user, pass, role FROM user_old;
+		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen) 
+		SELECT user, pass, role, '', 'admin', UNIXEPOCH(), UNIXEPOCH() FROM user_old;
 
 		INSERT INTO user_access (user_id, topic, read, write)
 		SELECT u.id, a.topic, a.read, a.write
@@ -371,11 +382,11 @@ func (a *Manager) RemoveExpiredTokens() error {
 
 // ChangeSettings persists the user settings
 func (a *Manager) ChangeSettings(user *User) error {
-	settings, err := json.Marshal(user.Prefs)
+	prefs, err := json.Marshal(user.Prefs)
 	if err != nil {
 		return err
 	}
-	if _, err := a.db.Exec(updateUserSettingsQuery, string(settings), user.Name); err != nil {
+	if _, err := a.db.Exec(updateUserPrefsQuery, string(prefs), user.Name); err != nil {
 		return err
 	}
 	return nil
@@ -462,7 +473,7 @@ func (a *Manager) resolvePerms(base, perm Permission) error {
 }
 
 // AddUser adds a user with the given username, password and role
-func (a *Manager) AddUser(username, password string, role Role) error {
+func (a *Manager) AddUser(username, password string, role Role, createdBy string) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
@@ -470,7 +481,9 @@ func (a *Manager) AddUser(username, password string, role Role) error {
 	if err != nil {
 		return err
 	}
-	if _, err = a.db.Exec(insertUserQuery, username, hash, role); err != nil {
+	// INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen)
+	syncTopic, now := util.RandomString(syncTopicLength), time.Now().Unix()
+	if _, err = a.db.Exec(insertUserQuery, username, hash, role, syncTopic, createdBy, now, now); err != nil {
 		return err
 	}
 	return nil
@@ -538,33 +551,32 @@ func (a *Manager) userByToken(token string) (*User, error) {
 
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
-	var username, hash, role string
-	var settings, tierCode, tierName sql.NullString
+	var username, hash, role, prefs, syncTopic string
+	var tierCode, tierName sql.NullString
 	var paid sql.NullBool
 	var messages, emails int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &messages, &emails, &settings, &tierCode, &tierName, &paid, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &tierCode, &tierName, &paid, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	user := &User{
-		Name: username,
-		Hash: hash,
-		Role: Role(role),
+		Name:      username,
+		Hash:      hash,
+		Role:      Role(role),
+		Prefs:     &Prefs{},
+		SyncTopic: syncTopic,
 		Stats: &Stats{
 			Messages: messages,
 			Emails:   emails,
 		},
 	}
-	if settings.Valid {
-		user.Prefs = &Prefs{}
-		if err := json.Unmarshal([]byte(settings.String), user.Prefs); err != nil {
-			return nil, err
-		}
+	if err := json.Unmarshal([]byte(prefs), user.Prefs); err != nil {
+		return nil, err
 	}
 	if tierCode.Valid {
 		user.Tier = &Tier{

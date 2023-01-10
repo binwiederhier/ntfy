@@ -271,6 +271,7 @@ type apiAccountReservation struct {
 type apiAccountResponse struct {
 	Username      string                   `json:"username"`
 	Role          string                   `json:"role,omitempty"`
+	SyncTopic     string                   `json:"sync_topic,omitempty"`
 	Language      string                   `json:"language,omitempty"`
 	Notification  *user.NotificationPrefs  `json:"notification,omitempty"`
 	Subscriptions []*user.Subscription     `json:"subscriptions,omitempty"`

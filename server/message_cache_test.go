@@ -536,6 +536,7 @@ func TestSqliteCache_Migration_From9(t *testing.T) {
 	// Create cache to trigger migration
 	cacheDuration := 17 * time.Hour
 	c, err := newSqliteCache(filename, "", cacheDuration, 0, 0, false)
+	require.Nil(t, err)
 	checkSchemaVersion(t, c.db)
 
 	// Check version

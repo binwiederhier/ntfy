@@ -13,8 +13,8 @@ const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this sh
 
 func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, "unit-test"))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
 	require.Nil(t, a.AllowAccess("", "ben", "writeme", false, true))
@@ -92,20 +92,20 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 
 func TestManager_AddUser_Invalid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Equal(t, ErrInvalidArgument, a.AddUser("  invalid  ", "pass", RoleAdmin))
-	require.Equal(t, ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role"))
+	require.Equal(t, ErrInvalidArgument, a.AddUser("  invalid  ", "pass", RoleAdmin, "unit-test"))
+	require.Equal(t, ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role", "unit-test"))
 }
 
 func TestManager_AddUser_Timing(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	start := time.Now().UnixMilli()
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, "unit-test"))
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestManager_Authenticate_Timing(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, "unit-test"))
 
 	// Timing a correct attempt
 	start := time.Now().UnixMilli()
@@ -128,8 +128,8 @@ func TestManager_Authenticate_Timing(t *testing.T) {
 
 func TestManager_UserManagement(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, "unit-test"))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
 	require.Nil(t, a.AllowAccess("", "ben", "writeme", false, true))
@@ -219,7 +219,7 @@ func TestManager_UserManagement(t *testing.T) {
 
 func TestManager_ChangePassword(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, "unit-test"))
 
 	_, err := a.Authenticate("phil", "phil")
 	require.Nil(t, err)
@@ -233,7 +233,7 @@ func TestManager_ChangePassword(t *testing.T) {
 
 func TestManager_ChangeRole(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 	require.Nil(t, a.AllowAccess("", "ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("", "ben", "readme", true, false))
 
@@ -270,7 +270,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 		AttachmentTotalSizeLimit: 524288000,
 		AttachmentExpiryDuration: 24 * time.Hour,
 	}))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 	require.Nil(t, a.ChangeTier("ben", "pro"))
 	require.Nil(t, a.AllowAccess("ben", "ben", "mytopic", true, true))
 	require.Nil(t, a.AllowAccess("ben", Everyone, "mytopic", false, false))
@@ -312,7 +312,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 
 func TestManager_Token_Valid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	u, err := a.User("ben")
 	require.Nil(t, err)
@@ -337,7 +337,7 @@ func TestManager_Token_Valid(t *testing.T) {
 
 func TestManager_Token_Invalid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	u, err := a.AuthenticateToken(strings.Repeat("x", 32)) // 32 == token length
 	require.Nil(t, u)
@@ -350,7 +350,7 @@ func TestManager_Token_Invalid(t *testing.T) {
 
 func TestManager_Token_Expire(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	u, err := a.User("ben")
 	require.Nil(t, err)
@@ -398,7 +398,7 @@ func TestManager_Token_Expire(t *testing.T) {
 
 func TestManager_Token_Extend(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	// Try to extend token for user without token
 	u, err := a.User("ben")
@@ -425,7 +425,7 @@ func TestManager_Token_Extend(t *testing.T) {
 
 func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	// Try to extend token for user without token
 	u, err := a.User("ben")
@@ -469,7 +469,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 func TestManager_EnqueueStats(t *testing.T) {
 	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	// Baseline: No messages or emails
 	u, err := a.User("ben")
@@ -499,12 +499,14 @@ func TestManager_EnqueueStats(t *testing.T) {
 func TestManager_ChangeSettings(t *testing.T) {
 	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 
 	// No settings
 	u, err := a.User("ben")
 	require.Nil(t, err)
-	require.Nil(t, u.Prefs)
+	require.Nil(t, u.Prefs.Subscriptions)
+	require.Nil(t, u.Prefs.Notification)
+	require.Equal(t, "", u.Prefs.Language)
 
 	// Save with new settings
 	u.Prefs = &Prefs{

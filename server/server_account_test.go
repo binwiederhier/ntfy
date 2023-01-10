@@ -67,8 +67,8 @@ func TestAccount_Signup_AsUser(t *testing.T) {
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"emma"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -133,7 +133,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 
 func TestAccount_ChangeSettings(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 	user, _ := s.userManager.User("phil")
 	token, _ := s.userManager.CreateToken(user)
 
@@ -160,7 +160,7 @@ func TestAccount_ChangeSettings(t *testing.T) {
 
 func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account/subscription", `{"base_url": "http://abc.com", "topic": "def"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -210,7 +210,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 
 func TestAccount_ChangePassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account/password", `{"password": "new password"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -237,7 +237,7 @@ func TestAccount_ChangePassword_NoAccount(t *testing.T) {
 
 func TestAccount_ExtendToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -260,7 +260,7 @@ func TestAccount_ExtendToken(t *testing.T) {
 
 func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "PATCH", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"), // Not Bearer!
@@ -271,7 +271,7 @@ func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 
 func TestAccount_DeleteToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -360,7 +360,7 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
-	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin, "unit-test"))
 
 	rr := request(t, s, "POST", "/v1/account/access", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "adminpass"),

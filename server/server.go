@@ -38,14 +38,18 @@ import (
 	TODO
 		Limits & rate limiting:
 			login/account endpoints
-		purge accounts that were not logged int o in X
 		reset daily Limits for users
+			- set last_stats_reset in migration
+		set sync_topic in migration
+		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
+
 		UI:
 		- flicker of upgrade banner
 		- JS constants
 		Sync:
 			- "account topic" sync mechanism
+				- subscribe to sync topic in UI
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
 		Delete visitor when tier is changed to refresh rate limiters
@@ -54,10 +58,9 @@ import (
 		- Message rate limiting and reset tests
 		Docs:
 		- "expires" field in message
+		- server.yml: enable-X flags
 		Refactor:
 		- rename /access -> /reservation
-		Later:
-		- Pricing
 */
 
 // Server is the main server, providing the UI and API for ntfy

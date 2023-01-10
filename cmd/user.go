@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	tierReset = "-"
+	tierReset    = "-"
+	createdByCLI = "cli"
 )
 
 func init() {
@@ -196,7 +197,7 @@ func execUserAdd(c *cli.Context) error {
 
 		password = p
 	}
-	if err := manager.AddUser(username, password, role); err != nil {
+	if err := manager.AddUser(username, password, role, createdByCLI); err != nil {
 		return err
 	}
 	fmt.Fprintf(c.App.ErrWriter, "user %s added with role %s\n", username, role)

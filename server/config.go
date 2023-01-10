@@ -110,7 +110,7 @@ type Config struct {
 	EnableEmailConfirm                   bool
 	EnablePasswordReset                  bool
 	EnablePayments                       bool
-	EnableReserveTopics                  bool   // Allow users with role "user" to own/reserve topics
+	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
 	Version                              string // injected by App
 }
 

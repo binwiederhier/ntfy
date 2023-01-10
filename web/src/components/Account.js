@@ -1,6 +1,6 @@
 import * as React from 'react';
-import {useState} from 'react';
-import {LinearProgress, Link, Stack, useMediaQuery} from "@mui/material";
+import {useContext, useState} from 'react';
+import {LinearProgress, Stack, useMediaQuery} from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import Typography from "@mui/material/Typography";
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,7 +18,6 @@ import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {useOutletContext} from "react-router-dom";
 import {formatBytes} from "../app/utils";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -28,6 +27,7 @@ import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
 import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
+import {AccountContext} from "./App";
 
 const Account = () => {
     if (!session.exists()) {
@@ -62,7 +62,7 @@ const Basics = () => {
 
 const Username = () => {
     const { t } = useTranslation();
-    const { account } = useOutletContext();
+    const { account } = useContext(AccountContext);
     const labelId = "prefUsername";
 
     return (
@@ -169,23 +169,12 @@ const ChangePasswordDialog = (props) => {
 
 const Stats = () => {
     const { t } = useTranslation();
-    const { account } = useOutletContext();
+    const { account } = useContext(AccountContext);
     const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
-
     if (!account) {
         return <></>;
     }
-
     const normalize = (value, max) => Math.min(value / max * 100, 100);
-    const barColor = (remaining, limit) => {
-        if (account.role === "admin") {
-            return "primary";
-        } else if (limit > 0 && remaining === 0) {
-            return "error";
-        }
-        return "primary";
-    };
-
     return (
         <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -238,7 +227,6 @@ const Stats = () => {
                                 <LinearProgress
                                     variant="determinate"
                                     value={account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
-                                    color={barColor(account.stats.reservations_remaining, account.limits.reservations)}
                                 />
                             </>
                         }
@@ -260,7 +248,6 @@ const Stats = () => {
                     <LinearProgress
                         variant="determinate"
                         value={account.role === "user" ? normalize(account.stats.messages, account.limits.messages) : 100}
-                        color={account.role === "user" && account.stats.messages_remaining === 0 ? 'error' : 'primary'}
                     />
                 </Pref>
                 <Pref title={
@@ -271,12 +258,11 @@ const Stats = () => {
                 }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.emails > 0 ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.limits.emails > 0 ? normalize(account.stats.emails, account.limits.emails) : 100}
-                        color={account?.role !== "admin" && account.stats.emails_remaining === 0 ? 'error' : 'primary'}
+                        value={account.role === "user" ? normalize(account.stats.emails, account.limits.emails) : 100}
                     />
                 </Pref>
                 <Pref
@@ -292,16 +278,15 @@ const Stats = () => {
                 >
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.limits.attachment_total_size > 0 ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.limits.attachment_total_size > 0 ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
-                        color={account.role !== "admin" && account.stats.attachment_total_size_remaining === 0 ? 'error' : 'primary'}
+                        value={account.role === "user" ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
                     />
                 </Pref>
             </PrefGroup>
-            {account.limits.basis === "ip" &&
+            {account.role === "user" && account.limits.basis === "ip" &&
                 <Typography variant="body1">
                     {t("account_usage_basis_ip_description")}
                 </Typography>

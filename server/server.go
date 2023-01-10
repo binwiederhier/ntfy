@@ -44,7 +44,6 @@ import (
 		UI:
 		- flicker of upgrade banner
 		- JS constants
-		- useContext for account
 		Sync:
 			- "account topic" sync mechanism
 			- "mute" setting
@@ -58,9 +57,7 @@ import (
 		Refactor:
 		- rename /access -> /reservation
 		Later:
-		- Password reset
 		- Pricing
-		- change email
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -457,10 +454,10 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableSignup:        s.config.EnableSignup,
 		EnablePasswordReset: s.config.EnablePasswordReset,
 		EnablePayments:      s.config.EnablePayments,
-		EnableReserveTopics: s.config.EnableReserveTopics,
+		EnableReservations:  s.config.EnableReservations,
 		DisallowedTopics:    disallowedTopics,
 	}
-	b, err := json.Marshal(response)
+	b, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
 		return err
 	}

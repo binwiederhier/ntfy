@@ -19,7 +19,8 @@ import {
     formatBytes,
     formatMessage,
     formatShortDateTime,
-    formatTitle, maybeAppendActionErrors,
+    formatTitle,
+    maybeAppendActionErrors,
     openUrl,
     shortUrl,
     topicShortUrl,
@@ -41,15 +42,27 @@ import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
 import {Trans, useTranslation} from "react-i18next";
+import {useOutletContext} from "react-router-dom";
+import {useAutoSubscribe} from "./hooks";
 
-const Notifications = (props) => {
-    if (props.mode === "all") {
-        return (props.subscriptions) ? <AllSubscriptions subscriptions={props.subscriptions}/> : <Loading/>;
+export const AllSubscriptions = () => {
+    const { subscriptions } = useOutletContext();
+    if (!subscriptions) {
+        return <Loading/>;
     }
-    return (props.subscription) ? <SingleSubscription subscription={props.subscription}/> : <Loading/>;
-}
+    return <AllSubscriptionsList subscriptions={subscriptions}/>;
+};
 
-const AllSubscriptions = (props) => {
+export const SingleSubscription = () => {
+    const { subscriptions, selected } = useOutletContext();
+    useAutoSubscribe(subscriptions, selected);
+    if (!selected) {
+        return <Loading/>;
+    }
+    return <SingleSubscriptionList subscription={selected}/>;
+};
+
+const AllSubscriptionsList = (props) => {
     const subscriptions = props.subscriptions;
     const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
     if (notifications === null || notifications === undefined) {
@@ -62,7 +75,7 @@ const AllSubscriptions = (props) => {
     return <NotificationList key="all" notifications={notifications} messageBar={false}/>;
 }
 
-const SingleSubscription = (props) => {
+const SingleSubscriptionList = (props) => {
     const subscription = props.subscription;
     const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
     if (notifications === null || notifications === undefined) {
@@ -533,5 +546,3 @@ const Loading = () => {
         </VerticallyCenteredContainer>
     );
 };
-
-export default Notifications;

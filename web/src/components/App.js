@@ -1,10 +1,10 @@
 import * as React from 'react';
-import {Suspense, useEffect, useState} from 'react';
+import {createContext, Suspense, useContext, useEffect, useState} from 'react';
 import Box from '@mui/material/Box';
 import {ThemeProvider} from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Toolbar from '@mui/material/Toolbar';
-import Notifications from "./Notifications";
+import {AllSubscriptions, SingleSubscription} from "./Notifications";
 import theme from "./theme";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
@@ -13,11 +13,11 @@ import Preferences from "./Preferences";
 import {useLiveQuery} from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {BrowserRouter, Outlet, Route, Routes, useOutletContext, useParams} from "react-router-dom";
+import {BrowserRouter, Outlet, Route, Routes, useParams} from "react-router-dom";
 import {expandUrl} from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {useAccountListener, useAutoSubscribe, useBackgroundProcesses, useConnectionListeners} from "./hooks";
+import {useAccountListener, useBackgroundProcesses, useConnectionListeners} from "./hooks";
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
@@ -27,53 +27,45 @@ import Login from "./Login";
 import Pricing from "./Pricing";
 import Signup from "./Signup";
 import Account from "./Account";
-import ResetPassword from "./ResetPassword";
+
+export const AccountContext = createContext(null);
 
 const App = () => {
+    const [account, setAccount] = useState(null);
     return (
         <Suspense fallback={<Loader />}>
             <BrowserRouter>
                 <ThemeProvider theme={theme}>
-                    <CssBaseline/>
-                    <ErrorBoundary>
-                        <Routes>
-                            <Route path={routes.home} element={<Home/>}/>
-                            <Route path={routes.pricing} element={<Pricing/>}/>
-                            <Route path={routes.login} element={<Login/>}/>
-                            <Route path={routes.signup} element={<Signup/>}/>
-                            <Route path={routes.resetPassword} element={<ResetPassword/>}/>
-                            <Route element={<Layout/>}>
-                                <Route path={routes.app} element={<AllSubscriptions/>}/>
-                                <Route path={routes.account} element={<Account/>}/>
-                                <Route path={routes.settings} element={<Preferences/>}/>
-                                <Route path={routes.subscription} element={<SingleSubscription/>}/>
-                                <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>
-                            </Route>
-                        </Routes>
-                    </ErrorBoundary>
+                    <AccountContext.Provider value={{ account, setAccount }}>
+                        <CssBaseline/>
+                        <ErrorBoundary>
+                            <Routes>
+                                <Route path={routes.home} element={<Home/>}/>
+                                <Route path={routes.pricing} element={<Pricing/>}/>
+                                <Route path={routes.login} element={<Login/>}/>
+                                <Route path={routes.signup} element={<Signup/>}/>
+                                <Route element={<Layout/>}>
+                                    <Route path={routes.app} element={<AllSubscriptions/>}/>
+                                    <Route path={routes.account} element={<Account/>}/>
+                                    <Route path={routes.settings} element={<Preferences/>}/>
+                                    <Route path={routes.subscription} element={<SingleSubscription/>}/>
+                                    <Route path={routes.subscriptionExternal} element={<SingleSubscription/>}/>
+                                </Route>
+                            </Routes>
+                        </ErrorBoundary>
+                    </AccountContext.Provider>
                 </ThemeProvider>
             </BrowserRouter>
         </Suspense>
     );
 }
 
-const AllSubscriptions = () => {
-    const { subscriptions } = useOutletContext();
-    return <Notifications mode="all" subscriptions={subscriptions}/>;
-};
-
-const SingleSubscription = () => {
-    const { subscriptions, selected } = useOutletContext();
-    useAutoSubscribe(subscriptions, selected);
-    return <Notifications mode="one" subscription={selected}/>;
-};
-
 const Layout = () => {
     const params = useParams();
+    const { account, setAccount } = useContext(AccountContext);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
     const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
-    const [account, setAccount] = useState(null);
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
     const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
@@ -94,7 +86,6 @@ const Layout = () => {
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
             <Navigation
-                account={account}
                 subscriptions={subscriptions}
                 selectedSubscription={selected}
                 notificationsGranted={notificationsGranted}
@@ -105,7 +96,7 @@ const Layout = () => {
             />
             <Main>
                 <Toolbar/>
-                <Outlet context={{ account, subscriptions, selected }}/>
+                <Outlet context={{ subscriptions, selected }}/>
             </Main>
             <Messaging
                 selected={selected}

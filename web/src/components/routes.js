@@ -8,7 +8,7 @@ const routes = {
     pricing: "/pricing",
     login: "/login",
     signup: "/signup",
-    resetPassword: "/reset-password",
+    resetPassword: "/reset-password", // Not used (yet)
     app: config.app_root,
     account: "/account",
     settings: "/settings",

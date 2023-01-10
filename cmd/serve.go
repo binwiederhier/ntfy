@@ -79,7 +79,7 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "xxx"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-login", Aliases: []string{"enable_login"}, EnvVars: []string{"NTFY_ENABLE_LOGIN"}, Value: false, Usage: "xxx"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-payments", Aliases: []string{"enable_payments"}, EnvVars: []string{"NTFY_ENABLE_PAYMENTS"}, Value: false, Usage: "xxx"}),
-	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-reserve-topics", Aliases: []string{"enable_reserve_topics"}, EnvVars: []string{"NTFY_ENABLE_RESERVE_TOPICS"}, Value: false, Usage: "xxx"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-reservations", Aliases: []string{"enable_reservations"}, EnvVars: []string{"NTFY_ENABLE_RESERVATIONS"}, Value: false, Usage: "xxx"}),
 )
 
 var cmdServe = &cli.Command{
@@ -151,7 +151,7 @@ func execServe(c *cli.Context) error {
 	enableSignup := c.Bool("enable-signup")
 	enableLogin := c.Bool("enable-login")
 	enablePayments := c.Bool("enable-payments")
-	enableReserveTopics := c.Bool("enable-reserve-topics")
+	enableReservations := c.Bool("enable-reservations")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -188,7 +188,7 @@ func execServe(c *cli.Context) error {
 		return errors.New("if upstream-base-url is set, base-url must also be set")
 	} else if upstreamBaseURL != "" && baseURL != "" && baseURL == upstreamBaseURL {
 		return errors.New("base-url and upstream-base-url cannot be identical, you'll likely want to set upstream-base-url to https://ntfy.sh, see https://ntfy.sh/docs/config/#ios-instant-notifications")
-	} else if authFile == "" && (enableSignup || enableLogin || enableReserveTopics || enablePayments) {
+	} else if authFile == "" && (enableSignup || enableLogin || enableReservations || enablePayments) {
 		return errors.New("cannot set enable-signup, enable-login, enable-reserve-topics, or enable-payments if auth-file is not set")
 	}
 
@@ -284,7 +284,7 @@ func execServe(c *cli.Context) error {
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
 	conf.EnablePayments = enablePayments
-	conf.EnableReserveTopics = enableReserveTopics
+	conf.EnableReservations = enableReservations
 	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config

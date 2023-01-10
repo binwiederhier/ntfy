@@ -243,6 +243,7 @@
   "prefs_appearance_language_title": "Language",
   "prefs_reservations_title": "Reserved topics",
   "prefs_reservations_description": "You can reserve topic names for personal use here. Reserving a topic gives you ownership over the topic, and allows you to define access permissions for other users over the topic.",
+  "prefs_reservations_limit_reached": "You reached your reserved topics limit.",
   "prefs_reservations_add_button": "Add reserved topic",
   "prefs_reservations_edit_button": "Edit topic access",
   "prefs_reservations_delete_button": "Reset topic access",

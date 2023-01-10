@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {useEffect, useState} from 'react';
+import {useContext, useEffect, useState} from 'react';
 import {
     Alert,
     CardActions,
@@ -40,13 +40,11 @@ import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
-import {useOutletContext} from "react-router-dom";
 import LockIcon from "@mui/icons-material/Lock";
 import {Public, PublicOff} from "@mui/icons-material";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 import DialogContentText from "@mui/material/DialogContentText";
 import ReserveTopicSelect from "./ReserveTopicSelect";
+import {AccountContext} from "./App";
 
 const Preferences = () => {
     return (
@@ -481,11 +479,11 @@ const Language = () => {
 
 const Reservations = () => {
     const { t } = useTranslation();
-    const { account } = useOutletContext();
+    const { account } = useContext(AccountContext);
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    if (!config.enable_reserve_topics || !session.exists() || !account || account.role === "admin") {
+    if (!config.enable_reservations || !session.exists() || !account || account.role === "admin") {
         return <></>;
     }
     const reservations = account.reservations || [];
@@ -522,14 +520,7 @@ const Reservations = () => {
                     {t("prefs_reservations_description")}
                 </Paragraph>
                 {reservations.length > 0 && <ReservationsTable reservations={reservations}/>}
-                {limitReached &&
-                    <Alert severity="info">
-                        You reached your reserved topics limit.
-                        {config.enable_payments &&
-                            <>{" "}<b>Upgrade</b></>
-                        }
-                    </Alert>
-                }
+                {limitReached && <Alert severity="info">{t("prefs_reservations_limit_reached")}</Alert>}
             </CardContent>
             <CardActions>
                 <Button onClick={handleAddClick} disabled={limitReached}>{t("prefs_reservations_add_button")}</Button>

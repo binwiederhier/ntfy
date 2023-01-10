@@ -1,6 +1,6 @@
 import Drawer from "@mui/material/Drawer";
 import * as React from "react";
-import {useState} from "react";
+import {useContext, useState} from "react";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -30,6 +30,7 @@ import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import CelebrationIcon from '@mui/icons-material/Celebration';
 import UpgradeDialog from "./UpgradeDialog";
+import {AccountContext} from "./App";
 
 const navWidth = 280;
 
@@ -76,6 +77,7 @@ const NavList = (props) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
+    const { account } = useContext(AccountContext);
     const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
     const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
 
@@ -100,8 +102,8 @@ const NavList = (props) => {
         navigate(routes.account);
     };
 
-    const isAdmin = props.account?.role === "admin";
-    const isPaid = props.account?.tier?.paid;
+    const isAdmin = account?.role === "admin";
+    const isPaid = account?.tier?.paid;
     const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;// && (!props.account || !props.account.tier || !props.account.tier.paid || props.account);
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();

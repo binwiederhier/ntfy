@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {useState} from 'react';
+import {useContext, useState} from 'react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
@@ -19,7 +19,7 @@ import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
 import ReserveTopicSelect from "./ReserveTopicSelect";
-import {useOutletContext} from "react-router-dom";
+import {AccountContext} from "./App";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -76,7 +76,7 @@ const SubscribeDialog = (props) => {
 
 const SubscribePage = (props) => {
     const { t } = useTranslation();
-    //const { account } = useOutletContext();
+    const { account } = useContext(AccountContext);
     const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
     const [errorText, setErrorText] = useState("");
@@ -87,7 +87,7 @@ const SubscribePage = (props) => {
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
-    //const reserveTopicEnabled = session.exists() && (account?.stats.reservations_remaining || 0) > 0;
+    const reserveTopicEnabled = session.exists() && account?.role === "user" && (account?.stats.reservations_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined
@@ -177,14 +177,14 @@ const SubscribePage = (props) => {
                         {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                     </Button>
                 </div>
-                {config.enable_reserve_topics && session.exists() && !anotherServerVisible &&
+                {config.enable_reservations && session.exists() && !anotherServerVisible &&
                     <FormGroup>
                         <FormControlLabel
                             variant="standard"
                             control={
                                 <Checkbox
                                     fullWidth
-                                    // disabled={account.stats.reservations_remaining}
+                                    disabled={!reserveTopicEnabled}
                                     checked={reserveTopicVisible}
                                     onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                                     inputProps={{

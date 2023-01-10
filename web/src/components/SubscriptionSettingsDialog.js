@@ -78,7 +78,7 @@ const SubscriptionSettingsDialog = (props) => {
                         "aria-label": t("subscription_settings_dialog_display_name_placeholder")
                     }}
                 />
-                {config.enable_reserve_topics && session.exists() &&
+                {config.enable_reservations && session.exists() &&
                     <>
                         <FormControlLabel
                             fullWidth

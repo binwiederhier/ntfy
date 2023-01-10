@@ -107,6 +107,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [Comment envoyer des notifications push sur votre téléphone facilement et gratuitement?](https://korben.info/notifications-push-telephone.html) - 1/2023
+- [UnifiedPush: a decentralized, open-source push notification protocol](https://f-droid.org/en/2022/12/18/unifiedpush.html) ⭐ - 12/2022
 - [ntfy setup instructions](https://docs.benjamin-altpeter.de/network/vms/1001029-ntfy/) - benjamin-altpeter.de - 12/2022
 - [Ntfy Self-Hosted Push Notifications](https://lachlanlife.net/posts/2022-12-ntfy/) - lachlanlife.net - 12/2022 
 - [ntfy.sh](https://paramdeo.com/til/ntfy-sh) - paramdeo.com - 11/2022

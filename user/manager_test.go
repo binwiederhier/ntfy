@@ -600,10 +600,13 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 
 	require.Equal(t, "phil", phil.Name)
 	require.Equal(t, RoleAdmin, phil.Role)
+	require.Equal(t, syncTopicLength, len(phil.SyncTopic))
 	require.Equal(t, 0, len(philGrants))
 
 	require.Equal(t, "ben", ben.Name)
 	require.Equal(t, RoleUser, ben.Role)
+	require.Equal(t, syncTopicLength, len(ben.SyncTopic))
+	require.NotEqual(t, ben.SyncTopic, phil.SyncTopic)
 	require.Equal(t, 2, len(benGrants))
 	require.Equal(t, "stats", benGrants[0].TopicPattern)
 	require.Equal(t, PermissionReadWrite, benGrants[0].Allow)

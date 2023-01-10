@@ -232,6 +232,8 @@ const (
 		DROP TABLE access;
 		DROP TABLE user_old;
 	`
+	migrate1To2SelectAllUsersIDsNoTx = `SELECT id FROM user`
+	migrate1To2UpdateSyncTopicNoTx   = `UPDATE user SET sync_topic = ? WHERE id = ?`
 )
 
 // Manager is an implementation of Manager. It stores users and access control list
@@ -481,7 +483,6 @@ func (a *Manager) AddUser(username, password string, role Role, createdBy string
 	if err != nil {
 		return err
 	}
-	// INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen)
 	syncTopic, now := util.RandomString(syncTopicLength), time.Now().Unix()
 	if _, err = a.db.Exec(insertUserQuery, username, hash, role, syncTopic, createdBy, now, now); err != nil {
 		return err
@@ -884,6 +885,27 @@ func migrateFrom1(db *sql.DB) error {
 	}
 	if _, err := tx.Exec(migrate1To2InsertFromOldTablesAndDropNoTx); err != nil {
 		return err
+	}
+	rows, err := tx.Query(migrate1To2SelectAllUsersIDsNoTx)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	syncTopics := make(map[int]string)
+	for rows.Next() {
+		var userID int
+		if err := rows.Scan(&userID); err != nil {
+			return err
+		}
+		syncTopics[userID] = util.RandomString(syncTopicLength)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for userID, syncTopic := range syncTopics {
+		if _, err := tx.Exec(migrate1To2UpdateSyncTopicNoTx, syncTopic, userID); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec(updateSchemaVersion, 2); err != nil {
 		return err

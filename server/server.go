@@ -40,7 +40,6 @@ import (
 			login/account endpoints
 		reset daily Limits for users
 			- set last_stats_reset in migration
-		set sync_topic in migration
 		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 

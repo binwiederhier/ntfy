@@ -51,6 +51,11 @@ const (
 	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB
 )
 
+var (
+	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
+	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+)
+
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
 	BaseURL                              string
@@ -103,12 +108,11 @@ type Config struct {
 	VisitorEmailLimitReplenish           time.Duration
 	VisitorAccountCreateLimitBurst       int
 	VisitorAccountCreateLimitReplenish   time.Duration
+	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	BehindProxy                          bool
 	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
-	EnableEmailConfirm                   bool
-	EnablePasswordReset                  bool
 	EnablePayments                       bool
 	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
 	Version                              string // injected by App
@@ -155,6 +159,7 @@ func NewConfig() *Config {
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		VisitorAccountCreateLimitBurst:       DefaultVisitorAccountCreateLimitBurst,
 		VisitorAccountCreateLimitReplenish:   DefaultVisitorAccountCreateLimitReplenish,
+		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		BehindProxy:                          false,
 		EnableWeb:                            true,
 		Version:                              "",

@@ -182,7 +182,7 @@ func (v *visitor) Stale() bool {
 	return time.Since(v.seen) > visitorExpungeAfter
 }
 
-func (v *visitor) IncrMessages() {
+func (v *visitor) IncrementMessages() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.messages++
@@ -191,12 +191,23 @@ func (v *visitor) IncrMessages() {
 	}
 }
 
-func (v *visitor) IncrEmails() {
+func (v *visitor) IncrementEmails() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.emails++
 	if v.user != nil {
 		v.user.Stats.Emails = v.emails
+	}
+}
+
+func (v *visitor) ResetStats() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.messages = 0
+	v.emails = 0
+	if v.user != nil {
+		v.user.Stats.Messages = 0
+		v.user.Stats.Emails = 0
 	}
 }
 

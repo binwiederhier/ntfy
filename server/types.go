@@ -287,12 +287,11 @@ type apiAccountAccessRequest struct {
 }
 
 type apiConfigResponse struct {
-	BaseURL             string   `json:"base_url"`
-	AppRoot             string   `json:"app_root"`
-	EnableLogin         bool     `json:"enable_login"`
-	EnableSignup        bool     `json:"enable_signup"`
-	EnablePasswordReset bool     `json:"enable_password_reset"`
-	EnablePayments      bool     `json:"enable_payments"`
-	EnableReservations  bool     `json:"enable_reservations"`
-	DisallowedTopics    []string `json:"disallowed_topics"`
+	BaseURL            string   `json:"base_url"`
+	AppRoot            string   `json:"app_root"`
+	EnableLogin        bool     `json:"enable_login"`
+	EnableSignup       bool     `json:"enable_signup"`
+	EnablePayments     bool     `json:"enable_payments"`
+	EnableReservations bool     `json:"enable_reservations"`
+	DisallowedTopics   []string `json:"disallowed_topics"`
 }

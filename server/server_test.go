@@ -622,22 +622,20 @@ func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 }
 
 func TestServer_Auth_Success_Admin(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
-		"Authorization": basicAuth("phil:phil"),
+		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 }
 
 func TestServer_Auth_Success_User(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
@@ -645,14 +643,13 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	require.Nil(t, s.userManager.AllowAccess("", "ben", "mytopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
-		"Authorization": basicAuth("ben:ben"),
+		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 200, response.Code)
 }
 
 func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
@@ -661,12 +658,12 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	require.Nil(t, s.userManager.AllowAccess("", "ben", "anothertopic", true, true))
 
 	response := request(t, s, "GET", "/mytopic,anothertopic/auth", "", map[string]string{
-		"Authorization": basicAuth("ben:ben"),
+		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 200, response.Code)
 
 	response = request(t, s, "GET", "/mytopic,anothertopic,NOT-THIS-ONE/auth", "", map[string]string{
-		"Authorization": basicAuth("ben:ben"),
+		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 403, response.Code)
 }
@@ -680,14 +677,13 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
-		"Authorization": basicAuth("phil:INVALID"),
+		"Authorization": util.BasicAuth("phil", "INVALID"),
 	})
 	require.Equal(t, 401, response.Code)
 }
 
 func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
@@ -695,14 +691,13 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	require.Nil(t, s.userManager.AllowAccess("", "ben", "sometopic", true, true)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
-		"Authorization": basicAuth("ben:ben"),
+		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 403, response.Code)
 }
 
 func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionReadWrite // Open by default
 	s := newTestServer(t, c)
 
@@ -720,7 +715,7 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	require.Equal(t, 403, response.Code) // Cannot write as anonymous
 
 	response = request(t, s, "PUT", "/announcements", "test", map[string]string{
-		"Authorization": basicAuth("phil:phil"),
+		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, response.Code)
 
@@ -732,20 +727,62 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 }
 
 func TestServer_Auth_ViaQuery(t *testing.T) {
-	c := newTestConfig(t)
-	c.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin, "unit-test"))
 
-	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:some pass"))))
+	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(util.BasicAuth("ben", "some pass"))))
 	response := request(t, s, "GET", u, "", nil)
 	require.Equal(t, 200, response.Code)
 
-	u = fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(basicAuth("ben:WRONNNGGGG"))))
+	u = fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(util.BasicAuth("ben", "WRONNNGGGG"))))
 	response = request(t, s, "GET", u, "", nil)
 	require.Equal(t, 401, response.Code)
+}
+
+func TestServer_StatsResetter(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.AuthDefault = user.PermissionDenyAll
+	c.VisitorStatsResetTime = time.Now().Add(time.Second)
+	s := newTestServer(t, c)
+	go s.runStatsResetter()
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AllowAccess("", "phil", "mytopic", true, true))
+
+	for i := 0; i < 5; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+	}
+
+	response := request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+
+	// User stats show 10 messages
+	response = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(5), account.Stats.Messages)
+
+	// Start stats resetter
+	time.Sleep(1200 * time.Millisecond)
+
+	// User stats show 0 messages now!
+	response = request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(0), account.Stats.Messages)
+
 }
 
 type testMailer struct {
@@ -1478,12 +1515,13 @@ func TestServer_PublishAttachmentAccountStats(t *testing.T) {
 	// User stats
 	response = request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, response.Code)
-	var account *apiAccountResponse
-	require.Nil(t, json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&account))
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
 	require.Equal(t, int64(5000), account.Limits.AttachmentFileSize)
 	require.Equal(t, int64(6000), account.Limits.AttachmentTotalSize)
 	require.Equal(t, int64(4999), account.Stats.AttachmentTotalSize)
 	require.Equal(t, int64(1001), account.Stats.AttachmentTotalSizeRemaining)
+	require.Equal(t, int64(1), account.Stats.Messages)
 }
 
 func TestServer_Visitor_XForwardedFor_None(t *testing.T) {
@@ -1642,10 +1680,6 @@ func toHTTPError(t *testing.T, s string) *errHTTP {
 	var e errHTTP
 	require.Nil(t, json.NewDecoder(strings.NewReader(s)).Decode(&e))
 	return &e
-}
-
-func basicAuth(s string) string {
-	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(s)))
 }
 
 func readAll(t *testing.T, rc io.ReadCloser) string {

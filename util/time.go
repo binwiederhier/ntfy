@@ -14,6 +14,18 @@ var (
 	durationStrRegex  = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
 )
 
+// NextOccurrenceUTC takes a time of day (e.g. 9:00am), and returns the next occurrence
+// of that time from the current time (in UTC).
+func NextOccurrenceUTC(timeOfDay, base time.Time) time.Time {
+	hour, minute, seconds := timeOfDay.Clock()
+	now := base.UTC()
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, seconds, 0, time.UTC)
+	if next.Before(now) {
+		next = next.AddDate(0, 0, 1)
+	}
+	return next
+}
+
 // ParseFutureTime parses a date/time string to a time.Time. It supports unix timestamps, durations
 // and natural language dates
 func ParseFutureTime(s string, now time.Time) (time.Time, error) {

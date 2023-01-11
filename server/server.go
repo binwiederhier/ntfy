@@ -37,9 +37,9 @@ import (
 /*
 	TODO
 		Limits & rate limiting:
+			users without tier: should the stats be persisted? are they meaningful?
+				-> test that the visitor is based on the IP address!
 			login/account endpoints
-		reset daily Limits for users
-			- set last_stats_reset in migration
 		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 
@@ -55,6 +55,7 @@ import (
 		Tests:
 		- Change tier from higher to lower tier (delete reservations)
 		- Message rate limiting and reset tests
+		- test that the visitor is based on the IP address when a user has no tier
 		Docs:
 		- "expires" field in message
 		- server.yml: enable-X flags
@@ -266,6 +267,7 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
+	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -450,14 +452,13 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		appRoot = "/app"
 	}
 	response := &apiConfigResponse{
-		BaseURL:             "", // Will translate to window.location.origin
-		AppRoot:             appRoot,
-		EnableLogin:         s.config.EnableLogin,
-		EnableSignup:        s.config.EnableSignup,
-		EnablePasswordReset: s.config.EnablePasswordReset,
-		EnablePayments:      s.config.EnablePayments,
-		EnableReservations:  s.config.EnableReservations,
-		DisallowedTopics:    disallowedTopics,
+		BaseURL:            "", // Will translate to window.location.origin
+		AppRoot:            appRoot,
+		EnableLogin:        s.config.EnableLogin,
+		EnableSignup:       s.config.EnableSignup,
+		EnablePayments:     s.config.EnablePayments,
+		EnableReservations: s.config.EnableReservations,
+		DisallowedTopics:   disallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
@@ -563,7 +564,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			go s.sendToFirebase(v, m)
 		}
 		if s.smtpSender != nil && email != "" {
-			v.IncrEmails()
+			v.IncrementEmails()
 			go s.sendEmail(v, m, email)
 		}
 		if s.config.UpstreamBaseURL != "" {
@@ -578,7 +579,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
-	v.IncrMessages()
+	v.IncrementMessages()
 	if s.userManager != nil && v.user != nil {
 		s.userManager.EnqueueStats(v.user)
 	}
@@ -1330,6 +1331,35 @@ func (s *Server) runManager() {
 			s.execManager()
 		case <-s.closeChan:
 			return
+		}
+	}
+}
+
+func (s *Server) runStatsResetter() {
+	for {
+		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())
+		timer := time.NewTimer(time.Until(runAt))
+		log.Debug("Stats resetter: Waiting until %v to reset visitor stats", runAt)
+		select {
+		case <-timer.C:
+			s.resetStats()
+		case <-s.closeChan:
+			timer.Stop()
+			return
+		}
+	}
+}
+
+func (s *Server) resetStats() {
+	log.Info("Resetting all visitor stats (daily task)")
+	s.mu.Lock()
+	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
+	for _, v := range s.visitors {
+		v.ResetStats()
+	}
+	if s.userManager != nil {
+		if err := s.userManager.ResetStats(); err != nil {
+			log.Warn("Failed to write to database: %s", err.Error())
 		}
 	}
 }

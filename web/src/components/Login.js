@@ -112,7 +112,7 @@ const Login = () => {
                     </Box>
                 }
                 <Box sx={{width: "100%"}}>
-                    {config.enable_password_reset && <div style={{float: "left"}}><NavLink to={routes.resetPassword} variant="body1">{t("Reset password")}</NavLink></div>}
+                    {/* This is where the password reset link would go */}
                     {config.enable_signup && <div style={{float: "right"}}><NavLink to={routes.signup} variant="body1">{t("login_link_signup")}</NavLink></div>}
                 </Box>
             </Box>

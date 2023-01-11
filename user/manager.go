@@ -59,7 +59,6 @@ const (
 			created_by TEXT NOT NULL,
 			created_at INT NOT NULL,
 			last_seen INT NOT NULL,
-			last_stats_reset INT NOT NULL DEFAULT (0),
 		    FOREIGN KEY (tier_id) REFERENCES tier (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
@@ -128,11 +127,12 @@ const (
 				ELSE 2
 			END, user
 	`
-	updateUserPassQuery  = `UPDATE user SET pass = ? WHERE user = ?`
-	updateUserRoleQuery  = `UPDATE user SET role = ? WHERE user = ?`
-	updateUserPrefsQuery = `UPDATE user SET prefs = ? WHERE user = ?`
-	updateUserStatsQuery = `UPDATE user SET stats_messages = ?, stats_emails = ? WHERE user = ?`
-	deleteUserQuery      = `DELETE FROM user WHERE user = ?`
+	updateUserPassQuery          = `UPDATE user SET pass = ? WHERE user = ?`
+	updateUserRoleQuery          = `UPDATE user SET role = ? WHERE user = ?`
+	updateUserPrefsQuery         = `UPDATE user SET prefs = ? WHERE user = ?`
+	updateUserStatsQuery         = `UPDATE user SET stats_messages = ?, stats_emails = ? WHERE user = ?`
+	updateUserStatsResetAllQuery = `UPDATE user SET stats_messages = 0, stats_emails = 0`
+	deleteUserQuery              = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery = `
 		INSERT INTO user_access (user_id, topic, read, write, owner_user_id) 
@@ -391,6 +391,17 @@ func (a *Manager) ChangeSettings(user *User) error {
 	if _, err := a.db.Exec(updateUserPrefsQuery, string(prefs), user.Name); err != nil {
 		return err
 	}
+	return nil
+}
+
+// ResetStats resets all user stats in the user database. This touches all users.
+func (a *Manager) ResetStats() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if _, err := a.db.Exec(updateUserStatsResetAllQuery); err != nil {
+		return err
+	}
+	a.statsQueue = make(map[string]*User)
 	return nil
 }
 

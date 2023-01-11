@@ -11,6 +11,26 @@ var (
 	base = time.Date(2021, 12, 10, 10, 17, 23, 0, time.UTC)
 )
 
+func TestNextOccurrenceUTC_NextDate(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	require.Nil(t, err)
+
+	timeOfDay := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC) // Run at midnight UTC
+	nowInFairfieldCT := time.Date(2023, time.January, 10, 22, 19, 12, 0, loc)
+	nextRunTme := NextOccurrenceUTC(timeOfDay, nowInFairfieldCT)
+	require.Equal(t, time.Date(2023, time.January, 12, 0, 0, 0, 0, time.UTC), nextRunTme)
+}
+
+func TestNextOccurrenceUTC_SameDay(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	require.Nil(t, err)
+
+	timeOfDay := time.Date(0, 0, 0, 4, 0, 0, 0, time.UTC) // Run at 4am UTC
+	nowInFairfieldCT := time.Date(2023, time.January, 10, 22, 19, 12, 0, loc)
+	nextRunTme := NextOccurrenceUTC(timeOfDay, nowInFairfieldCT)
+	require.Equal(t, time.Date(2023, time.January, 11, 4, 0, 0, 0, time.UTC), nextRunTme)
+}
+
 func TestParseFutureTime_11am_FutureTime(t *testing.T) {
 	d, err := ParseFutureTime("11am", base)
 	require.Nil(t, err)

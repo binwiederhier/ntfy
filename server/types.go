@@ -23,10 +23,10 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID         string      `json:"id"`      // Random message ID
-	Time       int64       `json:"time"`    // Unix time in seconds
-	Expires    int64       `json:"expires"` // Unix time in seconds
-	Event      string      `json:"event"`   // One of the above
+	ID         string      `json:"id"`                // Random message ID
+	Time       int64       `json:"time"`              // Unix time in seconds
+	Expires    int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
+	Event      string      `json:"event"`             // One of the above
 	Topic      string      `json:"topic"`
 	Title      string      `json:"title,omitempty"`
 	Message    string      `json:"message,omitempty"`
@@ -281,7 +281,7 @@ type apiAccountResponse struct {
 	Stats         *apiAccountStats         `json:"stats,omitempty"`
 }
 
-type apiAccountAccessRequest struct {
+type apiAccountReservationRequest struct {
 	Topic    string `json:"topic"`
 	Everyone string `json:"everyone"`
 }

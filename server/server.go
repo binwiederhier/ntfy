@@ -47,18 +47,14 @@ import (
 		- flicker of upgrade banner
 		- JS constants
 		Sync:
-			- "account topic" sync mechanism
-				- subscribe to sync topic in UI
 			- "mute" setting
 			- figure out what settings are "web" or "phone"
+			- sync problems with "deleteAfter=0" and "displayName="
 		Delete visitor when tier is changed to refresh rate limiters
 		Tests:
 		- Change tier from higher to lower tier (delete reservations)
 		- Message rate limiting and reset tests
 		- test that the visitor is based on the IP address when a user has no tier
-		Docs:
-		- "expires" field in message
-		- server.yml: enable-X flags
 */
 
 // Server is the main server, providing the UI and API for ntfy

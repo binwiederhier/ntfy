@@ -319,6 +319,7 @@ format of the message. It's very straight forward:
 |--------------|----------|---------------------------------------------------|-------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | `id`         | ✔️       | *string*                                          | `hwQ2YpKdmg`                                          | Randomly chosen message identifier                                                                                                   |
 | `time`       | ✔️       | *number*                                          | `1635528741`                                          | Message date time, as Unix time stamp                                                                                                |  
+| `expires`    | ✔️       | *number*                                          | `1673542291`                                          | Unix time stamp indicating when the message will be deleted                                                                          |  
 | `event`      | ✔️       | `open`, `keepalive`, `message`, or `poll_request` | `message`                                             | Message type, typically you'd be only interested in `message`                                                                        |
 | `topic`      | ✔️       | *string*                                          | `topic1,topic2`                                       | Comma-separated list of topics the message is associated with; only one for all `message` events, but may be a list in `open` events |
 | `message`    | -        | *string*                                          | `Some message`                                        | Message body; always present in `message` events                                                                                     |
@@ -346,6 +347,7 @@ Here's an example for each message type:
     {
         "id": "sPs71M8A2T",
         "time": 1643935928,
+        "expires": 1643936928,
         "event": "message",
         "topic": "mytopic",
         "priority": 5,
@@ -372,6 +374,7 @@ Here's an example for each message type:
     {
         "id": "wze9zgqK41",
         "time": 1638542110,
+        "expires": 1638543112,
         "event": "message",
         "topic": "phil_alerts",
         "message": "Remote access to phils-laptop detected. Act right away."

@@ -320,7 +320,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if v.user != nil && v.user.Role == user.RoleAdmin {
 		return errHTTPBadRequestMakesNoSenseForAdmin
 	}
-	req, err := readJSONWithLimit[apiAccountAccessRequest](r.Body, jsonBodyBytesLimit)
+	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	}

@@ -158,6 +158,19 @@
 #
 # web-root: app
 
+# Various feature flags used to control the web app, and API access, mainly around user and
+# account management.
+#
+# - enable-signup allows users to sign up via the web app, or API
+# - enable-login allows users to log in via the web app, or API
+# - enable-reservations allows users to reserve topics (if their tier allows it)
+# - enable-payments enables payments integration [preliminary option, may change]
+#
+# enable-signup: false
+# enable-login: false
+# enable-reservations: false
+# enable-payments: false
+
 # Server URL of a Firebase/APNS-connected ntfy server (likely "https://ntfy.sh").
 #
 # iOS users:

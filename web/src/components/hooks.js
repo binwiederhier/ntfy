@@ -1,5 +1,5 @@
 import {useNavigate, useParams} from "react-router-dom";
-import {useEffect, useState} from "react";
+import {useContext, useEffect, useState} from "react";
 import subscriptionManager from "../app/SubscriptionManager";
 import {disallowedTopic, expandSecureUrl, topicUrl} from "../app/utils";
 import notifier from "../app/Notifier";
@@ -10,6 +10,7 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import {UnauthorizedError} from "../app/AccountApi";
 import accountApi from "../app/AccountApi";
+import {AccountContext} from "./App";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -20,6 +21,34 @@ export const useConnectionListeners = (subscriptions, users) => {
     const navigate = useNavigate();
 
     useEffect(() => {
+            const handleMessage = async (subscriptionId, message) => {
+                const subscription = await subscriptionManager.get(subscriptionId);
+                if (subscription.internal) {
+                    await handleInternalMessage(message);
+                } else {
+                    await handleNotification(subscriptionId, message);
+                }
+            };
+
+            const handleInternalMessage = async (message) => {
+                console.log(`[ConnectionListener] Received message on sync topic`, message.message);
+                try {
+                    const data = JSON.parse(message.message);
+                    if (data.event === "sync") {
+                        if (data.source !== accountApi.identity) {
+                            console.log(`[ConnectionListener] Triggering account sync`);
+                            await accountApi.sync();
+                        } else {
+                            console.log(`[ConnectionListener] I triggered the account sync, ignoring message`);
+                        }
+                    } else {
+                        console.log(`[ConnectionListener] Unknown message type. Doing nothing.`);
+                    }
+                } catch (e) {
+                    console.log(`[ConnectionListener] Error parsing sync topic message`, e);
+                }
+            };
+
             const handleNotification = async (subscriptionId, notification) => {
                 const added = await subscriptionManager.addNotification(subscriptionId, notification);
                 if (added) {
@@ -28,10 +57,10 @@ export const useConnectionListeners = (subscriptions, users) => {
                 }
             };
             connectionManager.registerStateListener(subscriptionManager.updateState);
-            connectionManager.registerNotificationListener(handleNotification);
+            connectionManager.registerMessageListener(handleMessage);
             return () => {
                 connectionManager.resetStateListener();
-                connectionManager.resetNotificationListener();
+                connectionManager.resetMessageListener();
             }
         },
         // We have to disable dep checking for "navigate". This is fine, it never changes.
@@ -100,11 +129,9 @@ export const useBackgroundProcesses = () => {
 export const useAccountListener = (setAccount) => {
     useEffect(() => {
         accountApi.registerListener(setAccount);
-        (async () => {
-            await accountApi.sync();
-        })();
+        accountApi.sync(); // Dangle
         return () => {
-            accountApi.registerListener();
+            accountApi.resetListener();
         }
     }, []);
 }

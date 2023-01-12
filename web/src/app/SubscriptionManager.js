@@ -29,7 +29,8 @@ class SubscriptionManager {
             topic: topic,
             mutedUntil: 0,
             last: null,
-            remoteId: null
+            remoteId: null,
+            internal: false
         };
         await db.subscriptions.put(subscription);
         return subscription;
@@ -44,9 +45,11 @@ class SubscriptionManager {
             const remote = remoteSubscriptions[i];
             const local = await this.add(remote.base_url, remote.topic);
             const reservation = remoteReservations?.find(r => remote.base_url === config.base_url && remote.topic === r.topic) || null;
-            await this.setRemoteId(local.id, remote.id);
-            await this.setDisplayName(local.id, remote.display_name);
-            await this.setReservation(local.id, reservation); // May be null!
+            await this.update(local.id, {
+                remoteId: remote.id,
+                displayName: remote.display_name,
+                reservation: reservation // May be null!
+            });
             remoteIds.push(remote.id);
         }
 
@@ -54,7 +57,8 @@ class SubscriptionManager {
         const localSubscriptions = await db.subscriptions.toArray();
         for (let i = 0; i < localSubscriptions.length; i++) {
             const local = localSubscriptions[i];
-            if (!local.remoteId || !remoteIds.includes(local.remoteId)) {
+            const remoteExists = local.remoteId && remoteIds.includes(local.remoteId);
+            if (!local.internal && !remoteExists) {
                 await this.remove(local.id);
             }
         }
@@ -180,6 +184,10 @@ class SubscriptionManager {
         await db.subscriptions.update(subscriptionId, {
             reservation: reservation
         });
+    }
+
+    async update(subscriptionId, params) {
+        await db.subscriptions.update(subscriptionId, params);
     }
 
     async pruneNotifications(thresholdTimestamp) {

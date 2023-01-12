@@ -6,7 +6,7 @@ import {
     accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
-    accountUrl,
+    accountUrl, maybeWithAuth, topicUrl,
     withBasicAuth,
     withBearerAuth
 } from "./utils";
@@ -15,6 +15,7 @@ import subscriptionManager from "./SubscriptionManager";
 import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
+import userManager from "./UserManager";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes
@@ -23,6 +24,11 @@ class AccountApi {
     constructor() {
         this.timer = null;
         this.listener = null; // Fired when account is fetched from remote
+
+        // Random ID used to identify this client when sending/receiving "sync" events
+        // to the sync topic of an account. This ID doesn't matter much, but it will prevent
+        // a client from reacting to its own message.
+        this.identity = Math.floor(Math.random() * 2586000);
     }
 
     registerListener(listener) {
@@ -164,6 +170,7 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+        this.triggerChange(); // Dangle!
     }
 
     async addSubscription(payload) {
@@ -182,6 +189,7 @@ class AccountApi {
         }
         const subscription = await response.json();
         console.log(`[AccountApi] Subscription`, subscription);
+        this.triggerChange(); // Dangle!
         return subscription;
     }
 
@@ -201,6 +209,7 @@ class AccountApi {
         }
         const subscription = await response.json();
         console.log(`[AccountApi] Subscription`, subscription);
+        this.triggerChange(); // Dangle!
         return subscription;
     }
 
@@ -216,6 +225,7 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+        this.triggerChange(); // Dangle!
     }
 
     async upsertAccess(topic, everyone) {
@@ -236,6 +246,7 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+        this.triggerChange(); // Dangle!
     }
 
     async deleteAccess(topic) {
@@ -250,6 +261,7 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
+        this.triggerChange(); // Dangle!
     }
 
     async sync() {
@@ -282,6 +294,34 @@ class AccountApi {
             if ((e instanceof UnauthorizedError)) {
                 session.resetAndRedirect(routes.login);
             }
+        }
+    }
+
+    async triggerChange() {
+        const account = await this.get();
+        if (!account.sync_topic) {
+            return;
+        }
+        const url = topicUrl(config.base_url, account.sync_topic);
+        console.log(`[AccountApi] Triggering account change to ${url}`);
+        const user = await userManager.get(config.base_url);
+        const headers = {
+            Cache: "no" // We really don't need to store this!
+        };
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    event: "sync",
+                    source: this.identity
+                }),
+                headers: maybeWithAuth(headers, user)
+            });
+            if (response.status < 200 || response.status > 299) {
+                throw new Error(`Unexpected response: ${response.status}`);
+            }
+        } catch (e) {
+            console.log(`[AccountApi] Publishing to sync topic failed`, e);
         }
     }
 

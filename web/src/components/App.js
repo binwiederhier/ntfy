@@ -27,6 +27,7 @@ import Login from "./Login";
 import Pricing from "./Pricing";
 import Signup from "./Signup";
 import Account from "./Account";
+import accountApi from "../app/AccountApi";
 
 export const AccountContext = createContext(null);
 
@@ -78,6 +79,20 @@ const Layout = () => {
     useAccountListener(setAccount)
     useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
+
+    useEffect(() => {
+        if (!account || !account.sync_topic) {
+            return;
+        }
+        (async () => {
+            const subscription = await subscriptionManager.add(config.base_url, account.sync_topic);
+            if (!subscription.hidden) {
+                await subscriptionManager.update(subscription.id, {
+                    internal: true
+                });
+            }
+        })();
+    }, [account]);
 
     return (
         <Box sx={{display: 'flex'}}>

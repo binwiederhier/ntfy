@@ -11,7 +11,7 @@ class ConnectionManager {
     constructor() {
         this.connections = new Map(); // ConnectionId -> Connection (hash, see below)
         this.stateListener = null; // Fired when connection state changes
-        this.notificationListener = null; // Fired when new notifications arrive
+        this.messageListener = null; // Fired when new notifications arrive
     }
 
     registerStateListener(listener) {
@@ -22,12 +22,12 @@ class ConnectionManager {
         this.stateListener = null;
     }
 
-    registerNotificationListener(listener) {
-        this.notificationListener = listener;
+    registerMessageListener(listener) {
+        this.messageListener = listener;
     }
 
-    resetNotificationListener() {
-        this.notificationListener = null;
+    resetMessageListener() {
+        this.messageListener = null;
     }
 
     /**
@@ -97,9 +97,9 @@ class ConnectionManager {
     }
 
     notificationReceived(subscriptionId, notification) {
-        if (this.notificationListener) {
+        if (this.messageListener) {
             try {
-                this.notificationListener(subscriptionId, notification);
+                this.messageListener(subscriptionId, notification);
             } catch (e) {
                 console.error(`[ConnectionManager] Error handling notification for ${subscriptionId}`, e);
             }

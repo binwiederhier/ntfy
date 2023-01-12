@@ -46,6 +46,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		return err
 	}
 	limits, stats := info.Limits, info.Stats
+
 	response := &apiAccountResponse{
 		Limits: &apiAccountLimits{
 			Basis:                    string(limits.Basis),

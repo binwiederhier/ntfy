@@ -215,9 +215,11 @@ const UpgradeBanner = () => {
 };
 
 const SubscriptionList = (props) => {
-    const sortedSubscriptions = props.subscriptions.sort( (a, b) => {
-        return (topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic)) ? -1 : 1;
-    });
+    const sortedSubscriptions = props.subscriptions
+        .filter(s => !s.internal)
+        .sort((a, b) => {
+            return (topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic)) ? -1 : 1;
+        });
     return (
         <>
             {sortedSubscriptions.map(subscription =>

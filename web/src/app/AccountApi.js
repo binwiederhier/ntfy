@@ -1,6 +1,6 @@
 import {
-    accountAccessSingleUrl,
-    accountAccessUrl,
+    accountReservationSingleUrl,
+    accountReservationUrl,
     accountPasswordUrl,
     accountSettingsUrl,
     accountSubscriptionSingleUrl,
@@ -229,7 +229,7 @@ class AccountApi {
     }
 
     async upsertAccess(topic, everyone) {
-        const url = accountAccessUrl(config.base_url);
+        const url = accountReservationUrl(config.base_url);
         console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
         const response = await fetch(url, {
             method: "POST",
@@ -250,7 +250,7 @@ class AccountApi {
     }
 
     async deleteAccess(topic) {
-        const url = accountAccessSingleUrl(config.base_url, topic);
+        const url = accountReservationSingleUrl(config.base_url, topic);
         console.log(`[AccountApi] Removing topic reservation ${url}`);
         const response = await fetch(url, {
             method: "DELETE",

@@ -59,8 +59,6 @@ import (
 		Docs:
 		- "expires" field in message
 		- server.yml: enable-X flags
-		Refactor:
-		- rename /access -> /reservation
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -105,8 +103,8 @@ var (
 	accountPasswordPath            = "/v1/account/password"
 	accountSettingsPath            = "/v1/account/settings"
 	accountSubscriptionPath        = "/v1/account/subscription"
-	accountAccessPath              = "/v1/account/access"
-	accountAccessSingleRegex       = regexp.MustCompile(`/v1/account/access/([-_A-Za-z0-9]{1,64})$`)
+	accountReservationPath         = "/v1/account/reservation"
+	accountReservationSingleRegex  = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
 	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
 	matrixPushPath                 = "/_matrix/push/v1/notify"
 	staticRegex                    = regexp.MustCompile(`^/static/.+`)
@@ -364,10 +362,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.handleAccountSubscriptionChange)(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.handleAccountSubscriptionDelete)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountAccessPath {
-		return s.ensureUser(s.handleAccountAccessAdd)(w, r, v)
-	} else if r.Method == http.MethodDelete && accountAccessSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureUser(s.handleAccountAccessDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountReservationPath {
+		return s.ensureUser(s.handleAccountReservationAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && accountReservationSingleRegex.MatchString(r.URL.Path) {
+		return s.ensureUser(s.handleAccountReservationDelete)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {

@@ -350,7 +350,7 @@ func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic":"mytopic", "everyone":"deny-all"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic", "everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 401, rr.Code)
@@ -362,7 +362,7 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	s := newTestServer(t, conf)
 	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin, "unit-test"))
 
-	rr := request(t, s, "POST", "/v1/account/access", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "adminpass"),
 	})
 	require.Equal(t, 400, rr.Code)
@@ -393,24 +393,24 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Reserve two topics
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
 
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "another", "everyone":"read-only"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "another", "everyone":"read-only"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
 
 	// Trying to reserve a third should fail
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "yet-another", "everyone":"deny-all"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "yet-another", "everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 429, rr.Code)
 
 	// Modify existing should still work
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "another", "everyone":"write-only"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "another", "everyone":"write-only"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -436,7 +436,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	require.Equal(t, "deny-all", account.Reservations[1].Everyone)
 
 	// Delete and re-check
-	rr = request(t, s, "DELETE", "/v1/account/access/another", "", map[string]string{
+	rr = request(t, s, "DELETE", "/v1/account/reservation/another", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -468,7 +468,7 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Reserve a topic
-	rr = request(t, s, "POST", "/v1/account/access", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)

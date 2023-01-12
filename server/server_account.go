@@ -316,7 +316,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	return nil
 }
 
-func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user != nil && v.user.Role == user.RoleAdmin {
 		return errHTTPBadRequestMakesNoSenseForAdmin
 	}
@@ -332,7 +332,7 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 		return errHTTPBadRequestPermissionInvalid
 	}
 	if v.user.Tier == nil {
-		return errHTTPUnauthorized // FIXME there should always be a plan!
+		return errHTTPUnauthorized
 	}
 	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
@@ -361,8 +361,8 @@ func (s *Server) handleAccountAccessAdd(w http.ResponseWriter, r *http.Request, 
 	return nil
 }
 
-func (s *Server) handleAccountAccessDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := accountAccessSingleRegex.FindStringSubmatch(r.URL.Path)
+func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	matches := accountReservationSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidPath
 	}

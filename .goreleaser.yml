@@ -13,9 +13,6 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [amd64]
-    hooks:
-      post:
-        - upx "{{ .Path }}" # apt install upx
   -
     id: ntfy_linux_armv6
     binary: ntfy
@@ -28,7 +25,6 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [6]
-    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
     id: ntfy_linux_armv7
     binary: ntfy
@@ -41,7 +37,6 @@ builds:
     goos: [linux]
     goarch: [arm]
     goarm: [7]
-    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
     id: ntfy_linux_arm64
     binary: ntfy
@@ -53,7 +48,6 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [linux]
     goarch: [arm64]
-    # No "upx" for ARM, see https://github.com/binwiederhier/ntfy/issues/191#issuecomment-1083406546
   -
     id: ntfy_windows_amd64
     binary: ntfy
@@ -64,7 +58,6 @@ builds:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [windows]
     goarch: [amd64]
-    # No "upx" for Windows to hopefully avoid Virus warnings
   -
     id: ntfy_darwin_all
     binary: ntfy

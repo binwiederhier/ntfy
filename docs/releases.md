@@ -18,6 +18,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Add HTTP/2 and TLSv1.3 support to nginx docs ([#553](https://github.com/binwiederhier/ntfy/issues/553), thanks to [@bt90](https://github.com/bt90))
 * Small wording change for `client.yml` ([#562](https://github.com/binwiederhier/ntfy/pull/562), thanks to [@fleopaulD](https://github.com/fleopaulD))
+* Fix K8s install docs ([#582](https://github.com/binwiederhier/ntfy/pull/582), thanks to [@Remedan](https://github.com/Remedan))
 
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅

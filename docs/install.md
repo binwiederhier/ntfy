@@ -371,7 +371,7 @@ unmanned pod.
           containers:
           - name: ntfy
             image: binwiederhier/ntfy
-            args: ["serve", "--cache-file /var/cache/ntfy/cache.db"]
+            args: ["serve", "--cache-file", "/var/cache/ntfy/cache.db"]
             ports:
             - containerPort: 80
               name: http
@@ -379,6 +379,8 @@ unmanned pod.
             - name: config
               mountPath: "/etc/ntfy"
               readOnly: true
+            - name: cache
+              mountPath: "/var/cache/ntfy"
           volumes:
             - name: config
               configMap:

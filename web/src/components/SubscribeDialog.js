@@ -110,7 +110,7 @@ const SubscribePage = (props) => {
         if (session.exists() && baseUrl === config.base_url && reserveTopicVisible) {
             console.log(`[SubscribeDialog] Reserving topic ${topic} with everyone access ${everyone}`);
             try {
-                await accountApi.upsertAccess(topic, everyone);
+                await accountApi.upsertReservation(topic, everyone);
                 // Account sync later after it was added
             } catch (e) {
                 console.log(`[SubscribeDialog] Error reserving topic`, e);

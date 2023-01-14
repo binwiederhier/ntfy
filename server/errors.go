@@ -58,6 +58,8 @@ var (
 	errHTTPBadRequestJSONInvalid                     = &errHTTP{40024, http.StatusBadRequest, "invalid request: request body must be valid JSON", ""}
 	errHTTPBadRequestPermissionInvalid               = &errHTTP{40025, http.StatusBadRequest, "invalid request: incorrect permission string", ""}
 	errHTTPBadRequestMakesNoSenseForAdmin            = &errHTTP{40026, http.StatusBadRequest, "invalid request: this makes no sense for admins", ""}
+	errHTTPBadRequestNotAPaidUser                    = &errHTTP{40027, http.StatusBadRequest, "invalid request: not a paid user", ""}
+	errHTTPBadRequestInvalidStripeRequest            = &errHTTP{40028, http.StatusBadRequest, "invalid request: not a valid Stripe request", ""}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication"}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication"}

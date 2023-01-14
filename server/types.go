@@ -295,3 +295,15 @@ type apiConfigResponse struct {
 	EnableReservations bool     `json:"enable_reservations"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
+
+type apiAccountTierChangeRequest struct {
+	Tier string `json:"tier"`
+}
+
+type apiAccountCheckoutResponse struct {
+	RedirectURL string `json:"redirect_url"`
+}
+
+type apiAccountBillingPortalRedirectResponse struct {
+	RedirectURL string `json:"redirect_url"`
+}

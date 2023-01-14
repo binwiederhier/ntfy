@@ -110,6 +110,8 @@ type Config struct {
 	VisitorAccountCreateLimitReplenish   time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	BehindProxy                          bool
+	StripeKey                            string
+	StripeWebhookKey                     string
 	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool

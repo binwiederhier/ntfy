@@ -37,9 +37,9 @@ const SubscriptionSettingsDialog = (props) => {
 
                 // Reservation
                 if (reserveTopicVisible) {
-                    await accountApi.upsertAccess(subscription.topic, everyone);
+                    await accountApi.upsertReservation(subscription.topic, everyone);
                 } else if (!reserveTopicVisible && subscription.reservation) { // Was removed
-                    await accountApi.deleteAccess(subscription.topic);
+                    await accountApi.deleteReservation(subscription.topic);
                 }
 
                 // Sync account

@@ -36,6 +36,10 @@ import (
 
 /*
 	TODO
+		payments:
+		- handle overdue payment (-> downgrade after 7 days)
+		- delete stripe subscription when acocunt is deleted
+
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?
 				-> test that the visitor is based on the IP address!
@@ -43,6 +47,7 @@ import (
 		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 
+		triggerChange after publishing a message
 		UI:
 		- flicker of upgrade banner
 		- JS constants
@@ -100,6 +105,11 @@ var (
 	accountSettingsPath            = "/v1/account/settings"
 	accountSubscriptionPath        = "/v1/account/subscription"
 	accountReservationPath         = "/v1/account/reservation"
+	accountBillingPortalPath       = "/v1/account/billing/portal"
+	accountBillingWebhookPath      = "/v1/account/billing/webhook"
+	accountCheckoutPath            = "/v1/account/checkout"
+	accountCheckoutSuccessTemplate = "/v1/account/checkout/success/{CHECKOUT_SESSION_ID}"
+	accountCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/checkout/success/(.+)$`)
 	accountReservationSingleRegex  = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
 	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
 	matrixPushPath                 = "/_matrix/push/v1/notify"
@@ -362,6 +372,14 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.handleAccountReservationAdd)(w, r, v)
 	} else if r.Method == http.MethodDelete && accountReservationSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.handleAccountReservationDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountCheckoutPath {
+		return s.ensureUser(s.handleAccountCheckoutSessionCreate)(w, r, v)
+	} else if r.Method == http.MethodGet && accountCheckoutSuccessRegex.MatchString(r.URL.Path) {
+		return s.ensureUserManager(s.handleAccountCheckoutSessionSuccessGet)(w, r, v) // No user context!
+	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingPortalPath {
+		return s.ensureUser(s.handleAccountBillingPortalSessionCreate)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingWebhookPath {
+		return s.ensureUserManager(s.handleAccountBillingWebhookTrigger)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {

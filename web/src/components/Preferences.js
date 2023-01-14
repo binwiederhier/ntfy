@@ -501,7 +501,7 @@ const Reservations = () => {
     const handleDialogSubmit = async (reservation) => {
         setDialogOpen(false);
         try {
-            await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            await accountApi.upsertReservation(reservation.topic, reservation.everyone);
             await accountApi.sync();
             console.debug(`[Preferences] Added topic reservation`, reservation);
         } catch (e) {
@@ -557,7 +557,7 @@ const ReservationsTable = (props) => {
     const handleDialogSubmit = async (reservation) => {
         setDialogOpen(false);
         try {
-            await accountApi.upsertAccess(reservation.topic, reservation.everyone);
+            await accountApi.upsertReservation(reservation.topic, reservation.everyone);
             await accountApi.sync();
             console.debug(`[Preferences] Added topic reservation`, reservation);
         } catch (e) {
@@ -568,7 +568,7 @@ const ReservationsTable = (props) => {
 
     const handleDeleteClick = async (reservation) => {
         try {
-            await accountApi.deleteAccess(reservation.topic);
+            await accountApi.deleteReservation(reservation.topic);
             await accountApi.sync();
             console.debug(`[Preferences] Deleted topic reservation`, reservation);
         } catch (e) {

@@ -8,7 +8,7 @@ import {
     accountTokenUrl,
     accountUrl, maybeWithAuth, topicUrl,
     withBasicAuth,
-    withBearerAuth
+    withBearerAuth, accountCheckoutUrl, accountBillingPortalUrl
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
@@ -228,7 +228,7 @@ class AccountApi {
         this.triggerChange(); // Dangle!
     }
 
-    async upsertAccess(topic, everyone) {
+    async upsertReservation(topic, everyone) {
         const url = accountReservationUrl(config.base_url);
         console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
         const response = await fetch(url, {
@@ -249,7 +249,7 @@ class AccountApi {
         this.triggerChange(); // Dangle!
     }
 
-    async deleteAccess(topic) {
+    async deleteReservation(topic) {
         const url = accountReservationSingleUrl(config.base_url, topic);
         console.log(`[AccountApi] Removing topic reservation ${url}`);
         const response = await fetch(url, {
@@ -262,6 +262,39 @@ class AccountApi {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         this.triggerChange(); // Dangle!
+    }
+
+    async createCheckoutSession(tier) {
+        const url = accountCheckoutUrl(config.base_url);
+        console.log(`[AccountApi] Creating checkout session`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                tier: tier
+            })
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    async createBillingPortalSession() {
+        const url = accountBillingPortalUrl(config.base_url);
+        console.log(`[AccountApi] Creating billing portal session`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: withBearerAuth({}, session.token())
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        return await response.json();
     }
 
     async sync() {

@@ -208,7 +208,7 @@ func TestManager_UserManagement(t *testing.T) {
 	// Remove user
 	require.Nil(t, a.RemoveUser("ben"))
 	_, err = a.User("ben")
-	require.Equal(t, ErrNotFound, err)
+	require.Equal(t, ErrUserNotFound, err)
 
 	users, err = a.Users()
 	require.Nil(t, err)

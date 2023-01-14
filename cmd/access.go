@@ -103,7 +103,7 @@ func changeAccess(c *cli.Context, manager *user.Manager, username string, topic 
 	read := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
 	write := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
 	u, err := manager.User(username)
-	if err == user.ErrNotFound {
+	if err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	} else if u.Role == user.RoleAdmin {
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
@@ -173,7 +173,7 @@ func showAllAccess(c *cli.Context, manager *user.Manager) error {
 
 func showUserAccess(c *cli.Context, manager *user.Manager, username string) error {
 	users, err := manager.User(username)
-	if err == user.ErrNotFound {
+	if err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	} else if err != nil {
 		return err

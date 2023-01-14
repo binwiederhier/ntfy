@@ -16,6 +16,7 @@ type User struct {
 	Prefs     *Prefs
 	Tier      *Tier
 	Stats     *Stats
+	Billing   *Billing
 	SyncTopic string
 	Created   time.Time
 	LastSeen  time.Time
@@ -58,6 +59,7 @@ type Tier struct {
 	AttachmentFileSizeLimit  int64
 	AttachmentTotalSizeLimit int64
 	AttachmentExpiryDuration time.Duration
+	StripePriceID            string
 }
 
 // Subscription represents a user's topic subscription
@@ -79,6 +81,12 @@ type NotificationPrefs struct {
 type Stats struct {
 	Messages int64
 	Emails   int64
+}
+
+// Billing is a struct holding a user's billing information
+type Billing struct {
+	StripeCustomerID     string
+	StripeSubscriptionID string
 }
 
 // Grant is a struct that represents an access control entry to a topic by a user
@@ -212,5 +220,6 @@ var (
 	ErrUnauthenticated = errors.New("unauthenticated")
 	ErrUnauthorized    = errors.New("unauthorized")
 	ErrInvalidArgument = errors.New("invalid argument")
-	ErrNotFound        = errors.New("not found")
+	ErrUserNotFound    = errors.New("user not found")
+	ErrTierNotFound    = errors.New("tier not found")
 )

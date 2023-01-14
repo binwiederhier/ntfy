@@ -171,10 +171,28 @@ const Stats = () => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
     const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+
     if (!account) {
         return <></>;
     }
-    const normalize = (value, max) => Math.min(value / max * 100, 100);
+
+    const normalize = (value, max) => {
+        return Math.min(value / max * 100, 100);
+    };
+
+    const handleManageBilling = async () => {
+        try {
+            const response = await accountApi.createBillingPortalSession();
+            window.location.href = response.redirect_url;
+        } catch (e) {
+            console.log(`[Account] Error changing password`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+            // TODO show error
+        }
+    };
+
     return (
         <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
@@ -201,12 +219,20 @@ const Stats = () => {
                             >{t("account_usage_tier_upgrade_button")}</Button>
                         }
                         {config.enable_payments && account.role === "user" && account.tier?.paid &&
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => setUpgradeDialogOpen(true)}
-                                sx={{ml: 1}}
-                            >{t("account_usage_tier_change_button")}</Button>
+                            <>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => setUpgradeDialogOpen(true)}
+                                    sx={{ml: 1}}
+                                >{t("account_usage_tier_change_button")}</Button>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={handleManageBilling}
+                                    sx={{ml: 1}}
+                                >Manage billing</Button>
+                            </>
                         }
                         <UpgradeDialog
                             open={upgradeDialogOpen}

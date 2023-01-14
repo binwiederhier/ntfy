@@ -215,7 +215,7 @@ func execUserDel(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.RemoveUser(username); err != nil {
@@ -237,7 +237,7 @@ func execUserChangePass(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if password == "" {
@@ -265,7 +265,7 @@ func execUserChangeRole(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.ChangeRole(username, role); err != nil {
@@ -289,7 +289,7 @@ func execUserChangeTier(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrNotFound {
+	if _, err := manager.User(username); err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if tier == tierReset {

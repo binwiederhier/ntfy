@@ -40,12 +40,10 @@ import (
 		- send dunning emails when overdue
 		- payment methods
 		- unmarshal to stripe.Subscription instead of gjson
-		- Make ResetTier reset the stripe fields
 		- delete subscription when account deleted
-		- remove tier.paid
 		- add tier.visible
 		- fix tier selection boxes
-		- account sync after switching tiers
+		- delete messages + reserved topics on ResetTier
 
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?
@@ -360,7 +358,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
 		return s.handleAccountGet(w, r, v) // Allowed by anonymous
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
-		return s.ensureUser(s.handleAccountDelete)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountDelete))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
 		return s.ensureUser(s.handleAccountPasswordChange)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountTokenPath {
@@ -368,27 +366,29 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
 		return s.ensureUser(s.handleAccountTokenDelete)(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == accountSettingsPath {
-		return s.ensureUser(s.handleAccountSettingsChange)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountSettingsChange))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
-		return s.ensureUser(s.handleAccountSubscriptionAdd)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionAdd))(w, r, v)
 	} else if r.Method == http.MethodPatch && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureUser(s.handleAccountSubscriptionChange)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionChange))(w, r, v)
 	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureUser(s.handleAccountSubscriptionDelete)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionDelete))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountReservationPath {
-		return s.ensureUser(s.handleAccountReservationAdd)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountReservationAdd))(w, r, v)
 	} else if r.Method == http.MethodDelete && accountReservationSingleRegex.MatchString(r.URL.Path) {
-		return s.ensureUser(s.handleAccountReservationDelete)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountReservationDelete))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingSubscriptionPath {
-		return s.ensureUser(s.handleAccountBillingSubscriptionChange)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == accountBillingSubscriptionPath {
-		return s.ensureStripeCustomer(s.handleAccountBillingSubscriptionDelete)(w, r, v)
+		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionCreate))(w, r, v) // Account sync via incoming Stripe webhook
 	} else if r.Method == http.MethodGet && accountBillingSubscriptionCheckoutSuccessRegex.MatchString(r.URL.Path) {
-		return s.ensureUserManager(s.handleAccountCheckoutSessionSuccessGet)(w, r, v) // No user context!
+		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingSubscriptionCreateSuccess))(w, r, v) // No user context!
+	} else if r.Method == http.MethodPut && r.URL.Path == accountBillingSubscriptionPath {
+		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionUpdate))(w, r, v) // Account sync via incoming Stripe webhook
+	} else if r.Method == http.MethodDelete && r.URL.Path == accountBillingSubscriptionPath {
+		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingSubscriptionDelete))(w, r, v) // Account sync via incoming Stripe webhook
 	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingPortalPath {
-		return s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate)(w, r, v)
+		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingWebhookPath {
-		return s.ensureUserManager(s.handleAccountBillingWebhook)(w, r, v)
+		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -1423,12 +1423,12 @@ func (s *Server) sendDelayedMessages() error {
 	for _, m := range messages {
 		var v *visitor
 		if s.userManager != nil && m.User != "" {
-			user, err := s.userManager.User(m.User)
+			u, err := s.userManager.User(m.User)
 			if err != nil {
 				log.Warn("%s Error sending delayed message: %s", logMessagePrefix(v, m), err.Error())
 				continue
 			}
-			v = s.visitorFromUser(user, m.Sender)
+			v = s.visitorFromUser(u, m.Sender)
 		} else {
 			v = s.visitorFromIP(m.Sender)
 		}
@@ -1473,42 +1473,6 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 		}
 		return next(w, r, v)
 	}
-}
-
-func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
-	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if !s.config.EnableWeb {
-			return errHTTPNotFound
-		}
-		return next(w, r, v)
-	}
-}
-
-func (s *Server) ensureUserManager(next handleFunc) handleFunc {
-	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if s.userManager == nil {
-			return errHTTPNotFound
-		}
-		return next(w, r, v)
-	}
-}
-
-func (s *Server) ensureUser(next handleFunc) handleFunc {
-	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if v.user == nil {
-			return errHTTPUnauthorized
-		}
-		return next(w, r, v)
-	})
-}
-
-func (s *Server) ensureStripeCustomer(next handleFunc) handleFunc {
-	return s.ensureUser(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if v.user.Billing.StripeCustomerID == "" {
-			return errHTTPBadRequestNotAPaidUser
-		}
-		return next(w, r, v)
-	})
 }
 
 // transformBodyJSON peeks the request body, reads the JSON, and converts it to headers

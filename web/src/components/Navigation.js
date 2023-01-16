@@ -103,8 +103,8 @@ const NavList = (props) => {
     };
 
     const isAdmin = account?.role === "admin";
-    const isPaid = account?.tier?.paid;
-    const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;// && (!props.account || !props.account.tier || !props.account.tier.paid || props.account);
+    const isPaid = account?.billing?.subscription;
+    const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
     const showSubscriptionsList = props.subscriptions?.length > 0;
     const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
     const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
@@ -174,7 +174,14 @@ const NavList = (props) => {
 };
 
 const UpgradeBanner = () => {
+    const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
+
+    const handleClick = () => {
+        setDialogKey(k => k + 1);
+        setDialogOpen(true);
+    };
+
     return (
         <Box sx={{
             position: "fixed",
@@ -184,7 +191,7 @@ const UpgradeBanner = () => {
             background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
         }}>
             <Divider/>
-            <ListItemButton onClick={() => setDialogOpen(true)} sx={{pt: 2, pb: 2}}>
+            <ListItemButton onClick={handleClick} sx={{pt: 2, pb: 2}}>
                 <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
                 <ListItemText
                     sx={{ ml: 1 }}
@@ -207,6 +214,7 @@ const UpgradeBanner = () => {
                 />
             </ListItemButton>
             <UpgradeDialog
+                key={`upgradeDialog${dialogKey}`}
                 open={dialogOpen}
                 onCancel={() => setDialogOpen(false)}
             />

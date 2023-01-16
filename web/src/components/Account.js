@@ -56,6 +56,7 @@ const Basics = () => {
             <PrefGroup>
                 <Username/>
                 <ChangePassword/>
+                <AccountType/>
             </PrefGroup>
         </Card>
     );
@@ -168,18 +169,20 @@ const ChangePasswordDialog = (props) => {
     );
 };
 
-const Stats = () => {
+const AccountType = () => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
+    const [upgradeDialogKey, setUpgradeDialogKey] = useState(0);
     const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
     if (!account) {
         return <></>;
     }
 
-    const normalize = (value, max) => {
-        return Math.min(value / max * 100, 100);
-    };
+    const handleUpgradeClick = () => {
+        setUpgradeDialogKey(k => k + 1);
+        setUpgradeDialogOpen(true);
+    }
 
     const handleManageBilling = async () => {
         try {
@@ -194,67 +197,89 @@ const Stats = () => {
         }
     };
 
+    let accountType;
+    if (account.role === "admin") {
+        const tierSuffix = (account.tier) ? `(with ${account.tier.name} tier)` : `(no tier)`;
+        accountType = `${t("account_usage_tier_admin")} ${tierSuffix}`;
+    } else if (!account.tier) {
+        accountType = (config.enable_payments) ? t("account_usage_tier_free") : t("account_usage_tier_basic");
+    } else {
+        accountType = account.tier.name;
+    }
+
+    return (
+        <Pref
+            alignTop={account.billing?.status === "past_due" || account.billing?.cancel_at > 0}
+            title={t("account_usage_tier_title")}
+            description={t("account_usage_tier_description")}
+        >
+            <div>
+                {accountType}
+                {account.billing?.paid_until && !account.billing?.cancel_at &&
+                    <Tooltip title={t("account_usage_tier_paid_until", { date: formatShortDate(account.billing?.paid_until) })}>
+                        <span><InfoIcon/></span>
+                    </Tooltip>
+                }
+                {config.enable_payments && account.role === "user" && !account.billing?.subscription &&
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<CelebrationIcon sx={{ color: "#55b86e" }}/>}
+                        onClick={handleUpgradeClick}
+                        sx={{ml: 1}}
+                    >{t("account_usage_tier_upgrade_button")}</Button>
+                }
+                {config.enable_payments && account.role === "user" && account.billing?.subscription &&
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleUpgradeClick}
+                        sx={{ml: 1}}
+                    >{t("account_usage_tier_change_button")}</Button>
+                }
+                {config.enable_payments && account.role === "user" && account.billing?.customer &&
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleManageBilling}
+                        sx={{ml: 1}}
+                    >{t("account_usage_manage_billing_button")}</Button>
+                }
+                <UpgradeDialog
+                    key={`upgradeDialogFromAccount${upgradeDialogKey}`}
+                    open={upgradeDialogOpen}
+                    onCancel={() => setUpgradeDialogOpen(false)}
+                />
+            </div>
+            {account.billing?.status === "past_due" &&
+                <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
+            }
+            {account.billing?.cancel_at > 0 &&
+                <Alert severity="warning" sx={{mt: 1}}>{t("account_usage_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
+            }
+        </Pref>
+    )
+};
+
+const Stats = () => {
+    const { t } = useTranslation();
+    const { account } = useContext(AccountContext);
+    const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+
+    if (!account) {
+        return <></>;
+    }
+
+    const normalize = (value, max) => {
+        return Math.min(value / max * 100, 100);
+    };
+
     return (
         <Card sx={{p: 3}} aria-label={t("account_usage_title")}>
             <Typography variant="h5" sx={{marginBottom: 2}}>
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                <Pref
-                    alignTop={account.billing?.status === "past_due" || account.billing?.cancel_at > 0}
-                    title={t("account_usage_tier_title")}
-                >
-                    <div>
-                        {account.role === "admin" &&
-                            <>
-                                {t("account_usage_tier_admin")}
-                                {" "}{account.tier ? `(with ${account.tier.name} tier)` : `(no tier)`}
-                            </>
-                        }
-                        {account.role === "user" && account.tier && account.tier.name}
-                        {account.role === "user" && !account.tier && t("account_usage_tier_none")}
-                        {account.billing?.paid_until &&
-                            <Tooltip title={t("account_usage_tier_paid_until", { date: formatShortDate(account.billing?.paid_until) })}>
-                                <span><InfoIcon/></span>
-                            </Tooltip>
-                        }
-                        {config.enable_payments && account.role === "user" && (!account.tier || !account.tier.paid) &&
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={<CelebrationIcon sx={{ color: "#55b86e" }}/>}
-                                onClick={() => setUpgradeDialogOpen(true)}
-                                sx={{ml: 1}}
-                            >{t("account_usage_tier_upgrade_button")}</Button>
-                        }
-                        {config.enable_payments && account.role === "user" && account.tier?.paid &&
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => setUpgradeDialogOpen(true)}
-                                sx={{ml: 1}}
-                            >{t("account_usage_tier_change_button")}</Button>
-                        }
-                        {config.enable_payments && account.role === "user" && account.billing?.customer &&
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={handleManageBilling}
-                                sx={{ml: 1}}
-                            >{t("account_usage_manage_billing_button")}</Button>
-                        }
-                        <UpgradeDialog
-                            open={upgradeDialogOpen}
-                            onCancel={() => setUpgradeDialogOpen(false)}
-                        />
-                    </div>
-                    {account.billing?.status === "past_due" &&
-                        <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
-                    }
-                    {account.billing?.cancel_at > 0 &&
-                        <Alert severity="info" sx={{mt: 1}}>{t("account_usage_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
-                    }
-                </Pref>
                 {account.role !== "admin" &&
                     <Pref title={t("account_usage_reservations_title")}>
                         {account.limits.reservations > 0 &&

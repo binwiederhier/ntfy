@@ -264,11 +264,20 @@ class AccountApi {
         this.triggerChange(); // Dangle!
     }
 
+    async createBillingSubscription(tier) {
+        console.log(`[AccountApi] Creating billing subscription with ${tier}`);
+        return await this.upsertBillingSubscription("POST", tier)
+    }
+
     async updateBillingSubscription(tier) {
+        console.log(`[AccountApi] Updating billing subscription with ${tier}`);
+        return await this.upsertBillingSubscription("PUT", tier)
+    }
+
+    async upsertBillingSubscription(method, tier) {
         const url = accountBillingSubscriptionUrl(config.base_url);
-        console.log(`[AccountApi] Requesting tier change to ${tier}`);
         const response = await fetch(url, {
-            method: "POST",
+            method: method,
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
                 tier: tier
@@ -284,7 +293,7 @@ class AccountApi {
 
     async deleteBillingSubscription() {
         const url = accountBillingSubscriptionUrl(config.base_url);
-        console.log(`[AccountApi] Cancelling paid subscription`);
+        console.log(`[AccountApi] Cancelling billing subscription`);
         const response = await fetch(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token())
@@ -345,6 +354,7 @@ class AccountApi {
     }
 
     async triggerChange() {
+        return null;
         const account = await this.get();
         if (!account.sync_topic) {
             return;

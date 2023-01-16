@@ -2,15 +2,18 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
 )
 
 const (
-	jsonBodyBytesLimit   = 4096
-	subscriptionIDLength = 16
-	createdByAPI         = "api"
+	jsonBodyBytesLimit        = 4096
+	subscriptionIDLength      = 16
+	createdByAPI              = "api"
+	syncTopicAccountSyncEvent = "sync"
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -394,4 +397,38 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	return nil
+}
+
+func (s *Server) publishSyncEvent(v *visitor) error {
+	if v.user == nil || v.user.SyncTopic == "" {
+		return nil
+	}
+	log.Trace("Publishing sync event to user %s's sync topic %s", v.user.Name, v.user.SyncTopic)
+	topics, err := s.topicsFromIDs(v.user.SyncTopic)
+	if err != nil {
+		return err
+	} else if len(topics) == 0 {
+		return errors.New("cannot retrieve sync topic")
+	}
+	syncTopic := topics[0]
+	messageBytes, err := json.Marshal(&apiAccountSyncTopicResponse{Event: syncTopicAccountSyncEvent})
+	if err != nil {
+		return err
+	}
+	m := newDefaultMessage(syncTopic.ID, string(messageBytes))
+	if err := syncTopic.Publish(v, m); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) publishSyncEventAsync(v *visitor) {
+	go func() {
+		if v.user == nil || v.user.SyncTopic == "" {
+			return
+		}
+		if err := s.publishSyncEvent(v); err != nil {
+			log.Trace("Error publishing to user %s's sync topic %s: %s", v.user.Name, v.user.SyncTopic, err.Error())
+		}
+	}()
 }

@@ -2,7 +2,7 @@ import * as React from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import {CardActionArea, CardContent, useMediaQuery} from "@mui/material";
+import {Alert, CardActionArea, CardContent, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import DialogFooter from "./DialogFooter";
 import Button from "@mui/material/Button";
@@ -13,28 +13,53 @@ import {useContext, useState} from "react";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import {AccountContext} from "./App";
+import {formatShortDate} from "../app/utils";
+import {useTranslation} from "react-i18next";
 
 const UpgradeDialog = (props) => {
+    const { t } = useTranslation();
     const { account } = useContext(AccountContext);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const [newTier, setNewTier] = useState(account?.tier?.code || null);
     const [errorText, setErrorText] = useState("");
 
-    const handleCheckout = async () => {
-        try {
-            if (newTier == null) {
-                await accountApi.deleteBillingSubscription();
-            } else {
-                const response = await accountApi.updateBillingSubscription(newTier);
-                if (response.redirect_url) {
-                    window.location.href = response.redirect_url;
-                } else {
-                    await accountApi.sync();
-                }
-            }
+    if (!account) {
+        return <></>;
+    }
 
+    const currentTier = account.tier?.code || null;
+    let action, submitButtonLabel, submitButtonEnabled;
+    if (currentTier === newTier) {
+        submitButtonLabel = "Update subscription";
+        submitButtonEnabled = false;
+        action = null;
+    } else if (currentTier === null) {
+        submitButtonLabel = "Pay $5 now and subscribe";
+        submitButtonEnabled = true;
+        action = Action.CREATE;
+    } else if (newTier === null) {
+        submitButtonLabel = "Cancel subscription";
+        submitButtonEnabled = true;
+        action = Action.CANCEL;
+    } else {
+        submitButtonLabel = "Update subscription";
+        submitButtonEnabled = true;
+        action = Action.UPDATE;
+    }
+
+    const handleSubmit = async () => {
+        try {
+            if (action === Action.CREATE) {
+                const response = await accountApi.createBillingSubscription(newTier);
+                window.location.href = response.redirect_url;
+            } else if (action === Action.UPDATE) {
+                await accountApi.updateBillingSubscription(newTier);
+            } else if (action === Action.CANCEL) {
+                await accountApi.deleteBillingSubscription();
+            }
+            props.onCancel();
         } catch (e) {
-            console.log(`[UpgradeDialog] Error creating checkout session`, e);
+            console.log(`[UpgradeDialog] Error changing billing subscription`, e);
             if ((e instanceof UnauthorizedError)) {
                 session.resetAndRedirect(routes.login);
             }
@@ -44,7 +69,7 @@ const UpgradeDialog = (props) => {
 
     return (
         <Dialog open={props.open} onClose={props.onCancel} maxWidth="md" fullScreen={fullScreen}>
-            <DialogTitle>Upgrade to Pro</DialogTitle>
+            <DialogTitle>Change billing plan</DialogTitle>
             <DialogContent>
                 <div style={{
                     display: "flex",
@@ -55,9 +80,15 @@ const UpgradeDialog = (props) => {
                     <TierCard code="pro" name={"Pro"} selected={newTier === "pro"} onClick={() => setNewTier("pro")}/>
                     <TierCard code="business" name={"Business"} selected={newTier === "business"} onClick={() => setNewTier("business")}/>
                 </div>
+                {action === Action.CANCEL &&
+                    <Alert severity="warning">
+                        {t("account_upgrade_dialog_cancel_warning", { date: formatShortDate(account.billing.paid_until) })}
+                    </Alert>
+                }
             </DialogContent>
             <DialogFooter status={errorText}>
-                <Button onClick={handleCheckout}>Checkout</Button>
+                <Button onClick={props.onCancel}>Cancel</Button>
+                <Button onClick={handleSubmit} disabled={!submitButtonEnabled}>{submitButtonLabel}</Button>
             </DialogFooter>
         </Dialog>
     );
@@ -65,8 +96,7 @@ const UpgradeDialog = (props) => {
 
 const TierCard = (props) => {
     const cardStyle = (props.selected) ? {
-        border: "1px solid red",
-
+        background: "#eee"
     } : {};
     return (
         <Card sx={{ m: 1, maxWidth: 345 }}>
@@ -84,5 +114,11 @@ const TierCard = (props) => {
         </Card>
     );
 }
+
+const Action = {
+    CREATE: 1,
+    UPDATE: 2,
+    CANCEL: 3
+};
 
 export default UpgradeDialog;

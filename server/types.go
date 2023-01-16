@@ -305,7 +305,7 @@ type apiConfigResponse struct {
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
-type apiAccountTierChangeRequest struct {
+type apiAccountBillingSubscriptionChangeRequest struct {
 	Tier string `json:"tier"`
 }
 
@@ -315,4 +315,8 @@ type apiAccountCheckoutResponse struct {
 
 type apiAccountBillingPortalRedirectResponse struct {
 	RedirectURL string `json:"redirect_url"`
+}
+
+type apiAccountSyncTopicResponse struct {
+	Event string `json:"event"`
 }

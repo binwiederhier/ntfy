@@ -164,12 +164,10 @@
 # - enable-signup allows users to sign up via the web app, or API
 # - enable-login allows users to log in via the web app, or API
 # - enable-reservations allows users to reserve topics (if their tier allows it)
-# - enable-payments enables payments integration [preliminary option, may change]
 #
 # enable-signup: false
 # enable-login: false
 # enable-reservations: false
-# enable-payments: false
 
 # Server URL of a Firebase/APNS-connected ntfy server (likely "https://ntfy.sh").
 #
@@ -215,6 +213,16 @@
 #
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
+
+# Payments integration via Stripe
+#
+# - stripe-secret-key is the key used for the Stripe API communication. Setting this values
+#   enables payments in the ntfy web app (e.g. Upgrade dialog). See https://dashboard.stripe.com/apikeys.
+# - stripe-webhook-key is the key required to validate the authenticity of incoming webhooks from Stripe.
+#   Webhooks are essential up keep the local database in sync with the payment provider. See https://dashboard.stripe.com/webhooks.
+#
+# stripe-secret-key:
+# stripe-webhook-key:
 
 # Log level, can be TRACE, DEBUG, INFO, WARN or ERROR
 # This option can be hot-reloaded by calling "kill -HUP $pid" or "systemctl reload ntfy".

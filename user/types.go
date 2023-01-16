@@ -3,6 +3,7 @@ package user
 
 import (
 	"errors"
+	"github.com/stripe/stripe-go/v74"
 	"regexp"
 	"time"
 )
@@ -85,8 +86,10 @@ type Stats struct {
 
 // Billing is a struct holding a user's billing information
 type Billing struct {
-	StripeCustomerID     string
-	StripeSubscriptionID string
+	StripeCustomerID            string
+	StripeSubscriptionID        string
+	StripeSubscriptionStatus    stripe.SubscriptionStatus
+	StripeSubscriptionPaidUntil time.Time
 }
 
 // Grant is a struct that represents an access control entry to a topic by a user
@@ -222,4 +225,14 @@ var (
 	ErrInvalidArgument = errors.New("invalid argument")
 	ErrUserNotFound    = errors.New("user not found")
 	ErrTierNotFound    = errors.New("tier not found")
+)
+
+// BillingStatus represents the status of a Stripe subscription
+type BillingStatus string
+
+// BillingStatus values, subset of https://stripe.com/docs/billing/subscriptions/overview
+const (
+	BillingStatusIncomplete = BillingStatus("incomplete")
+	BillingStatusActive     = BillingStatus("active")
+	BillingStatusPastDue    = BillingStatus("past_due")
 )

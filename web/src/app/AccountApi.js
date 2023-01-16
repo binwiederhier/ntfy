@@ -8,7 +8,7 @@ import {
     accountTokenUrl,
     accountUrl, maybeWithAuth, topicUrl,
     withBasicAuth,
-    withBearerAuth, accountCheckoutUrl, accountBillingPortalUrl
+    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
@@ -264,9 +264,9 @@ class AccountApi {
         this.triggerChange(); // Dangle!
     }
 
-    async createCheckoutSession(tier) {
-        const url = accountCheckoutUrl(config.base_url);
-        console.log(`[AccountApi] Creating checkout session`);
+    async updateBillingSubscription(tier) {
+        const url = accountBillingSubscriptionUrl(config.base_url);
+        console.log(`[AccountApi] Requesting tier change to ${tier}`);
         const response = await fetch(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
@@ -280,6 +280,20 @@ class AccountApi {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         return await response.json();
+    }
+
+    async deleteBillingSubscription() {
+        const url = accountBillingSubscriptionUrl(config.base_url);
+        console.log(`[AccountApi] Cancelling paid subscription`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: withBearerAuth({}, session.token())
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
     }
 
     async createBillingPortalSession() {

@@ -37,8 +37,13 @@ import (
 /*
 	TODO
 		payments:
-		- handle overdue payment (-> downgrade after 7 days)
-		- delete stripe subscription when acocunt is deleted
+		- send dunning emails when overdue
+		- payment methods
+		- unmarshal to stripe.Subscription instead of gjson
+		- Make ResetTier reset the stripe fields
+		- delete subscription when account deleted
+		- remove tier.paid
+		- add tier.visible
 
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?
@@ -97,27 +102,27 @@ var (
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
-	webConfigPath                  = "/config.js"
-	healthPath                     = "/v1/health"
-	accountPath                    = "/v1/account"
-	accountTokenPath               = "/v1/account/token"
-	accountPasswordPath            = "/v1/account/password"
-	accountSettingsPath            = "/v1/account/settings"
-	accountSubscriptionPath        = "/v1/account/subscription"
-	accountReservationPath         = "/v1/account/reservation"
-	accountBillingPortalPath       = "/v1/account/billing/portal"
-	accountBillingWebhookPath      = "/v1/account/billing/webhook"
-	accountCheckoutPath            = "/v1/account/checkout"
-	accountCheckoutSuccessTemplate = "/v1/account/checkout/success/{CHECKOUT_SESSION_ID}"
-	accountCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/checkout/success/(.+)$`)
-	accountReservationSingleRegex  = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
-	accountSubscriptionSingleRegex = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
-	matrixPushPath                 = "/_matrix/push/v1/notify"
-	staticRegex                    = regexp.MustCompile(`^/static/.+`)
-	docsRegex                      = regexp.MustCompile(`^/docs(|/.*)$`)
-	fileRegex                      = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics               = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
-	urlRegex                       = regexp.MustCompile(`^https?://`)
+	webConfigPath                                     = "/config.js"
+	healthPath                                        = "/v1/health"
+	accountPath                                       = "/v1/account"
+	accountTokenPath                                  = "/v1/account/token"
+	accountPasswordPath                               = "/v1/account/password"
+	accountSettingsPath                               = "/v1/account/settings"
+	accountSubscriptionPath                           = "/v1/account/subscription"
+	accountReservationPath                            = "/v1/account/reservation"
+	accountBillingPortalPath                          = "/v1/account/billing/portal"
+	accountBillingWebhookPath                         = "/v1/account/billing/webhook"
+	accountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
+	accountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
+	accountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
+	accountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
+	accountSubscriptionSingleRegex                    = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
+	matrixPushPath                                    = "/_matrix/push/v1/notify"
+	staticRegex                                       = regexp.MustCompile(`^/static/.+`)
+	docsRegex                                         = regexp.MustCompile(`^/docs(|/.*)$`)
+	fileRegex                                         = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
+	disallowedTopics                                  = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
+	urlRegex                                          = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -372,14 +377,16 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.handleAccountReservationAdd)(w, r, v)
 	} else if r.Method == http.MethodDelete && accountReservationSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.handleAccountReservationDelete)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountCheckoutPath {
-		return s.ensureUser(s.handleAccountCheckoutSessionCreate)(w, r, v)
-	} else if r.Method == http.MethodGet && accountCheckoutSuccessRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingSubscriptionPath {
+		return s.ensureUser(s.handleAccountBillingSubscriptionChange)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == accountBillingSubscriptionPath {
+		return s.ensureStripeCustomer(s.handleAccountBillingSubscriptionDelete)(w, r, v)
+	} else if r.Method == http.MethodGet && accountBillingSubscriptionCheckoutSuccessRegex.MatchString(r.URL.Path) {
 		return s.ensureUserManager(s.handleAccountCheckoutSessionSuccessGet)(w, r, v) // No user context!
 	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingPortalPath {
-		return s.ensureUser(s.handleAccountBillingPortalSessionCreate)(w, r, v)
+		return s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingWebhookPath {
-		return s.ensureUserManager(s.handleAccountBillingWebhookTrigger)(w, r, v)
+		return s.ensureUserManager(s.handleAccountBillingWebhook)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -1488,6 +1495,15 @@ func (s *Server) ensureUser(next handleFunc) handleFunc {
 	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if v.user == nil {
 			return errHTTPUnauthorized
+		}
+		return next(w, r, v)
+	})
+}
+
+func (s *Server) ensureStripeCustomer(next handleFunc) handleFunc {
+	return s.ensureUser(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if v.user.Billing.StripeCustomerID == "" {
+			return errHTTPBadRequestNotAPaidUser
 		}
 		return next(w, r, v)
 	})

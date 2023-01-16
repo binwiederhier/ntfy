@@ -183,6 +183,8 @@
   "account_usage_tier_none": "Basic",
   "account_usage_tier_upgrade_button": "Upgrade to Pro",
   "account_usage_tier_change_button": "Change",
+  "account_usage_tier_payment_overdue": "Your payment is overdue. Please update your payment method, or your account will be downgraded soon.",
+  "account_usage_manage_billing_button": "Manage billing",
   "account_usage_messages_title": "Published messages",
   "account_usage_emails_title": "Emails sent",
   "account_usage_reservations_title": "Reserved topics",

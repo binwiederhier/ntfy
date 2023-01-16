@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {useContext, useState} from 'react';
-import {LinearProgress, Stack, useMediaQuery} from "@mui/material";
+import {Alert, LinearProgress, Stack, useMediaQuery} from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import Typography from "@mui/material/Typography";
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,7 +18,7 @@ import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {formatBytes} from "../app/utils";
+import {formatBytes, formatShortDateTime} from "../app/utils";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
@@ -28,6 +28,7 @@ import humanizeDuration from "humanize-duration";
 import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import {AccountContext} from "./App";
+import {Warning, WarningAmber} from "@mui/icons-material";
 
 const Account = () => {
     if (!session.exists()) {
@@ -183,7 +184,7 @@ const Stats = () => {
     const handleManageBilling = async () => {
         try {
             const response = await accountApi.createBillingPortalSession();
-            window.location.href = response.redirect_url;
+            window.open(response.redirect_url, "billing_portal");
         } catch (e) {
             console.log(`[Account] Error changing password`, e);
             if ((e instanceof UnauthorizedError)) {
@@ -199,7 +200,10 @@ const Stats = () => {
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                <Pref title={t("account_usage_tier_title")}>
+                <Pref
+                    alignTop={account.billing?.status === "past_due"}
+                    title={t("account_usage_tier_title")}
+                >
                     <div>
                         {account.role === "admin" &&
                             <>
@@ -219,26 +223,29 @@ const Stats = () => {
                             >{t("account_usage_tier_upgrade_button")}</Button>
                         }
                         {config.enable_payments && account.role === "user" && account.tier?.paid &&
-                            <>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => setUpgradeDialogOpen(true)}
-                                    sx={{ml: 1}}
-                                >{t("account_usage_tier_change_button")}</Button>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={handleManageBilling}
-                                    sx={{ml: 1}}
-                                >Manage billing</Button>
-                            </>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => setUpgradeDialogOpen(true)}
+                                sx={{ml: 1}}
+                            >{t("account_usage_tier_change_button")}</Button>
+                        }
+                        {config.enable_payments && account.role === "user" && account.billing?.customer &&
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={handleManageBilling}
+                                sx={{ml: 1}}
+                            >{t("account_usage_manage_billing_button")}</Button>
                         }
                         <UpgradeDialog
                             open={upgradeDialogOpen}
                             onCancel={() => setUpgradeDialogOpen(false)}
                         />
                     </div>
+                    {account.billing?.status === "past_due" &&
+                        <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
+                    }
                 </Pref>
                 {account.role !== "admin" &&
                     <Pref title={t("account_usage_reservations_title")}>

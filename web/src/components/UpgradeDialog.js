@@ -17,16 +17,20 @@ import {AccountContext} from "./App";
 const UpgradeDialog = (props) => {
     const { account } = useContext(AccountContext);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const [selected, setSelected] = useState(account?.tier?.code || null);
+    const [newTier, setNewTier] = useState(account?.tier?.code || null);
     const [errorText, setErrorText] = useState("");
 
     const handleCheckout = async () => {
         try {
-            const response = await accountApi.createCheckoutSession(selected);
-            if (response.redirect_url) {
-                window.location.href = response.redirect_url;
+            if (newTier == null) {
+                await accountApi.deleteBillingSubscription();
             } else {
-                await accountApi.sync();
+                const response = await accountApi.updateBillingSubscription(newTier);
+                if (response.redirect_url) {
+                    window.location.href = response.redirect_url;
+                } else {
+                    await accountApi.sync();
+                }
             }
 
         } catch (e) {
@@ -46,10 +50,10 @@ const UpgradeDialog = (props) => {
                     display: "flex",
                     flexDirection: "row"
                 }}>
-                    <TierCard code={null} name={"Free"} selected={selected === null} onClick={() => setSelected(null)}/>
-                    <TierCard code="starter" name={"Starter"} selected={selected === "starter"} onClick={() => setSelected("starter")}/>
-                    <TierCard code="pro" name={"Pro"} selected={selected === "pro"} onClick={() => setSelected("pro")}/>
-                    <TierCard code="business" name={"Business"} selected={selected === "business"} onClick={() => setSelected("business")}/>
+                    <TierCard code={null} name={"Free"} selected={newTier === null} onClick={() => setNewTier(null)}/>
+                    <TierCard code="starter" name={"Starter"} selected={newTier === "starter"} onClick={() => setNewTier("starter")}/>
+                    <TierCard code="pro" name={"Pro"} selected={newTier === "pro"} onClick={() => setNewTier("pro")}/>
+                    <TierCard code="business" name={"Business"} selected={newTier === "business"} onClick={() => setNewTier("business")}/>
                 </div>
             </DialogContent>
             <DialogFooter status={errorText}>

@@ -268,6 +268,13 @@ type apiAccountReservation struct {
 	Everyone string `json:"everyone"`
 }
 
+type apiAccountBilling struct {
+	Customer     bool   `json:"customer"`
+	Subscription bool   `json:"subscription"`
+	Status       string `json:"status,omitempty"`
+	PaidUntil    int64  `json:"paid_until,omitempty"`
+}
+
 type apiAccountResponse struct {
 	Username      string                   `json:"username"`
 	Role          string                   `json:"role,omitempty"`
@@ -279,6 +286,7 @@ type apiAccountResponse struct {
 	Tier          *apiAccountTier          `json:"tier,omitempty"`
 	Limits        *apiAccountLimits        `json:"limits,omitempty"`
 	Stats         *apiAccountStats         `json:"stats,omitempty"`
+	Billing       *apiAccountBilling       `json:"billing,omitempty"`
 }
 
 type apiAccountReservationRequest struct {

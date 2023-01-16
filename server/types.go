@@ -273,6 +273,7 @@ type apiAccountBilling struct {
 	Subscription bool   `json:"subscription"`
 	Status       string `json:"status,omitempty"`
 	PaidUntil    int64  `json:"paid_until,omitempty"`
+	CancelAt     int64  `json:"cancel_at,omitempty"`
 }
 
 type apiAccountResponse struct {

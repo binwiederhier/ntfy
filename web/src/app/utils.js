@@ -184,6 +184,11 @@ export const formatShortDateTime = (timestamp) => {
         .format(new Date(timestamp * 1000));
 }
 
+export const formatShortDate = (timestamp) => {
+    return new Intl.DateTimeFormat('default', {dateStyle: 'short'})
+        .format(new Date(timestamp * 1000));
+}
+
 export const formatBytes = (bytes, decimals = 2) => {
     if (bytes === 0) return '0 bytes';
     const k = 1024;

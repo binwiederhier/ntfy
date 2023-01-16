@@ -18,7 +18,7 @@ import TextField from "@mui/material/TextField";
 import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {formatBytes, formatShortDateTime} from "../app/utils";
+import {formatBytes, formatShortDate, formatShortDateTime} from "../app/utils";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
@@ -201,7 +201,7 @@ const Stats = () => {
             </Typography>
             <PrefGroup>
                 <Pref
-                    alignTop={account.billing?.status === "past_due"}
+                    alignTop={account.billing?.status === "past_due" || account.billing?.cancel_at > 0}
                     title={t("account_usage_tier_title")}
                 >
                     <div>
@@ -213,6 +213,11 @@ const Stats = () => {
                         }
                         {account.role === "user" && account.tier && account.tier.name}
                         {account.role === "user" && !account.tier && t("account_usage_tier_none")}
+                        {account.billing?.paid_until &&
+                            <Tooltip title={t("account_usage_tier_paid_until", { date: formatShortDate(account.billing?.paid_until) })}>
+                                <span><InfoIcon/></span>
+                            </Tooltip>
+                        }
                         {config.enable_payments && account.role === "user" && (!account.tier || !account.tier.paid) &&
                             <Button
                                 variant="outlined"
@@ -245,6 +250,9 @@ const Stats = () => {
                     </div>
                     {account.billing?.status === "past_due" &&
                         <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
+                    }
+                    {account.billing?.cancel_at > 0 &&
+                        <Alert severity="info" sx={{mt: 1}}>{t("account_usage_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
                     }
                 </Pref>
                 {account.role !== "admin" &&
@@ -331,7 +339,7 @@ const Stats = () => {
 const InfoIcon = () => {
     return (
         <InfoOutlinedIcon sx={{
-            verticalAlign: "bottom",
+            verticalAlign: "middle",
             width: "18px",
             marginLeft: "4px",
             color: "gray"

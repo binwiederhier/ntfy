@@ -44,6 +44,8 @@ import (
 		- delete subscription when account deleted
 		- remove tier.paid
 		- add tier.visible
+		- fix tier selection boxes
+		- account sync after switching tiers
 
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?

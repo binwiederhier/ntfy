@@ -97,6 +97,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 				Subscription: v.user.Billing.StripeSubscriptionID != "",
 				Status:       string(v.user.Billing.StripeSubscriptionStatus),
 				PaidUntil:    v.user.Billing.StripeSubscriptionPaidUntil.Unix(),
+				CancelAt:     v.user.Billing.StripeSubscriptionCancelAt.Unix(),
 			}
 		}
 		reservations, err := s.userManager.Reservations(v.user.Name)

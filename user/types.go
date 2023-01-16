@@ -90,6 +90,7 @@ type Billing struct {
 	StripeSubscriptionID        string
 	StripeSubscriptionStatus    stripe.SubscriptionStatus
 	StripeSubscriptionPaidUntil time.Time
+	StripeSubscriptionCancelAt  time.Time
 }
 
 // Grant is a struct that represents an access control entry to a topic by a user

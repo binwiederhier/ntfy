@@ -62,6 +62,7 @@ func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r
 	v.user.Billing.StripeSubscriptionID = ""
 	v.user.Billing.StripeSubscriptionStatus = ""
 	v.user.Billing.StripeSubscriptionPaidUntil = time.Unix(0, 0)
+	v.user.Billing.StripeSubscriptionCancelAt = time.Unix(0, 0)
 	if err := s.userManager.ChangeBilling(v.user); err != nil {
 		return err
 	}
@@ -170,6 +171,7 @@ func (s *Server) handleAccountCheckoutSessionSuccessGet(w http.ResponseWriter, r
 	u.Billing.StripeSubscriptionID = sub.ID
 	u.Billing.StripeSubscriptionStatus = sub.Status
 	u.Billing.StripeSubscriptionPaidUntil = time.Unix(sub.CurrentPeriodEnd, 0)
+	u.Billing.StripeSubscriptionCancelAt = time.Unix(sub.CancelAt, 0)
 	if err := s.userManager.ChangeBilling(u); err != nil {
 		return err
 	}
@@ -240,8 +242,9 @@ func (s *Server) handleAccountBillingWebhook(w http.ResponseWriter, r *http.Requ
 func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(stripeCustomerID string, event json.RawMessage) error {
 	status := gjson.GetBytes(event, "status")
 	currentPeriodEnd := gjson.GetBytes(event, "current_period_end")
+	cancelAt := gjson.GetBytes(event, "cancel_at")
 	priceID := gjson.GetBytes(event, "items.data.0.price.id")
-	if !status.Exists() || !currentPeriodEnd.Exists() || !priceID.Exists() {
+	if !status.Exists() || !currentPeriodEnd.Exists() || !cancelAt.Exists() || !priceID.Exists() {
 		return errHTTPBadRequestInvalidStripeRequest
 	}
 	log.Info("Stripe: customer %s: subscription updated to %s, with price %s", stripeCustomerID, status, priceID)
@@ -258,6 +261,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(stripeCustomerID
 	}
 	u.Billing.StripeSubscriptionStatus = stripe.SubscriptionStatus(status.String())
 	u.Billing.StripeSubscriptionPaidUntil = time.Unix(currentPeriodEnd.Int(), 0)
+	u.Billing.StripeSubscriptionCancelAt = time.Unix(cancelAt.Int(), 0)
 	if err := s.userManager.ChangeBilling(u); err != nil {
 		return err
 	}
@@ -280,6 +284,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(stripeCustomerID
 	u.Billing.StripeSubscriptionID = ""
 	u.Billing.StripeSubscriptionStatus = ""
 	u.Billing.StripeSubscriptionPaidUntil = time.Unix(0, 0)
+	u.Billing.StripeSubscriptionCancelAt = time.Unix(0, 0)
 	if err := s.userManager.ChangeBilling(u); err != nil {
 		return err
 	}

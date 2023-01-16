@@ -137,12 +137,14 @@ var (
 )
 
 const (
-	firebaseControlTopic     = "~control"                // See Android if changed
-	firebasePollTopic        = "~poll"                   // See iOS if changed
-	emptyMessageBody         = "triggered"               // Used if message body is empty
-	newMessageBody           = "New message"             // Used in poll requests as generic message
-	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
-	encodingBase64           = "base64"
+	firebaseControlTopic            = "~control"                // See Android if changed
+	firebasePollTopic               = "~poll"                   // See iOS if changed
+	emptyMessageBody                = "triggered"               // Used if message body is empty
+	newMessageBody                  = "New message"             // Used in poll requests as generic message
+	defaultAttachmentMessage        = "You received a file: %s" // Used if message body is empty, and there is an attachment
+	encodingBase64                  = "base64"
+	unifiedpushTopicPrefix          = "up"
+	unifiedPushSubscriptionDuration = 12 * time.Hour
 )
 
 // WebSocket constants
@@ -544,6 +546,17 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
+
+	var v_billing *visitor
+	if strings.HasPrefix(t.ID, unifiedpushTopicPrefix) {
+		v_billing := t.getBillee()
+		if v_billing != nil {
+			// instant reject and won't even store it if there's no one registered for a UP topic in the past some time
+	// need to find error code for device not available try again later
+			return nil, errHTTPInternalError
+		}
+	}
+
 	if err := v.MessageAllowed(); err != nil {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	}
@@ -569,6 +582,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if m.Message == "" {
 		m.Message = emptyMessageBody
 	}
+	// we do not need to handle delays, because 1. for UP delays are not needed 2. if the up app server is adding a delay it is shooting itself in the foot
 	delayed := m.Time > time.Now().Unix()
 	log.Debug("%s Received message: event=%s, user=%s, body=%d byte(s), delayed=%t, firebase=%t, cache=%t, up=%t, email=%s",
 		logMessagePrefix(v, m), m.Event, m.User, len(m.Message), delayed, firebase, cache, unifiedpush, email)
@@ -582,6 +596,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		if s.firebaseClient != nil && firebase {
 			go s.sendToFirebase(v, m)
 		}
+		// same as delays, it should count against app servers
 		if s.smtpSender != nil && email != "" {
 			v.IncrementEmails()
 			go s.sendEmail(v, m, email)
@@ -598,7 +613,11 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
-	v.IncrementMessages()
+	if v_billing != nil {
+		v_billing.IncrementMessages()
+	} else {
+		v.IncrementMessages()
+	}
 	if s.userManager != nil && v.user != nil {
 		s.userManager.EnqueueStats(v.user)
 	}
@@ -961,7 +980,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1076,7 +1095,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {

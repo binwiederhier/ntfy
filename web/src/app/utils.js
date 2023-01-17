@@ -28,6 +28,7 @@ export const accountReservationUrl = (baseUrl) => `${baseUrl}/v1/account/reserva
 export const accountReservationSingleUrl = (baseUrl, topic) => `${baseUrl}/v1/account/reservation/${topic}`;
 export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/billing/subscription`;
 export const accountBillingPortalUrl = (baseUrl) => `${baseUrl}/v1/account/billing/portal`;
+export const accountBillingTiersUrl = (baseUrl) => `${baseUrl}/v1/account/billing/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

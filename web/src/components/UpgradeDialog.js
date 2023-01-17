@@ -9,21 +9,29 @@ import Button from "@mui/material/Button";
 import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
-import {useContext, useState} from "react";
+import {useContext, useEffect, useState} from "react";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import {AccountContext} from "./App";
 import {formatShortDate} from "../app/utils";
 import {useTranslation} from "react-i18next";
+import subscriptionManager from "../app/SubscriptionManager";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+    const [tiers, setTiers] = useState(null);
     const [newTier, setNewTier] = useState(account?.tier?.code || null);
     const [errorText, setErrorText] = useState("");
 
-    if (!account) {
+    useEffect(() => {
+        (async () => {
+            setTiers(await accountApi.billingTiers());
+        })();
+    }, []);
+
+    if (!account || !tiers) {
         return <></>;
     }
 
@@ -69,20 +77,41 @@ const UpgradeDialog = (props) => {
 
     return (
         <Dialog open={props.open} onClose={props.onCancel} maxWidth="md" fullScreen={fullScreen}>
-            <DialogTitle>Change billing plan</DialogTitle>
+            <DialogTitle>{t("account_upgrade_dialog_title")}</DialogTitle>
             <DialogContent>
                 <div style={{
                     display: "flex",
-                    flexDirection: "row"
+                    flexDirection: "row",
+                    marginBottom: "8px",
+                    width: "100%"
                 }}>
-                    <TierCard code={null} name={"Free"} selected={newTier === null} onClick={() => setNewTier(null)}/>
-                    <TierCard code="starter" name={"Starter"} selected={newTier === "starter"} onClick={() => setNewTier("starter")}/>
-                    <TierCard code="pro" name={"Pro"} selected={newTier === "pro"} onClick={() => setNewTier("pro")}/>
-                    <TierCard code="business" name={"Business"} selected={newTier === "business"} onClick={() => setNewTier("business")}/>
+                    <TierCard
+                        code={null}
+                        name={t("account_usage_tier_free")}
+                        price={null}
+                        selected={newTier === null}
+                        onClick={() => setNewTier(null)}
+                    />
+                    {tiers.map(tier =>
+                        <TierCard
+                            key={`tierCard${tier.code}`}
+                            code={tier.code}
+                            name={tier.name}
+                            price={tier.price}
+                            features={tier.features}
+                            selected={newTier === tier.code}
+                            onClick={() => setNewTier(tier.code)}
+                        />
+                    )}
                 </div>
                 {action === Action.CANCEL &&
                     <Alert severity="warning">
                         {t("account_upgrade_dialog_cancel_warning", { date: formatShortDate(account.billing.paid_until) })}
+                    </Alert>
+                }
+                {action === Action.UPDATE &&
+                    <Alert severity="info">
+                        {t("account_upgrade_dialog_proration_info")}
                     </Alert>
                 }
             </DialogContent>
@@ -95,20 +124,42 @@ const UpgradeDialog = (props) => {
 };
 
 const TierCard = (props) => {
-    const cardStyle = (props.selected) ? {
-        background: "#eee"
-    } : {};
+    const cardStyle = (props.selected) ? { background: "#eee", border: "2px solid #338574" } : {};
     return (
-        <Card sx={{ m: 1, maxWidth: 345 }}>
-            <CardActionArea>
-                <CardContent sx={{...cardStyle}} onClick={props.onClick}>
+        <Card sx={{
+            m: 1,
+            minWidth: "190px",
+            maxWidth: "250px",
+            "&:first-child": { ml: 0 },
+            "&:last-child": { mr: 0 },
+            ...cardStyle
+        }}>
+            <CardActionArea sx={{ height: "100%" }}>
+                <CardContent onClick={props.onClick} sx={{ height: "100%" }}>
+                    {props.selected &&
+                        <div style={{
+                            position: "absolute",
+                            top: "0",
+                            right: "15px",
+                            padding: "2px 10px",
+                            background: "#338574",
+                            color: "white",
+                            borderRadius: "3px",
+                        }}>Selected</div>
+                    }
                     <Typography gutterBottom variant="h5" component="div">
                         {props.name}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Lizards are a widespread group of squamate reptiles, with over 6,000
-                        species, ranging across all continents except Antarctica
-                    </Typography>
+                    {props.features &&
+                        <Typography variant="body2" color="text.secondary" sx={{whiteSpace: "pre-wrap"}}>
+                            {props.features}
+                        </Typography>
+                    }
+                    {props.price &&
+                        <Typography variant="subtitle1" sx={{mt: 1}}>
+                            {props.price} / month
+                        </Typography>
+                    }
                 </CardContent>
             </CardActionArea>
         </Card>

@@ -8,7 +8,7 @@ import {
     accountTokenUrl,
     accountUrl, maybeWithAuth, topicUrl,
     withBasicAuth,
-    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl
+    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl, accountBillingTiersUrl
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
@@ -262,6 +262,20 @@ class AccountApi {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         this.triggerChange(); // Dangle!
+    }
+
+    async billingTiers() {
+        const url = accountBillingTiersUrl(config.base_url);
+        console.log(`[AccountApi] Fetching billing tiers`);
+        const response = await fetch(url, {
+            headers: withBearerAuth({}, session.token())
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+        return await response.json();
     }
 
     async createBillingSubscription(tier) {

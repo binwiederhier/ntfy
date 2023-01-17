@@ -238,7 +238,6 @@ type apiAccountTokenResponse struct {
 type apiAccountTier struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
-	Paid bool   `json:"paid"`
 }
 
 type apiAccountLimits struct {
@@ -305,12 +304,19 @@ type apiConfigResponse struct {
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
-type apiAccountBillingSubscriptionChangeRequest struct {
-	Tier string `json:"tier"`
+type apiAccountBillingTier struct {
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	Price    string `json:"price"`
+	Features string `json:"features"`
 }
 
-type apiAccountCheckoutResponse struct {
+type apiAccountBillingSubscriptionCreateResponse struct {
 	RedirectURL string `json:"redirect_url"`
+}
+
+type apiAccountBillingSubscriptionChangeRequest struct {
+	Tier string `json:"tier"`
 }
 
 type apiAccountBillingPortalRedirectResponse struct {
@@ -319,4 +325,14 @@ type apiAccountBillingPortalRedirectResponse struct {
 
 type apiAccountSyncTopicResponse struct {
 	Event string `json:"event"`
+}
+
+type apiSuccessResponse struct {
+	Success bool `json:"success"`
+}
+
+func newSuccessResponse() *apiSuccessResponse {
+	return &apiSuccessResponse{
+		Success: true,
+	}
 }

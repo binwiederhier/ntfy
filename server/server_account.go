@@ -91,7 +91,6 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			response.Tier = &apiAccountTier{
 				Code: v.user.Tier.Code,
 				Name: v.user.Tier.Name,
-				Paid: v.user.Tier.Paid,
 			}
 		}
 		if v.user.Billing.StripeCustomerID != "" {
@@ -268,7 +267,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
+	matches := apiAccountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidPath
 	}
@@ -303,7 +302,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := accountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
+	matches := apiAccountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidPath
 	}
@@ -374,7 +373,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := accountReservationSingleRegex.FindStringSubmatch(r.URL.Path)
+	matches := apiAccountReservationSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidPath
 	}

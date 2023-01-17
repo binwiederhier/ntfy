@@ -45,6 +45,7 @@ const (
 			attachment_file_size_limit INT NOT NULL,
 			attachment_total_size_limit INT NOT NULL,
 			attachment_expiry_duration INT NOT NULL,
+			features TEXT,
 			stripe_price_id TEXT
 		);
 		CREATE UNIQUE INDEX idx_tier_code ON tier (code);
@@ -103,22 +104,22 @@ const (
 	`
 
 	selectUserByNameQuery = `
-		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, p.code, p.name, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration, p.stripe_price_id
+		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.features, t.stripe_price_id
 		FROM user u
-		LEFT JOIN tier p on p.id = u.tier_id
+		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE user = ?		
 	`
 	selectUserByTokenQuery = `
-		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, p.code, p.name, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration, p.stripe_price_id
+		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.features, t.stripe_price_id
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
-		LEFT JOIN tier p on p.id = u.tier_id
+		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE t.token = ? AND t.expires >= ?
 	`
 	selectUserByStripeCustomerIDQuery = `
-		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, p.code, p.name, p.messages_limit, p.messages_expiry_duration, p.emails_limit, p.reservations_limit, p.attachment_file_size_limit, p.attachment_total_size_limit, p.attachment_expiry_duration, p.stripe_price_id
+		SELECT u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.features, t.stripe_price_id
 		FROM user u
-		LEFT JOIN tier p on p.id = u.tier_id
+		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.stripe_customer_id = ?
 	`
 	selectTopicPermsQuery = `
@@ -220,14 +221,18 @@ const (
 		INSERT INTO tier (code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	selectTierIDQuery     = `SELECT id FROM tier WHERE code = ?`
+	selectTierIDQuery = `SELECT id FROM tier WHERE code = ?`
+	selectTiersQuery  = `
+		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, features, stripe_price_id
+		FROM tier
+	`
 	selectTierByCodeQuery = `
-		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, stripe_price_id
+		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, features, stripe_price_id
 		FROM tier
 		WHERE code = ?
 	`
 	selectTierByPriceIDQuery = `
-		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, stripe_price_id
+		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, features, stripe_price_id
 		FROM tier
 		WHERE stripe_price_id = ?
 	`
@@ -604,13 +609,13 @@ func (a *Manager) userByToken(token string) (*User, error) {
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var username, hash, role, prefs, syncTopic string
-	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripePriceID, tierCode, tierName sql.NullString
+	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripePriceID, tierCode, tierName, tierFeatures sql.NullString
 	var messages, emails int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrUserNotFound
 	}
-	if err := rows.Scan(&username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &stripePriceID); err != nil {
+	if err := rows.Scan(&username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &tierFeatures, &stripePriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -649,7 +654,8 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 			AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
-			StripePriceID:            stripePriceID.String,
+			Features:                 tierFeatures.String,  // May be empty
+			StripePriceID:            stripePriceID.String, // May be empty
 		}
 	}
 	return user, nil
@@ -881,11 +887,31 @@ func (a *Manager) ChangeBilling(user *User) error {
 	return nil
 }
 
+func (a *Manager) Tiers() ([]*Tier, error) {
+	rows, err := a.db.Query(selectTiersQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tiers := make([]*Tier, 0)
+	for {
+		tier, err := a.readTier(rows)
+		if err == ErrTierNotFound {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		tiers = append(tiers, tier)
+	}
+	return tiers, nil
+}
+
 func (a *Manager) Tier(code string) (*Tier, error) {
 	rows, err := a.db.Query(selectTierByCodeQuery, code)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	return a.readTier(rows)
 }
 
@@ -894,18 +920,18 @@ func (a *Manager) TierByStripePrice(priceID string) (*Tier, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	return a.readTier(rows)
 }
 
 func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
-	defer rows.Close()
 	var code, name string
-	var stripePriceID sql.NullString
+	var features, stripePriceID sql.NullString
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrTierNotFound
 	}
-	if err := rows.Scan(&code, &name, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &stripePriceID); err != nil {
+	if err := rows.Scan(&code, &name, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &features, &stripePriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -922,7 +948,8 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 		AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 		AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
-		StripePriceID:            stripePriceID.String, // May be empty!
+		Features:                 features.String,      // May be empty
+		StripePriceID:            stripePriceID.String, // May be empty
 	}, nil
 }
 

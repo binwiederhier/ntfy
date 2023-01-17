@@ -69,8 +69,9 @@ const Layout = () => {
     const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
     const users = useLiveQuery(() => userManager.all());
     const subscriptions = useLiveQuery(() => subscriptionManager.all());
-    const newNotificationsCount = subscriptions?.reduce((prev, cur) => prev + cur.new, 0) || 0;
-    const [selected] = (subscriptions || []).filter(s => {
+    const subscriptionsWithoutInternal = subscriptions?.filter(s => !s.internal);
+    const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
+    const [selected] = (subscriptionsWithoutInternal || []).filter(s => {
         return (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic)
             || (config.base_url === s.baseUrl && params.topic === s.topic)
     });
@@ -101,7 +102,7 @@ const Layout = () => {
                 onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             />
             <Navigation
-                subscriptions={subscriptions}
+                subscriptions={subscriptionsWithoutInternal}
                 selectedSubscription={selected}
                 notificationsGranted={notificationsGranted}
                 mobileDrawerOpen={mobileDrawerOpen}
@@ -111,7 +112,10 @@ const Layout = () => {
             />
             <Main>
                 <Toolbar/>
-                <Outlet context={{ subscriptions, selected }}/>
+                <Outlet context={{
+                    subscriptions: subscriptionsWithoutInternal,
+                    selected: selected
+                }}/>
             </Main>
             <Messaging
                 selected={selected}

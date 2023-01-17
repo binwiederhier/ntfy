@@ -52,7 +52,6 @@ import (
 		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 
-		triggerChange after publishing a message
 		UI:
 		- flicker of upgrade banner
 		- JS constants
@@ -83,6 +82,7 @@ type Server struct {
 	userManager       *user.Manager // Might be nil!
 	messageCache      *messageCache
 	fileCache         *fileCache
+	priceCache        map[string]string // Stripe price ID -> formatted price
 	closeChan         chan bool
 	mu                sync.Mutex
 }
@@ -102,27 +102,29 @@ var (
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
-	webConfigPath                                     = "/config.js"
-	healthPath                                        = "/v1/health"
-	accountPath                                       = "/v1/account"
-	accountTokenPath                                  = "/v1/account/token"
-	accountPasswordPath                               = "/v1/account/password"
-	accountSettingsPath                               = "/v1/account/settings"
-	accountSubscriptionPath                           = "/v1/account/subscription"
-	accountReservationPath                            = "/v1/account/reservation"
-	accountBillingPortalPath                          = "/v1/account/billing/portal"
-	accountBillingWebhookPath                         = "/v1/account/billing/webhook"
-	accountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
-	accountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
-	accountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
-	accountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
-	accountSubscriptionSingleRegex                    = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
-	matrixPushPath                                    = "/_matrix/push/v1/notify"
-	staticRegex                                       = regexp.MustCompile(`^/static/.+`)
-	docsRegex                                         = regexp.MustCompile(`^/docs(|/.*)$`)
-	fileRegex                                         = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics                                  = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
-	urlRegex                                          = regexp.MustCompile(`^https?://`)
+	webConfigPath                                        = "/config.js"
+	accountPath                                          = "/account"
+	matrixPushPath                                       = "/_matrix/push/v1/notify"
+	apiHealthPath                                        = "/v1/health"
+	apiAccountPath                                       = "/v1/account"
+	apiAccountTokenPath                                  = "/v1/account/token"
+	apiAccountPasswordPath                               = "/v1/account/password"
+	apiAccountSettingsPath                               = "/v1/account/settings"
+	apiAccountSubscriptionPath                           = "/v1/account/subscription"
+	apiAccountReservationPath                            = "/v1/account/reservation"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
+	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
+	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
+	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
+	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
+	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
+	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
+	apiAccountSubscriptionSingleRegex                    = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
+	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
+	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
+	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
+	disallowedTopics                                     = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
+	urlRegex                                             = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
 	webFs        embed.FS
@@ -199,6 +201,7 @@ func New(conf *Config) (*Server, error) {
 		topics:         topics,
 		userManager:    userManager,
 		visitors:       make(map[string]*visitor),
+		priceCache:     make(map[string]string),
 	}, nil
 }
 
@@ -347,47 +350,49 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleHome)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == healthPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountTokenPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountTokenPath {
 		return s.ensureUser(s.handleAccountTokenIssue)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == accountPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
 		return s.handleAccountGet(w, r, v) // Allowed by anonymous
-	} else if r.Method == http.MethodDelete && r.URL.Path == accountPath {
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountDelete))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountPasswordPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPasswordPath {
 		return s.ensureUser(s.handleAccountPasswordChange)(w, r, v)
-	} else if r.Method == http.MethodPatch && r.URL.Path == accountTokenPath {
+	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountTokenPath {
 		return s.ensureUser(s.handleAccountTokenExtend)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == accountTokenPath {
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountTokenPath {
 		return s.ensureUser(s.handleAccountTokenDelete)(w, r, v)
-	} else if r.Method == http.MethodPatch && r.URL.Path == accountSettingsPath {
+	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountSettingsPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSettingsChange))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountSubscriptionPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountSubscriptionPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionAdd))(w, r, v)
-	} else if r.Method == http.MethodPatch && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodPatch && apiAccountSubscriptionSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionChange))(w, r, v)
-	} else if r.Method == http.MethodDelete && accountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodDelete && apiAccountSubscriptionSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionDelete))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountReservationPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountReservationPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountReservationAdd))(w, r, v)
-	} else if r.Method == http.MethodDelete && accountReservationSingleRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodDelete && apiAccountReservationSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.withAccountSync(s.handleAccountReservationDelete))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingSubscriptionPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
+		return s.ensurePaymentsEnabled(s.handleAccountBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingSubscriptionPath {
 		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionCreate))(w, r, v) // Account sync via incoming Stripe webhook
-	} else if r.Method == http.MethodGet && accountBillingSubscriptionCheckoutSuccessRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && apiAccountBillingSubscriptionCheckoutSuccessRegex.MatchString(r.URL.Path) {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingSubscriptionCreateSuccess))(w, r, v) // No user context!
-	} else if r.Method == http.MethodPut && r.URL.Path == accountBillingSubscriptionPath {
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountBillingSubscriptionPath {
 		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionUpdate))(w, r, v) // Account sync via incoming Stripe webhook
-	} else if r.Method == http.MethodDelete && r.URL.Path == accountBillingSubscriptionPath {
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountBillingSubscriptionPath {
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingSubscriptionDelete))(w, r, v) // Account sync via incoming Stripe webhook
-	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingPortalPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingPortalPath {
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == accountBillingWebhookPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)

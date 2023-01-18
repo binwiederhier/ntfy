@@ -33,7 +33,7 @@ func (s *Server) ensureUser(next handleFunc) handleFunc {
 
 func (s *Server) ensurePaymentsEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if !s.config.EnablePayments {
+		if s.config.StripeSecretKey == "" {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)

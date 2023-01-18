@@ -8,7 +8,7 @@ import {
     accountTokenUrl,
     accountUrl, maybeWithAuth, topicUrl,
     withBasicAuth,
-    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl, accountBillingTiersUrl
+    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl, tiersUrl
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
@@ -170,7 +170,6 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        this.triggerChange(); // Dangle!
     }
 
     async addSubscription(payload) {
@@ -189,7 +188,6 @@ class AccountApi {
         }
         const subscription = await response.json();
         console.log(`[AccountApi] Subscription`, subscription);
-        this.triggerChange(); // Dangle!
         return subscription;
     }
 
@@ -209,7 +207,6 @@ class AccountApi {
         }
         const subscription = await response.json();
         console.log(`[AccountApi] Subscription`, subscription);
-        this.triggerChange(); // Dangle!
         return subscription;
     }
 
@@ -225,7 +222,6 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        this.triggerChange(); // Dangle!
     }
 
     async upsertReservation(topic, everyone) {
@@ -246,7 +242,6 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        this.triggerChange(); // Dangle!
     }
 
     async deleteReservation(topic) {
@@ -261,18 +256,13 @@ class AccountApi {
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
-        this.triggerChange(); // Dangle!
     }
 
     async billingTiers() {
-        const url = accountBillingTiersUrl(config.base_url);
+        const url = tiersUrl(config.base_url);
         console.log(`[AccountApi] Fetching billing tiers`);
-        const response = await fetch(url, {
-            headers: withBearerAuth({}, session.token())
-        });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
+        const response = await fetch(url); // No auth needed!
+        if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
         }
         return await response.json();
@@ -364,35 +354,6 @@ class AccountApi {
             if ((e instanceof UnauthorizedError)) {
                 session.resetAndRedirect(routes.login);
             }
-        }
-    }
-
-    async triggerChange() {
-        return null;
-        const account = await this.get();
-        if (!account.sync_topic) {
-            return;
-        }
-        const url = topicUrl(config.base_url, account.sync_topic);
-        console.log(`[AccountApi] Triggering account change to ${url}`);
-        const user = await userManager.get(config.base_url);
-        const headers = {
-            Cache: "no" // We really don't need to store this!
-        };
-        try {
-            const response = await fetch(url, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    event: "sync",
-                    source: this.identity
-                }),
-                headers: maybeWithAuth(headers, user)
-            });
-            if (response.status < 200 || response.status > 299) {
-                throw new Error(`Unexpected response: ${response.status}`);
-            }
-        } catch (e) {
-            console.log(`[AccountApi] Publishing to sync topic failed`, e);
         }
     }
 

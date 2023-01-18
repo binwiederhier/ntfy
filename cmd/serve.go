@@ -201,7 +201,6 @@ func execServe(c *cli.Context) error {
 
 	webRootIsApp := webRoot == "app"
 	enableWeb := webRoot != "disable"
-	enablePayments := stripeSecretKey != ""
 
 	// Default auth permissions
 	authDefault, err := user.ParsePermission(authDefaultAccess)
@@ -298,7 +297,6 @@ func execServe(c *cli.Context) error {
 	conf.EnableWeb = enableWeb
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
-	conf.EnablePayments = enablePayments
 	conf.EnableReservations = enableReservations
 	conf.Version = c.App.Version
 

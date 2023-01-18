@@ -208,6 +208,7 @@ func (v *visitor) ResetStats() {
 	if v.user != nil {
 		v.user.Stats.Messages = 0
 		v.user.Stats.Emails = 0
+		// v.messagesLimiter = ... // FIXME
 	}
 }
 

@@ -89,12 +89,7 @@ const (
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
 	`
-	selectMessagesExpiredQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
-		FROM messages 
-		WHERE expires <= ? AND published = 1
-		ORDER BY time, id
-	`
+	selectMessagesExpiredQuery      = `SELECT mid FROM messages WHERE expires <= ? AND published = 1`
 	updateMessagePublishedQuery     = `UPDATE messages SET published = 1 WHERE mid = ?`
 	selectMessagesCountQuery        = `SELECT COUNT(*) FROM messages`
 	selectMessageCountPerTopicQuery = `SELECT topic, COUNT(*) FROM messages GROUP BY topic`
@@ -431,12 +426,25 @@ func (c *messageCache) MessagesDue() ([]*message, error) {
 	return readMessages(rows)
 }
 
-func (c *messageCache) MessagesExpired() ([]*message, error) {
+// MessagesExpired returns a list of IDs for messages that have expires (should be deleted)
+func (c *messageCache) MessagesExpired() ([]string, error) {
 	rows, err := c.db.Query(selectMessagesExpiredQuery, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	defer rows.Close()
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func (c *messageCache) MarkPublished(m *message) error {

@@ -25,11 +25,15 @@ const (
 )
 
 var (
-	errNotAPaidTier = errors.New("tier does not have Stripe price identifier")
+	errNotAPaidTier                 = errors.New("tier does not have billing price identifier")
+	errMultipleBillingSubscriptions = errors.New("cannot have multiple billing subscriptions")
+	errNoBillingSubscription        = errors.New("user does not have an active billing subscription")
 )
 
-func (s *Server) handleAccountBillingTiersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	tiers, err := v.userManager.Tiers()
+// handleBillingTiersGet returns all available paid tiers, and the free tier. This is to populate the upgrade dialog
+// in the UI. Note that this endpoint does NOT have a user context (no v.user!).
+func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	tiers, err := s.userManager.Tiers()
 	if err != nil {
 		return err
 	}
@@ -92,7 +96,7 @@ func (s *Server) handleAccountBillingTiersGet(w http.ResponseWriter, r *http.Req
 // will be updated by a subsequent webhook from Stripe, once the subscription becomes active.
 func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user.Billing.StripeSubscriptionID != "" {
-		return errors.New("subscription already exists") //FIXME
+		return errHTTPBadRequestBillingSubscriptionExists
 	}
 	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
@@ -112,7 +116,7 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 		if err != nil {
 			return err
 		} else if stripeCustomer.Subscriptions != nil && len(stripeCustomer.Subscriptions.Data) > 0 {
-			return errors.New("customer cannot have more than one subscription") //FIXME
+			return errMultipleBillingSubscriptions
 		}
 	}
 	successURL := s.config.BaseURL + apiAccountBillingSubscriptionCheckoutSuccessTemplate
@@ -157,15 +161,15 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	sess, err := session.Get(sessionID, nil) // FIXME how do I rate limit this?
 	if err != nil {
 		log.Warn("Stripe: %s", err)
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	} else if sess.Customer == nil || sess.Subscription == nil || sess.ClientReferenceID == "" {
-		return wrapErrHTTP(errHTTPBadRequestInvalidStripeRequest, "customer or subscription not found")
+		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "customer or subscription not found")
 	}
 	sub, err := subscription.Get(sess.Subscription.ID, nil)
 	if err != nil {
 		return err
 	} else if sub.Items == nil || len(sub.Items.Data) != 1 || sub.Items.Data[0].Price == nil {
-		return wrapErrHTTP(errHTTPBadRequestInvalidStripeRequest, "more than one line item in existing subscription")
+		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "more than one line item in existing subscription")
 	}
 	tier, err := s.userManager.TierByStripePrice(sub.Items.Data[0].Price.ID)
 	if err != nil {
@@ -186,7 +190,7 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 // a user's tier accordingly. This endpoint only works if there is an existing subscription.
 func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user.Billing.StripeSubscriptionID == "" {
-		return errors.New("no existing subscription for user")
+		return errNoBillingSubscription
 	}
 	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
@@ -226,9 +230,6 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 // handleAccountBillingSubscriptionDelete facilitates downgrading a paid user to a tier-less user,
 // and cancelling the Stripe subscription entirely
 func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user.Billing.StripeCustomerID == "" {
-		return errHTTPBadRequestNotAPaidUser
-	}
 	if v.user.Billing.StripeSubscriptionID != "" {
 		params := &stripe.SubscriptionParams{
 			CancelAtPeriodEnd: stripe.Bool(true),
@@ -269,11 +270,13 @@ func (s *Server) handleAccountBillingPortalSessionCreate(w http.ResponseWriter, 
 	return nil
 }
 
+// handleAccountBillingWebhook handles incoming Stripe webhooks. It mainly keeps the local user database in sync
+// with the Stripe view of the world. This endpoint is authorized via the Stripe webhook secret. Note that the
+// visitor (v) in this endpoint is the Stripe API, so we don't have v.user available.
 func (s *Server) handleAccountBillingWebhook(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	// Note that the visitor (v) in this endpoint is the Stripe API, so we don't have v.user available
 	stripeSignature := r.Header.Get("Stripe-Signature")
 	if stripeSignature == "" {
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	}
 	body, err := util.Peek(r.Body, stripeBodyBytesLimit)
 	if err != nil {
@@ -283,9 +286,9 @@ func (s *Server) handleAccountBillingWebhook(w http.ResponseWriter, r *http.Requ
 	}
 	event, err := webhook.ConstructEvent(body.PeekedBytes, stripeSignature, s.config.StripeWebhookKey)
 	if err != nil {
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	} else if event.Data == nil || event.Data.Raw == nil {
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	}
 	log.Info("Stripe: webhook event %s received", event.Type)
 	switch event.Type {
@@ -306,7 +309,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMe
 	cancelAt := gjson.GetBytes(event, "cancel_at")
 	priceID := gjson.GetBytes(event, "items.data.0.price.id")
 	if !subscriptionID.Exists() || !status.Exists() || !currentPeriodEnd.Exists() || !cancelAt.Exists() || !priceID.Exists() {
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	}
 	log.Info("Stripe: customer %s: Updating subscription to status %s, with price %s", customerID.String(), status, priceID)
 	u, err := s.userManager.UserByStripeCustomer(customerID.String())
@@ -327,7 +330,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMe
 func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(event json.RawMessage) error {
 	customerID := gjson.GetBytes(event, "customer")
 	if !customerID.Exists() {
-		return errHTTPBadRequestInvalidStripeRequest
+		return errHTTPBadRequestBillingRequestInvalid
 	}
 	log.Info("Stripe: customer %s: subscription deleted, downgrading to unpaid tier", customerID.String())
 	u, err := s.userManager.UserByStripeCustomer(customerID.String())

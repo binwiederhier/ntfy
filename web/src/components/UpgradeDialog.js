@@ -24,7 +24,7 @@ import Box from "@mui/material/Box";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
-    const { account } = useContext(AccountContext);
+    const { account } = useContext(AccountContext); // May be undefined!
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const [tiers, setTiers] = useState(null);
     const [newTier, setNewTier] = useState(account?.tier?.code); // May be undefined
@@ -37,28 +37,32 @@ const UpgradeDialog = (props) => {
         })();
     }, []);
 
-    if (!account || !tiers) {
+    if (!tiers) {
         return <></>;
     }
 
-    const currentTier = account.tier?.code; // May be undefined
+    const currentTier = account?.tier?.code; // May be undefined
     let action, submitButtonLabel, submitButtonEnabled;
-    if (currentTier === newTier) {
+    if (!account) {
+        submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
+        submitButtonEnabled = true;
+        action = Action.REDIRECT_SIGNUP;
+    } else if (currentTier === newTier) {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
         submitButtonEnabled = false;
         action = null;
     } else if (!currentTier) {
         submitButtonLabel = t("account_upgrade_dialog_button_pay_now");
         submitButtonEnabled = true;
-        action = Action.CREATE;
+        action = Action.CREATE_SUBSCRIPTION;
     } else if (!newTier) {
         submitButtonLabel = t("account_upgrade_dialog_button_cancel_subscription");
         submitButtonEnabled = true;
-        action = Action.CANCEL;
+        action = Action.CANCEL_SUBSCRIPTION;
     } else {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
         submitButtonEnabled = true;
-        action = Action.UPDATE;
+        action = Action.UPDATE_SUBSCRIPTION;
     }
 
     if (loading) {
@@ -66,14 +70,18 @@ const UpgradeDialog = (props) => {
     }
 
     const handleSubmit = async () => {
+        if (action === Action.REDIRECT_SIGNUP) {
+            window.location.href = routes.signup;
+            return;
+        }
         try {
             setLoading(true);
-            if (action === Action.CREATE) {
+            if (action === Action.CREATE_SUBSCRIPTION) {
                 const response = await accountApi.createBillingSubscription(newTier);
                 window.location.href = response.redirect_url;
-            } else if (action === Action.UPDATE) {
+            } else if (action === Action.UPDATE_SUBSCRIPTION) {
                 await accountApi.updateBillingSubscription(newTier);
-            } else if (action === Action.CANCEL) {
+            } else if (action === Action.CANCEL_SUBSCRIPTION) {
                 await accountApi.deleteBillingSubscription();
             }
             props.onCancel();
@@ -113,14 +121,14 @@ const UpgradeDialog = (props) => {
                         />
                     )}
                 </div>
-                {action === Action.CANCEL &&
+                {action === Action.CANCEL_SUBSCRIPTION &&
                     <Alert severity="warning">
                         <Trans
                             i18nKey="account_upgrade_dialog_cancel_warning"
-                            values={{ date: formatShortDate(account.billing.paid_until) }} />
+                            values={{ date: formatShortDate(account?.billing?.paid_until || 0) }} />
                     </Alert>
                 }
-                {currentTier && (!action || action === Action.UPDATE) &&
+                {currentTier && (!action || action === Action.UPDATE_SUBSCRIPTION) &&
                     <Alert severity="info">
                         <Trans i18nKey="account_upgrade_dialog_proration_info" />
                     </Alert>
@@ -148,8 +156,8 @@ const TierCard = (props) => {
             flexShrink: 1,
             flexBasis: 0,
             borderRadius: "3px",
-            "&:first-child": { ml: 0 },
-            "&:last-child": { mr: 0 },
+            "&:first-of-type": { ml: 0 },
+            "&:last-of-type": { mr: 0 },
             ...cardStyle
         }}>
             <Card sx={{ height: "100%" }}>
@@ -209,9 +217,10 @@ const FeatureItem = (props) => {
 };
 
 const Action = {
-    CREATE: 1,
-    UPDATE: 2,
-    CANCEL: 3
+    REDIRECT_SIGNUP: 0,
+    CREATE_SUBSCRIPTION: 1,
+    UPDATE_SUBSCRIPTION: 2,
+    CANCEL_SUBSCRIPTION: 3
 };
 
 export default UpgradeDialog;

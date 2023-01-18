@@ -43,10 +43,13 @@ import (
 		- delete subscription when account deleted
 		- delete messages + reserved topics on ResetTier
 
+		- move v1/account/tiers to v1/tiers
+
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?
 				-> test that the visitor is based on the IP address!
 			login/account endpoints
+			when ResetStats() is run, reset messagesLimiter (and others)?
 		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 
@@ -54,11 +57,10 @@ import (
 		- flicker of upgrade banner
 		- JS constants
 		Sync:
-			- "mute" setting
-			- figure out what settings are "web" or "phone"
 			- sync problems with "deleteAfter=0" and "displayName="
 		Delete visitor when tier is changed to refresh rate limiters
 		Tests:
+		- Payment endpoints (make mocks)
 		- Change tier from higher to lower tier (delete reservations)
 		- Message rate limiting and reset tests
 		- test that the visitor is based on the IP address when a user has no tier
@@ -104,13 +106,13 @@ var (
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	apiHealthPath                                        = "/v1/health"
+	apiTiers                                             = "/v1/tiers"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
-	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -378,20 +380,20 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.withAccountSync(s.handleAccountReservationAdd))(w, r, v)
 	} else if r.Method == http.MethodDelete && apiAccountReservationSingleRegex.MatchString(r.URL.Path) {
 		return s.ensureUser(s.withAccountSync(s.handleAccountReservationDelete))(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
-		return s.ensurePaymentsEnabled(s.handleAccountBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingSubscriptionPath {
 		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionCreate))(w, r, v) // Account sync via incoming Stripe webhook
 	} else if r.Method == http.MethodGet && apiAccountBillingSubscriptionCheckoutSuccessRegex.MatchString(r.URL.Path) {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingSubscriptionCreateSuccess))(w, r, v) // No user context!
 	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountBillingSubscriptionPath {
-		return s.ensurePaymentsEnabled(s.ensureUser(s.handleAccountBillingSubscriptionUpdate))(w, r, v) // Account sync via incoming Stripe webhook
+		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingSubscriptionUpdate))(w, r, v) // Account sync via incoming Stripe webhook
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountBillingSubscriptionPath {
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingSubscriptionDelete))(w, r, v) // Account sync via incoming Stripe webhook
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingPortalPath {
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
-		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v)
+		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiers {
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
@@ -480,7 +482,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		AppRoot:            appRoot,
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
-		EnablePayments:     s.config.EnablePayments,
+		EnablePayments:     s.config.StripeSecretKey != "",
 		EnableReservations: s.config.EnableReservations,
 		DisallowedTopics:   disallowedTopics,
 	}
@@ -1271,18 +1273,14 @@ func (s *Server) execManager() {
 
 	// DeleteMessages message cache
 	log.Debug("Manager: Pruning messages")
-	expiredMessages, err := s.messageCache.MessagesExpired()
+	expiredMessageIDs, err := s.messageCache.MessagesExpired()
 	if err != nil {
 		log.Warn("Manager: Error retrieving expired messages: %s", err.Error())
-	} else if len(expiredMessages) > 0 {
-		ids := make([]string, 0)
-		for _, m := range expiredMessages {
-			ids = append(ids, m.ID)
-		}
-		if err := s.fileCache.Remove(ids...); err != nil {
+	} else if len(expiredMessageIDs) > 0 {
+		if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
 			log.Warn("Manager: Error deleting attachments for expired messages: %s", err.Error())
 		}
-		if err := s.messageCache.DeleteMessages(ids...); err != nil {
+		if err := s.messageCache.DeleteMessages(expiredMessageIDs...); err != nil {
 			log.Warn("Manager: Error marking attachments deleted: %s", err.Error())
 		}
 	} else {
@@ -1359,6 +1357,8 @@ func (s *Server) runManager() {
 	}
 }
 
+// runStatsResetter runs once a day (usually midnight UTC) to reset all the visitor's message and
+// email counters. The stats are used to display the counters in the web app, as well as for rate limiting.
 func (s *Server) runStatsResetter() {
 	for {
 		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())

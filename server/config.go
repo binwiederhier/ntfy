@@ -115,7 +115,6 @@ type Config struct {
 	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
-	EnablePayments                       bool
 	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
 	Version                              string // injected by App
 }

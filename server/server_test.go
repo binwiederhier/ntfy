@@ -745,7 +745,7 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 func TestServer_StatsResetter(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
-	c.VisitorStatsResetTime = time.Now().Add(time.Second)
+	c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
 	s := newTestServer(t, c)
 	go s.runStatsResetter()
 
@@ -773,8 +773,8 @@ func TestServer_StatsResetter(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(5), account.Stats.Messages)
 
-	// Start stats resetter
-	time.Sleep(1200 * time.Millisecond)
+	// Wait for stats resetter to run
+	time.Sleep(2200 * time.Millisecond)
 
 	// User stats show 0 messages now!
 	response = request(t, s, "GET", "/v1/account", "", nil)
@@ -1325,7 +1325,7 @@ func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *
 	require.Equal(t, 41301, err.Code)
 }
 
-func TestServer_PublishAttachmentAndPrune(t *testing.T) {
+func TestServer_PublishAttachmentAndExpire(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfig(t)

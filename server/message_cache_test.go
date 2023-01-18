@@ -270,13 +270,9 @@ func testCachePrune(t *testing.T, c *messageCache) {
 	require.Equal(t, 2, counts["mytopic"])
 	require.Equal(t, 1, counts["another_topic"])
 
-	expiredMessages, err := c.MessagesExpired()
+	expiredMessageIDs, err := c.MessagesExpired()
 	require.Nil(t, err)
-	ids := make([]string, 0)
-	for _, m := range expiredMessages {
-		ids = append(ids, m.ID)
-	}
-	require.Nil(t, c.DeleteMessages(ids...))
+	require.Nil(t, c.DeleteMessages(expiredMessageIDs...))
 
 	counts, err = c.MessageCounts()
 	require.Nil(t, err)

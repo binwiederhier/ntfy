@@ -241,7 +241,7 @@ type apiAccountTier struct {
 }
 
 type apiAccountLimits struct {
-	Basis                    string `json:"basis"` // "ip", "role" or "tier"
+	Basis                    string `json:"basis,omitempty"` // "ip", "role" or "tier"
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
@@ -305,10 +305,10 @@ type apiConfigResponse struct {
 }
 
 type apiAccountBillingTier struct {
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	Price    string `json:"price"`
-	Features string `json:"features"`
+	Code   string            `json:"code,omitempty"`
+	Name   string            `json:"name,omitempty"`
+	Price  string            `json:"price,omitempty"`
+	Limits *apiAccountLimits `json:"limits"`
 }
 
 type apiAccountBillingSubscriptionCreateResponse struct {

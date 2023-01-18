@@ -24,12 +24,30 @@ const (
 	stripeBodyBytesLimit = 16384
 )
 
+var (
+	errNotAPaidTier = errors.New("tier does not have Stripe price identifier")
+)
+
 func (s *Server) handleAccountBillingTiersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	tiers, err := v.userManager.Tiers()
 	if err != nil {
 		return err
 	}
-	response := make([]*apiAccountBillingTier, 0)
+	freeTier := defaultVisitorLimits(s.config)
+	response := []*apiAccountBillingTier{
+		{
+			// Free tier: no code, name or price
+			Limits: &apiAccountLimits{
+				Messages:                 freeTier.MessagesLimit,
+				MessagesExpiryDuration:   int64(freeTier.MessagesExpiryDuration.Seconds()),
+				Emails:                   freeTier.EmailsLimit,
+				Reservations:             freeTier.ReservationsLimit,
+				AttachmentTotalSize:      freeTier.AttachmentTotalSizeLimit,
+				AttachmentFileSize:       freeTier.AttachmentFileSizeLimit,
+				AttachmentExpiryDuration: int64(freeTier.AttachmentExpiryDuration.Seconds()),
+			},
+		},
+	}
 	for _, tier := range tiers {
 		if tier.StripePriceID == "" {
 			continue
@@ -48,10 +66,18 @@ func (s *Server) handleAccountBillingTiersGet(w http.ResponseWriter, r *http.Req
 			s.priceCache[tier.StripePriceID] = priceStr // FIXME race, make this sync.Map or something
 		}
 		response = append(response, &apiAccountBillingTier{
-			Code:     tier.Code,
-			Name:     tier.Name,
-			Price:    priceStr,
-			Features: tier.Features,
+			Code:  tier.Code,
+			Name:  tier.Name,
+			Price: priceStr,
+			Limits: &apiAccountLimits{
+				Messages:                 tier.MessagesLimit,
+				MessagesExpiryDuration:   int64(tier.MessagesExpiryDuration.Seconds()),
+				Emails:                   tier.EmailsLimit,
+				Reservations:             tier.ReservationsLimit,
+				AttachmentTotalSize:      tier.AttachmentTotalSizeLimit,
+				AttachmentFileSize:       tier.AttachmentFileSizeLimit,
+				AttachmentExpiryDuration: int64(tier.AttachmentExpiryDuration.Seconds()),
+			},
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -75,9 +101,8 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 	tier, err := s.userManager.Tier(req.Tier)
 	if err != nil {
 		return err
-	}
-	if tier.StripePriceID == "" {
-		return errors.New("invalid tier") //FIXME
+	} else if tier.StripePriceID == "" {
+		return errNotAPaidTier
 	}
 	log.Info("Stripe: No existing subscription, creating checkout flow")
 	var stripeCustomerID *string
@@ -92,10 +117,11 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 	}
 	successURL := s.config.BaseURL + apiAccountBillingSubscriptionCheckoutSuccessTemplate
 	params := &stripe.CheckoutSessionParams{
-		Customer:          stripeCustomerID, // A user may have previously deleted their subscription
-		ClientReferenceID: &v.user.Name,
-		SuccessURL:        &successURL,
-		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		Customer:            stripeCustomerID, // A user may have previously deleted their subscription
+		ClientReferenceID:   &v.user.Name,
+		SuccessURL:          &successURL,
+		Mode:                stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		AllowPromotionCodes: stripe.Bool(true),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
 				Price:    stripe.String(tier.StripePriceID),
@@ -211,6 +237,11 @@ func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r
 		if err != nil {
 			return err
 		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
+	if err := json.NewEncoder(w).Encode(newSuccessResponse()); err != nil {
+		return err
 	}
 	return nil
 }

@@ -199,6 +199,13 @@ export const formatBytes = (bytes, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+export const formatNumber = (n) => {
+    if (n % 1000 === 0) {
+        return `${n/1000}k`;
+    }
+    return n;
+}
+
 export const openUrl = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
 };

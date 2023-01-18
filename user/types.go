@@ -60,7 +60,6 @@ type Tier struct {
 	AttachmentFileSizeLimit  int64
 	AttachmentTotalSizeLimit int64
 	AttachmentExpiryDuration time.Duration
-	Features                 string
 	StripePriceID            string
 }
 

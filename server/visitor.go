@@ -212,7 +212,7 @@ func (v *visitor) ResetStats() {
 }
 
 func (v *visitor) Limits() *visitorLimits {
-	limits := &visitorLimits{}
+	limits := defaultVisitorLimits(v.config)
 	if v.user != nil && v.user.Tier != nil {
 		limits.Basis = visitorLimitBasisTier
 		limits.MessagesLimit = v.user.Tier.MessagesLimit
@@ -222,15 +222,6 @@ func (v *visitor) Limits() *visitorLimits {
 		limits.AttachmentTotalSizeLimit = v.user.Tier.AttachmentTotalSizeLimit
 		limits.AttachmentFileSizeLimit = v.user.Tier.AttachmentFileSizeLimit
 		limits.AttachmentExpiryDuration = v.user.Tier.AttachmentExpiryDuration
-	} else {
-		limits.Basis = visitorLimitBasisIP
-		limits.MessagesLimit = replenishDurationToDailyLimit(v.config.VisitorRequestLimitReplenish)
-		limits.MessagesExpiryDuration = v.config.CacheDuration
-		limits.EmailsLimit = replenishDurationToDailyLimit(v.config.VisitorEmailLimitReplenish)
-		limits.ReservationsLimit = 0 // No reservations for anonymous users, or users without a tier
-		limits.AttachmentTotalSizeLimit = v.config.VisitorAttachmentTotalSizeLimit
-		limits.AttachmentFileSizeLimit = v.config.AttachmentFileSizeLimit
-		limits.AttachmentExpiryDuration = v.config.AttachmentExpiryDuration
 	}
 	return limits
 }
@@ -287,4 +278,17 @@ func replenishDurationToDailyLimit(duration time.Duration) int64 {
 
 func dailyLimitToRate(limit int64) rate.Limit {
 	return rate.Limit(limit) * rate.Every(24*time.Hour)
+}
+
+func defaultVisitorLimits(conf *Config) *visitorLimits {
+	return &visitorLimits{
+		Basis:                    visitorLimitBasisIP,
+		MessagesLimit:            replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish),
+		MessagesExpiryDuration:   conf.CacheDuration,
+		EmailsLimit:              replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish),
+		ReservationsLimit:        0, // No reservations for anonymous users, or users without a tier
+		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
+		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
+	}
 }

@@ -39,21 +39,18 @@ import (
 		payments:
 		- send dunning emails when overdue
 		- payment methods
-		- unmarshal to stripe.Subscription instead of gjson
 		- delete subscription when account deleted
 		- delete messages + reserved topics on ResetTier
-
-		- move v1/account/tiers to v1/tiers
 
 		Limits & rate limiting:
 			users without tier: should the stats be persisted? are they meaningful?
 				-> test that the visitor is based on the IP address!
 			login/account endpoints
 			when ResetStats() is run, reset messagesLimiter (and others)?
-		update last_seen when API is accessed
 		Make sure account endpoints make sense for admins
 
 		UI:
+		- revert home page change
 		- flicker of upgrade banner
 		- JS constants
 		Sync:
@@ -82,7 +79,7 @@ type Server struct {
 	userManager       *user.Manager // Might be nil!
 	messageCache      *messageCache
 	fileCache         *fileCache
-	priceCache        map[string]string // Stripe price ID -> formatted price
+	priceCache        *util.LookupCache[map[string]string] // Stripe price ID -> formatted price
 	closeChan         chan bool
 	mu                sync.Mutex
 }
@@ -144,7 +141,8 @@ const (
 	emptyMessageBody         = "triggered"               // Used if message body is empty
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
-	encodingBase64           = "base64"
+	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
+	jsonBodyBytesLimit       = 16384
 )
 
 // WebSocket constants
@@ -201,7 +199,7 @@ func New(conf *Config) (*Server, error) {
 		topics:         topics,
 		userManager:    userManager,
 		visitors:       make(map[string]*visitor),
-		priceCache:     make(map[string]string),
+		priceCache:     util.NewLookupCache(fetchStripePrices, conf.StripePriceCacheDuration),
 	}, nil
 }
 
@@ -454,22 +452,14 @@ func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor)
 }
 
 func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	_, err := io.WriteString(w, `{"success":true}`+"\n")
-	return err
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	response := &apiHealthResponse{
 		Healthy: true,
 	}
-	w.Header().Set("Content-Type", "text/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, response)
 }
 
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
@@ -620,12 +610,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // CORS, allow cross-origin requests
-	if err := json.NewEncoder(w).Encode(m); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, m)
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -1175,8 +1160,8 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 
 func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE")
-	w.Header().Set("Access-Control-Allow-Origin", "*")  // CORS, allow cross-origin requests
-	w.Header().Set("Access-Control-Allow-Headers", "*") // CORS, allow auth via JS // FIXME is this terrible?
+	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
+	w.Header().Set("Access-Control-Allow-Headers", "*")                              // CORS, allow auth via JS // FIXME is this terrible?
 	return nil
 }
 
@@ -1482,7 +1467,7 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit)
+		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit*2) // 2x to account for JSON format overhead
 		if err != nil {
 			return err
 		}
@@ -1649,4 +1634,13 @@ func (s *Server) visitorFromIP(ip netip.Addr) *visitor {
 
 func (s *Server) visitorFromUser(user *user.User, ip netip.Addr) *visitor {
 	return s.visitorFromID(fmt.Sprintf("user:%s", user.Name), ip, user)
+}
+
+func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		return err
+	}
+	return nil
 }

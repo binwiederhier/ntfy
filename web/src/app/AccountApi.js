@@ -24,11 +24,6 @@ class AccountApi {
     constructor() {
         this.timer = null;
         this.listener = null; // Fired when account is fetched from remote
-
-        // Random ID used to identify this client when sending/receiving "sync" events
-        // to the sync topic of an account. This ID doesn't matter much, but it will prevent
-        // a client from reacting to its own message.
-        this.identity = Math.floor(Math.random() * 2586000);
     }
 
     registerListener(listener) {

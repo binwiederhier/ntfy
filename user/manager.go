@@ -66,7 +66,6 @@ const (
 			stripe_subscription_cancel_at INT,
 			created_by TEXT NOT NULL,
 			created_at INT NOT NULL,
-			last_seen INT NOT NULL,
 		    FOREIGN KEY (tier_id) REFERENCES tier (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
@@ -93,8 +92,8 @@ const (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
-		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at, last_seen)
-		VALUES (1, '*', '', 'anonymous', '', 'system', UNIXEPOCH(), 0) 
+		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at)
+		VALUES (1, '*', '', 'anonymous', '', 'system', UNIXEPOCH()) 
 		ON CONFLICT (id) DO NOTHING;
 	`
 	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
@@ -130,8 +129,8 @@ const (
 	`
 
 	insertUserQuery = `
-		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at) 
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	selectUsernamesQuery = `
 		SELECT user 
@@ -257,8 +256,8 @@ const (
 		ALTER TABLE user RENAME TO user_old;
 	`
 	migrate1To2InsertFromOldTablesAndDropNoTx = `
-		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at, last_seen) 
-		SELECT user, pass, role, '', 'admin', UNIXEPOCH(), UNIXEPOCH() FROM user_old;
+		INSERT INTO user (user, pass, role, sync_topic, created_by, created_at) 
+		SELECT user, pass, role, '', 'admin', UNIXEPOCH() FROM user_old;
 
 		INSERT INTO user_access (user_id, topic, read, write)
 		SELECT u.id, a.topic, a.read, a.write
@@ -531,7 +530,7 @@ func (a *Manager) AddUser(username, password string, role Role, createdBy string
 		return err
 	}
 	syncTopic, now := util.RandomString(syncTopicLength), time.Now().Unix()
-	if _, err = a.db.Exec(insertUserQuery, username, hash, role, syncTopic, createdBy, now, now); err != nil {
+	if _, err = a.db.Exec(insertUserQuery, username, hash, role, syncTopic, createdBy, now); err != nil {
 		return err
 	}
 	return nil
@@ -589,6 +588,7 @@ func (a *Manager) User(username string) (*User, error) {
 	return a.readUser(rows)
 }
 
+// UserByStripeCustomer returns the user with the given Stripe customer ID if it exists, or ErrUserNotFound otherwise.
 func (a *Manager) UserByStripeCustomer(stripeCustomerID string) (*User, error) {
 	rows, err := a.db.Query(selectUserByStripeCustomerIDQuery, stripeCustomerID)
 	if err != nil {
@@ -878,6 +878,7 @@ func (a *Manager) CreateTier(tier *Tier) error {
 	return nil
 }
 
+// ChangeBilling updates a user's billing fields, namely the Stripe customer ID, and subscription information
 func (a *Manager) ChangeBilling(user *User) error {
 	if _, err := a.db.Exec(updateBillingQuery, nullString(user.Billing.StripeCustomerID), nullString(user.Billing.StripeSubscriptionID), nullString(string(user.Billing.StripeSubscriptionStatus)), nullInt64(user.Billing.StripeSubscriptionPaidUntil.Unix()), nullInt64(user.Billing.StripeSubscriptionCancelAt.Unix()), user.Name); err != nil {
 		return err
@@ -885,6 +886,7 @@ func (a *Manager) ChangeBilling(user *User) error {
 	return nil
 }
 
+// Tiers returns a list of all Tier structs
 func (a *Manager) Tiers() ([]*Tier, error) {
 	rows, err := a.db.Query(selectTiersQuery)
 	if err != nil {
@@ -904,6 +906,7 @@ func (a *Manager) Tiers() ([]*Tier, error) {
 	return tiers, nil
 }
 
+// Tier returns a Tier based on the code, or ErrTierNotFound if it does not exist
 func (a *Manager) Tier(code string) (*Tier, error) {
 	rows, err := a.db.Query(selectTierByCodeQuery, code)
 	if err != nil {
@@ -913,6 +916,7 @@ func (a *Manager) Tier(code string) (*Tier, error) {
 	return a.readTier(rows)
 }
 
+// TierByStripePrice returns a Tier based on the Stripe price ID, or ErrTierNotFound if it does not exist
 func (a *Manager) TierByStripePrice(priceID string) (*Tier, error) {
 	rows, err := a.db.Query(selectTierByPriceIDQuery, priceID)
 	if err != nil {

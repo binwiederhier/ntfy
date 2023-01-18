@@ -35,12 +35,8 @@ export const useConnectionListeners = (subscriptions, users) => {
                 try {
                     const data = JSON.parse(message.message);
                     if (data.event === "sync") {
-                        if (data.source !== accountApi.identity) {
-                            console.log(`[ConnectionListener] Triggering account sync`);
-                            await accountApi.sync();
-                        } else {
-                            console.log(`[ConnectionListener] I triggered the account sync, ignoring message`);
-                        }
+                        console.log(`[ConnectionListener] Triggering account sync`);
+                        await accountApi.sync();
                     } else {
                         console.log(`[ConnectionListener] Unknown message type. Doing nothing.`);
                     }

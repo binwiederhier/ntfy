@@ -25,7 +25,10 @@ require (
 
 require github.com/pkg/errors v0.9.1 // indirect
 
-require firebase.google.com/go/v4 v4.10.0
+require (
+	firebase.google.com/go/v4 v4.10.0
+	github.com/stripe/stripe-go/v74 v74.5.0
+)
 
 require (
 	cloud.google.com/go v0.107.0 // indirect
@@ -46,10 +49,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/stripe/stripe-go/v74 v74.5.0 // indirect
-	github.com/tidwall/gjson v1.14.4 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/net v0.4.0 // indirect

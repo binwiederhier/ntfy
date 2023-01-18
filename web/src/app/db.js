@@ -7,6 +7,7 @@ import session from "./Session";
 // Notes:
 // - As per docs, we only declare the indexable columns, not all columns
 
+// The IndexedDB database name is based on the logged-in user
 const dbName = (session.username()) ? `ntfy-${session.username()}` : "ntfy";
 const db = new Dexie(dbName);
 

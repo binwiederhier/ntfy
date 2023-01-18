@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	jsonBodyBytesLimit        = 4096
 	subscriptionIDLength      = 16
 	createdByAPI              = "api"
 	syncTopicAccountSyncEvent = "sync"
@@ -38,9 +37,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser, createdByAPI); err != nil { // TODO this should return a User
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *visitor) error {
@@ -118,21 +115,14 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, response)
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
 	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -143,9 +133,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	if err := s.userManager.ChangePassword(v.user.Name, newPassword.Password); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, _ *http.Request, v *visitor) error {
@@ -154,16 +142,11 @@ func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, _ *http.Request,
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
 		Expires: token.Expires.Unix(),
 	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, response)
 }
 
 func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, _ *http.Request, v *visitor) error {
@@ -177,16 +160,11 @@ func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, _ *http.Request
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
 		Expires: token.Expires.Unix(),
 	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, response)
 }
 
 func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
@@ -197,8 +175,7 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, _ *http.Request
 	if err := s.userManager.RemoveToken(v.user); err != nil {
 		return err
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -230,9 +207,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 	if err := s.userManager.ChangeSettings(v.user); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -257,12 +232,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 			return err
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	if err := json.NewEncoder(w).Encode(newSubscription); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, newSubscription)
 }
 
 func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -292,12 +262,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if err := s.userManager.ChangeSettings(v.user); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	if err := json.NewEncoder(w).Encode(subscription); err != nil {
-		return err
-	}
-	return nil
+	return s.writeJSON(w, subscription)
 }
 
 func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -321,9 +286,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 			return err
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -366,9 +329,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err := s.userManager.AllowAccess(owner, user.Everyone, req.Topic, everyone.IsRead(), everyone.IsWrite()); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -392,9 +353,7 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	if err := s.userManager.ResetAccess(user.Everyone, topic); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*") // FIXME remove this
-	return nil
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) publishSyncEvent(v *visitor) error {

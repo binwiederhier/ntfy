@@ -1463,7 +1463,7 @@ func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
 
-	// Get it 4 times successfully
+	// Value it 4 times successfully
 	path := strings.TrimPrefix(msg.Attachment.URL, "http://127.0.0.1:12345")
 	for i := 1; i <= 4; i++ { // 4 successful downloads
 		response = request(t, s, "GET", path, "", nil)

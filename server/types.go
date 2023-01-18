@@ -336,3 +336,22 @@ func newSuccessResponse() *apiSuccessResponse {
 		Success: true,
 	}
 }
+
+type apiStripeSubscriptionUpdatedEvent struct {
+	ID               string `json:"id"`
+	Customer         string `json:"customer"`
+	Status           string `json:"status"`
+	CurrentPeriodEnd int64  `json:"current_period_end"`
+	CancelAt         int64  `json:"cancel_at"`
+	Items            *struct {
+		Data []*struct {
+			Price *struct {
+				ID string `json:"id"`
+			} `json:"price"`
+		} `json:"data"`
+	} `json:"items"`
+}
+
+type apiStripeSubscriptionDeletedEvent struct {
+	Customer string `json:"customer"`
+}

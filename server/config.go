@@ -19,6 +19,7 @@ const (
 	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
+	DefaultStripePriceCacheDuration             = time.Hour        // Time to keep Stripe prices cached in memory before a refresh is needed
 )
 
 // Defines all global and per-visitor limits
@@ -112,10 +113,12 @@ type Config struct {
 	BehindProxy                          bool
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
+	StripePriceCacheDuration             time.Duration
 	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
 	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
+	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
 }
 
@@ -132,9 +135,11 @@ func NewConfig() *Config {
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
+		CacheStartupQueries:                  "",
 		CacheBatchSize:                       0,
 		CacheBatchTimeout:                    0,
 		AuthFile:                             "",
+		AuthStartupQueries:                   "",
 		AuthDefault:                          user.NewPermission(true, true),
 		AttachmentCacheDir:                   "",
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
@@ -142,14 +147,24 @@ func NewConfig() *Config {
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
-		MessageLimit:                         DefaultMessageLengthLimit,
-		MinDelay:                             DefaultMinDelay,
-		MaxDelay:                             DefaultMaxDelay,
+		WebRootIsApp:                         false,
 		DelayedSenderInterval:                DefaultDelayedSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
 		FirebaseQuotaExceededPenaltyDuration: DefaultFirebaseQuotaExceededPenaltyDuration,
+		UpstreamBaseURL:                      "",
+		SMTPSenderAddr:                       "",
+		SMTPSenderUser:                       "",
+		SMTPSenderPass:                       "",
+		SMTPSenderFrom:                       "",
+		SMTPServerListen:                     "",
+		SMTPServerDomain:                     "",
+		SMTPServerAddrPrefix:                 "",
+		MessageLimit:                         DefaultMessageLengthLimit,
+		MinDelay:                             DefaultMinDelay,
+		MaxDelay:                             DefaultMaxDelay,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,
+		TotalAttachmentSizeLimit:             0,
 		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
 		VisitorAttachmentTotalSizeLimit:      DefaultVisitorAttachmentTotalSizeLimit,
 		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
@@ -162,7 +177,14 @@ func NewConfig() *Config {
 		VisitorAccountCreateLimitReplenish:   DefaultVisitorAccountCreateLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		BehindProxy:                          false,
+		StripeSecretKey:                      "",
+		StripeWebhookKey:                     "",
+		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,
 		EnableWeb:                            true,
+		EnableSignup:                         false,
+		EnableLogin:                          false,
+		EnableReservations:                   false,
+		AccessControlAllowOrigin:             "*",
 		Version:                              "",
 	}
 }

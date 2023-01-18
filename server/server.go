@@ -41,8 +41,6 @@ import (
 		- payment methods
 		- unmarshal to stripe.Subscription instead of gjson
 		- delete subscription when account deleted
-		- add tier.visible
-		- fix tier selection boxes
 		- delete messages + reserved topics on ResetTier
 
 		Limits & rate limiting:

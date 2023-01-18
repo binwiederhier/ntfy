@@ -20,6 +20,7 @@ import List from "@mui/material/List";
 import {Check} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
+import Box from "@mui/material/Box";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
@@ -27,6 +28,7 @@ const UpgradeDialog = (props) => {
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const [tiers, setTiers] = useState(null);
     const [newTier, setNewTier] = useState(account?.tier?.code); // May be undefined
+    const [loading, setLoading] = useState(false);
     const [errorText, setErrorText] = useState("");
 
     useEffect(() => {
@@ -59,8 +61,13 @@ const UpgradeDialog = (props) => {
         action = Action.UPDATE;
     }
 
+    if (loading) {
+        submitButtonEnabled = false;
+    }
+
     const handleSubmit = async () => {
         try {
+            setLoading(true);
             if (action === Action.CREATE) {
                 const response = await accountApi.createBillingSubscription(newTier);
                 window.location.href = response.redirect_url;
@@ -76,6 +83,8 @@ const UpgradeDialog = (props) => {
                 session.resetAndRedirect(routes.login);
             }
             // FIXME show error
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -118,7 +127,7 @@ const UpgradeDialog = (props) => {
                 }
             </DialogContent>
             <DialogFooter status={errorText}>
-                <Button onClick={props.onCancel}>Cancel</Button>
+                <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
                 <Button onClick={handleSubmit} disabled={!submitButtonEnabled}>{submitButtonLabel}</Button>
             </DialogFooter>
         </Dialog>
@@ -131,48 +140,52 @@ const TierCard = (props) => {
     const tier = props.tier;
 
     return (
-        <Card sx={{
-            m: 1,
+        <Box sx={{
+            m: "7px",
             minWidth: "190px",
             maxWidth: "250px",
             flexGrow: 1,
             flexShrink: 1,
             flexBasis: 0,
+            borderRadius: "3px",
             "&:first-child": { ml: 0 },
             "&:last-child": { mr: 0 },
             ...cardStyle
         }}>
-            <CardActionArea sx={{ height: "100%" }}>
-                <CardContent onClick={props.onClick} sx={{ height: "100%" }}>
-                    {props.selected &&
-                        <div style={{
-                            position: "absolute",
-                            top: "0",
-                            right: "15px",
-                            padding: "2px 10px",
-                            background: "#338574",
-                            color: "white",
-                            borderRadius: "3px",
-                        }}>{t("account_upgrade_dialog_tier_selected_label")}</div>
-                    }
-                    <Typography variant="h5" component="div">
-                        {tier.name || t("account_usage_tier_free")}
-                    </Typography>
-                    <List dense>
-                        {tier.limits.reservations > 0 && <FeatureItem>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations })}</FeatureItem>}
-                        <FeatureItem>{t("account_upgrade_dialog_tier_features_messages", { messages: formatNumber(tier.limits.messages) })}</FeatureItem>
-                        <FeatureItem>{t("account_upgrade_dialog_tier_features_emails", { emails: formatNumber(tier.limits.emails) })}</FeatureItem>
-                        <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}</FeatureItem>
-                        <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_total_size", { totalsize: formatBytes(tier.limits.attachment_total_size, 0) })}</FeatureItem>
-                    </List>
-                    {tier.price &&
-                        <Typography variant="subtitle1" sx={{fontWeight: 500}}>
-                            {tier.price} / month
+            <Card sx={{ height: "100%" }}>
+                <CardActionArea sx={{ height: "100%" }}>
+                    <CardContent onClick={props.onClick} sx={{ height: "100%" }}>
+                        {props.selected &&
+                            <div style={{
+                                position: "absolute",
+                                top: "0",
+                                right: "15px",
+                                padding: "2px 10px",
+                                background: "#338574",
+                                color: "white",
+                                borderRadius: "3px",
+                            }}>{t("account_upgrade_dialog_tier_selected_label")}</div>
+                        }
+                        <Typography variant="h5" component="div">
+                            {tier.name || t("account_usage_tier_free")}
                         </Typography>
-                    }
-                </CardContent>
-            </CardActionArea>
-        </Card>
+                        <List dense>
+                            {tier.limits.reservations > 0 && <FeatureItem>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations })}</FeatureItem>}
+                            <FeatureItem>{t("account_upgrade_dialog_tier_features_messages", { messages: formatNumber(tier.limits.messages) })}</FeatureItem>
+                            <FeatureItem>{t("account_upgrade_dialog_tier_features_emails", { emails: formatNumber(tier.limits.emails) })}</FeatureItem>
+                            <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}</FeatureItem>
+                            <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_total_size", { totalsize: formatBytes(tier.limits.attachment_total_size, 0) })}</FeatureItem>
+                        </List>
+                        {tier.price &&
+                            <Typography variant="subtitle1" sx={{fontWeight: 500}}>
+                                {tier.price} / month
+                            </Typography>
+                        }
+                    </CardContent>
+                </CardActionArea>
+            </Card>
+        </Box>
+
     );
 }
 

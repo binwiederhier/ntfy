@@ -261,7 +261,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	require.Nil(t, a.CreateTier(&Tier{
 		Code:                     "pro",
 		Name:                     "ntfy Pro",
-		Paid:                     true,
+		StripePriceID:            "price123",
 		MessagesLimit:            5_000,
 		MessagesExpiryDuration:   3 * 24 * time.Hour,
 		EmailsLimit:              50,

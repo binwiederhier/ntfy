@@ -37,8 +37,6 @@ import (
 /*
 	TODO
 		payments:
-		- send dunning emails when overdue
-		- payment methods
 		- delete subscription when account deleted
 		- delete messages + reserved topics on ResetTier
 
@@ -76,9 +74,10 @@ type Server struct {
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
 	messages          int64
-	userManager       *user.Manager // Might be nil!
-	messageCache      *messageCache
-	fileCache         *fileCache
+	userManager       *user.Manager                        // Might be nil!
+	messageCache      *messageCache                        // Database that stores the messages
+	fileCache         *fileCache                           // File system based cache that stores attachments
+	stripe            stripeAPI                            // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]string] // Stripe price ID -> formatted price
 	closeChan         chan bool
 	mu                sync.Mutex
@@ -160,6 +159,10 @@ func New(conf *Config) (*Server, error) {
 	if conf.SMTPSenderAddr != "" {
 		mailer = &smtpSender{config: conf}
 	}
+	var stripe stripeAPI
+	if conf.StripeSecretKey != "" {
+		stripe = newStripeAPI()
+	}
 	messageCache, err := createMessageCache(conf)
 	if err != nil {
 		return nil, err
@@ -190,7 +193,7 @@ func New(conf *Config) (*Server, error) {
 		}
 		firebaseClient = newFirebaseClient(sender, userManager)
 	}
-	return &Server{
+	s := &Server{
 		config:         conf,
 		messageCache:   messageCache,
 		fileCache:      fileCache,
@@ -199,8 +202,10 @@ func New(conf *Config) (*Server, error) {
 		topics:         topics,
 		userManager:    userManager,
 		visitors:       make(map[string]*visitor),
-		priceCache:     util.NewLookupCache(fetchStripePrices, conf.StripePriceCacheDuration),
-	}, nil
+		stripe:         stripe,
+	}
+	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	return s, nil
 }
 
 func createMessageCache(conf *Config) (*messageCache, error) {

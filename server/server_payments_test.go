@@ -83,6 +83,48 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 	require.Equal(t, "https://billing.stripe.com/abc/def", redirectResponse.RedirectURL)
 }
 
+func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.EnableSignup = true
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("CancelSubscription", "sub_123").
+		Return(&stripe.Subscription{}, nil)
+
+	// Create tier and user
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:          "pro",
+		StripePriceID: "price_123",
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+
+	u.Billing.StripeCustomerID = "acct_123"
+	u.Billing.StripeSubscriptionID = "sub_123"
+	require.Nil(t, s.userManager.ChangeBilling(u))
+
+	// Delete account
+	rr := request(t, s, "DELETE", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 401, rr.Code)
+}
+
 type testStripeAPI struct {
 	mock.Mock
 }
@@ -118,6 +160,11 @@ func (s *testStripeAPI) GetSubscription(id string) (*stripe.Subscription, error)
 }
 
 func (s *testStripeAPI) UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error) {
+	args := s.Called(id)
+	return args.Get(0).(*stripe.Subscription), args.Error(1)
+}
+
+func (s *testStripeAPI) CancelSubscription(id string) (*stripe.Subscription, error) {
 	args := s.Called(id)
 	return args.Get(0).(*stripe.Subscription), args.Error(1)
 }

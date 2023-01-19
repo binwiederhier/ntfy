@@ -36,8 +36,10 @@ import (
 
 /*
 	TODO
+		races:
+		- v.user --> see publishSyncEventAsync() test
+
 		payments:
-		- delete subscription when account deleted
 		- delete messages + reserved topics on ResetTier
 
 		Limits & rate limiting:

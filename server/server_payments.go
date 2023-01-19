@@ -359,6 +359,7 @@ type stripeAPI interface {
 	GetSession(id string) (*stripe.CheckoutSession, error)
 	GetSubscription(id string) (*stripe.Subscription, error)
 	UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error)
+	CancelSubscription(id string) (*stripe.Subscription, error)
 	ConstructWebhookEvent(payload []byte, header string, secret string) (stripe.Event, error)
 }
 
@@ -405,6 +406,10 @@ func (s *realStripeAPI) GetSubscription(id string) (*stripe.Subscription, error)
 
 func (s *realStripeAPI) UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error) {
 	return subscription.Update(id, params)
+}
+
+func (s *realStripeAPI) CancelSubscription(id string) (*stripe.Subscription, error) {
+	return subscription.Cancel(id, nil)
 }
 
 func (s *realStripeAPI) ConstructWebhookEvent(payload []byte, header string, secret string) (stripe.Event, error) {

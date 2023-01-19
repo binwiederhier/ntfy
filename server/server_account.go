@@ -119,6 +119,16 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+	if v.user.Billing.StripeCustomerID != "" {
+		log.Info("Deleting user %s (billing customer: %s, billing subscription: %s)", v.user.Name, v.user.Billing.StripeCustomerID, v.user.Billing.StripeSubscriptionID)
+		if v.user.Billing.StripeSubscriptionID != "" {
+			if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
+				return err
+			}
+		}
+	} else {
+		log.Info("Deleting user %s", v.user.Name)
+	}
 	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
 		return err
 	}

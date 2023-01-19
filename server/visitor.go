@@ -213,6 +213,8 @@ func (v *visitor) ResetStats() {
 }
 
 func (v *visitor) Limits() *visitorLimits {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	limits := defaultVisitorLimits(v.config)
 	if v.user != nil && v.user.Tier != nil {
 		limits.Basis = visitorLimitBasisTier

@@ -107,6 +107,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ignition-ntfy-module](https://github.com/Kyvis-Labs/ignition-ntfy-module) - Adds support for sending notifications via a ntfy server to Ignition (Java)
 - [maubot-ntfy](https://gitlab.com/999eagle/maubot-ntfy) - Matrix bot to subscribe to ntfy topics and send messages to Matrix (Python)
 - [ntfy-wrapper](https://github.com/vict0rsch/ntfy-wrapper) - Wrapper around ntfy (Python)
+- [nodebb-plugin-ntfy](https://github.com/NodeBB/nodebb-plugin-ntfy) - Push notifications for NodeBB forums
 
 ## Blog + forum posts
 

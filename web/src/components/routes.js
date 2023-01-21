@@ -4,8 +4,6 @@ import {shortUrl} from "../app/utils";
 // Remember to also update the "disallowedTopics" list!
 
 const routes = {
-    home: "/",
-    pricing: "/pricing",
     login: "/login",
     signup: "/signup",
     resetPassword: "/reset-password", // Not used (yet)

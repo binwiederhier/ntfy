@@ -74,7 +74,7 @@ const UpgradeDialog = (props) => {
     // Exceptional conditions
     if (loading) {
         submitAction = null;
-    } else if (newTier?.code && account?.reservations.length > newTier?.limits.reservations) {
+    } else if (newTier?.code && account?.reservations?.length > newTier?.limits?.reservations) {
         submitAction = null;
         banner = Banner.RESERVATIONS_WARNING;
     }

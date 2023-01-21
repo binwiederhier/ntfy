@@ -40,10 +40,14 @@ import (
 		- v.user --> see publishSyncEventAsync() test
 
 		payments:
-		- delete messages + reserved topics on ResetTier delete attachments in access.go
 		- reconciliation
 
+		delete messages + reserved topics on ResetTier delete attachments in access.go
+		account deletion should delete messages and reservations and attachments
+
 		Limits & rate limiting:
+			rate limiting weirdness. wth is going on?
+			bandwidth limit must be in tier
 			users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
 			login/account endpoints
 			when ResetStats() is run, reset messagesLimiter (and others)?
@@ -52,7 +56,8 @@ import (
 		Make sure account endpoints make sense for admins
 
 		UI:
-		- revert home page change
+		- reservation icons
+		- reservation table delete button: dialog "keep or delete messages?"
 		- flicker of upgrade banner
 		- JS constants
 		Sync:
@@ -61,6 +66,7 @@ import (
 		Tests:
 		- Payment endpoints (make mocks)
 		- Message rate limiting and reset tests
+		- Bandwidth limit test
 		- test that the visitor is based on the IP address when a user has no tier
 */
 

@@ -22,12 +22,9 @@ import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
 import {Backdrop, CircularProgress} from "@mui/material";
-import Home from "./Home";
 import Login from "./Login";
-import Pricing from "./Pricing";
 import Signup from "./Signup";
 import Account from "./Account";
-import accountApi from "../app/AccountApi";
 
 export const AccountContext = createContext(null);
 
@@ -41,8 +38,6 @@ const App = () => {
                         <CssBaseline/>
                         <ErrorBoundary>
                             <Routes>
-                                <Route path={routes.home} element={<Home/>}/>
-                                <Route path={routes.pricing} element={<Pricing/>}/>
                                 <Route path={routes.login} element={<Login/>}/>
                                 <Route path={routes.signup} element={<Signup/>}/>
                                 <Route element={<Layout/>}>

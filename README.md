@@ -110,6 +110,7 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/biopsin"><img src="https://github.com/biopsin.png" width="40px" /></a>
 <a href="https://github.com/thebino"><img src="https://github.com/thebino.png" width="40px" /></a>
 <a href="https://github.com/sky4055"><img src="https://github.com/sky4055.png" width="40px" /></a>
+<a href="https://github.com/julianlam"><img src="https://github.com/julianlam.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

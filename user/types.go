@@ -221,19 +221,10 @@ func AllowedTier(tier string) bool {
 
 // Error constants used by the package
 var (
-	ErrUnauthenticated = errors.New("unauthenticated")
-	ErrUnauthorized    = errors.New("unauthorized")
-	ErrInvalidArgument = errors.New("invalid argument")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrTierNotFound    = errors.New("tier not found")
-)
-
-// BillingStatus represents the status of a Stripe subscription
-type BillingStatus string
-
-// BillingStatus values, subset of https://stripe.com/docs/billing/subscriptions/overview
-const (
-	BillingStatusIncomplete = BillingStatus("incomplete")
-	BillingStatusActive     = BillingStatus("active")
-	BillingStatusPastDue    = BillingStatus("past_due")
+	ErrUnauthenticated     = errors.New("unauthenticated")
+	ErrUnauthorized        = errors.New("unauthorized")
+	ErrInvalidArgument     = errors.New("invalid argument")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrTierNotFound        = errors.New("tier not found")
+	ErrTooManyReservations = errors.New("new tier has lower reservation limit")
 )

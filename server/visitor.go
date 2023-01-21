@@ -16,6 +16,10 @@ const (
 	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
 	// they are replenished faster (typically).
 	visitorExpungeAfter = 24 * time.Hour
+
+	// visitorDefaultReservationsLimit is the amount of topic names a user without a tier is allowed to reserve.
+	// This number is zero, and changing it may have unintended consequences in the web app, or otherwise
+	visitorDefaultReservationsLimit = int64(0)
 )
 
 var (
@@ -289,7 +293,7 @@ func defaultVisitorLimits(conf *Config) *visitorLimits {
 		MessagesLimit:            replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish),
 		MessagesExpiryDuration:   conf.CacheDuration,
 		EmailsLimit:              replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish),
-		ReservationsLimit:        0, // No reservations for anonymous users, or users without a tier
+		ReservationsLimit:        visitorDefaultReservationsLimit,
 		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
 		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,

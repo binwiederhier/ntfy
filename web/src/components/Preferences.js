@@ -3,7 +3,7 @@ import {useContext, useEffect, useState} from 'react';
 import {
     Alert,
     CardActions,
-    CardContent,
+    CardContent, Chip,
     FormControl,
     Select,
     Stack,
@@ -20,6 +20,7 @@ import prefs from "../app/Prefs";
 import {Paragraph} from "./styles";
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from "@mui/icons-material/Close";
+import WarningIcon from '@mui/icons-material/Warning';
 import IconButton from "@mui/material/IconButton";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import Container from "@mui/material/Container";
@@ -41,10 +42,12 @@ import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
 import LockIcon from "@mui/icons-material/Lock";
-import {Public, PublicOff} from "@mui/icons-material";
+import {Check, Info, Public, PublicOff} from "@mui/icons-material";
 import DialogContentText from "@mui/material/DialogContentText";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
+import {useOutletContext} from "react-router-dom";
+import subscriptionManager from "../app/SubscriptionManager";
 
 const Preferences = () => {
     return (
@@ -543,6 +546,12 @@ const ReservationsTable = (props) => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogReservation, setDialogReservation] = useState(null);
+    const { subscriptions } = useOutletContext();
+    const localSubscriptions = Object.assign(
+        ...subscriptions
+            .filter(s => s.baseUrl === config.base_url)
+            .map(s => ({[s.topic]: s}))
+    );
 
     const handleEditClick = (reservation) => {
         setDialogKey(prev => prev+1);
@@ -592,7 +601,9 @@ const ReservationsTable = (props) => {
                         key={reservation.topic}
                         sx={{'&:last-child td, &:last-child th': {border: 0}}}
                     >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_reservations_table_topic_header")}>{reservation.topic}</TableCell>
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_reservations_table_topic_header")}>
+                            {reservation.topic}
+                        </TableCell>
                         <TableCell aria-label={t("prefs_reservations_table_access_header")}>
                             {reservation.everyone === "read-write" &&
                                 <>
@@ -620,6 +631,9 @@ const ReservationsTable = (props) => {
                             }
                         </TableCell>
                         <TableCell align="right">
+                            {!localSubscriptions[reservation.topic] &&
+                                <Chip icon={<Info/>} label="Not subscribed" color="primary" variant="outlined"/>
+                            }
                             <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
                                 <EditIcon/>
                             </IconButton>

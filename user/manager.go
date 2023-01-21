@@ -219,8 +219,7 @@ const (
 		INSERT INTO tier (code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, stripe_price_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	selectTierIDQuery = `SELECT id FROM tier WHERE code = ?`
-	selectTiersQuery  = `
+	selectTiersQuery = `
 		SELECT code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, stripe_price_id
 		FROM tier
 	`
@@ -234,7 +233,7 @@ const (
 		FROM tier
 		WHERE stripe_price_id = ?
 	`
-	updateUserTierQuery = `UPDATE user SET tier_id = ? WHERE user = ?`
+	updateUserTierQuery = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	deleteUserTierQuery = `UPDATE user SET tier_id = null WHERE user = ?`
 
 	updateBillingQuery = `
@@ -772,26 +771,47 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 	return nil
 }
 
-// ChangeTier changes a user's tier using the tier code
+// ChangeTier changes a user's tier using the tier code. This function does not delete reservations, messages,
+// or attachments, even if the new tier has lower limits in this regard. That has to be done elsewhere.
 func (a *Manager) ChangeTier(username, tier string) error {
 	if !AllowedUsername(username) {
 		return ErrInvalidArgument
 	}
-	rows, err := a.db.Query(selectTierIDQuery, tier)
+	t, err := a.Tier(tier)
+	if err != nil {
+		return err
+	} else if err := a.checkReservationsLimit(username, t.ReservationsLimit); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(updateUserTierQuery, tier, username); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ResetTier removes the tier from the given user
+func (a *Manager) ResetTier(username string) error {
+	if !AllowedUsername(username) && username != Everyone && username != "" {
+		return ErrInvalidArgument
+	} else if err := a.checkReservationsLimit(username, 0); err != nil {
+		return err
+	}
+	_, err := a.db.Exec(deleteUserTierQuery, username)
+	return err
+}
+
+func (a *Manager) checkReservationsLimit(username string, reservationsLimit int64) error {
+	u, err := a.User(username)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	if !rows.Next() {
-		return ErrInvalidArgument
-	}
-	var tierID int64
-	if err := rows.Scan(&tierID); err != nil {
-		return err
-	}
-	rows.Close()
-	if _, err := a.db.Exec(updateUserTierQuery, tierID, username); err != nil {
-		return err
+	if u.Tier != nil && reservationsLimit < u.Tier.ReservationsLimit {
+		reservations, err := a.Reservations(username)
+		if err != nil {
+			return err
+		} else if int64(len(reservations)) > reservationsLimit {
+			return ErrTooManyReservations
+		}
 	}
 	return nil
 }
@@ -823,18 +843,35 @@ func (a *Manager) CheckAllowAccess(username string, topic string) error {
 // AllowAccess adds or updates an entry in th access control list for a specific user. It controls
 // read/write access to a topic. The parameter topicPattern may include wildcards (*). The ACL entry
 // owner may either be a user (username), or the system (empty).
-func (a *Manager) AllowAccess(owner, username string, topicPattern string, read bool, write bool) error {
+func (a *Manager) AllowAccess(username string, topicPattern string, permission Permission) error {
 	if !AllowedUsername(username) && username != Everyone {
-		return ErrInvalidArgument
-	} else if owner != "" && !AllowedUsername(owner) {
 		return ErrInvalidArgument
 	} else if !AllowedTopicPattern(topicPattern) {
 		return ErrInvalidArgument
 	}
-	if _, err := a.db.Exec(upsertUserAccessQuery, username, toSQLWildcard(topicPattern), read, write, owner, owner); err != nil {
+	owner := ""
+	if _, err := a.db.Exec(upsertUserAccessQuery, username, toSQLWildcard(topicPattern), permission.IsRead(), permission.IsWrite(), owner, owner); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (a *Manager) ReserveAccess(username string, topic string, everyone Permission) error {
+	if !AllowedUsername(username) || username == Everyone || !AllowedTopic(topic) {
+		return ErrInvalidArgument
+	}
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(upsertUserAccessQuery, username, topic, true, true, username, username); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(upsertUserAccessQuery, Everyone, topic, everyone.IsRead(), everyone.IsWrite(), username, username); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
@@ -856,13 +893,29 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 	return err
 }
 
-// ResetTier removes the tier from the given user
-func (a *Manager) ResetTier(username string) error {
-	if !AllowedUsername(username) && username != Everyone && username != "" {
+func (a *Manager) RemoveReservations(username string, topics ...string) error {
+	if !AllowedUsername(username) || username == Everyone || len(topics) == 0 {
 		return ErrInvalidArgument
 	}
-	_, err := a.db.Exec(deleteUserTierQuery, username)
-	return err
+	for _, topic := range topics {
+		if !AllowedTopic(topic) {
+			return ErrInvalidArgument
+		}
+	}
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, topic := range topics {
+		if _, err := tx.Exec(deleteTopicAccessQuery, username, username, topic); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(deleteTopicAccessQuery, Everyone, Everyone, topic); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // DefaultAccess returns the default read/write access if no access control entry matches
@@ -879,8 +932,8 @@ func (a *Manager) CreateTier(tier *Tier) error {
 }
 
 // ChangeBilling updates a user's billing fields, namely the Stripe customer ID, and subscription information
-func (a *Manager) ChangeBilling(user *User) error {
-	if _, err := a.db.Exec(updateBillingQuery, nullString(user.Billing.StripeCustomerID), nullString(user.Billing.StripeSubscriptionID), nullString(string(user.Billing.StripeSubscriptionStatus)), nullInt64(user.Billing.StripeSubscriptionPaidUntil.Unix()), nullInt64(user.Billing.StripeSubscriptionCancelAt.Unix()), user.Name); err != nil {
+func (a *Manager) ChangeBilling(username string, billing *Billing) error {
+	if _, err := a.db.Exec(updateBillingQuery, nullString(billing.StripeCustomerID), nullString(billing.StripeSubscriptionID), nullString(string(billing.StripeSubscriptionStatus)), nullInt64(billing.StripeSubscriptionPaidUntil.Unix()), nullInt64(billing.StripeSubscriptionCancelAt.Unix()), username); err != nil {
 		return err
 	}
 	return nil

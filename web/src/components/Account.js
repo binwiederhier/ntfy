@@ -264,7 +264,6 @@ const AccountType = () => {
 const Stats = () => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
-    const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
     if (!account) {
         return <></>;
@@ -435,6 +434,7 @@ const DeleteAccount = () => {
 
 const DeleteAccountDialog = (props) => {
     const { t } = useTranslation();
+    const { account } = useContext(AccountContext);
     const [username, setUsername] = useState("");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const buttonEnabled = username === session.username();
@@ -456,6 +456,9 @@ const DeleteAccountDialog = (props) => {
                     fullWidth
                     variant="standard"
                 />
+                {account?.billing?.subscription &&
+                    <Alert severity="warning" sx={{mt: 1}}>{t("account_delete_dialog_billing_warning")}</Alert>
+                }
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onCancel}>{t("account_delete_dialog_button_cancel")}</Button>

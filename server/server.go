@@ -40,13 +40,15 @@ import (
 		- v.user --> see publishSyncEventAsync() test
 
 		payments:
-		- delete messages + reserved topics on ResetTier
+		- delete messages + reserved topics on ResetTier delete attachments in access.go
+		- reconciliation
 
 		Limits & rate limiting:
-			users without tier: should the stats be persisted? are they meaningful?
-				-> test that the visitor is based on the IP address!
+			users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
 			login/account endpoints
 			when ResetStats() is run, reset messagesLimiter (and others)?
+			Delete visitor when tier is changed to refresh rate limiters
+
 		Make sure account endpoints make sense for admins
 
 		UI:
@@ -55,10 +57,9 @@ import (
 		- JS constants
 		Sync:
 			- sync problems with "deleteAfter=0" and "displayName="
-		Delete visitor when tier is changed to refresh rate limiters
+
 		Tests:
 		- Payment endpoints (make mocks)
-		- Change tier from higher to lower tier (delete reservations)
 		- Message rate limiting and reset tests
 		- test that the visitor is based on the IP address when a user has no tier
 */

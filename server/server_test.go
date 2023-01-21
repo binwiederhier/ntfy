@@ -640,7 +640,7 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
-	require.Nil(t, s.userManager.AllowAccess("", "ben", "mytopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
@@ -654,8 +654,8 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
-	require.Nil(t, s.userManager.AllowAccess("", "ben", "mytopic", true, true))
-	require.Nil(t, s.userManager.AllowAccess("", "ben", "anothertopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
+	require.Nil(t, s.userManager.AllowAccess("ben", "anothertopic", user.PermissionReadWrite))
 
 	response := request(t, s, "GET", "/mytopic,anothertopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
@@ -688,7 +688,7 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
-	require.Nil(t, s.userManager.AllowAccess("", "ben", "sometopic", true, true)) // Not mytopic!
+	require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", user.PermissionReadWrite)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
@@ -702,8 +702,8 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	s := newTestServer(t, c)
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
-	require.Nil(t, s.userManager.AllowAccess("", user.Everyone, "private", false, false))
-	require.Nil(t, s.userManager.AllowAccess("", user.Everyone, "announcements", true, false))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "private", user.PermissionDenyAll))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
 
 	response := request(t, s, "PUT", "/mytopic", "test", nil)
 	require.Equal(t, 200, response.Code)
@@ -750,7 +750,7 @@ func TestServer_StatsResetter(t *testing.T) {
 	go s.runStatsResetter()
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
-	require.Nil(t, s.userManager.AllowAccess("", "phil", "mytopic", true, true))
+	require.Nil(t, s.userManager.AllowAccess("phil", "mytopic", user.PermissionReadWrite))
 
 	for i := 0; i < 5; i++ {
 		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{

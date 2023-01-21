@@ -362,6 +362,61 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	require.Equal(t, int64(0), size)
 }
 
+func TestSqliteCache_Attachments_Expired(t *testing.T) {
+	testCacheAttachmentsExpired(t, newSqliteTestCache(t))
+}
+
+func TestMemCache_Attachments_Expired(t *testing.T) {
+	testCacheAttachmentsExpired(t, newMemTestCache(t))
+}
+
+func testCacheAttachmentsExpired(t *testing.T, c *messageCache) {
+	m := newDefaultMessage("mytopic", "flower for you")
+	m.ID = "m1"
+	m.Expires = time.Now().Add(time.Hour).Unix()
+	require.Nil(t, c.AddMessage(m))
+
+	m = newDefaultMessage("mytopic", "message with attachment")
+	m.ID = "m2"
+	m.Expires = time.Now().Add(2 * time.Hour).Unix()
+	m.Attachment = &attachment{
+		Name:    "car.jpg",
+		Type:    "image/jpeg",
+		Size:    10000,
+		Expires: time.Now().Add(2 * time.Hour).Unix(),
+		URL:     "https://ntfy.sh/file/aCaRURL.jpg",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	m = newDefaultMessage("mytopic", "message with external attachment")
+	m.ID = "m3"
+	m.Expires = time.Now().Add(2 * time.Hour).Unix()
+	m.Attachment = &attachment{
+		Name:    "car.jpg",
+		Type:    "image/jpeg",
+		Expires: 0, // Unknown!
+		URL:     "https://somedomain.com/car.jpg",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	m = newDefaultMessage("mytopic2", "message with expired attachment")
+	m.ID = "m4"
+	m.Expires = time.Now().Add(2 * time.Hour).Unix()
+	m.Attachment = &attachment{
+		Name:    "expired-car.jpg",
+		Type:    "image/jpeg",
+		Size:    20000,
+		Expires: time.Now().Add(-1 * time.Hour).Unix(),
+		URL:     "https://ntfy.sh/file/aCaRURL.jpg",
+	}
+	require.Nil(t, c.AddMessage(m))
+
+	ids, err := c.AttachmentsExpired()
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ids))
+	require.Equal(t, "m4", ids[0])
+}
+
 func TestSqliteCache_Migration_From0(t *testing.T) {
 	filename := newSqliteTestCacheFile(t)
 	db, err := sql.Open("sqlite3", filename)

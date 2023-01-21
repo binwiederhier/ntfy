@@ -57,9 +57,10 @@ const (
 		INSERT INTO messages (mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, encoding, published)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	deleteMessageQuery           = `DELETE FROM messages WHERE mid = ?`
-	selectRowIDFromMessageID     = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
-	selectMessagesSinceTimeQuery = `
+	deleteMessageQuery                = `DELETE FROM messages WHERE mid = ?`
+	updateMessagesForTopicExpiryQuery = `UPDATE messages SET expires = ? WHERE topic = ?`
+	selectRowIDFromMessageID          = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
+	selectMessagesSinceTimeQuery      = `
 		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
@@ -96,7 +97,7 @@ const (
 	selectTopicsQuery               = `SELECT topic FROM messages GROUP BY topic`
 
 	updateAttachmentDeleted            = `UPDATE messages SET attachment_deleted = 1 WHERE mid = ?`
-	selectAttachmentsExpiredQuery      = `SELECT mid FROM messages WHERE attachment_expires <= ? AND attachment_deleted = 0`
+	selectAttachmentsExpiredQuery      = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires <= ? AND attachment_deleted = 0`
 	selectAttachmentsSizeBySenderQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
 	selectAttachmentsSizeByUserQuery   = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = ? AND attachment_expires >= ?`
 )
@@ -500,6 +501,20 @@ func (c *messageCache) DeleteMessages(ids ...string) error {
 	defer tx.Rollback()
 	for _, id := range ids {
 		if _, err := tx.Exec(deleteMessageQuery, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (c *messageCache) ExpireMessages(topics ...string) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, t := range topics {
+		if _, err := tx.Exec(updateMessagesForTopicExpiryQuery, time.Now().Unix(), t); err != nil {
 			return err
 		}
 	}

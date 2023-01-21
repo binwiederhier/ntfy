@@ -119,7 +119,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
-	if v.user.Billing.StripeCustomerID != "" {
+	if v.user.Billing.StripeSubscriptionID != "" {
 		log.Info("Deleting user %s (billing customer: %s, billing subscription: %s)", v.user.Name, v.user.Billing.StripeCustomerID, v.user.Billing.StripeSubscriptionID)
 		if v.user.Billing.StripeSubscriptionID != "" {
 			if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
@@ -332,11 +332,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}
-	owner, username := v.user.Name, v.user.Name
-	if err := s.userManager.AllowAccess(owner, username, req.Topic, true, true); err != nil {
-		return err
-	}
-	if err := s.userManager.AllowAccess(owner, user.Everyone, req.Topic, everyone.IsRead(), everyone.IsWrite()); err != nil {
+	if err := s.userManager.ReserveAccess(v.user.Name, req.Topic, everyone); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -357,10 +353,7 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	} else if !authorized {
 		return errHTTPUnauthorized
 	}
-	if err := s.userManager.ResetAccess(v.user.Name, topic); err != nil {
-		return err
-	}
-	if err := s.userManager.ResetAccess(user.Everyone, topic); err != nil {
+	if err := s.userManager.RemoveReservations(v.user.Name, topic); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

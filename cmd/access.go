@@ -100,22 +100,24 @@ func changeAccess(c *cli.Context, manager *user.Manager, username string, topic 
 	if !util.Contains([]string{"", "read-write", "rw", "read-only", "read", "ro", "write-only", "write", "wo", "none", "deny"}, perms) {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	}
-	read := util.Contains([]string{"read-write", "rw", "read-only", "read", "ro"}, perms)
-	write := util.Contains([]string{"read-write", "rw", "write-only", "write", "wo"}, perms)
+	permission, err := user.ParsePermission(perms)
+	if err != nil {
+		return err
+	}
 	u, err := manager.User(username)
 	if err == user.ErrUserNotFound {
 		return fmt.Errorf("user %s does not exist", username)
 	} else if u.Role == user.RoleAdmin {
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
 	}
-	if err := manager.AllowAccess("", username, topic, read, write); err != nil {
+	if err := manager.AllowAccess(username, topic, permission); err != nil {
 		return err
 	}
-	if read && write {
+	if permission.IsReadWrite() {
 		fmt.Fprintf(c.App.ErrWriter, "granted read-write access to topic %s\n\n", topic)
-	} else if read {
+	} else if permission.IsRead() {
 		fmt.Fprintf(c.App.ErrWriter, "granted read-only access to topic %s\n\n", topic)
-	} else if write {
+	} else if permission.IsWrite() {
 		fmt.Fprintf(c.App.ErrWriter, "granted write-only access to topic %s\n\n", topic)
 	} else {
 		fmt.Fprintf(c.App.ErrWriter, "revoked all access to topic %s\n\n", topic)

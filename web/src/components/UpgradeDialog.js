@@ -21,13 +21,14 @@ import {Check} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Box from "@mui/material/Box";
+import {NavLink} from "react-router-dom";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext); // May be undefined!
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const [tiers, setTiers] = useState(null);
-    const [newTier, setNewTier] = useState(account?.tier?.code); // May be undefined
+    const [newTierCode, setNewTierCode] = useState(account?.tier?.code); // May be undefined
     const [loading, setLoading] = useState(false);
     const [errorText, setErrorText] = useState("");
 
@@ -41,47 +42,56 @@ const UpgradeDialog = (props) => {
         return <></>;
     }
 
-    const currentTier = account?.tier?.code; // May be undefined
-    let action, submitButtonLabel, submitButtonEnabled;
+    const tiersMap = Object.assign(...tiers.map(tier => ({[tier.code]: tier})));
+    const newTier = tiersMap[newTierCode]; // May be undefined
+    const currentTier = account?.tier; // May be undefined
+    const currentTierCode = currentTier?.code; // May be undefined
+
+    // Figure out buttons, labels and the submit action
+    let submitAction, submitButtonLabel, banner;
     if (!account) {
         submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
-        submitButtonEnabled = true;
-        action = Action.REDIRECT_SIGNUP;
-    } else if (currentTier === newTier) {
+        submitAction = Action.REDIRECT_SIGNUP;
+        banner = null;
+    } else if (currentTierCode === newTierCode) {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
-        submitButtonEnabled = false;
-        action = null;
-    } else if (!currentTier) {
+        submitAction = null;
+        banner = (currentTierCode) ? Banner.PRORATION_INFO : null;
+    } else if (!currentTierCode) {
         submitButtonLabel = t("account_upgrade_dialog_button_pay_now");
-        submitButtonEnabled = true;
-        action = Action.CREATE_SUBSCRIPTION;
-    } else if (!newTier) {
+        submitAction = Action.CREATE_SUBSCRIPTION;
+        banner = null;
+    } else if (!newTierCode) {
         submitButtonLabel = t("account_upgrade_dialog_button_cancel_subscription");
-        submitButtonEnabled = true;
-        action = Action.CANCEL_SUBSCRIPTION;
+        submitAction = Action.CANCEL_SUBSCRIPTION;
+        banner = Banner.CANCEL_WARNING;
     } else {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
-        submitButtonEnabled = true;
-        action = Action.UPDATE_SUBSCRIPTION;
+        submitAction = Action.UPDATE_SUBSCRIPTION;
+        banner = Banner.PRORATION_INFO;
     }
 
+    // Exceptional conditions
     if (loading) {
-        submitButtonEnabled = false;
+        submitAction = null;
+    } else if (newTier?.code && account?.reservations.length > newTier?.limits.reservations) {
+        submitAction = null;
+        banner = Banner.RESERVATIONS_WARNING;
     }
 
     const handleSubmit = async () => {
-        if (action === Action.REDIRECT_SIGNUP) {
+        if (submitAction === Action.REDIRECT_SIGNUP) {
             window.location.href = routes.signup;
             return;
         }
         try {
             setLoading(true);
-            if (action === Action.CREATE_SUBSCRIPTION) {
-                const response = await accountApi.createBillingSubscription(newTier);
+            if (submitAction === Action.CREATE_SUBSCRIPTION) {
+                const response = await accountApi.createBillingSubscription(newTierCode);
                 window.location.href = response.redirect_url;
-            } else if (action === Action.UPDATE_SUBSCRIPTION) {
-                await accountApi.updateBillingSubscription(newTier);
-            } else if (action === Action.CANCEL_SUBSCRIPTION) {
+            } else if (submitAction === Action.UPDATE_SUBSCRIPTION) {
+                await accountApi.updateBillingSubscription(newTierCode);
+            } else if (submitAction === Action.CANCEL_SUBSCRIPTION) {
                 await accountApi.deleteBillingSubscription();
             }
             props.onCancel();
@@ -116,27 +126,39 @@ const UpgradeDialog = (props) => {
                         <TierCard
                             key={`tierCard${tier.code || '_free'}`}
                             tier={tier}
-                            selected={newTier === tier.code} // tier.code may be undefined!
-                            onClick={() => setNewTier(tier.code)} // tier.code may be undefined!
+                            current={currentTierCode === tier.code} // tier.code or currentTierCode may be undefined!
+                            selected={newTierCode === tier.code} // tier.code may be undefined!
+                            onClick={() => setNewTierCode(tier.code)} // tier.code may be undefined!
                         />
                     )}
                 </div>
-                {action === Action.CANCEL_SUBSCRIPTION &&
+                {banner === Banner.CANCEL_WARNING &&
                     <Alert severity="warning">
                         <Trans
                             i18nKey="account_upgrade_dialog_cancel_warning"
                             values={{ date: formatShortDate(account?.billing?.paid_until || 0) }} />
                     </Alert>
                 }
-                {currentTier && (!action || action === Action.UPDATE_SUBSCRIPTION) &&
+                {banner === Banner.PRORATION_INFO &&
                     <Alert severity="info">
                         <Trans i18nKey="account_upgrade_dialog_proration_info" />
+                    </Alert>
+                }
+                {banner === Banner.RESERVATIONS_WARNING &&
+                    <Alert severity="warning">
+                        <Trans
+                            i18nKey="account_upgrade_dialog_reservations_warning"
+                            count={account?.reservations.length - newTier?.limits.reservations}
+                            components={{
+                                Link: <NavLink to={routes.settings}/>,
+                            }}
+                        />
                     </Alert>
                 }
             </DialogContent>
             <DialogFooter status={errorText}>
                 <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
-                <Button onClick={handleSubmit} disabled={!submitButtonEnabled}>{submitButtonLabel}</Button>
+                <Button onClick={handleSubmit} disabled={!submitAction}>{submitButtonLabel}</Button>
             </DialogFooter>
         </Dialog>
     );
@@ -144,8 +166,19 @@ const UpgradeDialog = (props) => {
 
 const TierCard = (props) => {
     const { t } = useTranslation();
-    const cardStyle = (props.selected) ? { background: "#eee", border: "2px solid #338574" } : { border: "2px solid transparent" };
     const tier = props.tier;
+    let cardStyle, labelStyle, labelText;
+    if (props.selected) {
+        cardStyle = { background: "#eee", border: "2px solid #338574" };
+        labelStyle = { background: "#338574", color: "white" };
+        labelText = t("account_upgrade_dialog_tier_selected_label");
+    } else if (props.current) {
+        cardStyle = { border: "2px solid #eee" };
+        labelStyle = { background: "#eee", color: "black" };
+        labelText = t("account_upgrade_dialog_tier_current_label");
+    } else {
+        cardStyle = { border: "2px solid transparent" };
+    }
 
     return (
         <Box sx={{
@@ -163,16 +196,15 @@ const TierCard = (props) => {
             <Card sx={{ height: "100%" }}>
                 <CardActionArea sx={{ height: "100%" }}>
                     <CardContent onClick={props.onClick} sx={{ height: "100%" }}>
-                        {props.selected &&
+                        {labelStyle &&
                             <div style={{
                                 position: "absolute",
                                 top: "0",
                                 right: "15px",
                                 padding: "2px 10px",
-                                background: "#338574",
-                                color: "white",
                                 borderRadius: "3px",
-                            }}>{t("account_upgrade_dialog_tier_selected_label")}</div>
+                                ...labelStyle
+                            }}>{labelText}</div>
                         }
                         <Typography variant="h5" component="div">
                             {tier.name || t("account_usage_tier_free")}
@@ -217,10 +249,17 @@ const FeatureItem = (props) => {
 };
 
 const Action = {
-    REDIRECT_SIGNUP: 0,
-    CREATE_SUBSCRIPTION: 1,
-    UPDATE_SUBSCRIPTION: 2,
-    CANCEL_SUBSCRIPTION: 3
+    REDIRECT_SIGNUP: 1,
+    CREATE_SUBSCRIPTION: 2,
+    UPDATE_SUBSCRIPTION: 3,
+    CANCEL_SUBSCRIPTION: 4
 };
+
+const Banner = {
+    CANCEL_WARNING: 1,
+    PRORATION_INFO: 2,
+    RESERVATIONS_WARNING: 3
+};
+
 
 export default UpgradeDialog;

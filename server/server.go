@@ -35,39 +35,51 @@ import (
 )
 
 /*
-	TODO
-		races:
-		- v.user --> see publishSyncEventAsync() test
+TODO
+--
 
-		payments:
-		- reconciliation
+UAT results (round 1):
+- Security: Account re-creation leads to terrible behavior. Use user ID instead of user name for (a) visitor map, (b) messages.user column, (c) Stripe checkout session
+- Account: Changing password should confirm the old password (Thorben)
+- Signup: Re-add password confirmation (Thorben & deadcade)
+- Reservation: Kill existing subscribers when topic is reserved (deadcade)
+- Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
+- Reservation (UI): Ask for confirmation when removing reservation (deadcade)
 
-		delete messages + reserved topics on ResetTier delete attachments in access.go
-		account deletion should delete messages and reservations and attachments
+races:
+- v.user --> see publishSyncEventAsync() test
 
-		Limits & rate limiting:
-			rate limiting weirdness. wth is going on?
-			bandwidth limit must be in tier
-			users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
-			login/account endpoints
-			when ResetStats() is run, reset messagesLimiter (and others)?
-			Delete visitor when tier is changed to refresh rate limiters
+payments:
+- reconciliation
 
-		Make sure account endpoints make sense for admins
+delete messages + reserved topics on ResetTier delete attachments in access.go
+account deletion should delete messages and reservations and attachments
 
-		UI:
-		- reservation icons
-		- reservation table delete button: dialog "keep or delete messages?"
-		- flicker of upgrade banner
-		- JS constants
-		Sync:
-			- sync problems with "deleteAfter=0" and "displayName="
+Limits & rate limiting:
+	rate limiting weirdness. wth is going on?
+	bandwidth limit must be in tier
+	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
+	login/account endpoints
+	when ResetStats() is run, reset messagesLimiter (and others)?
+	Delete visitor when tier is changed to refresh rate limiters
 
-		Tests:
-		- Payment endpoints (make mocks)
-		- Message rate limiting and reset tests
-		- Bandwidth limit test
-		- test that the visitor is based on the IP address when a user has no tier
+Make sure account endpoints make sense for admins
+
+
+UI:
+-
+- reservation icons
+- reservation table delete button: dialog "keep or delete messages?"
+- flicker of upgrade banner
+- JS constants
+Sync:
+	- sync problems with "deleteAfter=0" and "displayName="
+
+Tests:
+- Payment endpoints (make mocks)
+- Message rate limiting and reset tests
+- Bandwidth limit test
+- test that the visitor is based on the IP address when a user has no tier
 */
 
 // Server is the main server, providing the UI and API for ntfy

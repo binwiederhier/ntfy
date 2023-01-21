@@ -111,6 +111,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [January 2023 Developer Update](https://community.nodebb.org/topic/16908/january-2023-developer-update) - nodebb.org - 1/2023
 - [Comment envoyer des notifications push sur votre téléphone facilement et gratuitement?](https://korben.info/notifications-push-telephone.html) - 1/2023
 - [UnifiedPush: a decentralized, open-source push notification protocol](https://f-droid.org/en/2022/12/18/unifiedpush.html) ⭐ - 12/2022
 - [ntfy setup instructions](https://docs.benjamin-altpeter.de/network/vms/1001029-ntfy/) - benjamin-altpeter.de - 12/2022

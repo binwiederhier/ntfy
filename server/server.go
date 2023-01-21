@@ -45,6 +45,7 @@ UAT results (round 1):
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
+- Logging: Add detailed logging with username/customerID for all Stripe events (phil)
 
 races:
 - v.user --> see publishSyncEventAsync() test

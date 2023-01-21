@@ -20,6 +20,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Small wording change for `client.yml` ([#562](https://github.com/binwiederhier/ntfy/pull/562), thanks to [@fleopaulD](https://github.com/fleopaulD))
 * Fix K8s install docs ([#582](https://github.com/binwiederhier/ntfy/pull/582), thanks to [@Remedan](https://github.com/Remedan))
 
+**Additional languages:**
+
+* Portuguese (thanks to [@ssantos](https://hosted.weblate.org/user/ssantos/))
+
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅
 

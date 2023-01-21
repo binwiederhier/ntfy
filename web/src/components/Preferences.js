@@ -470,6 +470,7 @@ const Language = () => {
                     <MenuItem value="nl">Nederlands</MenuItem>
                     <MenuItem value="nb_NO">Norsk bokmål</MenuItem>
                     <MenuItem value="uk">Українська</MenuItem>
+                    <MenuItem value="pt">Português</MenuItem>
                     <MenuItem value="pt_BR">Português (Brasil)</MenuItem>
                     <MenuItem value="pl">Polski</MenuItem>
                     <MenuItem value="ru">Русский</MenuItem>

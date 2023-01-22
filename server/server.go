@@ -41,7 +41,6 @@ TODO
 UAT results (round 1):
 - Security: Account re-creation leads to terrible behavior. Use user ID instead of user name for (a) visitor map, (b) messages.user column, (c) Stripe checkout session
 - Account: Changing password should confirm the old password (Thorben)
-- Signup: Re-add password confirmation (Thorben & deadcade)
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)

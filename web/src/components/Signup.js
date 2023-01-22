@@ -20,7 +20,10 @@ const Signup = () => {
     const [error, setError] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         const user = { username, password };
@@ -43,6 +46,7 @@ const Signup = () => {
             }
         }
     };
+
     if (!config.enable_signup) {
         return (
             <AvatarBox>
@@ -50,6 +54,7 @@ const Signup = () => {
             </AvatarBox>
         );
     }
+
     return (
         <AvatarBox>
             <Typography sx={{ typography: 'h6' }}>
@@ -75,7 +80,7 @@ const Signup = () => {
                     label={t("signup_form_password")}
                     type={showPassword ? "text" : "password"}
                     id="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     value={password}
                     onChange={ev => setPassword(ev.target.value.trim())}
                     InputProps={{
@@ -93,11 +98,37 @@ const Signup = () => {
                         )
                     }}
                 />
+                <TextField
+                    margin="dense"
+                    required
+                    fullWidth
+                    name="password"
+                    label={t("signup_form_confirm_password")}
+                    type={showConfirm ? "text" : "password"}
+                    id="confirm"
+                    autoComplete="new-password"
+                    value={confirm}
+                    onChange={ev => setConfirm(ev.target.value.trim())}
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    aria-label={t("signup_form_toggle_password_visibility")}
+                                    onClick={() => setShowConfirm(!showConfirm)}
+                                    onMouseDown={(ev) => ev.preventDefault()}
+                                    edge="end"
+                                >
+                                    {showConfirm ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                            </InputAdornment>
+                        )
+                    }}
+                />
                 <Button
                     type="submit"
                     fullWidth
                     variant="contained"
-                    disabled={username === "" || password === ""}
+                    disabled={username === "" || password === "" || password !== confirm}
                     sx={{mt: 2, mb: 2}}
                 >
                     {t("signup_form_button_submit")}

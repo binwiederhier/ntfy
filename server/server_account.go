@@ -337,7 +337,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}
-	if err := s.userManager.ReserveAccess(v.user.Name, req.Topic, everyone); err != nil {
+	if err := s.userManager.AddReservation(v.user.Name, req.Topic, everyone); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

@@ -259,8 +259,8 @@ func TestManager_ChangeRole(t *testing.T) {
 func TestManager_Reservations(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
-	require.Nil(t, a.ReserveAccess("ben", "ztopic", PermissionDenyAll))
-	require.Nil(t, a.ReserveAccess("ben", "readme", PermissionRead))
+	require.Nil(t, a.AddReservation("ben", "ztopic", PermissionDenyAll))
+	require.Nil(t, a.AddReservation("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "something-else", PermissionRead))
 
 	reservations, err := a.Reservations("ben")
@@ -294,7 +294,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	}))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser, "unit-test"))
 	require.Nil(t, a.ChangeTier("ben", "pro"))
-	require.Nil(t, a.ReserveAccess("ben", "mytopic", PermissionDenyAll))
+	require.Nil(t, a.AddReservation("ben", "mytopic", PermissionDenyAll))
 
 	ben, err := a.User("ben")
 	require.Nil(t, err)
@@ -626,11 +626,14 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	everyoneGrants, err := a.Grants(Everyone)
 	require.Nil(t, err)
 
+	require.True(t, strings.HasPrefix(phil.ID, "u_"))
 	require.Equal(t, "phil", phil.Name)
 	require.Equal(t, RoleAdmin, phil.Role)
 	require.Equal(t, syncTopicLength, len(phil.SyncTopic))
 	require.Equal(t, 0, len(philGrants))
 
+	require.True(t, strings.HasPrefix(ben.ID, "u_"))
+	require.NotEqual(t, phil.ID, ben.ID)
 	require.Equal(t, "ben", ben.Name)
 	require.Equal(t, RoleUser, ben.Role)
 	require.Equal(t, syncTopicLength, len(ben.SyncTopic))
@@ -641,6 +644,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Equal(t, "secret", benGrants[1].TopicPattern)
 	require.Equal(t, PermissionRead, benGrants[1].Allow)
 
+	require.Equal(t, "u_everyone", everyone.ID)
 	require.Equal(t, Everyone, everyone.Name)
 	require.Equal(t, RoleAnonymous, everyone.Role)
 	require.Equal(t, 1, len(everyoneGrants))

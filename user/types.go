@@ -10,6 +10,7 @@ import (
 
 // User is a struct that represents a user
 type User struct {
+	ID        string
 	Name      string
 	Hash      string // password hash (bcrypt)
 	Token     string // Only set if token was used to log in
@@ -50,6 +51,7 @@ type Prefs struct {
 
 // Tier represents a user's account type, including its account limits
 type Tier struct {
+	ID                       string
 	Code                     string
 	Name                     string
 	Paid                     bool

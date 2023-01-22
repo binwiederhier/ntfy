@@ -12,10 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	exampleIP1234 = netip.MustParseAddr("1.2.3.4")
-)
-
 func TestSqliteCache_Messages(t *testing.T) {
 	testCacheMessages(t, newSqliteTestCache(t))
 }
@@ -294,10 +290,10 @@ func TestMemCache_Attachments(t *testing.T) {
 }
 
 func testCacheAttachments(t *testing.T, c *messageCache) {
-	expires1 := time.Now().Add(-4 * time.Hour).Unix()
+	expires1 := time.Now().Add(-4 * time.Hour).Unix() // Expired
 	m := newDefaultMessage("mytopic", "flower for you")
 	m.ID = "m1"
-	m.Sender = exampleIP1234
+	m.Sender = netip.MustParseAddr("1.2.3.4")
 	m.Attachment = &attachment{
 		Name:    "flower.jpg",
 		Type:    "image/jpeg",
@@ -310,7 +306,7 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires2 := time.Now().Add(2 * time.Hour).Unix() // Future
 	m = newDefaultMessage("mytopic", "sending you a car")
 	m.ID = "m2"
-	m.Sender = exampleIP1234
+	m.Sender = netip.MustParseAddr("1.2.3.4")
 	m.Attachment = &attachment{
 		Name:    "car.jpg",
 		Type:    "image/jpeg",
@@ -323,7 +319,8 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 	expires3 := time.Now().Add(1 * time.Hour).Unix() // Future
 	m = newDefaultMessage("another-topic", "sending you another car")
 	m.ID = "m3"
-	m.Sender = exampleIP1234
+	m.User = "u_BAsbaAa"
+	m.Sender = netip.MustParseAddr("5.6.7.8")
 	m.Attachment = &attachment{
 		Name:    "another-car.jpg",
 		Type:    "image/jpeg",
@@ -355,11 +352,15 @@ func testCacheAttachments(t *testing.T, c *messageCache) {
 
 	size, err := c.AttachmentBytesUsedBySender("1.2.3.4")
 	require.Nil(t, err)
-	require.Equal(t, int64(30000), size)
+	require.Equal(t, int64(10000), size)
 
 	size, err = c.AttachmentBytesUsedBySender("5.6.7.8")
 	require.Nil(t, err)
-	require.Equal(t, int64(0), size)
+	require.Equal(t, int64(0), size) // Accounted to the user, not the IP!
+
+	size, err = c.AttachmentBytesUsedByUser("u_BAsbaAa")
+	require.Nil(t, err)
+	require.Equal(t, int64(20000), size)
 }
 
 func TestSqliteCache_Attachments_Expired(t *testing.T) {

@@ -107,13 +107,18 @@ func LastString(s []string, def string) string {
 
 // RandomString returns a random string with a given length
 func RandomString(length int) string {
+	return RandomStringPrefix("", length)
+}
+
+// RandomStringPrefix returns a random string with a given length, with a prefix
+func RandomStringPrefix(prefix string, length int) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!
 	defer randomMutex.Unlock()
-	b := make([]byte, length)
+	b := make([]byte, length-len(prefix))
 	for i := range b {
 		b[i] = randomStringCharset[random.Intn(len(randomStringCharset))]
 	}
-	return string(b)
+	return prefix + string(b)
 }
 
 // ValidRandomString returns true if the given string matches the format created by RandomString

@@ -98,8 +98,8 @@ const (
 
 	updateAttachmentDeleted            = `UPDATE messages SET attachment_deleted = 1 WHERE mid = ?`
 	selectAttachmentsExpiredQuery      = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires <= ? AND attachment_deleted = 0`
-	selectAttachmentsSizeBySenderQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE sender = ? AND attachment_expires >= ?`
-	selectAttachmentsSizeByUserQuery   = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = ? AND attachment_expires >= ?`
+	selectAttachmentsSizeBySenderQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = '' AND sender = ? AND attachment_expires >= ?`
+	selectAttachmentsSizeByUserIDQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = ? AND attachment_expires >= ?`
 )
 
 // Schema management queries
@@ -563,8 +563,8 @@ func (c *messageCache) AttachmentBytesUsedBySender(sender string) (int64, error)
 	return c.readAttachmentBytesUsed(rows)
 }
 
-func (c *messageCache) AttachmentBytesUsedByUser(user string) (int64, error) {
-	rows, err := c.db.Query(selectAttachmentsSizeByUserQuery, user, time.Now().Unix())
+func (c *messageCache) AttachmentBytesUsedByUser(userID string) (int64, error) {
+	rows, err := c.db.Query(selectAttachmentsSizeByUserIDQuery, userID, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}

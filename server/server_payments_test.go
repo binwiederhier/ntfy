@@ -176,8 +176,8 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
-	require.Nil(t, s.userManager.ReserveAccess("phil", "atopic", user.PermissionDenyAll))
-	require.Nil(t, s.userManager.ReserveAccess("phil", "ztopic", user.PermissionDenyAll))
+	require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll))
+	require.Nil(t, s.userManager.AddReservation("phil", "ztopic", user.PermissionDenyAll))
 
 	// Add billing details
 	u, err := s.userManager.User("phil")

@@ -128,7 +128,7 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 	successURL := s.config.BaseURL + apiAccountBillingSubscriptionCheckoutSuccessTemplate
 	params := &stripe.CheckoutSessionParams{
 		Customer:            stripeCustomerID, // A user may have previously deleted their subscription
-		ClientReferenceID:   &v.user.Name,
+		ClientReferenceID:   &v.user.ID,
 		SuccessURL:          &successURL,
 		Mode:                stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		AllowPromotionCodes: stripe.Bool(true),
@@ -178,7 +178,7 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	}
-	u, err := s.userManager.User(sess.ClientReferenceID)
+	u, err := s.userManager.UserByID(sess.ClientReferenceID)
 	if err != nil {
 		return err
 	}

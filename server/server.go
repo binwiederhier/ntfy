@@ -38,12 +38,13 @@ import (
 TODO
 --
 
-- Security: Account re-creation leads to terrible behavior. Use user ID instead of user name for (a) visitor map, (b) messages.user column, (c) Stripe checkout session
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
 - Logging: Add detailed logging with username/customerID for all Stripe events (phil)
 - Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- Stripe webhook: Do not respond wih error if user does not exist (after account deletion)
+- Stripe: Add metadata to customer
 
 races:
 - v.user --> see publishSyncEventAsync() test
@@ -581,7 +582,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
 	if v.user != nil {
-		m.User = v.user.Name
+		m.User = v.user.ID
 	}
 	m.Expires = time.Now().Add(v.Limits().MessagesExpiryDuration).Unix()
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
@@ -859,6 +860,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Time > attachmentExpiry {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
+	fmt.Printf("v = %#v\nlimits = %#v\nstats = %#v\n", v, vinfo.Limits, vinfo.Stats)
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
@@ -885,6 +887,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		util.NewFixedLimiter(vinfo.Limits.AttachmentFileSizeLimit),
 		util.NewFixedLimiter(vinfo.Stats.AttachmentTotalSizeRemaining),
 	}
+	fmt.Printf("limiters = %#v\nv = %#v\n", limiters, v)
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {
 		return errHTTPEntityTooLargeAttachment
@@ -1657,7 +1660,7 @@ func (s *Server) visitorFromIP(ip netip.Addr) *visitor {
 }
 
 func (s *Server) visitorFromUser(user *user.User, ip netip.Addr) *visitor {
-	return s.visitorFromID(fmt.Sprintf("user:%s", user.Name), ip, user)
+	return s.visitorFromID(fmt.Sprintf("user:%s", user.ID), ip, user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {

@@ -241,7 +241,7 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	var attachmentsBytesUsed int64
 	var err error
 	if v.user != nil {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(v.user.Name)
+		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(v.user.ID)
 	} else {
 		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.ip.String())
 	}

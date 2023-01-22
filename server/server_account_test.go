@@ -212,7 +212,7 @@ func TestAccount_ChangePassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
 
-	rr := request(t, s, "POST", "/v1/account/password", `{"password": "new password"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/account/password", `{"password": "phil", "new_password": "new password"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)

@@ -830,7 +830,7 @@ func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
 func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 60
-	c.VisitorRequestLimitReplenish = 500 * time.Millisecond
+	c.VisitorRequestLimitReplenish = time.Second
 	s := newTestServer(t, c)
 	for i := 0; i < 60; i++ {
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
@@ -839,7 +839,7 @@ func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
 	response := request(t, s, "PUT", "/mytopic", "message", nil)
 	require.Equal(t, 429, response.Code)
 
-	time.Sleep(520 * time.Millisecond)
+	time.Sleep(1020 * time.Millisecond)
 	response = request(t, s, "PUT", "/mytopic", "message", nil)
 	require.Equal(t, 200, response.Code)
 }

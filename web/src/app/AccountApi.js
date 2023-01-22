@@ -120,17 +120,20 @@ class AccountApi {
         }
     }
 
-    async changePassword(newPassword) {
+    async changePassword(currentPassword, newPassword) {
         const url = accountPasswordUrl(config.base_url);
         console.log(`[AccountApi] Changing account password ${url}`);
         const response = await fetch(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
-                password: newPassword
+                password: currentPassword,
+                new_password: newPassword
             })
         });
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 400) {
+            throw new CurrentPasswordWrongError();
+        } else if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
@@ -391,6 +394,12 @@ export class TopicReservedError extends Error {
 export class AccountCreateLimitReachedError extends Error {
     constructor() {
         super("Account creation limit reached");
+    }
+}
+
+export class CurrentPasswordWrongError extends Error {
+    constructor() {
+        super("Current password incorrect");
     }
 }
 

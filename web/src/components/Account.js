@@ -19,7 +19,7 @@ import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
 import {formatBytes, formatShortDate, formatShortDateTime} from "../app/utils";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi, {CurrentPasswordWrongError, UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
@@ -29,6 +29,7 @@ import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import {AccountContext} from "./App";
 import {Warning, WarningAmber} from "@mui/icons-material";
+import DialogFooter from "./DialogFooter";
 
 const Account = () => {
     if (!session.exists()) {
@@ -90,22 +91,8 @@ const ChangePassword = () => {
         setDialogOpen(true);
     };
 
-    const handleDialogCancel = () => {
+    const handleDialogClose = () => {
         setDialogOpen(false);
-    };
-
-    const handleDialogSubmit = async (newPassword) => {
-        try {
-            await accountApi.changePassword(newPassword);
-            setDialogOpen(false);
-            console.debug(`[Account] Password changed`);
-        } catch (e) {
-            console.log(`[Account] Error changing password`, e);
-            if ((e instanceof UnauthorizedError)) {
-                session.resetAndRedirect(routes.login);
-            }
-            // TODO show error
-        }
     };
 
     return (
@@ -119,8 +106,7 @@ const ChangePassword = () => {
             <ChangePasswordDialog
                 key={`changePasswordDialog${dialogKey}`}
                 open={dialogOpen}
-                onCancel={handleDialogCancel}
-                onSubmit={handleDialogSubmit}
+                onClose={handleDialogClose}
             />
         </Pref>
     )
@@ -128,16 +114,44 @@ const ChangePassword = () => {
 
 const ChangePasswordDialog = (props) => {
     const { t } = useTranslation();
+    const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [errorText, setErrorText] = useState("");
+
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const changeButtonEnabled = (() => {
-        return newPassword.length > 0 && newPassword === confirmPassword;
-    })();
+
+    const handleDialogSubmit = async () => {
+        try {
+            console.debug(`[Account] Changing password`);
+            await accountApi.changePassword(currentPassword, newPassword);
+            props.onClose();
+        } catch (e) {
+            console.log(`[Account] Error changing password`, e);
+            if ((e instanceof CurrentPasswordWrongError)) {
+                setErrorText(t("account_basics_password_dialog_current_password_incorrect"));
+            } else if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+            // TODO show error
+        }
+    };
+
     return (
         <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
             <DialogTitle>{t("account_basics_password_dialog_title")}</DialogTitle>
             <DialogContent>
+                <TextField
+                    margin="dense"
+                    id="current-password"
+                    label={t("account_basics_password_dialog_current_password_label")}
+                    aria-label={t("account_basics_password_dialog_current_password_label")}
+                    type="password"
+                    value={currentPassword}
+                    onChange={ev => setCurrentPassword(ev.target.value)}
+                    fullWidth
+                    variant="standard"
+                />
                 <TextField
                     margin="dense"
                     id="new-password"
@@ -161,10 +175,15 @@ const ChangePasswordDialog = (props) => {
                     variant="standard"
                 />
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.onCancel}>{t("account_basics_password_dialog_button_cancel")}</Button>
-                <Button onClick={() => props.onSubmit(newPassword)} disabled={!changeButtonEnabled}>{t("account_basics_password_dialog_button_submit")}</Button>
-            </DialogActions>
+            <DialogFooter status={errorText}>
+                <Button onClick={props.onClose}>{t("account_basics_password_dialog_button_cancel")}</Button>
+                <Button
+                    onClick={handleDialogSubmit}
+                    disabled={newPassword.length === 0 || currentPassword.length === 0 || newPassword !== confirmPassword}
+                >
+                    {t("account_basics_password_dialog_button_submit")}
+                </Button>
+            </DialogFooter>
         </Dialog>
     );
 };

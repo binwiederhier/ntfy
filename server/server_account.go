@@ -136,11 +136,16 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPassword, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
+	req, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
+	} else if req.Password == "" || req.NewPassword == "" {
+		return errHTTPBadRequest
 	}
-	if err := s.userManager.ChangePassword(v.user.Name, newPassword.Password); err != nil {
+	if _, err := s.userManager.Authenticate(v.user.Name, req.Password); err != nil {
+		return errHTTPBadRequestCurrentPasswordWrong
+	}
+	if err := s.userManager.ChangePassword(v.user.Name, req.NewPassword); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

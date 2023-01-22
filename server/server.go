@@ -38,13 +38,12 @@ import (
 TODO
 --
 
-UAT results (round 1):
 - Security: Account re-creation leads to terrible behavior. Use user ID instead of user name for (a) visitor map, (b) messages.user column, (c) Stripe checkout session
-- Account: Changing password should confirm the old password (Thorben)
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
 - Logging: Add detailed logging with username/customerID for all Stripe events (phil)
+- Rate limiting: Sensitive endpoints (account/login/change-password/...)
 
 races:
 - v.user --> see publishSyncEventAsync() test
@@ -59,7 +58,6 @@ Limits & rate limiting:
 	rate limiting weirdness. wth is going on?
 	bandwidth limit must be in tier
 	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
-	login/account endpoints
 	when ResetStats() is run, reset messagesLimiter (and others)?
 	Delete visitor when tier is changed to refresh rate limiters
 

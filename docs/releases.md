@@ -24,6 +24,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Portuguese (thanks to [@ssantos](https://hosted.weblate.org/user/ssantos/))
 
+**Special thanks:**
+
+A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
+suggestions, and bug reports. Thank you, @nwithan8, @deadcade, and @xenrox.
+
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅
 

@@ -227,7 +227,8 @@ type apiAccountCreateRequest struct {
 }
 
 type apiAccountPasswordChangeRequest struct {
-	Password string `json:"password"`
+	Password    string `json:"password"`
+	NewPassword string `json:"new_password"`
 }
 
 type apiAccountTokenResponse struct {

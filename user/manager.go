@@ -707,7 +707,6 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 		user.Tier = &Tier{
 			Code:                     tierCode.String,
 			Name:                     tierName.String,
-			Paid:                     stripePriceID.Valid, // If there is a price, it's a paid tier
 			MessagesLimit:            messagesLimit.Int64,
 			MessagesExpiryDuration:   time.Duration(messagesExpiryDuration.Int64) * time.Second,
 			EmailsLimit:              emailsLimit.Int64,
@@ -1066,7 +1065,6 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 		ID:                       id,
 		Code:                     code,
 		Name:                     name,
-		Paid:                     stripePriceID.Valid, // If there is a price, it's a paid tier
 		MessagesLimit:            messagesLimit.Int64,
 		MessagesExpiryDuration:   time.Duration(messagesExpiryDuration.Int64) * time.Second,
 		EmailsLimit:              emailsLimit.Int64,

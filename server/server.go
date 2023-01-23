@@ -40,9 +40,9 @@ TODO
 
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
 - Rate limiting: Sensitive endpoints (account/login/change-password/...)
-- Stripe: Add metadata to customer
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
+- Reservation icons (UI)
 
 races:
 - v.user --> see publishSyncEventAsync() test
@@ -65,7 +65,6 @@ Make sure account endpoints make sense for admins
 
 UI:
 -
-- reservation icons
 - reservation table delete button: dialog "keep or delete messages?"
 - flicker of upgrade banner
 - JS constants
@@ -858,7 +857,6 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	if m.Time > attachmentExpiry {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
 	}
-	fmt.Printf("v = %#v\nlimits = %#v\nstats = %#v\n", v, vinfo.Limits, vinfo.Stats)
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)

@@ -231,6 +231,10 @@ type apiAccountPasswordChangeRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+type apiAccountDeleteRequest struct {
+	Password string `json:"password"`
+}
+
 type apiAccountTokenResponse struct {
 	Token   string `json:"token"`
 	Expires int64  `json:"expires"`

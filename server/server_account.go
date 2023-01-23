@@ -7,6 +7,7 @@ import (
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -118,16 +119,23 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	req, err := readJSONWithLimit[apiAccountDeleteRequest](r.Body, jsonBodyBytesLimit)
+	if err != nil {
+		return err
+	} else if req.Password == "" {
+		return errHTTPBadRequest
+	}
+	if _, err := s.userManager.Authenticate(v.user.Name, req.Password); err != nil {
+		return errHTTPBadRequestIncorrectPasswordConfirmation
+	}
 	if v.user.Billing.StripeSubscriptionID != "" {
 		log.Info("%s Canceling billing subscription %s", logHTTPPrefix(v, r), v.user.Billing.StripeSubscriptionID)
-		if v.user.Billing.StripeSubscriptionID != "" {
-			if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
-				return err
-			}
-		}
-		if err := s.maybeRemoveExcessReservations(logHTTPPrefix(v, r), v.user, 0); err != nil {
+		if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
 			return err
 		}
+	}
+	if err := s.maybeRemoveMessagesAndExcessReservations(logHTTPPrefix(v, r), v.user, 0); err != nil {
+		return err
 	}
 	log.Info("%s Marking user %s as deleted", logHTTPPrefix(v, r), v.user.Name)
 	if err := s.userManager.MarkUserRemoved(v.user); err != nil {
@@ -144,7 +152,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 		return errHTTPBadRequest
 	}
 	if _, err := s.userManager.Authenticate(v.user.Name, req.Password); err != nil {
-		return errHTTPBadRequestCurrentPasswordWrong
+		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
 	if err := s.userManager.ChangePassword(v.user.Name, req.NewPassword); err != nil {
 		return err
@@ -363,6 +371,30 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
+}
+
+// maybeRemoveMessagesAndExcessReservations deletes topic reservations for the given user (if too many for tier),
+// and marks associated messages for the topics as deleted. This also eventually deletes attachments.
+// The process relies on the manager to perform the actual deletions (see runManager).
+func (s *Server) maybeRemoveMessagesAndExcessReservations(logPrefix string, u *user.User, reservationsLimit int64) error {
+	reservations, err := s.userManager.Reservations(u.Name)
+	if err != nil {
+		return err
+	} else if int64(len(reservations)) <= reservationsLimit {
+		return nil
+	}
+	topics := make([]string, 0)
+	for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
+		topics = append(topics, reservations[i].Topic)
+	}
+	log.Info("%s Removing excess reservations for topics %s", logPrefix, strings.Join(topics, ", "))
+	if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
+		return err
+	}
+	if err := s.messageCache.ExpireMessages(topics...); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Server) publishSyncEvent(v *visitor) error {

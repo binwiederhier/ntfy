@@ -14,6 +14,108 @@ import (
 	"time"
 )
 
+func TestPayments_Tiers(t *testing.T) {
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	c.VisitorRequestLimitReplenish = 12 * time.Hour
+	c.CacheDuration = 13 * time.Hour
+	c.AttachmentFileSizeLimit = 111
+	c.VisitorAttachmentTotalSizeLimit = 222
+	c.AttachmentExpiryDuration = 123 * time.Second
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("ListPrices", mock.Anything).
+		Return([]*stripe.Price{
+			{ID: "price_123", UnitAmount: 500},
+			{ID: "price_456", UnitAmount: 1000},
+			{ID: "price_999", UnitAmount: 9999},
+		}, nil)
+
+	// Create tiers
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:   "ti_1",
+		Code: "admin",
+		Name: "Admin",
+	}))
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:                       "ti_123",
+		Code:                     "pro",
+		Name:                     "Pro",
+		MessagesLimit:            1000,
+		MessagesExpiryDuration:   time.Hour,
+		EmailsLimit:              123,
+		ReservationsLimit:        777,
+		AttachmentFileSizeLimit:  999,
+		AttachmentTotalSizeLimit: 888,
+		AttachmentExpiryDuration: time.Minute,
+		StripePriceID:            "price_123",
+	}))
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:                       "ti_444",
+		Code:                     "business",
+		Name:                     "Business",
+		MessagesLimit:            2000,
+		MessagesExpiryDuration:   10 * time.Hour,
+		EmailsLimit:              123123,
+		ReservationsLimit:        777333,
+		AttachmentFileSizeLimit:  999111,
+		AttachmentTotalSizeLimit: 888111,
+		AttachmentExpiryDuration: time.Hour,
+		StripePriceID:            "price_456",
+	}))
+	response := request(t, s, "GET", "/v1/tiers", "", nil)
+	require.Equal(t, 200, response.Code)
+	var tiers []apiAccountBillingTier
+	require.Nil(t, json.NewDecoder(response.Body).Decode(&tiers))
+	require.Equal(t, 3, len(tiers))
+
+	// Free tier
+	tier := tiers[0]
+	require.Equal(t, "", tier.Code)
+	require.Equal(t, "", tier.Name)
+	require.Equal(t, "ip", tier.Limits.Basis)
+	require.Equal(t, int64(0), tier.Limits.Reservations)
+	require.Equal(t, int64(2), tier.Limits.Messages) // :-(
+	require.Equal(t, int64(13*3600), tier.Limits.MessagesExpiryDuration)
+	require.Equal(t, int64(24), tier.Limits.Emails)
+	require.Equal(t, int64(111), tier.Limits.AttachmentFileSize)
+	require.Equal(t, int64(222), tier.Limits.AttachmentTotalSize)
+	require.Equal(t, int64(123), tier.Limits.AttachmentExpiryDuration)
+
+	// Admin tier is not included, because it is not paid!
+
+	tier = tiers[1]
+	require.Equal(t, "pro", tier.Code)
+	require.Equal(t, "Pro", tier.Name)
+	require.Equal(t, "tier", tier.Limits.Basis)
+	require.Equal(t, int64(777), tier.Limits.Reservations)
+	require.Equal(t, int64(1000), tier.Limits.Messages)
+	require.Equal(t, int64(3600), tier.Limits.MessagesExpiryDuration)
+	require.Equal(t, int64(123), tier.Limits.Emails)
+	require.Equal(t, int64(999), tier.Limits.AttachmentFileSize)
+	require.Equal(t, int64(888), tier.Limits.AttachmentTotalSize)
+	require.Equal(t, int64(60), tier.Limits.AttachmentExpiryDuration)
+
+	tier = tiers[2]
+	require.Equal(t, "business", tier.Code)
+	require.Equal(t, "Business", tier.Name)
+	require.Equal(t, "tier", tier.Limits.Basis)
+	require.Equal(t, int64(777333), tier.Limits.Reservations)
+	require.Equal(t, int64(2000), tier.Limits.Messages)
+	require.Equal(t, int64(36000), tier.Limits.MessagesExpiryDuration)
+	require.Equal(t, int64(123123), tier.Limits.Emails)
+	require.Equal(t, int64(999111), tier.Limits.AttachmentFileSize)
+	require.Equal(t, int64(888111), tier.Limits.AttachmentTotalSize)
+	require.Equal(t, int64(3600), tier.Limits.AttachmentExpiryDuration)
+}
+
 func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 	stripeMock := &testStripeAPI{}
 	defer stripeMock.AssertExpectations(t)
@@ -122,7 +224,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 	require.Nil(t, s.userManager.ChangeBilling(u.Name, billing))
 
 	// Delete account
-	rr := request(t, s, "DELETE", "/v1/account", "", map[string]string{
+	rr := request(t, s, "DELETE", "/v1/account", `{"password": "phil"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -258,6 +360,8 @@ type testStripeAPI struct {
 	mock.Mock
 }
 
+var _ stripeAPI = (*testStripeAPI)(nil)
+
 func (s *testStripeAPI) NewCheckoutSession(params *stripe.CheckoutSessionParams) (*stripe.CheckoutSession, error) {
 	args := s.Called(params)
 	return args.Get(0).(*stripe.CheckoutSession), args.Error(1)
@@ -288,6 +392,11 @@ func (s *testStripeAPI) GetSubscription(id string) (*stripe.Subscription, error)
 	return args.Get(0).(*stripe.Subscription), args.Error(1)
 }
 
+func (s *testStripeAPI) UpdateCustomer(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
+	args := s.Called(id)
+	return args.Get(0).(*stripe.Customer), args.Error(1)
+}
+
 func (s *testStripeAPI) UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error) {
 	args := s.Called(id)
 	return args.Get(0).(*stripe.Subscription), args.Error(1)
@@ -302,8 +411,6 @@ func (s *testStripeAPI) ConstructWebhookEvent(payload []byte, header string, sec
 	args := s.Called(payload, header, secret)
 	return args.Get(0).(stripe.Event), args.Error(1)
 }
-
-var _ stripeAPI = (*testStripeAPI)(nil)
 
 func jsonToStripeEvent(t *testing.T, v string) stripe.Event {
 	var e stripe.Event

@@ -319,7 +319,7 @@ func TestAccount_Delete_Success(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 
-	rr = request(t, s, "DELETE", "/v1/account", "", map[string]string{
+	rr = request(t, s, "DELETE", "/v1/account", `{"password":"mypass"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -345,6 +345,15 @@ func TestAccount_Delete_Not_Allowed(t *testing.T) {
 
 	rr = request(t, s, "DELETE", "/v1/account", "", nil)
 	require.Equal(t, 401, rr.Code)
+
+	rr = request(t, s, "DELETE", "/v1/account", `{"password":"mypass"}`, nil)
+	require.Equal(t, 401, rr.Code)
+
+	rr = request(t, s, "DELETE", "/v1/account", `{"password":"INCORRECT"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
 }
 
 func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {
@@ -386,7 +395,6 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	// Create a tier
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "pro",
-		Paid:                     false,
 		MessagesLimit:            123,
 		MessagesExpiryDuration:   86400 * time.Second,
 		EmailsLimit:              32,

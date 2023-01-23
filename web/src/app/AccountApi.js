@@ -106,14 +106,19 @@ class AccountApi {
         return account;
     }
 
-    async delete() {
+    async delete(password) {
         const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Deleting user account ${url}`);
         const response = await fetch(url, {
             method: "DELETE",
-            headers: withBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                password: password
+            })
         });
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 400) {
+            throw new IncorrectPasswordError();
+        } else if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
         } else if (response.status !== 200) {
             throw new Error(`Unexpected server response ${response.status}`);
@@ -132,7 +137,7 @@ class AccountApi {
             })
         });
         if (response.status === 400) {
-            throw new CurrentPasswordWrongError();
+            throw new IncorrectPasswordError();
         } else if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();
         } else if (response.status !== 200) {
@@ -397,9 +402,9 @@ export class AccountCreateLimitReachedError extends Error {
     }
 }
 
-export class CurrentPasswordWrongError extends Error {
+export class IncorrectPasswordError extends Error {
     constructor() {
-        super("Current password incorrect");
+        super("Password incorrect");
     }
 }
 

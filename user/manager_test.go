@@ -350,7 +350,6 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, RoleUser, ben.Role)
 	require.Equal(t, "pro", ben.Tier.Code)
-	require.Equal(t, true, ben.Tier.Paid)
 	require.Equal(t, int64(5000), ben.Tier.MessagesLimit)
 	require.Equal(t, 3*24*time.Hour, ben.Tier.MessagesExpiryDuration)
 	require.Equal(t, int64(50), ben.Tier.EmailsLimit)

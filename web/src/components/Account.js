@@ -19,7 +19,7 @@ import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
 import {formatBytes, formatShortDate, formatShortDateTime} from "../app/utils";
-import accountApi, {CurrentPasswordWrongError, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {IncorrectPasswordError, UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
@@ -128,7 +128,7 @@ const ChangePasswordDialog = (props) => {
             props.onClose();
         } catch (e) {
             console.log(`[Account] Error changing password`, e);
-            if ((e instanceof CurrentPasswordWrongError)) {
+            if ((e instanceof IncorrectPasswordError)) {
                 setErrorText(t("account_basics_password_dialog_current_password_incorrect"));
             } else if ((e instanceof UnauthorizedError)) {
                 session.resetAndRedirect(routes.login);
@@ -414,24 +414,8 @@ const DeleteAccount = () => {
         setDialogOpen(true);
     };
 
-    const handleDialogCancel = () => {
+    const handleDialogClose = () => {
         setDialogOpen(false);
-    };
-
-    const handleDialogSubmit = async () => {
-        try {
-            await accountApi.delete();
-            await db.delete();
-            setDialogOpen(false);
-            console.debug(`[Account] Account deleted`);
-            session.resetAndRedirect(routes.app);
-        } catch (e) {
-            console.log(`[Account] Error deleting account`, e);
-            if ((e instanceof UnauthorizedError)) {
-                session.resetAndRedirect(routes.login);
-            }
-            // TODO show error
-        }
     };
 
     return (
@@ -444,8 +428,7 @@ const DeleteAccount = () => {
             <DeleteAccountDialog
                 key={`deleteAccountDialog${dialogKey}`}
                 open={dialogOpen}
-                onCancel={handleDialogCancel}
-                onSubmit={handleDialogSubmit}
+                onClose={handleDialogClose}
             />
         </Pref>
     )
@@ -454,24 +437,42 @@ const DeleteAccount = () => {
 const DeleteAccountDialog = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
-    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [errorText, setErrorText] = useState("");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const buttonEnabled = username === session.username();
+
+    const handleSubmit = async () => {
+        try {
+            await accountApi.delete(password);
+            await db.delete();
+            console.debug(`[Account] Account deleted`);
+            session.resetAndRedirect(routes.app);
+        } catch (e) {
+            console.log(`[Account] Error deleting account`, e);
+            if ((e instanceof IncorrectPasswordError)) {
+                setErrorText(t("account_basics_password_dialog_current_password_incorrect"));
+            } else if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+            // TODO show error
+        }
+    };
+
     return (
-        <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
+        <Dialog open={props.open} onClose={props.onClose} fullScreen={fullScreen}>
             <DialogTitle>{t("account_delete_title")}</DialogTitle>
             <DialogContent>
                 <Typography variant="body1">
-                    {t("account_delete_dialog_description", { username: session.username()})}
+                    {t("account_delete_dialog_description")}
                 </Typography>
                 <TextField
                     margin="dense"
                     id="account-delete-confirm"
-                    label={t("account_delete_dialog_label", { username: session.username()})}
-                    aria-label={t("account_delete_dialog_label", { username: session.username()})}
-                    type="text"
-                    value={username}
-                    onChange={ev => setUsername(ev.target.value)}
+                    label={t("account_delete_dialog_label")}
+                    aria-label={t("account_delete_dialog_label")}
+                    type="password"
+                    value={password}
+                    onChange={ev => setPassword(ev.target.value)}
                     fullWidth
                     variant="standard"
                 />
@@ -479,10 +480,10 @@ const DeleteAccountDialog = (props) => {
                     <Alert severity="warning" sx={{mt: 1}}>{t("account_delete_dialog_billing_warning")}</Alert>
                 }
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.onCancel}>{t("account_delete_dialog_button_cancel")}</Button>
-                <Button onClick={props.onSubmit} color="error" disabled={!buttonEnabled}>{t("account_delete_dialog_button_submit")}</Button>
-            </DialogActions>
+            <DialogFooter status={errorText}>
+                <Button onClick={props.onClose}>{t("account_delete_dialog_button_cancel")}</Button>
+                <Button onClick={handleSubmit} color="error" disabled={password.length === 0}>{t("account_delete_dialog_button_submit")}</Button>
+            </DialogFooter>
         </Dialog>
     );
 };

@@ -53,7 +53,6 @@ type Tier struct {
 	ID                       string
 	Code                     string
 	Name                     string
-	Paid                     bool
 	MessagesLimit            int64
 	MessagesExpiryDuration   time.Duration
 	EmailsLimit              int64

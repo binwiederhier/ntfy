@@ -57,18 +57,18 @@ func logHTTPPrefix(v *visitor, r *http.Request) string {
 	if requestURI == "" {
 		requestURI = r.URL.Path
 	}
-	return fmt.Sprintf("%s HTTP %s %s", v.String(), r.Method, requestURI)
+	return fmt.Sprintf("HTTP %s %s %s", v.String(), r.Method, requestURI)
 }
 
 func logStripePrefix(customerID, subscriptionID string) string {
 	if subscriptionID != "" {
-		return fmt.Sprintf("%s/%s STRIPE", customerID, subscriptionID)
+		return fmt.Sprintf("STRIPE %s/%s", customerID, subscriptionID)
 	}
-	return fmt.Sprintf("%s STRIPE", customerID)
+	return fmt.Sprintf("STRIPE %s", customerID)
 }
 
 func logSMTPPrefix(state *smtp.ConnectionState) string {
-	return fmt.Sprintf("%s/%s SMTP", state.Hostname, state.RemoteAddr.String())
+	return fmt.Sprintf("SMTP %s/%s", state.Hostname, state.RemoteAddr.String())
 }
 
 func renderHTTPRequest(r *http.Request) string {

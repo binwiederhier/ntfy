@@ -18,7 +18,6 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
-	"strings"
 	"time"
 )
 
@@ -66,6 +65,7 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 		{
 			// This is a bit of a hack: This is the "Free" tier. It has no tier code, name or price.
 			Limits: &apiAccountLimits{
+				Basis:                    string(visitorLimitBasisIP),
 				Messages:                 freeTier.MessagesLimit,
 				MessagesExpiryDuration:   int64(freeTier.MessagesExpiryDuration.Seconds()),
 				Emails:                   freeTier.EmailsLimit,
@@ -90,6 +90,7 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 			Name:  tier.Name,
 			Price: priceStr,
 			Limits: &apiAccountLimits{
+				Basis:                    string(visitorLimitBasisTier),
 				Messages:                 tier.MessagesLimit,
 				MessagesExpiryDuration:   int64(tier.MessagesExpiryDuration.Seconds()),
 				Emails:                   tier.EmailsLimit,
@@ -143,6 +144,11 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 				Quantity: stripe.Int64(1),
 			},
 		},
+		Params: stripe.Params{
+			Metadata: map[string]string{
+				"user_id": v.user.ID,
+			},
+		},
 	}
 	sess, err := s.stripe.NewCheckoutSession(params)
 	if err != nil {
@@ -185,6 +191,17 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 		return err
 	}
 	v.SetUser(u)
+	customerParams := &stripe.CustomerParams{
+		Params: stripe.Params{
+			Metadata: map[string]string{
+				"user_id":   u.ID,
+				"user_name": u.Name,
+			},
+		},
+	}
+	if _, err := s.stripe.UpdateCustomer(sess.Customer.ID, customerParams); err != nil {
+		return err
+	}
 	if err := s.updateSubscriptionAndTier(logHTTPPrefix(v, r), u, tier, sess.Customer.ID, sub.ID, string(sub.Status), sub.CurrentPeriodEnd, sub.CancelAt); err != nil {
 		return err
 	}
@@ -342,36 +359,12 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(event json.RawMe
 	return nil
 }
 
-// maybeRemoveExcessReservations deletes topic reservations for the given user (if too many for tier),
-// and marks associated messages for the topics as deleted. This also eventually deletes attachments.
-// The process relies on the manager to perform the actual deletions (see runManager).
-func (s *Server) maybeRemoveExcessReservations(logPrefix string, u *user.User, reservationsLimit int64) error {
-	reservations, err := s.userManager.Reservations(u.Name)
-	if err != nil {
-		return err
-	} else if int64(len(reservations)) <= reservationsLimit {
-		return nil
-	}
-	topics := make([]string, 0)
-	for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
-		topics = append(topics, reservations[i].Topic)
-	}
-	log.Info("%s Removing excess reservations for topics %s", logPrefix, strings.Join(topics, ", "))
-	if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
-		return err
-	}
-	if err := s.messageCache.ExpireMessages(topics...); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *Server) updateSubscriptionAndTier(logPrefix string, u *user.User, tier *user.Tier, customerID, subscriptionID, status string, paidUntil, cancelAt int64) error {
 	reservationsLimit := visitorDefaultReservationsLimit
 	if tier != nil {
 		reservationsLimit = tier.ReservationsLimit
 	}
-	if err := s.maybeRemoveExcessReservations(logPrefix, u, reservationsLimit); err != nil {
+	if err := s.maybeRemoveMessagesAndExcessReservations(logPrefix, u, reservationsLimit); err != nil {
 		return err
 	}
 	if tier == nil {
@@ -426,6 +419,7 @@ type stripeAPI interface {
 	GetCustomer(id string) (*stripe.Customer, error)
 	GetSession(id string) (*stripe.CheckoutSession, error)
 	GetSubscription(id string) (*stripe.Subscription, error)
+	UpdateCustomer(id string, params *stripe.CustomerParams) (*stripe.Customer, error)
 	UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error)
 	CancelSubscription(id string) (*stripe.Subscription, error)
 	ConstructWebhookEvent(payload []byte, header string, secret string) (stripe.Event, error)
@@ -470,6 +464,10 @@ func (s *realStripeAPI) GetSession(id string) (*stripe.CheckoutSession, error) {
 
 func (s *realStripeAPI) GetSubscription(id string) (*stripe.Subscription, error) {
 	return subscription.Get(id, nil)
+}
+
+func (s *realStripeAPI) UpdateCustomer(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
+	return customer.Update(id, params)
 }
 
 func (s *realStripeAPI) UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error) {

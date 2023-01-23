@@ -62,7 +62,7 @@ var (
 	errHTTPBadRequestNotAPaidUser                    = &errHTTP{40027, http.StatusBadRequest, "invalid request: not a paid user", ""}
 	errHTTPBadRequestBillingRequestInvalid           = &errHTTP{40028, http.StatusBadRequest, "invalid request: not a valid billing request", ""}
 	errHTTPBadRequestBillingSubscriptionExists       = &errHTTP{40029, http.StatusBadRequest, "invalid request: billing subscription already exists", ""}
-	errHTTPBadRequestCurrentPasswordWrong            = &errHTTP{40030, http.StatusBadRequest, "invalid request: current password is not correct", ""}
+	errHTTPBadRequestIncorrectPasswordConfirmation   = &errHTTP{40030, http.StatusBadRequest, "invalid request: password confirmation is not correct", ""}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", ""}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication"}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication"}

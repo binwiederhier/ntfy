@@ -354,5 +354,6 @@ type apiStripeSubscriptionUpdatedEvent struct {
 }
 
 type apiStripeSubscriptionDeletedEvent struct {
+	ID       string `json:"id"`
 	Customer string `json:"customer"`
 }

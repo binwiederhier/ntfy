@@ -11,7 +11,6 @@ import (
 
 const (
 	subscriptionIDLength      = 16
-	createdByAPI              = "api"
 	syncTopicAccountSyncEvent = "sync"
 )
 
@@ -34,7 +33,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
 		return errHTTPTooManyRequestsLimitAccountCreation
 	}
-	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser, createdByAPI); err != nil { // TODO this should return a User
+	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -118,18 +117,20 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 	return s.writeJSON(w, response)
 }
 
-func (s *Server) handleAccountDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if v.user.Billing.StripeSubscriptionID != "" {
-		log.Info("Deleting user %s (billing customer: %s, billing subscription: %s)", v.user.Name, v.user.Billing.StripeCustomerID, v.user.Billing.StripeSubscriptionID)
+		log.Info("%s Canceling billing subscription %s", logHTTPPrefix(v, r), v.user.Billing.StripeSubscriptionID)
 		if v.user.Billing.StripeSubscriptionID != "" {
 			if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
 				return err
 			}
 		}
-	} else {
-		log.Info("Deleting user %s", v.user.Name)
+		if err := s.maybeRemoveExcessReservations(logHTTPPrefix(v, r), v.user, 0); err != nil {
+			return err
+		}
 	}
-	if err := s.userManager.RemoveUser(v.user.Name); err != nil {
+	log.Info("%s Marking user %s as deleted", logHTTPPrefix(v, r), v.user.Name)
+	if err := s.userManager.MarkUserRemoved(v.user); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

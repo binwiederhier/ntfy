@@ -39,12 +39,10 @@ TODO
 --
 
 - Reservation: Kill existing subscribers when topic is reserved (deadcade)
+- Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- Stripe: Add metadata to customer
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
-- Logging: Add detailed logging with username/customerID for all Stripe events (phil)
-- Rate limiting: Sensitive endpoints (account/login/change-password/...)
-- Stripe webhook: Do not respond wih error if user does not exist (after account deletion)
-- Stripe: Add metadata to customer
 
 races:
 - v.user --> see publishSyncEventAsync() test
@@ -53,7 +51,7 @@ payments:
 - reconciliation
 
 delete messages + reserved topics on ResetTier delete attachments in access.go
-account deletion should delete messages and reservations and attachments
+
 
 Limits & rate limiting:
 	rate limiting weirdness. wth is going on?
@@ -1256,10 +1254,13 @@ func (s *Server) execManager() {
 	s.mu.Unlock()
 	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
 
-	// Delete expired user tokens
+	// Delete expired user tokens and users
 	if s.userManager != nil {
 		if err := s.userManager.RemoveExpiredTokens(); err != nil {
 			log.Warn("Error expiring user tokens: %s", err.Error())
+		}
+		if err := s.userManager.RemoveDeletedUsers(); err != nil {
+			log.Warn("Error deleting soft-deleted users: %s", err.Error())
 		}
 	}
 
@@ -1283,7 +1284,7 @@ func (s *Server) execManager() {
 		}
 	}
 
-	// DeleteMessages message cache
+	// Prune messages
 	log.Debug("Manager: Pruning messages")
 	expiredMessageIDs, err := s.messageCache.MessagesExpired()
 	if err != nil {

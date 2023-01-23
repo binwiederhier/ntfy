@@ -34,7 +34,7 @@ func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	// Create subscription
 	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro"}`, map[string]string{
@@ -69,7 +69,7 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -110,7 +110,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -174,7 +174,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentFileSizeLimit:  1000000,
 		AttachmentTotalSizeLimit: 1000000,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll))
 	require.Nil(t, s.userManager.AddReservation("phil", "ztopic", user.PermissionDenyAll))

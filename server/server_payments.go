@@ -18,13 +18,8 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"strings"
 	"time"
-)
-
-var (
-	errNotAPaidTier                 = errors.New("tier does not have billing price identifier")
-	errMultipleBillingSubscriptions = errors.New("cannot have multiple billing subscriptions")
-	errNoBillingSubscription        = errors.New("user does not have an active billing subscription")
 )
 
 // Payments in ntfy are done via Stripe.
@@ -48,6 +43,16 @@ var (
 //      Whenever a subscription changes (updated, deleted), Stripe sends us a request via a webhook.
 //      This is used to keep the local user database fields up to date. Stripe is the source of truth.
 //      What Stripe says is mirrored and not questioned.
+
+var (
+	errNotAPaidTier                 = errors.New("tier does not have billing price identifier")
+	errMultipleBillingSubscriptions = errors.New("cannot have multiple billing subscriptions")
+	errNoBillingSubscription        = errors.New("user does not have an active billing subscription")
+)
+
+var (
+	retryUserDelays = []time.Duration{3 * time.Second, 5 * time.Second, 7 * time.Second}
+)
 
 // handleBillingTiersGet returns all available paid tiers, and the free tier. This is to populate the upgrade dialog
 // in the UI. Note that this endpoint does NOT have a user context (no v.user!).
@@ -114,7 +119,7 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 	} else if tier.StripePriceID == "" {
 		return errNotAPaidTier
 	}
-	log.Info("Stripe: No existing subscription, creating checkout flow")
+	log.Info("%s Creating Stripe checkout flow", logHTTPPrefix(v, r))
 	var stripeCustomerID *string
 	if v.user.Billing.StripeCustomerID != "" {
 		stripeCustomerID = &v.user.Billing.StripeCustomerID
@@ -138,9 +143,6 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 				Quantity: stripe.Int64(1),
 			},
 		},
-		/*AutomaticTax: &stripe.CheckoutSessionAutomaticTaxParams{
-			Enabled: stripe.Bool(true),
-		},*/
 	}
 	sess, err := s.stripe.NewCheckoutSession(params)
 	if err != nil {
@@ -155,7 +157,7 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 // handleAccountBillingSubscriptionCreateSuccess is called after the Stripe checkout session has succeeded. We use
 // the session ID in the URL to retrieve the Stripe subscription and update the local database. This is the first
 // and only time we can map the local username with the Stripe customer ID.
-func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// We don't have a v.user in this endpoint, only a userManager!
 	matches := apiAccountBillingSubscriptionCheckoutSuccessRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {
@@ -182,7 +184,8 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	}
-	if err := s.updateSubscriptionAndTier(u, tier, sess.Customer.ID, sub.ID, string(sub.Status), sub.CurrentPeriodEnd, sub.CancelAt); err != nil {
+	v.SetUser(u)
+	if err := s.updateSubscriptionAndTier(logHTTPPrefix(v, r), u, tier, sess.Customer.ID, sub.ID, string(sub.Status), sub.CurrentPeriodEnd, sub.CancelAt); err != nil {
 		return err
 	}
 	http.Redirect(w, r, s.config.BaseURL+accountPath, http.StatusSeeOther)
@@ -203,7 +206,7 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 	if err != nil {
 		return err
 	}
-	log.Info("Stripe: Changing tier and subscription to %s", tier.Code)
+	log.Info("%s Changing billing tier to %s (price %s) for subscription %s", logHTTPPrefix(v, r), tier.Code, tier.StripePriceID, v.user.Billing.StripeSubscriptionID)
 	sub, err := s.stripe.GetSubscription(v.user.Billing.StripeSubscriptionID)
 	if err != nil {
 		return err
@@ -228,6 +231,7 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 // handleAccountBillingSubscriptionDelete facilitates downgrading a paid user to a tier-less user,
 // and cancelling the Stripe subscription entirely
 func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	log.Info("%s Deleting billing subscription %s", logHTTPPrefix(v, r), v.user.Billing.StripeSubscriptionID)
 	if v.user.Billing.StripeSubscriptionID != "" {
 		params := &stripe.SubscriptionParams{
 			CancelAtPeriodEnd: stripe.Bool(true),
@@ -246,6 +250,7 @@ func (s *Server) handleAccountBillingPortalSessionCreate(w http.ResponseWriter, 
 	if v.user.Billing.StripeCustomerID == "" {
 		return errHTTPBadRequestNotAPaidUser
 	}
+	log.Info("%s Creating billing portal session", logHTTPPrefix(v, r))
 	params := &stripe.BillingPortalSessionParams{
 		Customer:  stripe.String(v.user.Billing.StripeCustomerID),
 		ReturnURL: stripe.String(s.config.BaseURL),
@@ -280,28 +285,30 @@ func (s *Server) handleAccountBillingWebhook(w http.ResponseWriter, r *http.Requ
 	} else if event.Data == nil || event.Data.Raw == nil {
 		return errHTTPBadRequestBillingRequestInvalid
 	}
-
-	log.Info("Stripe: webhook event %s received", event.Type)
 	switch event.Type {
 	case "customer.subscription.updated":
 		return s.handleAccountBillingWebhookSubscriptionUpdated(event.Data.Raw)
 	case "customer.subscription.deleted":
 		return s.handleAccountBillingWebhookSubscriptionDeleted(event.Data.Raw)
 	default:
+		log.Warn("STRIPE Unhandled webhook event %s received", event.Type)
 		return nil
 	}
 }
 
 func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMessage) error {
-	r, err := util.UnmarshalJSON[apiStripeSubscriptionUpdatedEvent](io.NopCloser(bytes.NewReader(event)))
+	ev, err := util.UnmarshalJSON[apiStripeSubscriptionUpdatedEvent](io.NopCloser(bytes.NewReader(event)))
 	if err != nil {
 		return err
-	} else if r.ID == "" || r.Customer == "" || r.Status == "" || r.CurrentPeriodEnd == 0 || r.Items == nil || len(r.Items.Data) != 1 || r.Items.Data[0].Price == nil || r.Items.Data[0].Price.ID == "" {
+	} else if ev.ID == "" || ev.Customer == "" || ev.Status == "" || ev.CurrentPeriodEnd == 0 || ev.Items == nil || len(ev.Items.Data) != 1 || ev.Items.Data[0].Price == nil || ev.Items.Data[0].Price.ID == "" {
 		return errHTTPBadRequestBillingRequestInvalid
 	}
-	subscriptionID, priceID := r.ID, r.Items.Data[0].Price.ID
-	log.Info("Stripe: customer %s: Updating subscription to status %s, with price %s", r.Customer, r.Status, priceID)
-	u, err := s.userManager.UserByStripeCustomer(r.Customer)
+	subscriptionID, priceID := ev.ID, ev.Items.Data[0].Price.ID
+	log.Info("%s Updating subscription to status %s, with price %s", logStripePrefix(ev.Customer, ev.ID), ev.Status, priceID)
+	userFn := func() (*user.User, error) {
+		return s.userManager.UserByStripeCustomer(ev.Customer)
+	}
+	u, err := util.Retry[user.User](userFn, retryUserDelays...)
 	if err != nil {
 		return err
 	}
@@ -309,7 +316,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMe
 	if err != nil {
 		return err
 	}
-	if err := s.updateSubscriptionAndTier(u, tier, r.Customer, subscriptionID, r.Status, r.CurrentPeriodEnd, r.CancelAt); err != nil {
+	if err := s.updateSubscriptionAndTier(logStripePrefix(ev.Customer, ev.ID), u, tier, ev.Customer, subscriptionID, ev.Status, ev.CurrentPeriodEnd, ev.CancelAt); err != nil {
 		return err
 	}
 	s.publishSyncEventAsync(s.visitorFromUser(u, netip.IPv4Unspecified()))
@@ -317,47 +324,56 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMe
 }
 
 func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(event json.RawMessage) error {
-	r, err := util.UnmarshalJSON[apiStripeSubscriptionDeletedEvent](io.NopCloser(bytes.NewReader(event)))
+	ev, err := util.UnmarshalJSON[apiStripeSubscriptionDeletedEvent](io.NopCloser(bytes.NewReader(event)))
 	if err != nil {
 		return err
-	} else if r.Customer == "" {
+	} else if ev.Customer == "" {
 		return errHTTPBadRequestBillingRequestInvalid
 	}
-	log.Info("Stripe: customer %s: subscription deleted, downgrading to unpaid tier", r.Customer)
-	u, err := s.userManager.UserByStripeCustomer(r.Customer)
+	log.Info("%s Subscription deleted, downgrading to unpaid tier", logStripePrefix(ev.Customer, ev.ID))
+	u, err := s.userManager.UserByStripeCustomer(ev.Customer)
 	if err != nil {
 		return err
 	}
-	if err := s.updateSubscriptionAndTier(u, nil, r.Customer, "", "", 0, 0); err != nil {
+	if err := s.updateSubscriptionAndTier(logStripePrefix(ev.Customer, ev.ID), u, nil, ev.Customer, "", "", 0, 0); err != nil {
 		return err
 	}
 	s.publishSyncEventAsync(s.visitorFromUser(u, netip.IPv4Unspecified()))
 	return nil
 }
 
-func (s *Server) updateSubscriptionAndTier(u *user.User, tier *user.Tier, customerID, subscriptionID, status string, paidUntil, cancelAt int64) error {
-	// Remove excess reservations (if too many for tier), and mark associated messages deleted
+// maybeRemoveExcessReservations deletes topic reservations for the given user (if too many for tier),
+// and marks associated messages for the topics as deleted. This also eventually deletes attachments.
+// The process relies on the manager to perform the actual deletions (see runManager).
+func (s *Server) maybeRemoveExcessReservations(logPrefix string, u *user.User, reservationsLimit int64) error {
 	reservations, err := s.userManager.Reservations(u.Name)
 	if err != nil {
 		return err
+	} else if int64(len(reservations)) <= reservationsLimit {
+		return nil
 	}
+	topics := make([]string, 0)
+	for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
+		topics = append(topics, reservations[i].Topic)
+	}
+	log.Info("%s Removing excess reservations for topics %s", logPrefix, strings.Join(topics, ", "))
+	if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
+		return err
+	}
+	if err := s.messageCache.ExpireMessages(topics...); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) updateSubscriptionAndTier(logPrefix string, u *user.User, tier *user.Tier, customerID, subscriptionID, status string, paidUntil, cancelAt int64) error {
 	reservationsLimit := visitorDefaultReservationsLimit
 	if tier != nil {
 		reservationsLimit = tier.ReservationsLimit
 	}
-	if int64(len(reservations)) > reservationsLimit {
-		topics := make([]string, 0)
-		for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
-			topics = append(topics, reservations[i].Topic)
-		}
-		if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
-			return err
-		}
-		if err := s.messageCache.ExpireMessages(topics...); err != nil {
-			return err
-		}
+	if err := s.maybeRemoveExcessReservations(logPrefix, u, reservationsLimit); err != nil {
+		return err
 	}
-	// Change or remove tier
 	if tier == nil {
 		if err := s.userManager.ResetTier(u.Name); err != nil {
 			return err

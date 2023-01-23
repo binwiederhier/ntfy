@@ -324,3 +324,15 @@ func UnmarshalJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
 	}
 	return &obj, nil
 }
+
+// Retry executes function f until if succeeds, and then returns t. If f fails, it sleeps
+// and tries again. The sleep durations are passed as the after params.
+func Retry[T any](f func() (*T, error), after ...time.Duration) (t *T, err error) {
+	for _, delay := range after {
+		if t, err = f(); err == nil {
+			return t, nil
+		}
+		time.Sleep(delay)
+	}
+	return nil, err
+}

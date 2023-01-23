@@ -625,7 +625,7 @@ func TestServer_Auth_Success_Admin(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -639,7 +639,7 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -653,7 +653,7 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
 	require.Nil(t, s.userManager.AllowAccess("ben", "anothertopic", user.PermissionReadWrite))
 
@@ -674,7 +674,7 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "INVALID"),
@@ -687,7 +687,7 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", user.PermissionReadWrite)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -701,7 +701,7 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	c.AuthDefault = user.PermissionReadWrite // Open by default
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "private", user.PermissionDenyAll))
 	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
 
@@ -731,7 +731,7 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin))
 
 	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(util.BasicAuth("ben", "some pass"))))
 	response := request(t, s, "GET", u, "", nil)
@@ -749,7 +749,7 @@ func TestServer_StatsResetter(t *testing.T) {
 	s := newTestServer(t, c)
 	go s.runStatsResetter()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("phil", "mytopic", user.PermissionReadWrite))
 
 	for i := 0; i < 5; i++ {
@@ -1137,7 +1137,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 		MessagesLimit:          5,
 		MessagesExpiryDuration: -5 * time.Second, // Second, what a hack!
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish to reach message limit
@@ -1369,7 +1369,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 		AttachmentTotalSizeLimit: 200_000,
 		AttachmentExpiryDuration: sevenDays, // 7 days
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish and make sure we can retrieve it
@@ -1413,7 +1413,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 		AttachmentTotalSizeLimit: 200_000,
 		AttachmentExpiryDuration: 30 * time.Second,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, "unit-test"))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish small file as anonymous

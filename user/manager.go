@@ -25,6 +25,7 @@ const (
 	userPasswordBcryptCost          = 10
 	userAuthIntentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match userPasswordBcryptCost
 	userStatsQueueWriterInterval    = 33 * time.Second
+	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
 	tokenMaxCount                   = 10             // Only keep this many tokens in the table per user
@@ -57,7 +58,7 @@ const (
 		CREATE UNIQUE INDEX idx_tier_price_id ON tier (stripe_price_id);
 		CREATE TABLE IF NOT EXISTS user (
 		    id TEXT PRIMARY KEY,
-			tier_id INT,
+			tier_id TEXT,
 			user TEXT NOT NULL,
 			pass TEXT NOT NULL,
 			role TEXT CHECK (role IN ('anonymous', 'admin', 'user')) NOT NULL,
@@ -70,8 +71,8 @@ const (
 			stripe_subscription_status TEXT,
 			stripe_subscription_paid_until INT,
 			stripe_subscription_cancel_at INT,
-			created_by TEXT NOT NULL,
-			created_at INT NOT NULL,
+			created INT NOT NULL,
+			deleted INT,
 		    FOREIGN KEY (tier_id) REFERENCES tier (id)
 		);
 		CREATE UNIQUE INDEX idx_user ON user (user);
@@ -98,8 +99,8 @@ const (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
 		);
-		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at)
-		VALUES ('u_everyone', '*', '', 'anonymous', '', 'system', UNIXEPOCH()) 
+		INSERT INTO user (id, user, pass, role, sync_topic, created)
+		VALUES ('` + everyoneID + `', '*', '', 'anonymous', '', UNIXEPOCH()) 
 		ON CONFLICT (id) DO NOTHING;
 	`
 	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
@@ -108,26 +109,26 @@ const (
 	`
 
 	selectUserByIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.id = ?		
 	`
 	selectUserByNameQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
-		WHERE user = ?		
+		WHERE user = ?
 	`
 	selectUserByTokenQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE t.token = ? AND t.expires >= ?
 	`
 	selectUserByStripeCustomerIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.stripe_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.stripe_customer_id = ?
@@ -141,8 +142,8 @@ const (
 	`
 
 	insertUserQuery = `
-		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user (id, user, pass, role, sync_topic, created) 
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	selectUsernamesQuery = `
 		SELECT user 
@@ -159,6 +160,8 @@ const (
 	updateUserPrefsQuery         = `UPDATE user SET prefs = ? WHERE user = ?`
 	updateUserStatsQuery         = `UPDATE user SET stats_messages = ?, stats_emails = ? WHERE id = ?`
 	updateUserStatsResetAllQuery = `UPDATE user SET stats_messages = 0, stats_emails = 0`
+	updateUserDeletedQuery       = `UPDATE user SET deleted = ? WHERE id = ?`
+	deleteUsersMarkedQuery       = `DELETE FROM user WHERE deleted < ?`
 	deleteUserQuery              = `DELETE FROM user WHERE user = ?`
 
 	upsertUserAccessQuery = `
@@ -214,7 +217,8 @@ const (
 	selectTokenCountQuery    = `SELECT COUNT(*) FROM user_token WHERE user_id = ?`
 	insertTokenQuery         = `INSERT INTO user_token (user_id, token, expires) VALUES (?, ?, ?)`
 	updateTokenExpiryQuery   = `UPDATE user_token SET expires = ? WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
-	deleteTokenQuery         = `DELETE FROM user_token WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
+	deleteTokenQuery         = `DELETE FROM user_token WHERE user_id = ? AND token = ?`
+	deleteAllTokenQuery      = `DELETE FROM user_token WHERE user_id = ?`
 	deleteExpiredTokensQuery = `DELETE FROM user_token WHERE expires < ?`
 	deleteExcessTokensQuery  = `
 		DELETE FROM user_token
@@ -268,8 +272,8 @@ const (
 	`
 	migrate1To2SelectAllOldUsernamesNoTx = `SELECT user FROM user_old`
 	migrate1To2InsertUserNoTx            = `
-		INSERT INTO user (id, user, pass, role, sync_topic, created_by, created_at) 
-		SELECT ?, user, pass, role, ?, 'admin', UNIXEPOCH() FROM user_old WHERE user = ?
+		INSERT INTO user (id, user, pass, role, sync_topic, created) 
+		SELECT ?, user, pass, role, ?, UNIXEPOCH() FROM user_old WHERE user = ?
 	`
 	migrate1To2InsertFromOldTablesAndDropNoTx = `
 		INSERT INTO user_access (user_id, topic, read, write)
@@ -320,9 +324,9 @@ func newManager(filename, startupQueries string, defaultAccess Permission, stats
 	return manager, nil
 }
 
-// Authenticate checks username and password and returns a User if correct. The method
-// returns in constant-ish time, regardless of whether the user exists or the password is
-// correct or incorrect.
+// Authenticate checks username and password and returns a User if correct, and the user has not been
+// marked as deleted. The method returns in constant-ish time, regardless of whether the user exists or
+// the password is correct or incorrect.
 func (a *Manager) Authenticate(username, password string) (*User, error) {
 	if username == Everyone {
 		return nil, ErrUnauthenticated
@@ -332,9 +336,12 @@ func (a *Manager) Authenticate(username, password string) (*User, error) {
 		log.Trace("authentication of user %s failed (1): %s", username, err.Error())
 		bcrypt.CompareHashAndPassword([]byte(userAuthIntentionalSlowDownHash), []byte("intentional slow-down to avoid timing attacks"))
 		return nil, ErrUnauthenticated
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
-		log.Trace("authentication of user %s failed (2): %s", username, err.Error())
+	} else if user.Deleted {
+		log.Trace("authentication of user %s failed (2): user marked deleted", username)
+		bcrypt.CompareHashAndPassword([]byte(userAuthIntentionalSlowDownHash), []byte("intentional slow-down to avoid timing attacks"))
+		return nil, ErrUnauthenticated
+	} else if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
+		log.Trace("authentication of user %s failed (3): %s", username, err.Error())
 		return nil, ErrUnauthenticated
 	}
 	return user, nil
@@ -415,7 +422,7 @@ func (a *Manager) RemoveToken(user *User) error {
 	if user.Token == "" {
 		return ErrUnauthorized
 	}
-	if _, err := a.db.Exec(deleteTokenQuery, user.Name, user.Token); err != nil {
+	if _, err := a.db.Exec(deleteTokenQuery, user.ID, user.Token); err != nil {
 		return err
 	}
 	return nil
@@ -424,6 +431,14 @@ func (a *Manager) RemoveToken(user *User) error {
 // RemoveExpiredTokens deletes all expired tokens from the database
 func (a *Manager) RemoveExpiredTokens() error {
 	if _, err := a.db.Exec(deleteExpiredTokensQuery, time.Now().Unix()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RemoveDeletedUsers deletes all users that have been marked deleted for
+func (a *Manager) RemoveDeletedUsers() error {
+	if _, err := a.db.Exec(deleteUsersMarkedQuery, time.Now().Unix()); err != nil {
 		return err
 	}
 	return nil
@@ -533,7 +548,7 @@ func (a *Manager) resolvePerms(base, perm Permission) error {
 }
 
 // AddUser adds a user with the given username, password and role
-func (a *Manager) AddUser(username, password string, role Role, createdBy string) error {
+func (a *Manager) AddUser(username, password string, role Role) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
@@ -543,7 +558,7 @@ func (a *Manager) AddUser(username, password string, role Role, createdBy string
 	}
 	userID := util.RandomStringPrefix(userIDPrefix, userIDLength)
 	syncTopic, now := util.RandomStringPrefix(syncTopicPrefix, syncTopicLength), time.Now().Unix()
-	if _, err = a.db.Exec(insertUserQuery, userID, username, hash, role, syncTopic, createdBy, now); err != nil {
+	if _, err = a.db.Exec(insertUserQuery, userID, username, hash, role, syncTopic, now); err != nil {
 		return err
 	}
 	return nil
@@ -560,6 +575,29 @@ func (a *Manager) RemoveUser(username string) error {
 		return err
 	}
 	return nil
+}
+
+// MarkUserRemoved sets the deleted flag on the user, and deletes all access tokens. This prevents
+// successful auth via Authenticate. A background process will delete the user at a later date.
+func (a *Manager) MarkUserRemoved(user *User) error {
+	if !AllowedUsername(user.Name) {
+		return ErrInvalidArgument
+	}
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := a.db.Exec(deleteUserAccessQuery, user.Name, user.Name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(deleteAllTokenQuery, user.ID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateUserDeletedQuery, time.Now().Add(userHardDeleteAfterDuration).Unix(), user.ID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Users returns a list of users. It always also returns the Everyone user ("*").
@@ -632,11 +670,11 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	var id, username, hash, role, prefs, syncTopic string
 	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripePriceID, tierCode, tierName sql.NullString
 	var messages, emails int64
-	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt sql.NullInt64
+	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt, deleted sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrUserNotFound
 	}
-	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &stripePriceID); err != nil {
+	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &stripePriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -659,6 +697,7 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			StripeSubscriptionPaidUntil: time.Unix(stripeSubscriptionPaidUntil.Int64, 0),            // May be zero
 			StripeSubscriptionCancelAt:  time.Unix(stripeSubscriptionCancelAt.Int64, 0),             // May be zero
 		},
+		Deleted: deleted.Valid,
 	}
 	if err := json.Unmarshal([]byte(prefs), user.Prefs); err != nil {
 		return nil, err

@@ -20,8 +20,7 @@ type User struct {
 	Stats     *Stats
 	Billing   *Billing
 	SyncTopic string
-	Created   time.Time
-	LastSeen  time.Time
+	Deleted   bool
 }
 
 // Auther is an interface for authentication and authorization
@@ -186,7 +185,8 @@ const (
 
 // Everyone is a special username representing anonymous users
 const (
-	Everyone = "*"
+	Everyone   = "*"
+	everyoneID = "u_everyone"
 )
 
 var (

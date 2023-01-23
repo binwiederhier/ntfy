@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"heckel.io/ntfy/user"
 	"net/netip"
 	"sync"
@@ -119,6 +120,17 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 	}
 }
 
+func (v *visitor) String() string {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.user != nil && v.user.Billing.StripeCustomerID != "" {
+		return fmt.Sprintf("%s/%s/%s", v.ip.String(), v.user.ID, v.user.Billing.StripeCustomerID)
+	} else if v.user != nil {
+		return fmt.Sprintf("%s/%s", v.ip.String(), v.user.ID)
+	}
+	return v.ip.String()
+}
+
 func (v *visitor) RequestAllowed() error {
 	if !v.requestLimiter.Allow() {
 		return errVisitorLimitReached
@@ -214,6 +226,12 @@ func (v *visitor) ResetStats() {
 		v.user.Stats.Emails = 0
 		// v.messagesLimiter = ... // FIXME
 	}
+}
+
+func (v *visitor) SetUser(u *user.User) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.user = u
 }
 
 func (v *visitor) Limits() *visitorLimits {

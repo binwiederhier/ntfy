@@ -49,7 +49,7 @@ func readQueryParam(r *http.Request, names ...string) string {
 }
 
 func logMessagePrefix(v *visitor, m *message) string {
-	return fmt.Sprintf("%s/%s/%s", v.ip, m.Topic, m.ID)
+	return fmt.Sprintf("%s/%s/%s", v.String(), m.Topic, m.ID)
 }
 
 func logHTTPPrefix(v *visitor, r *http.Request) string {
@@ -57,7 +57,14 @@ func logHTTPPrefix(v *visitor, r *http.Request) string {
 	if requestURI == "" {
 		requestURI = r.URL.Path
 	}
-	return fmt.Sprintf("%s HTTP %s %s", v.ip, r.Method, requestURI)
+	return fmt.Sprintf("%s HTTP %s %s", v.String(), r.Method, requestURI)
+}
+
+func logStripePrefix(customerID, subscriptionID string) string {
+	if subscriptionID != "" {
+		return fmt.Sprintf("%s/%s STRIPE", customerID, subscriptionID)
+	}
+	return fmt.Sprintf("%s STRIPE", customerID)
 }
 
 func logSMTPPrefix(state *smtp.ConnectionState) string {

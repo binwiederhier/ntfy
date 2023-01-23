@@ -228,10 +228,22 @@ func (v *visitor) ResetStats() {
 	}
 }
 
+// SetUser sets the visitors user to the given value
 func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.user = u
+}
+
+// MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,
+// an empty string is returned.
+func (v *visitor) MaybeUserID() string {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.user != nil {
+		return v.user.ID
+	}
+	return ""
 }
 
 func (v *visitor) Limits() *visitorLimits {

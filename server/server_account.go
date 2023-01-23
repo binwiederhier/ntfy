@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
@@ -331,6 +330,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if v.user.Tier == nil {
 		return errHTTPUnauthorized
 	}
+	// CHeck if we are allowed to reserve this topic
 	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
 	}
@@ -346,9 +346,16 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}
+	// Actually add the reservation
 	if err := s.userManager.AddReservation(v.user.Name, req.Topic, everyone); err != nil {
 		return err
 	}
+	// Kill existing subscribers
+	t, err := s.topicFromID(req.Topic)
+	if err != nil {
+		return err
+	}
+	t.CancelSubscribers(v.user.ID)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -402,13 +409,10 @@ func (s *Server) publishSyncEvent(v *visitor) error {
 		return nil
 	}
 	log.Trace("Publishing sync event to user %s's sync topic %s", v.user.Name, v.user.SyncTopic)
-	topics, err := s.topicsFromIDs(v.user.SyncTopic)
+	syncTopic, err := s.topicFromID(v.user.SyncTopic)
 	if err != nil {
 		return err
-	} else if len(topics) == 0 {
-		return errors.New("cannot retrieve sync topic")
 	}
-	syncTopic := topics[0]
 	messageBytes, err := json.Marshal(&apiAccountSyncTopicResponse{Event: syncTopicAccountSyncEvent})
 	if err != nil {
 		return err

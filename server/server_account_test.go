@@ -496,3 +496,72 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	rr = request(t, s, "POST", "/mytopic", `Howdy`, nil)
 	require.Equal(t, 403, rr.Code)
 }
+
+func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	conf.AuthDefault = user.PermissionReadWrite
+	conf.EnableSignup = true
+	s := newTestServer(t, conf)
+
+	// Create user with tier
+	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
+	require.Equal(t, 200, rr.Code)
+
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:              "pro",
+		MessagesLimit:     20,
+		ReservationsLimit: 2,
+	}))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+
+	// Subscribe anonymously
+	anonCh, userCh := make(chan bool), make(chan bool)
+	go func() {
+		rr := request(t, s, "GET", "/mytopic/json", ``, nil)
+		require.Equal(t, 200, rr.Code)
+		messages := toMessages(t, rr.Body.String())
+		require.Equal(t, 2, len(messages)) // This is the meat. We should NOT receive the second message!
+		require.Equal(t, "open", messages[0].Event)
+		require.Equal(t, "message before reservation", messages[1].Message)
+		anonCh <- true
+	}()
+
+	// Subscribe with user
+	go func() {
+		rr := request(t, s, "GET", "/mytopic/json", ``, map[string]string{
+			"Authorization": util.BasicAuth("phil", "mypass"),
+		})
+		require.Equal(t, 200, rr.Code)
+		messages := toMessages(t, rr.Body.String())
+		require.Equal(t, 3, len(messages))
+		require.Equal(t, "open", messages[0].Event)
+		require.Equal(t, "message before reservation", messages[1].Message)
+		require.Equal(t, "message after reservation", messages[2].Message)
+		userCh <- true
+	}()
+
+	// Publish message (before reservation)
+	time.Sleep(700 * time.Millisecond) // Wait for subscribers
+	rr = request(t, s, "POST", "/mytopic", "message before reservation", nil)
+	require.Equal(t, 200, rr.Code)
+	time.Sleep(700 * time.Millisecond) // Wait for subscribers to receive message
+
+	// Reserve a topic
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Everyone but phil should be killed
+	<-anonCh
+
+	// Publish a message
+	rr = request(t, s, "POST", "/mytopic", "message after reservation", map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Kill user Go routine
+	s.topics["mytopic"].CancelSubscribers("<invalid>")
+	<-userCh
+}

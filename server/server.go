@@ -38,24 +38,16 @@ import (
 TODO
 --
 
-- HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Rate limiting: dailyLimitToRate is wrong? + TESTS
+- HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Rate limiting: Bandwidth limit must be in tier + TESTS
-- HIGH Sync problems with "deleteAfter=0" and "displayName="
-- Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
-- Reservation (UI): Ask for confirmation when removing reservation (deadcade)
-- Reservation table delete button: dialog "keep or delete messages?"
-- UI: Flickering upgrade banner when logging in
-- JS constants
-
-races:
-- v.user --> see publishSyncEventAsync() test
-
-payments:
-- reconciliation
-
-delete messages + reserved topics on ResetTier delete attachments in access.go
-
+- MEDIUM: Races with v.user (see publishSyncEventAsync test)
+- MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
+- MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
+- MEDIUM: Reservation table delete button: dialog "keep or delete messages?"
+- LOW: UI: Flickering upgrade banner when logging in
+- LOW: JS constants
+- LOW: Payments reconciliation process
 
 Limits & rate limiting:
 	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
@@ -1030,12 +1022,12 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	defer conn.Close()
 
 	// Subscription connections can be canceled externally, see topic.CancelSubscribers
-	subscriberContext, cancel := context.WithCancel(context.Background())
+	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Use errgroup to run WebSocket reader and writer in Go routines
 	var wlock sync.Mutex
-	g, gctx := errgroup.WithContext(subscriberContext)
+	g, gctx := errgroup.WithContext(cancelCtx)
 	g.Go(func() error {
 		pongWait := s.config.KeepaliveInterval + wsPongWait
 		conn.SetReadLimit(wsReadLimit)
@@ -1072,7 +1064,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			select {
 			case <-gctx.Done():
 				return nil
-			case <-subscriberContext.Done():
+			case <-cancelCtx.Done():
 				log.Trace("%s Cancel received, closing subscriber connection", logHTTPPrefix(v, r))
 				conn.Close()
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}

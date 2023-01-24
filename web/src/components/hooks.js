@@ -1,5 +1,5 @@
 import {useNavigate, useParams} from "react-router-dom";
-import {useContext, useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import subscriptionManager from "../app/SubscriptionManager";
 import {disallowedTopic, expandSecureUrl, topicUrl} from "../app/utils";
 import notifier from "../app/Notifier";
@@ -8,18 +8,17 @@ import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import session from "../app/Session";
-import {UnauthorizedError} from "../app/AccountApi";
-import accountApi from "../app/AccountApi";
-import {AccountContext} from "./App";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
  * state changes. Conversely, when the subscription changes, the connection is refreshed (which may lead
  * to the connection being re-established).
  */
-export const useConnectionListeners = (subscriptions, users) => {
+export const useConnectionListeners = (account, subscriptions, users) => {
     const navigate = useNavigate();
 
+    // Register listeners for incoming messages, and connection state changes
     useEffect(() => {
             const handleMessage = async (subscriptionId, message) => {
                 const subscription = await subscriptionManager.get(subscriptionId);
@@ -64,6 +63,15 @@ export const useConnectionListeners = (subscriptions, users) => {
         []
     );
 
+    // Sync topic listener: For accounts with sync_topic, subscribe to an internal topic
+    useEffect(() => {
+        if (!account || !account.sync_topic) {
+            return;
+        }
+        subscriptionManager.add(config.base_url, account.sync_topic, true); // Dangle!
+    }, [account]);
+
+    // When subscriptions or users change, refresh the connections
     useEffect(() => {
         connectionManager.refresh(subscriptions, users); // Dangle
     }, [subscriptions, users]);

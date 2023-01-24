@@ -17,7 +17,7 @@ class SubscriptionManager {
         return await db.subscriptions.get(subscriptionId)
     }
 
-    async add(baseUrl, topic) {
+    async add(baseUrl, topic, internal) {
         const id = topicUrl(baseUrl, topic);
         const existingSubscription = await this.get(id);
         if (existingSubscription) {
@@ -30,7 +30,7 @@ class SubscriptionManager {
             mutedUntil: 0,
             last: null,
             remoteId: null,
-            internal: false
+            internal: internal || false
         };
         await db.subscriptions.put(subscription);
         return subscription;
@@ -47,7 +47,7 @@ class SubscriptionManager {
             const reservation = remoteReservations?.find(r => remote.base_url === config.base_url && remote.topic === r.topic) || null;
             await this.update(local.id, {
                 remoteId: remote.id,
-                displayName: remote.display_name,
+                displayName: remote.display_name, // May be undefined
                 reservation: reservation // May be null!
             });
             remoteIds.push(remote.id);

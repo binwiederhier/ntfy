@@ -71,24 +71,10 @@ const Layout = () => {
             || (config.base_url === s.baseUrl && params.topic === s.topic)
     });
 
-    useConnectionListeners(subscriptions, users);
+    useConnectionListeners(account, subscriptions, users);
     useAccountListener(setAccount)
     useBackgroundProcesses();
     useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
-
-    useEffect(() => {
-        if (!account || !account.sync_topic) {
-            return;
-        }
-        (async () => {
-            const subscription = await subscriptionManager.add(config.base_url, account.sync_topic);
-            if (!subscription.hidden) {
-                await subscriptionManager.update(subscription.id, {
-                    internal: true
-                });
-            }
-        })();
-    }, [account]);
 
     return (
         <Box sx={{display: 'flex'}}>

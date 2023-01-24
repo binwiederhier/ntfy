@@ -11,6 +11,7 @@ import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import SubscribeDialog from "./SubscribeDialog";
 import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Tooltip} from "@mui/material";
 import Button from "@mui/material/Button";
@@ -31,6 +32,7 @@ import accountApi from "../app/AccountApi";
 import CelebrationIcon from '@mui/icons-material/Celebration';
 import UpgradeDialog from "./UpgradeDialog";
 import {AccountContext} from "./App";
+import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
 
 const navWidth = 280;
 
@@ -263,16 +265,16 @@ const SubscriptionItem = (props) => {
             {subscription.reservation?.everyone &&
                 <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
                     {subscription.reservation?.everyone === "read-write" &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><Public fontSize="small"/></Tooltip>
+                        <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><PermissionReadWrite size="small"/></Tooltip>
                     }
                     {subscription.reservation?.everyone === "read-only" &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PublicOff fontSize="small"/></Tooltip>
+                        <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PermissionRead size="small"/></Tooltip>
                     }
                     {subscription.reservation?.everyone === "write-only" &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PublicOff fontSize="small"/></Tooltip>
+                        <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PermissionWrite size="small"/></Tooltip>
                     }
                     {subscription.reservation?.everyone === "deny-all" &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><Lock fontSize="small"/></Tooltip>
+                        <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><PermissionDenyAll size="small"/></Tooltip>
                     }
                 </ListItemIcon>
             }

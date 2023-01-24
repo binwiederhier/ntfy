@@ -38,11 +38,13 @@ import (
 TODO
 --
 
-- Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- HIGH Rate limiting: dailyLimitToRate is wrong? + TESTS
+- HIGH Rate limiting: Bandwidth limit must be in tier + TESTS
+- HIGH Sync problems with "deleteAfter=0" and "displayName="
 - Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - Reservation (UI): Ask for confirmation when removing reservation (deadcade)
-- Reservation icons (UI)
-- reservation table delete button: dialog "keep or delete messages?"
+- Reservation table delete button: dialog "keep or delete messages?"
 - UI: Flickering upgrade banner when logging in
 - JS constants
 
@@ -56,22 +58,14 @@ delete messages + reserved topics on ResetTier delete attachments in access.go
 
 
 Limits & rate limiting:
-	rate limiting weirdness. wth is going on?
-	bandwidth limit must be in tier
 	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
 	when ResetStats() is run, reset messagesLimiter (and others)?
 	Delete visitor when tier is changed to refresh rate limiters
 
 Make sure account endpoints make sense for admins
 
-
-Sync:
-	- sync problems with "deleteAfter=0" and "displayName="
-
 Tests:
 - Payment endpoints (make mocks)
-- Message rate limiting and reset tests
-- Bandwidth limit test
 - test that the visitor is based on the IP address when a user has no tier
 */
 

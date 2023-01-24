@@ -1035,13 +1035,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 
 	// Use errgroup to run WebSocket reader and writer in Go routines
 	var wlock sync.Mutex
-	g, gctx := errgroup.WithContext(context.Background())
-	g.Go(func() error {
-		<-subscriberContext.Done()
-		log.Trace("%s Cancel received, closing subscriber connection", logHTTPPrefix(v, r))
-		conn.Close()
-		return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}
-	})
+	g, gctx := errgroup.WithContext(subscriberContext)
 	g.Go(func() error {
 		pongWait := s.config.KeepaliveInterval + wsPongWait
 		conn.SetReadLimit(wsReadLimit)
@@ -1078,6 +1072,10 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			select {
 			case <-gctx.Done():
 				return nil
+			case <-subscriberContext.Done():
+				log.Trace("%s Cancel received, closing subscriber connection", logHTTPPrefix(v, r))
+				conn.Close()
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}
 			case <-time.After(s.config.KeepaliveInterval):
 				v.Keepalive()
 				if err := ping(); err != nil {

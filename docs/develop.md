@@ -92,7 +92,6 @@ sudo apt install \
     gcc-arm-linux-gnueabi \
     gcc-aarch64-linux-gnu \
     python3-pip \
-    upx \
     git
 ```
 

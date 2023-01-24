@@ -64,7 +64,7 @@ func (t *topic) Publish(v *visitor, m *message) error {
 				// we don't want individual slow subscribers to be able to block others.
 				go func(s subscriber) {
 					if err := s(v, m); err != nil {
-						log.Warn("%s Error forwarding to subscriber", logMessagePrefix(v, m))
+						log.Warn("%s Error forwarding to subscriber: %s", logMessagePrefix(v, m), err.Error())
 					}
 				}(s.subscriber)
 			}

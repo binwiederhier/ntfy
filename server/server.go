@@ -1328,6 +1328,7 @@ func (s *Server) execManager() {
 	var subscribers int
 	for _, t := range s.topics {
 		subs := t.SubscribersCount()
+		log.Trace("- topic %s: %d subscribers", t.ID, subs)
 		msgs, exists := messageCounts[t.ID]
 		if subs == 0 && (!exists || msgs == 0) {
 			log.Trace("Deleting empty topic %s", t.ID)

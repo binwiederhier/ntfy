@@ -72,8 +72,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		response.Role = string(v.user.Role)
 		response.SyncTopic = v.user.SyncTopic
 		if v.user.Prefs != nil {
-			if v.user.Prefs.Language != "" {
-				response.Language = v.user.Prefs.Language
+			if v.user.Prefs.Language != nil {
+				response.Language = *v.user.Prefs.Language
 			}
 			if v.user.Prefs.Notification != nil {
 				response.Notification = v.user.Prefs.Notification
@@ -210,20 +210,20 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 		v.user.Prefs = &user.Prefs{}
 	}
 	prefs := v.user.Prefs
-	if newPrefs.Language != "" {
+	if newPrefs.Language != nil {
 		prefs.Language = newPrefs.Language
 	}
 	if newPrefs.Notification != nil {
 		if prefs.Notification == nil {
 			prefs.Notification = &user.NotificationPrefs{}
 		}
-		if newPrefs.Notification.DeleteAfter > 0 {
+		if newPrefs.Notification.DeleteAfter != nil {
 			prefs.Notification.DeleteAfter = newPrefs.Notification.DeleteAfter
 		}
-		if newPrefs.Notification.Sound != "" {
+		if newPrefs.Notification.Sound != nil {
 			prefs.Notification.Sound = newPrefs.Notification.Sound
 		}
-		if newPrefs.Notification.MinPriority > 0 {
+		if newPrefs.Notification.MinPriority != nil {
 			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
 		}
 	}

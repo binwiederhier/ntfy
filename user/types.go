@@ -43,7 +43,7 @@ type Token struct {
 
 // Prefs represents a user's configuration settings
 type Prefs struct {
-	Language      string             `json:"language,omitempty"`
+	Language      *string            `json:"language,omitempty"`
 	Notification  *NotificationPrefs `json:"notification,omitempty"`
 	Subscriptions []*Subscription    `json:"subscriptions,omitempty"`
 }
@@ -65,17 +65,17 @@ type Tier struct {
 
 // Subscription represents a user's topic subscription
 type Subscription struct {
-	ID          string `json:"id"`
-	BaseURL     string `json:"base_url"`
-	Topic       string `json:"topic"`
-	DisplayName string `json:"display_name"`
+	ID          string  `json:"id"`
+	BaseURL     string  `json:"base_url"`
+	Topic       string  `json:"topic"`
+	DisplayName *string `json:"display_name"`
 }
 
 // NotificationPrefs represents the user's notification settings
 type NotificationPrefs struct {
-	Sound       string `json:"sound,omitempty"`
-	MinPriority int    `json:"min_priority,omitempty"`
-	DeleteAfter int    `json:"delete_after,omitempty"`
+	Sound       *string `json:"sound,omitempty"`
+	MinPriority *int    `json:"min_priority,omitempty"`
+	DeleteAfter *int    `json:"delete_after,omitempty"`
 }
 
 // Stats is a struct holding daily user statistics

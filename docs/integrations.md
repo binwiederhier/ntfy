@@ -108,6 +108,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [maubot-ntfy](https://gitlab.com/999eagle/maubot-ntfy) - Matrix bot to subscribe to ntfy topics and send messages to Matrix (Python)
 - [ntfy-wrapper](https://github.com/vict0rsch/ntfy-wrapper) - Wrapper around ntfy (Python)
 - [nodebb-plugin-ntfy](https://github.com/NodeBB/nodebb-plugin-ntfy) - Push notifications for NodeBB forums
+- [n8n-ntfy](https://github.com/raghavanand98/n8n-ntfy.sh) - n8n community node that lets you use ntfy in your workflows
 
 ## Blog + forum posts
 

@@ -61,9 +61,9 @@ for the server and the Android app. Or, if you'd like to help translate 🇩🇪
 </a>
 
 ## Sponsors
-I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
-I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
-appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
+I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier),
+and [Liberapay](https://liberapay.com/ntfy). I would be humbled if you helped me carry the server and developer 
+account costs. Even small donations are very much appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
@@ -111,6 +111,7 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/thebino"><img src="https://github.com/thebino.png" width="40px" /></a>
 <a href="https://github.com/sky4055"><img src="https://github.com/sky4055.png" width="40px" /></a>
 <a href="https://github.com/julianlam"><img src="https://github.com/julianlam.png" width="40px" /></a>
+<a href="https://github.com/andreapx"><img src="https://github.com/andreapx.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

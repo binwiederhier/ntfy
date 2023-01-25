@@ -31,9 +31,9 @@ var (
 type visitor struct {
 	config              *Config
 	messageCache        *messageCache
-	userManager         *user.Manager // May be nil!
-	ip                  netip.Addr
-	user                *user.User
+	userManager         *user.Manager // May be nil
+	ip                  netip.Addr    // Visitor IP address
+	user                *user.User    // Only set if authenticated user, otherwise nil
 	messages            int64         // Number of messages sent, reset every day
 	emails              int64         // Number of emails sent, reset every day
 	requestLimiter      *rate.Limiter // Rate limiter for (almost) all requests (including messages)
@@ -61,6 +61,7 @@ type visitorLimits struct {
 	AttachmentTotalSizeLimit int64
 	AttachmentFileSizeLimit  int64
 	AttachmentExpiryDuration time.Duration
+	AttachmentBandwidthLimit int64
 }
 
 type visitorStats struct {
@@ -84,7 +85,7 @@ const (
 )
 
 func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
-	var messagesLimiter util.Limiter
+	var messagesLimiter, attachmentBandwidthLimiter util.Limiter
 	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
@@ -97,9 +98,11 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.MessagesLimit), conf.VisitorRequestLimitBurst)
 		messagesLimiter = util.NewFixedLimiter(user.Tier.MessagesLimit)
 		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.EmailsLimit), conf.VisitorEmailLimitBurst)
+		attachmentBandwidthLimiter = util.NewBytesLimiter(int(user.Tier.AttachmentBandwidthLimit), 24*time.Hour)
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
 		emailsLimiter = rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst)
+		attachmentBandwidthLimiter = util.NewBytesLimiter(int(conf.VisitorAttachmentDailyBandwidthLimit), 24*time.Hour)
 	}
 	return &visitor{
 		config:              conf,
@@ -113,7 +116,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		messagesLimiter:     messagesLimiter, // May be nil
 		emailsLimiter:       emailsLimiter,
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		bandwidthLimiter:    util.NewBytesLimiter(conf.VisitorAttachmentDailyBandwidthLimit, 24*time.Hour),
+		bandwidthLimiter:    attachmentBandwidthLimiter,
 		accountLimiter:      accountLimiter, // May be nil
 		firebase:            time.Unix(0, 0),
 		seen:                time.Now(),
@@ -259,6 +262,7 @@ func (v *visitor) Limits() *visitorLimits {
 		limits.AttachmentTotalSizeLimit = v.user.Tier.AttachmentTotalSizeLimit
 		limits.AttachmentFileSizeLimit = v.user.Tier.AttachmentFileSizeLimit
 		limits.AttachmentExpiryDuration = v.user.Tier.AttachmentExpiryDuration
+		limits.AttachmentBandwidthLimit = v.user.Tier.AttachmentBandwidthLimit
 	}
 	return limits
 }
@@ -327,5 +331,6 @@ func defaultVisitorLimits(conf *Config) *visitorLimits {
 		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
 		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
+		AttachmentBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
 	}
 }

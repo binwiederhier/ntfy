@@ -101,7 +101,7 @@ type Config struct {
 	TotalAttachmentSizeLimit             int64
 	VisitorSubscriptionLimit             int
 	VisitorAttachmentTotalSizeLimit      int64
-	VisitorAttachmentDailyBandwidthLimit int
+	VisitorAttachmentDailyBandwidthLimit int64
 	VisitorRequestLimitBurst             int
 	VisitorRequestLimitReplenish         time.Duration
 	VisitorRequestExemptIPAddrs          []netip.Prefix

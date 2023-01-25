@@ -40,7 +40,6 @@ TODO
 
 - HIGH Rate limiting: dailyLimitToRate is wrong? + TESTS
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
-- HIGH Rate limiting: Bandwidth limit must be in tier + TESTS
 - MEDIUM: Races with v.user (see publishSyncEventAsync test)
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
@@ -866,7 +865,6 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		util.NewFixedLimiter(vinfo.Limits.AttachmentFileSizeLimit),
 		util.NewFixedLimiter(vinfo.Stats.AttachmentTotalSizeRemaining),
 	}
-	fmt.Printf("limiters = %#v\nv = %#v\n", limiters, v)
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {
 		return errHTTPEntityTooLargeAttachment

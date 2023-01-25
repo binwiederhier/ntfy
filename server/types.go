@@ -246,7 +246,7 @@ type apiAccountTier struct {
 }
 
 type apiAccountLimits struct {
-	Basis                    string `json:"basis,omitempty"` // "ip", "role" or "tier"
+	Basis                    string `json:"basis,omitempty"` // "ip" or "tier"
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
@@ -254,6 +254,7 @@ type apiAccountLimits struct {
 	AttachmentTotalSize      int64  `json:"attachment_total_size"`
 	AttachmentFileSize       int64  `json:"attachment_file_size"`
 	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
+	AttachmentBandwidth      int64  `json:"attachment_bandwidth"`
 }
 
 type apiAccountStats struct {

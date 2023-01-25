@@ -153,9 +153,9 @@ func TestAccount_ChangeSettings(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, "de", account.Language)
-	require.Equal(t, 86400, account.Notification.DeleteAfter)
-	require.Equal(t, "juntos", account.Notification.Sound)
-	require.Equal(t, 0, account.Notification.MinPriority) // Not set
+	require.Equal(t, util.Int(86400), account.Notification.DeleteAfter)
+	require.Equal(t, util.String("juntos"), account.Notification.Sound)
+	require.Nil(t, account.Notification.MinPriority) // Not set
 }
 
 func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
@@ -176,7 +176,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	require.NotEmpty(t, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
 	require.Equal(t, "def", account.Subscriptions[0].Topic)
-	require.Equal(t, "", account.Subscriptions[0].DisplayName)
+	require.Nil(t, account.Subscriptions[0].DisplayName)
 
 	subscriptionID := account.Subscriptions[0].ID
 	rr = request(t, s, "PATCH", "/v1/account/subscription/"+subscriptionID, `{"display_name": "ding dong"}`, map[string]string{
@@ -193,7 +193,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	require.Equal(t, subscriptionID, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
 	require.Equal(t, "def", account.Subscriptions[0].Topic)
-	require.Equal(t, "ding dong", account.Subscriptions[0].DisplayName)
+	require.Equal(t, util.String("ding dong"), account.Subscriptions[0].DisplayName)
 
 	rr = request(t, s, "DELETE", "/v1/account/subscription/"+subscriptionID, "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -402,6 +402,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 		AttachmentFileSizeLimit:  1231231,
 		AttachmentTotalSizeLimit: 123123,
 		AttachmentExpiryDuration: 10800 * time.Second,
+		AttachmentBandwidthLimit: 21474836480,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
@@ -442,6 +443,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	require.Equal(t, int64(1231231), account.Limits.AttachmentFileSize)
 	require.Equal(t, int64(123123), account.Limits.AttachmentTotalSize)
 	require.Equal(t, int64(10800), account.Limits.AttachmentExpiryDuration)
+	require.Equal(t, int64(21474836480), account.Limits.AttachmentBandwidth)
 	require.Equal(t, 2, len(account.Reservations))
 	require.Equal(t, "another", account.Reservations[0].Topic)
 	require.Equal(t, "write-only", account.Reservations[0].Everyone)

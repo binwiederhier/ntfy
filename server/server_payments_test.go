@@ -265,6 +265,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentExpiryDuration: time.Hour,
 		AttachmentFileSizeLimit:  1000000,
 		AttachmentTotalSizeLimit: 1000000,
+		AttachmentBandwidthLimit: 1000000,
 	}))
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "pro",
@@ -275,6 +276,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentExpiryDuration: time.Hour,
 		AttachmentFileSizeLimit:  1000000,
 		AttachmentTotalSizeLimit: 1000000,
+		AttachmentBandwidthLimit: 1000000,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))

@@ -11,6 +11,7 @@ import (
 
 const (
 	subscriptionIDLength      = 16
+	subscriptionIDPrefix      = "su_"
 	syncTopicAccountSyncEvent = "sync"
 )
 
@@ -55,6 +56,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			AttachmentTotalSize:      limits.AttachmentTotalSizeLimit,
 			AttachmentFileSize:       limits.AttachmentFileSizeLimit,
 			AttachmentExpiryDuration: int64(limits.AttachmentExpiryDuration.Seconds()),
+			AttachmentBandwidth:      limits.AttachmentBandwidthLimit,
 		},
 		Stats: &apiAccountStats{
 			Messages:                     stats.Messages,
@@ -249,7 +251,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if newSubscription.ID == "" {
-		newSubscription.ID = util.RandomString(subscriptionIDLength)
+		newSubscription.ID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
 		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, newSubscription)
 		if err := s.userManager.ChangeSettings(v.user); err != nil {
 			return err

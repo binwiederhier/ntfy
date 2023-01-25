@@ -50,17 +50,18 @@ type Prefs struct {
 
 // Tier represents a user's account type, including its account limits
 type Tier struct {
-	ID                       string
-	Code                     string
-	Name                     string
-	MessagesLimit            int64
-	MessagesExpiryDuration   time.Duration
-	EmailsLimit              int64
-	ReservationsLimit        int64
-	AttachmentFileSizeLimit  int64
-	AttachmentTotalSizeLimit int64
-	AttachmentExpiryDuration time.Duration
-	StripePriceID            string
+	ID                       string        // Tier identifier (ti_...)
+	Code                     string        // Code of the tier
+	Name                     string        // Name of the tier
+	MessagesLimit            int64         // Daily message limit
+	MessagesExpiryDuration   time.Duration // Cache duration for messages
+	EmailsLimit              int64         // Daily email limit
+	ReservationsLimit        int64         // Number of topic reservations allowed by user
+	AttachmentFileSizeLimit  int64         // Max file size per file (bytes)
+	AttachmentTotalSizeLimit int64         // Total file size for all files of this user (bytes)
+	AttachmentExpiryDuration time.Duration // Duration after which attachments will be deleted
+	AttachmentBandwidthLimit int64         // Daily bandwidth limit for the user
+	StripePriceID            string        // Price ID for paid tiers (price_...)
 }
 
 // Subscription represents a user's topic subscription

@@ -1368,6 +1368,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
 		AttachmentExpiryDuration: sevenDays, // 7 days
+		AttachmentBandwidthLimit: 100000,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -1376,6 +1377,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 	response := request(t, s, "PUT", "/mytopic", content, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
+	require.Equal(t, 200, response.Code)
 	msg := toMessage(t, response.Body.String())
 	require.Contains(t, msg.Attachment.URL, "http://127.0.0.1:12345/file/")
 	require.True(t, msg.Attachment.Expires > time.Now().Add(sevenDays-30*time.Second).Unix())
@@ -1396,6 +1398,46 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 }
 
+func TestServer_PublishAttachmentWithTierBasedBandwidthLimit(t *testing.T) {
+	content := util.RandomString(5000) // > 4096
+
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+
+	// Create tier with certain limits
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                     "test",
+		MessagesLimit:            10,
+		MessagesExpiryDuration:   time.Hour,
+		AttachmentFileSizeLimit:  50_000,
+		AttachmentTotalSizeLimit: 200_000,
+		AttachmentExpiryDuration: time.Hour,
+		AttachmentBandwidthLimit: 14000, // < 3x5000 bytes -> enough for one upload, one download
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+
+	// Publish and make sure we can retrieve it
+	rr := request(t, s, "PUT", "/mytopic", content, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	msg := toMessage(t, rr.Body.String())
+
+	// Retrieve it (first time succeeds)
+	rr = request(t, s, "GET", "/file/"+msg.ID, content, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, content, rr.Body.String())
+
+	// Retrieve it AGAIN (fails, due to bandwidth limit)
+	rr = request(t, s, "GET", "/file/"+msg.ID, content, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, rr.Code)
+}
+
 func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 	smallFile := util.RandomString(20_000)
 	largeFile := util.RandomString(50_000)
@@ -1412,6 +1454,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 		AttachmentFileSizeLimit:  50_000,
 		AttachmentTotalSizeLimit: 200_000,
 		AttachmentExpiryDuration: 30 * time.Second,
+		AttachmentBandwidthLimit: 1000000,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))

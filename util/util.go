@@ -336,3 +336,13 @@ func Retry[T any](f func() (*T, error), after ...time.Duration) (t *T, err error
 	}
 	return nil, err
 }
+
+// String turns a string into a pointer of a string
+func String(v string) *string {
+	return &v
+}
+
+// Int turns a string into a pointer of an int
+func Int(v int) *int {
+	return &v
+}

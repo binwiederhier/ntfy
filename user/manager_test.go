@@ -3,6 +3,7 @@ package user
 import (
 	"database/sql"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/util"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -583,21 +584,21 @@ func TestManager_ChangeSettings(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, u.Prefs.Subscriptions)
 	require.Nil(t, u.Prefs.Notification)
-	require.Equal(t, "", u.Prefs.Language)
+	require.Nil(t, u.Prefs.Language)
 
 	// Save with new settings
 	u.Prefs = &Prefs{
-		Language: "de",
+		Language: util.String("de"),
 		Notification: &NotificationPrefs{
-			Sound:       "ding",
-			MinPriority: 2,
+			Sound:       util.String("ding"),
+			MinPriority: util.Int(2),
 		},
 		Subscriptions: []*Subscription{
 			{
 				ID:          "someID",
 				BaseURL:     "https://ntfy.sh",
 				Topic:       "mytopic",
-				DisplayName: "My Topic",
+				DisplayName: util.String("My Topic"),
 			},
 		},
 	}
@@ -606,14 +607,14 @@ func TestManager_ChangeSettings(t *testing.T) {
 	// Read again
 	u, err = a.User("ben")
 	require.Nil(t, err)
-	require.Equal(t, "de", u.Prefs.Language)
-	require.Equal(t, "ding", u.Prefs.Notification.Sound)
-	require.Equal(t, 2, u.Prefs.Notification.MinPriority)
-	require.Equal(t, 0, u.Prefs.Notification.DeleteAfter)
+	require.Equal(t, util.String("de"), u.Prefs.Language)
+	require.Equal(t, util.String("ding"), u.Prefs.Notification.Sound)
+	require.Equal(t, util.Int(2), u.Prefs.Notification.MinPriority)
+	require.Nil(t, u.Prefs.Notification.DeleteAfter)
 	require.Equal(t, "someID", u.Prefs.Subscriptions[0].ID)
 	require.Equal(t, "https://ntfy.sh", u.Prefs.Subscriptions[0].BaseURL)
 	require.Equal(t, "mytopic", u.Prefs.Subscriptions[0].Topic)
-	require.Equal(t, "My Topic", u.Prefs.Subscriptions[0].DisplayName)
+	require.Equal(t, util.String("My Topic"), u.Prefs.Subscriptions[0].DisplayName)
 }
 
 func TestSqliteCache_Migration_From1(t *testing.T) {

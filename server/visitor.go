@@ -251,12 +251,13 @@ func (v *visitor) resetLimiters() {
 		messagesLimiter = util.NewFixedLimiter(v.user.Tier.MessagesLimit)
 		emailsLimiter = rate.NewLimiter(dailyLimitToRate(v.user.Tier.EmailsLimit), v.config.VisitorEmailLimitBurst)
 		bandwidthLimiter = util.NewBytesLimiter(int(v.user.Tier.AttachmentBandwidthLimit), 24*time.Hour)
-		accountLimiter = nil // A logged-in user cannot create an account
 	} else {
 		requestLimiter = rate.NewLimiter(rate.Every(v.config.VisitorRequestLimitReplenish), v.config.VisitorRequestLimitBurst)
 		messagesLimiter = nil // Message limit is governed by the requestLimiter
 		emailsLimiter = rate.NewLimiter(rate.Every(v.config.VisitorEmailLimitReplenish), v.config.VisitorEmailLimitBurst)
 		bandwidthLimiter = util.NewBytesLimiter(int(v.config.VisitorAttachmentDailyBandwidthLimit), 24*time.Hour)
+	}
+	if v.user == nil {
 		accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
 	}
 	v.requestLimiter = requestLimiter

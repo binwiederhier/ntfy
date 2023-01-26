@@ -133,6 +133,7 @@ func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
@@ -168,6 +169,7 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
@@ -209,6 +211,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
@@ -235,6 +238,106 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 	require.Equal(t, 401, rr.Code)
 }
 
+func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *testing.T) {
+	// This tests a successful checkout flow (not a paying customer -> paying customer),
+	// and also tests that during the upgrade we are RESETTING THE RATE LIMITS of the existing user.
+
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	c.VisitorRequestLimitBurst = 10
+	c.VisitorRequestLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Create a user with a Stripe subscription and 3 reservations
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:                     "ti_123",
+		Code:                   "starter",
+		StripePriceID:          "price_1234",
+		ReservationsLimit:      1,
+		MessagesLimit:          100,
+		MessagesExpiryDuration: time.Hour,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser)) // No tier
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+
+	// Define how the mock should react
+	stripeMock.
+		On("GetSession", "SOMETOKEN").
+		Return(&stripe.CheckoutSession{
+			ClientReferenceID: u.ID, // ntfy user ID
+			Customer: &stripe.Customer{
+				ID: "acct_5555",
+			},
+			Subscription: &stripe.Subscription{
+				ID: "sub_1234",
+			},
+		}, nil)
+	stripeMock.
+		On("GetSubscription", "sub_1234").
+		Return(&stripe.Subscription{
+			ID:               "sub_1234",
+			Status:           stripe.SubscriptionStatusActive,
+			CurrentPeriodEnd: 123456789,
+			CancelAt:         0,
+			Items: &stripe.SubscriptionItemList{
+				Data: []*stripe.SubscriptionItem{
+					{
+						Price: &stripe.Price{ID: "price_1234"},
+					},
+				},
+			},
+		}, nil)
+	stripeMock.
+		On("UpdateCustomer", mock.Anything).
+		Return(&stripe.Customer{}, nil)
+
+	// Send messages until rate limit of free tier is hit
+	for i := 0; i < 10; i++ {
+		rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, rr.Code)
+	}
+	rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, rr.Code)
+
+	// Simulate Stripe success return URL call (no user context)
+	rr = request(t, s, "GET", "/v1/account/billing/subscription/success/SOMETOKEN", "", nil)
+	require.Equal(t, 303, rr.Code)
+
+	// Verify that database columns were updated
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, "starter", u.Tier.Code) // Not "pro"
+	require.Equal(t, "acct_5555", u.Billing.StripeCustomerID)
+	require.Equal(t, "sub_1234", u.Billing.StripeSubscriptionID)
+	require.Equal(t, stripe.SubscriptionStatusActive, u.Billing.StripeSubscriptionStatus)
+	require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
+	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
+
+	// FIXME FIXME This test is broken, because the rate limit logic is unclear!
+
+	// Now for the fun part: Verify that new rate limits are immediately applied
+	for i := 0; i < 100; i++ {
+		rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, rr.Code, "failed on iteration %d", i)
+	}
+	rr = request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, rr.Code)
+}
+
 func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(t *testing.T) {
 	// This tests incoming webhooks from Stripe to update a subscription:
 	// - All Stripe columns are updated in the user table
@@ -257,6 +360,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 
 	// Create a user with a Stripe subscription and 3 reservations
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:                       "ti_1",
 		Code:                     "starter",
 		StripePriceID:            "price_1234", // !
 		ReservationsLimit:        1,            // !
@@ -268,6 +372,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentBandwidthLimit: 1000000,
 	}))
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:                       "ti_2",
 		Code:                     "pro",
 		StripePriceID:            "price_1111", // !
 		ReservationsLimit:        3,            // !

@@ -40,6 +40,8 @@ TODO
 
 - HIGH Rate limiting: dailyLimitToRate is wrong? + TESTS
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- HIGH Rate limiting: Delete visitor when tier is changed to refresh rate limiters
+- HIGH Rate limiting: When ResetStats() is run, reset messagesLimiter (and others)?
 - MEDIUM: Races with v.user (see publishSyncEventAsync test)
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
@@ -50,8 +52,6 @@ TODO
 
 Limits & rate limiting:
 	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
-	when ResetStats() is run, reset messagesLimiter (and others)?
-	Delete visitor when tier is changed to refresh rate limiters
 
 Make sure account endpoints make sense for admins
 
@@ -1602,9 +1602,7 @@ func (s *Server) visitor(r *http.Request) (v *visitor, err error) {
 	} else {
 		v = s.visitorFromIP(ip)
 	}
-	v.mu.Lock()
-	v.user = u
-	v.mu.Unlock()
+	v.SetUser(u)  // Update visitor user with latest from database!
 	return v, err // Always return visitor, even when error occurs!
 }
 

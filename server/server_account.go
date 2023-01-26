@@ -31,7 +31,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if existingUser, _ := s.userManager.User(newAccount.Username); existingUser != nil {
 		return errHTTPConflictUserExists
 	}
-	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
+	if err := v.AccountCreationAllowed(); err != nil {
 		return errHTTPTooManyRequestsLimitAccountCreation
 	}
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User

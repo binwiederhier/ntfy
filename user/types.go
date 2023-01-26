@@ -23,6 +23,15 @@ type User struct {
 	Deleted   bool
 }
 
+// TierID returns the ID of the User.Tier, or an empty string if the user has no tier,
+// or if the user itself is nil.
+func (u *User) TierID() string {
+	if u == nil || u.Tier == nil {
+		return ""
+	}
+	return u.Tier.ID
+}
+
 // Auther is an interface for authentication and authorization
 type Auther interface {
 	// Authenticate checks username and password and returns a user if correct. The method

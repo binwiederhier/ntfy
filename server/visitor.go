@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"net/netip"
 	"sync"
@@ -41,7 +42,7 @@ type visitor struct {
 	emailsLimiter       *rate.Limiter // Rate limiter for emails
 	subscriptionLimiter util.Limiter  // Fixed limiter for active subscriptions (ongoing connections)
 	bandwidthLimiter    util.Limiter  // Limiter for attachment bandwidth downloads
-	accountLimiter      *rate.Limiter // Rate limiter for account creation
+	accountLimiter      *rate.Limiter // Rate limiter for account creation, may be nil
 	firebase            time.Time     // Next allowed Firebase message
 	seen                time.Time     // Last seen time of this visitor (needed for removal of stale visitors)
 	mu                  sync.Mutex
@@ -85,26 +86,12 @@ const (
 )
 
 func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
-	var messagesLimiter, attachmentBandwidthLimiter util.Limiter
-	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
 	var messages, emails int64
 	if user != nil {
 		messages = user.Stats.Messages
 		emails = user.Stats.Emails
-	} else {
-		accountLimiter = rate.NewLimiter(rate.Every(conf.VisitorAccountCreateLimitReplenish), conf.VisitorAccountCreateLimitBurst)
 	}
-	if user != nil && user.Tier != nil {
-		requestLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.MessagesLimit), conf.VisitorRequestLimitBurst)
-		messagesLimiter = util.NewFixedLimiter(user.Tier.MessagesLimit)
-		emailsLimiter = rate.NewLimiter(dailyLimitToRate(user.Tier.EmailsLimit), conf.VisitorEmailLimitBurst)
-		attachmentBandwidthLimiter = util.NewBytesLimiter(int(user.Tier.AttachmentBandwidthLimit), 24*time.Hour)
-	} else {
-		requestLimiter = rate.NewLimiter(rate.Every(conf.VisitorRequestLimitReplenish), conf.VisitorRequestLimitBurst)
-		emailsLimiter = rate.NewLimiter(rate.Every(conf.VisitorEmailLimitReplenish), conf.VisitorEmailLimitBurst)
-		attachmentBandwidthLimiter = util.NewBytesLimiter(int(conf.VisitorAttachmentDailyBandwidthLimit), 24*time.Hour)
-	}
-	return &visitor{
+	v := &visitor{
 		config:              conf,
 		messageCache:        messageCache,
 		userManager:         userManager, // May be nil
@@ -112,20 +99,26 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		user:                user,
 		messages:            messages,
 		emails:              emails,
-		requestLimiter:      requestLimiter,
-		messagesLimiter:     messagesLimiter, // May be nil
-		emailsLimiter:       emailsLimiter,
-		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		bandwidthLimiter:    attachmentBandwidthLimiter,
-		accountLimiter:      accountLimiter, // May be nil
 		firebase:            time.Unix(0, 0),
 		seen:                time.Now(),
+		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
+		requestLimiter:      nil, // Set in resetLimiters
+		messagesLimiter:     nil, // Set in resetLimiters, may be nil
+		emailsLimiter:       nil, // Set in resetLimiters
+		bandwidthLimiter:    nil, // Set in resetLimiters
+		accountLimiter:      nil, // Set in resetLimiters, may be nil
 	}
+	v.resetLimiters()
+	return v
 }
 
 func (v *visitor) String() string {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	return v.stringNoLock()
+}
+
+func (v *visitor) stringNoLock() string {
 	if v.user != nil && v.user.Billing.StripeCustomerID != "" {
 		return fmt.Sprintf("%s/%s/%s", v.ip.String(), v.user.ID, v.user.Billing.StripeCustomerID)
 	} else if v.user != nil {
@@ -174,6 +167,13 @@ func (v *visitor) SubscriptionAllowed() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.subscriptionLimiter.Allow(1); err != nil {
+		return errVisitorLimitReached
+	}
+	return nil
+}
+
+func (v *visitor) AccountCreationAllowed() error {
+	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
 		return errVisitorLimitReached
 	}
 	return nil
@@ -235,7 +235,35 @@ func (v *visitor) ResetStats() {
 func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	v.user = u
+	if shouldResetLimiters {
+		v.resetLimiters()
+	}
+}
+
+func (v *visitor) resetLimiters() {
+	log.Info("%s Resetting limiters for visitor", v.stringNoLock())
+	var messagesLimiter, bandwidthLimiter util.Limiter
+	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
+	if v.user != nil && v.user.Tier != nil {
+		requestLimiter = rate.NewLimiter(dailyLimitToRate(v.user.Tier.MessagesLimit), v.config.VisitorRequestLimitBurst)
+		messagesLimiter = util.NewFixedLimiter(v.user.Tier.MessagesLimit)
+		emailsLimiter = rate.NewLimiter(dailyLimitToRate(v.user.Tier.EmailsLimit), v.config.VisitorEmailLimitBurst)
+		bandwidthLimiter = util.NewBytesLimiter(int(v.user.Tier.AttachmentBandwidthLimit), 24*time.Hour)
+		accountLimiter = nil // A logged-in user cannot create an account
+	} else {
+		requestLimiter = rate.NewLimiter(rate.Every(v.config.VisitorRequestLimitReplenish), v.config.VisitorRequestLimitBurst)
+		messagesLimiter = nil // Message limit is governed by the requestLimiter
+		emailsLimiter = rate.NewLimiter(rate.Every(v.config.VisitorEmailLimitReplenish), v.config.VisitorEmailLimitBurst)
+		bandwidthLimiter = util.NewBytesLimiter(int(v.config.VisitorAttachmentDailyBandwidthLimit), 24*time.Hour)
+		accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
+	}
+	v.requestLimiter = requestLimiter
+	v.messagesLimiter = messagesLimiter
+	v.emailsLimiter = emailsLimiter
+	v.bandwidthLimiter = bandwidthLimiter
+	v.accountLimiter = accountLimiter
 }
 
 // MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,

@@ -6,6 +6,7 @@ import (
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -89,6 +90,20 @@ func TestAccount_Signup_Disabled(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 400, rr.Code)
 	require.Equal(t, 40022, toHTTPError(t, rr.Body.String()).Code)
+}
+
+func TestAccount_Signup_Rate_Limit(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	conf.EnableSignup = true
+	s := newTestServer(t, conf)
+
+	for i := 0; i < 3; i++ {
+		rr := request(t, s, "POST", "/v1/account", fmt.Sprintf(`{"username":"phil%d", "password":"mypass"}`, i), nil)
+		require.Equal(t, 200, rr.Code, "failed on iteration %d", i)
+	}
+	rr := request(t, s, "POST", "/v1/account", `{"username":"notallowed", "password":"mypass"}`, nil)
+	require.Equal(t, 429, rr.Code)
+	require.Equal(t, 42906, toHTTPError(t, rr.Body.String()).Code)
 }
 
 func TestAccount_Get_Anonymous(t *testing.T) {
@@ -566,4 +581,61 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	// Kill user Go routine
 	s.topics["mytopic"].CancelSubscribers("<invalid>")
 	<-userCh
+}
+
+func TestAccount_Tier_Create(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, conf)
+
+	// Create tier and user
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:                     "pro",
+		Name:                     "Pro",
+		MessagesLimit:            123,
+		MessagesExpiryDuration:   86400 * time.Second,
+		EmailsLimit:              32,
+		ReservationsLimit:        2,
+		AttachmentFileSizeLimit:  1231231,
+		AttachmentTotalSizeLimit: 123123,
+		AttachmentExpiryDuration: 10800 * time.Second,
+		AttachmentBandwidthLimit: 21474836480,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+
+	ti, err := s.userManager.Tier("pro")
+	require.Nil(t, err)
+
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+
+	// These are populated by different SQL queries
+	require.Equal(t, ti, u.Tier)
+
+	// Fields
+	require.True(t, strings.HasPrefix(ti.ID, "ti_"))
+	require.Equal(t, "pro", ti.Code)
+	require.Equal(t, "Pro", ti.Name)
+	require.Equal(t, int64(123), ti.MessagesLimit)
+	require.Equal(t, 86400*time.Second, ti.MessagesExpiryDuration)
+	require.Equal(t, int64(32), ti.EmailsLimit)
+	require.Equal(t, int64(2), ti.ReservationsLimit)
+	require.Equal(t, int64(1231231), ti.AttachmentFileSizeLimit)
+	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
+	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
+	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
+}
+
+func TestAccount_Tier_Create_With_ID(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, conf)
+
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:   "ti_123",
+		Code: "pro",
+	}))
+
+	ti, err := s.userManager.Tier("pro")
+	require.Nil(t, err)
+	require.Equal(t, "ti_123", ti.ID)
 }

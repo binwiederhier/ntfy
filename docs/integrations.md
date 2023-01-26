@@ -32,6 +32,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Gatus](https://gatus.io/) ⭐ - Automated service health dashboard
 - [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative / workflow automation tool
 - [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
+- [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
 - [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 

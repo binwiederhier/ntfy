@@ -769,6 +769,7 @@ func TestServer_StatsResetter_User_Without_Tier(t *testing.T) {
 
 	// Send an anonymous message
 	response := request(t, s, "PUT", "/mytopic", "test", nil)
+	require.Equal(t, 200, response.Code)
 
 	// Send messages from user without tier (phil)
 	for i := 0; i < 5; i++ {

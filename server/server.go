@@ -597,7 +597,6 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
-	v.IncrementMessages()
 	if s.userManager != nil && v.user != nil {
 		s.userManager.EnqueueStats(v.user.ID, v.Stats()) // FIXME this makes no sense for tier-less users
 	}

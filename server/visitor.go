@@ -232,17 +232,20 @@ func (v *visitor) IncrementMessages() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.messages++
-	if v.user != nil {
-		v.user.Stats.Messages = v.messages
-	}
 }
 
 func (v *visitor) IncrementEmails() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.emails++
-	if v.user != nil {
-		v.user.Stats.Emails = v.emails
+}
+
+func (v *visitor) Stats() *user.Stats {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return &user.Stats{
+		Messages: v.messages,
+		Emails:   v.emails,
 	}
 }
 
@@ -253,10 +256,6 @@ func (v *visitor) ResetStats() {
 	v.emails = 0
 	if v.messagesLimiter != nil {
 		v.messagesLimiter.Reset()
-	}
-	if v.user != nil {
-		v.user.Stats.Messages = 0
-		v.user.Stats.Emails = 0
 	}
 }
 

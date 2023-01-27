@@ -292,8 +292,8 @@ const (
 // in a SQLite database.
 type Manager struct {
 	db            *sql.DB
-	defaultAccess Permission       // Default permission if no ACL matches
-	statsQueue    map[string]*User // Username -> User, for "unimportant" user updates
+	defaultAccess Permission        // Default permission if no ACL matches
+	statsQueue    map[string]*Stats // "Queue" to asynchronously write user stats to the database (UserID -> Stats)
 	mu            sync.Mutex
 }
 
@@ -319,7 +319,7 @@ func newManager(filename, startupQueries string, defaultAccess Permission, stats
 	manager := &Manager{
 		db:            db,
 		defaultAccess: defaultAccess,
-		statsQueue:    make(map[string]*User),
+		statsQueue:    make(map[string]*Stats),
 	}
 	go manager.userStatsQueueWriter(statsWriterInterval)
 	return manager, nil
@@ -464,16 +464,16 @@ func (a *Manager) ResetStats() error {
 	if _, err := a.db.Exec(updateUserStatsResetAllQuery); err != nil {
 		return err
 	}
-	a.statsQueue = make(map[string]*User)
+	a.statsQueue = make(map[string]*Stats)
 	return nil
 }
 
 // EnqueueStats adds the user to a queue which writes out user stats (messages, emails, ..) in
 // batches at a regular interval
-func (a *Manager) EnqueueStats(user *User) {
+func (a *Manager) EnqueueStats(userID string, stats *Stats) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.statsQueue[user.ID] = user
+	a.statsQueue[userID] = stats
 }
 
 func (a *Manager) userStatsQueueWriter(interval time.Duration) {
@@ -493,7 +493,7 @@ func (a *Manager) writeUserStatsQueue() error {
 		return nil
 	}
 	statsQueue := a.statsQueue
-	a.statsQueue = make(map[string]*User)
+	a.statsQueue = make(map[string]*Stats)
 	a.mu.Unlock()
 	tx, err := a.db.Begin()
 	if err != nil {
@@ -501,9 +501,9 @@ func (a *Manager) writeUserStatsQueue() error {
 	}
 	defer tx.Rollback()
 	log.Debug("User Manager: Writing user stats queue for %d user(s)", len(statsQueue))
-	for userID, u := range statsQueue {
-		log.Trace("User Manager: Updating stats for user %s: messages=%d, emails=%d", userID, u.Stats.Messages, u.Stats.Emails)
-		if _, err := tx.Exec(updateUserStatsQuery, u.Stats.Messages, u.Stats.Emails, userID); err != nil {
+	for userID, update := range statsQueue {
+		log.Trace("User Manager: Updating stats for user %s: messages=%d, emails=%d", userID, update.Messages, update.Emails)
+		if _, err := tx.Exec(updateUserStatsQuery, update.Messages, update.Emails, userID); err != nil {
 			return err
 		}
 	}

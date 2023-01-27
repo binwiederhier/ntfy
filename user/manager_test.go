@@ -554,10 +554,10 @@ func TestManager_EnqueueStats(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(0), u.Stats.Messages)
 	require.Equal(t, int64(0), u.Stats.Emails)
-
-	u.Stats.Messages = 11
-	u.Stats.Emails = 2
-	a.EnqueueStats(u)
+	a.EnqueueStats(u.ID, &Stats{
+		Messages: 11,
+		Emails:   2,
+	})
 
 	// Still no change, because it's queued asynchronously
 	u, err = a.User("ben")

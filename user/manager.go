@@ -709,10 +709,10 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			ID:                       tierID.String,
 			Code:                     tierCode.String,
 			Name:                     tierName.String,
-			MessagesLimit:            messagesLimit.Int64,
-			MessagesExpiryDuration:   time.Duration(messagesExpiryDuration.Int64) * time.Second,
-			EmailsLimit:              emailsLimit.Int64,
-			ReservationsLimit:        reservationsLimit.Int64,
+			MessageLimit:             messagesLimit.Int64,
+			MessageExpiryDuration:    time.Duration(messagesExpiryDuration.Int64) * time.Second,
+			EmailLimit:               emailsLimit.Int64,
+			ReservationLimit:         reservationsLimit.Int64,
 			AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 			AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
@@ -845,7 +845,7 @@ func (a *Manager) ChangeTier(username, tier string) error {
 	t, err := a.Tier(tier)
 	if err != nil {
 		return err
-	} else if err := a.checkReservationsLimit(username, t.ReservationsLimit); err != nil {
+	} else if err := a.checkReservationsLimit(username, t.ReservationLimit); err != nil {
 		return err
 	}
 	if _, err := a.db.Exec(updateUserTierQuery, tier, username); err != nil {
@@ -870,7 +870,7 @@ func (a *Manager) checkReservationsLimit(username string, reservationsLimit int6
 	if err != nil {
 		return err
 	}
-	if u.Tier != nil && reservationsLimit < u.Tier.ReservationsLimit {
+	if u.Tier != nil && reservationsLimit < u.Tier.ReservationLimit {
 		reservations, err := a.Reservations(username)
 		if err != nil {
 			return err
@@ -999,7 +999,7 @@ func (a *Manager) CreateTier(tier *Tier) error {
 	if tier.ID == "" {
 		tier.ID = util.RandomStringPrefix(tierIDPrefix, tierIDLength)
 	}
-	if _, err := a.db.Exec(insertTierQuery, tier.ID, tier.Code, tier.Name, tier.MessagesLimit, int64(tier.MessagesExpiryDuration.Seconds()), tier.EmailsLimit, tier.ReservationsLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, tier.StripePriceID); err != nil {
+	if _, err := a.db.Exec(insertTierQuery, tier.ID, tier.Code, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, tier.StripePriceID); err != nil {
 		return err
 	}
 	return nil
@@ -1070,10 +1070,10 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 		ID:                       id,
 		Code:                     code,
 		Name:                     name,
-		MessagesLimit:            messagesLimit.Int64,
-		MessagesExpiryDuration:   time.Duration(messagesExpiryDuration.Int64) * time.Second,
-		EmailsLimit:              emailsLimit.Int64,
-		ReservationsLimit:        reservationsLimit.Int64,
+		MessageLimit:             messagesLimit.Int64,
+		MessageExpiryDuration:    time.Duration(messagesExpiryDuration.Int64) * time.Second,
+		EmailLimit:               emailsLimit.Int64,
+		ReservationLimit:         reservationsLimit.Int64,
 		AttachmentFileSizeLimit:  attachmentFileSizeLimit.Int64,
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 		AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,

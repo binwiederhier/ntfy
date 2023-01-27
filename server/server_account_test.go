@@ -410,10 +410,10 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	// Create a tier
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "pro",
-		MessagesLimit:            123,
-		MessagesExpiryDuration:   86400 * time.Second,
-		EmailsLimit:              32,
-		ReservationsLimit:        2,
+		MessageLimit:             123,
+		MessageExpiryDuration:    86400 * time.Second,
+		EmailLimit:               32,
+		ReservationLimit:         2,
 		AttachmentFileSizeLimit:  1231231,
 		AttachmentTotalSizeLimit: 123123,
 		AttachmentExpiryDuration: 10800 * time.Second,
@@ -491,9 +491,9 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
-		Code:              "pro",
-		MessagesLimit:     20,
-		ReservationsLimit: 2,
+		Code:             "pro",
+		MessageLimit:     20,
+		ReservationLimit: 2,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
@@ -525,9 +525,9 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
-		Code:              "pro",
-		MessagesLimit:     20,
-		ReservationsLimit: 2,
+		Code:             "pro",
+		MessageLimit:     20,
+		ReservationLimit: 2,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
@@ -591,10 +591,10 @@ func TestAccount_Tier_Create(t *testing.T) {
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
 		Code:                     "pro",
 		Name:                     "Pro",
-		MessagesLimit:            123,
-		MessagesExpiryDuration:   86400 * time.Second,
-		EmailsLimit:              32,
-		ReservationsLimit:        2,
+		MessageLimit:             123,
+		MessageExpiryDuration:    86400 * time.Second,
+		EmailLimit:               32,
+		ReservationLimit:         2,
 		AttachmentFileSizeLimit:  1231231,
 		AttachmentTotalSizeLimit: 123123,
 		AttachmentExpiryDuration: 10800 * time.Second,
@@ -616,10 +616,10 @@ func TestAccount_Tier_Create(t *testing.T) {
 	require.True(t, strings.HasPrefix(ti.ID, "ti_"))
 	require.Equal(t, "pro", ti.Code)
 	require.Equal(t, "Pro", ti.Name)
-	require.Equal(t, int64(123), ti.MessagesLimit)
-	require.Equal(t, 86400*time.Second, ti.MessagesExpiryDuration)
-	require.Equal(t, int64(32), ti.EmailsLimit)
-	require.Equal(t, int64(2), ti.ReservationsLimit)
+	require.Equal(t, int64(123), ti.MessageLimit)
+	require.Equal(t, 86400*time.Second, ti.MessageExpiryDuration)
+	require.Equal(t, int64(32), ti.EmailLimit)
+	require.Equal(t, int64(2), ti.ReservationLimit)
 	require.Equal(t, int64(1231231), ti.AttachmentFileSizeLimit)
 	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)

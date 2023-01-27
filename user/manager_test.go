@@ -335,10 +335,10 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 		Code:                     "pro",
 		Name:                     "ntfy Pro",
 		StripePriceID:            "price123",
-		MessagesLimit:            5_000,
-		MessagesExpiryDuration:   3 * 24 * time.Hour,
-		EmailsLimit:              50,
-		ReservationsLimit:        5,
+		MessageLimit:             5_000,
+		MessageExpiryDuration:    3 * 24 * time.Hour,
+		EmailLimit:               50,
+		ReservationLimit:         5,
 		AttachmentFileSizeLimit:  52428800,
 		AttachmentTotalSizeLimit: 524288000,
 		AttachmentExpiryDuration: 24 * time.Hour,
@@ -351,10 +351,10 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, RoleUser, ben.Role)
 	require.Equal(t, "pro", ben.Tier.Code)
-	require.Equal(t, int64(5000), ben.Tier.MessagesLimit)
-	require.Equal(t, 3*24*time.Hour, ben.Tier.MessagesExpiryDuration)
-	require.Equal(t, int64(50), ben.Tier.EmailsLimit)
-	require.Equal(t, int64(5), ben.Tier.ReservationsLimit)
+	require.Equal(t, int64(5000), ben.Tier.MessageLimit)
+	require.Equal(t, 3*24*time.Hour, ben.Tier.MessageExpiryDuration)
+	require.Equal(t, int64(50), ben.Tier.EmailLimit)
+	require.Equal(t, int64(5), ben.Tier.ReservationLimit)
 	require.Equal(t, int64(52428800), ben.Tier.AttachmentFileSizeLimit)
 	require.Equal(t, int64(524288000), ben.Tier.AttachmentTotalSizeLimit)
 	require.Equal(t, 24*time.Hour, ben.Tier.AttachmentExpiryDuration)

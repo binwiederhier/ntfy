@@ -5,11 +5,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stripe/stripe-go/v74"
+	"golang.org/x/time/rate"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"io"
+	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -48,10 +51,10 @@ func TestPayments_Tiers(t *testing.T) {
 		ID:                       "ti_123",
 		Code:                     "pro",
 		Name:                     "Pro",
-		MessagesLimit:            1000,
-		MessagesExpiryDuration:   time.Hour,
-		EmailsLimit:              123,
-		ReservationsLimit:        777,
+		MessageLimit:             1000,
+		MessageExpiryDuration:    time.Hour,
+		EmailLimit:               123,
+		ReservationLimit:         777,
 		AttachmentFileSizeLimit:  999,
 		AttachmentTotalSizeLimit: 888,
 		AttachmentExpiryDuration: time.Minute,
@@ -61,10 +64,10 @@ func TestPayments_Tiers(t *testing.T) {
 		ID:                       "ti_444",
 		Code:                     "business",
 		Name:                     "Business",
-		MessagesLimit:            2000,
-		MessagesExpiryDuration:   10 * time.Hour,
-		EmailsLimit:              123123,
-		ReservationsLimit:        777333,
+		MessageLimit:             2000,
+		MessageExpiryDuration:    10 * time.Hour,
+		EmailLimit:               123123,
+		ReservationLimit:         777333,
 		AttachmentFileSizeLimit:  999111,
 		AttachmentTotalSizeLimit: 888111,
 		AttachmentExpiryDuration: time.Hour,
@@ -238,9 +241,14 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 	require.Equal(t, 401, rr.Code)
 }
 
-func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *testing.T) {
-	// This tests a successful checkout flow (not a paying customer -> paying customer),
-	// and also tests that during the upgrade we are RESETTING THE RATE LIMITS of the existing user.
+func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *testing.T) {
+	// This test is too overloaded, but it's also a great end-to-end a test.
+	//
+	// It tests:
+	// - A successful checkout flow (not a paying customer -> paying customer)
+	// - Tier-changes reset the rate limits for the user
+	// - The request limits for tier-less user and a tier-user
+	// - The message limits for a tier-user
 
 	stripeMock := &testStripeAPI{}
 	defer stripeMock.AssertExpectations(t)
@@ -248,19 +256,26 @@ func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *test
 	c := newTestConfigWithAuthFile(t)
 	c.StripeSecretKey = "secret key"
 	c.StripeWebhookKey = "webhook key"
-	c.VisitorRequestLimitBurst = 10
+	c.VisitorRequestLimitBurst = 5
 	c.VisitorRequestLimitReplenish = time.Hour
+	c.CacheStartupQueries = `
+pragma journal_mode = WAL;
+pragma synchronous = normal;
+pragma temp_store = memory;
+`
+	c.CacheBatchSize = 500
+	c.CacheBatchTimeout = time.Second
 	s := newTestServer(t, c)
 	s.stripe = stripeMock
 
 	// Create a user with a Stripe subscription and 3 reservations
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{
-		ID:                     "ti_123",
-		Code:                   "starter",
-		StripePriceID:          "price_1234",
-		ReservationsLimit:      1,
-		MessagesLimit:          100,
-		MessagesExpiryDuration: time.Hour,
+		ID:                    "ti_123",
+		Code:                  "starter",
+		StripePriceID:         "price_1234",
+		ReservationLimit:      1,
+		MessageLimit:          220, // 220 * 5% = 11 requests before rate limiting kicks in
+		MessageExpiryDuration: time.Hour,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser)) // No tier
 	u, err := s.userManager.User("phil")
@@ -298,7 +313,7 @@ func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *test
 		Return(&stripe.Customer{}, nil)
 
 	// Send messages until rate limit of free tier is hit
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 5; i++ {
 		rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
@@ -323,10 +338,9 @@ func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *test
 	require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
 
-	// FIXME FIXME This test is broken, because the rate limit logic is unclear!
-
 	// Now for the fun part: Verify that new rate limits are immediately applied
-	for i := 0; i < 100; i++ {
+	// This only tests the request limiter, which kicks in before the message limiter.
+	for i := 0; i < 11; i++ {
 		rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
@@ -336,6 +350,37 @@ func TestPayments_Checkout_Success_And_Increase_Ratelimits_Reset_Visitor(t *test
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 429, rr.Code)
+
+	// Now let's test the message limiter by faking a ridiculously generous rate limiter
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	v.requestLimiter = rate.NewLimiter(rate.Every(time.Millisecond), 1000000)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 209; i++ {
+		wg.Add(1)
+		go func() {
+			rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+				"Authorization": util.BasicAuth("phil", "phil"),
+			})
+			require.Equal(t, 200, rr.Code)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	rr = request(t, s, "PUT", "/mytopic", "some message", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, rr.Code)
+
+	// And now let's cross-check that the stats are correct too
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, int64(220), account.Limits.Messages)
+	require.Equal(t, int64(220), account.Stats.Messages)
+	require.Equal(t, int64(0), account.Stats.MessagesRemaining)
 }
 
 func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(t *testing.T) {
@@ -363,9 +408,9 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		ID:                       "ti_1",
 		Code:                     "starter",
 		StripePriceID:            "price_1234", // !
-		ReservationsLimit:        1,            // !
-		MessagesLimit:            100,
-		MessagesExpiryDuration:   time.Hour,
+		ReservationLimit:         1,            // !
+		MessageLimit:             100,
+		MessageExpiryDuration:    time.Hour,
 		AttachmentExpiryDuration: time.Hour,
 		AttachmentFileSizeLimit:  1000000,
 		AttachmentTotalSizeLimit: 1000000,
@@ -375,9 +420,9 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		ID:                       "ti_2",
 		Code:                     "pro",
 		StripePriceID:            "price_1111", // !
-		ReservationsLimit:        3,            // !
-		MessagesLimit:            200,
-		MessagesExpiryDuration:   time.Hour,
+		ReservationLimit:         3,            // !
+		MessageLimit:             200,
+		MessageExpiryDuration:    time.Hour,
 		AttachmentExpiryDuration: time.Hour,
 		AttachmentFileSizeLimit:  1000000,
 		AttachmentTotalSizeLimit: 1000000,

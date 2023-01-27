@@ -27,8 +27,14 @@ type FixedLimiter struct {
 
 // NewFixedLimiter creates a new Limiter
 func NewFixedLimiter(limit int64) *FixedLimiter {
+	return NewFixedLimiterWithValue(limit, 0)
+}
+
+// NewFixedLimiterWithValue creates a new Limiter and sets the initial value
+func NewFixedLimiterWithValue(limit, value int64) *FixedLimiter {
 	return &FixedLimiter{
 		limit: limit,
+		value: value,
 	}
 }
 

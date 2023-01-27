@@ -44,6 +44,7 @@ const (
 	DefaultVisitorSubscriptionLimit             = 30
 	DefaultVisitorRequestLimitBurst             = 60
 	DefaultVisitorRequestLimitReplenish         = 5 * time.Second
+	DefaultVisitorMessageDailyLimit             = 0
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
 	DefaultVisitorAccountCreationLimitBurst     = 3
@@ -105,6 +106,7 @@ type Config struct {
 	VisitorRequestLimitBurst             int
 	VisitorRequestLimitReplenish         time.Duration
 	VisitorRequestExemptIPAddrs          []netip.Prefix
+	VisitorMessageDailyLimit             int
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
 	VisitorAccountCreationLimitBurst     int
@@ -171,6 +173,7 @@ func NewConfig() *Config {
 		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
 		VisitorRequestExemptIPAddrs:          make([]netip.Prefix, 0),
+		VisitorMessageDailyLimit:             DefaultVisitorMessageDailyLimit,
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		VisitorAccountCreationLimitBurst:     DefaultVisitorAccountCreationLimitBurst,

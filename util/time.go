@@ -17,7 +17,7 @@ var (
 // NextOccurrenceUTC takes a time of day (e.g. 9:00am), and returns the next occurrence
 // of that time from the current time (in UTC).
 func NextOccurrenceUTC(timeOfDay, base time.Time) time.Time {
-	hour, minute, seconds := timeOfDay.Clock()
+	hour, minute, seconds := timeOfDay.UTC().Clock()
 	now := base.UTC()
 	next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, seconds, 0, time.UTC)
 	if next.Before(now) {

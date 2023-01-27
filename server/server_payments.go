@@ -60,15 +60,15 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 	if err != nil {
 		return err
 	}
-	freeTier := defaultVisitorLimits(s.config)
+	freeTier := configBasedVisitorLimits(s.config)
 	response := []*apiAccountBillingTier{
 		{
 			// This is a bit of a hack: This is the "Free" tier. It has no tier code, name or price.
 			Limits: &apiAccountLimits{
 				Basis:                    string(visitorLimitBasisIP),
-				Messages:                 freeTier.MessagesLimit,
-				MessagesExpiryDuration:   int64(freeTier.MessagesExpiryDuration.Seconds()),
-				Emails:                   freeTier.EmailsLimit,
+				Messages:                 freeTier.MessageLimit,
+				MessagesExpiryDuration:   int64(freeTier.MessageExpiryDuration.Seconds()),
+				Emails:                   freeTier.EmailLimit,
 				Reservations:             freeTier.ReservationsLimit,
 				AttachmentTotalSize:      freeTier.AttachmentTotalSizeLimit,
 				AttachmentFileSize:       freeTier.AttachmentFileSizeLimit,
@@ -91,10 +91,10 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 			Price: priceStr,
 			Limits: &apiAccountLimits{
 				Basis:                    string(visitorLimitBasisTier),
-				Messages:                 tier.MessagesLimit,
-				MessagesExpiryDuration:   int64(tier.MessagesExpiryDuration.Seconds()),
-				Emails:                   tier.EmailsLimit,
-				Reservations:             tier.ReservationsLimit,
+				Messages:                 tier.MessageLimit,
+				MessagesExpiryDuration:   int64(tier.MessageExpiryDuration.Seconds()),
+				Emails:                   tier.EmailLimit,
+				Reservations:             tier.ReservationLimit,
 				AttachmentTotalSize:      tier.AttachmentTotalSizeLimit,
 				AttachmentFileSize:       tier.AttachmentFileSizeLimit,
 				AttachmentExpiryDuration: int64(tier.AttachmentExpiryDuration.Seconds()),
@@ -336,7 +336,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(event json.RawMe
 	if err := s.updateSubscriptionAndTier(logStripePrefix(ev.Customer, ev.ID), u, tier, ev.Customer, subscriptionID, ev.Status, ev.CurrentPeriodEnd, ev.CancelAt); err != nil {
 		return err
 	}
-	s.publishSyncEventAsync(s.visitorFromUser(u, netip.IPv4Unspecified()))
+	s.publishSyncEventAsync(s.visitor(netip.IPv4Unspecified(), u))
 	return nil
 }
 
@@ -355,14 +355,14 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(event json.RawMe
 	if err := s.updateSubscriptionAndTier(logStripePrefix(ev.Customer, ev.ID), u, nil, ev.Customer, "", "", 0, 0); err != nil {
 		return err
 	}
-	s.publishSyncEventAsync(s.visitorFromUser(u, netip.IPv4Unspecified()))
+	s.publishSyncEventAsync(s.visitor(netip.IPv4Unspecified(), u))
 	return nil
 }
 
 func (s *Server) updateSubscriptionAndTier(logPrefix string, u *user.User, tier *user.Tier, customerID, subscriptionID, status string, paidUntil, cancelAt int64) error {
 	reservationsLimit := visitorDefaultReservationsLimit
 	if tier != nil {
-		reservationsLimit = tier.ReservationsLimit
+		reservationsLimit = tier.ReservationLimit
 	}
 	if err := s.maybeRemoveMessagesAndExcessReservations(logPrefix, u, reservationsLimit); err != nil {
 		return err

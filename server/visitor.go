@@ -14,14 +14,37 @@ import (
 )
 
 const (
+	// oneDay is an approximation of a day as a time.Duration
+	oneDay = 24 * time.Hour
+
 	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory. This number
 	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
 	// they are replenished faster (typically).
-	visitorExpungeAfter = 24 * time.Hour
+	visitorExpungeAfter = oneDay
 
 	// visitorDefaultReservationsLimit is the amount of topic names a user without a tier is allowed to reserve.
 	// This number is zero, and changing it may have unintended consequences in the web app, or otherwise
 	visitorDefaultReservationsLimit = int64(0)
+)
+
+// Constants used to convert a tier-user's MessageLimit (see user.Tier) into adequate request limiter
+// values (token bucket).
+//
+// Example: Assuming a user.Tier's MessageLimit is 10,000:
+// - the allowed burst is 500 (= 10,000 * 5%), which is < 1000 (the max)
+// - the replenish rate is 2 * 10,000 / 24 hours
+const (
+	visitorMessageToRequestLimitBurstRate       = 0.05
+	visitorMessageToRequestLimitBurstMax        = 1000
+	visitorMessageToRequestLimitReplenishFactor = 2
+)
+
+// Constants used to convert a tier-user's EmailLimit (see user.Tier) into adequate email limiter
+// values (token bucket). Example: Assuming a user.Tier's EmailLimit is 200, the allowed burst is
+// 40 (= 200 * 20%), which is <150 (the max).
+const (
+	visitorEmailLimitBurstRate = 0.2
+	visitorEmailLimitBurstMax  = 150
 )
 
 var (
@@ -55,9 +78,13 @@ type visitorInfo struct {
 
 type visitorLimits struct {
 	Basis                    visitorLimitBasis
-	MessagesLimit            int64
-	MessagesExpiryDuration   time.Duration
-	EmailsLimit              int64
+	RequestLimitBurst        int
+	RequestLimitReplenish    rate.Limit
+	MessageLimit             int64
+	MessageExpiryDuration    time.Duration
+	EmailLimit               int64
+	EmailLimitBurst          int
+	EmailLimitReplenish      rate.Limit
 	ReservationsLimit        int64
 	AttachmentTotalSizeLimit int64
 	AttachmentFileSizeLimit  int64
@@ -173,7 +200,7 @@ func (v *visitor) SubscriptionAllowed() error {
 }
 
 func (v *visitor) AccountCreationAllowed() error {
-	if v.accountLimiter != nil && !v.accountLimiter.Allow() {
+	if v.accountLimiter == nil || (v.accountLimiter != nil && !v.accountLimiter.Allow()) {
 		return errVisitorLimitReached
 	}
 	return nil
@@ -242,31 +269,6 @@ func (v *visitor) SetUser(u *user.User) {
 	}
 }
 
-func (v *visitor) resetLimiters() {
-	log.Info("%s Resetting limiters for visitor", v.stringNoLock())
-	var messagesLimiter, bandwidthLimiter util.Limiter
-	var requestLimiter, emailsLimiter, accountLimiter *rate.Limiter
-	if v.user != nil && v.user.Tier != nil {
-		requestLimiter = rate.NewLimiter(dailyLimitToRate(v.user.Tier.MessagesLimit), v.config.VisitorRequestLimitBurst)
-		messagesLimiter = util.NewFixedLimiter(v.user.Tier.MessagesLimit)
-		emailsLimiter = rate.NewLimiter(dailyLimitToRate(v.user.Tier.EmailsLimit), v.config.VisitorEmailLimitBurst)
-		bandwidthLimiter = util.NewBytesLimiter(int(v.user.Tier.AttachmentBandwidthLimit), 24*time.Hour)
-	} else {
-		requestLimiter = rate.NewLimiter(rate.Every(v.config.VisitorRequestLimitReplenish), v.config.VisitorRequestLimitBurst)
-		messagesLimiter = nil // Message limit is governed by the requestLimiter
-		emailsLimiter = rate.NewLimiter(rate.Every(v.config.VisitorEmailLimitReplenish), v.config.VisitorEmailLimitBurst)
-		bandwidthLimiter = util.NewBytesLimiter(int(v.config.VisitorAttachmentDailyBandwidthLimit), 24*time.Hour)
-	}
-	if v.user == nil {
-		accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
-	}
-	v.requestLimiter = requestLimiter
-	v.messagesLimiter = messagesLimiter
-	v.emailsLimiter = emailsLimiter
-	v.bandwidthLimiter = bandwidthLimiter
-	v.accountLimiter = accountLimiter
-}
-
 // MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,
 // an empty string is returned.
 func (v *visitor) MaybeUserID() string {
@@ -278,22 +280,71 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
+func (v *visitor) resetLimiters() {
+	log.Debug("%s Resetting limiters for visitor", v.stringNoLock())
+	limits := v.limitsNoLock()
+	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
+	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, v.messages)
+	v.emailsLimiter = rate.NewLimiter(limits.EmailLimitReplenish, limits.EmailLimitBurst)
+	v.bandwidthLimiter = util.NewBytesLimiter(int(limits.AttachmentBandwidthLimit), oneDay)
+	if v.user == nil {
+		v.accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
+	} else {
+		v.accountLimiter = nil // Users cannot create accounts when logged in
+	}
+}
+
 func (v *visitor) Limits() *visitorLimits {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	limits := defaultVisitorLimits(v.config)
+	return v.limitsNoLock()
+}
+
+func (v *visitor) limitsNoLock() *visitorLimits {
 	if v.user != nil && v.user.Tier != nil {
-		limits.Basis = visitorLimitBasisTier
-		limits.MessagesLimit = v.user.Tier.MessagesLimit
-		limits.MessagesExpiryDuration = v.user.Tier.MessagesExpiryDuration
-		limits.EmailsLimit = v.user.Tier.EmailsLimit
-		limits.ReservationsLimit = v.user.Tier.ReservationsLimit
-		limits.AttachmentTotalSizeLimit = v.user.Tier.AttachmentTotalSizeLimit
-		limits.AttachmentFileSizeLimit = v.user.Tier.AttachmentFileSizeLimit
-		limits.AttachmentExpiryDuration = v.user.Tier.AttachmentExpiryDuration
-		limits.AttachmentBandwidthLimit = v.user.Tier.AttachmentBandwidthLimit
+		return tierBasedVisitorLimits(v.config, v.user.Tier)
 	}
-	return limits
+	return configBasedVisitorLimits(v.config)
+}
+
+func tierBasedVisitorLimits(conf *Config, tier *user.Tier) *visitorLimits {
+	return &visitorLimits{
+		Basis:                    visitorLimitBasisTier,
+		RequestLimitBurst:        util.MinMax(int(float64(tier.MessageLimit)*visitorMessageToRequestLimitBurstRate), conf.VisitorRequestLimitBurst, visitorMessageToRequestLimitBurstMax),
+		RequestLimitReplenish:    dailyLimitToRate(tier.MessageLimit * visitorMessageToRequestLimitReplenishFactor),
+		MessageLimit:             tier.MessageLimit,
+		MessageExpiryDuration:    tier.MessageExpiryDuration,
+		EmailLimit:               tier.EmailLimit,
+		EmailLimitBurst:          util.MinMax(int(float64(tier.EmailLimit)*visitorEmailLimitBurstRate), conf.VisitorEmailLimitBurst, visitorEmailLimitBurstMax),
+		EmailLimitReplenish:      dailyLimitToRate(tier.EmailLimit),
+		ReservationsLimit:        tier.ReservationLimit,
+		AttachmentTotalSizeLimit: tier.AttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:  tier.AttachmentFileSizeLimit,
+		AttachmentExpiryDuration: tier.AttachmentExpiryDuration,
+		AttachmentBandwidthLimit: tier.AttachmentBandwidthLimit,
+	}
+}
+
+func configBasedVisitorLimits(conf *Config) *visitorLimits {
+	messagesLimit := replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish) // Approximation!
+	if conf.VisitorMessageDailyLimit > 0 {
+		messagesLimit = int64(conf.VisitorMessageDailyLimit)
+	}
+	return &visitorLimits{
+		Basis:                    visitorLimitBasisIP,
+		RequestLimitBurst:        conf.VisitorRequestLimitBurst,
+		RequestLimitReplenish:    rate.Every(conf.VisitorRequestLimitReplenish),
+		MessageLimit:             messagesLimit,
+		MessageExpiryDuration:    conf.CacheDuration,
+		EmailLimit:               replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish), // Approximation!
+		EmailLimitBurst:          conf.VisitorEmailLimitBurst,
+		EmailLimitReplenish:      rate.Every(conf.VisitorEmailLimitReplenish),
+		ReservationsLimit:        visitorDefaultReservationsLimit,
+		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
+		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
+		AttachmentBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
+	}
 }
 
 func (v *visitor) Info() (*visitorInfo, error) {
@@ -321,9 +372,9 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	limits := v.Limits()
 	stats := &visitorStats{
 		Messages:                     messages,
-		MessagesRemaining:            zeroIfNegative(limits.MessagesLimit - messages),
+		MessagesRemaining:            zeroIfNegative(limits.MessageLimit - messages),
 		Emails:                       emails,
-		EmailsRemaining:              zeroIfNegative(limits.EmailsLimit - emails),
+		EmailsRemaining:              zeroIfNegative(limits.EmailLimit - emails),
 		Reservations:                 reservations,
 		ReservationsRemaining:        zeroIfNegative(limits.ReservationsLimit - reservations),
 		AttachmentTotalSize:          attachmentsBytesUsed,
@@ -343,23 +394,16 @@ func zeroIfNegative(value int64) int64 {
 }
 
 func replenishDurationToDailyLimit(duration time.Duration) int64 {
-	return int64(24 * time.Hour / duration)
+	return int64(oneDay / duration)
 }
 
 func dailyLimitToRate(limit int64) rate.Limit {
-	return rate.Limit(limit) * rate.Every(24*time.Hour)
+	return rate.Limit(limit) * rate.Every(oneDay)
 }
 
-func defaultVisitorLimits(conf *Config) *visitorLimits {
-	return &visitorLimits{
-		Basis:                    visitorLimitBasisIP,
-		MessagesLimit:            replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish),
-		MessagesExpiryDuration:   conf.CacheDuration,
-		EmailsLimit:              replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish),
-		ReservationsLimit:        visitorDefaultReservationsLimit,
-		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
-		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
-		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
-		AttachmentBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
+func visitorID(ip netip.Addr, u *user.User) string {
+	if u != nil && u.Tier != nil {
+		return fmt.Sprintf("user:%s", u.ID)
 	}
+	return fmt.Sprintf("ip:%s", ip.String())
 }

@@ -337,6 +337,17 @@ func Retry[T any](f func() (*T, error), after ...time.Duration) (t *T, err error
 	return nil, err
 }
 
+// MinMax returns value if it is between min and max, or either
+// min or max if it is out of range
+func MinMax[T int | int64](value, min, max T) T {
+	if value < min {
+		return min
+	} else if value > max {
+		return max
+	}
+	return value
+}
+
 // String turns a string into a pointer of a string
 func String(v string) *string {
 	return &v

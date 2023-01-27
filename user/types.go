@@ -62,10 +62,10 @@ type Tier struct {
 	ID                       string        // Tier identifier (ti_...)
 	Code                     string        // Code of the tier
 	Name                     string        // Name of the tier
-	MessagesLimit            int64         // Daily message limit
-	MessagesExpiryDuration   time.Duration // Cache duration for messages
-	EmailsLimit              int64         // Daily email limit
-	ReservationsLimit        int64         // Number of topic reservations allowed by user
+	MessageLimit             int64         // Daily message limit
+	MessageExpiryDuration    time.Duration // Cache duration for messages
+	EmailLimit               int64         // Daily email limit
+	ReservationLimit         int64         // Number of topic reservations allowed by user
 	AttachmentFileSizeLimit  int64         // Max file size per file (bytes)
 	AttachmentTotalSizeLimit int64         // Total file size for all files of this user (bytes)
 	AttachmentExpiryDuration time.Duration // Duration after which attachments will be deleted

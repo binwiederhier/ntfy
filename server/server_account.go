@@ -23,6 +23,9 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		} else if v.user != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
+		if err := v.AccountCreationAllowed(); err != nil {
+			return errHTTPTooManyRequestsLimitAccountCreation
+		}
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit)
 	if err != nil {
@@ -30,9 +33,6 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	}
 	if existingUser, _ := s.userManager.User(newAccount.Username); existingUser != nil {
 		return errHTTPConflictUserExists
-	}
-	if err := v.AccountCreationAllowed(); err != nil {
-		return errHTTPTooManyRequestsLimitAccountCreation
 	}
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
 		return err
@@ -49,9 +49,9 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 	response := &apiAccountResponse{
 		Limits: &apiAccountLimits{
 			Basis:                    string(limits.Basis),
-			Messages:                 limits.MessagesLimit,
-			MessagesExpiryDuration:   int64(limits.MessagesExpiryDuration.Seconds()),
-			Emails:                   limits.EmailsLimit,
+			Messages:                 limits.MessageLimit,
+			MessagesExpiryDuration:   int64(limits.MessageExpiryDuration.Seconds()),
+			Emails:                   limits.EmailLimit,
 			Reservations:             limits.ReservationsLimit,
 			AttachmentTotalSize:      limits.AttachmentTotalSizeLimit,
 			AttachmentFileSize:       limits.AttachmentFileSizeLimit,
@@ -344,7 +344,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		reservations, err := s.userManager.ReservationsCount(v.user.Name)
 		if err != nil {
 			return err
-		} else if reservations >= v.user.Tier.ReservationsLimit {
+		} else if reservations >= v.user.Tier.ReservationLimit {
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}

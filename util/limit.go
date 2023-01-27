@@ -50,6 +50,20 @@ func (l *FixedLimiter) Allow(n int64) error {
 	return nil
 }
 
+// Value returns the current limiter value
+func (l *FixedLimiter) Value() int64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.value
+}
+
+// Reset sets the limiter's value back to zero
+func (l *FixedLimiter) Reset() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.value = 0
+}
+
 // RateLimiter is a Limiter that wraps a rate.Limiter, allowing a floating time-based limit.
 type RateLimiter struct {
 	limiter *rate.Limiter

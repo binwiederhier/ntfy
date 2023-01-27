@@ -746,7 +746,7 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	require.Equal(t, 401, response.Code)
 }
 
-func TestServer_StatsResetter_User_Without_Tier(t *testing.T) {
+func TestServer_StatsResetter(t *testing.T) {
 	// This tests the stats resetter for
 	// - an anonymous user
 	// - a user without a tier (treated like the same as the anonymous user)
@@ -839,6 +839,34 @@ func TestServer_StatsResetter_User_Without_Tier(t *testing.T) {
 	account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 	require.Nil(t, err)
 	require.Equal(t, int64(0), account.Stats.Messages)
+}
+
+func TestServer_StatsResetter_MessageLimiter(t *testing.T) {
+	// This tests that the messageLimiter (the only fixed limiter) is reset by the stats resetter
+
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+
+	// Publish some messages, and check stats
+	for i := 0; i < 3; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", nil)
+		require.Equal(t, 200, response.Code)
+	}
+	rr := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, rr.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(3), account.Stats.Messages)
+	require.Equal(t, int64(3), s.visitor(netip.MustParseAddr("9.9.9.9"), nil).messagesLimiter.Value())
+
+	// Reset stats and check again
+	s.resetStats()
+	rr = request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, rr.Code)
+	account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(0), account.Stats.Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("9.9.9.9"), nil).messagesLimiter.Value())
 }
 
 type testMailer struct {

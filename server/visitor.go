@@ -55,19 +55,19 @@ var (
 type visitor struct {
 	config              *Config
 	messageCache        *messageCache
-	userManager         *user.Manager // May be nil
-	ip                  netip.Addr    // Visitor IP address
-	user                *user.User    // Only set if authenticated user, otherwise nil
-	messages            int64         // Number of messages sent, reset every day
-	emails              int64         // Number of emails sent, reset every day
-	requestLimiter      *rate.Limiter // Rate limiter for (almost) all requests (including messages)
-	messagesLimiter     util.Limiter  // Rate limiter for messages, may be nil
-	emailsLimiter       *rate.Limiter // Rate limiter for emails
-	subscriptionLimiter util.Limiter  // Fixed limiter for active subscriptions (ongoing connections)
-	bandwidthLimiter    util.Limiter  // Limiter for attachment bandwidth downloads
-	accountLimiter      *rate.Limiter // Rate limiter for account creation, may be nil
-	firebase            time.Time     // Next allowed Firebase message
-	seen                time.Time     // Last seen time of this visitor (needed for removal of stale visitors)
+	userManager         *user.Manager      // May be nil
+	ip                  netip.Addr         // Visitor IP address
+	user                *user.User         // Only set if authenticated user, otherwise nil
+	messages            int64              // Number of messages sent, reset every day
+	emails              int64              // Number of emails sent, reset every day
+	requestLimiter      *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
+	messagesLimiter     *util.FixedLimiter // Rate limiter for messages, may be nil
+	emailsLimiter       *rate.Limiter      // Rate limiter for emails
+	subscriptionLimiter util.Limiter       // Fixed limiter for active subscriptions (ongoing connections)
+	bandwidthLimiter    util.Limiter       // Limiter for attachment bandwidth downloads
+	accountLimiter      *rate.Limiter      // Rate limiter for account creation, may be nil
+	firebase            time.Time          // Next allowed Firebase message
+	seen                time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
 	mu                  sync.Mutex
 }
 
@@ -251,10 +251,12 @@ func (v *visitor) ResetStats() {
 	defer v.mu.Unlock()
 	v.messages = 0
 	v.emails = 0
+	if v.messagesLimiter != nil {
+		v.messagesLimiter.Reset()
+	}
 	if v.user != nil {
 		v.user.Stats.Messages = 0
 		v.user.Stats.Emails = 0
-		// v.messagesLimiter = ... // FIXME
 	}
 }
 

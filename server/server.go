@@ -35,27 +35,19 @@ import (
 )
 
 /*
-TODO
---
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
-- HIGH Rate limiting: When ResetStats() is run, reset messagesLimiter (and others)?
-- MEDIUM Rate limiting: Test daily message quota read from database initially
 - MEDIUM: Races with v.user (see publishSyncEventAsync test)
+- MEDIUM: Test that anonymous user and user without tier are the same visitor
+- MEDIUM: Make sure account endpoints make sense for admins
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
 - MEDIUM: Reservation table delete button: dialog "keep or delete messages?"
+- MEDIUM: Tests for remaining payment endpoints
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: JS constants
 - LOW: Payments reconciliation process
 
-Limits & rate limiting:
-	users without tier: should the stats be persisted? are they meaningful? -> test that the visitor is based on the IP address!
-
-Make sure account endpoints make sense for admins
-
-Tests:
-- Payment endpoints (make mocks)
 */
 
 // Server is the main server, providing the UI and API for ntfy
@@ -513,7 +505,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return errHTTPNotFound
 	}
 	if r.Method == http.MethodGet {
-		if err := v.BandwidthLimiter().Allow(stat.Size()); err != nil {
+		if !v.BandwidthAllowed(stat.Size()) {
 			return errHTTPTooManyRequestsLimitAttachmentBandwidth
 		}
 	}
@@ -543,7 +535,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
-	if err := v.MessageAllowed(); err != nil {
+	if !v.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
@@ -558,9 +550,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
-	if v.user != nil {
-		m.User = v.user.ID
-	}
+	m.User = v.MaybeUserID()
 	m.Expires = time.Now().Add(v.Limits().MessageExpiryDuration).Unix()
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
@@ -582,7 +572,6 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			go s.sendToFirebase(v, m)
 		}
 		if s.smtpSender != nil && email != "" {
-			v.IncrementEmails()
 			go s.sendEmail(v, m, email)
 		}
 		if s.config.UpstreamBaseURL != "" {
@@ -597,8 +586,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 	}
-	if s.userManager != nil && v.user != nil {
-		s.userManager.EnqueueStats(v.user.ID, v.Stats()) // FIXME this makes no sense for tier-less users
+	u := v.User()
+	if s.userManager != nil && u != nil && u.Tier != nil {
+		s.userManager.EnqueueStats(u.ID, v.Stats())
 	}
 	s.mu.Lock()
 	s.messages++
@@ -704,7 +694,7 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" {
-		if err := v.EmailAllowed(); err != nil {
+		if !v.EmailAllowed() {
 			return false, false, "", false, errHTTPTooManyRequestsLimitEmails
 		}
 	}
@@ -909,7 +899,7 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request, v *v
 func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *visitor, contentType string, encoder messageEncoder) error {
 	log.Debug("%s HTTP stream connection opened", logHTTPPrefix(v, r))
 	defer log.Debug("%s HTTP stream connection closed", logHTTPPrefix(v, r))
-	if err := v.SubscriptionAllowed(); err != nil {
+	if !v.SubscriptionAllowed() {
 		return errHTTPTooManyRequestsLimitSubscriptions
 	}
 	defer v.RemoveSubscription()
@@ -989,7 +979,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if strings.ToLower(r.Header.Get("Upgrade")) != "websocket" {
 		return errHTTPBadRequestWebSocketsUpgradeHeaderMissing
 	}
-	if err := v.SubscriptionAllowed(); err != nil {
+	if !v.SubscriptionAllowed() {
 		return errHTTPTooManyRequestsLimitSubscriptions
 	}
 	defer v.RemoveSubscription()

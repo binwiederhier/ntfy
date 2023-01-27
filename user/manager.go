@@ -301,11 +301,11 @@ var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
 func NewManager(filename, startupQueries string, defaultAccess Permission) (*Manager, error) {
-	return newManager(filename, startupQueries, defaultAccess, userStatsQueueWriterInterval)
+	return NewManagerWithStatsInterval(filename, startupQueries, defaultAccess, userStatsQueueWriterInterval)
 }
 
-// NewManager creates a new Manager instance
-func newManager(filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) (*Manager, error) {
+// NewManagerWithStatsInterval creates a new Manager instance
+func NewManagerWithStatsInterval(filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err

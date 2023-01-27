@@ -23,7 +23,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		} else if v.user != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
-		if err := v.AccountCreationAllowed(); err != nil {
+		if !v.AccountCreationAllowed() {
 			return errHTTPTooManyRequestsLimitAccountCreation
 		}
 	}
@@ -428,11 +428,12 @@ func (s *Server) publishSyncEvent(v *visitor) error {
 
 func (s *Server) publishSyncEventAsync(v *visitor) {
 	go func() {
-		if v.user == nil || v.user.SyncTopic == "" {
+		u := v.User()
+		if u == nil || u.SyncTopic == "" {
 			return
 		}
 		if err := s.publishSyncEvent(v); err != nil {
-			log.Trace("Error publishing to user %s's sync topic %s: %s", v.user.Name, v.user.SyncTopic, err.Error())
+			log.Trace("Error publishing to user %s's sync topic %s: %s", u.Name, u.SyncTopic, err.Error())
 		}
 	}()
 }

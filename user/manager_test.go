@@ -545,7 +545,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 }
 
 func TestManager_EnqueueStats(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
+	a, err := NewManagerWithStatsInterval(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -575,7 +575,7 @@ func TestManager_EnqueueStats(t *testing.T) {
 }
 
 func TestManager_ChangeSettings(t *testing.T) {
-	a, err := newManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
+	a, err := NewManagerWithStatsInterval(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -718,7 +718,7 @@ func newTestManager(t *testing.T, defaultAccess Permission) *Manager {
 }
 
 func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) *Manager {
-	a, err := newManager(filename, startupQueries, defaultAccess, statsWriterInterval)
+	a, err := NewManagerWithStatsInterval(filename, startupQueries, defaultAccess, statsWriterInterval)
 	require.Nil(t, err)
 	return a
 }

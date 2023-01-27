@@ -841,23 +841,35 @@ func TestServer_StatsResetter(t *testing.T) {
 	require.Equal(t, int64(0), account.Stats.Messages)
 }
 
-func TestServer_StatsResetter_MessageLimiter(t *testing.T) {
-	// This tests that the messageLimiter (the only fixed limiter) is reset by the stats resetter
+func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
+	// This tests that the messageLimiter (the only fixed limiter) and the emailsLimiter (token bucket)
+	// is reset by the stats resetter
 
 	c := newTestConfigWithAuthFile(t)
 	s := newTestServer(t, c)
+	s.smtpSender = &testMailer{}
 
 	// Publish some messages, and check stats
 	for i := 0; i < 3; i++ {
 		response := request(t, s, "PUT", "/mytopic", "test", nil)
 		require.Equal(t, 200, response.Code)
 	}
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Email": "test@email.com",
+	})
+	require.Equal(t, 200, response.Code)
+
 	rr := request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, rr.Code)
 	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
-	require.Equal(t, int64(3), account.Stats.Messages)
-	require.Equal(t, int64(3), s.visitor(netip.MustParseAddr("9.9.9.9"), nil).messagesLimiter.Value())
+	require.Equal(t, int64(4), account.Stats.Messages)
+	require.Equal(t, int64(1), account.Stats.Emails)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.Equal(t, int64(4), v.Stats().Messages)
+	require.Equal(t, int64(4), v.messagesLimiter.Value())
+	require.Equal(t, int64(1), v.Stats().Emails)
+	require.Equal(t, int64(1), v.emailsLimiter.Value())
 
 	// Reset stats and check again
 	s.resetStats()
@@ -866,7 +878,53 @@ func TestServer_StatsResetter_MessageLimiter(t *testing.T) {
 	account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
 	require.Equal(t, int64(0), account.Stats.Messages)
-	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("9.9.9.9"), nil).messagesLimiter.Value())
+	require.Equal(t, int64(0), account.Stats.Emails)
+	v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.Equal(t, int64(0), v.Stats().Messages)
+	require.Equal(t, int64(0), v.messagesLimiter.Value())
+	require.Equal(t, int64(0), v.Stats().Emails)
+	require.Equal(t, int64(0), v.emailsLimiter.Value())
+}
+
+func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
+	// This tests that the daily message quota is prefilled originally from the database,
+	// if the visitor is unknown
+
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+	var err error
+	s.userManager, err = user.NewManagerWithStatsInterval(c.AuthFile, c.AuthStartupQueries, c.AuthDefault, 100*time.Millisecond)
+	require.Nil(t, err)
+
+	// Create user, and update it with some message and email stats
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code: "test",
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	s.userManager.EnqueueStats(u.ID, &user.Stats{
+		Messages: 123456,
+		Emails:   999,
+	})
+	time.Sleep(400 * time.Millisecond)
+
+	// Get account and verify stats are read from the DB, and that the visitor also has these stats
+	rr := request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(123456), account.Stats.Messages)
+	require.Equal(t, int64(999), account.Stats.Emails)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	require.Equal(t, int64(123456), v.Stats().Messages)
+	require.Equal(t, int64(123456), v.messagesLimiter.Value())
+	require.Equal(t, int64(999), v.Stats().Emails)
+	require.Equal(t, int64(999), v.emailsLimiter.Value())
 }
 
 type testMailer struct {

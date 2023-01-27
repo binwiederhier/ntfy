@@ -58,12 +58,11 @@ type visitor struct {
 	userManager         *user.Manager      // May be nil
 	ip                  netip.Addr         // Visitor IP address
 	user                *user.User         // Only set if authenticated user, otherwise nil
-	emails              int64              // Number of emails sent, reset every day
 	requestLimiter      *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
 	messagesLimiter     *util.FixedLimiter // Rate limiter for messages
-	emailsLimiter       *rate.Limiter      // Rate limiter for emails
-	subscriptionLimiter util.Limiter       // Fixed limiter for active subscriptions (ongoing connections)
-	bandwidthLimiter    util.Limiter       // Limiter for attachment bandwidth downloads
+	emailsLimiter       *util.RateLimiter  // Rate limiter for emails
+	subscriptionLimiter *util.FixedLimiter // Fixed limiter for active subscriptions (ongoing connections)
+	bandwidthLimiter    *util.RateLimiter  // Limiter for attachment bandwidth downloads
 	accountLimiter      *rate.Limiter      // Rate limiter for account creation, may be nil
 	firebase            time.Time          // Next allowed Firebase message
 	seen                time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
@@ -123,7 +122,6 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		userManager:         userManager, // May be nil
 		ip:                  ip,
 		user:                user,
-		emails:              emails,
 		firebase:            time.Unix(0, 0),
 		seen:                time.Now(),
 		subscriptionLimiter: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
@@ -133,7 +131,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		bandwidthLimiter:    nil, // Set in resetLimiters
 		accountLimiter:      nil, // Set in resetLimiters, may be nil
 	}
-	v.resetLimiters(messages)
+	v.resetLimitersNoLock(messages, emails)
 	return v
 }
 
@@ -153,6 +151,8 @@ func (v *visitor) stringNoLock() string {
 }
 
 func (v *visitor) RequestAllowed() error {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
 	if !v.requestLimiter.Allow() {
 		return errVisitorLimitReached
 	}
@@ -174,40 +174,43 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 	v.firebase = time.Now().Add(v.config.FirebaseQuotaExceededPenaltyDuration)
 }
 
-func (v *visitor) MessageAllowed() error {
-	if v.messagesLimiter.Allow(1) != nil {
-		return errVisitorLimitReached
-	}
-	return nil
-}
-
-func (v *visitor) EmailAllowed() error {
-	if !v.emailsLimiter.Allow() {
-		return errVisitorLimitReached
-	}
-	return nil
-}
-
-func (v *visitor) SubscriptionAllowed() error {
-	v.mu.Lock()
+func (v *visitor) MessageAllowed() bool {
+	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
-	if err := v.subscriptionLimiter.Allow(1); err != nil {
-		return errVisitorLimitReached
-	}
-	return nil
+	return v.messagesLimiter.Allow()
 }
 
-func (v *visitor) AccountCreationAllowed() error {
+func (v *visitor) EmailAllowed() bool {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	return v.emailsLimiter.Allow()
+}
+
+func (v *visitor) SubscriptionAllowed() bool {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	return v.subscriptionLimiter.Allow()
+}
+
+func (v *visitor) AccountCreationAllowed() bool {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
 	if v.accountLimiter == nil || (v.accountLimiter != nil && !v.accountLimiter.Allow()) {
-		return errVisitorLimitReached
+		return false
 	}
-	return nil
+	return true
+}
+
+func (v *visitor) BandwidthAllowed(bytes int64) bool {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	return v.bandwidthLimiter.AllowN(bytes)
 }
 
 func (v *visitor) RemoveSubscription() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.subscriptionLimiter.Allow(-1)
+	v.subscriptionLimiter.AllowN(-1)
 }
 
 func (v *visitor) Keepalive() {
@@ -217,6 +220,8 @@ func (v *visitor) Keepalive() {
 }
 
 func (v *visitor) BandwidthLimiter() util.Limiter {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
 	return v.bandwidthLimiter
 }
 
@@ -226,26 +231,27 @@ func (v *visitor) Stale() bool {
 	return time.Since(v.seen) > visitorExpungeAfter
 }
 
-func (v *visitor) IncrementEmails() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.emails++
-}
-
 func (v *visitor) Stats() *user.Stats {
-	v.mu.Lock()
+	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
 	return &user.Stats{
 		Messages: v.messagesLimiter.Value(),
-		Emails:   v.emails,
+		Emails:   v.emailsLimiter.Value(),
 	}
 }
 
 func (v *visitor) ResetStats() {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	v.emailsLimiter.Reset()
+	v.messagesLimiter.Reset()
+}
+
+// User returns the visitor user, or nil if there is none
+func (v *visitor) User() *user.User {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.emails = 0
-	v.messagesLimiter.Reset()
+	return v.user // May be nil
 }
 
 // SetUser sets the visitors user to the given value
@@ -255,7 +261,7 @@ func (v *visitor) SetUser(u *user.User) {
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	v.user = u
 	if shouldResetLimiters {
-		v.resetLimiters(0)
+		v.resetLimitersNoLock(0, 0)
 	}
 }
 
@@ -270,12 +276,12 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
-func (v *visitor) resetLimiters(messages int64) {
+func (v *visitor) resetLimitersNoLock(messages, emails int64) {
 	log.Debug("%s Resetting limiters for visitor", v.stringNoLock())
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)
-	v.emailsLimiter = rate.NewLimiter(limits.EmailLimitReplenish, limits.EmailLimitBurst)
+	v.emailsLimiter = util.NewRateLimiterWithValue(limits.EmailLimitReplenish, limits.EmailLimitBurst, emails)
 	v.bandwidthLimiter = util.NewBytesLimiter(int(limits.AttachmentBandwidthLimit), oneDay)
 	if v.user == nil {
 		v.accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
@@ -340,12 +346,13 @@ func configBasedVisitorLimits(conf *Config) *visitorLimits {
 func (v *visitor) Info() (*visitorInfo, error) {
 	v.mu.Lock()
 	messages := v.messagesLimiter.Value()
-	emails := v.emails
+	emails := v.emailsLimiter.Value()
 	v.mu.Unlock()
 	var attachmentsBytesUsed int64
 	var err error
-	if v.user != nil {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(v.user.ID)
+	u := v.User()
+	if u != nil {
+		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(u.ID)
 	} else {
 		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.ip.String())
 	}
@@ -353,8 +360,8 @@ func (v *visitor) Info() (*visitorInfo, error) {
 		return nil, err
 	}
 	var reservations int64
-	if v.user != nil && v.userManager != nil {
-		reservations, err = v.userManager.ReservationsCount(v.user.Name)
+	if v.userManager != nil && u != nil {
+		reservations, err = v.userManager.ReservationsCount(u.Name)
 		if err != nil {
 			return nil, err
 		}

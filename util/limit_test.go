@@ -7,26 +7,31 @@ import (
 	"time"
 )
 
-func TestFixedLimiter_Add(t *testing.T) {
+func TestFixedLimiter_AllowValueReset(t *testing.T) {
 	l := NewFixedLimiter(10)
-	if err := l.Allow(5); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.Allow(5); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.Allow(5); err != ErrLimitReached {
-		t.Fatalf("expected ErrLimitReached, got %#v", err)
-	}
+	require.True(t, l.AllowN(5))
+	require.Equal(t, int64(5), l.Value())
+
+	require.True(t, l.AllowN(5))
+	require.Equal(t, int64(10), l.Value())
+
+	require.False(t, l.Allow())
+	require.Equal(t, int64(10), l.Value())
+
+	l.Reset()
+	require.Equal(t, int64(0), l.Value())
+	require.True(t, l.Allow())
+	require.True(t, l.AllowN(9))
+	require.False(t, l.Allow())
 }
 
 func TestFixedLimiter_AddSub(t *testing.T) {
 	l := NewFixedLimiter(10)
-	l.Allow(5)
+	l.AllowN(5)
 	if l.value != 5 {
 		t.Fatalf("expected value to be %d, got %d", 5, l.value)
 	}
-	l.Allow(-2)
+	l.AllowN(-2)
 	if l.value != 3 {
 		t.Fatalf("expected value to be %d, got %d", 7, l.value)
 	}
@@ -34,17 +39,22 @@ func TestFixedLimiter_AddSub(t *testing.T) {
 
 func TestBytesLimiter_Add_Simple(t *testing.T) {
 	l := NewBytesLimiter(250*1024*1024, 24*time.Hour) // 250 MB per 24h
-	require.Nil(t, l.Allow(100*1024*1024))
-	require.Nil(t, l.Allow(100*1024*1024))
-	require.Equal(t, ErrLimitReached, l.Allow(300*1024*1024))
+	require.True(t, l.AllowN(100*1024*1024))
+	require.Equal(t, int64(100*1024*1024), l.Value())
+
+	require.True(t, l.AllowN(100*1024*1024))
+	require.Equal(t, int64(200*1024*1024), l.Value())
+
+	require.False(t, l.AllowN(300*1024*1024))
+	require.Equal(t, int64(200*1024*1024), l.Value())
 }
 
 func TestBytesLimiter_Add_Wait(t *testing.T) {
 	l := NewBytesLimiter(250*1024*1024, 24*time.Hour) // 250 MB per 24h (~ 303 bytes per 100ms)
-	require.Nil(t, l.Allow(250*1024*1024))
-	require.Equal(t, ErrLimitReached, l.Allow(400))
+	require.True(t, l.AllowN(250*1024*1024))
+	require.False(t, l.AllowN(400))
 	time.Sleep(200 * time.Millisecond)
-	require.Nil(t, l.Allow(400))
+	require.True(t, l.AllowN(400))
 }
 
 func TestLimitWriter_WriteNoLimiter(t *testing.T) {

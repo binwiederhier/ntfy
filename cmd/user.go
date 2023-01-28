@@ -330,7 +330,7 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 	if err != nil {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	}
-	return user.NewManager(authFile, authStartupQueries, authDefault)
+	return user.NewManager(authFile, authStartupQueries, authDefault, user.DefaultUserPasswordBcryptCost, user.DefaultUserStatsQueueWriterInterval)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

@@ -676,6 +676,10 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	return messages, nil
 }
 
+func (c *messageCache) Close() error {
+	return c.db.Close()
+}
+
 func setupDB(db *sql.DB, startupQueries string, cacheDuration time.Duration) error {
 	// Run startup queries
 	if startupQueries != "" {

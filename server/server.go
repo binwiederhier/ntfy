@@ -171,7 +171,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var userManager *user.Manager
 	if conf.AuthFile != "" {
-		userManager, err = user.NewManager(conf.AuthFile, conf.AuthStartupQueries, conf.AuthDefault)
+		userManager, err = user.NewManager(conf.AuthFile, conf.AuthStartupQueries, conf.AuthDefault, conf.AuthBcryptCost, user.DefaultUserStatsQueueWriterInterval)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +296,15 @@ func (s *Server) Stop() {
 	if s.smtpServer != nil {
 		s.smtpServer.Close()
 	}
+	s.closeDatabases()
 	close(s.closeChan)
+}
+
+func (s *Server) closeDatabases() {
+	if s.userManager != nil {
+		s.userManager.Close()
+	}
+	s.messageCache.Close()
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
@@ -1567,8 +1575,9 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 		if err != nil {
 			return err
 		}
+		u := v.User()
 		for _, t := range topics {
-			if err := s.userManager.Authorize(v.user, t.ID, perm); err != nil {
+			if err := s.userManager.Authorize(u, t.ID, perm); err != nil {
 				log.Info("unauthorized: %s", err.Error())
 				return errHTTPForbidden
 			}

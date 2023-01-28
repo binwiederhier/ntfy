@@ -22,13 +22,16 @@ const (
 	syncTopicLength                 = 16
 	userIDPrefix                    = "u_"
 	userIDLength                    = 12
-	userPasswordBcryptCost          = 10
-	userAuthIntentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match userPasswordBcryptCost
-	userStatsQueueWriterInterval    = 33 * time.Second
+	userAuthIntentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match DefaultUserPasswordBcryptCost
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
 	tokenMaxCount                   = 10 // Only keep this many tokens in the table per user
+)
+
+const (
+	DefaultUserStatsQueueWriterInterval = 33 * time.Second
+	DefaultUserPasswordBcryptCost       = 10
 )
 
 var (
@@ -296,18 +299,14 @@ type Manager struct {
 	db            *sql.DB
 	defaultAccess Permission        // Default permission if no ACL matches
 	statsQueue    map[string]*Stats // "Queue" to asynchronously write user stats to the database (UserID -> Stats)
+	bcryptCost    int               // Makes testing easier
 	mu            sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
-func NewManager(filename, startupQueries string, defaultAccess Permission) (*Manager, error) {
-	return NewManagerWithStatsInterval(filename, startupQueries, defaultAccess, userStatsQueueWriterInterval)
-}
-
-// NewManagerWithStatsInterval creates a new Manager instance
-func NewManagerWithStatsInterval(filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) (*Manager, error) {
+func NewManager(filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) (*Manager, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -322,6 +321,7 @@ func NewManagerWithStatsInterval(filename, startupQueries string, defaultAccess 
 		db:            db,
 		defaultAccess: defaultAccess,
 		statsQueue:    make(map[string]*Stats),
+		bcryptCost:    bcryptCost,
 	}
 	go manager.userStatsQueueWriter(statsWriterInterval)
 	return manager, nil
@@ -615,7 +615,7 @@ func (a *Manager) AddUser(username, password string, role Role) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), userPasswordBcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -871,7 +871,7 @@ func (a *Manager) ReservationsCount(username string) (int64, error) {
 
 // ChangePassword changes a user's password
 func (a *Manager) ChangePassword(username, password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), userPasswordBcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -1142,6 +1142,10 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 		AttachmentBandwidthLimit: attachmentBandwidthLimit.Int64,
 		StripePriceID:            stripePriceID.String, // May be empty
 	}, nil
+}
+
+func (a *Manager) Close() error {
+	return a.db.Close()
 }
 
 func toSQLWildcard(s string) string {

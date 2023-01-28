@@ -232,11 +232,11 @@ test: .PHONY
 	go test -v $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 race: .PHONY
-	go test -race $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -v -race $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:

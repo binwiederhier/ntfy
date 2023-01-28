@@ -16,6 +16,7 @@ func TestAccount_Signup_Success(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
@@ -41,6 +42,7 @@ func TestAccount_Signup_UserExists(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
@@ -54,6 +56,7 @@ func TestAccount_Signup_LimitReached(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
 	for i := 0; i < 3; i++ {
 		rr := request(t, s, "POST", "/v1/account", fmt.Sprintf(`{"username":"phil%d", "password":"mypass"}`, i), nil)
@@ -68,15 +71,18 @@ func TestAccount_Signup_AsUser(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
+	log.Info("1")
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	log.Info("2")
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
-
+	log.Info("3")
 	rr := request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"emma"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
-
+	log.Info("4")
 	rr = request(t, s, "POST", "/v1/account", `{"username":"marian", "password":"marian"}`, map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
@@ -87,6 +93,7 @@ func TestAccount_Signup_Disabled(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = false
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 400, rr.Code)
@@ -115,6 +122,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 	conf.AttachmentFileSizeLimit = 512
 	s := newTestServer(t, conf)
 	s.smtpSender = &testMailer{}
+	defer s.closeDatabases()
 
 	rr := request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, rr.Code)
@@ -149,6 +157,8 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 
 func TestAccount_ChangeSettings(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	u, _ := s.userManager.User("phil")
 	token, _ := s.userManager.CreateToken(u.ID, "", time.Unix(0, 0))
@@ -176,6 +186,8 @@ func TestAccount_ChangeSettings(t *testing.T) {
 
 func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	rr := request(t, s, "POST", "/v1/account/subscription", `{"base_url": "http://abc.com", "topic": "def"}`, map[string]string{
@@ -226,6 +238,8 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 
 func TestAccount_ChangePassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	rr := request(t, s, "POST", "/v1/account/password", `{"password": "phil", "new_password": "new password"}`, map[string]string{
@@ -246,6 +260,7 @@ func TestAccount_ChangePassword(t *testing.T) {
 
 func TestAccount_ChangePassword_NoAccount(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
 
 	rr := request(t, s, "POST", "/v1/account/password", `{"password": "new password"}`, nil)
 	require.Equal(t, 401, rr.Code)
@@ -253,6 +268,8 @@ func TestAccount_ChangePassword_NoAccount(t *testing.T) {
 
 func TestAccount_ExtendToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
@@ -276,6 +293,8 @@ func TestAccount_ExtendToken(t *testing.T) {
 
 func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	rr := request(t, s, "PATCH", "/v1/account/token", "", map[string]string{
@@ -287,6 +306,8 @@ func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 
 func TestAccount_DeleteToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
@@ -295,7 +316,6 @@ func TestAccount_DeleteToken(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
-	log.Info("token = %#v", token)
 	require.True(t, token.Expires > time.Now().Add(71*time.Hour).Unix())
 
 	// Delete token failure (using basic auth)
@@ -522,6 +542,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	conf.AuthDefault = user.PermissionReadWrite
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+	defer s.closeDatabases()
 
 	// Create user with tier
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
@@ -544,6 +565,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 		require.Equal(t, "open", messages[0].Event)
 		require.Equal(t, "message before reservation", messages[1].Message)
 		anonCh <- true
+		log.Info("Anonymous subscription ended")
 	}()
 
 	// Subscribe with user
@@ -558,13 +580,14 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 		require.Equal(t, "message before reservation", messages[1].Message)
 		require.Equal(t, "message after reservation", messages[2].Message)
 		userCh <- true
+		log.Info("User subscription ended")
 	}()
 
 	// Publish message (before reservation)
-	time.Sleep(700 * time.Millisecond) // Wait for subscribers
+	time.Sleep(time.Second) // Wait for subscribers
 	rr = request(t, s, "POST", "/mytopic", "message before reservation", nil)
 	require.Equal(t, 200, rr.Code)
-	time.Sleep(700 * time.Millisecond) // Wait for subscribers to receive message
+	time.Sleep(time.Second) // Wait for subscribers to receive message
 
 	// Reserve a topic
 	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{

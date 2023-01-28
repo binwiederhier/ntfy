@@ -3,6 +3,7 @@ package user
 import (
 	"database/sql"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/util"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ import (
 const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
 
 func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
-	a := newTestManager(t, PermissionDenyAll)
+	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", PermissionReadWrite))
@@ -98,14 +99,14 @@ func TestManager_AddUser_Invalid(t *testing.T) {
 }
 
 func TestManager_AddUser_Timing(t *testing.T) {
-	a := newTestManager(t, PermissionDenyAll)
+	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
 	start := time.Now().UnixMilli()
 	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestManager_Authenticate_Timing(t *testing.T) {
-	a := newTestManager(t, PermissionDenyAll)
+	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
 	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
 
 	// Timing a correct attempt
@@ -192,7 +193,7 @@ func TestManager_UserManagement(t *testing.T) {
 	phil, err := a.User("phil")
 	require.Nil(t, err)
 	require.Equal(t, "phil", phil.Name)
-	require.True(t, strings.HasPrefix(phil.Hash, "$2a$10$"))
+	require.True(t, strings.HasPrefix(phil.Hash, "$2a$04$")) // Min cost for testing
 	require.Equal(t, RoleAdmin, phil.Role)
 
 	philGrants, err := a.Grants("phil")
@@ -202,7 +203,7 @@ func TestManager_UserManagement(t *testing.T) {
 	ben, err := a.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, "ben", ben.Name)
-	require.True(t, strings.HasPrefix(ben.Hash, "$2a$10$"))
+	require.True(t, strings.HasPrefix(ben.Hash, "$2a$04$")) // Min cost for testing
 	require.Equal(t, RoleUser, ben.Role)
 
 	benGrants, err := a.Grants("ben")
@@ -551,7 +552,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 }
 
 func TestManager_EnqueueStats(t *testing.T) {
-	a, err := NewManagerWithStatsInterval(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
+	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -581,7 +582,7 @@ func TestManager_EnqueueStats(t *testing.T) {
 }
 
 func TestManager_ChangeSettings(t *testing.T) {
-	a, err := NewManagerWithStatsInterval(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, 1500*time.Millisecond)
+	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
 
@@ -665,7 +666,7 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create manager to trigger migration
-	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, userStatsQueueWriterInterval)
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
 	checkSchemaVersion(t, a.db)
 
 	users, err := a.Users()
@@ -720,11 +721,11 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 }
 
 func newTestManager(t *testing.T, defaultAccess Permission) *Manager {
-	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", defaultAccess, userStatsQueueWriterInterval)
+	return newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", defaultAccess, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
 }
 
-func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, statsWriterInterval time.Duration) *Manager {
-	a, err := NewManagerWithStatsInterval(filename, startupQueries, defaultAccess, statsWriterInterval)
+func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) *Manager {
+	a, err := NewManager(filename, startupQueries, defaultAccess, bcryptCost, statsWriterInterval)
 	require.Nil(t, err)
 	return a
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/user"
 	"io"
 	"math/rand"
@@ -893,7 +894,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	s := newTestServer(t, c)
 	var err error
-	s.userManager, err = user.NewManagerWithStatsInterval(c.AuthFile, c.AuthStartupQueries, c.AuthDefault, 100*time.Millisecond)
+	s.userManager, err = user.NewManager(c.AuthFile, c.AuthStartupQueries, c.AuthDefault, c.AuthBcryptCost, 100*time.Millisecond)
 	require.Nil(t, err)
 
 	// Create user, and update it with some message and email stats
@@ -1794,6 +1795,7 @@ func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
+	conf.CacheStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	conf.AttachmentCacheDir = t.TempDir()
 	return conf
 }
@@ -1801,6 +1803,8 @@ func newTestConfig(t *testing.T) *Config {
 func newTestConfigWithAuthFile(t *testing.T) *Config {
 	conf := newTestConfig(t)
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	conf.AuthStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
+	conf.AuthBcryptCost = bcrypt.MinCost // This speeds up tests a lot
 	return conf
 }
 

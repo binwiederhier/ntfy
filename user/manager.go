@@ -406,6 +406,7 @@ func (a *Manager) CreateToken(userID, label string, expires time.Time) (*Token, 
 	}, nil
 }
 
+// Tokens returns all existing tokens for the user with the given user ID
 func (a *Manager) Tokens(userID string) ([]*Token, error) {
 	rows, err := a.db.Query(selectTokensQuery, userID)
 	if err != nil {
@@ -425,6 +426,7 @@ func (a *Manager) Tokens(userID string) ([]*Token, error) {
 	return tokens, nil
 }
 
+// Token returns a specific token for a user
 func (a *Manager) Token(userID, token string) (*Token, error) {
 	rows, err := a.db.Query(selectTokenQuery, userID, token)
 	if err != nil {

@@ -190,13 +190,25 @@ func TestReadJSON_Failure(t *testing.T) {
 }
 
 func TestReadJSONWithLimit_Success(t *testing.T) {
-	v, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 100)
+	v, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 100, false)
 	require.Nil(t, err)
 	require.Equal(t, "some name", v.Name)
 	require.Equal(t, 99, v.Something)
 }
 
 func TestReadJSONWithLimit_FailureTooLong(t *testing.T) {
-	_, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 10)
+	_, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(`{"name":"some name","something":99}`)), 10, false)
 	require.Equal(t, ErrTooLargeJSON, err)
+}
+
+func TestReadJSONWithLimit_AllowEmpty(t *testing.T) {
+	v, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(` `)), 10, true)
+	require.Nil(t, err)
+	require.Equal(t, "", v.Name)
+	require.Equal(t, 0, v.Something)
+}
+
+func TestReadJSONWithLimit_NoAllowEmpty(t *testing.T) {
+	_, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(` `)), 10, false)
+	require.Equal(t, ErrUnmarshalJSON, err)
 }

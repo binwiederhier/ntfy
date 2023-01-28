@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"io"
@@ -149,8 +150,8 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 func TestAccount_ChangeSettings(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
-	user, _ := s.userManager.User("phil")
-	token, _ := s.userManager.CreateToken(user)
+	u, _ := s.userManager.User("phil")
+	token, _ := s.userManager.CreateToken(u.ID, "", time.Unix(0, 0))
 
 	rr := request(t, s, "PATCH", "/v1/account/settings", `{"notification": {"sound": "juntos"},"ignored": true}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -294,6 +295,8 @@ func TestAccount_DeleteToken(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.Nil(t, err)
+	log.Info("token = %#v", token)
+	require.True(t, token.Expires > time.Now().Add(71*time.Hour).Unix())
 
 	// Delete token failure (using basic auth)
 	rr = request(t, s, "DELETE", "/v1/account/token", "", map[string]string{

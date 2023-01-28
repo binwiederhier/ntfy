@@ -37,6 +37,8 @@ import (
 /*
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- HIGH Stripe payment methods
+- MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Races with v.user (see publishSyncEventAsync test)
 - MEDIUM: Test that anonymous user and user without tier are the same visitor
 - MEDIUM: Make sure account endpoints make sense for admins
@@ -348,18 +350,18 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountTokenPath {
-		return s.ensureUser(s.handleAccountTokenIssue)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
 		return s.handleAccountGet(w, r, v) // Allowed by anonymous
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountDelete))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPasswordPath {
 		return s.ensureUser(s.handleAccountPasswordChange)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountTokenPath {
+		return s.ensureUser(s.withAccountSync(s.handleAccountTokenCreate))(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountTokenPath {
-		return s.ensureUser(s.handleAccountTokenExtend)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountTokenUpdate))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountTokenPath {
-		return s.ensureUser(s.handleAccountTokenDelete)(w, r, v)
+		return s.ensureUser(s.withAccountSync(s.handleAccountTokenDelete))(w, r, v)
 	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountSettingsPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSettingsChange))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountSubscriptionPath {
@@ -1485,7 +1487,7 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit*2) // 2x to account for JSON format overhead
+		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit*2, false) // 2x to account for JSON format overhead
 		if err != nil {
 			return err
 		}

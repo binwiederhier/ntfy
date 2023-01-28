@@ -254,6 +254,13 @@ func (v *visitor) User() *user.User {
 	return v.user // May be nil
 }
 
+// Authenticated returns true if a user successfully authenticated
+func (v *visitor) Authenticated() bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.user != nil
+}
+
 // SetUser sets the visitors user to the given value
 func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()

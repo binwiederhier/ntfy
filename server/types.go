@@ -235,9 +235,21 @@ type apiAccountDeleteRequest struct {
 	Password string `json:"password"`
 }
 
+type apiAccountTokenIssueRequest struct {
+	Label   *string `json:"label"`
+	Expires *int64  `json:"expires"` // Unix timestamp
+}
+
+type apiAccountTokenUpdateRequest struct {
+	Token   string  `json:"token"`
+	Label   *string `json:"label"`
+	Expires *int64  `json:"expires"` // Unix timestamp
+}
+
 type apiAccountTokenResponse struct {
 	Token   string `json:"token"`
-	Expires int64  `json:"expires"`
+	Label   string `json:"label,omitempty"`
+	Expires int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
 type apiAccountTier struct {
@@ -282,17 +294,18 @@ type apiAccountBilling struct {
 }
 
 type apiAccountResponse struct {
-	Username      string                   `json:"username"`
-	Role          string                   `json:"role,omitempty"`
-	SyncTopic     string                   `json:"sync_topic,omitempty"`
-	Language      string                   `json:"language,omitempty"`
-	Notification  *user.NotificationPrefs  `json:"notification,omitempty"`
-	Subscriptions []*user.Subscription     `json:"subscriptions,omitempty"`
-	Reservations  []*apiAccountReservation `json:"reservations,omitempty"`
-	Tier          *apiAccountTier          `json:"tier,omitempty"`
-	Limits        *apiAccountLimits        `json:"limits,omitempty"`
-	Stats         *apiAccountStats         `json:"stats,omitempty"`
-	Billing       *apiAccountBilling       `json:"billing,omitempty"`
+	Username      string                     `json:"username"`
+	Role          string                     `json:"role,omitempty"`
+	SyncTopic     string                     `json:"sync_topic,omitempty"`
+	Language      string                     `json:"language,omitempty"`
+	Notification  *user.NotificationPrefs    `json:"notification,omitempty"`
+	Subscriptions []*user.Subscription       `json:"subscriptions,omitempty"`
+	Reservations  []*apiAccountReservation   `json:"reservations,omitempty"`
+	Tokens        []*apiAccountTokenResponse `json:"tokens,omitempty"`
+	Tier          *apiAccountTier            `json:"tier,omitempty"`
+	Limits        *apiAccountLimits          `json:"limits,omitempty"`
+	Stats         *apiAccountStats           `json:"stats,omitempty"`
+	Billing       *apiAccountBilling         `json:"billing,omitempty"`
 }
 
 type apiAccountReservationRequest struct {

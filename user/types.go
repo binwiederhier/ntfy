@@ -47,6 +47,7 @@ type Auther interface {
 // Token represents a user token, including expiry date
 type Token struct {
 	Value   string
+	Label   string
 	Expires time.Time
 }
 
@@ -237,5 +238,6 @@ var (
 	ErrInvalidArgument     = errors.New("invalid argument")
 	ErrUserNotFound        = errors.New("user not found")
 	ErrTierNotFound        = errors.New("tier not found")
+	ErrTokenNotFound       = errors.New("token not found")
 	ErrTooManyReservations = errors.New("new tier has lower reservation limit")
 )

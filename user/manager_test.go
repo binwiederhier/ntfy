@@ -138,7 +138,7 @@ func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, u.Deleted)
 
-	token, err := a.CreateToken(u)
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(time.Hour))
 	require.Nil(t, err)
 
 	u, err = a.Authenticate("user", "pass")
@@ -396,9 +396,10 @@ func TestManager_Token_Valid(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create token for user
-	token, err := a.CreateToken(u)
+	token, err := a.CreateToken(u.ID, "some label", time.Now().Add(72*time.Hour))
 	require.Nil(t, err)
 	require.NotEmpty(t, token.Value)
+	require.Equal(t, "some label", token.Label)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires.Unix())
 
 	u2, err := a.AuthenticateToken(token.Value)
@@ -406,8 +407,13 @@ func TestManager_Token_Valid(t *testing.T) {
 	require.Equal(t, u.Name, u2.Name)
 	require.Equal(t, token.Value, u2.Token)
 
+	token2, err := a.Token(u.ID, token.Value)
+	require.Nil(t, err)
+	require.Equal(t, token.Value, token2.Value)
+	require.Equal(t, "some label", token2.Label)
+
 	// Remove token and auth again
-	require.Nil(t, a.RemoveToken(u2))
+	require.Nil(t, a.RemoveToken(u2.ID, u2.Token))
 	u3, err := a.AuthenticateToken(token.Value)
 	require.Equal(t, ErrUnauthenticated, err)
 	require.Nil(t, u3)
@@ -434,12 +440,12 @@ func TestManager_Token_Expire(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create tokens for user
-	token1, err := a.CreateToken(u)
+	token1, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
 	require.Nil(t, err)
 	require.NotEmpty(t, token1.Value)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token1.Expires.Unix())
 
-	token2, err := a.CreateToken(u)
+	token2, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
 	require.Nil(t, err)
 	require.NotEmpty(t, token2.Value)
 	require.NotEqual(t, token1.Value, token2.Value)
@@ -482,23 +488,23 @@ func TestManager_Token_Extend(t *testing.T) {
 	u, err := a.User("ben")
 	require.Nil(t, err)
 
-	_, err = a.ExtendToken(u)
+	_, err = a.ChangeToken(u.ID, u.Token, util.String("some label"), util.Time(time.Now().Add(time.Hour)))
 	require.Equal(t, errNoTokenProvided, err)
 
 	// Create token for user
-	token, err := a.CreateToken(u)
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
 	require.Nil(t, err)
 	require.NotEmpty(t, token.Value)
 
 	userWithToken, err := a.AuthenticateToken(token.Value)
 	require.Nil(t, err)
 
-	time.Sleep(1100 * time.Millisecond)
-
-	extendedToken, err := a.ExtendToken(userWithToken)
+	extendedToken, err := a.ChangeToken(userWithToken.ID, userWithToken.Token, util.String("changed label"), util.Time(time.Now().Add(100*time.Hour)))
 	require.Nil(t, err)
 	require.Equal(t, token.Value, extendedToken.Value)
+	require.Equal(t, "changed label", extendedToken.Label)
 	require.True(t, token.Expires.Unix() < extendedToken.Expires.Unix())
+	require.True(t, time.Now().Add(99*time.Hour).Unix() < extendedToken.Expires.Unix())
 }
 
 func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
@@ -513,7 +519,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	baseTime := time.Now().Add(24 * time.Hour)
 	tokens := make([]string, 0)
 	for i := 0; i < 12; i++ {
-		token, err := a.CreateToken(u)
+		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
 		tokens = append(tokens, token.Value)

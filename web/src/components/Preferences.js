@@ -3,7 +3,8 @@ import {useContext, useEffect, useState} from 'react';
 import {
     Alert,
     CardActions,
-    CardContent, Chip,
+    CardContent,
+    Chip,
     FormControl,
     Select,
     Stack,
@@ -20,7 +21,6 @@ import prefs from "../app/Prefs";
 import {Paragraph} from "./styles";
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from "@mui/icons-material/Close";
-import WarningIcon from '@mui/icons-material/Warning';
 import IconButton from "@mui/material/IconButton";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import Container from "@mui/material/Container";
@@ -42,12 +42,11 @@ import routes from "./routes";
 import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
 import LockIcon from "@mui/icons-material/Lock";
-import {Check, Info, Public, PublicOff} from "@mui/icons-material";
+import {Info, Public, PublicOff} from "@mui/icons-material";
 import DialogContentText from "@mui/material/DialogContentText";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
 import {useOutletContext} from "react-router-dom";
-import subscriptionManager from "../app/SubscriptionManager";
 
 const Preferences = () => {
     return (

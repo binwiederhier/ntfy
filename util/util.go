@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -310,7 +311,7 @@ func UnmarshalJSON[T any](body io.ReadCloser) (*T, error) {
 }
 
 // UnmarshalJSONWithLimit reads the given io.ReadCloser into a struct, but only until limit is reached
-func UnmarshalJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
+func UnmarshalJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, error) {
 	defer r.Close()
 	p, err := Peek(r, limit)
 	if err != nil {
@@ -319,7 +320,9 @@ func UnmarshalJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
 		return nil, ErrTooLargeJSON
 	}
 	var obj T
-	if err := json.NewDecoder(p).Decode(&obj); err != nil {
+	if len(bytes.TrimSpace(p.PeekedBytes)) == 0 && allowEmpty {
+		return &obj, nil
+	} else if err := json.NewDecoder(p).Decode(&obj); err != nil {
 		return nil, ErrUnmarshalJSON
 	}
 	return &obj, nil
@@ -355,5 +358,10 @@ func String(v string) *string {
 
 // Int turns a string into a pointer of an int
 func Int(v int) *int {
+	return &v
+}
+
+// Time turns a time.Time into a pointer
+func Time(v time.Time) *time.Time {
 	return &v
 }

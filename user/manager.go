@@ -28,8 +28,7 @@ const (
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
-	tokenMaxCount                   = 10             // Only keep this many tokens in the table per user
-	tokenExpiryDuration             = 72 * time.Hour // Extend tokens by this much
+	tokenMaxCount                   = 10 // Only keep this many tokens in the table per user
 )
 
 var (
@@ -92,6 +91,7 @@ const (
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id TEXT NOT NULL,
 			token TEXT NOT NULL,
+			label TEXT NOT NULL,
 			expires INT NOT NULL,
 			PRIMARY KEY (user_id, token),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
@@ -126,7 +126,7 @@ const (
 		FROM user u
 		JOIN user_token t on u.id = t.user_id
 		LEFT JOIN tier t on t.id = u.tier_id
-		WHERE t.token = ? AND t.expires >= ?
+		WHERE t.token = ? AND (t.expires = 0 OR t.expires >= ?)
 	`
 	selectUserByStripeCustomerIDQuery = `
 		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_price_id
@@ -216,11 +216,14 @@ const (
   	`
 
 	selectTokenCountQuery    = `SELECT COUNT(*) FROM user_token WHERE user_id = ?`
-	insertTokenQuery         = `INSERT INTO user_token (user_id, token, expires) VALUES (?, ?, ?)`
-	updateTokenExpiryQuery   = `UPDATE user_token SET expires = ? WHERE user_id = (SELECT id FROM user WHERE user = ?) AND token = ?`
+	selectTokensQuery        = `SELECT token, label, expires FROM user_token WHERE user_id = ?`
+	selectTokenQuery         = `SELECT token, label, expires FROM user_token WHERE user_id = ? AND token = ?`
+	insertTokenQuery         = `INSERT INTO user_token (user_id, token, label, expires) VALUES (?, ?, ?, ?)`
+	updateTokenExpiryQuery   = `UPDATE user_token SET expires = ? WHERE user_id = ? AND token = ?`
+	updateTokenLabelQuery    = `UPDATE user_token SET label = ? WHERE user_id = ? AND token = ?`
 	deleteTokenQuery         = `DELETE FROM user_token WHERE user_id = ? AND token = ?`
 	deleteAllTokenQuery      = `DELETE FROM user_token WHERE user_id = ?`
-	deleteExpiredTokensQuery = `DELETE FROM user_token WHERE expires < ?`
+	deleteExpiredTokensQuery = `DELETE FROM user_token WHERE expires > 0 AND expires < ?`
 	deleteExcessTokensQuery  = `
 		DELETE FROM user_token
 		WHERE (user_id, token) NOT IN (
@@ -285,7 +288,6 @@ const (
 		DROP TABLE access;
 		DROP TABLE user_old;
 	`
-	migrate1To2UpdateSyncTopicNoTx = `UPDATE user SET sync_topic = ? WHERE id = ?`
 )
 
 // Manager is an implementation of Manager. It stores users and access control list
@@ -363,19 +365,19 @@ func (a *Manager) AuthenticateToken(token string) (*User, error) {
 }
 
 // CreateToken generates a random token for the given user and returns it. The token expires
-// after a fixed duration unless ExtendToken is called. This function also prunes tokens for the
+// after a fixed duration unless ChangeToken is called. This function also prunes tokens for the
 // given user, if there are too many of them.
-func (a *Manager) CreateToken(user *User) (*Token, error) {
-	token, expires := util.RandomStringPrefix(tokenPrefix, tokenLength), time.Now().Add(tokenExpiryDuration)
+func (a *Manager) CreateToken(userID, label string, expires time.Time) (*Token, error) {
+	token := util.RandomStringPrefix(tokenPrefix, tokenLength)
 	tx, err := a.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(insertTokenQuery, user.ID, token, expires.Unix()); err != nil {
+	if _, err := tx.Exec(insertTokenQuery, userID, token, label, expires.Unix()); err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(selectTokenCountQuery, user.ID)
+	rows, err := tx.Query(selectTokenCountQuery, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +392,7 @@ func (a *Manager) CreateToken(user *User) (*Token, error) {
 	if tokenCount >= tokenMaxCount {
 		// This pruning logic is done in two queries for efficiency. The SELECT above is a lookup
 		// on two indices, whereas the query below is a full table scan.
-		if _, err := tx.Exec(deleteExcessTokensQuery, user.ID, tokenMaxCount); err != nil {
+		if _, err := tx.Exec(deleteExcessTokensQuery, userID, tokenMaxCount); err != nil {
 			return nil, err
 		}
 	}
@@ -399,31 +401,89 @@ func (a *Manager) CreateToken(user *User) (*Token, error) {
 	}
 	return &Token{
 		Value:   token,
+		Label:   label,
 		Expires: expires,
 	}, nil
 }
 
-// ExtendToken sets the new expiry date for a token, thereby extending its use further into the future.
-func (a *Manager) ExtendToken(user *User) (*Token, error) {
-	if user.Token == "" {
-		return nil, errNoTokenProvided
+func (a *Manager) Tokens(userID string) ([]*Token, error) {
+	rows, err := a.db.Query(selectTokensQuery, userID)
+	if err != nil {
+		return nil, err
 	}
-	newExpires := time.Now().Add(tokenExpiryDuration)
-	if _, err := a.db.Exec(updateTokenExpiryQuery, newExpires.Unix(), user.Name, user.Token); err != nil {
+	defer rows.Close()
+	tokens := make([]*Token, 0)
+	for {
+		token, err := a.readToken(rows)
+		if err == ErrTokenNotFound {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
+	}
+	return tokens, nil
+}
+
+func (a *Manager) Token(userID, token string) (*Token, error) {
+	rows, err := a.db.Query(selectTokenQuery, userID, token)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return a.readToken(rows)
+}
+
+func (a *Manager) readToken(rows *sql.Rows) (*Token, error) {
+	var token, label string
+	var expires int64
+	if !rows.Next() {
+		return nil, ErrTokenNotFound
+	}
+	if err := rows.Scan(&token, &label, &expires); err != nil {
+		return nil, err
+	} else if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return &Token{
-		Value:   user.Token,
-		Expires: newExpires,
+		Value:   token,
+		Label:   label,
+		Expires: time.Unix(expires, 0),
 	}, nil
 }
 
-// RemoveToken deletes the token defined in User.Token
-func (a *Manager) RemoveToken(user *User) error {
-	if user.Token == "" {
-		return ErrUnauthorized
+// ChangeToken updates a token's label and/or expiry date
+func (a *Manager) ChangeToken(userID, token string, label *string, expires *time.Time) (*Token, error) {
+	if token == "" {
+		return nil, errNoTokenProvided
 	}
-	if _, err := a.db.Exec(deleteTokenQuery, user.ID, user.Token); err != nil {
+	tx, err := a.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if label != nil {
+		if _, err := tx.Exec(updateTokenLabelQuery, *label, userID, token); err != nil {
+			return nil, err
+		}
+	}
+	if expires != nil {
+		if _, err := tx.Exec(updateTokenExpiryQuery, expires.Unix(), userID, token); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return a.Token(userID, token)
+}
+
+// RemoveToken deletes the token defined in User.Token
+func (a *Manager) RemoveToken(userID, token string) error {
+	if token == "" {
+		return errNoTokenProvided
+	}
+	if _, err := a.db.Exec(deleteTokenQuery, userID, token); err != nil {
 		return err
 	}
 	return nil

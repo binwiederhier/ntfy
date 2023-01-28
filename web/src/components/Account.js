@@ -1,13 +1,23 @@
 import * as React from 'react';
-import {useContext, useState} from 'react';
-import {Alert, LinearProgress, Stack, useMediaQuery} from "@mui/material";
+import {useContext, useEffect, useState} from 'react';
+import {
+    Alert,
+    CardActions,
+    CardContent, FormControl,
+    LinearProgress, Link, Portal, Select, Snackbar,
+    Stack,
+    Table, TableBody, TableCell,
+    TableHead,
+    TableRow,
+    useMediaQuery
+} from "@mui/material";
 import Tooltip from '@mui/material/Tooltip';
 import Typography from "@mui/material/Typography";
 import EditIcon from '@mui/icons-material/Edit';
 import Container from "@mui/material/Container";
 import Card from "@mui/material/Card";
 import Button from "@mui/material/Button";
-import {useTranslation} from "react-i18next";
+import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import theme from "./theme";
@@ -15,10 +25,9 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
-import DialogActions from "@mui/material/DialogActions";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {formatBytes, formatShortDate, formatShortDateTime} from "../app/utils";
+import {formatBytes, formatShortDate, formatShortDateTime, truncateString, validUrl} from "../app/utils";
 import accountApi, {IncorrectPasswordError, UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
@@ -28,8 +37,18 @@ import humanizeDuration from "humanize-duration";
 import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import {AccountContext} from "./App";
-import {Warning, WarningAmber} from "@mui/icons-material";
 import DialogFooter from "./DialogFooter";
+import {useLiveQuery} from "dexie-react-hooks";
+import userManager from "../app/UserManager";
+import {Paragraph} from "./styles";
+import CloseIcon from "@mui/icons-material/Close";
+import DialogActions from "@mui/material/DialogActions";
+import {ContentCopy} from "@mui/icons-material";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
+import ListItemText from "@mui/material/ListItemText";
+import DialogContentText from "@mui/material/DialogContentText";
 
 const Account = () => {
     if (!session.exists()) {
@@ -41,6 +60,7 @@ const Account = () => {
             <Stack spacing={3}>
                 <Basics/>
                 <Stats/>
+                <Tokens/>
                 <Delete/>
             </Stack>
         </Container>
@@ -389,6 +409,268 @@ const InfoIcon = () => {
         }}/>
     );
 }
+
+
+const Tokens = () => {
+    const { t } = useTranslation();
+    const { account } = useContext(AccountContext);
+    const [dialogKey, setDialogKey] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const tokens = account?.tokens || [];
+
+    const handleCreateClick = () => {
+        setDialogKey(prev => prev+1);
+        setDialogOpen(true);
+    };
+
+    const handleDialogClose = () => {
+        setDialogOpen(false);
+    };
+
+    const handleDialogSubmit = async (user) => {
+        setDialogOpen(false);
+        //
+    };
+    return (
+        <Card sx={{ padding: 1 }} aria-label={t("prefs_users_title")}>
+            <CardContent sx={{ paddingBottom: 1 }}>
+                <Typography variant="h5" sx={{marginBottom: 2}}>
+                    {t("account_tokens_title")}
+                </Typography>
+                <Paragraph>
+                    <Trans
+                        i18nKey="account_tokens_description"
+                        components={{
+                            Link: <Link href="/docs"/>
+                        }}
+                    />
+                </Paragraph>
+                {tokens?.length > 0 && <TokensTable tokens={tokens}/>}
+            </CardContent>
+            <CardActions>
+                <Button onClick={handleCreateClick}>{t("account_tokens_table_create_token_button")}</Button>
+            </CardActions>
+            <TokenDialog
+                key={`tokenDialogCreate${dialogKey}`}
+                open={dialogOpen}
+                onClose={handleDialogClose}
+            />
+        </Card>
+    );
+};
+
+const TokensTable = (props) => {
+    const { t } = useTranslation();
+    const [snackOpen, setSnackOpen] = useState(false);
+    const [upsertDialogKey, setUpsertDialogKey] = useState(0);
+    const [upsertDialogOpen, setUpsertDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [selectedToken, setSelectedToken] = useState(null);
+
+    const tokens = (props.tokens || [])
+        .sort( (a, b) => {
+            if (a.token === session.token()) {
+                return -1;
+            } else if (b.token === session.token()) {
+                return 1;
+            }
+            return a.token.localeCompare(b.token);
+        });
+
+    const handleEditClick = (token) => {
+        setUpsertDialogKey(prev => prev+1);
+        setSelectedToken(token);
+        setUpsertDialogOpen(true);
+    };
+
+    const handleDialogClose = () => {
+        setUpsertDialogOpen(false);
+        setDeleteDialogOpen(false);
+        setSelectedToken(null);
+    };
+
+    const handleDeleteClick = async (token) => {
+        setSelectedToken(token);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleCopy = async (token) => {
+        await navigator.clipboard.writeText(token);
+        setSnackOpen(true);
+    };
+
+    return (
+        <Table size="small" aria-label={t("account_tokens_title")}>
+            <TableHead>
+                <TableRow>
+                    <TableCell sx={{paddingLeft: 0}}>{t("account_tokens_table_token_header")}</TableCell>
+                    <TableCell>{t("account_tokens_table_label_header")}</TableCell>
+                    <TableCell>{t("account_tokens_table_expires_header")}</TableCell>
+                    <TableCell/>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+                {tokens.map(token => (
+                    <TableRow
+                        key={token.token}
+                        sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                    >
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("account_tokens_table_token_header")}>
+                            <span>
+                                <span style={{fontFamily: "Monospace", fontSize: "0.9rem"}}>{token.token.slice(0, 20)}</span>
+                                ...
+                                <Tooltip title={t("account_tokens_table_copy_to_clipboard")} placement="right">
+                                    <IconButton onClick={() => handleCopy(token.token)}><ContentCopy/></IconButton>
+                                </Tooltip>
+                            </span>
+                        </TableCell>
+                        <TableCell aria-label={t("account_tokens_table_label_header")}>
+                            {token.token === session.token() && <em>{t("account_tokens_table_current_session")}</em>}
+                            {token.token !== session.token() && (token.label || "-")}
+                        </TableCell>
+                        <TableCell aria-label={t("account_tokens_table_expires_header")}>
+                            {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
+                        </TableCell>
+                        <TableCell align="right">
+                            {token.token !== session.token() &&
+                                <>
+                                    <IconButton onClick={() => handleEditClick(token)} aria-label={t("account_tokens_dialog_title_edit")}>
+                                        <EditIcon/>
+                                    </IconButton>
+                                    <IconButton onClick={() => handleDeleteClick(token)} aria-label={t("account_tokens_dialog_title_delete")}>
+                                        <CloseIcon/>
+                                    </IconButton>
+                                </>
+                            }
+                            {token.token === session.token() &&
+                                <Tooltip title={t("account_tokens_table_cannot_delete_or_edit")}>
+                                    <span>
+                                        <IconButton disabled><EditIcon/></IconButton>
+                                        <IconButton disabled><CloseIcon/></IconButton>
+                                    </span>
+                                </Tooltip>
+                            }
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+            <Portal>
+                <Snackbar
+                    open={snackOpen}
+                    autoHideDuration={3000}
+                    onClose={() => setSnackOpen(false)}
+                    message={t("account_tokens_table_copied_to_clipboard")}
+                />
+            </Portal>
+            <TokenDialog
+                key={`tokenDialogEdit${upsertDialogKey}`}
+                open={upsertDialogOpen}
+                token={selectedToken}
+                onClose={handleDialogClose}
+            />
+            <TokenDeleteDialog
+                open={deleteDialogOpen}
+                token={selectedToken}
+                onClose={handleDialogClose}
+            />
+        </Table>
+    );
+};
+
+const TokenDialog = (props) => {
+    const { t } = useTranslation();
+    const [label, setLabel] = useState(props.token?.label || "");
+    const [expires, setExpires] = useState(props.token ? -1 : 0);
+    const [errorText, setErrorText] = useState("");
+    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+    const editMode = !!props.token;
+
+    const handleSubmit = async () => {
+        try {
+            if (editMode) {
+                await accountApi.updateToken(props.token.token, label, expires);
+            } else {
+                await accountApi.createToken(label, expires);
+            }
+            props.onClose();
+        } catch (e) {
+            console.log(`[Account] Error creating token`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+            // TODO show error
+        }
+    };
+
+    return (
+        <Dialog open={props.open} onClose={props.onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+            <DialogTitle>{editMode ? t("account_tokens_dialog_title_edit") : t("account_tokens_dialog_title_create")}</DialogTitle>
+            <DialogContent>
+                <TextField
+                    margin="dense"
+                    id="token-label"
+                    label={t("account_tokens_dialog_label")}
+                    aria-label={t("account_delete_dialog_label")}
+                    type="text"
+                    value={label}
+                    onChange={ev => setLabel(ev.target.value)}
+                    fullWidth
+                    variant="standard"
+                />
+                <FormControl fullWidth variant="standard" sx={{ mt: 1 }}>
+                    <Select value={expires} onChange={(ev) => setExpires(ev.target.value)} aria-label={t("account_tokens_dialog_expires_label")}>
+                        {editMode && <MenuItem value={-1}>{t("account_tokens_dialog_expires_unchanged")}</MenuItem>}
+                        <MenuItem value={0}>{t("account_tokens_dialog_expires_never")}</MenuItem>
+                        <MenuItem value={21600}>{t("account_tokens_dialog_expires_x_hours", { hours: 6 })}</MenuItem>
+                        <MenuItem value={43200}>{t("account_tokens_dialog_expires_x_hours", { hours: 12 })}</MenuItem>
+                        <MenuItem value={259200}>{t("account_tokens_dialog_expires_x_days", { days: 3 })}</MenuItem>
+                        <MenuItem value={604800}>{t("account_tokens_dialog_expires_x_days", { days: 7 })}</MenuItem>
+                        <MenuItem value={2592000}>{t("account_tokens_dialog_expires_x_days", { days: 30 })}</MenuItem>
+                        <MenuItem value={7776000}>{t("account_tokens_dialog_expires_x_days", { days: 90 })}</MenuItem>
+                        <MenuItem value={15552000}>{t("account_tokens_dialog_expires_x_days", { days: 180 })}</MenuItem>
+                    </Select>
+                </FormControl>
+            </DialogContent>
+            <DialogFooter status={errorText}>
+                <Button onClick={props.onClose}>{t("account_tokens_dialog_button_cancel")}</Button>
+                <Button onClick={handleSubmit}>{editMode ? t("account_tokens_dialog_button_update") : t("account_tokens_dialog_button_create")}</Button>
+            </DialogFooter>
+        </Dialog>
+    );
+};
+
+const TokenDeleteDialog = (props) => {
+    const { t } = useTranslation();
+
+    const handleSubmit = async () => {
+        try {
+            await accountApi.deleteToken(props.token.token);
+            props.onClose();
+        } catch (e) {
+            console.log(`[Account] Error deleting token`, e);
+            if ((e instanceof UnauthorizedError)) {
+                session.resetAndRedirect(routes.login);
+            }
+            // TODO show error
+        }
+    };
+
+    return (
+        <Dialog open={props.open} onClose={props.onClose}>
+            <DialogTitle>{t("account_tokens_delete_dialog_title")}</DialogTitle>
+            <DialogContent>
+                <DialogContentText>
+                    <Trans i18nKey="account_tokens_delete_dialog_description"/>
+                </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={props.onClose}>{t("common_cancel")}</Button>
+                <Button onClick={handleSubmit} color="error">{t("account_tokens_delete_dialog_submit_button")}</Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 
 const Delete = () => {
     const { t } = useTranslation();

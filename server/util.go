@@ -130,8 +130,8 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 	return ip
 }
 
-func readJSONWithLimit[T any](r io.ReadCloser, limit int) (*T, error) {
-	obj, err := util.UnmarshalJSONWithLimit[T](r, limit)
+func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, error) {
+	obj, err := util.UnmarshalJSONWithLimit[T](r, limit, allowEmpty)
 	if err == util.ErrUnmarshalJSON {
 		return nil, errHTTPBadRequestJSONInvalid
 	} else if err == util.ErrTooLargeJSON {

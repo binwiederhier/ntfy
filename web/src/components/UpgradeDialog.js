@@ -261,5 +261,4 @@ const Banner = {
     RESERVATIONS_WARNING: 3
 };
 
-
 export default UpgradeDialog;

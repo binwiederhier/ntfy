@@ -7,12 +7,14 @@ import (
 	"heckel.io/ntfy/util"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
 	subscriptionIDLength      = 16
 	subscriptionIDPrefix      = "su_"
 	syncTopicAccountSyncEvent = "sync"
+	tokenExpiryDuration       = 72 * time.Hour // Extend tokens by this much
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -27,7 +29,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 			return errHTTPTooManyRequestsLimitAccountCreation
 		}
 	}
-	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit)
+	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -69,37 +71,38 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
 		},
 	}
-	if v.user != nil {
-		response.Username = v.user.Name
-		response.Role = string(v.user.Role)
-		response.SyncTopic = v.user.SyncTopic
-		if v.user.Prefs != nil {
-			if v.user.Prefs.Language != nil {
-				response.Language = *v.user.Prefs.Language
+	u := v.User()
+	if u != nil {
+		response.Username = u.Name
+		response.Role = string(u.Role)
+		response.SyncTopic = u.SyncTopic
+		if u.Prefs != nil {
+			if u.Prefs.Language != nil {
+				response.Language = *u.Prefs.Language
 			}
-			if v.user.Prefs.Notification != nil {
-				response.Notification = v.user.Prefs.Notification
+			if u.Prefs.Notification != nil {
+				response.Notification = u.Prefs.Notification
 			}
-			if v.user.Prefs.Subscriptions != nil {
-				response.Subscriptions = v.user.Prefs.Subscriptions
+			if u.Prefs.Subscriptions != nil {
+				response.Subscriptions = u.Prefs.Subscriptions
 			}
 		}
-		if v.user.Tier != nil {
+		if u.Tier != nil {
 			response.Tier = &apiAccountTier{
-				Code: v.user.Tier.Code,
-				Name: v.user.Tier.Name,
+				Code: u.Tier.Code,
+				Name: u.Tier.Name,
 			}
 		}
-		if v.user.Billing.StripeCustomerID != "" {
+		if u.Billing.StripeCustomerID != "" {
 			response.Billing = &apiAccountBilling{
 				Customer:     true,
-				Subscription: v.user.Billing.StripeSubscriptionID != "",
-				Status:       string(v.user.Billing.StripeSubscriptionStatus),
-				PaidUntil:    v.user.Billing.StripeSubscriptionPaidUntil.Unix(),
-				CancelAt:     v.user.Billing.StripeSubscriptionCancelAt.Unix(),
+				Subscription: u.Billing.StripeSubscriptionID != "",
+				Status:       string(u.Billing.StripeSubscriptionStatus),
+				PaidUntil:    u.Billing.StripeSubscriptionPaidUntil.Unix(),
+				CancelAt:     u.Billing.StripeSubscriptionCancelAt.Unix(),
 			}
 		}
-		reservations, err := s.userManager.Reservations(v.user.Name)
+		reservations, err := s.userManager.Reservations(u.Name)
 		if err != nil {
 			return err
 		}
@@ -112,6 +115,20 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 				})
 			}
 		}
+		tokens, err := s.userManager.Tokens(u.ID)
+		if err != nil {
+			return err
+		}
+		if len(tokens) > 0 {
+			response.Tokens = make([]*apiAccountTokenResponse, 0)
+			for _, t := range tokens {
+				response.Tokens = append(response.Tokens, &apiAccountTokenResponse{
+					Token:   t.Value,
+					Label:   t.Label,
+					Expires: t.Expires.Unix(),
+				})
+			}
+		}
 	} else {
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
@@ -120,7 +137,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccountDeleteRequest](r.Body, jsonBodyBytesLimit)
+	req, err := readJSONWithLimit[apiAccountDeleteRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if req.Password == "" {
@@ -146,7 +163,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit)
+	req, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if req.Password == "" || req.NewPassword == "" {
@@ -161,50 +178,81 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) handleAccountTokenIssue(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
-	token, err := s.userManager.CreateToken(v.user)
+	req, err := readJSONWithLimit[apiAccountTokenIssueRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
+	if err != nil {
+		return err
+	}
+	var label string
+	if req.Label != nil {
+		label = *req.Label
+	}
+	expires := time.Now().Add(tokenExpiryDuration)
+	if req.Expires != nil {
+		expires = time.Unix(*req.Expires, 0)
+	}
+	token, err := s.userManager.CreateToken(v.User().ID, label, expires)
 	if err != nil {
 		return err
 	}
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
+		Label:   token.Label,
 		Expires: token.Expires.Unix(),
 	}
 	return s.writeJSON(w, response)
 }
 
-func (s *Server) handleAccountTokenExtend(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
-	if v.user == nil {
-		return errHTTPUnauthorized
-	} else if v.user.Token == "" {
-		return errHTTPBadRequestNoTokenProvided
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
+	if err != nil {
+		return err
+	} else if req.Token == "" {
+		req.Token = u.Token
+		if req.Token == "" {
+			return errHTTPBadRequestNoTokenProvided
+		}
 	}
-	token, err := s.userManager.ExtendToken(v.user)
+	var expires *time.Time
+	if req.Expires != nil {
+		expires = util.Time(time.Unix(*req.Expires, 0))
+	} else if req.Label == nil {
+		// If label and expires are not set, simply extend the token by 72 hours
+		expires = util.Time(time.Now().Add(tokenExpiryDuration))
+	}
+	token, err := s.userManager.ChangeToken(u.ID, req.Token, req.Label, expires)
 	if err != nil {
 		return err
 	}
 	response := &apiAccountTokenResponse{
 		Token:   token.Value,
+		Label:   token.Label,
 		Expires: token.Expires.Unix(),
 	}
 	return s.writeJSON(w, response)
 }
 
-func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	// TODO rate limit
-	if v.user.Token == "" {
-		return errHTTPBadRequestNoTokenProvided
+	u := v.User()
+	token := readParam(r, "X-Token", "Token") // DELETEs cannot have a body, and we don't want it in the path
+	if token == "" {
+		token = u.Token
+		if token == "" {
+			return errHTTPBadRequestNoTokenProvided
+		}
 	}
-	if err := s.userManager.RemoveToken(v.user); err != nil {
+	if err := s.userManager.RemoveToken(u.ID, token); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPrefs, err := readJSONWithLimit[user.Prefs](r.Body, jsonBodyBytesLimit)
+	newPrefs, err := readJSONWithLimit[user.Prefs](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -236,7 +284,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
+	newSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -266,7 +314,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 		return errHTTPInternalErrorInvalidPath
 	}
 	subscriptionID := matches[1]
-	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit)
+	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -318,7 +366,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if v.user != nil && v.user.Role == user.RoleAdmin {
 		return errHTTPBadRequestMakesNoSenseForAdmin
 	}
-	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit)
+	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}

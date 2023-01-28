@@ -2,7 +2,6 @@ import * as React from 'react';
 import {Lock, Public} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 
-
 export const PermissionReadWrite = React.forwardRef((props, ref) => {
     const size = props.size ?? "medium";
     return <Public fontSize={size} ref={ref} {...props}/>;

@@ -145,12 +145,71 @@ class AccountApi {
         }
     }
 
+    async createToken(label, expires) {
+        const url = accountTokenUrl(config.base_url);
+        const body = {
+            label: label,
+            expires: (expires > 0) ? Math.floor(Date.now() / 1000) + expires : 0
+        };
+        console.log(`[AccountApi] Creating user access token ${url}`);
+        const response = await fetch(url, {
+            method: "POST",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify(body)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async updateToken(token, label, expires) {
+        const url = accountTokenUrl(config.base_url);
+        const body = {
+            token: token,
+            label: label
+        };
+        if (expires > 0) {
+            body.expires = Math.floor(Date.now() / 1000) + expires;
+        }
+        console.log(`[AccountApi] Creating user access token ${url}`);
+        const response = await fetch(url, {
+            method: "PATCH",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify(body)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
     async extendToken() {
         const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Extending user access token ${url}`);
         const response = await fetch(url, {
             method: "PATCH",
-            headers: withBearerAuth({}, session.token())
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                token: session.token(),
+                expires: Math.floor(Date.now() / 1000) + 6220800 // FIXME
+            })
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new UnauthorizedError();
+        } else if (response.status !== 200) {
+            throw new Error(`Unexpected server response ${response.status}`);
+        }
+    }
+
+    async deleteToken(token) {
+        const url = accountTokenUrl(config.base_url);
+        console.log(`[AccountApi] Deleting user access token ${url}`);
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: withBearerAuth({"X-Token": token}, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();

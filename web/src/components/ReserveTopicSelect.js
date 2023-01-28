@@ -1,24 +1,9 @@
 import * as React from 'react';
-import {useState} from 'react';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import {Checkbox, FormControl, FormControlLabel, Select, useMediaQuery} from "@mui/material";
-import theme from "./theme";
-import subscriptionManager from "../app/SubscriptionManager";
-import DialogFooter from "./DialogFooter";
+import {FormControl, Select} from "@mui/material";
 import {useTranslation} from "react-i18next";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
-import session from "../app/Session";
-import routes from "./routes";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
-import LockIcon from "@mui/icons-material/Lock";
 import ListItemText from "@mui/material/ListItemText";
-import {Public, PublicOff} from "@mui/icons-material";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
 
 const ReserveTopicSelect = (props) => {

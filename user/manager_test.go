@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/util"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -139,7 +140,7 @@ func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, u.Deleted)
 
-	token, err := a.CreateToken(u.ID, "", time.Now().Add(time.Hour))
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(time.Hour), netip.IPv4Unspecified())
 	require.Nil(t, err)
 
 	u, err = a.Authenticate("user", "pass")
@@ -397,7 +398,7 @@ func TestManager_Token_Valid(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create token for user
-	token, err := a.CreateToken(u.ID, "some label", time.Now().Add(72*time.Hour))
+	token, err := a.CreateToken(u.ID, "some label", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 	require.Nil(t, err)
 	require.NotEmpty(t, token.Value)
 	require.Equal(t, "some label", token.Label)
@@ -441,12 +442,12 @@ func TestManager_Token_Expire(t *testing.T) {
 	require.Nil(t, err)
 
 	// Create tokens for user
-	token1, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
+	token1, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 	require.Nil(t, err)
 	require.NotEmpty(t, token1.Value)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token1.Expires.Unix())
 
-	token2, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
+	token2, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 	require.Nil(t, err)
 	require.NotEmpty(t, token2.Value)
 	require.NotEqual(t, token1.Value, token2.Value)
@@ -493,7 +494,7 @@ func TestManager_Token_Extend(t *testing.T) {
 	require.Equal(t, errNoTokenProvided, err)
 
 	// Create token for user
-	token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 	require.Nil(t, err)
 	require.NotEmpty(t, token.Value)
 
@@ -520,7 +521,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	baseTime := time.Now().Add(24 * time.Hour)
 	tokens := make([]string, 0)
 	for i := 0; i < 12; i++ {
-		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour))
+		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
 		tokens = append(tokens, token.Value)
@@ -622,6 +623,61 @@ func TestManager_ChangeSettings(t *testing.T) {
 	require.Equal(t, "https://ntfy.sh", u.Prefs.Subscriptions[0].BaseURL)
 	require.Equal(t, "mytopic", u.Prefs.Subscriptions[0].Topic)
 	require.Equal(t, util.String("My Topic"), u.Prefs.Subscriptions[0].DisplayName)
+}
+
+func TestManager_Tier_Create(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	// Create tier and user
+	require.Nil(t, a.CreateTier(&Tier{
+		Code:                     "pro",
+		Name:                     "Pro",
+		MessageLimit:             123,
+		MessageExpiryDuration:    86400 * time.Second,
+		EmailLimit:               32,
+		ReservationLimit:         2,
+		AttachmentFileSizeLimit:  1231231,
+		AttachmentTotalSizeLimit: 123123,
+		AttachmentExpiryDuration: 10800 * time.Second,
+		AttachmentBandwidthLimit: 21474836480,
+	}))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.ChangeTier("phil", "pro"))
+
+	ti, err := a.Tier("pro")
+	require.Nil(t, err)
+
+	u, err := a.User("phil")
+	require.Nil(t, err)
+
+	// These are populated by different SQL queries
+	require.Equal(t, ti, u.Tier)
+
+	// Fields
+	require.True(t, strings.HasPrefix(ti.ID, "ti_"))
+	require.Equal(t, "pro", ti.Code)
+	require.Equal(t, "Pro", ti.Name)
+	require.Equal(t, int64(123), ti.MessageLimit)
+	require.Equal(t, 86400*time.Second, ti.MessageExpiryDuration)
+	require.Equal(t, int64(32), ti.EmailLimit)
+	require.Equal(t, int64(2), ti.ReservationLimit)
+	require.Equal(t, int64(1231231), ti.AttachmentFileSizeLimit)
+	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
+	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
+	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
+}
+
+func TestAccount_Tier_Create_With_ID(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	require.Nil(t, a.CreateTier(&Tier{
+		ID:   "ti_123",
+		Code: "pro",
+	}))
+
+	ti, err := a.Tier("pro")
+	require.Nil(t, err)
+	require.Equal(t, "ti_123", ti.ID)
 }
 
 func TestSqliteCache_Migration_From1(t *testing.T) {

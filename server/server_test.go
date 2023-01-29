@@ -892,10 +892,8 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 	// if the visitor is unknown
 
 	c := newTestConfigWithAuthFile(t)
+	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
-	var err error
-	s.userManager, err = user.NewManager(c.AuthFile, c.AuthStartupQueries, c.AuthDefault, c.AuthBcryptCost, 100*time.Millisecond)
-	require.Nil(t, err)
 
 	// Create user, and update it with some message and email stats
 	require.Nil(t, s.userManager.CreateTier(&user.Tier{

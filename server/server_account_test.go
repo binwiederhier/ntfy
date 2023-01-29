@@ -7,6 +7,7 @@ import (
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"io"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,10 @@ func TestAccount_Signup_Success(t *testing.T) {
 	token, _ := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
 	require.NotEmpty(t, token.Token)
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires)
+	require.True(t, strings.HasPrefix(token.Token, "tk_"))
+	require.Equal(t, "9.9.9.9", token.LastOrigin)
+	require.True(t, token.LastAccess > time.Now().Unix()-1)
+	require.True(t, token.LastAccess < time.Now().Unix()+1)
 
 	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
 		"Authorization": util.BearerAuth(token.Token),
@@ -161,7 +166,7 @@ func TestAccount_ChangeSettings(t *testing.T) {
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	u, _ := s.userManager.User("phil")
-	token, _ := s.userManager.CreateToken(u.ID, "", time.Unix(0, 0))
+	token, _ := s.userManager.CreateToken(u.ID, "", time.Unix(0, 0), netip.IPv4Unspecified())
 
 	rr := request(t, s, "PATCH", "/v1/account/settings", `{"notification": {"sound": "juntos"},"ignored": true}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -558,7 +563,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	// Subscribe anonymously
 	anonCh, userCh := make(chan bool), make(chan bool)
 	go func() {
-		rr := request(t, s, "GET", "/mytopic/json", ``, nil)
+		rr := request(t, s, "GET", "/mytopic/json", ``, nil) // This blocks until it's killed!
 		require.Equal(t, 200, rr.Code)
 		messages := toMessages(t, rr.Body.String())
 		require.Equal(t, 2, len(messages)) // This is the meat. We should NOT receive the second message!
@@ -570,7 +575,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 
 	// Subscribe with user
 	go func() {
-		rr := request(t, s, "GET", "/mytopic/json", ``, map[string]string{
+		rr := request(t, s, "GET", "/mytopic/json", ``, map[string]string{ // Blocks!
 			"Authorization": util.BasicAuth("phil", "mypass"),
 		})
 		require.Equal(t, 200, rr.Code)
@@ -584,10 +589,10 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	}()
 
 	// Publish message (before reservation)
-	time.Sleep(time.Second) // Wait for subscribers
+	time.Sleep(2 * time.Second) // Wait for subscribers
 	rr = request(t, s, "POST", "/mytopic", "message before reservation", nil)
 	require.Equal(t, 200, rr.Code)
-	time.Sleep(time.Second) // Wait for subscribers to receive message
+	time.Sleep(2 * time.Second) // Wait for subscribers to receive message
 
 	// Reserve a topic
 	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic", "everyone":"deny-all"}`, map[string]string{
@@ -596,7 +601,11 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Everyone but phil should be killed
-	<-anonCh
+	select {
+	case <-anonCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Waiting for anonymous subscription to be killed failed")
+	}
 
 	// Publish a message
 	rr = request(t, s, "POST", "/mytopic", "message after reservation", map[string]string{
@@ -606,62 +615,10 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 
 	// Kill user Go routine
 	s.topics["mytopic"].CancelSubscribers("<invalid>")
-	<-userCh
-}
 
-func TestAccount_Tier_Create(t *testing.T) {
-	conf := newTestConfigWithAuthFile(t)
-	s := newTestServer(t, conf)
-
-	// Create tier and user
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
-		Code:                     "pro",
-		Name:                     "Pro",
-		MessageLimit:             123,
-		MessageExpiryDuration:    86400 * time.Second,
-		EmailLimit:               32,
-		ReservationLimit:         2,
-		AttachmentFileSizeLimit:  1231231,
-		AttachmentTotalSizeLimit: 123123,
-		AttachmentExpiryDuration: 10800 * time.Second,
-		AttachmentBandwidthLimit: 21474836480,
-	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
-	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
-
-	ti, err := s.userManager.Tier("pro")
-	require.Nil(t, err)
-
-	u, err := s.userManager.User("phil")
-	require.Nil(t, err)
-
-	// These are populated by different SQL queries
-	require.Equal(t, ti, u.Tier)
-
-	// Fields
-	require.True(t, strings.HasPrefix(ti.ID, "ti_"))
-	require.Equal(t, "pro", ti.Code)
-	require.Equal(t, "Pro", ti.Name)
-	require.Equal(t, int64(123), ti.MessageLimit)
-	require.Equal(t, 86400*time.Second, ti.MessageExpiryDuration)
-	require.Equal(t, int64(32), ti.EmailLimit)
-	require.Equal(t, int64(2), ti.ReservationLimit)
-	require.Equal(t, int64(1231231), ti.AttachmentFileSizeLimit)
-	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
-	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
-	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
-}
-
-func TestAccount_Tier_Create_With_ID(t *testing.T) {
-	conf := newTestConfigWithAuthFile(t)
-	s := newTestServer(t, conf)
-
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
-		ID:   "ti_123",
-		Code: "pro",
-	}))
-
-	ti, err := s.userManager.Tier("pro")
-	require.Nil(t, err)
-	require.Equal(t, "ti_123", ti.ID)
+	select {
+	case <-userCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Waiting for user subscription to be killed failed")
+	}
 }

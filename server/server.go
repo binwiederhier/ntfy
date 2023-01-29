@@ -171,7 +171,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var userManager *user.Manager
 	if conf.AuthFile != "" {
-		userManager, err = user.NewManager(conf.AuthFile, conf.AuthStartupQueries, conf.AuthDefault, conf.AuthBcryptCost, user.DefaultUserStatsQueueWriterInterval)
+		userManager, err = user.NewManager(conf.AuthFile, conf.AuthStartupQueries, conf.AuthDefault, conf.AuthBcryptCost, conf.AuthStatsQueueWriterInterval)
 		if err != nil {
 			return nil, err
 		}
@@ -598,7 +598,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
-		s.userManager.EnqueueStats(u.ID, v.Stats())
+		go s.userManager.EnqueueStats(u.ID, v.Stats())
 	}
 	s.mu.Lock()
 	s.messages++
@@ -1620,7 +1620,7 @@ func (s *Server) authenticate(r *http.Request) (user *user.User, err error) {
 		return nil, errHTTPUnauthorized
 	}
 	if strings.HasPrefix(value, "Bearer") {
-		return s.authenticateBearerAuth(value)
+		return s.authenticateBearerAuth(r, value)
 	}
 	return s.authenticateBasicAuth(r, value)
 }
@@ -1634,9 +1634,18 @@ func (s *Server) authenticateBasicAuth(r *http.Request, value string) (user *use
 	return s.userManager.Authenticate(username, password)
 }
 
-func (s *Server) authenticateBearerAuth(value string) (user *user.User, err error) {
+func (s *Server) authenticateBearerAuth(r *http.Request, value string) (*user.User, error) {
 	token := strings.TrimSpace(strings.TrimPrefix(value, "Bearer"))
-	return s.userManager.AuthenticateToken(token)
+	u, err := s.userManager.AuthenticateToken(token)
+	if err != nil {
+		return nil, err
+	}
+	ip := extractIPAddress(r, s.config.BehindProxy)
+	go s.userManager.EnqueueTokenUpdate(token, &user.TokenUpdate{
+		LastAccess: time.Now(),
+		LastOrigin: ip,
+	})
+	return u, nil
 }
 
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {

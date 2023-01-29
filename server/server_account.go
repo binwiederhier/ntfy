@@ -6,6 +6,7 @@ import (
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 )
@@ -122,10 +123,16 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *vis
 		if len(tokens) > 0 {
 			response.Tokens = make([]*apiAccountTokenResponse, 0)
 			for _, t := range tokens {
+				var lastOrigin string
+				if t.LastOrigin != netip.IPv4Unspecified() {
+					lastOrigin = t.LastOrigin.String()
+				}
 				response.Tokens = append(response.Tokens, &apiAccountTokenResponse{
-					Token:   t.Value,
-					Label:   t.Label,
-					Expires: t.Expires.Unix(),
+					Token:      t.Value,
+					Label:      t.Label,
+					LastAccess: t.LastAccess.Unix(),
+					LastOrigin: lastOrigin,
+					Expires:    t.Expires.Unix(),
 				})
 			}
 		}
@@ -192,14 +199,16 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 	if req.Expires != nil {
 		expires = time.Unix(*req.Expires, 0)
 	}
-	token, err := s.userManager.CreateToken(v.User().ID, label, expires)
+	token, err := s.userManager.CreateToken(v.User().ID, label, expires, v.IP())
 	if err != nil {
 		return err
 	}
 	response := &apiAccountTokenResponse{
-		Token:   token.Value,
-		Label:   token.Label,
-		Expires: token.Expires.Unix(),
+		Token:      token.Value,
+		Label:      token.Label,
+		LastAccess: token.LastAccess.Unix(),
+		LastOrigin: token.LastOrigin.String(),
+		Expires:    token.Expires.Unix(),
 	}
 	return s.writeJSON(w, response)
 }
@@ -228,9 +237,11 @@ func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request
 		return err
 	}
 	response := &apiAccountTokenResponse{
-		Token:   token.Value,
-		Label:   token.Label,
-		Expires: token.Expires.Unix(),
+		Token:      token.Value,
+		Label:      token.Label,
+		LastAccess: token.LastAccess.Unix(),
+		LastOrigin: token.LastOrigin.String(),
+		Expires:    token.Expires.Unix(),
 	}
 	return s.writeJSON(w, response)
 }

@@ -258,11 +258,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	c.StripeWebhookKey = "webhook key"
 	c.VisitorRequestLimitBurst = 5
 	c.VisitorRequestLimitReplenish = time.Hour
-	c.CacheStartupQueries = `
-pragma journal_mode = WAL;
-pragma synchronous = normal;
-pragma temp_store = memory;
-`
 	c.CacheBatchSize = 500
 	c.CacheBatchTimeout = time.Second
 	s := newTestServer(t, c)
@@ -324,6 +319,18 @@ pragma temp_store = memory;
 	})
 	require.Equal(t, 429, rr.Code)
 
+	// Verify some "before-stats"
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, u.Tier)
+	require.Equal(t, "", u.Billing.StripeCustomerID)
+	require.Equal(t, "", u.Billing.StripeSubscriptionID)
+	require.Equal(t, stripe.SubscriptionStatus(""), u.Billing.StripeSubscriptionStatus)
+	require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
+	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
+	require.Equal(t, int64(0), u.Stats.Messages) // Messages and emails are not persisted for no-tier users!
+	require.Equal(t, int64(0), u.Stats.Emails)
+
 	// Simulate Stripe success return URL call (no user context)
 	rr = request(t, s, "GET", "/v1/account/billing/subscription/success/SOMETOKEN", "", nil)
 	require.Equal(t, 303, rr.Code)
@@ -337,6 +344,8 @@ pragma temp_store = memory;
 	require.Equal(t, stripe.SubscriptionStatusActive, u.Billing.StripeSubscriptionStatus)
 	require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
+	require.Equal(t, int64(0), u.Stats.Messages)
+	require.Equal(t, int64(0), u.Stats.Emails)
 
 	// Now for the fun part: Verify that new rate limits are immediately applied
 	// This only tests the request limiter, which kicks in before the message limiter.

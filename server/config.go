@@ -77,6 +77,7 @@ type Config struct {
 	AuthStartupQueries                   string
 	AuthDefault                          user.Permission
 	AuthBcryptCost                       int
+	AuthStatsQueueWriterInterval         time.Duration
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
@@ -145,6 +146,7 @@ func NewConfig() *Config {
 		AuthStartupQueries:                   "",
 		AuthDefault:                          user.NewPermission(true, true),
 		AuthBcryptCost:                       user.DefaultUserPasswordBcryptCost,
+		AuthStatsQueueWriterInterval:         user.DefaultUserStatsQueueWriterInterval,
 		AttachmentCacheDir:                   "",
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,

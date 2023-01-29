@@ -300,10 +300,9 @@ const UserTable = (props) => {
                         key={user.baseUrl}
                         sx={{'&:last-child td, &:last-child th': {border: 0}}}
                     >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}}
-                                   aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
+                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_users_table_user_header")}>{user.username}</TableCell>
                         <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                             {(!session.exists() || user.baseUrl !== config.base_url) &&
                                 <>
                                     <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
@@ -597,7 +596,7 @@ const ReservationsTable = (props) => {
                 {props.reservations.map(reservation => (
                     <TableRow
                         key={reservation.topic}
-                        sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                        sx={{'&:last-child td, &:last-child th': { border: 0 }}}
                     >
                         <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("prefs_reservations_table_topic_header")}>
                             {reservation.topic}
@@ -628,7 +627,7 @@ const ReservationsTable = (props) => {
                                 </>
                             }
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                             {!localSubscriptions[reservation.topic] &&
                                 <Chip icon={<Info/>} label="Not subscribed" color="primary" variant="outlined"/>
                             }

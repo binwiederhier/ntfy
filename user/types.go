@@ -4,6 +4,7 @@ package user
 import (
 	"errors"
 	"github.com/stripe/stripe-go/v74"
+	"net/netip"
 	"regexp"
 	"time"
 )
@@ -46,9 +47,17 @@ type Auther interface {
 
 // Token represents a user token, including expiry date
 type Token struct {
-	Value   string
-	Label   string
-	Expires time.Time
+	Value      string
+	Label      string
+	LastAccess time.Time
+	LastOrigin netip.Addr
+	Expires    time.Time
+}
+
+// TokenUpdate holds information about the last access time and origin IP address of a token
+type TokenUpdate struct {
+	LastAccess time.Time
+	LastOrigin netip.Addr
 }
 
 // Prefs represents a user's configuration settings

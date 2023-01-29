@@ -131,7 +131,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		bandwidthLimiter:    nil, // Set in resetLimiters
 		accountLimiter:      nil, // Set in resetLimiters, may be nil
 	}
-	v.resetLimitersNoLock(messages, emails)
+	v.resetLimitersNoLock(messages, emails, false)
 	return v
 }
 
@@ -254,6 +254,13 @@ func (v *visitor) User() *user.User {
 	return v.user // May be nil
 }
 
+// IP returns the visitor IP address
+func (v *visitor) IP() netip.Addr {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.ip
+}
+
 // Authenticated returns true if a user successfully authenticated
 func (v *visitor) Authenticated() bool {
 	v.mu.Lock()
@@ -268,7 +275,7 @@ func (v *visitor) SetUser(u *user.User) {
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	v.user = u
 	if shouldResetLimiters {
-		v.resetLimitersNoLock(0, 0)
+		v.resetLimitersNoLock(0, 0, true)
 	}
 }
 
@@ -283,7 +290,7 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
-func (v *visitor) resetLimitersNoLock(messages, emails int64) {
+func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool) {
 	log.Debug("%s Resetting limiters for visitor", v.stringNoLock())
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
@@ -295,6 +302,13 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64) {
 	} else {
 		v.accountLimiter = nil // Users cannot create accounts when logged in
 	}
+	/*
+		if enqueueUpdate && v.user != nil {
+			go v.userManager.EnqueueStats(v.user.ID, &user.Stats{
+				Messages: messages,
+				Emails:   emails,
+			})
+		}*/
 }
 
 func (v *visitor) Limits() *visitorLimits {
@@ -361,7 +375,7 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if u != nil {
 		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(u.ID)
 	} else {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.ip.String())
+		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.IP().String())
 	}
 	if err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {formatBytes, formatShortDate, formatShortDateTime, truncateString, validUrl} from "../app/utils";
+import {formatBytes, formatShortDate, formatShortDateTime, openUrl, truncateString, validUrl} from "../app/utils";
 import accountApi, {IncorrectPasswordError, UnauthorizedError} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
@@ -43,7 +43,7 @@ import userManager from "../app/UserManager";
 import {Paragraph} from "./styles";
 import CloseIcon from "@mui/icons-material/Close";
 import DialogActions from "@mui/material/DialogActions";
-import {ContentCopy} from "@mui/icons-material";
+import {ContentCopy, Public} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
@@ -506,6 +506,7 @@ const TokensTable = (props) => {
                     <TableCell sx={{paddingLeft: 0}}>{t("account_tokens_table_token_header")}</TableCell>
                     <TableCell>{t("account_tokens_table_label_header")}</TableCell>
                     <TableCell>{t("account_tokens_table_expires_header")}</TableCell>
+                    <TableCell>{t("account_tokens_table_last_access_header")}</TableCell>
                     <TableCell/>
                 </TableRow>
             </TableHead>
@@ -513,11 +514,11 @@ const TokensTable = (props) => {
                 {tokens.map(token => (
                     <TableRow
                         key={token.token}
-                        sx={{'&:last-child td, &:last-child th': {border: 0}}}
+                        sx={{'&:last-child td, &:last-child th': { border: 0 }}}
                     >
-                        <TableCell component="th" scope="row" sx={{paddingLeft: 0}} aria-label={t("account_tokens_table_token_header")}>
+                        <TableCell component="th" scope="row" sx={{ paddingLeft: 0, whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_token_header")}>
                             <span>
-                                <span style={{fontFamily: "Monospace", fontSize: "0.9rem"}}>{token.token.slice(0, 20)}</span>
+                                <span style={{fontFamily: "Monospace", fontSize: "0.9rem"}}>{token.token.slice(0, 12)}</span>
                                 ...
                                 <Tooltip title={t("account_tokens_table_copy_to_clipboard")} placement="right">
                                     <IconButton onClick={() => handleCopy(token.token)}><ContentCopy/></IconButton>
@@ -531,7 +532,17 @@ const TokensTable = (props) => {
                         <TableCell aria-label={t("account_tokens_table_expires_header")}>
                             {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell aria-label={t("account_tokens_table_last_access_header")}>
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                                <span>{formatShortDateTime(token.last_access)}</span>
+                                <Tooltip title={t("account_tokens_table_last_origin_tooltip", { ip: token.last_origin })}>
+                                    <IconButton onClick={() => openUrl(`https://whatismyipaddress.com/ip/${token.last_origin}`)}>
+                                        <Public />
+                                    </IconButton>
+                                </Tooltip>
+                            </div>
+                        </TableCell>
+                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                             {token.token !== session.token() &&
                                 <>
                                     <IconButton onClick={() => handleEditClick(token)} aria-label={t("account_tokens_dialog_title_edit")}>

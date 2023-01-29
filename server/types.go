@@ -247,9 +247,11 @@ type apiAccountTokenUpdateRequest struct {
 }
 
 type apiAccountTokenResponse struct {
-	Token   string `json:"token"`
-	Label   string `json:"label,omitempty"`
-	Expires int64  `json:"expires,omitempty"` // Unix timestamp
+	Token      string `json:"token"`
+	Label      string `json:"label,omitempty"`
+	LastAccess int64  `json:"last_access,omitempty"`
+	LastOrigin string `json:"last_origin,omitempty"`
+	Expires    int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
 type apiAccountTier struct {

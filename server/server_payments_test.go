@@ -304,7 +304,14 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 			},
 		}, nil)
 	stripeMock.
-		On("UpdateCustomer", mock.Anything).
+		On("UpdateCustomer", "acct_5555", &stripe.CustomerParams{
+			Params: stripe.Params{
+				Metadata: map[string]string{
+					"user_id":   u.ID,
+					"user_name": u.Name,
+				},
+			},
+		}).
 		Return(&stripe.Customer{}, nil)
 
 	// Send messages until rate limit of free tier is hit
@@ -517,6 +524,135 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	require.NoFileExists(t, filepath.Join(s.config.AttachmentCacheDir, z2.ID))
 }
 
+func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("GetSubscription", "sub_123").
+		Return(&stripe.Subscription{
+			ID: "sub_123",
+			Items: &stripe.SubscriptionItemList{
+				Data: []*stripe.SubscriptionItem{
+					{
+						ID:    "someid_123",
+						Price: &stripe.Price{ID: "price_123"},
+					},
+				},
+			},
+		}, nil)
+	stripeMock.
+		On("UpdateSubscription", "sub_123", &stripe.SubscriptionParams{
+			CancelAtPeriodEnd: stripe.Bool(false),
+			ProrationBehavior: stripe.String(string(stripe.SubscriptionSchedulePhaseProrationBehaviorCreateProrations)),
+			Items: []*stripe.SubscriptionItemsParams{
+				{
+					ID:    stripe.String("someid_123"),
+					Price: stripe.String("price_456"),
+				},
+			},
+		}).
+		Return(&stripe.Subscription{}, nil)
+
+	// Create tier and user
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:            "ti_123",
+		Code:          "pro",
+		StripePriceID: "price_123",
+	}))
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:            "ti_456",
+		Code:          "business",
+		StripePriceID: "price_456",
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
+		StripeCustomerID:     "acct_123",
+		StripeSubscriptionID: "sub_123",
+	}))
+
+	// Call endpoint to change subscription
+	rr := request(t, s, "PUT", "/v1/account/billing/subscription", `{"tier":"business"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestPayments_Subscription_Delete_At_Period_End(t *testing.T) {
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("UpdateSubscription", "sub_123", mock.MatchedBy(func(s *stripe.SubscriptionParams) bool {
+			return *s.CancelAtPeriodEnd // Is true
+		})).
+		Return(&stripe.Subscription{}, nil)
+
+	// Create user
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
+		StripeCustomerID:     "acct_123",
+		StripeSubscriptionID: "sub_123",
+	}))
+
+	// Delete subscription
+	rr := request(t, s, "DELETE", "/v1/account/billing/subscription", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestPayments_CreatePortalSession(t *testing.T) {
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("NewPortalSession", &stripe.BillingPortalSessionParams{
+			Customer:  stripe.String("acct_123"),
+			ReturnURL: stripe.String(s.config.BaseURL),
+		}).
+		Return(&stripe.BillingPortalSession{
+			URL: "https://billing.stripe.com/blablabla",
+		}, nil)
+
+	// Create user
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
+		StripeCustomerID:     "acct_123",
+		StripeSubscriptionID: "sub_123",
+	}))
+
+	// Create portal session
+	rr := request(t, s, "POST", "/v1/account/billing/portal", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	ps, _ := util.UnmarshalJSON[apiAccountBillingPortalRedirectResponse](io.NopCloser(rr.Body))
+	require.Equal(t, "https://billing.stripe.com/blablabla", ps.RedirectURL)
+}
+
 type testStripeAPI struct {
 	mock.Mock
 }
@@ -554,12 +690,12 @@ func (s *testStripeAPI) GetSubscription(id string) (*stripe.Subscription, error)
 }
 
 func (s *testStripeAPI) UpdateCustomer(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
-	args := s.Called(id)
+	args := s.Called(id, params)
 	return args.Get(0).(*stripe.Customer), args.Error(1)
 }
 
 func (s *testStripeAPI) UpdateSubscription(id string, params *stripe.SubscriptionParams) (*stripe.Subscription, error) {
-	args := s.Called(id)
+	args := s.Called(id, params)
 	return args.Get(0).(*stripe.Subscription), args.Error(1)
 }
 

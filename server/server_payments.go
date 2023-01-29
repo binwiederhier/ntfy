@@ -229,6 +229,8 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 	sub, err := s.stripe.GetSubscription(u.Billing.StripeSubscriptionID)
 	if err != nil {
 		return err
+	} else if sub.Items == nil || len(sub.Items.Data) != 1 {
+		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "no items, or more than one item")
 	}
 	params := &stripe.SubscriptionParams{
 		CancelAtPeriodEnd: stripe.Bool(false),

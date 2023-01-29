@@ -38,7 +38,6 @@ import (
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Docs
-- Large uploads for higher tiers (nginx config!)
 - MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Make sure account endpoints make sense for admins
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
@@ -1641,7 +1640,7 @@ func (s *Server) authenticate(r *http.Request) (user *user.User, err error) {
 		return nil, errHTTPUnauthorized
 	}
 	if strings.HasPrefix(value, "Bearer") {
-		return s.authenticateBearerAuth(r, value)
+		return s.authenticateBearerAuth(r, strings.TrimSpace(strings.TrimPrefix(value, "Bearer")))
 	}
 	return s.authenticateBasicAuth(r, value)
 }
@@ -1651,12 +1650,13 @@ func (s *Server) authenticateBasicAuth(r *http.Request, value string) (user *use
 	username, password, ok := r.BasicAuth()
 	if !ok {
 		return nil, errors.New("invalid basic auth")
+	} else if username == "" {
+		return s.authenticateBearerAuth(r, password) // Treat password as token
 	}
 	return s.userManager.Authenticate(username, password)
 }
 
-func (s *Server) authenticateBearerAuth(r *http.Request, value string) (*user.User, error) {
-	token := strings.TrimSpace(strings.TrimPrefix(value, "Bearer"))
+func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.User, error) {
 	u, err := s.userManager.AuthenticateToken(token)
 	if err != nil {
 		return nil, err

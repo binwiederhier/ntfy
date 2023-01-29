@@ -41,6 +41,13 @@ func TestAccount_Signup_Success(t *testing.T) {
 	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, "phil", account.Username)
 	require.Equal(t, "user", account.Role)
+
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("", token.Token), // We allow a fake basic auth to make curl-ing easier (curl -u :<token>)
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, "phil", account.Username)
 }
 
 func TestAccount_Signup_UserExists(t *testing.T) {
@@ -247,7 +254,18 @@ func TestAccount_ChangePassword(t *testing.T) {
 
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
-	rr := request(t, s, "POST", "/v1/account/password", `{"password": "phil", "new_password": "new password"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/account/password", `{"password": "WRONG", "new_password": ""}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 400, rr.Code)
+
+	rr = request(t, s, "POST", "/v1/account/password", `{"password": "WRONG", "new_password": "new password"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
+
+	rr = request(t, s, "POST", "/v1/account/password", `{"password": "phil", "new_password": "new password"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)

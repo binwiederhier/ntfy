@@ -529,10 +529,10 @@ const TokensTable = (props) => {
                             {token.token === session.token() && <em>{t("account_tokens_table_current_session")}</em>}
                             {token.token !== session.token() && (token.label || "-")}
                         </TableCell>
-                        <TableCell aria-label={t("account_tokens_table_expires_header")}>
+                        <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_expires_header")}>
                             {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
                         </TableCell>
-                        <TableCell aria-label={t("account_tokens_table_last_access_header")}>
+                        <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_last_access_header")}>
                             <div style={{ display: "flex", alignItems: "center" }}>
                                 <span>{formatShortDateTime(token.last_access)}</span>
                                 <Tooltip title={t("account_tokens_table_last_origin_tooltip", { ip: token.last_origin })}>

@@ -17,15 +17,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from '@mui/icons-material/InsertEmoticon';
 import {Close} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {
-    formatBytes,
-    maybeWithAuth,
-    withBasicAuth,
-    topicShortUrl,
-    topicUrl,
-    validTopic,
-    validUrl
-} from "../app/utils";
+import {formatBytes, maybeWithAuth, topicShortUrl, topicUrl, validTopic, validUrl} from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";

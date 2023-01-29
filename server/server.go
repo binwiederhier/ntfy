@@ -37,7 +37,8 @@ import (
 /*
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
-- HIGH Stripe payment methods
+- HIGH Docs
+- Large uploads for higher tiers (nginx config!)
 - MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Make sure account endpoints make sense for admins
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
@@ -498,6 +499,9 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) 
 	return nil
 }
 
+// handleFile processes the download of attachment files. The method handles GET and HEAD requests against a file.
+// Before streaming the file to a client, it locates uploader (m.Sender or m.User) in the message cache, so it
+// can associate the download bandwidth with the uploader.
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	if s.config.AttachmentCacheDir == "" {
 		return errHTTPInternalError
@@ -512,23 +516,42 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	if err != nil {
 		return errHTTPNotFound
 	}
-	if r.Method == http.MethodGet {
-		if !v.BandwidthAllowed(stat.Size()) {
-			return errHTTPTooManyRequestsLimitAttachmentBandwidth
-		}
-	}
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
-	if r.Method == http.MethodGet {
-		f, err := os.Open(file)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
+	if r.Method == http.MethodHead {
+		return nil
+	}
+	// Find message in database, and associate bandwidth to the uploader user
+	// This is an easy way to
+	//   - avoid abuse (e.g. 1 uploader, 1k downloaders)
+	//   - and also uses the higher bandwidth limits of a paying user
+	m, err := s.messageCache.Message(messageID)
+	if err == errMessageNotFound {
+		return errHTTPNotFound
+	} else if err != nil {
+		return err
+	}
+	bandwidthVisitor := v
+	if s.userManager != nil && m.User != "" {
+		u, err := s.userManager.UserByID(m.User)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
+		bandwidthVisitor = s.visitor(v.IP(), u)
+	} else if m.Sender != netip.IPv4Unspecified() {
+		bandwidthVisitor = s.visitor(m.Sender, nil)
+	}
+	if !bandwidthVisitor.BandwidthAllowed(stat.Size()) {
+		return errHTTPTooManyRequestsLimitAttachmentBandwidth
+	}
+	// Actually send file
+	f, err := os.Open(file)
+	if err != nil {
 		return err
 	}
-	return nil
+	defer f.Close()
+	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
+	return err
 }
 
 func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {

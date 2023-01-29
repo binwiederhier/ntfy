@@ -16,6 +16,7 @@ import (
 
 var (
 	errUnexpectedMessageType = errors.New("unexpected message type")
+	errMessageNotFound       = errors.New("message not found")
 )
 
 // Messages cache
@@ -60,7 +61,12 @@ const (
 	deleteMessageQuery                = `DELETE FROM messages WHERE mid = ?`
 	updateMessagesForTopicExpiryQuery = `UPDATE messages SET expires = ? WHERE topic = ?`
 	selectRowIDFromMessageID          = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
-	selectMessagesSinceTimeQuery      = `
+	selectMessagesByIDQuery           = `
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
+		FROM messages 
+		WHERE mid = ?
+	`
+	selectMessagesSinceTimeQuery = `
 		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
@@ -448,6 +454,18 @@ func (c *messageCache) MessagesExpired() ([]string, error) {
 	return ids, nil
 }
 
+func (c *messageCache) Message(id string) (*message, error) {
+	rows, err := c.db.Query(selectMessagesByIDQuery, id)
+	if err != nil {
+		return nil, err
+	}
+	if !rows.Next() {
+		return nil, errMessageNotFound
+	}
+	defer rows.Close()
+	return readMessage(rows)
+}
+
 func (c *messageCache) MarkPublished(m *message) error {
 	_, err := c.db.Exec(updateMessagePublishedQuery, m.ID)
 	return err
@@ -600,80 +618,88 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 	defer rows.Close()
 	messages := make([]*message, 0)
 	for rows.Next() {
-		var timestamp, expires, attachmentSize, attachmentExpires int64
-		var priority int
-		var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, encoding string
-		err := rows.Scan(
-			&id,
-			&timestamp,
-			&expires,
-			&topic,
-			&msg,
-			&title,
-			&priority,
-			&tagsStr,
-			&click,
-			&icon,
-			&actionsStr,
-			&attachmentName,
-			&attachmentType,
-			&attachmentSize,
-			&attachmentExpires,
-			&attachmentURL,
-			&sender,
-			&user,
-			&encoding,
-		)
+		m, err := readMessage(rows)
 		if err != nil {
 			return nil, err
 		}
-		var tags []string
-		if tagsStr != "" {
-			tags = strings.Split(tagsStr, ",")
-		}
-		var actions []*action
-		if actionsStr != "" {
-			if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
-				return nil, err
-			}
-		}
-		senderIP, err := netip.ParseAddr(sender)
-		if err != nil {
-			senderIP = netip.Addr{} // if no IP stored in database, return invalid address
-		}
-		var att *attachment
-		if attachmentName != "" && attachmentURL != "" {
-			att = &attachment{
-				Name:    attachmentName,
-				Type:    attachmentType,
-				Size:    attachmentSize,
-				Expires: attachmentExpires,
-				URL:     attachmentURL,
-			}
-		}
-		messages = append(messages, &message{
-			ID:         id,
-			Time:       timestamp,
-			Expires:    expires,
-			Event:      messageEvent,
-			Topic:      topic,
-			Message:    msg,
-			Title:      title,
-			Priority:   priority,
-			Tags:       tags,
-			Click:      click,
-			Icon:       icon,
-			Actions:    actions,
-			Attachment: att,
-			Sender:     senderIP, // Must parse assuming database must be correct
-			User:       user,
-			Encoding:   encoding,
-		})
+		messages = append(messages, m)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return messages, nil
+}
+
+func readMessage(rows *sql.Rows) (*message, error) {
+	var timestamp, expires, attachmentSize, attachmentExpires int64
+	var priority int
+	var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, encoding string
+	err := rows.Scan(
+		&id,
+		&timestamp,
+		&expires,
+		&topic,
+		&msg,
+		&title,
+		&priority,
+		&tagsStr,
+		&click,
+		&icon,
+		&actionsStr,
+		&attachmentName,
+		&attachmentType,
+		&attachmentSize,
+		&attachmentExpires,
+		&attachmentURL,
+		&sender,
+		&user,
+		&encoding,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var tags []string
+	if tagsStr != "" {
+		tags = strings.Split(tagsStr, ",")
+	}
+	var actions []*action
+	if actionsStr != "" {
+		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
+			return nil, err
+		}
+	}
+	senderIP, err := netip.ParseAddr(sender)
+	if err != nil {
+		senderIP = netip.Addr{} // if no IP stored in database, return invalid address
+	}
+	var att *attachment
+	if attachmentName != "" && attachmentURL != "" {
+		att = &attachment{
+			Name:    attachmentName,
+			Type:    attachmentType,
+			Size:    attachmentSize,
+			Expires: attachmentExpires,
+			URL:     attachmentURL,
+		}
+	}
+	return &message{
+		ID:         id,
+		Time:       timestamp,
+		Expires:    expires,
+		Event:      messageEvent,
+		Topic:      topic,
+		Message:    msg,
+		Title:      title,
+		Priority:   priority,
+		Tags:       tags,
+		Click:      click,
+		Icon:       icon,
+		Actions:    actions,
+		Attachment: att,
+		Sender:     senderIP, // Must parse assuming database must be correct
+		User:       user,
+		Encoding:   encoding,
+	}, nil
 }
 
 func (c *messageCache) Close() error {

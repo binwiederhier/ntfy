@@ -80,6 +80,8 @@
 # - auth-file is the SQLite user/access database; it is created automatically if it doesn't already exist
 # - auth-default-access defines the default/fallback access if no access control entry is found; it can be
 #   set to "read-write" (default), "read-only", "write-only" or "deny-all".
+# - auth-startup-queries allows you to run commands when the database is initialized, e.g. to enable
+#   WAL mode. This is similar to cache-startup-queries. See above for details.
 #
 # Debian/RPM package users:
 #   Use /var/lib/ntfy/user.db as user database to avoid permission issues. The package
@@ -91,6 +93,7 @@
 #
 # auth-file: <filename>
 # auth-default-access: "read-write"
+# auth-startup-queries:
 
 # If set, the X-Forwarded-For header is used to determine the visitor IP address
 # instead of the remote address of the connection.

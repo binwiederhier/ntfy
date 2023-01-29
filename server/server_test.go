@@ -1543,6 +1543,7 @@ func TestServer_PublishAttachmentWithTierBasedBandwidthLimit(t *testing.T) {
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfigWithAuthFile(t)
+	c.VisitorAttachmentDailyBandwidthLimit = 1000 // Much lower than tier bandwidth!
 	s := newTestServer(t, c)
 
 	// Create tier with certain limits
@@ -1566,16 +1567,12 @@ func TestServer_PublishAttachmentWithTierBasedBandwidthLimit(t *testing.T) {
 	msg := toMessage(t, rr.Body.String())
 
 	// Retrieve it (first time succeeds)
-	rr = request(t, s, "GET", "/file/"+msg.ID, content, map[string]string{
-		"Authorization": util.BasicAuth("phil", "phil"),
-	})
+	rr = request(t, s, "GET", "/file/"+msg.ID, content, nil) // File downloads do not send auth headers!!
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, content, rr.Body.String())
 
 	// Retrieve it AGAIN (fails, due to bandwidth limit)
-	rr = request(t, s, "GET", "/file/"+msg.ID, content, map[string]string{
-		"Authorization": util.BasicAuth("phil", "phil"),
-	})
+	rr = request(t, s, "GET", "/file/"+msg.ID, content, nil)
 	require.Equal(t, 429, rr.Code)
 }
 

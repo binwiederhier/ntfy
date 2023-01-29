@@ -622,3 +622,50 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 		t.Fatal("Waiting for user subscription to be killed failed")
 	}
 }
+
+func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	conf.AuthDefault = user.PermissionReadWrite
+	conf.AuthStatsQueueWriterInterval = 100 * time.Millisecond
+	s := newTestServer(t, conf)
+	defer s.closeDatabases()
+
+	// Create user with tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:         "starter",
+		MessageLimit: 10,
+	}))
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:         "pro",
+		MessageLimit: 20,
+	}))
+	require.Nil(t, s.userManager.ChangeTier("phil", "starter"))
+
+	// Publish a message
+	rr := request(t, s, "POST", "/mytopic", "hi", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Wait for stats queue writer
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify that message stats were persisted
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(1), u.Stats.Messages)
+
+	// Change tier, make a request (to reset limiters)
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Verify that message stats were persisted
+	time.Sleep(300 * time.Millisecond)
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), u.Stats.Messages) // v.EnqueueStats had run!
+}

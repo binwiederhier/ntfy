@@ -302,13 +302,12 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool
 	} else {
 		v.accountLimiter = nil // Users cannot create accounts when logged in
 	}
-	/*
-		if enqueueUpdate && v.user != nil {
-			go v.userManager.EnqueueStats(v.user.ID, &user.Stats{
-				Messages: messages,
-				Emails:   emails,
-			})
-		}*/
+	if enqueueUpdate && v.user != nil {
+		go v.userManager.EnqueueStats(v.user.ID, &user.Stats{
+			Messages: messages,
+			Emails:   emails,
+		})
+	}
 }
 
 func (v *visitor) Limits() *visitorLimits {

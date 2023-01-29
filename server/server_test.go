@@ -1785,8 +1785,43 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	log.Info("Done: Publishing message; took %s", time.Since(start).Round(time.Millisecond))
 
 	// Wait for all goroutines
-	<-statsChan
+	select {
+	case <-statsChan:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Timed out waiting for Go routines")
+	}
 	log.Info("Done: Waiting for all locks")
+}
+
+func TestServer_AnonymousUser_And_NonTierUser_Are_Same_Visitor(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, conf)
+	defer s.closeDatabases()
+
+	// Create user without tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+
+	// Publish a message (anonymous user)
+	rr := request(t, s, "POST", "/mytopic", "hi", nil)
+	require.Equal(t, 200, rr.Code)
+
+	// Publish a message (non-tier user)
+	rr = request(t, s, "POST", "/mytopic", "hi", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// User stats (anonymous user)
+	rr = request(t, s, "GET", "/v1/account", "", nil)
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, int64(2), account.Stats.Messages)
+
+	// User stats (non-tier user)
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, int64(2), account.Stats.Messages)
 }
 
 func newTestConfig(t *testing.T) *Config {

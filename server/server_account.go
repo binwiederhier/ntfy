@@ -19,11 +19,12 @@ const (
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	admin := v.user != nil && v.user.Role == user.RoleAdmin
+	u := v.User()
+	admin := u != nil && u.Role == user.RoleAdmin
 	if !admin {
 		if !s.config.EnableSignup {
 			return errHTTPBadRequestSignupNotEnabled
-		} else if v.user != nil {
+		} else if u != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
 		if !v.AccountCreationAllowed() {
@@ -150,20 +151,21 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	} else if req.Password == "" {
 		return errHTTPBadRequest
 	}
-	if _, err := s.userManager.Authenticate(v.user.Name, req.Password); err != nil {
+	u := v.User()
+	if _, err := s.userManager.Authenticate(u.Name, req.Password); err != nil {
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
-	if v.user.Billing.StripeSubscriptionID != "" {
-		log.Info("%s Canceling billing subscription %s", logHTTPPrefix(v, r), v.user.Billing.StripeSubscriptionID)
-		if _, err := s.stripe.CancelSubscription(v.user.Billing.StripeSubscriptionID); err != nil {
+	if u.Billing.StripeSubscriptionID != "" {
+		log.Info("%s Canceling billing subscription %s", logHTTPPrefix(v, r), u.Billing.StripeSubscriptionID)
+		if _, err := s.stripe.CancelSubscription(u.Billing.StripeSubscriptionID); err != nil {
 			return err
 		}
 	}
-	if err := s.maybeRemoveMessagesAndExcessReservations(logHTTPPrefix(v, r), v.user, 0); err != nil {
+	if err := s.maybeRemoveMessagesAndExcessReservations(logHTTPPrefix(v, r), u, 0); err != nil {
 		return err
 	}
-	log.Info("%s Marking user %s as deleted", logHTTPPrefix(v, r), v.user.Name)
-	if err := s.userManager.MarkUserRemoved(v.user); err != nil {
+	log.Info("%s Marking user %s as deleted", logHTTPPrefix(v, r), u.Name)
+	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -176,10 +178,11 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	} else if req.Password == "" || req.NewPassword == "" {
 		return errHTTPBadRequest
 	}
-	if _, err := s.userManager.Authenticate(v.user.Name, req.Password); err != nil {
+	u := v.User()
+	if _, err := s.userManager.Authenticate(u.Name, req.Password); err != nil {
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
-	if err := s.userManager.ChangePassword(v.user.Name, req.NewPassword); err != nil {
+	if err := s.userManager.ChangePassword(u.Name, req.NewPassword); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -267,10 +270,11 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	if v.user.Prefs == nil {
-		v.user.Prefs = &user.Prefs{}
+	u := v.User()
+	if u.Prefs == nil {
+		u.Prefs = &user.Prefs{}
 	}
-	prefs := v.user.Prefs
+	prefs := u.Prefs
 	if newPrefs.Language != nil {
 		prefs.Language = newPrefs.Language
 	}
@@ -288,7 +292,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
 		}
 	}
-	if err := s.userManager.ChangeSettings(v.user); err != nil {
+	if err := s.userManager.ChangeSettings(u); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -299,11 +303,12 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		return err
 	}
-	if v.user.Prefs == nil {
-		v.user.Prefs = &user.Prefs{}
+	u := v.User()
+	if u.Prefs == nil {
+		u.Prefs = &user.Prefs{}
 	}
 	newSubscription.ID = "" // Client cannot set ID
-	for _, subscription := range v.user.Prefs.Subscriptions {
+	for _, subscription := range u.Prefs.Subscriptions {
 		if newSubscription.BaseURL == subscription.BaseURL && newSubscription.Topic == subscription.Topic {
 			newSubscription = subscription
 			break
@@ -311,8 +316,8 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	}
 	if newSubscription.ID == "" {
 		newSubscription.ID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
-		v.user.Prefs.Subscriptions = append(v.user.Prefs.Subscriptions, newSubscription)
-		if err := s.userManager.ChangeSettings(v.user); err != nil {
+		u.Prefs.Subscriptions = append(u.Prefs.Subscriptions, newSubscription)
+		if err := s.userManager.ChangeSettings(u); err != nil {
 			return err
 		}
 	}
@@ -329,11 +334,12 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if err != nil {
 		return err
 	}
-	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
+	u := v.User()
+	if u.Prefs == nil || u.Prefs.Subscriptions == nil {
 		return errHTTPNotFound
 	}
 	var subscription *user.Subscription
-	for _, sub := range v.user.Prefs.Subscriptions {
+	for _, sub := range u.Prefs.Subscriptions {
 		if sub.ID == subscriptionID {
 			sub.DisplayName = updatedSubscription.DisplayName
 			subscription = sub
@@ -343,7 +349,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if subscription == nil {
 		return errHTTPNotFound
 	}
-	if err := s.userManager.ChangeSettings(v.user); err != nil {
+	if err := s.userManager.ChangeSettings(u); err != nil {
 		return err
 	}
 	return s.writeJSON(w, subscription)
@@ -355,18 +361,19 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 		return errHTTPInternalErrorInvalidPath
 	}
 	subscriptionID := matches[1]
-	if v.user.Prefs == nil || v.user.Prefs.Subscriptions == nil {
+	u := v.User()
+	if u.Prefs == nil || u.Prefs.Subscriptions == nil {
 		return nil
 	}
 	newSubscriptions := make([]*user.Subscription, 0)
-	for _, subscription := range v.user.Prefs.Subscriptions {
+	for _, subscription := range u.Prefs.Subscriptions {
 		if subscription.ID != subscriptionID {
 			newSubscriptions = append(newSubscriptions, subscription)
 		}
 	}
-	if len(newSubscriptions) < len(v.user.Prefs.Subscriptions) {
-		v.user.Prefs.Subscriptions = newSubscriptions
-		if err := s.userManager.ChangeSettings(v.user); err != nil {
+	if len(newSubscriptions) < len(u.Prefs.Subscriptions) {
+		u.Prefs.Subscriptions = newSubscriptions
+		if err := s.userManager.ChangeSettings(u); err != nil {
 			return err
 		}
 	}
@@ -374,7 +381,8 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if v.user != nil && v.user.Role == user.RoleAdmin {
+	u := v.User()
+	if u != nil && u.Role == user.RoleAdmin {
 		return errHTTPBadRequestMakesNoSenseForAdmin
 	}
 	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit, false)
@@ -388,27 +396,27 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return errHTTPBadRequestPermissionInvalid
 	}
-	if v.user.Tier == nil {
+	if u.Tier == nil {
 		return errHTTPUnauthorized
 	}
 	// CHeck if we are allowed to reserve this topic
-	if err := s.userManager.CheckAllowAccess(v.user.Name, req.Topic); err != nil {
+	if err := s.userManager.CheckAllowAccess(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
 	}
-	hasReservation, err := s.userManager.HasReservation(v.user.Name, req.Topic)
+	hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)
 	if err != nil {
 		return err
 	}
 	if !hasReservation {
-		reservations, err := s.userManager.ReservationsCount(v.user.Name)
+		reservations, err := s.userManager.ReservationsCount(u.Name)
 		if err != nil {
 			return err
-		} else if reservations >= v.user.Tier.ReservationLimit {
+		} else if reservations >= u.Tier.ReservationLimit {
 			return errHTTPTooManyRequestsLimitReservations
 		}
 	}
 	// Actually add the reservation
-	if err := s.userManager.AddReservation(v.user.Name, req.Topic, everyone); err != nil {
+	if err := s.userManager.AddReservation(u.Name, req.Topic, everyone); err != nil {
 		return err
 	}
 	// Kill existing subscribers
@@ -416,7 +424,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribers(v.user.ID)
+	t.CancelSubscribers(u.ID)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -429,13 +437,14 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	if !topicRegex.MatchString(topic) {
 		return errHTTPBadRequestTopicInvalid
 	}
-	authorized, err := s.userManager.HasReservation(v.user.Name, topic)
+	u := v.User()
+	authorized, err := s.userManager.HasReservation(u.Name, topic)
 	if err != nil {
 		return err
 	} else if !authorized {
 		return errHTTPUnauthorized
 	}
-	if err := s.userManager.RemoveReservations(v.user.Name, topic); err != nil {
+	if err := s.userManager.RemoveReservations(u.Name, topic); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -465,12 +474,23 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(logPrefix string, u *u
 	return nil
 }
 
+// publishSyncEventAsync kicks of a Go routine to publish a sync message to the user's sync topic
+func (s *Server) publishSyncEventAsync(v *visitor) {
+	go func() {
+		if err := s.publishSyncEvent(v); err != nil {
+			log.Trace("%s Error publishing to user's sync topic: %s", v.String(), err.Error())
+		}
+	}()
+}
+
+// publishSyncEvent publishes a sync message to the user's sync topic
 func (s *Server) publishSyncEvent(v *visitor) error {
-	if v.user == nil || v.user.SyncTopic == "" {
+	u := v.User()
+	if u == nil || u.SyncTopic == "" {
 		return nil
 	}
-	log.Trace("Publishing sync event to user %s's sync topic %s", v.user.Name, v.user.SyncTopic)
-	syncTopic, err := s.topicFromID(v.user.SyncTopic)
+	log.Trace("Publishing sync event to user %s's sync topic %s", u.Name, u.SyncTopic)
+	syncTopic, err := s.topicFromID(u.SyncTopic)
 	if err != nil {
 		return err
 	}
@@ -483,16 +503,4 @@ func (s *Server) publishSyncEvent(v *visitor) error {
 		return err
 	}
 	return nil
-}
-
-func (s *Server) publishSyncEventAsync(v *visitor) {
-	go func() {
-		u := v.User()
-		if u == nil || u.SyncTopic == "" {
-			return
-		}
-		if err := s.publishSyncEvent(v); err != nil {
-			log.Trace("Error publishing to user %s's sync topic %s: %s", u.Name, u.SyncTopic, err.Error())
-		}
-	}()
 }

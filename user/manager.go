@@ -30,6 +30,7 @@ const (
 	tokenMaxCount                   = 10 // Only keep this many tokens in the table per user
 )
 
+// Default constants that may be overridden by configs
 const (
 	DefaultUserStatsQueueWriterInterval = 33 * time.Second
 	DefaultUserPasswordBcryptCost       = 10
@@ -1195,6 +1196,7 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 	}, nil
 }
 
+// Close closes the underlying database
 func (a *Manager) Close() error {
 	return a.db.Close()
 }

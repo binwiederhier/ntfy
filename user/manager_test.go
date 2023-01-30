@@ -520,7 +520,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	// Tokens
 	baseTime := time.Now().Add(24 * time.Hour)
 	tokens := make([]string, 0)
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 22; i++ {
 		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
@@ -537,7 +537,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	_, err = a.AuthenticateToken(tokens[1])
 	require.Equal(t, ErrUnauthenticated, err)
 
-	for i := 2; i < 12; i++ {
+	for i := 2; i < 22; i++ {
 		userWithToken, err := a.AuthenticateToken(tokens[i])
 		require.Nil(t, err, "token[%d]=%s failed", i, tokens[i])
 		require.Equal(t, "ben", userWithToken.Name)
@@ -549,7 +549,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, rows.Next())
 	require.Nil(t, rows.Scan(&count))
-	require.Equal(t, 10, count)
+	require.Equal(t, 20, count)
 }
 
 func TestManager_EnqueueStats(t *testing.T) {

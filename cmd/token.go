@@ -46,8 +46,7 @@ Examples:
   ntfy token add phil                   # Create token for user phil which never expires
   ntfy token add --expires=2d phil      # Create token for user phil which expires in 2 days
   ntfy token add -e "tuesday, 8pm" phil # Create token for user phil which expires next Tuesday
-  ntfy token add -l backups phil        # Create token for user phil with label "backups"
-`,
+  ntfy token add -l backups phil        # Create token for user phil with label "backups"`,
 		},
 		{
 			Name:      "remove",
@@ -58,8 +57,7 @@ Examples:
 			Description: `Remove a token from the ntfy user database.
 
 Example:
-  ntfy token del phil tk_th2srHVlxrANQHAso5t0HuQ1J1TjN
-`,
+  ntfy token del phil tk_th2srHVlxrANQHAso5t0HuQ1J1TjN`,
 		},
 		{
 			Name:    "list",
@@ -69,8 +67,7 @@ Example:
 			Description: `Shows a list of all tokens.
 
 This is a server-only command. It directly reads from the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
-`,
+file server.yml. The command only works if 'auth-file' is properly defined.`,
 		},
 	},
 	Description: `Manage access tokens for individual users.
@@ -87,8 +84,7 @@ Examples:
   ntfy token list phil                          # Shows list of tokens for user phil
   ntfy token add phil                           # Create token for user phil which never expires
   ntfy token add --expires=2d phil              # Create token for user phil which expires in 2 days
-  ntfy token del phil tk_th2srHVlxr...          # Delete token
-`,
+  ntfy token remove phil tk_th2srHVlxr...       # Delete token`,
 }
 
 func execTokenAdd(c *cli.Context) error {
@@ -133,7 +129,7 @@ func execTokenAdd(c *cli.Context) error {
 func execTokenDel(c *cli.Context) error {
 	username, token := c.Args().Get(0), c.Args().Get(1)
 	if username == "" || token == "" {
-		return errors.New("username and token expected, type 'ntfy token del --help' for help")
+		return errors.New("username and token expected, type 'ntfy token remove --help' for help")
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
@@ -178,33 +174,34 @@ func execTokenList(c *cli.Context) error {
 			return err
 		}
 	}
-	if len(users) == 0 {
-		fmt.Fprintf(c.App.ErrWriter, "no users\n")
-	} else {
-		for _, u := range users {
-			tokens, err := manager.Tokens(u.ID)
-			if err != nil {
-				return err
-			} else if len(tokens) == 0 && username != "" {
-				fmt.Fprintf(c.App.ErrWriter, "user %s has no access tokens\n", username)
-				return nil
-			} else if len(tokens) == 0 {
-				continue
-			}
-			fmt.Fprintf(c.App.ErrWriter, "user %s\n", u.Name)
-			for _, t := range tokens {
-				var label, expires string
-				if t.Label != "" {
-					label = fmt.Sprintf(" (%s)", t.Label)
-				}
-				if t.Expires.Unix() == 0 {
-					expires = "never expires"
-				} else {
-					expires = fmt.Sprintf("expires %s", t.Expires.Format(time.RFC822))
-				}
-				fmt.Fprintf(c.App.ErrWriter, "- %s%s, %s, accessed from %s at %s\n", t.Value, label, expires, t.LastOrigin.String(), t.LastAccess.Format(time.RFC822))
-			}
+	usersWithTokens := 0
+	for _, u := range users {
+		tokens, err := manager.Tokens(u.ID)
+		if err != nil {
+			return err
+		} else if len(tokens) == 0 && username != "" {
+			fmt.Fprintf(c.App.ErrWriter, "user %s has no access tokens\n", username)
+			return nil
+		} else if len(tokens) == 0 {
+			continue
 		}
+		usersWithTokens++
+		fmt.Fprintf(c.App.ErrWriter, "user %s\n", u.Name)
+		for _, t := range tokens {
+			var label, expires string
+			if t.Label != "" {
+				label = fmt.Sprintf(" (%s)", t.Label)
+			}
+			if t.Expires.Unix() == 0 {
+				expires = "never expires"
+			} else {
+				expires = fmt.Sprintf("expires %s", t.Expires.Format(time.RFC822))
+			}
+			fmt.Fprintf(c.App.ErrWriter, "- %s%s, %s, accessed from %s at %s\n", t.Value, label, expires, t.LastOrigin.String(), t.LastAccess.Format(time.RFC822))
+		}
+	}
+	if usersWithTokens == 0 {
+		fmt.Fprintf(c.App.ErrWriter, "no users with tokens\n")
 	}
 	return nil
 }

@@ -1,21 +1,23 @@
 import {
+    accountBillingPortalUrl,
+    accountBillingSubscriptionUrl,
+    accountPasswordUrl,
     accountReservationSingleUrl,
     accountReservationUrl,
-    accountPasswordUrl,
     accountSettingsUrl,
     accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
-    accountUrl, maybeWithAuth, topicUrl,
+    accountUrl,
+    tiersUrl,
     withBasicAuth,
-    withBearerAuth, accountBillingSubscriptionUrl, accountBillingPortalUrl, tiersUrl
+    withBearerAuth
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
 import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
-import userManager from "./UserManager";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes
@@ -440,6 +442,32 @@ class AccountApi {
         }
     }
 }
+
+// Maps to user.Role in user/types.go
+export const Role = {
+    ADMIN: "admin",
+    USER: "user"
+};
+
+// Maps to server.visitorLimitBasis in server/visitor.go
+export const LimitBasis = {
+    IP: "ip",
+    TIER: "tier"
+};
+
+// Maps to stripe.SubscriptionStatus
+export const SubscriptionStatus = {
+    ACTIVE: "active",
+    PAST_DUE: "past_due"
+};
+
+// Maps to user.Permission in user/types.go
+export const Permission = {
+    READ_WRITE: "read-write",
+    READ_ONLY: "read-only",
+    WRITE_ONLY: "write-only",
+    DENY_ALL: "deny-all"
+};
 
 export class UsernameTakenError extends Error {
     constructor(username) {

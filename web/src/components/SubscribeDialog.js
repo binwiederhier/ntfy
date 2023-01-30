@@ -17,7 +17,7 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {Role, TopicReservedError, UnauthorizedError} from "../app/AccountApi";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
 
@@ -87,7 +87,7 @@ const SubscribePage = (props) => {
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
-    const reserveTopicEnabled = session.exists() && account?.role === "user" && (account?.stats.reservations_remaining || 0) > 0;
+    const reserveTopicEnabled = session.exists() && account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined

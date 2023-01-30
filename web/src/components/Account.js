@@ -28,7 +28,13 @@ import TextField from "@mui/material/TextField";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
 import {formatBytes, formatShortDate, formatShortDateTime, openUrl, truncateString, validUrl} from "../app/utils";
-import accountApi, {IncorrectPasswordError, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {
+    IncorrectPasswordError,
+    LimitBasis,
+    Role,
+    SubscriptionStatus,
+    UnauthorizedError
+} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
@@ -92,7 +98,7 @@ const Username = () => {
         <Pref labelId={labelId} title={t("account_basics_username_title")} description={t("account_basics_username_description")}>
             <div aria-labelledby={labelId}>
                 {session.username()}
-                {account?.role === "admin"
+                {account?.role === Role.ADMIN
                     ? <>{" "}<Tooltip title={t("account_basics_username_admin_tooltip")}><span style={{cursor: "default"}}>👑</span></Tooltip></>
                     : ""}
             </div>
@@ -237,7 +243,7 @@ const AccountType = () => {
     };
 
     let accountType;
-    if (account.role === "admin") {
+    if (account.role === Role.ADMIN) {
         const tierSuffix = (account.tier) ? `(with ${account.tier.name} tier)` : `(no tier)`;
         accountType = `${t("account_usage_tier_admin")} ${tierSuffix}`;
     } else if (!account.tier) {
@@ -248,7 +254,7 @@ const AccountType = () => {
 
     return (
         <Pref
-            alignTop={account.billing?.status === "past_due" || account.billing?.cancel_at > 0}
+            alignTop={account.billing?.status === SubscriptionStatus.PAST_DUE || account.billing?.cancel_at > 0}
             title={t("account_usage_tier_title")}
             description={t("account_usage_tier_description")}
         >
@@ -259,7 +265,7 @@ const AccountType = () => {
                         <span><InfoIcon/></span>
                     </Tooltip>
                 }
-                {config.enable_payments && account.role === "user" && !account.billing?.subscription &&
+                {config.enable_payments && account.role === Role.USER && !account.billing?.subscription &&
                     <Button
                         variant="outlined"
                         size="small"
@@ -268,7 +274,7 @@ const AccountType = () => {
                         sx={{ml: 1}}
                     >{t("account_usage_tier_upgrade_button")}</Button>
                 }
-                {config.enable_payments && account.role === "user" && account.billing?.subscription &&
+                {config.enable_payments && account.role === Role.USER && account.billing?.subscription &&
                     <Button
                         variant="outlined"
                         size="small"
@@ -276,7 +282,7 @@ const AccountType = () => {
                         sx={{ml: 1}}
                     >{t("account_usage_tier_change_button")}</Button>
                 }
-                {config.enable_payments && account.role === "user" && account.billing?.customer &&
+                {config.enable_payments && account.role === Role.USER && account.billing?.customer &&
                     <Button
                         variant="outlined"
                         size="small"
@@ -290,7 +296,7 @@ const AccountType = () => {
                     onCancel={() => setUpgradeDialogOpen(false)}
                 />
             </div>
-            {account.billing?.status === "past_due" &&
+            {account.billing?.status === SubscriptionStatus.PAST_DUE &&
                 <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
             }
             {account.billing?.cancel_at > 0 &&
@@ -318,7 +324,7 @@ const Stats = () => {
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                {account.role !== "admin" &&
+                {account.role === Role.USER &&
                     <Pref title={t("account_usage_reservations_title")}>
                         {account.limits.reservations > 0 &&
                             <>
@@ -326,7 +332,7 @@ const Stats = () => {
                                     <Typography variant="body2"
                                                 sx={{float: "left"}}>{account.stats.reservations}</Typography>
                                     <Typography variant="body2"
-                                                sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
+                                                sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
                                 </div>
                                 <LinearProgress
                                     variant="determinate"
@@ -347,11 +353,11 @@ const Stats = () => {
                 }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.role === "user" ? normalize(account.stats.messages, account.limits.messages) : 100}
+                        value={account.role === Role.USER ? normalize(account.stats.messages, account.limits.messages) : 100}
                     />
                 </Pref>
                 <Pref title={
@@ -362,11 +368,11 @@ const Stats = () => {
                 }>
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.role === "user" ? normalize(account.stats.emails, account.limits.emails) : 100}
+                        value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100}
                     />
                 </Pref>
                 <Pref
@@ -382,15 +388,15 @@ const Stats = () => {
                 >
                     <div>
                         <Typography variant="body2" sx={{float: "left"}}>{formatBytes(account.stats.attachment_total_size)}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === "user" ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: formatBytes(account.limits.attachment_total_size) }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
-                        value={account.role === "user" ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
+                        value={account.role === Role.USER ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
                     />
                 </Pref>
             </PrefGroup>
-            {account.role === "user" && account.limits.basis === "ip" &&
+            {account.role === Role.USER && account.limits.basis === LimitBasis.IP &&
                 <Typography variant="body1">
                     {t("account_usage_basis_ip_description")}
                 </Typography>

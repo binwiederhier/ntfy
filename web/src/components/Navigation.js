@@ -28,7 +28,7 @@ import config from "../app/config";
 import ArticleIcon from '@mui/icons-material/Article';
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
-import accountApi from "../app/AccountApi";
+import accountApi, {Permission, Role} from "../app/AccountApi";
 import CelebrationIcon from '@mui/icons-material/Celebration';
 import UpgradeDialog from "./UpgradeDialog";
 import {AccountContext} from "./App";
@@ -104,7 +104,7 @@ const NavList = (props) => {
         navigate(routes.account);
     };
 
-    const isAdmin = account?.role === "admin";
+    const isAdmin = account?.role === Role.ADMIN;
     const isPaid = account?.billing?.subscription;
     const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
     const showSubscriptionsList = props.subscriptions?.length > 0;
@@ -264,16 +264,16 @@ const SubscriptionItem = (props) => {
             <ListItemText primary={displayName} primaryTypographyProps={{ style: { overflow: "hidden", textOverflow: "ellipsis" } }}/>
             {subscription.reservation?.everyone &&
                 <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
-                    {subscription.reservation?.everyone === "read-write" &&
+                    {subscription.reservation?.everyone === Permission.READ_WRITE &&
                         <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><PermissionReadWrite size="small"/></Tooltip>
                     }
-                    {subscription.reservation?.everyone === "read-only" &&
+                    {subscription.reservation?.everyone === Permission.READ_ONLY &&
                         <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PermissionRead size="small"/></Tooltip>
                     }
-                    {subscription.reservation?.everyone === "write-only" &&
+                    {subscription.reservation?.everyone === Permission.WRITE_ONLY &&
                         <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PermissionWrite size="small"/></Tooltip>
                     }
-                    {subscription.reservation?.everyone === "deny-all" &&
+                    {subscription.reservation?.everyone === Permission.DENY_ALL &&
                         <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><PermissionDenyAll size="small"/></Tooltip>
                     }
                 </ListItemIcon>

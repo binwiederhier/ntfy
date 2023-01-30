@@ -39,7 +39,7 @@ import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi, {Permission, Role, UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
 import LockIcon from "@mui/icons-material/Lock";
 import {Info, Public, PublicOff} from "@mui/icons-material";
@@ -485,11 +485,11 @@ const Reservations = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    if (!config.enable_reservations || !session.exists() || !account || account.role === "admin") {
+    if (!config.enable_reservations || !session.exists() || !account || account.role === Role.ADMIN) {
         return <></>;
     }
     const reservations = account.reservations || [];
-    const limitReached = account.role === "user" && account.stats.reservations_remaining === 0;
+    const limitReached = account.role === Role.USER && account.stats.reservations_remaining === 0;
 
     const handleAddClick = () => {
         setDialogKey(prev => prev+1);
@@ -602,25 +602,25 @@ const ReservationsTable = (props) => {
                             {reservation.topic}
                         </TableCell>
                         <TableCell aria-label={t("prefs_reservations_table_access_header")}>
-                            {reservation.everyone === "read-write" &&
+                            {reservation.everyone === Permission.READ_WRITE &&
                                 <>
                                     <Public fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_read_write")}
                                 </>
                             }
-                            {reservation.everyone === "read-only" &&
+                            {reservation.everyone === Permission.READ_ONLY &&
                                 <>
                                     <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_read_only")}
                                 </>
                             }
-                            {reservation.everyone === "write-only" &&
+                            {reservation.everyone === Permission.WRITE_ONLY &&
                                 <>
                                     <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_write_only")}
                                 </>
                             }
-                            {reservation.everyone === "deny-all" &&
+                            {reservation.everyone === Permission.DENY_ALL &&
                                 <>
                                     <LockIcon fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
                                     {t("prefs_reservations_table_everyone_deny_all")}

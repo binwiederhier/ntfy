@@ -5,6 +5,7 @@ import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
+import {Permission} from "../app/AccountApi";
 
 const ReserveTopicSelect = (props) => {
     const { t } = useTranslation();
@@ -24,19 +25,19 @@ const ReserveTopicSelect = (props) => {
                     }
                 }}
             >
-                <MenuItem value="deny-all">
+                <MenuItem value={Permission.DENY_ALL}>
                     <ListItemIcon><PermissionDenyAll/></ListItemIcon>
                     <ListItemText primary={t("prefs_reservations_table_everyone_deny_all")}/>
                 </MenuItem>
-                <MenuItem value="read-only">
+                <MenuItem value={Permission.READ_ONLY}>
                     <ListItemIcon><PermissionRead/></ListItemIcon>
                     <ListItemText primary={t("prefs_reservations_table_everyone_read_only")}/>
                 </MenuItem>
-                <MenuItem value="write-only">
+                <MenuItem value={Permission.WRITE_ONLY}>
                     <ListItemIcon><PermissionWrite/></ListItemIcon>
                     <ListItemText primary={t("prefs_reservations_table_everyone_write_only")}/>
                 </MenuItem>
-                <MenuItem value="read-write">
+                <MenuItem value={Permission.READ_WRITE}>
                     <ListItemIcon><PermissionReadWrite/></ListItemIcon>
                     <ListItemText primary={t("prefs_reservations_table_everyone_read_write")}/>
                 </MenuItem>

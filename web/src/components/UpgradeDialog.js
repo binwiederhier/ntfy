@@ -1,4 +1,5 @@
 import * as React from 'react';
+import {useContext, useEffect, useState} from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -6,16 +7,14 @@ import {Alert, CardActionArea, CardContent, ListItem, useMediaQuery} from "@mui/
 import theme from "./theme";
 import DialogFooter from "./DialogFooter";
 import Button from "@mui/material/Button";
-import accountApi, {TopicReservedError, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {UnauthorizedError} from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
-import {useContext, useEffect, useState} from "react";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import {AccountContext} from "./App";
 import {formatBytes, formatNumber, formatShortDate} from "../app/utils";
 import {Trans, useTranslation} from "react-i18next";
-import subscriptionManager from "../app/SubscriptionManager";
 import List from "@mui/material/List";
 import {Check} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";

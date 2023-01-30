@@ -145,10 +145,8 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 				Quantity: stripe.Int64(1),
 			},
 		},
-		Params: stripe.Params{
-			Metadata: map[string]string{
-				"user_id": u.ID,
-			},
+		AutomaticTax: &stripe.CheckoutSessionAutomaticTaxParams{
+			Enabled: stripe.Bool(true),
 		},
 	}
 	sess, err := s.stripe.NewCheckoutSession(params)

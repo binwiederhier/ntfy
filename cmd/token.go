@@ -16,9 +16,7 @@ func init() {
 	commands = append(commands, cmdToken)
 }
 
-var flagsToken = append(
-	flagsUser,
-)
+var flagsToken = flagsUser
 
 var cmdToken = &cli.Command{
 	Name:      "token",

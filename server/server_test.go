@@ -1872,11 +1872,11 @@ func subscribe(t *testing.T, s *Server, url string, rr *httptest.ResponseRecorde
 		done <- true
 	}()
 	cancelAndWaitForDone := func() {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		cancel()
 		<-done
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	return cancelAndWaitForDone
 }
 

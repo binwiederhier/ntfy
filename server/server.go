@@ -9,7 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
 	"io"
 	"net"
 	"net/http"
@@ -25,13 +30,6 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
-
-	"heckel.io/ntfy/log"
-
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/util"
 )
 
 /*
@@ -43,7 +41,6 @@ import (
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
 - MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
 - MEDIUM: Reservation table delete button: dialog "keep or delete messages?"
-- MEDIUM: Tests for remaining payment endpoints
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: JS constants
 - LOW: Payments reconciliation process

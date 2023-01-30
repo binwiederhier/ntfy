@@ -524,6 +524,70 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	require.NoFileExists(t, filepath.Join(s.config.AttachmentCacheDir, z2.ID))
 }
 
+func TestPayments_Webhook_Subscription_Deleted(t *testing.T) {
+	// This tests incoming webhooks from Stripe to delete a subscription. It verifies that the database is
+	// updated (all Stripe fields are deleted, and the tier is removed).
+	//
+	// It doesn't fully test the message/attachment deletion. That is tested above in the subscription update call.
+
+	stripeMock := &testStripeAPI{}
+	defer stripeMock.AssertExpectations(t)
+
+	c := newTestConfigWithAuthFile(t)
+	c.StripeSecretKey = "secret key"
+	c.StripeWebhookKey = "webhook key"
+	s := newTestServer(t, c)
+	s.stripe = stripeMock
+
+	// Define how the mock should react
+	stripeMock.
+		On("ConstructWebhookEvent", mock.Anything, "stripe signature", "webhook key").
+		Return(jsonToStripeEvent(t, subscriptionDeletedEventJSON), nil)
+
+	// Create a user with a Stripe subscription and 3 reservations
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		ID:               "ti_1",
+		Code:             "pro",
+		StripePriceID:    "price_1234",
+		ReservationLimit: 1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll))
+
+	// Add billing details
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, s.userManager.ChangeBilling(u.Name, &user.Billing{
+		StripeCustomerID:            "acct_5555",
+		StripeSubscriptionID:        "sub_1234",
+		StripeSubscriptionStatus:    stripe.SubscriptionStatusPastDue,
+		StripeSubscriptionPaidUntil: time.Unix(123, 0),
+		StripeSubscriptionCancelAt:  time.Unix(0, 0),
+	}))
+
+	// Call the webhook: This does all the magic
+	rr := request(t, s, "POST", "/v1/account/billing/webhook", "dummy", map[string]string{
+		"Stripe-Signature": "stripe signature",
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Verify that database columns were updated
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, u.Tier)
+	require.Equal(t, "acct_5555", u.Billing.StripeCustomerID)
+	require.Equal(t, "", u.Billing.StripeSubscriptionID)
+	require.Equal(t, stripe.SubscriptionStatus(""), u.Billing.StripeSubscriptionStatus)
+	require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
+	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
+
+	// Verify that reservations were deleted
+	r, err := s.userManager.Reservations("phil")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(r))
+}
+
 func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 	stripeMock := &testStripeAPI{}
 	defer stripeMock.AssertExpectations(t)
@@ -720,6 +784,29 @@ func jsonToStripeEvent(t *testing.T, v string) stripe.Event {
 const subscriptionUpdatedEventJSON = `
 {
 	"type": "customer.subscription.updated",
+	"data": {
+		"object": {
+			"id": "sub_1234",
+			"customer": "acct_5555",
+			"status": "active",
+			"current_period_end": 1674268231,
+			"cancel_at": 1674299999,
+			"items": {
+				"data": [
+					{
+						"price": {
+							"id": "price_1234"
+						}
+					}
+				]
+			}
+		}
+	}
+}`
+
+const subscriptionDeletedEventJSON = `
+{
+	"type": "customer.subscription.deleted",
 	"data": {
 		"object": {
 			"id": "sub_1234",

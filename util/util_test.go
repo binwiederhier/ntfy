@@ -1,12 +1,14 @@
 package util
 
 import (
+	"errors"
 	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -211,4 +213,52 @@ func TestReadJSONWithLimit_AllowEmpty(t *testing.T) {
 func TestReadJSONWithLimit_NoAllowEmpty(t *testing.T) {
 	_, err := UnmarshalJSONWithLimit[testJSON](io.NopCloser(strings.NewReader(` `)), 10, false)
 	require.Equal(t, ErrUnmarshalJSON, err)
+}
+
+func TestRetry_Succeeds(t *testing.T) {
+	start := time.Now()
+	delays, i := []time.Duration{10 * time.Millisecond, 50 * time.Millisecond, 100 * time.Millisecond, time.Second}, 0
+	fn := func() (*int, error) {
+		i++
+		if i < len(delays) {
+			return nil, errors.New("error")
+		}
+		return Int(99), nil
+	}
+	result, err := Retry[int](fn, delays...)
+	require.Nil(t, err)
+	require.Equal(t, 99, *result)
+	require.True(t, time.Since(start).Milliseconds() > 150)
+}
+
+func TestRetry_Fails(t *testing.T) {
+	fn := func() (*int, error) {
+		return nil, errors.New("fails")
+	}
+	_, err := Retry[int](fn, 10*time.Millisecond)
+	require.Error(t, err)
+}
+
+func TestMinMax(t *testing.T) {
+	require.Equal(t, 10, MinMax(9, 10, 99))
+	require.Equal(t, 99, MinMax(100, 10, 99))
+	require.Equal(t, 50, MinMax(50, 10, 99))
+}
+
+func TestPointerFunctions(t *testing.T) {
+	i, s, ti := Int(99), String("abc"), Time(time.Unix(99, 0))
+	require.Equal(t, 99, *i)
+	require.Equal(t, "abc", *s)
+	require.Equal(t, time.Unix(99, 0), *ti)
+}
+
+func TestMaybeMarshalJSON(t *testing.T) {
+	require.Equal(t, `"aa"`, MaybeMarshalJSON("aa"))
+	require.Equal(t, `[
+  "aa",
+  "bb"
+]`, MaybeMarshalJSON([]string{"aa", "bb"}))
+	require.Equal(t, "<cannot serialize>", MaybeMarshalJSON(func() {}))
+	require.Equal(t, `"`+strings.Repeat("x", 4999), MaybeMarshalJSON(strings.Repeat("x", 6000)))
+
 }

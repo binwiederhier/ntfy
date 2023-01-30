@@ -176,7 +176,7 @@ func execUserAdd(c *cli.Context) error {
 	password := os.Getenv("NTFY_PASSWORD")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
-	} else if username == userEveryone {
+	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	} else if !user.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
@@ -207,7 +207,7 @@ func execUserDel(c *cli.Context) error {
 	username := c.Args().Get(0)
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user del --help' for help")
-	} else if username == userEveryone {
+	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
 	manager, err := createUserManager(c)
@@ -229,7 +229,7 @@ func execUserChangePass(c *cli.Context) error {
 	password := os.Getenv("NTFY_PASSWORD")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user change-pass --help' for help")
-	} else if username == userEveryone {
+	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
 	manager, err := createUserManager(c)
@@ -257,7 +257,7 @@ func execUserChangeRole(c *cli.Context) error {
 	role := user.Role(c.Args().Get(1))
 	if username == "" || !user.AllowedRole(role) {
 		return errors.New("username and new role expected, type 'ntfy user change-role --help' for help")
-	} else if username == userEveryone {
+	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
 	manager, err := createUserManager(c)
@@ -281,7 +281,7 @@ func execUserChangeTier(c *cli.Context) error {
 		return errors.New("username and new tier expected, type 'ntfy user change-tier --help' for help")
 	} else if !user.AllowedTier(tier) && tier != tierReset {
 		return errors.New("invalid tier, must be tier code, or - to reset")
-	} else if username == userEveryone {
+	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
 	manager, err := createUserManager(c)

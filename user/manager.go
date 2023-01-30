@@ -27,7 +27,7 @@ const (
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
-	tokenMaxCount                   = 10 // Only keep this many tokens in the table per user
+	tokenMaxCount                   = 20 // Only keep this many tokens in the table per user
 )
 
 // Default constants that may be overridden by configs

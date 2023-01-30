@@ -36,6 +36,7 @@ import (
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Docs
+- HIGH CLI
 - MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Make sure account endpoints make sense for admins
 - MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)

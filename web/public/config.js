@@ -6,7 +6,7 @@
 // During web development, you may change values here for rapid testing.
 
 var config = {
-    base_url: "https://127-0-0-1.my.local-ip.co", // window.location.origin FIXME update before merging
+    base_url: "https://127.0.0.1", // window.location.origin FIXME update before merging
     app_root: "/app",
     enable_login: true,
     enable_signup: true,

@@ -188,11 +188,11 @@ const SubscribePage = (props) => {
                                     checked={reserveTopicVisible}
                                     onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
                                     inputProps={{
-                                        "aria-label": t("subscription_settings_dialog_reserve_topic_label")
+                                        "aria-label": t("reserve_dialog_checkbox_label")
                                     }}
                                 />
                             }
-                            label={t("subscription_settings_dialog_reserve_topic_label")}
+                            label={t("reserve_dialog_checkbox_label")}
                         />
                         {reserveTopicVisible &&
                             <ReserveTopicSelect

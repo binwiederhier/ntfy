@@ -13,7 +13,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Tooltip} from "@mui/material";
+import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Menu, Portal, Tooltip} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {openUrl, topicDisplayName, topicUrl} from "../app/utils";
@@ -21,7 +21,16 @@ import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {ChatBubble, Lock, NotificationsOffOutlined, Public, PublicOff, Send} from "@mui/icons-material";
+import {
+    ChatBubble,
+    Lock, Logout,
+    MoreHoriz, MoreVert,
+    NotificationsOffOutlined,
+    Public,
+    PublicOff,
+    Send,
+    Settings
+} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -33,6 +42,10 @@ import CelebrationIcon from '@mui/icons-material/Celebration';
 import UpgradeDialog from "./UpgradeDialog";
 import {AccountContext} from "./App";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
+import IconButton from "@mui/material/IconButton";
+import MenuItem from "@mui/material/MenuItem";
+import PopupMenu from "./PopupMenu";
+import SubscriptionPopup from "./SubscriptionPopup";
 
 const navWidth = 280;
 
@@ -245,19 +258,23 @@ const SubscriptionList = (props) => {
 const SubscriptionItem = (props) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+
     const subscription = props.subscription;
     const iconBadge = (subscription.new <= 99) ? subscription.new : "99+";
-    const icon = (subscription.state === ConnectionState.Connecting)
-        ? <CircularProgress size="24px"/>
-        : <Badge badgeContent={iconBadge} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
     const displayName = topicDisplayName(subscription);
     const ariaLabel = (subscription.state === ConnectionState.Connecting)
         ? `${displayName} (${t("nav_button_connecting")})`
         : displayName;
+    const icon = (subscription.state === ConnectionState.Connecting)
+        ? <CircularProgress size="24px"/>
+        : <Badge badgeContent={iconBadge} invisible={subscription.new === 0} color="primary"><ChatBubbleOutlineIcon/></Badge>;
+
     const handleClick = async () => {
         navigate(routes.forSubscription(subscription));
         await subscriptionManager.markNotificationsRead(subscription.id);
     };
+
     return (
         <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
             <ListItemIcon>{icon}</ListItemIcon>
@@ -283,6 +300,18 @@ const SubscriptionItem = (props) => {
                     <Tooltip title={t("nav_button_muted")}><NotificationsOffOutlined /></Tooltip>
                 </ListItemIcon>
             }
+            <ListItemIcon edge="end" sx={{minWidth: "26px"}}>
+                <IconButton size="small" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
+                    <MoreVert fontSize="small"/>
+                </IconButton>
+                <Portal>
+                    <SubscriptionPopup
+                        subscription={subscription}
+                        anchor={menuAnchorEl}
+                        onClose={() => setMenuAnchorEl(null)}
+                    />
+                </Portal>
+            </ListItemIcon>
         </ListItemButton>
     );
 };

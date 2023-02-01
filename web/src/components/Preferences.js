@@ -35,18 +35,17 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import userManager from "../app/UserManager";
-import {playSound, shuffle, sounds, validTopic, validUrl} from "../app/utils";
+import {playSound, shuffle, sounds, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, {Permission, Role, UnauthorizedError} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
-import LockIcon from "@mui/icons-material/Lock";
-import {Info, Public, PublicOff} from "@mui/icons-material";
-import DialogContentText from "@mui/material/DialogContentText";
-import ReserveTopicSelect from "./ReserveTopicSelect";
+import {Info} from "@mui/icons-material";
 import {AccountContext} from "./App";
 import {useOutletContext} from "react-router-dom";
+import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
+import {ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog} from "./ReserveDialogs";
 
 const Preferences = () => {
     return (
@@ -496,22 +495,6 @@ const Reservations = () => {
         setDialogOpen(true);
     };
 
-    const handleDialogCancel = () => {
-        setDialogOpen(false);
-    };
-
-    const handleDialogSubmit = async (reservation) => {
-        setDialogOpen(false);
-        try {
-            await accountApi.upsertReservation(reservation.topic, reservation.everyone);
-            await accountApi.sync();
-            console.debug(`[Preferences] Added topic reservation`, reservation);
-        } catch (e) {
-            console.log(`[Preferences] Error topic reservation.`, e);
-        }
-        // FIXME handle 401/403/409
-    };
-
     return (
         <Card sx={{ padding: 1 }} aria-label={t("prefs_reservations_title")}>
             <CardContent sx={{ paddingBottom: 1 }}>
@@ -526,14 +509,11 @@ const Reservations = () => {
             </CardContent>
             <CardActions>
                 <Button onClick={handleAddClick} disabled={limitReached}>{t("prefs_reservations_add_button")}</Button>
-
-                <ReservationsDialog
+                <ReserveAddDialog
                     key={`reservationAddDialog${dialogKey}`}
                     open={dialogOpen}
-                    reservation={null}
                     reservations={reservations}
-                    onCancel={handleDialogCancel}
-                    onSubmit={handleDialogSubmit}
+                    onClose={() => setDialogOpen(false)}
                 />
             </CardActions>
         </Card>
@@ -543,8 +523,9 @@ const Reservations = () => {
 const ReservationsTable = (props) => {
     const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
-    const [dialogOpen, setDialogOpen] = useState(false);
     const [dialogReservation, setDialogReservation] = useState(null);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const { subscriptions } = useOutletContext();
     const localSubscriptions = (subscriptions?.length > 0)
         ? Object.assign(...subscriptions.filter(s => s.baseUrl === config.base_url).map(s => ({[s.topic]: s})))
@@ -553,34 +534,13 @@ const ReservationsTable = (props) => {
     const handleEditClick = (reservation) => {
         setDialogKey(prev => prev+1);
         setDialogReservation(reservation);
-        setDialogOpen(true);
-    };
-
-    const handleDialogCancel = () => {
-        setDialogOpen(false);
-    };
-
-    const handleDialogSubmit = async (reservation) => {
-        setDialogOpen(false);
-        try {
-            await accountApi.upsertReservation(reservation.topic, reservation.everyone);
-            await accountApi.sync();
-            console.debug(`[Preferences] Added topic reservation`, reservation);
-        } catch (e) {
-            console.log(`[Preferences] Error topic reservation.`, e);
-        }
-        // FIXME handle 401/403/409
+        setEditDialogOpen(true);
     };
 
     const handleDeleteClick = async (reservation) => {
-        try {
-            await accountApi.deleteReservation(reservation.topic);
-            await accountApi.sync();
-            console.debug(`[Preferences] Deleted topic reservation`, reservation);
-        } catch (e) {
-            console.log(`[Preferences] Error topic reservation.`, e);
-        }
-        // FIXME handle 401/403
+        setDialogKey(prev => prev+1);
+        setDialogReservation(reservation);
+        setDeleteDialogOpen(true);
     };
 
     return (
@@ -604,32 +564,32 @@ const ReservationsTable = (props) => {
                         <TableCell aria-label={t("prefs_reservations_table_access_header")}>
                             {reservation.everyone === Permission.READ_WRITE &&
                                 <>
-                                    <Public fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PermissionReadWrite size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }}/>
                                     {t("prefs_reservations_table_everyone_read_write")}
                                 </>
                             }
                             {reservation.everyone === Permission.READ_ONLY &&
                                 <>
-                                    <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PermissionRead size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }}/>
                                     {t("prefs_reservations_table_everyone_read_only")}
                                 </>
                             }
                             {reservation.everyone === Permission.WRITE_ONLY &&
                                 <>
-                                    <PublicOff fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PermissionWrite size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }}/>
                                     {t("prefs_reservations_table_everyone_write_only")}
                                 </>
                             }
                             {reservation.everyone === Permission.DENY_ALL &&
                                 <>
-                                    <LockIcon fontSize="small" sx={{color: "grey", verticalAlign: "bottom", mr: 0.5}}/>
+                                    <PermissionDenyAll size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }}/>
                                     {t("prefs_reservations_table_everyone_deny_all")}
                                 </>
                             }
                         </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                             {!localSubscriptions[reservation.topic] &&
-                                <Chip icon={<Info/>} label="Not subscribed" color="primary" variant="outlined"/>
+                                <Chip icon={<Info/>} label={t("prefs_reservations_table_not_subscribed")} color="primary" variant="outlined"/>
                             }
                             <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
                                 <EditIcon/>
@@ -641,76 +601,20 @@ const ReservationsTable = (props) => {
                     </TableRow>
                 ))}
             </TableBody>
-            <ReservationsDialog
+            <ReserveEditDialog
                 key={`reservationEditDialog${dialogKey}`}
-                open={dialogOpen}
+                open={editDialogOpen}
                 reservation={dialogReservation}
                 reservations={props.reservations}
-                onCancel={handleDialogCancel}
-                onSubmit={handleDialogSubmit}
+                onClose={() => setEditDialogOpen(false)}
+            />
+            <ReserveDeleteDialog
+                key={`reservationDeleteDialog${dialogKey}`}
+                open={deleteDialogOpen}
+                topic={dialogReservation?.topic}
+                onClose={() => setDeleteDialogOpen(false)}
             />
         </Table>
-    );
-};
-
-const ReservationsDialog = (props) => {
-    const { t } = useTranslation();
-    const [topic, setTopic] = useState("");
-    const [everyone, setEveryone] = useState("deny-all");
-    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-    const editMode = props.reservation !== null;
-    const addButtonEnabled = (() => {
-        if (editMode) {
-            return true;
-        } else if (!validTopic(topic)) {
-            return false;
-        }
-        return props.reservations
-            .filter(r => r.topic === topic)
-            .length === 0;
-    })();
-    const handleSubmit = async () => {
-        props.onSubmit({
-            topic: (editMode) ? props.reservation.topic : topic,
-            everyone: everyone
-        })
-    };
-    useEffect(() => {
-        if (editMode) {
-            setTopic(props.reservation.topic);
-            setEveryone(props.reservation.everyone);
-        }
-    }, [editMode, props.reservation]);
-    return (
-        <Dialog open={props.open} onClose={props.onCancel} maxWidth="sm" fullWidth fullScreen={fullScreen}>
-            <DialogTitle>{editMode ? t("prefs_reservations_dialog_title_edit") : t("prefs_reservations_dialog_title_add")}</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    {t("prefs_reservations_dialog_description")}
-                </DialogContentText>
-                {!editMode && <TextField
-                    autoFocus
-                    margin="dense"
-                    id="topic"
-                    label={t("prefs_reservations_dialog_topic_label")}
-                    aria-label={t("prefs_reservations_dialog_topic_label")}
-                    value={topic}
-                    onChange={ev => setTopic(ev.target.value)}
-                    type="url"
-                    fullWidth
-                    variant="standard"
-                />}
-                <ReserveTopicSelect
-                    value={everyone}
-                    onChange={setEveryone}
-                    sx={{mt: 1}}
-                />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>
-                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? t("prefs_users_dialog_button_save") : t("prefs_users_dialog_button_add")}</Button>
-            </DialogActions>
-        </Dialog>
     );
 };
 

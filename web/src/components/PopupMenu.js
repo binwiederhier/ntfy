@@ -1,4 +1,4 @@
-import {Menu} from "@mui/material";
+import {Fade, Menu} from "@mui/material";
 import * as React from "react";
 
 const PopupMenu = (props) => {
@@ -10,6 +10,7 @@ const PopupMenu = (props) => {
             open={props.open}
             onClose={props.onClose}
             onClick={props.onClose}
+            TransitionComponent={Fade}
             PaperProps={{
                 elevation: 0,
                 sx: {

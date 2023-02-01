@@ -308,12 +308,15 @@ class AccountApi {
         }
     }
 
-    async deleteReservation(topic) {
+    async deleteReservation(topic, deleteMessages) {
         const url = accountReservationSingleUrl(config.base_url, topic);
         console.log(`[AccountApi] Removing topic reservation ${url}`);
+        const headers = {
+            "X-Delete-Messages": deleteMessages ? "true" : "false"
+        }
         const response = await fetch(url, {
             method: "DELETE",
-            headers: withBearerAuth({}, session.token())
+            headers: withBearerAuth(headers, session.token())
         });
         if (response.status === 401 || response.status === 403) {
             throw new UnauthorizedError();

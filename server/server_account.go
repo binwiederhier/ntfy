@@ -447,6 +447,12 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	if err := s.userManager.RemoveReservations(u.Name, topic); err != nil {
 		return err
 	}
+	deleteMessages := readBoolParam(r, false, "X-Delete-Messages", "Delete-Messages")
+	if deleteMessages {
+		if err := s.messageCache.ExpireMessages(topic); err != nil {
+			return err
+		}
+	}
 	return s.writeJSON(w, newSuccessResponse())
 }
 

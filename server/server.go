@@ -37,11 +37,9 @@ import (
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Docs
 - HIGH CLI
+- MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Make sure account endpoints make sense for admins
-- MEDIUM: Reservation (UI): Show "This topic is reserved" error message when trying to reserve a reserved topic (Thorben)
-- MEDIUM: Reservation (UI): Ask for confirmation when removing reservation (deadcade)
-- MEDIUM: Reservation table delete button: dialog "keep or delete messages?"
 - LOW: UI: Flickering upgrade banner when logging in
 
 */

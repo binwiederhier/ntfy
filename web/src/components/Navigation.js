@@ -276,43 +276,45 @@ const SubscriptionItem = (props) => {
     };
 
     return (
-        <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
-            <ListItemIcon>{icon}</ListItemIcon>
-            <ListItemText primary={displayName} primaryTypographyProps={{ style: { overflow: "hidden", textOverflow: "ellipsis" } }}/>
-            {subscription.reservation?.everyone &&
-                <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
-                    {subscription.reservation?.everyone === Permission.READ_WRITE &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><PermissionReadWrite size="small"/></Tooltip>
-                    }
-                    {subscription.reservation?.everyone === Permission.READ_ONLY &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PermissionRead size="small"/></Tooltip>
-                    }
-                    {subscription.reservation?.everyone === Permission.WRITE_ONLY &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PermissionWrite size="small"/></Tooltip>
-                    }
-                    {subscription.reservation?.everyone === Permission.DENY_ALL &&
-                        <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><PermissionDenyAll size="small"/></Tooltip>
-                    }
+        <>
+            <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
+                <ListItemIcon>{icon}</ListItemIcon>
+                <ListItemText primary={displayName} primaryTypographyProps={{ style: { overflow: "hidden", textOverflow: "ellipsis" } }}/>
+                {subscription.reservation?.everyone &&
+                    <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
+                        {subscription.reservation?.everyone === Permission.READ_WRITE &&
+                            <Tooltip title={t("prefs_reservations_table_everyone_read_write")}><PermissionReadWrite size="small"/></Tooltip>
+                        }
+                        {subscription.reservation?.everyone === Permission.READ_ONLY &&
+                            <Tooltip title={t("prefs_reservations_table_everyone_read_only")}><PermissionRead size="small"/></Tooltip>
+                        }
+                        {subscription.reservation?.everyone === Permission.WRITE_ONLY &&
+                            <Tooltip title={t("prefs_reservations_table_everyone_write_only")}><PermissionWrite size="small"/></Tooltip>
+                        }
+                        {subscription.reservation?.everyone === Permission.DENY_ALL &&
+                            <Tooltip title={t("prefs_reservations_table_everyone_deny_all")}><PermissionDenyAll size="small"/></Tooltip>
+                        }
+                    </ListItemIcon>
+                }
+                {subscription.mutedUntil > 0 &&
+                    <ListItemIcon edge="end" sx={{ minWidth: "26px" }} aria-label={t("nav_button_muted")}>
+                        <Tooltip title={t("nav_button_muted")}><NotificationsOffOutlined /></Tooltip>
+                    </ListItemIcon>
+                }
+                <ListItemIcon edge="end" sx={{minWidth: "26px"}}>
+                    <IconButton size="small" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
+                        <MoreVert fontSize="small"/>
+                    </IconButton>
                 </ListItemIcon>
-            }
-            {subscription.mutedUntil > 0 &&
-                <ListItemIcon edge="end" sx={{ minWidth: "26px" }} aria-label={t("nav_button_muted")}>
-                    <Tooltip title={t("nav_button_muted")}><NotificationsOffOutlined /></Tooltip>
-                </ListItemIcon>
-            }
-            <ListItemIcon edge="end" sx={{minWidth: "26px"}}>
-                <IconButton size="small" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
-                    <MoreVert fontSize="small"/>
-                </IconButton>
-                <Portal>
-                    <SubscriptionPopup
-                        subscription={subscription}
-                        anchor={menuAnchorEl}
-                        onClose={() => setMenuAnchorEl(null)}
-                    />
-                </Portal>
-            </ListItemIcon>
-        </ListItemButton>
+            </ListItemButton>
+            <Portal>
+                <SubscriptionPopup
+                    subscription={subscription}
+                    anchor={menuAnchorEl}
+                    onClose={() => setMenuAnchorEl(null)}
+                />
+            </Portal>
+        </>
     );
 };
 

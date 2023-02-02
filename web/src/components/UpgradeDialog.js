@@ -7,7 +7,7 @@ import {Alert, CardActionArea, CardContent, ListItem, useMediaQuery} from "@mui/
 import theme from "./theme";
 import DialogFooter from "./DialogFooter";
 import Button from "@mui/material/Button";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
 import Card from "@mui/material/Card";
@@ -21,19 +21,24 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Box from "@mui/material/Box";
 import {NavLink} from "react-router-dom";
+import {UnauthorizedError} from "../app/errors";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext); // May be undefined!
-    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+    const [error, setError] = useState("");
     const [tiers, setTiers] = useState(null);
     const [newTierCode, setNewTierCode] = useState(account?.tier?.code); // May be undefined
     const [loading, setLoading] = useState(false);
-    const [errorText, setErrorText] = useState("");
+    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
     useEffect(() => {
         (async () => {
-            setTiers(await accountApi.billingTiers());
+            try {
+                setTiers(await accountApi.billingTiers());
+            } catch (e) {
+                setError(e.message);
+            }
         })();
     }, []);
 
@@ -96,10 +101,11 @@ const UpgradeDialog = (props) => {
             props.onCancel();
         } catch (e) {
             console.log(`[UpgradeDialog] Error changing billing subscription`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
             }
-            // FIXME show error
         } finally {
             setLoading(false);
         }
@@ -155,7 +161,7 @@ const UpgradeDialog = (props) => {
                     </Alert>
                 }
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
                 <Button onClick={handleSubmit} disabled={!submitAction}>{submitButtonLabel}</Button>
             </DialogFooter>

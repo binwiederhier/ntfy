@@ -254,6 +254,12 @@ func (v *visitor) User() *user.User {
 	return v.user // May be nil
 }
 
+// Admin returns true if the visitor is a user, and an admin
+func (v *visitor) Admin() bool {
+	u := v.User()
+	return u != nil && u.Role == user.RoleAdmin
+}
+
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
 	v.mu.Lock()

@@ -18,6 +18,7 @@ import subscriptionManager from "./SubscriptionManager";
 import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
+import {fetchOrThrow, throwAppError, UnauthorizedError} from "./errors";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes
@@ -39,16 +40,11 @@ class AccountApi {
     async login(user) {
         const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Checking auth for ${url}`);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             method: "POST",
             headers: withBasicAuth({}, user.username, user.password)
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const json = await response.json();
+        const json = await response.json(); // May throw SyntaxError
         if (!json.token) {
             throw new Error(`Unexpected server response: Cannot find token`);
         }
@@ -58,15 +54,10 @@ class AccountApi {
     async logout() {
         const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Logging out from ${url} using token ${session.token()}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async create(username, password) {
@@ -76,31 +67,19 @@ class AccountApi {
             password: password
         });
         console.log(`[AccountApi] Creating user account ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "POST",
             body: body
         });
-        if (response.status === 409) {
-            throw new UsernameTakenError(username);
-        } else if (response.status === 429) {
-            throw new AccountCreateLimitReachedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async get() {
         const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Fetching user account ${url}`);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             headers: withBearerAuth({}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const account = await response.json();
+        const account = await response.json(); // May throw SyntaxError
         console.log(`[AccountApi] Account`, account);
         if (this.listener) {
             this.listener(account);
@@ -111,26 +90,19 @@ class AccountApi {
     async delete(password) {
         const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Deleting user account ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
                 password: password
             })
         });
-        if (response.status === 400) {
-            throw new IncorrectPasswordError();
-        } else if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async changePassword(currentPassword, newPassword) {
         const url = accountPasswordUrl(config.base_url);
         console.log(`[AccountApi] Changing account password ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
@@ -138,13 +110,6 @@ class AccountApi {
                 new_password: newPassword
             })
         });
-        if (response.status === 400) {
-            throw new IncorrectPasswordError();
-        } else if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async createToken(label, expires) {
@@ -154,16 +119,11 @@ class AccountApi {
             expires: (expires > 0) ? Math.floor(Date.now() / 1000) + expires : 0
         };
         console.log(`[AccountApi] Creating user access token ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify(body)
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async updateToken(token, label, expires) {
@@ -176,22 +136,17 @@ class AccountApi {
             body.expires = Math.floor(Date.now() / 1000) + expires;
         }
         console.log(`[AccountApi] Creating user access token ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "PATCH",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify(body)
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async extendToken() {
         const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Extending user access token ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "PATCH",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
@@ -199,58 +154,38 @@ class AccountApi {
                 expires: Math.floor(Date.now() / 1000) + 6220800 // FIXME
             })
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async deleteToken(token) {
         const url = accountTokenUrl(config.base_url);
         console.log(`[AccountApi] Deleting user access token ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth({"X-Token": token}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async updateSettings(payload) {
         const url = accountSettingsUrl(config.base_url);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Updating user account ${url}: ${body}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "PATCH",
             headers: withBearerAuth({}, session.token()),
             body: body
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async addSubscription(payload) {
         const url = accountSubscriptionUrl(config.base_url);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
             body: body
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const subscription = await response.json();
+        const subscription = await response.json(); // May throw SyntaxError
         console.log(`[AccountApi] Subscription`, subscription);
         return subscription;
     }
@@ -259,17 +194,12 @@ class AccountApi {
         const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
         const body = JSON.stringify(payload);
         console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             method: "PATCH",
             headers: withBearerAuth({}, session.token()),
             body: body
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        const subscription = await response.json();
+        const subscription = await response.json(); // May throw SyntaxError
         console.log(`[AccountApi] Subscription`, subscription);
         return subscription;
     }
@@ -277,21 +207,16 @@ class AccountApi {
     async deleteSubscription(remoteId) {
         const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
         console.log(`[AccountApi] Removing user subscription ${url}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async upsertReservation(topic, everyone) {
         const url = accountReservationUrl(config.base_url);
         console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
@@ -299,13 +224,6 @@ class AccountApi {
                 everyone: everyone
             })
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status === 409) {
-            throw new TopicReservedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async deleteReservation(topic, deleteMessages) {
@@ -314,25 +232,17 @@ class AccountApi {
         const headers = {
             "X-Delete-Messages": deleteMessages ? "true" : "false"
         }
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth(headers, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async billingTiers() {
         const url = tiersUrl(config.base_url);
         console.log(`[AccountApi] Fetching billing tiers`);
-        const response = await fetch(url); // No auth needed!
-        if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        return await response.json();
+        const response = await fetchOrThrow(url); // No auth needed!
+        return await response.json(); // May throw SyntaxError
     }
 
     async createBillingSubscription(tier) {
@@ -347,48 +257,33 @@ class AccountApi {
 
     async upsertBillingSubscription(method, tier) {
         const url = accountBillingSubscriptionUrl(config.base_url);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             method: method,
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
                 tier: tier
             })
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        return await response.json();
+        return await response.json(); // May throw SyntaxError
     }
 
     async deleteBillingSubscription() {
         const url = accountBillingSubscriptionUrl(config.base_url);
         console.log(`[AccountApi] Cancelling billing subscription`);
-        const response = await fetch(url, {
+        await fetchOrThrow(url, {
             method: "DELETE",
             headers: withBearerAuth({}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
     }
 
     async createBillingPortalSession() {
         const url = accountBillingPortalUrl(config.base_url);
         console.log(`[AccountApi] Creating billing portal session`);
-        const response = await fetch(url, {
+        const response = await fetchOrThrow(url, {
             method: "POST",
             headers: withBearerAuth({}, session.token())
         });
-        if (response.status === 401 || response.status === 403) {
-            throw new UnauthorizedError();
-        } else if (response.status !== 200) {
-            throw new Error(`Unexpected server response ${response.status}`);
-        }
-        return await response.json();
+        return await response.json(); // May throw SyntaxError
     }
 
     async sync() {
@@ -418,7 +313,7 @@ class AccountApi {
             return account;
         } catch (e) {
             console.log(`[AccountApi] Error fetching account`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
             }
         }
@@ -471,38 +366,6 @@ export const Permission = {
     WRITE_ONLY: "write-only",
     DENY_ALL: "deny-all"
 };
-
-export class UsernameTakenError extends Error {
-    constructor(username) {
-        super("Username taken");
-        this.username = username;
-    }
-}
-
-export class TopicReservedError extends Error {
-    constructor(topic) {
-        super("Topic already reserved");
-        this.topic = topic;
-    }
-}
-
-export class AccountCreateLimitReachedError extends Error {
-    constructor() {
-        super("Account creation limit reached");
-    }
-}
-
-export class IncorrectPasswordError extends Error {
-    constructor() {
-        super("Password incorrect");
-    }
-}
-
-export class UnauthorizedError extends Error {
-    constructor() {
-        super("Unauthorized");
-    }
-}
 
 const accountApi = new AccountApi();
 export default accountApi;

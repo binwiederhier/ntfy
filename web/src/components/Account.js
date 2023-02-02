@@ -1,12 +1,19 @@
 import * as React from 'react';
-import {useContext, useEffect, useState} from 'react';
+import {useContext, useState} from 'react';
 import {
     Alert,
     CardActions,
-    CardContent, FormControl,
-    LinearProgress, Link, Portal, Select, Snackbar,
+    CardContent,
+    FormControl,
+    LinearProgress,
+    Link,
+    Portal,
+    Select,
+    Snackbar,
     Stack,
-    Table, TableBody, TableCell,
+    Table,
+    TableBody,
+    TableCell,
     TableHead,
     TableRow,
     useMediaQuery
@@ -27,14 +34,8 @@ import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {formatBytes, formatShortDate, formatShortDateTime, openUrl, truncateString, validUrl} from "../app/utils";
-import accountApi, {
-    IncorrectPasswordError,
-    LimitBasis,
-    Role,
-    SubscriptionStatus,
-    UnauthorizedError
-} from "../app/AccountApi";
+import {formatBytes, formatShortDate, formatShortDateTime, openUrl} from "../app/utils";
+import accountApi, {LimitBasis, Role, SubscriptionStatus} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
@@ -44,17 +45,12 @@ import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import {AccountContext} from "./App";
 import DialogFooter from "./DialogFooter";
-import {useLiveQuery} from "dexie-react-hooks";
-import userManager from "../app/UserManager";
 import {Paragraph} from "./styles";
 import CloseIcon from "@mui/icons-material/Close";
-import DialogActions from "@mui/material/DialogActions";
 import {ContentCopy, Public} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
-import ListItemText from "@mui/material/ListItemText";
 import DialogContentText from "@mui/material/DialogContentText";
+import {IncorrectPasswordError, UnauthorizedError} from "../app/errors";
 
 const Account = () => {
     if (!session.exists()) {
@@ -140,11 +136,10 @@ const ChangePassword = () => {
 
 const ChangePasswordDialog = (props) => {
     const { t } = useTranslation();
+    const [error, setError] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [errorText, setErrorText] = useState("");
-
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
     const handleDialogSubmit = async () => {
@@ -154,12 +149,13 @@ const ChangePasswordDialog = (props) => {
             props.onClose();
         } catch (e) {
             console.log(`[Account] Error changing password`, e);
-            if ((e instanceof IncorrectPasswordError)) {
-                setErrorText(t("account_basics_password_dialog_current_password_incorrect"));
-            } else if ((e instanceof UnauthorizedError)) {
+            if (e instanceof IncorrectPasswordError) {
+                setError(t("account_basics_password_dialog_current_password_incorrect"));
+            } else if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
             }
-            // TODO show error
         }
     };
 
@@ -201,7 +197,7 @@ const ChangePasswordDialog = (props) => {
                     variant="standard"
                 />
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onClose}>{t("account_basics_password_dialog_button_cancel")}</Button>
                 <Button
                     onClick={handleDialogSubmit}
@@ -219,6 +215,7 @@ const AccountType = () => {
     const { account } = useContext(AccountContext);
     const [upgradeDialogKey, setUpgradeDialogKey] = useState(0);
     const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+    const [showPortalError, setShowPortalError] = useState(false);
 
     if (!account) {
         return <></>;
@@ -234,11 +231,12 @@ const AccountType = () => {
             const response = await accountApi.createBillingPortalSession();
             window.open(response.redirect_url, "billing_portal");
         } catch (e) {
-            console.log(`[Account] Error changing password`, e);
-            if ((e instanceof UnauthorizedError)) {
+            console.log(`[Account] Error opening billing portal`, e);
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setShowPortalError(true);
             }
-            // TODO show error
         }
     };
 
@@ -302,6 +300,14 @@ const AccountType = () => {
             {account.billing?.cancel_at > 0 &&
                 <Alert severity="warning" sx={{mt: 1}}>{t("account_usage_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
             }
+            <Portal>
+                <Snackbar
+                    open={showPortalError}
+                    autoHideDuration={3000}
+                    onClose={() => setShowPortalError(false)}
+                    message={t("account_usage_cannot_create_portal_session")}
+                />
+            </Portal>
         </Pref>
     )
 };
@@ -324,27 +330,23 @@ const Stats = () => {
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                {account.role === Role.USER &&
-                    <Pref title={t("account_usage_reservations_title")}>
-                        {account.limits.reservations > 0 &&
-                            <>
-                                <div>
-                                    <Typography variant="body2"
-                                                sx={{float: "left"}}>{account.stats.reservations}</Typography>
-                                    <Typography variant="body2"
-                                                sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
-                                </div>
-                                <LinearProgress
-                                    variant="determinate"
-                                    value={account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
-                                />
-                            </>
-                        }
-                        {account.limits.reservations === 0 &&
-                            <em>No reserved topics for this account</em>
-                        }
-                    </Pref>
-                }
+                <Pref title={t("account_usage_reservations_title")}>
+                    {(account.role === Role.ADMIN || account.limits.reservations > 0) &&
+                        <>
+                            <div>
+                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.reservations}</Typography>
+                                <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
+                            </div>
+                            <LinearProgress
+                                variant="determinate"
+                                value={account.role === Role.USER && account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
+                            />
+                        </>
+                    }
+                    {account.role === Role.USER && account.limits.reservations === 0 &&
+                        <em>{t("account_usage_reservations_none")}</em>
+                    }
+                </Pref>
                 <Pref title={
                     <>
                         {t("account_usage_messages_title")}
@@ -596,9 +598,9 @@ const TokensTable = (props) => {
 
 const TokenDialog = (props) => {
     const { t } = useTranslation();
+    const [error, setError] = useState("");
     const [label, setLabel] = useState(props.token?.label || "");
     const [expires, setExpires] = useState(props.token ? -1 : 0);
-    const [errorText, setErrorText] = useState("");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
     const editMode = !!props.token;
 
@@ -612,10 +614,11 @@ const TokenDialog = (props) => {
             props.onClose();
         } catch (e) {
             console.log(`[Account] Error creating token`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
             }
-            // TODO show error
         }
     };
 
@@ -648,7 +651,7 @@ const TokenDialog = (props) => {
                     </Select>
                 </FormControl>
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onClose}>{t("account_tokens_dialog_button_cancel")}</Button>
                 <Button onClick={handleSubmit}>{editMode ? t("account_tokens_dialog_button_update") : t("account_tokens_dialog_button_create")}</Button>
             </DialogFooter>
@@ -658,6 +661,7 @@ const TokenDialog = (props) => {
 
 const TokenDeleteDialog = (props) => {
     const { t } = useTranslation();
+    const [error, setError] = useState("");
 
     const handleSubmit = async () => {
         try {
@@ -665,10 +669,11 @@ const TokenDeleteDialog = (props) => {
             props.onClose();
         } catch (e) {
             console.log(`[Account] Error deleting token`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
             }
-            // TODO show error
         }
     };
 
@@ -680,10 +685,10 @@ const TokenDeleteDialog = (props) => {
                     <Trans i18nKey="account_tokens_delete_dialog_description"/>
                 </DialogContentText>
             </DialogContent>
-            <DialogActions>
+            <DialogFooter status>
                 <Button onClick={props.onClose}>{t("common_cancel")}</Button>
                 <Button onClick={handleSubmit} color="error">{t("account_tokens_delete_dialog_submit_button")}</Button>
-            </DialogActions>
+            </DialogFooter>
         </Dialog>
     );
 }
@@ -736,8 +741,8 @@ const DeleteAccount = () => {
 const DeleteAccountDialog = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
+    const [error, setError] = useState("");
     const [password, setPassword] = useState("");
-    const [errorText, setErrorText] = useState("");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
     const handleSubmit = async () => {
@@ -748,12 +753,13 @@ const DeleteAccountDialog = (props) => {
             session.resetAndRedirect(routes.app);
         } catch (e) {
             console.log(`[Account] Error deleting account`, e);
-            if ((e instanceof IncorrectPasswordError)) {
-                setErrorText(t("account_basics_password_dialog_current_password_incorrect"));
-            } else if ((e instanceof UnauthorizedError)) {
+            if (e instanceof IncorrectPasswordError) {
+                setError(t("account_basics_password_dialog_current_password_incorrect"));
+            } else if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
             }
-            // TODO show error
         }
     };
 
@@ -779,7 +785,7 @@ const DeleteAccountDialog = (props) => {
                     <Alert severity="warning" sx={{mt: 1}}>{t("account_delete_dialog_billing_warning")}</Alert>
                 }
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onClose}>{t("account_delete_dialog_button_cancel")}</Button>
                 <Button onClick={handleSubmit} color="error" disabled={password.length === 0}>{t("account_delete_dialog_button_submit")}</Button>
             </DialogFooter>

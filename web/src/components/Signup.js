@@ -10,10 +10,11 @@ import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import accountApi, {AccountCreateLimitReachedError, UsernameTakenError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
 import {InputAdornment} from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import {Visibility, VisibilityOff} from "@mui/icons-material";
+import {AccountCreateLimitReachedError, UserExistsError} from "../app/errors";
 
 const Signup = () => {
     const { t } = useTranslation();
@@ -35,14 +36,12 @@ const Signup = () => {
             window.location.href = routes.app;
         } catch (e) {
             console.log(`[Signup] Signup for user ${user.username} failed`, e);
-            if ((e instanceof UsernameTakenError)) {
+            if (e instanceof UserExistsError) {
                 setError(t("signup_error_username_taken", { username: e.username }));
             } else if ((e instanceof AccountCreateLimitReachedError)) {
                 setError(t("signup_error_creation_limit_reached"));
-            } else if (e.message) {
-                setError(e.message);
             } else {
-                setError(t("signup_error_unknown"))
+                setError(e.message);
             }
         }
     };

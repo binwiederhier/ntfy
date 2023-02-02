@@ -8,7 +8,8 @@ import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import session from "../app/Session";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
+import {UnauthorizedError} from "../app/errors";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -94,7 +95,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
         const eligible = params.topic && !selected && !disallowedTopic(params.topic);
         if (eligible) {
             const baseUrl = (params.baseUrl) ? expandSecureUrl(params.baseUrl) : config.base_url;
-            console.log(`[App] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
+            console.log(`[Hooks] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
             (async () => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
@@ -105,8 +106,8 @@ export const useAutoSubscribe = (subscriptions, selected) => {
                         });
                         await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
                     } catch (e) {
-                        console.log(`[App] Auto-subscribing failed`, e);
-                        if ((e instanceof UnauthorizedError)) {
+                        console.log(`[Hooks] Auto-subscribing failed`, e);
+                        if (e instanceof UnauthorizedError) {
                             session.resetAndRedirect(routes.login);
                         }
                     }

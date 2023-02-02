@@ -10,10 +10,11 @@ import session from "../app/Session";
 import {NavLink} from "react-router-dom";
 import AvatarBox from "./AvatarBox";
 import {useTranslation} from "react-i18next";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
 import IconButton from "@mui/material/IconButton";
 import {InputAdornment} from "@mui/material";
 import {Visibility, VisibilityOff} from "@mui/icons-material";
+import {UnauthorizedError} from "../app/errors";
 
 const Login = () => {
     const { t } = useTranslation();
@@ -32,12 +33,10 @@ const Login = () => {
             window.location.href = routes.app;
         } catch (e) {
             console.log(`[Login] User auth for user ${user.username} failed`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 setError(t("Login failed: Invalid username or password"));
-            } else if (e.message) {
-                setError(e.message);
             } else {
-                setError(t("Unknown error. Check logs for details."))
+                setError(e.message);
             }
         }
     };

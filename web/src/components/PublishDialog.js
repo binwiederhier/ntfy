@@ -27,7 +27,8 @@ import EmojiPicker from "./EmojiPicker";
 import {Trans, useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
+import {UnauthorizedError} from "../app/errors";
 
 const PublishDialog = (props) => {
     const { t } = useTranslation();
@@ -179,7 +180,7 @@ const PublishDialog = (props) => {
             setAttachFileError("");
         } catch (e) {
             console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
-            if ((e instanceof UnauthorizedError)) {
+            if (e instanceof UnauthorizedError) {
                 session.resetAndRedirect(routes.login);
             } else {
                 setAttachFileError(""); // Reset error (rely on server-side checking)

@@ -17,9 +17,10 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {Role, TopicReservedError, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {Role} from "../app/AccountApi";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
+import {TopicReservedError, UnauthorizedError} from "../app/errors";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -32,22 +33,7 @@ const SubscribeDialog = (props) => {
     const handleSuccess = async () => {
         console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
         const actualBaseUrl = (baseUrl) ? baseUrl : config.base_url;
-        const subscription = await subscriptionManager.add(actualBaseUrl, topic);
-        if (session.exists()) {
-            try {
-                const remoteSubscription = await accountApi.addSubscription({
-                    base_url: actualBaseUrl,
-                    topic: topic
-                });
-                await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
-                await accountApi.sync();
-            } catch (e) {
-                console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
-                if ((e instanceof UnauthorizedError)) {
-                    session.resetAndRedirect(routes.login);
-                }
-            }
-        }
+        const subscription = subscribeTopic(actualBaseUrl, topic);
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }
@@ -77,9 +63,9 @@ const SubscribeDialog = (props) => {
 const SubscribePage = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
+    const [error, setError] = useState("");
     const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
-    const [errorText, setErrorText] = useState("");
     const [everyone, setEveryone] = useState("deny-all");
     const baseUrl = (anotherServerVisible) ? props.baseUrl : config.base_url;
     const topic = props.topic;
@@ -98,7 +84,7 @@ const SubscribePage = (props) => {
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
             if (user) {
-                setErrorText(t("subscribe_dialog_error_user_not_authorized", { username: username }));
+                setError(t("subscribe_dialog_error_user_not_authorized", { username: username }));
                 return;
             } else {
                 props.onNeedsLogin();
@@ -114,10 +100,10 @@ const SubscribePage = (props) => {
                 // Account sync later after it was added
             } catch (e) {
                 console.log(`[SubscribeDialog] Error reserving topic`, e);
-                if ((e instanceof UnauthorizedError)) {
+                if (e instanceof UnauthorizedError) {
                     session.resetAndRedirect(routes.login);
-                } else if ((e instanceof TopicReservedError)) {
-                    setErrorText(t("subscribe_dialog_error_topic_already_reserved"));
+                } else if (e instanceof TopicReservedError) {
+                    setError(t("subscribe_dialog_error_topic_already_reserved"));
                     return;
                 }
             }
@@ -231,7 +217,7 @@ const SubscribePage = (props) => {
                     </FormGroup>
                 }
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onCancel}>{t("subscribe_dialog_subscribe_button_cancel")}</Button>
                 <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>{t("subscribe_dialog_subscribe_button_subscribe")}</Button>
             </DialogFooter>
@@ -243,21 +229,23 @@ const LoginPage = (props) => {
     const { t } = useTranslation();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [errorText, setErrorText] = useState("");
+    const [error, setError] = useState("");
     const baseUrl = (props.baseUrl) ? props.baseUrl : config.base_url;
     const topic = props.topic;
+
     const handleLogin = async () => {
         const user = {baseUrl, username, password};
         const success = await api.topicAuth(baseUrl, topic, user);
         if (!success) {
             console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
-            setErrorText(t("subscribe_dialog_error_user_not_authorized", { username: username }));
+            setError(t("subscribe_dialog_error_user_not_authorized", { username: username }));
             return;
         }
         console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
         await userManager.save(user);
         props.onSuccess();
     };
+
     return (
         <>
             <DialogTitle>{t("subscribe_dialog_login_title")}</DialogTitle>
@@ -293,12 +281,31 @@ const LoginPage = (props) => {
                     }}
                 />
             </DialogContent>
-            <DialogFooter status={errorText}>
+            <DialogFooter status={error}>
                 <Button onClick={props.onBack}>{t("subscribe_dialog_login_button_back")}</Button>
                 <Button onClick={handleLogin}>{t("subscribe_dialog_login_button_login")}</Button>
             </DialogFooter>
         </>
     );
+};
+
+export const subscribeTopic = async (baseUrl, topic) => {
+    const subscription = await subscriptionManager.add(baseUrl, topic);
+    if (session.exists()) {
+        try {
+            const remoteSubscription = await accountApi.addSubscription({
+                base_url: baseUrl,
+                topic: topic
+            });
+            await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+        } catch (e) {
+            console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
+            if (e instanceof UnauthorizedError) {
+                session.resetAndRedirect(routes.login);
+            }
+        }
+    }
+    return subscription;
 };
 
 export default SubscribeDialog;

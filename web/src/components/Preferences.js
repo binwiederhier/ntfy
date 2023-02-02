@@ -39,13 +39,16 @@ import {playSound, shuffle, sounds, validUrl} from "../app/utils";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {Permission, Role, UnauthorizedError} from "../app/AccountApi";
+import accountApi, {Permission, Role} from "../app/AccountApi";
 import {Pref, PrefGroup} from "./Pref";
 import {Info} from "@mui/icons-material";
 import {AccountContext} from "./App";
 import {useOutletContext} from "react-router-dom";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
 import {ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog} from "./ReserveDialogs";
+import {UnauthorizedError} from "../app/errors";
+import subscriptionManager from "../app/SubscriptionManager";
+import {subscribeTopic} from "./SubscribeDialog";
 
 const Preferences = () => {
     return (
@@ -484,7 +487,7 @@ const Reservations = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    if (!config.enable_reservations || !session.exists() || !account || account.role === Role.ADMIN) {
+    if (!config.enable_reservations || !session.exists() || !account) {
         return <></>;
     }
     const reservations = account.reservations || [];
@@ -543,6 +546,10 @@ const ReservationsTable = (props) => {
         setDeleteDialogOpen(true);
     };
 
+    const handleSubscribeClick = async (reservation) => {
+        await subscribeTopic(config.base_url, reservation.topic);
+    };
+
     return (
         <Table size="small" aria-label={t("prefs_reservations_table")}>
             <TableHead>
@@ -589,7 +596,9 @@ const ReservationsTable = (props) => {
                         </TableCell>
                         <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                             {!localSubscriptions[reservation.topic] &&
-                                <Chip icon={<Info/>} label={t("prefs_reservations_table_not_subscribed")} color="primary" variant="outlined"/>
+                                <Tooltip title={t("prefs_reservations_table_click_to_subscribe")}>
+                                    <Chip icon={<Info/>} onClick={() => handleSubscribeClick(reservation)} label={t("prefs_reservations_table_not_subscribed")} color="primary" variant="outlined"/>
+                                </Tooltip>
                             }
                             <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
                                 <EditIcon/>
@@ -626,7 +635,7 @@ const maybeUpdateAccountSettings = async (payload) => {
         await accountApi.updateSettings(payload);
     } catch (e) {
         console.log(`[Preferences] Error updating account settings`, e);
-        if ((e instanceof UnauthorizedError)) {
+        if (e instanceof UnauthorizedError) {
             session.resetAndRedirect(routes.login);
         }
     }

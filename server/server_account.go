@@ -20,8 +20,7 @@ const (
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	admin := u != nil && u.Role == user.RoleAdmin
-	if !admin {
+	if !u.Admin() { // u may be nil, but that's fine
 		if !s.config.EnableSignup {
 			return errHTTPBadRequestSignupNotEnabled
 		} else if u != nil {
@@ -380,11 +379,11 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+// handleAccountReservationAdd adds a topic reservation for the logged-in user, but only if the user has a tier
+// with enough remaining reservations left, or if the user is an admin. Admins can always reserve a topic, unless
+// it is already reserved by someone else.
 func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	if u != nil && u.Role == user.RoleAdmin {
-		return errHTTPBadRequestMakesNoSenseForAdmin
-	}
 	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
@@ -396,23 +395,23 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return errHTTPBadRequestPermissionInvalid
 	}
-	if u.Tier == nil {
+	// Check if we are allowed to reserve this topic
+	if u.User() && u.Tier == nil {
 		return errHTTPUnauthorized
-	}
-	// CHeck if we are allowed to reserve this topic
-	if err := s.userManager.CheckAllowAccess(u.Name, req.Topic); err != nil {
+	} else if err := s.userManager.CheckAllowAccess(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
-	}
-	hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)
-	if err != nil {
-		return err
-	}
-	if !hasReservation {
-		reservations, err := s.userManager.ReservationsCount(u.Name)
+	} else if u.User() {
+		hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)
 		if err != nil {
 			return err
-		} else if reservations >= u.Tier.ReservationLimit {
-			return errHTTPTooManyRequestsLimitReservations
+		}
+		if !hasReservation {
+			reservations, err := s.userManager.ReservationsCount(u.Name)
+			if err != nil {
+				return err
+			} else if reservations >= u.Tier.ReservationLimit {
+				return errHTTPTooManyRequestsLimitReservations
+			}
 		}
 	}
 	// Actually add the reservation
@@ -428,6 +427,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+// handleAccountReservationDelete deletes a topic reservation if it is owned by the current user
 func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	matches := apiAccountReservationSingleRegex.FindStringSubmatch(r.URL.Path)
 	if len(matches) != 2 {

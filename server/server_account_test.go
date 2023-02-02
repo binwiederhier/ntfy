@@ -435,13 +435,52 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
 	s := newTestServer(t, conf)
+
+	// A user, an admin, and a reservation walk into a bar
+	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+		Code:             "pro",
+		ReservationLimit: 2,
+	}))
+	require.Nil(t, s.userManager.AddUser("noadmin1", "pass", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("noadmin1", "pro"))
+	require.Nil(t, s.userManager.AddReservation("noadmin1", "mytopic", user.PermissionDenyAll))
+
+	require.Nil(t, s.userManager.AddUser("noadmin2", "pass", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("noadmin2", "pro"))
+
 	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin))
 
-	rr := request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
+	// Admin can reserve topic
+	rr := request(t, s, "POST", "/v1/account/reservation", `{"topic":"sometopic","everyone":"deny-all"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "adminpass"),
 	})
-	require.Equal(t, 400, rr.Code)
-	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
+	require.Equal(t, 200, rr.Code)
+
+	// User cannot reserve already reserved topic
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("noadmin2", "pass"),
+	})
+	require.Equal(t, 409, rr.Code)
+
+	// Admin cannot reserve already reserved topic
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "adminpass"),
+	})
+	require.Equal(t, 409, rr.Code)
+
+	reservations, err := s.userManager.Reservations("phil")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(reservations))
+	require.Equal(t, "sometopic", reservations[0].Topic)
+
+	reservations, err = s.userManager.Reservations("noadmin1")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(reservations))
+	require.Equal(t, "mytopic", reservations[0].Topic)
+
+	reservations, err = s.userManager.Reservations("noadmin2")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(reservations))
 }
 
 func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {

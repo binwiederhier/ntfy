@@ -8,6 +8,7 @@ import {
     topicUrlJsonPollWithSince
 } from "./utils";
 import userManager from "./UserManager";
+import {fetchOrThrow} from "./errors";
 
 class Api {
     async poll(baseUrl, topic, since) {
@@ -35,15 +36,11 @@ class Api {
             message: message,
             ...options
         };
-        const response = await fetch(baseUrl, {
+        await fetchOrThrow(baseUrl, {
             method: 'PUT',
             body: JSON.stringify(body),
             headers: maybeWithAuth(headers, user)
         });
-        if (response.status < 200 || response.status > 299) {
-            throw new Error(`Unexpected response: ${response.status}`);
-        }
-        return response;
     }
 
     /**
@@ -108,8 +105,6 @@ class Api {
         });
         if (response.status >= 200 && response.status <= 299) {
             return true;
-        } else if (!user && response.status === 404) {
-            return true; // Special case: Anonymous login to old servers return 404 since /<topic>/auth doesn't exist
         } else if (response.status === 401 || response.status === 403) { // See server/server.go
             return false;
         }

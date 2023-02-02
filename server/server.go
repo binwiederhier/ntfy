@@ -35,11 +35,14 @@ import (
 /*
 
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
+- HIGH Account limit creation triggers when account is taken!
 - HIGH Docs
-- HIGH CLI
+- HIGH CLI "ntfy tier [add|list|delete]"
+- HIGH CLI "ntfy user" should show tier
+- HIGH Self-review
+- HIGH Stripe webhook failures cannot be diagnosed because of missing logs
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
-- MEDIUM: Make sure account endpoints make sense for admins
 - LOW: UI: Flickering upgrade banner when logging in
 
 */

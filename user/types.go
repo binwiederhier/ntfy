@@ -33,6 +33,16 @@ func (u *User) TierID() string {
 	return u.Tier.ID
 }
 
+// Admin returns true if the user is an admin
+func (u *User) Admin() bool {
+	return u != nil && u.Role == RoleAdmin
+}
+
+// User returns true if the user is a regular user, not an admin
+func (u *User) User() bool {
+	return !u.Admin()
+}
+
 // Auther is an interface for authentication and authorization
 type Auther interface {
 	// Authenticate checks username and password and returns a user if correct. The method

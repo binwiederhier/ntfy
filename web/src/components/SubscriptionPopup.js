@@ -11,10 +11,9 @@ import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
-import accountApi, {Permission, UnauthorizedError} from "../app/AccountApi";
+import accountApi from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
-import ReserveTopicSelect from "./ReserveTopicSelect";
 import MenuItem from "@mui/material/MenuItem";
 import PopupMenu from "./PopupMenu";
 import {formatShortDateTime, shuffle} from "../app/utils";
@@ -23,7 +22,8 @@ import {useNavigate} from "react-router-dom";
 import IconButton from "@mui/material/IconButton";
 import {Clear} from "@mui/icons-material";
 import {AccountContext} from "./App";
-import {ReserveEditDialog, ReserveAddDialog, ReserveDeleteDialog} from "./ReserveDialogs";
+import {ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog} from "./ReserveDialogs";
+import {UnauthorizedError} from "../app/errors";
 
 const SubscriptionPopup = (props) => {
     const { t } = useTranslation();
@@ -96,25 +96,25 @@ const SubscriptionPopup = (props) => {
                 tags: tags
             });
         } catch (e) {
-            console.log(`[ActionBar] Error publishing message`, e);
+            console.log(`[SubscriptionPopup] Error publishing message`, e);
             setShowPublishError(true);
         }
     }
 
     const handleClearAll = async () => {
-        console.log(`[ActionBar] Deleting all notifications from ${props.subscription.id}`);
+        console.log(`[SubscriptionPopup] Deleting all notifications from ${props.subscription.id}`);
         await subscriptionManager.deleteNotifications(props.subscription.id);
     };
 
-    const handleUnsubscribe = async (event) => {
-        console.log(`[ActionBar] Unsubscribing from ${props.subscription.id}`, props.subscription);
+    const handleUnsubscribe = async () => {
+        console.log(`[SubscriptionPopup] Unsubscribing from ${props.subscription.id}`, props.subscription);
         await subscriptionManager.remove(props.subscription.id);
         if (session.exists() && props.subscription.remoteId) {
             try {
                 await accountApi.deleteSubscription(props.subscription.remoteId);
             } catch (e) {
-                console.log(`[ActionBar] Error unsubscribing`, e);
-                if ((e instanceof UnauthorizedError)) {
+                console.log(`[SubscriptionPopup] Error unsubscribing`, e);
+                if (e instanceof UnauthorizedError) {
                     session.resetAndRedirect(routes.login);
                 }
             }
@@ -187,25 +187,24 @@ const SubscriptionPopup = (props) => {
 const DisplayNameDialog = (props) => {
     const { t } = useTranslation();
     const subscription = props.subscription;
+    const [error, setError] = useState("");
     const [displayName, setDisplayName] = useState(subscription.displayName ?? "");
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
     const handleSave = async () => {
-        // Apply locally
         await subscriptionManager.setDisplayName(subscription.id, displayName);
-
-        // Apply remotely
         if (session.exists() && subscription.remoteId) {
             try {
                 console.log(`[SubscriptionSettingsDialog] Updating subscription display name to ${displayName}`);
                 await accountApi.updateSubscription(subscription.remoteId, { display_name: displayName });
             } catch (e) {
                 console.log(`[SubscriptionSettingsDialog] Error updating subscription`, e);
-                if ((e instanceof UnauthorizedError)) {
+                if (e instanceof UnauthorizedError) {
                     session.resetAndRedirect(routes.login);
+                } else {
+                    setError(e.message);
+                    return;
                 }
-
-                // FIXME handle 409
             }
         }
         props.onClose();
@@ -241,7 +240,7 @@ const DisplayNameDialog = (props) => {
                     }}
                 />
             </DialogContent>
-            <DialogFooter>
+            <DialogFooter status={error}>
                 <Button onClick={props.onClose}>{t("common_cancel")}</Button>
                 <Button onClick={handleSave}>{t("common_save")}</Button>
             </DialogFooter>

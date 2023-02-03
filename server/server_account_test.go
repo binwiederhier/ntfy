@@ -263,7 +263,7 @@ func TestAccount_ChangePassword(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 400, rr.Code)
-	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
+	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
 
 	rr = request(t, s, "POST", "/v1/account/password", `{"password": "phil", "new_password": "new password"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -414,7 +414,7 @@ func TestAccount_Delete_Not_Allowed(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "mypass"),
 	})
 	require.Equal(t, 400, rr.Code)
-	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
+	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
 }
 
 func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {

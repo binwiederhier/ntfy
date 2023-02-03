@@ -203,6 +203,18 @@
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
 
+# MQTT configuration, if mqtt-server is empty no connexion to MQTT server :
+# - mqtt-server if it's empty no connexion to Mqtt server
+# - mqtt-port mqtt server port, by defaut it's 1883
+# - mqtt-username if it's empty no authentification
+# - mqtt-password can not be empty if username is not empty
+# - mqtt-topic defaut topic to listen, message need to be send in json format on mqtt-topic/message, by defaut it's ntfy/message
+# mqtt-server: ""
+# mqtt-port:  1883
+# mqtt-username: "" 
+# mqtt-password: "" 
+# mqtt-topic: "ntfy" 
+
 # Log level, can be TRACE, DEBUG, INFO, WARN or ERROR
 # This option can be hot-reloaded by calling "kill -HUP $pid" or "systemctl reload ntfy".
 #

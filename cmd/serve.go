@@ -74,6 +74,11 @@ var flagsServe = append(
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", Aliases: []string{"visitor_email_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: server.DefaultVisitorEmailLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "mqtt-server", Aliases: []string{"mqtt_server"}, EnvVars: []string{"NTFY_MQTT_SERVER"}, Value: "", Usage: "if set, ntfy try to connect to this mqtt server"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "mqtt-port", Aliases: []string{"mqtt_port"}, EnvVars: []string{"NTFY_MQTT_PORT"}, Value: 1883, Usage: "port of mqtt server"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "mqtt-username", Aliases: []string{"mqtt_username"}, EnvVars: []string{"NTFY_MQTT_USERNAME"}, Value: "", Usage: "if set ntfy connect to mqtt server in authentificated mode"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "mqtt-password", Aliases: []string{"mqtt_password"}, EnvVars: []string{"NTFY_MQTT_PASSWORD"}, Value: "", Usage: "must be set set if mqtt-username is set"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "mqtt-topic", Aliases: []string{"mqtt_topic"}, EnvVars: []string{"NTFY_MQTT_TOPIC"}, Value: "ntfy", Usage: "default mqtt topic to listen, message need to be send in json format on mqtt-topic/message, by defaut it's ntfy/message"}),
 )
 
 var cmdServe = &cli.Command{
@@ -141,6 +146,11 @@ func execServe(c *cli.Context) error {
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
 	visitorEmailLimitReplenish := c.Duration("visitor-email-limit-replenish")
 	behindProxy := c.Bool("behind-proxy")
+	mqttServer := c.String("mqtt-server")
+	mqttPort :=  c.Int("mqtt-port")
+	mqttUsername := c.String("mqtt-usernameig")
+	mqttPassword := c.String("mqtt-password")
+	mqttTopic := c.String("mqtt-topic")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -269,6 +279,11 @@ func execServe(c *cli.Context) error {
 	conf.BehindProxy = behindProxy
 	conf.EnableWeb = enableWeb
 	conf.Version = c.App.Version
+    conf.MqttServer = mqttServer
+	conf.MqttPort = mqttPort
+	conf.MqttUsername = mqttUsername
+	conf.MqttPassword = mqttPassword
+	conf.MqttTopic = mqttTopic
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

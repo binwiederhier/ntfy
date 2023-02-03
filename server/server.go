@@ -41,6 +41,7 @@ type Server struct {
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
+	mqttServerBackend *mqttBackend
 	smtpSender        mailer
 	topics            map[string]*topic
 	visitors          map[netip.Addr]*visitor
@@ -226,6 +227,11 @@ func (s *Server) Run() error {
 	if s.config.SMTPServerListen != "" {
 		go func() {
 			errChan <- s.runSMTPServer()
+		}()
+	}
+	if s.config.MqttServer != "" {
+		go func() {
+			s.runMqttServer()
 		}()
 	}
 	s.mu.Unlock()
@@ -1219,6 +1225,13 @@ func (s *Server) runSMTPServer() error {
 	s.smtpServer.MaxRecipients = 1
 	s.smtpServer.AllowInsecureAuth = true
 	return s.smtpServer.ListenAndServe()
+}
+
+func (s *Server) runMqttServer() {
+	s.mqttServerBackend = newMqttBackend(s.config, s.handle)
+	s.mqttServerBackend.Connect()
+	s.mqttServerBackend.Subscribe()
+	return
 }
 
 func (s *Server) runManager() {

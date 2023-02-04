@@ -309,9 +309,9 @@ func execServe(c *cli.Context) error {
 	// Run server
 	s, err := server.New(conf)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	} else if err := s.Run(); err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	log.Info("Exiting.")
 	return nil
@@ -338,7 +338,9 @@ func sigHandlerConfigReload(config string) {
 			log.Warn("Hot reload failed: %s", err.Error())
 			continue
 		}
-		reloadLogLevel(inputSource)
+		if err := reloadLogLevel(inputSource); err != nil {
+			log.Warn("Reloading log level failed: %s", err.Error())
+		}
 	}
 }
 
@@ -367,13 +369,24 @@ func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
 	return
 }
 
-func reloadLogLevel(inputSource altsrc.InputSourceContext) {
+func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
 	newLevelStr, err := inputSource.String("log-level")
 	if err != nil {
-		log.Warn("Cannot load log level: %s", err.Error())
-		return
+		return fmt.Errorf("cannot load log level: %s", err.Error())
 	}
-	newLevel := log.ToLevel(newLevelStr)
-	log.SetLevel(newLevel)
-	log.Info("Log level is %s", newLevel.String())
+	overrides, err := inputSource.StringSlice("log-level-overrides")
+	if err != nil {
+		return fmt.Errorf("cannot load log level overrides (1): %s", err.Error())
+	}
+	log.ResetLevelOverride()
+	if err := applyLogLevelOverrides(overrides); err != nil {
+		return fmt.Errorf("cannot load log level overrides (2): %s", err.Error())
+	}
+	log.SetLevel(log.ToLevel(newLevelStr))
+	if len(overrides) > 0 {
+		log.Info("Log level is %v, %d override(s) in place", strings.ToUpper(newLevelStr), len(overrides))
+	} else {
+		log.Info("Log level is %v", strings.ToUpper(newLevelStr))
+	}
+	return nil
 }

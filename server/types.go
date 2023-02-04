@@ -42,6 +42,23 @@ type message struct {
 	User       string      `json:"-"`                  // Username of the uploader, used to associated attachments
 }
 
+func (m *message) Context() map[string]any {
+	fields := map[string]any{
+		"message_id":        m.ID,
+		"message_time":      m.Time,
+		"message_event":     m.Event,
+		"message_topic":     m.Topic,
+		"message_body_size": len(m.Message),
+	}
+	if m.Sender != netip.IPv4Unspecified() {
+		fields["message_sender"] = m.Sender.String()
+	}
+	if m.User != "" {
+		fields["message_user"] = m.User
+	}
+	return fields
+}
+
 type attachment struct {
 	Name    string `json:"name"`
 	Type    string `json:"type,omitempty"`

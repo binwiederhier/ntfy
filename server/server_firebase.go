@@ -47,11 +47,16 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 		return err
 	}
 	if log.IsTrace() {
-		log.Trace("%s Firebase message: %s", logMessagePrefix(v, m), util.MaybeMarshalJSON(fbm))
+		logvm(v, m).
+			Tag(tagFirebase).
+			Field("firebase_message", util.MaybeMarshalJSON(fbm)).
+			Trace("Firebase message")
 	}
 	err = c.sender.Send(fbm)
 	if err == errFirebaseQuotaExceeded {
-		log.Warn("%s Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor", logMessagePrefix(v, m))
+		logvm(v, m).
+			Tag(tagFirebase).
+			Warn("Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor")
 		v.FirebaseTemporarilyDeny()
 	}
 	return err

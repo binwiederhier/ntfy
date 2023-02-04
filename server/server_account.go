@@ -155,7 +155,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
 	if u.Billing.StripeSubscriptionID != "" {
-		log.Info("%s Canceling billing subscription %s", logHTTPPrefix(v, r), u.Billing.StripeSubscriptionID)
+		logvr(v, r).Tag(tagPay).Info("Canceling billing subscription for user %s", u.Name)
 		if _, err := s.stripe.CancelSubscription(u.Billing.StripeSubscriptionID); err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if err := s.maybeRemoveMessagesAndExcessReservations(logHTTPPrefix(v, r), u, 0); err != nil {
 		return err
 	}
-	log.Info("%s Marking user %s as deleted", logHTTPPrefix(v, r), u.Name)
+	logvr(v, r).Tag(tagAccount).Info("Marking user %s as deleted", u.Name)
 	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
@@ -184,6 +184,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	if err := s.userManager.ChangePassword(u.Name, req.NewPassword); err != nil {
 		return err
 	}
+	logvr(v, r).Tag(tagAccount).Debug("Changed password for user %s", u.Name)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -201,10 +202,12 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 	if req.Expires != nil {
 		expires = time.Unix(*req.Expires, 0)
 	}
-	token, err := s.userManager.CreateToken(v.User().ID, label, expires, v.IP())
+	u := v.User()
+	token, err := s.userManager.CreateToken(u.ID, label, expires, v.IP())
 	if err != nil {
 		return err
 	}
+	logvr(v, r).Tag(tagAccount).Debug("Created token for user %s", u.Name)
 	response := &apiAccountTokenResponse{
 		Token:      token.Value,
 		Label:      token.Label,

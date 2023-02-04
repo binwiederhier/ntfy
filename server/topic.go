@@ -58,18 +58,18 @@ func (t *topic) Publish(v *visitor, m *message) error {
 		// subscribers map here. Actually sending out the messages then doesn't have to lock.
 		subscribers := t.subscribersCopy()
 		if len(subscribers) > 0 {
-			log.Debug("%s Forwarding to %d subscriber(s)", logMessagePrefix(v, m), len(subscribers))
+			logvm(v, m).Tag(tagPublish).Debug("Forwarding to %d subscriber(s)", len(subscribers))
 			for _, s := range subscribers {
 				// We call the subscriber functions in their own Go routines because they are blocking, and
 				// we don't want individual slow subscribers to be able to block others.
 				go func(s subscriber) {
 					if err := s(v, m); err != nil {
-						log.Warn("%s Error forwarding to subscriber: %s", logMessagePrefix(v, m), err.Error())
+						logvm(v, m).Tag(tagPublish).Err(err).Warn("Error forwarding to subscriber")
 					}
 				}(s.subscriber)
 			}
 		} else {
-			log.Trace("%s No stream or WebSocket subscribers, not forwarding", logMessagePrefix(v, m))
+			logvm(v, m).Tag(tagPublish).Trace("No stream or WebSocket subscribers, not forwarding")
 		}
 	}()
 	return nil

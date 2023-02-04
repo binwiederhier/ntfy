@@ -2,71 +2,60 @@ package log
 
 import (
 	"log"
-	"strings"
 	"sync"
 )
 
-// Level is a well-known log level, as defined below
-type Level int
-
-// Well known log levels
-const (
-	TraceLevel Level = iota
-	DebugLevel
-	InfoLevel
-	WarnLevel
-	ErrorLevel
-)
-
-func (l Level) String() string {
-	switch l {
-	case TraceLevel:
-		return "TRACE"
-	case DebugLevel:
-		return "DEBUG"
-	case InfoLevel:
-		return "INFO"
-	case WarnLevel:
-		return "WARN"
-	case ErrorLevel:
-		return "ERROR"
-	}
-	return "unknown"
-}
-
 var (
-	level = InfoLevel
-	mu    = &sync.Mutex{}
+	level     = InfoLevel
+	format    = TextFormat
+	overrides = make(map[string]*levelOverride)
+	mu        = &sync.Mutex{}
 )
 
-// Trace prints the given message, if the current log level is TRACE
-func Trace(message string, v ...any) {
-	logIf(TraceLevel, message, v...)
-}
-
-// Debug prints the given message, if the current log level is DEBUG or lower
-func Debug(message string, v ...any) {
-	logIf(DebugLevel, message, v...)
-}
-
-// Info prints the given message, if the current log level is INFO or lower
-func Info(message string, v ...any) {
-	logIf(InfoLevel, message, v...)
-}
-
-// Warn prints the given message, if the current log level is WARN or lower
-func Warn(message string, v ...any) {
-	logIf(WarnLevel, message, v...)
+// Fatal prints the given message, and exits the program
+func Fatal(message string, v ...any) {
+	newEvent().Fatal(message, v...)
 }
 
 // Error prints the given message, if the current log level is ERROR or lower
 func Error(message string, v ...any) {
-	logIf(ErrorLevel, message, v...)
+	newEvent().Error(message, v...)
 }
 
-// Fatal prints the given message, and exits the program
-func Fatal(v ...any) {
-	log.Fatalln(v...)
+// Warn prints the given message, if the current log level is WARN or lower
+func Warn(message string, v ...any) {
+	newEvent().Warn(message, v...)
+}
+
+// Info prints the given message, if the current log level is INFO or lower
+func Info(message string, v ...any) {
+	newEvent().Info(message, v...)
+}
+
+// Debug prints the given message, if the current log level is DEBUG or lower
+func Debug(message string, v ...any) {
+	newEvent().Debug(message, v...)
+}
+
+// Trace prints the given message, if the current log level is TRACE
+func Trace(message string, v ...any) {
+	newEvent().Trace(message, v...)
+}
+
+func Context(contexts ...Ctx) *Event {
+	return newEvent().Context(contexts...)
+}
+
+func Field(key string, value any) *Event {
+	return newEvent().Field(key, value)
+}
+
+func Fields(fields map[string]any) *Event {
+	return newEvent().Fields(fields)
+}
+
+func Tag(tag string) *Event {
+	return newEvent().Tag(tag)
 }
 
 // CurrentLevel returns the current log level
@@ -83,28 +72,40 @@ func SetLevel(newLevel Level) {
 	level = newLevel
 }
 
+// SetLevelOverride adds a log override for the given field
+func SetLevelOverride(field string, value any, level Level) {
+	mu.Lock()
+	defer mu.Unlock()
+	overrides[field] = &levelOverride{value: value, level: level}
+}
+
+// ResetLevelOverride removes all log level overrides
+func ResetLevelOverride() {
+	mu.Lock()
+	defer mu.Unlock()
+	overrides = make(map[string]*levelOverride)
+}
+
+// CurrentFormat returns the current log formt
+func CurrentFormat() Format {
+	mu.Lock()
+	defer mu.Unlock()
+	return format
+}
+
+// SetFormat sets a new log format
+func SetFormat(newFormat Format) {
+	mu.Lock()
+	defer mu.Unlock()
+	format = newFormat
+	if newFormat == JSONFormat {
+		DisableDates()
+	}
+}
+
 // DisableDates disables the date/time prefix
 func DisableDates() {
 	log.SetFlags(0)
-}
-
-// ToLevel converts a string to a Level. It returns InfoLevel if the string
-// does not match any known log levels.
-func ToLevel(s string) Level {
-	switch strings.ToUpper(s) {
-	case "TRACE":
-		return TraceLevel
-	case "DEBUG":
-		return DebugLevel
-	case "INFO":
-		return InfoLevel
-	case "WARN", "WARNING":
-		return WarnLevel
-	case "ERROR":
-		return ErrorLevel
-	default:
-		return InfoLevel
-	}
 }
 
 // Loggable returns true if the given log level is lower or equal to the current log level
@@ -120,10 +121,4 @@ func IsTrace() bool {
 // IsDebug returns true if the current log level is DebugLevel or below
 func IsDebug() bool {
 	return Loggable(DebugLevel)
-}
-
-func logIf(l Level, message string, v ...any) {
-	if CurrentLevel() <= l {
-		log.Printf(l.String()+" "+message, v...)
-	}
 }

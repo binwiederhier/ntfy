@@ -150,6 +150,25 @@ func (v *visitor) stringNoLock() string {
 	return v.ip.String()
 }
 
+func (v *visitor) Context() map[string]any {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	fields := map[string]any{
+		"visitor_ip": v.ip.String(),
+	}
+	if v.user != nil {
+		fields["user_id"] = v.user.ID
+		fields["user_name"] = v.user.Name
+		if v.user.Billing.StripeCustomerID != "" {
+			fields["stripe_customer_id"] = v.user.Billing.StripeCustomerID
+		}
+		if v.user.Billing.StripeSubscriptionID != "" {
+			fields["stripe_subscription_id"] = v.user.Billing.StripeSubscriptionID
+		}
+	}
+	return fields
+}
+
 func (v *visitor) RequestAllowed() error {
 	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
@@ -254,12 +273,6 @@ func (v *visitor) User() *user.User {
 	return v.user // May be nil
 }
 
-// Admin returns true if the visitor is a user, and an admin
-func (v *visitor) Admin() bool {
-	u := v.User()
-	return u != nil && u.Role == user.RoleAdmin
-}
-
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
 	v.mu.Lock()
@@ -297,7 +310,7 @@ func (v *visitor) MaybeUserID() string {
 }
 
 func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool) {
-	log.Debug("%s Resetting limiters for visitor", v.stringNoLock())
+	log.Context(v).Debug("%s Resetting limiters for visitor", v.stringNoLock())
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)

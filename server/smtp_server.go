@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
-	"heckel.io/ntfy/log"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -41,13 +40,13 @@ func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Reques
 	}
 }
 
-func (b *smtpBackend) Login(state *smtp.ConnectionState, username, password string) (smtp.Session, error) {
-	log.Debug("%s Incoming mail, login with user %s", logSMTPPrefix(state), username)
+func (b *smtpBackend) Login(state *smtp.ConnectionState, username, _ string) (smtp.Session, error) {
+	logem(state).Debug("Incoming mail, login with user %s", username)
 	return &smtpSession{backend: b, state: state}, nil
 }
 
 func (b *smtpBackend) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	log.Debug("%s Incoming mail, anonymous login", logSMTPPrefix(state))
+	logem(state).Debug("Incoming mail, anonymous login")
 	return &smtpSession{backend: b, state: state}, nil
 }
 
@@ -66,17 +65,17 @@ type smtpSession struct {
 }
 
 func (s *smtpSession) AuthPlain(username, password string) error {
-	log.Debug("%s AUTH PLAIN (with username %s)", logSMTPPrefix(s.state), username)
+	logem(s.state).Debug("AUTH PLAIN (with username %s)", username)
 	return nil
 }
 
 func (s *smtpSession) Mail(from string, opts smtp.MailOptions) error {
-	log.Debug("%s MAIL FROM: %s (with options: %#v)", logSMTPPrefix(s.state), from, opts)
+	logem(s.state).Debug("%s MAIL FROM: %s (with options: %#v)", from, opts)
 	return nil
 }
 
 func (s *smtpSession) Rcpt(to string) error {
-	log.Debug("%s RCPT TO: %s", logSMTPPrefix(s.state), to)
+	logem(s.state).Debug("RCPT TO: %s", to)
 	return s.withFailCount(func() error {
 		conf := s.backend.config
 		addressList, err := mail.ParseAddressList(to)
@@ -113,10 +112,11 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		if log.IsTrace() {
-			log.Trace("%s DATA: %s", logSMTPPrefix(s.state), string(b))
-		} else if log.IsDebug() {
-			log.Debug("%s DATA: %d byte(s)", logSMTPPrefix(s.state), len(b))
+		ev := logem(s.state).Tag(tagSMTP)
+		if ev.IsTrace() {
+			ev.Field("smtp_data", string(b)).Trace("DATA")
+		} else if ev.IsDebug() {
+			ev.Debug("DATA: %d byte(s)", len(b))
 		}
 		msg, err := mail.ReadMessage(bytes.NewReader(b))
 		if err != nil {
@@ -198,7 +198,7 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	if err != nil {
 		// Almost all of these errors are parse errors, and user input errors.
 		// We do not want to spam the log with WARN messages.
-		log.Debug("%s Incoming mail error: %s", logSMTPPrefix(s.state), err.Error())
+		logem(s.state).Err(err).Debug("Incoming mail error")
 		s.backend.failure++
 	}
 	return err

@@ -48,8 +48,44 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func logMessagePrefix(v *visitor, m *message) string {
-	return fmt.Sprintf("%s/%s/%s", v.String(), m.Topic, m.ID)
+func logr(r *http.Request) *log.Event {
+	return log.Fields(logFieldsHTTP(r))
+}
+
+func logv(v *visitor) *log.Event {
+	return log.Context(v)
+}
+
+func logvr(v *visitor, r *http.Request) *log.Event {
+	return logv(v).Fields(logFieldsHTTP(r))
+}
+
+func logvrm(v *visitor, r *http.Request, m *message) *log.Event {
+	return logvr(v, r).Context(m)
+}
+
+func logvm(v *visitor, m *message) *log.Event {
+	return logv(v).Context(m)
+}
+
+func logem(state *smtp.ConnectionState) *log.Event {
+	return log.
+		Tag(tagSMTP).
+		Fields(map[string]any{
+			"smtp_hostname":    state.Hostname,
+			"smtp_remote_addr": state.RemoteAddr.String(),
+		})
+}
+
+func logFieldsHTTP(r *http.Request) map[string]any {
+	requestURI := r.RequestURI
+	if requestURI == "" {
+		requestURI = r.URL.Path
+	}
+	return map[string]any{
+		"http_method": r.Method,
+		"http_path":   requestURI,
+	}
 }
 
 func logHTTPPrefix(v *visitor, r *http.Request) string {
@@ -65,10 +101,6 @@ func logStripePrefix(customerID, subscriptionID string) string {
 		return fmt.Sprintf("STRIPE %s/%s", customerID, subscriptionID)
 	}
 	return fmt.Sprintf("STRIPE %s", customerID)
-}
-
-func logSMTPPrefix(state *smtp.ConnectionState) string {
-	return fmt.Sprintf("SMTP %s/%s", state.Hostname, state.RemoteAddr.String())
 }
 
 func renderHTTPRequest(r *http.Request) string {

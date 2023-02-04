@@ -4,7 +4,6 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"mime"
 	"net"
@@ -37,8 +36,18 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 			return err
 		}
 		auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
-		log.Debug("%s Sending mail: via=%s, user=%s, pass=***, to=%s", logMessagePrefix(v, m), s.config.SMTPSenderAddr, s.config.SMTPSenderUser, to)
-		log.Trace("%s Mail body: %s", logMessagePrefix(v, m), message)
+		logvm(v, m).
+			Tag(tagEmail).
+			Fields(map[string]any{
+				"email_via":  s.config.SMTPSenderAddr,
+				"email_user": s.config.SMTPSenderUser,
+				"email_to":   to,
+			}).
+			Debug("Sending email")
+		logvm(v, m).
+			Tag(tagEmail).
+			Field("email_body", message).
+			Trace("Email body")
 		return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
 	})
 }
@@ -54,7 +63,7 @@ func (s *smtpSender) withCount(v *visitor, m *message, fn func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err != nil {
-		log.Debug("%s Sending mail failed: %s", logMessagePrefix(v, m), err.Error())
+		logvm(v, m).Err(err).Debug("Sending mail failed")
 		s.failure++
 	} else {
 		s.success++

@@ -1410,10 +1410,15 @@ func (s *Server) withAuth(next handleFunc, perm auth.Permission) handleFunc {
 		if err != nil {
 			return err
 		}
-		var user *auth.User // may stay nil if no auth header!
-		username, password, ok := extractUserPass(r)
-		if ok {
-			if user, err = s.auth.Authenticate(username, password); err != nil {
+		var user *auth.User               // may stay nil if no auth header!
+		if len(s.config.UserHeader) > 0 { //Lookup user from header if user-header is configured
+			username := extractUserHeader(r, s.config.UserHeader)
+			if user, err = s.auth.PreAuthenticatedUser(username); err != nil {
+				log.Info("unable to associate %s to user account: %s", username, err.Error()) //unknown users are assumed anonymous, not unauthorized/401
+			}
+		} else { //Fall back to native Basic Auth if no user-header is configured
+			username, password, ok := extractUserPass(r)
+			if ok {
 				log.Info("authentication failed: %s", err.Error())
 				return errHTTPUnauthorized
 			}
@@ -1447,6 +1452,11 @@ func extractUserPass(r *http.Request) (username string, password string, ok bool
 		return r.BasicAuth()
 	}
 	return
+}
+
+// extractUserHader pulls the username of an already authenticated user from the configured header
+func extractUserHeader(r *http.Request, h string) (username string) {
+	return readParam(r, h)
 }
 
 // visitor creates or retrieves a rate.Limiter for the given visitor.

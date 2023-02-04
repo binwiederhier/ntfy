@@ -98,6 +98,12 @@ func NewSQLiteAuth(filename string, defaultRead, defaultWrite bool) (*SQLiteAuth
 	}, nil
 }
 
+// PreAuthenticatedUser looks up a user based on name- no validation of credentials is done!
+func (a *SQLiteAuth) Authenticate(username) (*User, error) {
+	user, err := a.User(username)
+	return user, nil
+}
+
 // Authenticate checks username and password and returns a user if correct. The method
 // returns in constant-ish time, regardless of whether the user exists or the password is
 // correct or incorrect.

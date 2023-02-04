@@ -8,6 +8,9 @@ import (
 
 // Auther is a generic interface to implement password-based authentication and authorization
 type Auther interface {
+	// PreAuthenticatedUser looks up the user for a given username, and returns a user if one is found.
+	PreAuthenticatedUser(username) (*User, error)
+
 	// Authenticate checks username and password and returns a user if correct. The method
 	// returns in constant-ish time, regardless of whether the user exists or the password is
 	// correct or incorrect.

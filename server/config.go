@@ -101,6 +101,7 @@ type Config struct {
 	BehindProxy                          bool
 	EnableWeb                            bool
 	Version                              string // injected by App
+	UserHeader                           string
 }
 
 // NewConfig instantiates a default new server config
@@ -146,5 +147,6 @@ func NewConfig() *Config {
 		BehindProxy:                          false,
 		EnableWeb:                            true,
 		Version:                              "",
+		UserHeader:                           "",
 	}
 }

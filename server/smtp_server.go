@@ -70,7 +70,7 @@ func (s *smtpSession) AuthPlain(username, password string) error {
 }
 
 func (s *smtpSession) Mail(from string, opts smtp.MailOptions) error {
-	logem(s.state).Debug("%s MAIL FROM: %s (with options: %#v)", from, opts)
+	logem(s.state).Debug("MAIL FROM: %s (with options: %#v)", from, opts)
 	return nil
 }
 

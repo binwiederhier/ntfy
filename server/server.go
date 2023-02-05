@@ -149,6 +149,7 @@ const (
 	tagManager   = "manager"
 	tagResetter  = "resetter"
 	tagWebsocket = "websocket"
+	tagMatrix    = "matrix"
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -328,9 +329,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		if websocket.IsWebSocketUpgrade(r) {
 			isNormalError := strings.Contains(err.Error(), "i/o timeout")
 			if isNormalError {
-				logvr(v, r).Tag(tagWebsocket).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
+				logvr(v, r).Tag(tagWebsocket).Err(err).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
 			} else {
-				logvr(v, r).Tag(tagWebsocket).Info("WebSocket error: %s", err.Error())
+				logvr(v, r).Tag(tagWebsocket).Err(err).Info("WebSocket error: %s", err.Error())
 			}
 			return // Do not attempt to write to upgraded connection
 		}
@@ -711,7 +712,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	} else if response.StatusCode != http.StatusOK {
-		logvm(v, m).Err(err).Warn("Unable to publish poll request, unexpected HTTP status: %d")
+		logvm(v, m).Err(err).Warn("Unable to publish poll request, unexpected HTTP status: %d", response.StatusCode)
 		return
 	}
 }
@@ -1537,6 +1538,7 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
+			logvr(v, r).Err(err).Fields(requestLimiterFields(v.RequestLimiter())).Trace("Request not allowed by rate limiter")
 			return errHTTPTooManyRequestsLimitRequests
 		}
 		return next(w, r, v)
@@ -1601,6 +1603,7 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
 		if err != nil {
+			logvr(v, r).Tag(tagMatrix).Err(err).Trace("Invalid Matrix request")
 			return err
 		}
 		if err := next(w, newRequest, v); err != nil {
@@ -1630,7 +1633,7 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 		u := v.User()
 		for _, t := range topics {
 			if err := s.userManager.Authorize(u, t.ID, perm); err != nil {
-				logvr(v, r).Err(err).Debug("Unauthorized")
+				logvr(v, r).Err(err).Field("message_topic", t.ID).Debug("Access to topic %s not authorized", t.ID)
 				return errHTTPForbidden
 			}
 		}
@@ -1644,7 +1647,7 @@ func (s *Server) maybeAuthenticate(r *http.Request) (v *visitor, err error) {
 	ip := extractIPAddress(r, s.config.BehindProxy)
 	var u *user.User // may stay nil if no auth header!
 	if u, err = s.authenticate(r); err != nil {
-		logr(r).Debug("Authentication failed: %s", err.Error())
+		logr(r).Err(err).Debug("Authentication failed: %s", err.Error())
 		err = errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
 	v = s.visitor(ip, u)

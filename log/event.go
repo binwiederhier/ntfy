@@ -76,7 +76,7 @@ func (e *Event) Fields(fields map[string]any) *Event {
 	return e
 }
 
-func (e *Event) Context(contexts ...Ctx) *Event {
+func (e *Event) Context(contexts ...Contexter) *Event {
 	for _, c := range contexts {
 		e.Fields(c.Context())
 	}

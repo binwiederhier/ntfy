@@ -42,7 +42,7 @@ func Trace(message string, v ...any) {
 	newEvent().Trace(message, v...)
 }
 
-func Context(contexts ...Ctx) *Event {
+func Context(contexts ...Contexter) *Event {
 	return newEvent().Context(contexts...)
 }
 

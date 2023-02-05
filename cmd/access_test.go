@@ -26,6 +26,8 @@ func TestCLI_Access_Grant_And_Publish(t *testing.T) {
 	stdin.WriteString("philpass\nphilpass\nbenpass\nbenpass")
 	require.Nil(t, runUserCommand(app, conf, "add", "--role=admin", "phil"))
 	require.Nil(t, runUserCommand(app, conf, "add", "ben"))
+
+	app, stdin, _, _ = newTestApp()
 	require.Nil(t, runAccessCommand(app, conf, "ben", "announcements", "rw"))
 	require.Nil(t, runAccessCommand(app, conf, "ben", "sometopic", "read"))
 	require.Nil(t, runAccessCommand(app, conf, "everyone", "announcements", "read"))

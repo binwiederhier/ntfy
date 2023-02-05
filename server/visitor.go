@@ -159,6 +159,10 @@ func (v *visitor) Context() map[string]any {
 	if v.user != nil {
 		fields["user_id"] = v.user.ID
 		fields["user_name"] = v.user.Name
+		if v.user.Tier != nil {
+			fields["tier_id"] = v.user.Tier.ID
+			fields["tier_name"] = v.user.Tier.Name
+		}
 		if v.user.Billing.StripeCustomerID != "" {
 			fields["stripe_customer_id"] = v.user.Billing.StripeCustomerID
 		}
@@ -176,6 +180,12 @@ func (v *visitor) RequestAllowed() error {
 		return errVisitorLimitReached
 	}
 	return nil
+}
+
+func (v *visitor) RequestLimiter() *rate.Limiter {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	return v.requestLimiter
 }
 
 func (v *visitor) FirebaseAllowed() error {

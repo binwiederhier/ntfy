@@ -91,7 +91,7 @@ func ToFormat(s string) Format {
 	}
 }
 
-type Ctx interface {
+type Contexter interface {
 	Context() map[string]any
 }
 
@@ -101,7 +101,7 @@ func (f fieldsCtx) Context() map[string]any {
 	return f
 }
 
-func NewCtx(fields map[string]any) Ctx {
+func NewCtx(fields map[string]any) Contexter {
 	return fieldsCtx(fields)
 }
 

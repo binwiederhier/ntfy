@@ -160,7 +160,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 			return err
 		}
 	}
-	if err := s.maybeRemoveMessagesAndExcessReservations(logHTTPPrefix(v, r), u, 0); err != nil {
+	if err := s.maybeRemoveMessagesAndExcessReservations(r, v, u, 0); err != nil {
 		return err
 	}
 	logvr(v, r).Tag(tagAccount).Info("Marking user %s as deleted", u.Name)
@@ -462,18 +462,19 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 // maybeRemoveMessagesAndExcessReservations deletes topic reservations for the given user (if too many for tier),
 // and marks associated messages for the topics as deleted. This also eventually deletes attachments.
 // The process relies on the manager to perform the actual deletions (see runManager).
-func (s *Server) maybeRemoveMessagesAndExcessReservations(logPrefix string, u *user.User, reservationsLimit int64) error {
+func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *visitor, u *user.User, reservationsLimit int64) error {
 	reservations, err := s.userManager.Reservations(u.Name)
 	if err != nil {
 		return err
 	} else if int64(len(reservations)) <= reservationsLimit {
+		logvr(v, r).Tag(tagAccount).Debug("No excess reservations to remove")
 		return nil
 	}
 	topics := make([]string, 0)
 	for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
 		topics = append(topics, reservations[i].Topic)
 	}
-	log.Info("%s Removing excess reservations for topics %s", logPrefix, strings.Join(topics, ", "))
+	logvr(v, r).Tag(tagAccount).Info("Removing excess reservations for topics %s", strings.Join(topics, ", "))
 	if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
 		return err
 	}

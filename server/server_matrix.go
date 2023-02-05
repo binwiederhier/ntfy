@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
@@ -147,7 +146,7 @@ func writeMatrixDiscoveryResponse(w http.ResponseWriter) error {
 
 // writeMatrixError logs and writes the errMatrix to the given http.ResponseWriter as a matrixResponse
 func writeMatrixError(w http.ResponseWriter, r *http.Request, v *visitor, err *errMatrix) error {
-	log.Debug("%s Matrix gateway error: %s", logHTTPPrefix(v, r), err.Error())
+	logvr(v, r).Tag(tagMatrix).Err(err).Debug("Matrix gateway error")
 	return writeMatrixResponse(w, err.pushKey)
 }
 

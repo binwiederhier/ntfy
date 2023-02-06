@@ -34,7 +34,7 @@ func newEvent() *Event {
 // Fatal logs the event as FATAL, and exits the program with exit code 1
 func (e *Event) Fatal(message string, v ...any) {
 	e.Field("exit_code", 1).Log(FatalLevel, message, v...)
-	fmt.Fprintf(os.Stderr, fmt.Sprintf(message+"\n", v...)) // Always output error to stderr
+	fmt.Fprintf(os.Stderr, message+"\n", v...) // Always output error to stderr
 	os.Exit(1)
 }
 

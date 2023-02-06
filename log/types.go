@@ -36,6 +36,7 @@ func (l Level) String() string {
 	return "unknown"
 }
 
+// MarshalJSON converts a level to a JSON string
 func (l Level) MarshalJSON() ([]byte, error) {
 	return json.Marshal(l.String())
 }

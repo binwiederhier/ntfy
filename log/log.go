@@ -8,21 +8,19 @@ import (
 	"time"
 )
 
-const (
+// Defaults for package level variables
+var (
 	DefaultLevel  = InfoLevel
 	DefaultFormat = TextFormat
+	DefaultOutput = os.Stderr
 )
 
 var (
-	level     = DefaultLevel
-	format    = DefaultFormat
-	overrides = make(map[string]*levelOverride)
-	mu        = &sync.Mutex{}
-)
-
-var (
-	DefaultOutput           = os.Stderr
-	output        io.Writer = DefaultOutput
+	level               = DefaultLevel
+	format              = DefaultFormat
+	overrides           = make(map[string]*levelOverride)
+	output    io.Writer = DefaultOutput
+	mu                  = &sync.Mutex{}
 )
 
 // Fatal prints the given message, and exits the program

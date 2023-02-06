@@ -23,7 +23,8 @@ var flagsDefault = []cli.Flag{
 	&cli.BoolFlag{Name: "no-log-dates", Aliases: []string{"no_log_dates"}, EnvVars: []string{"NTFY_NO_LOG_DATES"}, Usage: "disable the date/time prefix"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "log-level", Aliases: []string{"log_level"}, Value: log.InfoLevel.String(), EnvVars: []string{"NTFY_LOG_LEVEL"}, Usage: "set log level"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "log-level-overrides", Aliases: []string{"log_level_overrides"}, EnvVars: []string{"NTFY_LOG_LEVEL_OVERRIDES"}, Usage: "set log level overrides"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "log-format", Aliases: []string{"log_format"}, Value: log.TextFormat.String(), EnvVars: []string{"NTFY_LOG_FORMAT"}, Usage: "set log level"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "log-format", Aliases: []string{"log_format"}, Value: log.TextFormat.String(), EnvVars: []string{"NTFY_LOG_FORMAT"}, Usage: "set log format"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "log-file", Aliases: []string{"log_file"}, EnvVars: []string{"NTFY_LOG_FILE"}, Usage: "set log file, default is STDOUT"}),
 }
 
 var (
@@ -60,6 +61,14 @@ func initLogFunc(c *cli.Context) error {
 	}
 	if err := applyLogLevelOverrides(c.StringSlice("log-level-overrides")); err != nil {
 		return err
+	}
+	logFile := c.String("log-file")
+	if logFile != "" {
+		w, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if err != nil {
+			return err
+		}
+		log.SetOutput(w)
 	}
 	return nil
 }

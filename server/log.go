@@ -11,30 +11,36 @@ import (
 	"unicode/utf8"
 )
 
+// logr creates a new log event with HTTP request fields
 func logr(r *http.Request) *log.Event {
 	return log.Fields(httpFields(r))
 }
 
+// logr creates a new log event with visitor fields
 func logv(v *visitor) *log.Event {
-	return log.Context(v)
+	return log.With(v)
 }
 
+// logr creates a new log event with HTTP request and visitor fields
 func logvr(v *visitor, r *http.Request) *log.Event {
 	return logv(v).Fields(httpFields(r))
 }
 
+// logvrm creates a new log event with HTTP request, visitor fields and message fields
 func logvrm(v *visitor, r *http.Request, m *message) *log.Event {
-	return logvr(v, r).Context(m)
+	return logvr(v, r).With(m)
 }
 
+// logvrm creates a new log event with visitor fields and message fields
 func logvm(v *visitor, m *message) *log.Event {
-	return logv(v).Context(m)
+	return logv(v).With(m)
 }
 
+// logem creates a new log event with email fields
 func logem(state *smtp.ConnectionState) *log.Event {
 	return log.
 		Tag(tagSMTP).
-		Fields(map[string]any{
+		Fields(log.Context{
 			"smtp_hostname":    state.Hostname,
 			"smtp_remote_addr": state.RemoteAddr.String(),
 		})

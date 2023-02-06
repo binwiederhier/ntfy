@@ -26,7 +26,7 @@ const (
 )
 
 var flagsSubscribe = append(
-	flagsDefault,
+	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},

@@ -20,7 +20,7 @@ func init() {
 }
 
 var flagsPublish = append(
-	flagsDefault,
+	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "title", Aliases: []string{"t"}, EnvVars: []string{"NTFY_TITLE"}, Usage: "message title"},
 	&cli.StringFlag{Name: "message", Aliases: []string{"m"}, EnvVars: []string{"NTFY_MESSAGE"}, Usage: "message body"},

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"net/http"
 	"net/netip"
@@ -42,7 +43,7 @@ type message struct {
 	User       string      `json:"-"`                  // Username of the uploader, used to associated attachments
 }
 
-func (m *message) Context() map[string]any {
+func (m *message) Context() log.Context {
 	fields := map[string]any{
 		"message_id":        m.ID,
 		"message_time":      m.Time,

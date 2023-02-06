@@ -4,6 +4,7 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"mime"
 	"net"
@@ -38,7 +39,7 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 		auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
 		logvm(v, m).
 			Tag(tagEmail).
-			Fields(map[string]any{
+			Fields(log.Context{
 				"email_via":  s.config.SMTPSenderAddr,
 				"email_user": s.config.SMTPSenderUser,
 				"email_to":   to,

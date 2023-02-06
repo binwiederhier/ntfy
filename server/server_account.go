@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -155,7 +154,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
 	if u.Billing.StripeSubscriptionID != "" {
-		logvr(v, r).Tag(tagPay).Info("Canceling billing subscription for user %s", u.Name)
+		logvr(v, r).Tag(tagStripe).Info("Canceling billing subscription for user %s", u.Name)
 		if _, err := s.stripe.CancelSubscription(u.Billing.StripeSubscriptionID); err != nil {
 			return err
 		}
@@ -488,7 +487,7 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 func (s *Server) publishSyncEventAsync(v *visitor) {
 	go func() {
 		if err := s.publishSyncEvent(v); err != nil {
-			log.Trace("%s Error publishing to user's sync topic: %s", v.String(), err.Error())
+			logv(v).Err(err).Trace("Error publishing to user's sync topic")
 		}
 	}()
 }
@@ -499,7 +498,7 @@ func (s *Server) publishSyncEvent(v *visitor) error {
 	if u == nil || u.SyncTopic == "" {
 		return nil
 	}
-	log.Trace("Publishing sync event to user %s's sync topic %s", u.Name, u.SyncTopic)
+	logv(v).Field("sync_topic", u.SyncTopic).Trace("Publishing sync event to user's sync topic")
 	syncTopic, err := s.topicFromID(u.SyncTopic)
 	if err != nil {
 		return err

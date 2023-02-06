@@ -233,10 +233,15 @@
 # stripe-secret-key:
 # stripe-webhook-key:
 
-# Log level, can be TRACE, DEBUG, INFO, WARN or ERROR
+# Log level, can be "trace", "debug", "info", "warn" or "error"
 # This option can be hot-reloaded by calling "kill -HUP $pid" or "systemctl reload ntfy".
 #
-# Be aware that DEBUG (and particularly TRACE) can be VERY CHATTY. Only turn them on for
+# FIXME
+#
+# Be aware that "debug" (and particularly "trace"") can be VERY CHATTY. Only turn them on for
 # debugging purposes, or your disk will fill up quickly.
 #
-# log-level: INFO
+# log-level: info
+# log-level-overrides:
+# log-format: text
+# log-file:

@@ -44,6 +44,7 @@ func (c *fileCache) Write(id string, in io.Reader, limiters ...util.Limiter) (in
 	if !fileIDRegex.MatchString(id) {
 		return 0, errInvalidFileID
 	}
+	log.Tag(tagFileCache).Field("message_id", id).Debug("Writing attachment")
 	file := filepath.Join(c.dir, id)
 	if _, err := os.Stat(file); err == nil {
 		return 0, errFileExists
@@ -75,10 +76,10 @@ func (c *fileCache) Remove(ids ...string) error {
 		if !fileIDRegex.MatchString(id) {
 			return errInvalidFileID
 		}
-		log.Debug("File Cache: Deleting attachment %s", id)
+		log.Tag(tagFileCache).Field("message_id", id).Debug("Deleting attachment")
 		file := filepath.Join(c.dir, id)
 		if err := os.Remove(file); err != nil {
-			log.Debug("File Cache: Error deleting attachment %s: %s", id, err.Error())
+			log.Tag(tagFileCache).Field("message_id", id).Err(err).Debug("Error deleting attachment")
 		}
 	}
 	size, err := dirSize(c.dir)

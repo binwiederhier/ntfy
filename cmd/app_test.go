@@ -14,7 +14,7 @@ import (
 // This only contains helpers so far
 
 func TestMain(m *testing.M) {
-	log.SetLevel(log.WarnLevel)
+	log.SetLevel(log.ErrorLevel)
 	os.Exit(m.Run())
 }
 

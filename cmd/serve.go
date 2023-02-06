@@ -34,7 +34,7 @@ const (
 )
 
 var flagsServe = append(
-	flagsDefault,
+	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, DefaultText: defaultServerConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
@@ -378,7 +378,7 @@ func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
 	if err != nil {
 		return fmt.Errorf("cannot load log level overrides (1): %s", err.Error())
 	}
-	log.ResetLevelOverride()
+	log.ResetLevelOverrides()
 	if err := applyLogLevelOverrides(overrides); err != nil {
 		return fmt.Errorf("cannot load log level overrides (2): %s", err.Error())
 	}

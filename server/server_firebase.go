@@ -46,7 +46,7 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 	if err != nil {
 		return err
 	}
-	if log.IsTrace() {
+	if log.Tag(tagFirebase).IsTrace() {
 		logvm(v, m).
 			Tag(tagFirebase).
 			Field("firebase_message", util.MaybeMarshalJSON(fbm)).

@@ -121,8 +121,8 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 		return errNotAPaidTier
 	}
 	logvr(v, r).
-		Tag(tagPay).
-		Fields(map[string]any{
+		Tag(tagStripe).
+		Fields(log.Context{
 			"tier":            tier,
 			"stripe_price_id": tier.StripePriceID,
 		}).
@@ -196,8 +196,8 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	}
 	v.SetUser(u)
 	logvr(v, r).
-		Tag(tagPay).
-		Fields(map[string]any{
+		Tag(tagStripe).
+		Fields(log.Context{
 			"tier_id":                        tier.ID,
 			"tier_name":                      tier.Name,
 			"stripe_price_id":                tier.StripePriceID,
@@ -241,8 +241,8 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 		return err
 	}
 	logvr(v, r).
-		Tag(tagPay).
-		Fields(map[string]any{
+		Tag(tagStripe).
+		Fields(log.Context{
 			"new_tier_id":              tier.ID,
 			"new_tier_name":            tier.Name,
 			"new_tier_stripe_price_id": tier.StripePriceID,
@@ -275,7 +275,7 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 // handleAccountBillingSubscriptionDelete facilitates downgrading a paid user to a tier-less user,
 // and cancelling the Stripe subscription entirely
 func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	logvr(v, r).Tag(tagPay).Info("Deleting Stripe subscription")
+	logvr(v, r).Tag(tagStripe).Info("Deleting Stripe subscription")
 	u := v.User()
 	if u.Billing.StripeSubscriptionID != "" {
 		params := &stripe.SubscriptionParams{
@@ -292,7 +292,7 @@ func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r
 // handleAccountBillingPortalSessionCreate creates a session to the customer billing portal, and returns the
 // redirect URL. The billing portal allows customers to change their payment methods, and cancel the subscription.
 func (s *Server) handleAccountBillingPortalSessionCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	logvr(v, r).Tag(tagPay).Info("Creating Stripe billing portal session")
+	logvr(v, r).Tag(tagStripe).Info("Creating Stripe billing portal session")
 	u := v.User()
 	if u.Billing.StripeCustomerID == "" {
 		return errHTTPBadRequestNotAPaidUser
@@ -338,7 +338,7 @@ func (s *Server) handleAccountBillingWebhook(_ http.ResponseWriter, r *http.Requ
 		return s.handleAccountBillingWebhookSubscriptionDeleted(r, v, event)
 	default:
 		logvr(v, r).
-			Tag(tagPay).
+			Tag(tagStripe).
 			Field("stripe_webhook_type", event.Type).
 			Warn("Unhandled Stripe webhook event %s received", event.Type)
 		return nil
@@ -354,8 +354,8 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 	}
 	subscriptionID, priceID := ev.ID, ev.Items.Data[0].Price.ID
 	logvr(v, r).
-		Tag(tagPay).
-		Fields(map[string]any{
+		Tag(tagStripe).
+		Fields(log.Context{
 			"stripe_webhook_type":            event.Type,
 			"stripe_customer_id":             ev.Customer,
 			"stripe_subscription_id":         ev.ID,
@@ -400,7 +400,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 	}
 	v.SetUser(u)
 	logvr(v, r).
-		Tag(tagPay).
+		Tag(tagStripe).
 		Field("stripe_webhook_type", event.Type).
 		Info("Subscription deleted, downgrading to unpaid tier")
 	if err := s.updateSubscriptionAndTier(r, v, u, nil, ev.Customer, "", "", 0, 0); err != nil {
@@ -419,14 +419,14 @@ func (s *Server) updateSubscriptionAndTier(r *http.Request, v *visitor, u *user.
 		return err
 	}
 	if tier == nil && u.Tier != nil {
-		logvr(v, r).Tag(tagPay).Info("Resetting tier for user %s", u.Name)
+		logvr(v, r).Tag(tagStripe).Info("Resetting tier for user %s", u.Name)
 		if err := s.userManager.ResetTier(u.Name); err != nil {
 			return err
 		}
 	} else if tier != nil && u.TierID() != tier.ID {
 		logvr(v, r).
-			Tag(tagPay).
-			Fields(map[string]any{
+			Tag(tagStripe).
+			Fields(log.Context{
 				"new_tier_id":              tier.ID,
 				"new_tier_name":            tier.Name,
 				"new_tier_stripe_price_id": tier.StripePriceID,

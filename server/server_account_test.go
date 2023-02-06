@@ -683,7 +683,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
-	conf.AuthStatsQueueWriterInterval = 100 * time.Millisecond
+	conf.AuthStatsQueueWriterInterval = 200 * time.Millisecond
 	s := newTestServer(t, conf)
 	defer s.closeDatabases()
 
@@ -706,7 +706,7 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Wait for stats queue writer
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Verify that message stats were persisted
 	u, err := s.userManager.User("phil")

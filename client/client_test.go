@@ -4,10 +4,17 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/test"
+	"os"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	log.SetLevel(log.ErrorLevel)
+	os.Exit(m.Run())
+}
 
 func TestClient_Publish_Subscribe(t *testing.T) {
 	s, port := test.StartServer(t)

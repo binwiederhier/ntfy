@@ -40,7 +40,6 @@ import (
 - HIGH CLI "ntfy tier [add|list|delete]"
 - HIGH CLI "ntfy user" should show tier
 - HIGH Self-review
-- HIGH Stripe webhook failures cannot be diagnosed because of missing logs
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
@@ -140,16 +139,18 @@ const (
 
 // Log tags
 const (
-	tagPublish   = "publish"
-	tagFirebase  = "firebase"
-	tagEmail     = "email" // Send email
-	tagSMTP      = "smtp"  // Receive email
-	tagPay       = "pay"
-	tagAccount   = "account"
-	tagManager   = "manager"
-	tagResetter  = "resetter"
-	tagWebsocket = "websocket"
-	tagMatrix    = "matrix"
+	tagPublish      = "publish"
+	tagFirebase     = "firebase"
+	tagEmail        = "email" // Send email
+	tagSMTP         = "smtp"  // Receive email
+	tagFileCache    = "file_cache"
+	tagMessageCache = "message_cache"
+	tagStripe       = "stripe"
+	tagAccount      = "account"
+	tagManager      = "manager"
+	tagResetter     = "resetter"
+	tagWebsocket    = "websocket"
+	tagMatrix       = "matrix"
 )
 
 // New instantiates a new Server. It creates the cache and adds a Firebase
@@ -234,6 +235,10 @@ func (s *Server) Run() error {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
 	log.Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
+	if log.IsFile() {
+		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s, log file is %s\n", listenStr, s.config.Version, log.File())
+		fmt.Fprintln(os.Stderr, "No more output is expected.")
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
@@ -346,19 +351,19 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest
 		if isNormalError {
 			logvr(v, r).
-				Fields(map[string]any{
-					"error":       err,
+				Fields(log.Context{
 					"error_code":  httpErr.Code,
 					"http_status": httpErr.HTTPCode,
 				}).
+				Err(err).
 				Debug("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
 		} else {
 			logvr(v, r).
-				Fields(map[string]any{
-					"error":       err,
+				Fields(log.Context{
 					"error_code":  httpErr.Code,
 					"http_status": httpErr.HTTPCode,
 				}).
+				Err(err).
 				Info("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -614,7 +619,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	delayed := m.Time > time.Now().Unix()
 	logvrm(v, r, m).
 		Tag(tagPublish).
-		Fields(map[string]any{
+		Fields(log.Context{
 			"message_delayed":     delayed,
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
@@ -1496,7 +1501,7 @@ func (s *Server) sendDelayedMessages() error {
 		if s.userManager != nil && m.User != "" {
 			u, err = s.userManager.User(m.User)
 			if err != nil {
-				log.Context(m).Err(err).Warn("Error sending delayed message")
+				log.With(m).Err(err).Warn("Error sending delayed message")
 				continue
 			}
 		}

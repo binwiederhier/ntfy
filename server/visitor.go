@@ -135,25 +135,14 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 	return v
 }
 
-func (v *visitor) String() string {
+func (v *visitor) Context() log.Context {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.stringNoLock()
+	return v.contextNoLock()
 }
 
-func (v *visitor) stringNoLock() string {
-	if v.user != nil && v.user.Billing.StripeCustomerID != "" {
-		return fmt.Sprintf("%s/%s/%s", v.ip.String(), v.user.ID, v.user.Billing.StripeCustomerID)
-	} else if v.user != nil {
-		return fmt.Sprintf("%s/%s", v.ip.String(), v.user.ID)
-	}
-	return v.ip.String()
-}
-
-func (v *visitor) Context() map[string]any {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	fields := map[string]any{
+func (v *visitor) contextNoLock() log.Context {
+	fields := log.Context{
 		"visitor_ip": v.ip.String(),
 	}
 	if v.user != nil {
@@ -320,7 +309,7 @@ func (v *visitor) MaybeUserID() string {
 }
 
 func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool) {
-	log.Context(v).Debug("%s Resetting limiters for visitor", v.stringNoLock())
+	log.Fields(v.contextNoLock()).Debug("Resetting limiters for visitor")
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)

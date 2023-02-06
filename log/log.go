@@ -1,15 +1,28 @@
 package log
 
 import (
+	"io"
 	"log"
+	"os"
 	"sync"
+	"time"
+)
+
+const (
+	DefaultLevel  = InfoLevel
+	DefaultFormat = TextFormat
 )
 
 var (
-	level     = InfoLevel
-	format    = TextFormat
+	level     = DefaultLevel
+	format    = DefaultFormat
 	overrides = make(map[string]*levelOverride)
 	mu        = &sync.Mutex{}
+)
+
+var (
+	DefaultOutput           = os.Stderr
+	output        io.Writer = DefaultOutput
 )
 
 // Fatal prints the given message, and exits the program
@@ -42,20 +55,29 @@ func Trace(message string, v ...any) {
 	newEvent().Trace(message, v...)
 }
 
-func Context(contexts ...Contexter) *Event {
-	return newEvent().Context(contexts...)
+// With creates a new log event and adds the fields of the given Contexter structs
+func With(contexts ...Contexter) *Event {
+	return newEvent().With(contexts...)
 }
 
+// Field creates a new log event and adds a custom field and value to it
 func Field(key string, value any) *Event {
 	return newEvent().Field(key, value)
 }
 
-func Fields(fields map[string]any) *Event {
+// Fields creates a new log event and adds a map of fields to it
+func Fields(fields Context) *Event {
 	return newEvent().Fields(fields)
 }
 
+// Tag creates a new log event and adds a "tag" field to it
 func Tag(tag string) *Event {
 	return newEvent().Tag(tag)
+}
+
+// Time creates a new log event and sets the time field
+func Time(time time.Time) *Event {
+	return newEvent().Time(time)
 }
 
 // CurrentLevel returns the current log level
@@ -79,8 +101,8 @@ func SetLevelOverride(field string, value any, level Level) {
 	overrides[field] = &levelOverride{value: value, level: level}
 }
 
-// ResetLevelOverride removes all log level overrides
-func ResetLevelOverride() {
+// ResetLevelOverrides removes all log level overrides
+func ResetLevelOverrides() {
 	mu.Lock()
 	defer mu.Unlock()
 	overrides = make(map[string]*levelOverride)
@@ -101,6 +123,34 @@ func SetFormat(newFormat Format) {
 	if newFormat == JSONFormat {
 		DisableDates()
 	}
+}
+
+// SetOutput sets the log output writer
+func SetOutput(w io.Writer) {
+	mu.Lock()
+	defer mu.Unlock()
+	log.SetOutput(w)
+	output = w
+}
+
+// File returns the log file, if any, or an empty string otherwise
+func File() string {
+	mu.Lock()
+	defer mu.Unlock()
+	if f, ok := output.(*os.File); ok {
+		return f.Name()
+	}
+	return ""
+}
+
+// IsFile returns true if the output is a non-default file
+func IsFile() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	if _, ok := output.(*os.File); ok && output != DefaultOutput {
+		return true
+	}
+	return false
 }
 
 // DisableDates disables the date/time prefix

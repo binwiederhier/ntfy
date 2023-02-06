@@ -28,6 +28,7 @@ const (
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
 	tokenMaxCount                   = 20 // Only keep this many tokens in the table per user
+	tagManager                      = "user_manager"
 )
 
 // Default constants that may be overridden by configs
@@ -343,15 +344,15 @@ func (a *Manager) Authenticate(username, password string) (*User, error) {
 	}
 	user, err := a.User(username)
 	if err != nil {
-		log.Trace("authentication of user %s failed (1): %s", username, err.Error())
+		log.Tag(tagManager).Field("user_name", username).Err(err).Trace("Authentication of user failed (1)")
 		bcrypt.CompareHashAndPassword([]byte(userAuthIntentionalSlowDownHash), []byte("intentional slow-down to avoid timing attacks"))
 		return nil, ErrUnauthenticated
 	} else if user.Deleted {
-		log.Trace("authentication of user %s failed (2): user marked deleted", username)
+		log.Tag(tagManager).Field("user_name", username).Trace("Authentication of user failed (2): user marked deleted")
 		bcrypt.CompareHashAndPassword([]byte(userAuthIntentionalSlowDownHash), []byte("intentional slow-down to avoid timing attacks"))
 		return nil, ErrUnauthenticated
 	} else if err := bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
-		log.Trace("authentication of user %s failed (3): %s", username, err.Error())
+		log.Tag(tagManager).Field("user_name", username).Err(err).Trace("Authentication of user failed (3)")
 		return nil, ErrUnauthenticated
 	}
 	return user, nil
@@ -566,10 +567,10 @@ func (a *Manager) asyncQueueWriter(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		if err := a.writeUserStatsQueue(); err != nil {
-			log.Warn("User Manager: Writing user stats queue failed: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Writing user stats queue failed")
 		}
 		if err := a.writeTokenUpdateQueue(); err != nil {
-			log.Warn("User Manager: Writing token update queue failed: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Writing token update queue failed")
 		}
 	}
 }
@@ -578,7 +579,7 @@ func (a *Manager) writeUserStatsQueue() error {
 	a.mu.Lock()
 	if len(a.statsQueue) == 0 {
 		a.mu.Unlock()
-		log.Trace("User Manager: No user stats updates to commit")
+		log.Tag(tagManager).Trace("No user stats updates to commit")
 		return nil
 	}
 	statsQueue := a.statsQueue
@@ -589,9 +590,16 @@ func (a *Manager) writeUserStatsQueue() error {
 		return err
 	}
 	defer tx.Rollback()
-	log.Debug("User Manager: Writing user stats queue for %d user(s)", len(statsQueue))
+	log.Tag(tagManager).Debug("Writing user stats queue for %d user(s)", len(statsQueue))
 	for userID, update := range statsQueue {
-		log.Trace("User Manager: Updating stats for user %s: messages=%d, emails=%d", userID, update.Messages, update.Emails)
+		log.
+			Tag(tagManager).
+			Fields(log.Context{
+				"user_id":        userID,
+				"messages_count": update.Messages,
+				"emails_count":   update.Emails,
+			}).
+			Trace("Updating stats for user %s", userID)
 		if _, err := tx.Exec(updateUserStatsQuery, update.Messages, update.Emails, userID); err != nil {
 			return err
 		}
@@ -603,7 +611,7 @@ func (a *Manager) writeTokenUpdateQueue() error {
 	a.mu.Lock()
 	if len(a.tokenQueue) == 0 {
 		a.mu.Unlock()
-		log.Trace("User Manager: No token updates to commit")
+		log.Tag(tagManager).Trace("No token updates to commit")
 		return nil
 	}
 	tokenQueue := a.tokenQueue
@@ -614,9 +622,9 @@ func (a *Manager) writeTokenUpdateQueue() error {
 		return err
 	}
 	defer tx.Rollback()
-	log.Debug("User Manager: Writing token update queue for %d token(s)", len(tokenQueue))
+	log.Tag(tagManager).Debug("Writing token update queue for %d token(s)", len(tokenQueue))
 	for tokenID, update := range tokenQueue {
-		log.Trace("User Manager: Updating token %s with last access time %v", tokenID, update.LastAccess.Unix())
+		log.Tag(tagManager).Trace("Updating token %s with last access time %v", tokenID, update.LastAccess.Unix())
 		if _, err := tx.Exec(updateTokenLastAccessQuery, update.LastAccess.Unix(), update.LastOrigin.String(), tokenID); err != nil {
 			return err
 		}
@@ -1257,7 +1265,7 @@ func setupNewDB(db *sql.DB) error {
 }
 
 func migrateFrom1(db *sql.DB) error {
-	log.Info("Migrating user database schema: from 1 to 2")
+	log.Tag(tagManager).Info("Migrating user database schema: from 1 to 2")
 	tx, err := db.Begin()
 	if err != nil {
 		return err

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,8 +27,9 @@ import (
 	"heckel.io/ntfy/util"
 )
 
-func init() {
-	// log.SetLevel(log.DebugLevel)
+func TestMain(m *testing.M) {
+	log.SetLevel(log.ErrorLevel)
+	os.Exit(m.Run())
 }
 
 func TestServer_PublishAndPoll(t *testing.T) {

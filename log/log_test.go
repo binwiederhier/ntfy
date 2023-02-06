@@ -1,57 +1,74 @@
 package log_test
 
 import (
+	"bytes"
+	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/log"
 	"net/http"
+	"os"
 	"testing"
+	"time"
 )
 
-const tagPay = "PAY"
+func TestMain(m *testing.M) {
+	exitCode := m.Run()
+	resetState()
+	log.SetLevel(log.ErrorLevel) // For other modules!
+	os.Exit(exitCode)
+}
 
-type visitor struct {
+func TestLog_TagContextFieldFields(t *testing.T) {
+	t.Cleanup(resetState)
+	v := &fakeVisitor{
+		UserID: "u_abc",
+		IP:     "1.2.3.4",
+	}
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	log.SetFormat(log.JSONFormat)
+	log.SetLevelOverride("tag", "stripe", log.DebugLevel)
+
+	log.
+		Tag("mytag").
+		Field("field2", 123).
+		Field("field1", "value1").
+		Time(time.Unix(123, 0)).
+		Info("hi there %s", "phil")
+	log.
+		Tag("not-stripe").
+		Debug("this message will not appear")
+	log.
+		With(v).
+		Fields(log.Context{
+			"stripe_customer_id":     "acct_123",
+			"stripe_subscription_id": "sub_123",
+		}).
+		Tag("stripe").
+		Err(http.ErrHandlerTimeout).
+		Time(time.Unix(456, 0)).
+		Debug("Subscription status %s", "active")
+
+	expected := `{"time":123000,"level":"INFO","message":"hi there phil","field1":"value1","field2":123,"tag":"mytag"}
+{"time":456000,"level":"DEBUG","message":"Subscription status active","error":"http: Handler timeout","stripe_customer_id":"acct_123","stripe_subscription_id":"sub_123","tag":"stripe","user_id":"u_abc","visitor_ip":"1.2.3.4"}
+`
+	require.Equal(t, expected, out.String())
+}
+
+type fakeVisitor struct {
 	UserID string
 	IP     string
 }
 
-func (v *visitor) Context() map[string]any {
+func (v *fakeVisitor) Context() log.Context {
 	return map[string]any{
-		"user_id": v.UserID,
-		"ip":      v.IP,
+		"user_id":    v.UserID,
+		"visitor_ip": v.IP,
 	}
 }
 
-func TestEvent_Info(t *testing.T) {
-	/*
-		log-level: INFO, user_id:u_abc=DEBUG
-		log-level-overrides:
-			- user_id=u_abc: DEBUG
-		log-filter =
-
-	*/
-	v := &visitor{
-		UserID: "u_abc",
-		IP:     "1.2.3.4",
-	}
-	stripeCtx := log.NewCtx(map[string]any{
-		"tag": "pay",
-	})
-	log.SetLevel(log.InfoLevel)
-	//log.SetFormat(log.JSONFormat)
-	//log.SetLevelOverride("user_id", "u_abc", log.DebugLevel)
-	log.SetLevelOverride("tag", "pay", log.DebugLevel)
-	mlog := log.Field("tag", "manager")
-	mlog.Field("one", 1).Info("this is one")
-	mlog.Err(http.ErrHandlerTimeout).Field("two", 2).Info("this is two")
-	log.Info("somebody did something")
-	log.
-		Context(stripeCtx, v).
-		Fields(map[string]any{
-			"tier":    "ti_abc",
-			"user_id": "u_abc",
-		}).
-		Debug("Somebody paid something for $%d", 10)
-	log.
-		Field("tag", "account").
-		Field("user_id", "u_abc").
-		Debug("User logged in")
+func resetState() {
+	log.SetLevel(log.DefaultLevel)
+	log.SetFormat(log.DefaultFormat)
+	log.SetOutput(log.DefaultOutput)
+	log.ResetLevelOverrides()
 }

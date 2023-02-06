@@ -369,10 +369,10 @@ func (c *messageCache) addMessages(ms []*message) error {
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		log.Error("Message Cache: Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
+		log.Tag(tagMessageCache).Err(err).Error("Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
 		return err
 	}
-	log.Debug("Message Cache: Wrote %d message(s) in %v", len(ms), time.Since(start))
+	log.Tag(tagMessageCache).Debug("Wrote %d message(s) in %v", len(ms), time.Since(start))
 	return nil
 }
 
@@ -609,7 +609,7 @@ func (c *messageCache) processMessageBatches() {
 	}
 	for messages := range c.queue.Dequeue() {
 		if err := c.addMessages(messages); err != nil {
-			log.Error("Message Cache: %s", err.Error())
+			log.Tag(tagMessageCache).Err(err).Error("Cannot write message batch")
 		}
 	}
 }
@@ -766,7 +766,7 @@ func setupNewCacheDB(db *sql.DB) error {
 }
 
 func migrateFrom0(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 0 to 1")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 0 to 1")
 	if _, err := db.Exec(migrate0To1AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -780,7 +780,7 @@ func migrateFrom0(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom1(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 1 to 2")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 1 to 2")
 	if _, err := db.Exec(migrate1To2AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -791,7 +791,7 @@ func migrateFrom1(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom2(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 2 to 3")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 2 to 3")
 	if _, err := db.Exec(migrate2To3AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -802,7 +802,7 @@ func migrateFrom2(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom3(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 3 to 4")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 3 to 4")
 	if _, err := db.Exec(migrate3To4AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -813,7 +813,7 @@ func migrateFrom3(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom4(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 4 to 5")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 4 to 5")
 	if _, err := db.Exec(migrate4To5AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -824,7 +824,7 @@ func migrateFrom4(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom5(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 5 to 6")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 5 to 6")
 	if _, err := db.Exec(migrate5To6AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -835,7 +835,7 @@ func migrateFrom5(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom6(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 6 to 7")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 6 to 7")
 	if _, err := db.Exec(migrate6To7AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -846,7 +846,7 @@ func migrateFrom6(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom7(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 7 to 8")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 7 to 8")
 	if _, err := db.Exec(migrate7To8AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -857,7 +857,7 @@ func migrateFrom7(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom8(db *sql.DB, _ time.Duration) error {
-	log.Info("Migrating cache database schema: from 8 to 9")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 8 to 9")
 	if _, err := db.Exec(migrate8To9AlterMessagesTableQuery); err != nil {
 		return err
 	}
@@ -868,7 +868,7 @@ func migrateFrom8(db *sql.DB, _ time.Duration) error {
 }
 
 func migrateFrom9(db *sql.DB, cacheDuration time.Duration) error {
-	log.Info("Migrating cache database schema: from 9 to 10")
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 9 to 10")
 	tx, err := db.Begin()
 	if err != nil {
 		return err

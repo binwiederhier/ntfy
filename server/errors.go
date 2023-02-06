@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/log"
 	"net/http"
 )
 
@@ -21,6 +22,14 @@ func (e errHTTP) Error() string {
 func (e errHTTP) JSON() string {
 	b, _ := json.Marshal(&e)
 	return string(b)
+}
+
+func (e errHTTP) Context() log.Context {
+	return log.Context{
+		"error":       e.Message,
+		"error_code":  e.Code,
+		"http_status": e.HTTPCode,
+	}
 }
 
 func wrapErrHTTP(err *errHTTP, message string, args ...any) *errHTTP {

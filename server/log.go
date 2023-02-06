@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
 	"golang.org/x/time/rate"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -13,7 +14,7 @@ import (
 
 // logr creates a new log event with HTTP request fields
 func logr(r *http.Request) *log.Event {
-	return log.Fields(httpFields(r))
+	return log.Fields(httpContext(r))
 }
 
 // logr creates a new log event with visitor fields
@@ -23,7 +24,7 @@ func logv(v *visitor) *log.Event {
 
 // logr creates a new log event with HTTP request and visitor fields
 func logvr(v *visitor, r *http.Request) *log.Event {
-	return logv(v).Fields(httpFields(r))
+	return logv(v).Fields(httpContext(r))
 }
 
 // logvrm creates a new log event with HTTP request, visitor fields and message fields
@@ -46,14 +47,27 @@ func logem(state *smtp.ConnectionState) *log.Event {
 		})
 }
 
-func httpFields(r *http.Request) map[string]any {
+func httpContext(r *http.Request) log.Context {
 	requestURI := r.RequestURI
 	if requestURI == "" {
 		requestURI = r.URL.Path
 	}
-	return map[string]any{
+	return log.Context{
 		"http_method": r.Method,
 		"http_path":   requestURI,
+	}
+}
+
+func websocketErrorContext(err error) log.Context {
+	if c, ok := err.(*websocket.CloseError); ok {
+		return log.Context{
+			"error":      c.Error(),
+			"error_code": c.Code,
+			"error_type": "websocket.CloseError",
+		}
+	}
+	return log.Context{
+		"error": err.Error(),
 	}
 }
 

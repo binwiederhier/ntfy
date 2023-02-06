@@ -77,7 +77,11 @@ func (e *Event) Time(time time.Time) *Event {
 
 // Err adds an "error" field to the log event
 func (e *Event) Err(err error) *Event {
-	e.fields[errorField] = err.Error()
+	if c, ok := err.(Contexter); ok {
+		e.Fields(c.Context())
+	} else {
+		e.fields[errorField] = err.Error()
+	}
 	return e
 }
 

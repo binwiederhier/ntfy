@@ -334,9 +334,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		if websocket.IsWebSocketUpgrade(r) {
 			isNormalError := strings.Contains(err.Error(), "i/o timeout")
 			if isNormalError {
-				logvr(v, r).Tag(tagWebsocket).Err(err).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
+				logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
 			} else {
-				logvr(v, r).Tag(tagWebsocket).Err(err).Info("WebSocket error: %s", err.Error())
+				logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Info("WebSocket error: %s", err.Error())
 			}
 			return // Do not attempt to write to upgraded connection
 		}
@@ -351,19 +351,11 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest
 		if isNormalError {
 			logvr(v, r).
-				Fields(log.Context{
-					"error_code":  httpErr.Code,
-					"http_status": httpErr.HTTPCode,
-				}).
-				Err(err).
+				Err(httpErr).
 				Debug("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
 		} else {
 			logvr(v, r).
-				Fields(log.Context{
-					"error_code":  httpErr.Code,
-					"http_status": httpErr.HTTPCode,
-				}).
-				Err(err).
+				Err(httpErr).
 				Info("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -1161,7 +1153,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	err = g.Wait()
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-		logvr(v, r).Tag(tagWebsocket).Err(err).Trace("WebSocket connection closed")
+		logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Trace("WebSocket connection closed")
 		return nil // Normal closures are not errors; note: "1006 (abnormal closure)" is treated as normal, because people disconnect a lot
 	}
 	return err

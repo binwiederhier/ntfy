@@ -414,7 +414,7 @@ alerting:
 ## Jellyseerr/Overseerr webhook
 Here is an example for [jellyseerr](https://github.com/Fallenbagel/jellyseerr)/[overseerr](https://overseerr.dev/) webhook
 JSON payload. 
-⚠️ Remember to change the following:
+### ⚠️ Remember to change the following:
 - `https://requests.example.com` to your jellyseerr/overseerr URL at `click
 - `topic` to your ntfy topic. E.g. your ntfy url is https://ntfy.sh/jellyseerr change `topic` to `jellyseerr`.
 - Remove your topic in the request URL in jellyseerr/overseerr. E.g. your ntfy url is https://ntfy.sh/jellyseerr, then only write https://ntfy.sh in the webhook URL in jellyseerr/overseerr.

@@ -24,7 +24,9 @@ func logv(v *visitor) *log.Event {
 
 // logr creates a new log event with HTTP request and visitor fields
 func logvr(v *visitor, r *http.Request) *log.Event {
-	return logv(v).Fields(httpContext(r))
+	return logv(v).
+		Fields(httpContext(r)).
+		Fields(requestLimiterFields(v.RequestLimiter()))
 }
 
 // logvrm creates a new log event with HTTP request, visitor fields and message fields

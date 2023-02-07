@@ -11,13 +11,14 @@ import (
 )
 
 const (
-	tagField   = "tag"
-	errorField = "error"
+	tagField        = "tag"
+	errorField      = "error"
+	timestampFormat = "2006-01-02T15:04:05.999Z07:00"
 )
 
 // Event represents a single log event
 type Event struct {
-	Timestamp int64  `json:"time"`
+	Timestamp string `json:"time"`
 	Level     Level  `json:"level"`
 	Message   string `json:"message"`
 	fields    Context
@@ -25,8 +26,9 @@ type Event struct {
 
 // newEvent creates a new log event
 func newEvent() *Event {
+	now := time.Now()
 	return &Event{
-		Timestamp: time.Now().UnixMilli(),
+		Timestamp: now.Format(timestampFormat),
 		fields:    make(Context),
 	}
 }
@@ -70,8 +72,8 @@ func (e *Event) Tag(tag string) *Event {
 }
 
 // Time sets the time field
-func (e *Event) Time(time time.Time) *Event {
-	e.Timestamp = time.UnixMilli()
+func (e *Event) Time(t time.Time) *Event {
+	e.Timestamp = t.Format(timestampFormat)
 	return e
 }
 

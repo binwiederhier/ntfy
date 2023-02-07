@@ -8,20 +8,27 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestCLI_Publish_Subscribe_Poll_Real_Server(t *testing.T) {
 	testMessage := util.RandomString(10)
-
 	app, _, _, _ := newTestApp()
 	require.Nil(t, app.Run([]string{"ntfy", "publish", "ntfytest", "ntfy unit test " + testMessage}))
-	time.Sleep(3 * time.Second) // Since #502, ntfy.sh writes messages to the cache asynchronously, after a timeout of ~1.5s
 
-	app2, _, stdout, _ := newTestApp()
-	require.Nil(t, app2.Run([]string{"ntfy", "subscribe", "--poll", "ntfytest"}))
-	require.Contains(t, stdout.String(), testMessage)
+	_, err := util.Retry(func() (*int, error) {
+		app2, _, stdout, _ := newTestApp()
+		if err := app2.Run([]string{"ntfy", "subscribe", "--poll", "ntfytest"}); err != nil {
+			return nil, err
+		}
+		if !strings.Contains(stdout.String(), testMessage) {
+			return nil, fmt.Errorf("test message %s not found in topic", testMessage)
+		}
+		return util.Int(1), nil
+	}, time.Second, 2*time.Second, 5*time.Second) // Since #502, ntfy.sh writes messages to the cache asynchronously, after a timeout of ~1.5s
+	require.Nil(t, err)
 }
 
 func TestCLI_Publish_Subscribe_Poll(t *testing.T) {

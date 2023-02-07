@@ -56,8 +56,27 @@ var cmdTier = &cli.Command{
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Value: defaultAttachmentBandwidthLimit, Usage: "daily bandwidth limit for attachment uploads/downloads"},
 				&cli.StringFlag{Name: "stripe-price-id", Usage: "Stripe price ID for paid tiers (e.g. price_12345)"},
 			},
-			Description: `
-FIXME
+			Description: `Add a new tier to the ntfy user database.
+
+Tiers can be used to grant users higher limits based, such as daily message limits, attachment size, or
+make it possible for users to reserve topics.
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
+
+Examples:
+  ntfy tier add pro                     # Add tier with code "pro", using the defaults
+  ntfy tier add \                       # Add a tier with custom limits
+    --name="Pro" \
+    --message-limit=10000 \
+    --message-expiry-duration=24h \
+    --email-limit=50 \
+    --reservation-limit=10 \
+    --attachment-file-size-limit=100M \
+    --attachment-total-size-limit=1G \
+    --attachment-expiry-duration=12h \
+    --attachment-bandwidth-limit=5G \
+    pro
 `,
 		},
 		{
@@ -78,8 +97,20 @@ FIXME
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Usage: "daily bandwidth limit for attachment uploads/downloads"},
 				&cli.StringFlag{Name: "stripe-price-id", Usage: "Stripe price ID for paid tiers (e.g. price_12345)"},
 			},
-			Description: `
-FIXME
+			Description: `Updates a tier to change the limits.
+
+After updating a tier, you may have to restart the ntfy server to apply them 
+to all visitors. 
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
+
+Examples:
+  ntfy tier change --name="Pro" pro        # Update the name of an existing tier
+  ntfy tier change \                       # Update multiple limits and fields
+    --message-expiry-duration=24h \
+    --stripe-price-id=price_1234 \
+    pro
 `,
 		},
 		{
@@ -88,8 +119,16 @@ FIXME
 			Usage:     "Removes a tier",
 			UsageText: "ntfy tier remove CODE",
 			Action:    execTierDel,
-			Description: `
-FIXME
+			Description: `Remove a tier from the ntfy user database.
+
+You cannot remove a tier if there are users associated with a tier. Use "ntfy user change-tier"
+to remove or switch their tier first.
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
+
+Example:
+  ntfy tier del pro
 `,
 		},
 		{
@@ -97,22 +136,26 @@ FIXME
 			Aliases: []string{"l"},
 			Usage:   "Shows a list of tiers",
 			Action:  execTierList,
-			Description: `
-FIXME
+			Description: `Shows a list of all configured tiers.
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
 `,
 		},
 	},
-	Description: `Manage tier of the ntfy server.
+	Description: `Manage tiers of the ntfy server.
 
-The command allows you to add/remove/change tier in the ntfy user database. Tiers are used
-to grant users higher limits based on their tier.
+The command allows you to add/remove/change tiers in the ntfy user database. Tiers are used
+to grant users higher limits, such as daily message limits, attachment size, or make it 
+possible for users to reserve topics.
 
 This is a server-only command. It directly manages the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
-to the related command 'ntfy access'.
+file server.yml. The command only works if 'auth-file' is properly defined.
 
-FIXME
-
+Examples:
+  ntfy tier add pro                     # Add tier with code "pro", using the defaults
+  ntfy tier change --name="Pro" pro     # Update the name of an existing tier
+  ntfy tier del pro                     # Delete an existing tier
 `,
 }
 

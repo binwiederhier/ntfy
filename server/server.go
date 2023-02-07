@@ -37,7 +37,7 @@ import (
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Account limit creation triggers when account is taken!
 - HIGH Docs
-- HIGH CLI "ntfy tier [add|list|delete]"
+- HIGH make request limit independent of message limit again
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
@@ -235,8 +235,8 @@ func (s *Server) Run() error {
 	}
 	log.Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
 	if log.IsFile() {
-		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s, log file is %s\n", listenStr, s.config.Version, log.File())
-		fmt.Fprintln(os.Stderr, "No more output is expected.")
+		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.Version)
+		fmt.Fprintf(os.Stderr, "Logs are written to %s\n", log.File())
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)

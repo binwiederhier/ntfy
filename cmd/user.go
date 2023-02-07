@@ -139,21 +139,21 @@ Example:
 			Action:  execUserList,
 			Description: `Shows a list of all configured users, including the everyone ('*') user.
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined. 
-
 This command is an alias to calling 'ntfy access' (display access control list).
+
+This is a server-only command. It directly reads from the user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
 `,
 		},
 	},
 	Description: `Manage users of the ntfy server.
 
+The command allows you to add/remove/change users in the ntfy user database, as well as change 
+passwords or roles.
+
 This is a server-only command. It directly manages the user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
 to the related command 'ntfy access'.
-
-The command allows you to add/remove/change users in the ntfy user database, as well as change 
-passwords or roles.
 
 Examples:
   ntfy user list                               # Shows list of users (alias: 'ntfy access')                      

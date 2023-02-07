@@ -333,7 +333,7 @@ func TestManager_Reservations(t *testing.T) {
 
 func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.CreateTier(&Tier{
+	require.Nil(t, a.AddTier(&Tier{
 		Code:                     "pro",
 		Name:                     "ntfy Pro",
 		StripePriceID:            "price123",
@@ -629,7 +629,7 @@ func TestManager_Tier_Create(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
 	// Create tier and user
-	require.Nil(t, a.CreateTier(&Tier{
+	require.Nil(t, a.AddTier(&Tier{
 		Code:                     "pro",
 		Name:                     "Pro",
 		MessageLimit:             123,
@@ -670,7 +670,7 @@ func TestManager_Tier_Create(t *testing.T) {
 func TestAccount_Tier_Create_With_ID(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
-	require.Nil(t, a.CreateTier(&Tier{
+	require.Nil(t, a.AddTier(&Tier{
 		ID:   "ti_123",
 		Code: "pro",
 	}))

@@ -761,7 +761,7 @@ func TestServer_StatsResetter(t *testing.T) {
 	go s.runStatsResetter()
 
 	// Create user with tier (tieruser) and user without tier (phil)
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                  "test",
 		MessageLimit:          5,
 		MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
@@ -898,7 +898,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 	s := newTestServer(t, c)
 
 	// Create user, and update it with some message and email stats
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code: "test",
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
@@ -1275,7 +1275,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 	s := newTestServer(t, c)
 
 	// Create tier with certain limits
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                  "test",
 		MessageLimit:          5,
 		MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
@@ -1504,7 +1504,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 
 	// Create tier with certain limits
 	sevenDays := time.Duration(604800) * time.Second
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                     "test",
 		MessageLimit:             10,
 		MessageExpiryDuration:    sevenDays,
@@ -1549,7 +1549,7 @@ func TestServer_PublishAttachmentWithTierBasedBandwidthLimit(t *testing.T) {
 	s := newTestServer(t, c)
 
 	// Create tier with certain limits
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                     "test",
 		MessageLimit:             10,
 		MessageExpiryDuration:    time.Hour,
@@ -1588,7 +1588,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 	s := newTestServer(t, c)
 
 	// Create tier with certain limits
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                     "test",
 		MessageLimit:             100,
 		AttachmentFileSizeLimit:  50_000,

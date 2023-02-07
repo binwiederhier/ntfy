@@ -38,7 +38,6 @@ import (
 - HIGH Account limit creation triggers when account is taken!
 - HIGH Docs
 - HIGH CLI "ntfy tier [add|list|delete]"
-- HIGH CLI "ntfy user" should show tier
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token

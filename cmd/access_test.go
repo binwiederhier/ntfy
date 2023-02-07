@@ -15,7 +15,7 @@ func TestCLI_Access_Show(t *testing.T) {
 
 	app, _, _, stderr := newTestApp()
 	require.Nil(t, runAccessCommand(app, conf))
-	require.Contains(t, stderr.String(), "user * (anonymous)\n- no topic-specific permissions\n- no access to any (other) topics (server config)")
+	require.Contains(t, stderr.String(), "user * (role: anonymous, tier: none)\n- no topic-specific permissions\n- no access to any (other) topics (server config)")
 }
 
 func TestCLI_Access_Grant_And_Publish(t *testing.T) {
@@ -32,12 +32,12 @@ func TestCLI_Access_Grant_And_Publish(t *testing.T) {
 
 	app, _, _, stderr := newTestApp()
 	require.Nil(t, runAccessCommand(app, conf))
-	expected := `user phil (admin)
+	expected := `user phil (role: admin, tier: none)
 - read-write access to all topics (admin role)
-user ben (user)
+user ben (role: user, tier: none)
 - read-write access to topic announcements
 - read-only access to topic sometopic
-user * (anonymous)
+user * (role: anonymous, tier: none)
 - read-only access to topic announcements
 - no access to any (other) topics (server config)
 `

@@ -222,6 +222,20 @@ func ParseSize(s string) (int64, error) {
 	}
 }
 
+// FormatSize formats bytes into a human-readable notation, e.g. 2.1 MB
+func FormatSize(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d bytes", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
 // ReadPassword will read a password from STDIN. If the terminal supports it, it will not print the
 // input characters to the screen. If not, it'll just read using normal readline semantics (useful for testing).
 func ReadPassword(in io.Reader) ([]byte, error) {

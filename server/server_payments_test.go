@@ -42,12 +42,12 @@ func TestPayments_Tiers(t *testing.T) {
 		}, nil)
 
 	// Create tiers
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:   "ti_1",
 		Code: "admin",
 		Name: "Admin",
 	}))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_123",
 		Code:                     "pro",
 		Name:                     "Pro",
@@ -60,7 +60,7 @@ func TestPayments_Tiers(t *testing.T) {
 		AttachmentExpiryDuration: time.Minute,
 		StripePriceID:            "price_123",
 	}))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_444",
 		Code:                     "business",
 		Name:                     "Business",
@@ -135,7 +135,7 @@ func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 		Return(&stripe.CheckoutSession{URL: "https://billing.stripe.com/abc/def"}, nil)
 
 	// Create tier and user
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
@@ -171,7 +171,7 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 		Return(&stripe.CheckoutSession{URL: "https://billing.stripe.com/abc/def"}, nil)
 
 	// Create tier and user
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
@@ -213,7 +213,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 		Return(&stripe.Subscription{}, nil)
 
 	// Create tier and user
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
@@ -264,7 +264,7 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	s.stripe = stripeMock
 
 	// Create a user with a Stripe subscription and 3 reservations
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                    "ti_123",
 		Code:                  "starter",
 		StripePriceID:         "price_1234",
@@ -420,7 +420,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		Return(jsonToStripeEvent(t, subscriptionUpdatedEventJSON), nil)
 
 	// Create a user with a Stripe subscription and 3 reservations
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_1",
 		Code:                     "starter",
 		StripePriceID:            "price_1234", // !
@@ -432,7 +432,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentTotalSizeLimit: 1000000,
 		AttachmentBandwidthLimit: 1000000,
 	}))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_2",
 		Code:                     "pro",
 		StripePriceID:            "price_1111", // !
@@ -545,7 +545,7 @@ func TestPayments_Webhook_Subscription_Deleted(t *testing.T) {
 		Return(jsonToStripeEvent(t, subscriptionDeletedEventJSON), nil)
 
 	// Create a user with a Stripe subscription and 3 reservations
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:               "ti_1",
 		Code:             "pro",
 		StripePriceID:    "price_1234",
@@ -626,12 +626,12 @@ func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 		Return(&stripe.Subscription{}, nil)
 
 	// Create tier and user
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:            "ti_123",
 		Code:          "pro",
 		StripePriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:            "ti_456",
 		Code:          "business",
 		StripePriceID: "price_456",

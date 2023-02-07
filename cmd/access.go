@@ -189,7 +189,11 @@ func showUsers(c *cli.Context, manager *user.Manager, users []*user.User) error 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(c.App.ErrWriter, "user %s (%s)\n", u.Name, u.Role)
+		tier := "none"
+		if u.Tier != nil {
+			tier = u.Tier.Name
+		}
+		fmt.Fprintf(c.App.ErrWriter, "user %s (role: %s, tier: %s)\n", u.Name, u.Role, tier)
 		if u.Role == user.RoleAdmin {
 			fmt.Fprintf(c.App.ErrWriter, "- read-write access to all topics (admin role)\n")
 		} else if len(grants) > 0 {

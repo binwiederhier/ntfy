@@ -437,7 +437,7 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	s := newTestServer(t, conf)
 
 	// A user, an admin, and a reservation walk into a bar
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:             "pro",
 		ReservationLimit: 2,
 	}))
@@ -493,7 +493,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Create a tier
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                     "pro",
 		MessageLimit:             123,
 		MessageExpiryDuration:    86400 * time.Second,
@@ -575,7 +575,7 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:             "pro",
 		MessageLimit:     20,
 		ReservationLimit: 2,
@@ -610,7 +610,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
 	require.Equal(t, 200, rr.Code)
 
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:             "pro",
 		MessageLimit:     20,
 		ReservationLimit: 2,
@@ -689,11 +689,11 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 
 	// Create user with tier
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:         "starter",
 		MessageLimit: 10,
 	}))
-	require.Nil(t, s.userManager.CreateTier(&user.Tier{
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:         "pro",
 		MessageLimit: 20,
 	}))

@@ -248,6 +248,11 @@ const (
 		INSERT INTO tier (id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+	updateTierQuery = `
+		UPDATE tier 
+		SET name = ?, messages_limit = ?, messages_expiry_duration = ?, emails_limit = ?, reservations_limit = ?, attachment_file_size_limit = ?, attachment_total_size_limit = ?, attachment_expiry_duration = ?, attachment_bandwidth_limit = ?, stripe_price_id = ?
+		WHERE code = ?
+	`
 	selectTiersQuery = `
 		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id
 		FROM tier
@@ -264,6 +269,7 @@ const (
 	`
 	updateUserTierQuery = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	deleteUserTierQuery = `UPDATE user SET tier_id = null WHERE user = ?`
+	deleteTierQuery     = `DELETE FROM tier WHERE code = ?`
 
 	updateBillingQuery = `
 		UPDATE user 
@@ -1116,12 +1122,32 @@ func (a *Manager) DefaultAccess() Permission {
 	return a.defaultAccess
 }
 
-// CreateTier creates a new tier in the database
-func (a *Manager) CreateTier(tier *Tier) error {
+// AddTier creates a new tier in the database
+func (a *Manager) AddTier(tier *Tier) error {
 	if tier.ID == "" {
 		tier.ID = util.RandomStringPrefix(tierIDPrefix, tierIDLength)
 	}
 	if _, err := a.db.Exec(insertTierQuery, tier.ID, tier.Code, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripePriceID)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateTier updates a tier's properties in the database
+func (a *Manager) UpdateTier(tier *Tier) error {
+	if _, err := a.db.Exec(updateTierQuery, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripePriceID), tier.Code); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RemoveTier deletes the tier with the given code
+func (a *Manager) RemoveTier(code string) error {
+	if !AllowedTier(code) {
+		return ErrInvalidArgument
+	}
+	// This fails if any user has this tier
+	if _, err := a.db.Exec(deleteTierQuery, code); err != nil {
 		return err
 	}
 	return nil

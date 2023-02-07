@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
-	"golang.org/x/time/rate"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -24,9 +23,7 @@ func logv(v *visitor) *log.Event {
 
 // logr creates a new log event with HTTP request and visitor fields
 func logvr(v *visitor, r *http.Request) *log.Event {
-	return logv(v).
-		Fields(httpContext(r)).
-		Fields(requestLimiterFields(v.RequestLimiter()))
+	return logv(v).Fields(httpContext(r))
 }
 
 // logvrm creates a new log event with HTTP request, visitor fields and message fields
@@ -70,13 +67,6 @@ func websocketErrorContext(err error) log.Context {
 	}
 	return log.Context{
 		"error": err.Error(),
-	}
-}
-
-func requestLimiterFields(limiter *rate.Limiter) map[string]any {
-	return map[string]any{
-		"visitor_request_limiter_limit":  limiter.Limit(),
-		"visitor_request_limiter_tokens": limiter.Tokens(),
 	}
 }
 

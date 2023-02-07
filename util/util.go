@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/time/rate"
 	"io"
 	"math/rand"
 	"net/netip"
@@ -363,6 +364,14 @@ func MinMax[T int | int64](value, min, max T) T {
 		return max
 	}
 	return value
+}
+
+// Max returns the maximum value of the two given values
+func Max[T int | int64 | rate.Limit](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // String turns a string into a pointer of a string

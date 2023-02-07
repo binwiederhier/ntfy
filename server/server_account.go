@@ -42,11 +42,12 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) handleAccountGet(w http.ResponseWriter, _ *http.Request, v *visitor) error {
+func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	info, err := v.Info()
 	if err != nil {
 		return err
 	}
+	logvr(v, r).Tag(tagAccount).Fields(visitorExtendedInfoContext(info)).Debug("Retrieving account stats")
 	limits, stats := info.Limits, info.Stats
 	response := &apiAccountResponse{
 		Limits: &apiAccountLimits{

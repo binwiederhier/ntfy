@@ -142,8 +142,17 @@ func (v *visitor) Context() log.Context {
 }
 
 func (v *visitor) contextNoLock() log.Context {
+	info := v.infoLightNoLock()
 	fields := log.Context{
-		"visitor_ip": v.ip.String(),
+		"visitor_ip":                     v.ip.String(),
+		"visitor_messages":               info.Stats.Messages,
+		"visitor_messages_limit":         info.Limits.MessageLimit,
+		"visitor_messages_remaining":     info.Stats.MessagesRemaining,
+		"visitor_emails":                 info.Stats.Emails,
+		"visitor_emails_limit":           info.Limits.EmailLimit,
+		"visitor_emails_remaining":       info.Stats.EmailsRemaining,
+		"visitor_request_limiter_limit":  v.requestLimiter.Limit(),
+		"visitor_request_limiter_tokens": v.requestLimiter.Tokens(),
 	}
 	if v.user != nil {
 		fields["user_id"] = v.user.ID
@@ -162,6 +171,17 @@ func (v *visitor) contextNoLock() log.Context {
 	return fields
 }
 
+func visitorExtendedInfoContext(info *visitorInfo) log.Context {
+	return log.Context{
+		"visitor_reservations":                    info.Stats.Reservations,
+		"visitor_reservations_limit":              info.Limits.ReservationsLimit,
+		"visitor_reservations_remaining":          info.Stats.ReservationsRemaining,
+		"visitor_attachment_total_size":           info.Stats.AttachmentTotalSize,
+		"visitor_attachment_total_size_limit":     info.Limits.AttachmentTotalSizeLimit,
+		"visitor_attachment_total_size_remaining": info.Stats.AttachmentTotalSizeRemaining,
+	}
+
+}
 func (v *visitor) RequestAllowed() error {
 	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
@@ -309,7 +329,6 @@ func (v *visitor) MaybeUserID() string {
 }
 
 func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool) {
-	log.Fields(v.contextNoLock()).Debug("Resetting limiters for visitor")
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)
@@ -326,6 +345,7 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool
 			Emails:   emails,
 		})
 	}
+	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
 }
 
 func (v *visitor) Limits() *visitorLimits {
@@ -345,7 +365,7 @@ func tierBasedVisitorLimits(conf *Config, tier *user.Tier) *visitorLimits {
 	return &visitorLimits{
 		Basis:                    visitorLimitBasisTier,
 		RequestLimitBurst:        util.MinMax(int(float64(tier.MessageLimit)*visitorMessageToRequestLimitBurstRate), conf.VisitorRequestLimitBurst, visitorMessageToRequestLimitBurstMax),
-		RequestLimitReplenish:    dailyLimitToRate(tier.MessageLimit * visitorMessageToRequestLimitReplenishFactor),
+		RequestLimitReplenish:    util.Max(rate.Every(conf.VisitorRequestLimitReplenish), dailyLimitToRate(tier.MessageLimit*visitorMessageToRequestLimitReplenishFactor)),
 		MessageLimit:             tier.MessageLimit,
 		MessageExpiryDuration:    tier.MessageExpiryDuration,
 		EmailLimit:               tier.EmailLimit,
@@ -383,9 +403,10 @@ func configBasedVisitorLimits(conf *Config) *visitorLimits {
 
 func (v *visitor) Info() (*visitorInfo, error) {
 	v.mu.Lock()
-	messages := v.messagesLimiter.Value()
-	emails := v.emailsLimiter.Value()
+	info := v.infoLightNoLock()
 	v.mu.Unlock()
+
+	// Attachment stats from database
 	var attachmentsBytesUsed int64
 	var err error
 	u := v.User()
@@ -397,6 +418,10 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	info.Stats.AttachmentTotalSize = attachmentsBytesUsed
+	info.Stats.AttachmentTotalSizeRemaining = zeroIfNegative(info.Limits.AttachmentTotalSizeLimit - attachmentsBytesUsed)
+
+	// Reservation stats from database
 	var reservations int64
 	if v.userManager != nil && u != nil {
 		reservations, err = v.userManager.ReservationsCount(u.Name)
@@ -404,23 +429,27 @@ func (v *visitor) Info() (*visitorInfo, error) {
 			return nil, err
 		}
 	}
-	limits := v.Limits()
+	info.Stats.Reservations = reservations
+	info.Stats.ReservationsRemaining = zeroIfNegative(info.Limits.ReservationsLimit - reservations)
+
+	return info, nil
+}
+
+func (v *visitor) infoLightNoLock() *visitorInfo {
+	messages := v.messagesLimiter.Value()
+	emails := v.emailsLimiter.Value()
+	limits := v.limitsNoLock()
 	stats := &visitorStats{
-		Messages:                     messages,
-		MessagesRemaining:            zeroIfNegative(limits.MessageLimit - messages),
-		Emails:                       emails,
-		EmailsRemaining:              zeroIfNegative(limits.EmailLimit - emails),
-		Reservations:                 reservations,
-		ReservationsRemaining:        zeroIfNegative(limits.ReservationsLimit - reservations),
-		AttachmentTotalSize:          attachmentsBytesUsed,
-		AttachmentTotalSizeRemaining: zeroIfNegative(limits.AttachmentTotalSizeLimit - attachmentsBytesUsed),
+		Messages:          messages,
+		MessagesRemaining: zeroIfNegative(limits.MessageLimit - messages),
+		Emails:            emails,
+		EmailsRemaining:   zeroIfNegative(limits.EmailLimit - emails),
 	}
 	return &visitorInfo{
 		Limits: limits,
 		Stats:  stats,
-	}, nil
+	}
 }
-
 func zeroIfNegative(value int64) int64 {
 	if value < 0 {
 		return 0

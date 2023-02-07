@@ -37,7 +37,6 @@ import (
 - HIGH Rate limiting: Sensitive endpoints (account/login/change-password/...)
 - HIGH Account limit creation triggers when account is taken!
 - HIGH Docs
-- HIGH make request limit independent of message limit again
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
@@ -138,6 +137,7 @@ const (
 
 // Log tags
 const (
+	tagStartup      = "startup"
 	tagPublish      = "publish"
 	tagFirebase     = "firebase"
 	tagEmail        = "email" // Send email
@@ -233,7 +233,7 @@ func (s *Server) Run() error {
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
-	log.Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
+	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
 	if log.IsFile() {
 		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.Version)
 		fmt.Fprintf(os.Stderr, "Logs are written to %s\n", log.File())
@@ -347,15 +347,15 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			httpErr = errHTTPInternalError
 		}
-		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest
+		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest || httpErr.HTTPCode == http.StatusTooManyRequests
 		if isNormalError {
 			logvr(v, r).
 				Err(httpErr).
-				Debug("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
+				Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 		} else {
 			logvr(v, r).
 				Err(httpErr).
-				Info("Connection closed with HTTP %d (ntfy error %d): %s", httpErr.HTTPCode, httpErr.Code, err.Error())
+				Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1294,21 +1294,21 @@ func (s *Server) execManager() {
 	staleVisitors := 0
 	for ip, v := range s.visitors {
 		if v.Stale() {
-			log.Trace("Deleting stale visitor %s", v.ip)
+			log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
 			delete(s.visitors, ip)
 			staleVisitors++
 		}
 	}
 	s.mu.Unlock()
-	log.Debug("Manager: Deleted %d stale visitor(s)", staleVisitors)
+	log.Tag(tagManager).Field("stale_visitors", staleVisitors).Debug("Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired user tokens and users
 	if s.userManager != nil {
 		if err := s.userManager.RemoveExpiredTokens(); err != nil {
-			log.Warn("Error expiring user tokens: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Error expiring user tokens")
 		}
 		if err := s.userManager.RemoveDeletedUsers(); err != nil {
-			log.Warn("Error deleting soft-deleted users: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Error deleting soft-deleted users")
 		}
 	}
 
@@ -1316,47 +1316,47 @@ func (s *Server) execManager() {
 	if s.fileCache != nil {
 		ids, err := s.messageCache.AttachmentsExpired()
 		if err != nil {
-			log.Warn("Manager: Error retrieving expired attachments: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Error retrieving expired attachments")
 		} else if len(ids) > 0 {
-			if log.IsDebug() {
-				log.Debug("Manager: Deleting attachments %s", strings.Join(ids, ", "))
+			if log.Tag(tagManager).IsDebug() {
+				log.Tag(tagManager).Debug("Deleting attachments %s", strings.Join(ids, ", "))
 			}
 			if err := s.fileCache.Remove(ids...); err != nil {
-				log.Warn("Manager: Error deleting attachments: %s", err.Error())
+				log.Tag(tagManager).Err(err).Warn("Error deleting attachments")
 			}
 			if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
-				log.Warn("Manager: Error marking attachments deleted: %s", err.Error())
+				log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
 			}
 		} else {
-			log.Debug("Manager: No expired attachments to delete")
+			log.Tag(tagManager).Debug("No expired attachments to delete")
 		}
 	}
 
 	// Prune messages
-	log.Debug("Manager: Pruning messages")
+	log.Tag(tagManager).Debug("Manager: Pruning messages")
 	expiredMessageIDs, err := s.messageCache.MessagesExpired()
 	if err != nil {
-		log.Warn("Manager: Error retrieving expired messages: %s", err.Error())
+		log.Tag(tagManager).Err(err).Warn("Error retrieving expired messages")
 	} else if len(expiredMessageIDs) > 0 {
 		if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
-			log.Warn("Manager: Error deleting attachments for expired messages: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Error deleting attachments for expired messages")
 		}
 		if err := s.messageCache.DeleteMessages(expiredMessageIDs...); err != nil {
-			log.Warn("Manager: Error marking attachments deleted: %s", err.Error())
+			log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
 		}
 	} else {
-		log.Debug("Manager: No expired messages to delete")
+		log.Tag(tagManager).Debug("No expired messages to delete")
 	}
 
 	// Message count per topic
-	var messages int
+	var messagesCached int
 	messageCounts, err := s.messageCache.MessageCounts()
 	if err != nil {
-		log.Warn("Manager: Cannot get message counts: %s", err.Error())
+		log.Tag(tagManager).Err(err).Warn("Cannot get message counts")
 		messageCounts = make(map[string]int) // Empty, so we can continue
 	}
 	for _, count := range messageCounts {
-		messages += count
+		messagesCached += count
 	}
 
 	// Remove subscriptions without subscribers
@@ -1364,10 +1364,10 @@ func (s *Server) execManager() {
 	var subscribers int
 	for _, t := range s.topics {
 		subs := t.SubscribersCount()
-		log.Trace("- topic %s: %d subscribers", t.ID, subs)
+		log.Tag(tagManager).Trace("- topic %s: %d subscribers", t.ID, subs)
 		msgs, exists := messageCounts[t.ID]
 		if subs == 0 && (!exists || msgs == 0) {
-			log.Trace("Deleting empty topic %s", t.ID)
+			log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)
 			delete(s.topics, t.ID)
 			continue
 		}
@@ -1389,10 +1389,22 @@ func (s *Server) execManager() {
 	s.mu.Lock()
 	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
 	s.mu.Unlock()
-	log.Info("Stats: %d messages published, %d in cache, %d topic(s) active, %d subscriber(s), %d visitor(s), %d mails received (%d successful, %d failed), %d mails sent (%d successful, %d failed)",
-		messagesCount, messages, topicsCount, subscribers, visitorsCount,
-		receivedMailTotal, receivedMailSuccess, receivedMailFailure,
-		sentMailTotal, sentMailSuccess, sentMailFailure)
+	log.
+		Tag(tagManager).
+		Fields(log.Context{
+			"messages_published":      messagesCount,
+			"messages_cached":         messagesCached,
+			"topics_active":           topicsCount,
+			"subscribers":             subscribers,
+			"visitors":                visitorsCount,
+			"emails_received":         receivedMailTotal,
+			"emails_received_success": receivedMailSuccess,
+			"emails_received_failure": receivedMailFailure,
+			"emails_sent":             sentMailTotal,
+			"emails_sent_success":     sentMailSuccess,
+			"emails_sent_failure":     sentMailFailure,
+		}).
+		Info("Server stats")
 }
 
 func (s *Server) runSMTPServer() error {
@@ -1534,7 +1546,7 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if err := v.RequestAllowed(); err != nil {
-			logvr(v, r).Err(err).Fields(requestLimiterFields(v.RequestLimiter())).Trace("Request not allowed by rate limiter")
+			logvr(v, r).Err(err).Trace("Request not allowed by rate limiter")
 			return errHTTPTooManyRequestsLimitRequests
 		}
 		return next(w, r, v)

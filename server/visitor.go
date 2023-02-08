@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
@@ -45,10 +44,6 @@ const (
 const (
 	visitorEmailLimitBurstRate = 0.2
 	visitorEmailLimitBurstMax  = 150
-)
-
-var (
-	errVisitorLimitReached = errors.New("limit reached")
 )
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"net/http"
@@ -36,7 +37,8 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if existingUser, _ := s.userManager.User(newAccount.Username); existingUser != nil {
 		return errHTTPConflictUserExists
 	}
-	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil { // TODO this should return a User
+	logvr(v, r).Tag(tagAccount).Field("user_name", newAccount.Username).Info("Creating user %s", newAccount.Username)
+	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -181,10 +183,10 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	if _, err := s.userManager.Authenticate(u.Name, req.Password); err != nil {
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
+	logvr(v, r).Tag(tagAccount).Debug("Changing password for user %s", u.Name)
 	if err := s.userManager.ChangePassword(u.Name, req.NewPassword); err != nil {
 		return err
 	}
-	logvr(v, r).Tag(tagAccount).Debug("Changed password for user %s", u.Name)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -203,11 +205,17 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 		expires = time.Unix(*req.Expires, 0)
 	}
 	u := v.User()
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"token_label":   label,
+			"token_expires": expires,
+		}).
+		Debug("Creating token for user %s", u.Name)
 	token, err := s.userManager.CreateToken(u.ID, label, expires, v.IP())
 	if err != nil {
 		return err
 	}
-	logvr(v, r).Tag(tagAccount).Debug("Created token for user %s", u.Name)
 	response := &apiAccountTokenResponse{
 		Token:      token.Value,
 		Label:      token.Label,
@@ -234,9 +242,15 @@ func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request
 	if req.Expires != nil {
 		expires = util.Time(time.Unix(*req.Expires, 0))
 	} else if req.Label == nil {
-		// If label and expires are not set, simply extend the token by 72 hours
-		expires = util.Time(time.Now().Add(tokenExpiryDuration))
+		expires = util.Time(time.Now().Add(tokenExpiryDuration)) // If label/expires not set, extend token by 72 hours
 	}
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"token_label":   req.Label,
+			"token_expires": expires,
+		}).
+		Debug("Updating token for user %s as deleted", u.Name)
 	token, err := s.userManager.ChangeToken(u.ID, req.Token, req.Label, expires)
 	if err != nil {
 		return err
@@ -264,6 +278,10 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request
 	if err := s.userManager.RemoveToken(u.ID, token); err != nil {
 		return err
 	}
+	logvr(v, r).
+		Tag(tagAccount).
+		Field("token", token).
+		Debug("Deleted token for user %s", u.Name)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -294,6 +312,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 			prefs.Notification.MinPriority = newPrefs.Notification.MinPriority
 		}
 	}
+	logvr(v, r).Tag(tagAccount).Debug("Changing account settings for user %s", u.Name)
 	if err := s.userManager.ChangeSettings(u); err != nil {
 		return err
 	}
@@ -319,6 +338,13 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	if newSubscription.ID == "" {
 		newSubscription.ID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
 		u.Prefs.Subscriptions = append(u.Prefs.Subscriptions, newSubscription)
+		logvr(v, r).
+			Tag(tagAccount).
+			Fields(log.Context{
+				"base_url": newSubscription.BaseURL,
+				"topic":    newSubscription.Topic,
+			}).
+			Debug("Adding subscription for user %s", u.Name)
 		if err := s.userManager.ChangeSettings(u); err != nil {
 			return err
 		}
@@ -351,6 +377,14 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if subscription == nil {
 		return errHTTPNotFound
 	}
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"base_url":     subscription.BaseURL,
+			"topic":        subscription.Topic,
+			"display_name": subscription.DisplayName,
+		}).
+		Debug("Changing subscription for user %s", u.Name)
 	if err := s.userManager.ChangeSettings(u); err != nil {
 		return err
 	}
@@ -369,7 +403,15 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 	}
 	newSubscriptions := make([]*user.Subscription, 0)
 	for _, subscription := range u.Prefs.Subscriptions {
-		if subscription.ID != subscriptionID {
+		if subscription.ID == subscriptionID {
+			logvr(v, r).
+				Tag(tagAccount).
+				Fields(log.Context{
+					"base_url": subscription.BaseURL,
+					"topic":    subscription.Topic,
+				}).
+				Debug("Removing subscription for user %s", u.Name)
+		} else {
 			newSubscriptions = append(newSubscriptions, subscription)
 		}
 	}
@@ -418,6 +460,13 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	// Actually add the reservation
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"topic":    req.Topic,
+			"everyone": everyone.String(),
+		}).
+		Debug("Adding topic reservation")
 	if err := s.userManager.AddReservation(u.Name, req.Topic, everyone); err != nil {
 		return err
 	}
@@ -447,10 +496,17 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 	} else if !authorized {
 		return errHTTPUnauthorized
 	}
+	deleteMessages := readBoolParam(r, false, "X-Delete-Messages", "Delete-Messages")
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"topic":           topic,
+			"delete_messages": deleteMessages,
+		}).
+		Debug("Removing topic reservation")
 	if err := s.userManager.RemoveReservations(u.Name, topic); err != nil {
 		return err
 	}
-	deleteMessages := readBoolParam(r, false, "X-Delete-Messages", "Delete-Messages")
 	if deleteMessages {
 		if err := s.messageCache.ExpireMessages(topic); err != nil {
 			return err

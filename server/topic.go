@@ -88,7 +88,7 @@ func (t *topic) CancelSubscribers(exceptUserID string) {
 	defer t.mu.Unlock()
 	for _, s := range t.subscribers {
 		if s.userID != exceptUserID {
-			log.Trace("Canceling subscriber %s", s.userID)
+			log.Field("topic", t.ID).Trace("Canceling subscriber %s", s.userID)
 			s.cancel()
 		}
 	}

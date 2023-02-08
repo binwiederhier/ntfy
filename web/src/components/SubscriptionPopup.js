@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {InputAdornment, Portal, Snackbar, useMediaQuery} from "@mui/material";
+import {Chip, InputAdornment, Portal, Snackbar, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
@@ -24,6 +24,7 @@ import {Clear} from "@mui/icons-material";
 import {AccountContext} from "./App";
 import {ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog} from "./ReserveDialogs";
 import {UnauthorizedError} from "../app/errors";
+import Box from "@mui/material/Box";
 
 const SubscriptionPopup = (props) => {
     const { t } = useTranslation();
@@ -137,7 +138,12 @@ const SubscriptionPopup = (props) => {
             >
                 <MenuItem onClick={handleChangeDisplayName}>{t("action_bar_change_display_name")}</MenuItem>
                 {showReservationAdd && <MenuItem onClick={handleReserveAdd}>{t("action_bar_reservation_add")}</MenuItem>}
-                {showReservationAddDisabled && <MenuItem disabled={true}>{t("action_bar_reservation_add")}</MenuItem>}
+                {showReservationAddDisabled &&
+                    <MenuItem sx={{ cursor: "default" }}>
+                        <span style={{ opacity: 0.3 }}>{t("action_bar_reservation_add")}</span>
+                        <Chip label={t("action_bar_reservation_limit_reached")} variant="outlined" color="primary" sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}/>
+                    </MenuItem>
+                }
                 {showReservationEdit && <MenuItem onClick={handleReserveEdit}>{t("action_bar_reservation_edit")}</MenuItem>}
                 {showReservationDelete && <MenuItem onClick={handleReserveDelete}>{t("action_bar_reservation_delete")}</MenuItem>}
                 <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>

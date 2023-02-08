@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Autocomplete, Checkbox, FormControlLabel, FormGroup, useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, Chip, FormControlLabel, FormGroup, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
@@ -178,7 +178,12 @@ const SubscribePage = (props) => {
                                     }}
                                 />
                             }
-                            label={t("reserve_dialog_checkbox_label")}
+                            label={
+                                <>
+                                    {t("reserve_dialog_checkbox_label")}
+                                    <Chip label={t("action_bar_reservation_limit_reached")} variant="outlined" color="primary" sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}/>
+                                </>
+                            }
                         />
                         {reserveTopicVisible &&
                             <ReserveTopicSelect

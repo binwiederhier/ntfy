@@ -22,6 +22,7 @@
   "action_bar_reservation_add": "Reserve topic",
   "action_bar_reservation_edit": "Change reservation",
   "action_bar_reservation_delete": "Remove reservation",
+  "action_bar_reservation_limit_reached": "Limit reached",
   "action_bar_send_test_notification": "Send test notification",
   "action_bar_clear_notifications": "Clear all notifications",
   "action_bar_unsubscribe": "Unsubscribe",

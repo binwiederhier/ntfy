@@ -556,7 +556,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 			return err
 		}
 		bandwidthVisitor = s.visitor(v.IP(), u)
-	} else if m.Sender != netip.IPv4Unspecified() {
+	} else if m.Sender.IsValid() {
 		bandwidthVisitor = s.visitor(m.Sender, nil)
 	}
 	if !bandwidthVisitor.BandwidthAllowed(stat.Size()) {
@@ -599,6 +599,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
+	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	m.Expires = time.Now().Add(v.Limits().MessageExpiryDuration).Unix()
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
@@ -792,7 +793,6 @@ func (s *Server) parsePublishParams(r *http.Request, v *visitor, m *message) (ca
 			return false, false, "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
-		m.Sender = v.ip // Important for rate limiting
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
@@ -896,7 +896,6 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		m.Attachment = &attachment{}
 	}
 	var ext string
-	m.Sender = v.ip // Important for attachment rate limiting
 	m.Attachment.Expires = attachmentExpiry
 	m.Attachment.Type, ext = util.DetectContentType(body.PeekedBytes, m.Attachment.Name)
 	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)

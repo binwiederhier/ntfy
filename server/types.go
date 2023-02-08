@@ -51,7 +51,7 @@ func (m *message) Context() log.Context {
 		"message_topic":     m.Topic,
 		"message_body_size": len(m.Message),
 	}
-	if m.Sender != netip.IPv4Unspecified() {
+	if m.Sender.IsValid() {
 		fields["message_sender"] = m.Sender.String()
 	}
 	if m.User != "" {

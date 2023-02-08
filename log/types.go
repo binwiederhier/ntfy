@@ -94,7 +94,6 @@ func ToFormat(s string) Format {
 
 // Contexter allows structs to export a key-value pairs in the form of a Context
 type Contexter interface {
-	// Context returns the object context as key-value pairs
 	Context() Context
 }
 

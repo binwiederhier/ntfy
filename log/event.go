@@ -13,88 +13,95 @@ import (
 const (
 	tagField        = "tag"
 	errorField      = "error"
+	exitCodeField   = "exit_code"
 	timestampFormat = "2006-01-02T15:04:05.999Z07:00"
 )
 
 // Event represents a single log event
 type Event struct {
-	Timestamp string `json:"time"`
-	Level     Level  `json:"level"`
-	Message   string `json:"message"`
-	fields    Context
+	Timestamp  string `json:"time"`
+	Level      Level  `json:"level"`
+	Message    string `json:"message"`
+	time       time.Time
+	contexters []Contexter
+	fields     Context
 }
 
 // newEvent creates a new log event
+//
+// We delay allocations and processing for efficiency, because most log events
+// are never actually rendered, so we don't format the time, or allocate a fields map.
 func newEvent() *Event {
-	now := time.Now()
 	return &Event{
-		Timestamp: now.Format(timestampFormat),
-		fields:    make(Context),
+		time: time.Now(),
 	}
 }
 
 // Fatal logs the event as FATAL, and exits the program with exit code 1
 func (e *Event) Fatal(message string, v ...any) {
-	e.Field("exit_code", 1).Log(FatalLevel, message, v...)
+	e.Field(exitCodeField, 1).maybeLog(FatalLevel, message, v...)
 	fmt.Fprintf(os.Stderr, message+"\n", v...) // Always output error to stderr
 	os.Exit(1)
 }
 
 // Error logs the event with log level error
 func (e *Event) Error(message string, v ...any) {
-	e.Log(ErrorLevel, message, v...)
+	e.maybeLog(ErrorLevel, message, v...)
 }
 
 // Warn logs the event with log level warn
 func (e *Event) Warn(message string, v ...any) {
-	e.Log(WarnLevel, message, v...)
+	e.maybeLog(WarnLevel, message, v...)
 }
 
 // Info logs the event with log level info
 func (e *Event) Info(message string, v ...any) {
-	e.Log(InfoLevel, message, v...)
+	e.maybeLog(InfoLevel, message, v...)
 }
 
 // Debug logs the event with log level debug
 func (e *Event) Debug(message string, v ...any) {
-	e.Log(DebugLevel, message, v...)
+	e.maybeLog(DebugLevel, message, v...)
 }
 
 // Trace logs the event with log level trace
 func (e *Event) Trace(message string, v ...any) {
-	e.Log(TraceLevel, message, v...)
+	e.maybeLog(TraceLevel, message, v...)
 }
 
 // Tag adds a "tag" field to the log event
 func (e *Event) Tag(tag string) *Event {
-	e.fields[tagField] = tag
-	return e
+	return e.Field(tagField, tag)
 }
 
 // Time sets the time field
 func (e *Event) Time(t time.Time) *Event {
-	e.Timestamp = t.Format(timestampFormat)
+	e.time = t
 	return e
 }
 
 // Err adds an "error" field to the log event
 func (e *Event) Err(err error) *Event {
 	if c, ok := err.(Contexter); ok {
-		e.Fields(c.Context())
-	} else {
-		e.fields[errorField] = err.Error()
+		return e.Fields(c.Context())
 	}
-	return e
+	return e.Field(errorField, err.Error())
 }
 
 // Field adds a custom field and value to the log event
 func (e *Event) Field(key string, value any) *Event {
+	if e.fields == nil {
+		e.fields = make(Context)
+	}
 	e.fields[key] = value
 	return e
 }
 
 // Fields adds a map of fields to the log event
 func (e *Event) Fields(fields Context) *Event {
+	if e.fields == nil {
+		e.fields = make(Context)
+	}
 	for k, v := range fields {
 		e.fields[k] = v
 	}
@@ -103,22 +110,36 @@ func (e *Event) Fields(fields Context) *Event {
 
 // With adds the fields of the given Contexter structs to the log event by calling their With method
 func (e *Event) With(contexts ...Contexter) *Event {
-	for _, c := range contexts {
-		e.Fields(c.Context())
+	if e.contexters == nil {
+		e.contexters = contexts
+	} else {
+		e.contexters = append(e.contexters, contexts...)
 	}
 	return e
 }
 
-// Log logs a message with the given log level
-func (e *Event) Log(l Level, message string, v ...any) {
+// maybeLog logs the event to the defined output. The event is only logged, if
+// either the global log level is >= l, or if the log level in one of the overrides matches
+// the level.
+//
+// If no overrides are defined (default), the Contexter array is not applied unless the event
+// is actually logged. If overrides are defined, then Contexters have to be applied in any case
+// to determine if they match. This is super complicated, but required for efficiency.
+func (e *Event) maybeLog(l Level, message string, v ...any) {
+	appliedContexters := e.maybeApplyContexters()
+	if !e.shouldLog(l) {
+		return
+	}
 	e.Message = fmt.Sprintf(message, v...)
 	e.Level = l
-	if e.shouldPrint() {
-		if CurrentFormat() == JSONFormat {
-			log.Println(e.JSON())
-		} else {
-			log.Println(e.String())
-		}
+	e.Timestamp = e.time.Format(timestampFormat)
+	if !appliedContexters {
+		e.applyContexters()
+	}
+	if CurrentFormat() == JSONFormat {
+		log.Println(e.JSON())
+	} else {
+		log.Println(e.String())
 	}
 }
 
@@ -161,14 +182,17 @@ func (e *Event) String() string {
 	return fmt.Sprintf("%s %s (%s)", e.Level.String(), e.Message, strings.Join(fields, ", "))
 }
 
-func (e *Event) shouldPrint() bool {
-	return e.globalLevelWithOverride() <= e.Level
+func (e *Event) shouldLog(l Level) bool {
+	return e.globalLevelWithOverride() <= l
 }
 
 func (e *Event) globalLevelWithOverride() Level {
 	mu.Lock()
 	l, ov := level, overrides
 	mu.Unlock()
+	if e.fields == nil {
+		return l
+	}
 	for field, override := range ov {
 		value, exists := e.fields[field]
 		if exists && value == override.value {
@@ -176,4 +200,20 @@ func (e *Event) globalLevelWithOverride() Level {
 		}
 	}
 	return l
+}
+
+func (e *Event) maybeApplyContexters() bool {
+	mu.Lock()
+	hasOverrides := len(overrides) > 0
+	mu.Unlock()
+	if hasOverrides {
+		e.applyContexters()
+	}
+	return hasOverrides // = applied
+}
+
+func (e *Event) applyContexters() {
+	for _, c := range e.contexters {
+		e.Fields(c.Context())
+	}
 }

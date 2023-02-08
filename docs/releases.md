@@ -3,9 +3,15 @@ Binaries for all releases can be found on the GitHub releases pages for the [ntf
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## ntfy server v1.31.0 (UNRELEASED)
+Released XXXX
+
+This is the biggest ntfy server release I've ever done. This release adds the ability to sign-up for accounts, log-in
+via the web app, synchronize accounts between devices (web only for now), introduces user access tokens, user tiers,
+and Stripe payments integration to support paid tiers (don't worry, [everything will stay open source](https://ntfy.sh/docs/faq/)).
 
 **Features:**
 
+* ⭐ User account signup, login, topic reservations, access tokens, tiers etc. ⭐ ([#522](https://github.com/binwiederhier/ntfy/issues/522))
 * Preliminary `/v1/health` API endpoint for service monitoring (no ticket)
 * Add basic health check to `Dockerfile` ([#555](https://github.com/binwiederhier/ntfy/pull/555), thanks to [@bt90](https://github.com/bt90))
 
@@ -13,6 +19,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Fix `chown` issues with RHEL-like based systems ([#566](https://github.com/binwiederhier/ntfy/issues/566)/[#565](https://github.com/binwiederhier/ntfy/pull/565), thanks to [@danieldemus](https://github.com/danieldemus))
 * Removed `upx` (binary packing) for all builds due to false virus warnings ([#576](https://github.com/binwiederhier/ntfy/issues/576), thanks to [@shawnhwei](https://github.com/shawnhwei) for reporting)
+* `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
 
 **Documentation:**
 

@@ -47,6 +47,11 @@ or you use *instant delivery* (Android only), the app has to maintain a constant
 about 0-1% of battery in 17h of use (on my phone). There has been a ton of testing and improvement around this. I think it's pretty 
 decent now.
 
+## Paid plans? I thought it was open source?
+All of ntfy will remain open source, with a free software license (Apache 2.0 and GPLv2). If you'd like to self-host, you
+can (and should do that). The paid plans I am offering are for people that do not want to self-host, and/or need higher
+limits.
+
 ## What is instant delivery?
 [Instant delivery](subscribe/phone.md#instant-delivery) is a feature in the Android app. If turned on, the app maintains a constant connection to the
 server and listens for incoming notifications. This consumes additional battery (see above),

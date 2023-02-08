@@ -413,7 +413,8 @@ alerting:
 
 ## Jellyseerr/Overseerr webhook
 Here is an example for [jellyseerr](https://github.com/Fallenbagel/jellyseerr)/[overseerr](https://overseerr.dev/) webhook
-JSON payload. Remember to change the `https://requests.example.com` to your jellyseerr/overseerr URL.
+JSON payload. 
+Remember to change the `https://request.example.com` to your url as the value of the json key, click. And if you're not using the request `topic`, make sure to change it in the json payload to your topic.
 
 ``` json
 {

@@ -39,7 +39,7 @@ func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClien
 }
 
 func (c *firebaseClient) Send(v *visitor, m *message) error {
-	if err := v.FirebaseAllowed(); err != nil {
+	if !v.FirebaseAllowed() {
 		return errFirebaseTemporarilyBanned
 	}
 	fbm, err := toFirebaseMessage(m, c.auther)

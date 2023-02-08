@@ -1,8 +1,20 @@
 package server
 
 import (
+	"heckel.io/ntfy/util"
 	"net/http"
 )
+
+func (s *Server) limitRequests(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+			return next(w, r, v)
+		} else if !v.RequestAllowed() {
+			return errHTTPTooManyRequestsLimitRequests
+		}
+		return next(w, r, v)
+	}
+}
 
 func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {

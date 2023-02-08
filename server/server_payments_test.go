@@ -374,13 +374,13 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	var wg sync.WaitGroup
 	for i := 0; i < 209; i++ {
 		wg.Add(1)
-		go func() {
+		go func(i int) {
+			defer wg.Done()
 			rr := request(t, s, "PUT", "/mytopic", "some message", map[string]string{
 				"Authorization": util.BasicAuth("phil", "phil"),
 			})
-			require.Equal(t, 200, rr.Code)
-			wg.Done()
-		}()
+			require.Equal(t, 200, rr.Code, "Failed on %d", i)
+		}(i)
 	}
 	wg.Wait()
 	rr = request(t, s, "PUT", "/mytopic", "some message", map[string]string{

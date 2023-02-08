@@ -733,6 +733,24 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	require.Equal(t, 403, response.Code) // Anonymous read not allowed
 }
 
+func TestServer_Auth_Fail_Rate_Limiting(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+
+	for i := 0; i < 10; i++ {
+		response := request(t, s, "PUT", "/announcements", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 401, response.Code)
+	}
+
+	response := request(t, s, "PUT", "/announcements", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42909, toHTTPError(t, response.Body.String()).Code)
+}
+
 func TestServer_Auth_ViaQuery(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll

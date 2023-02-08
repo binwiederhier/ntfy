@@ -41,6 +41,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil {
 		return err
 	}
+	v.AccountCreated()
 	return s.writeJSON(w, newSuccessResponse())
 }
 

@@ -6,6 +6,7 @@ import (
 	"heckel.io/ntfy/server"
 	"heckel.io/ntfy/test"
 	"heckel.io/ntfy/user"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -113,7 +114,10 @@ func TestCLI_User_Delete(t *testing.T) {
 }
 
 func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config, port int) {
+	configFile := filepath.Join(t.TempDir(), "server-dummy.yml")
+	require.Nil(t, os.WriteFile(configFile, []byte(""), 0600)) // Dummy config file to avoid lookup of real server.yml
 	conf = server.NewConfig()
+	conf.File = configFile
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthDefault = user.PermissionDenyAll
 	s, port = test.StartServerWithConfig(t, conf)
@@ -123,7 +127,9 @@ func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config,
 func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 	userArgs := []string{
 		"ntfy",
+		"--log-level=ERROR",
 		"user",
+		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
 		"--auth-default-access=" + conf.AuthDefault.String(),
 	}

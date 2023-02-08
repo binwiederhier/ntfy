@@ -79,7 +79,9 @@ user * (role: anonymous, tier: none)
 func runAccessCommand(app *cli.App, conf *server.Config, args ...string) error {
 	userArgs := []string{
 		"ntfy",
+		"--log-level=ERROR",
 		"access",
+		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
 		"--auth-default-access=" + conf.AuthDefault.String(),
 	}

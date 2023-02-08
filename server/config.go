@@ -49,6 +49,8 @@ const (
 	DefaultVisitorEmailLimitReplenish           = time.Hour
 	DefaultVisitorAccountCreationLimitBurst     = 3
 	DefaultVisitorAccountCreationLimitReplenish = 24 * time.Hour
+	DefaultVisitorAuthFailureLimitBurst         = 10
+	DefaultVisitorAuthFailureLimitReplenish     = time.Minute
 	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB
 	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB
 )
@@ -60,6 +62,7 @@ var (
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
 type Config struct {
+	File                                 string // Config file, only used for testing
 	BaseURL                              string
 	ListenHTTP                           string
 	ListenHTTPS                          string
@@ -113,6 +116,8 @@ type Config struct {
 	VisitorEmailLimitReplenish           time.Duration
 	VisitorAccountCreationLimitBurst     int
 	VisitorAccountCreationLimitReplenish time.Duration
+	VisitorAuthFailureLimitBurst         int
+	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	BehindProxy                          bool
 	StripeSecretKey                      string
@@ -129,6 +134,7 @@ type Config struct {
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
+		File:                                 "", // Only used for testing
 		BaseURL:                              "",
 		ListenHTTP:                           DefaultListenHTTP,
 		ListenHTTPS:                          "",
@@ -182,6 +188,8 @@ func NewConfig() *Config {
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,
 		VisitorAccountCreationLimitBurst:     DefaultVisitorAccountCreationLimitBurst,
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
+		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
+		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		BehindProxy:                          false,
 		StripeSecretKey:                      "",

@@ -372,6 +372,7 @@ func (a *Manager) AuthenticateToken(token string) (*User, error) {
 	}
 	user, err := a.userByToken(token)
 	if err != nil {
+		log.Tag(tagManager).Field("token", token).Err(err).Trace("Authentication of token failed")
 		return nil, ErrUnauthenticated
 	}
 	user.Token = token

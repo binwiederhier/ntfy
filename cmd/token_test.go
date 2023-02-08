@@ -41,7 +41,9 @@ func TestCLI_Token_AddListRemove(t *testing.T) {
 func runTokenCommand(app *cli.App, conf *server.Config, args ...string) error {
 	userArgs := []string{
 		"ntfy",
+		"--log-level=ERROR",
 		"token",
+		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
 	}
 	return app.Run(append(userArgs, args...))

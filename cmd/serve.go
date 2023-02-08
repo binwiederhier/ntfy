@@ -253,6 +253,7 @@ func execServe(c *cli.Context) error {
 
 	// Run server
 	conf := server.NewConfig()
+	conf.File = config
 	conf.BaseURL = baseURL
 	conf.ListenHTTP = listenHTTP
 	conf.ListenHTTPS = listenHTTPS

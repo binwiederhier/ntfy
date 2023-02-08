@@ -38,7 +38,9 @@ func TestCLI_Tier_AddListChangeDelete(t *testing.T) {
 func runTierCommand(app *cli.App, conf *server.Config, args ...string) error {
 	userArgs := []string{
 		"ntfy",
+		"--log-level=ERROR",
 		"tier",
+		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
 		"--auth-default-access=" + conf.AuthDefault.String(),
 	}

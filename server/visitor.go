@@ -64,6 +64,7 @@ type visitor struct {
 	subscriptionLimiter *util.FixedLimiter // Fixed limiter for active subscriptions (ongoing connections)
 	bandwidthLimiter    *util.RateLimiter  // Limiter for attachment bandwidth downloads
 	accountLimiter      *rate.Limiter      // Rate limiter for account creation, may be nil
+	authLimiter         *rate.Limiter      // Limiter for incorrect login attempts
 	firebase            time.Time          // Next allowed Firebase message
 	seen                time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
 	mu                  sync.Mutex
@@ -130,6 +131,7 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 		emailsLimiter:       nil, // Set in resetLimiters
 		bandwidthLimiter:    nil, // Set in resetLimiters
 		accountLimiter:      nil, // Set in resetLimiters, may be nil
+		authLimiter:         nil, // Set in resetLimiters, may be nil
 	}
 	v.resetLimitersNoLock(messages, emails, false)
 	return v
@@ -153,6 +155,10 @@ func (v *visitor) contextNoLock() log.Context {
 		"visitor_emails_remaining":       info.Stats.EmailsRemaining,
 		"visitor_request_limiter_limit":  v.requestLimiter.Limit(),
 		"visitor_request_limiter_tokens": v.requestLimiter.Tokens(),
+	}
+	if v.authLimiter != nil {
+		fields["visitor_auth_limiter_limit"] = v.authLimiter.Limit()
+		fields["visitor_auth_limiter_tokens"] = v.authLimiter.Tokens()
 	}
 	if v.user != nil {
 		fields["user_id"] = v.user.ID
@@ -182,28 +188,16 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 	}
 
 }
-func (v *visitor) RequestAllowed() error {
+func (v *visitor) RequestAllowed() bool {
 	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
-	if !v.requestLimiter.Allow() {
-		return errVisitorLimitReached
-	}
-	return nil
+	return v.requestLimiter.Allow()
 }
 
-func (v *visitor) RequestLimiter() *rate.Limiter {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
-	return v.requestLimiter
-}
-
-func (v *visitor) FirebaseAllowed() error {
+func (v *visitor) FirebaseAllowed() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if time.Now().Before(v.firebase) {
-		return errVisitorLimitReached
-	}
-	return nil
+	return !time.Now().Before(v.firebase)
 }
 
 func (v *visitor) FirebaseTemporarilyDeny() {
@@ -230,13 +224,42 @@ func (v *visitor) SubscriptionAllowed() bool {
 	return v.subscriptionLimiter.Allow()
 }
 
+// AuthAllowed returns true if an auth request can be attempted (> 1 token available)
+func (v *visitor) AuthAllowed() bool {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	if v.authLimiter == nil {
+		return true
+	}
+	return v.authLimiter.Tokens() > 1
+}
+
+// AuthFailed records an auth failure
+func (v *visitor) AuthFailed() {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	if v.authLimiter != nil {
+		v.authLimiter.Allow()
+	}
+}
+
+// AccountCreationAllowed returns true if a new account can be created
 func (v *visitor) AccountCreationAllowed() bool {
 	v.mu.Lock() // limiters could be replaced!
 	defer v.mu.Unlock()
-	if v.accountLimiter == nil || (v.accountLimiter != nil && !v.accountLimiter.Allow()) {
+	if v.accountLimiter == nil || (v.accountLimiter != nil && v.accountLimiter.Tokens() < 1) {
 		return false
 	}
 	return true
+}
+
+// AccountCreated decreases the account limiter. This is to be called after an account was created.
+func (v *visitor) AccountCreated() {
+	v.mu.Lock() // limiters could be replaced!
+	defer v.mu.Unlock()
+	if v.accountLimiter != nil {
+		v.accountLimiter.Allow()
+	}
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
@@ -336,8 +359,10 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool
 	v.bandwidthLimiter = util.NewBytesLimiter(int(limits.AttachmentBandwidthLimit), oneDay)
 	if v.user == nil {
 		v.accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
+		v.authLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAuthFailureLimitReplenish), v.config.VisitorAuthFailureLimitBurst)
 	} else {
 		v.accountLimiter = nil // Users cannot create accounts when logged in
+		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
 	if enqueueUpdate && v.user != nil {
 		go v.userManager.EnqueueStats(v.user.ID, &user.Stats{

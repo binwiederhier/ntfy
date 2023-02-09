@@ -10,14 +10,14 @@ import (
 //
 // Example:
 //
-//	    lookup := func() (string, error) {
-//		   r, _ := http.Get("...")
-//		   s, _ := io.ReadAll(r.Body)
-//		   return string(s), nil
-//		}
-//		c := NewLookupCache[string](lookup, time.Hour)
-//		fmt.Println(c.Get()) // Fetches the string via HTTP
-//		fmt.Println(c.Get()) // Uses cached value
+//	lookup := func() (string, error) {
+//	   r, _ := http.Get("...")
+//	   s, _ := io.ReadAll(r.Body)
+//	   return string(s), nil
+//	}
+//	c := NewLookupCache[string](lookup, time.Hour)
+//	fmt.Println(c.Get()) // Fetches the string via HTTP
+//	fmt.Println(c.Get()) // Uses cached value
 type LookupCache[T any] struct {
 	value   *T
 	lookup  func() (T, error)
@@ -26,8 +26,12 @@ type LookupCache[T any] struct {
 	mu      sync.Mutex
 }
 
+// LookupFunc is a function that is called by the LookupCache if the underlying
+// value is out-of-date. It returns the new value, or an error.
+type LookupFunc[T any] func() (T, error)
+
 // NewLookupCache creates a new LookupCache with a given time-to-live (TTL)
-func NewLookupCache[T any](lookup func() (T, error), ttl time.Duration) *LookupCache[T] {
+func NewLookupCache[T any](lookup LookupFunc[T], ttl time.Duration) *LookupCache[T] {
 	return &LookupCache[T]{
 		value:  nil,
 		lookup: lookup,

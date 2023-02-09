@@ -2,6 +2,7 @@ package util
 
 import (
 	"errors"
+	"golang.org/x/time/rate"
 	"io"
 	"net/netip"
 	"os"
@@ -243,6 +244,12 @@ func TestMinMax(t *testing.T) {
 	require.Equal(t, 10, MinMax(9, 10, 99))
 	require.Equal(t, 99, MinMax(100, 10, 99))
 	require.Equal(t, 50, MinMax(50, 10, 99))
+}
+
+func TestMax(t *testing.T) {
+	require.Equal(t, 9, Max(1, 9))
+	require.Equal(t, 9, Max(9, 1))
+	require.Equal(t, rate.Every(time.Minute), Max(rate.Every(time.Hour), rate.Every(time.Minute)))
 }
 
 func TestPointerFunctions(t *testing.T) {

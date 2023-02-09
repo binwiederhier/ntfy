@@ -39,6 +39,7 @@ import (
   - api
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
+- MEDIUM: disallowed-topics
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
 

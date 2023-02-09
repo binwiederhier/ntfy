@@ -19,7 +19,7 @@ const (
 	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
-	DefaultStripePriceCacheDuration             = time.Hour        // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
 )
 
 // Defines all global and per-visitor limits
@@ -150,7 +150,7 @@ func NewConfig() *Config {
 		CacheBatchTimeout:                    0,
 		AuthFile:                             "",
 		AuthStartupQueries:                   "",
-		AuthDefault:                          user.NewPermission(true, true),
+		AuthDefault:                          user.PermissionReadWrite,
 		AuthBcryptCost:                       user.DefaultUserPasswordBcryptCost,
 		AuthStatsQueueWriterInterval:         user.DefaultUserStatsQueueWriterInterval,
 		AttachmentCacheDir:                   "",

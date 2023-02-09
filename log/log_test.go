@@ -29,6 +29,7 @@ func TestLog_TagContextFieldFields(t *testing.T) {
 	SetOutput(&out)
 	SetFormat(JSONFormat)
 	SetLevelOverride("tag", "stripe", DebugLevel)
+	SetLevelOverride("number", "5", DebugLevel)
 
 	Tag("mytag").
 		Field("field2", 123).
@@ -49,8 +50,13 @@ func TestLog_TagContextFieldFields(t *testing.T) {
 		Time(time.Unix(456, 123000000).UTC()).
 		Debug("Subscription status %s", "active")
 
+	Field("number", 5).
+		Time(time.Unix(777, 001000000).UTC()).
+		Debug("The number 5 is an int, but the level override is a string")
+
 	expected := `{"time":"1970-01-01T00:02:03.999Z","level":"INFO","message":"hi there phil","field1":"value1","field2":123,"tag":"mytag"}
 {"time":"1970-01-01T00:07:36.123Z","level":"DEBUG","message":"Subscription status active","error":"some error","error_code":123,"stripe_customer_id":"acct_123","stripe_subscription_id":"sub_123","tag":"stripe","user_id":"u_abc","visitor_ip":"1.2.3.4"}
+{"time":"1970-01-01T00:12:57Z","level":"DEBUG","message":"The number 5 is an int, but the level override is a string","number":5}
 `
 	require.Equal(t, expected, out.String())
 }

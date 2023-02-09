@@ -55,6 +55,8 @@ func ToLevel(s string) Level {
 		return WarnLevel
 	case "ERROR":
 		return ErrorLevel
+	case "FATAL":
+		return FatalLevel
 	default:
 		return InfoLevel
 	}
@@ -101,6 +103,6 @@ type Contexter interface {
 type Context map[string]any
 
 type levelOverride struct {
-	value any
+	value string
 	level Level
 }

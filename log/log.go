@@ -93,7 +93,7 @@ func SetLevel(newLevel Level) {
 }
 
 // SetLevelOverride adds a log override for the given field
-func SetLevelOverride(field string, value any, level Level) {
+func SetLevelOverride(field string, value string, level Level) {
 	mu.Lock()
 	defer mu.Unlock()
 	overrides[field] = &levelOverride{value: value, level: level}

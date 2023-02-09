@@ -33,7 +33,7 @@ var (
 var cmdTier = &cli.Command{
 	Name:      "tier",
 	Usage:     "Manage/show tiers",
-	UsageText: "ntfy tier [list|add|remove] ...",
+	UsageText: "ntfy tier [list|add|change|remove] ...",
 	Flags:     flagsTier,
 	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
 	Category:  categoryServer,
@@ -58,7 +58,7 @@ var cmdTier = &cli.Command{
 			},
 			Description: `Add a new tier to the ntfy user database.
 
-Tiers can be used to grant users higher limits based, such as daily message limits, attachment size, or
+Tiers can be used to grant users higher limits, such as daily message limits, attachment size, or
 make it possible for users to reserve topics.
 
 This is a server-only command. It directly reads from the user.db as defined in the server config

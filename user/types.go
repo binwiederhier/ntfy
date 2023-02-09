@@ -40,7 +40,7 @@ func (u *User) Admin() bool {
 
 // User returns true if the user is a regular user, not an admin
 func (u *User) User() bool {
-	return !u.Admin()
+	return u != nil && u.Role == RoleUser
 }
 
 // Auther is an interface for authentication and authorization

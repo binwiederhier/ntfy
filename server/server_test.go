@@ -129,6 +129,7 @@ func TestServer_PublishAndSubscribe(t *testing.T) {
 
 	publishFirstRR := request(t, s, "PUT", "/mytopic", "my first message", nil)
 	require.Equal(t, 200, publishFirstRR.Code)
+	time.Sleep(500 * time.Millisecond) // Publishing is done asynchronously, this avoids races
 
 	publishSecondRR := request(t, s, "PUT", "/mytopic", "my other message", map[string]string{
 		"Title":  " This is a title ",

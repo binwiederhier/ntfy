@@ -6,7 +6,6 @@ import {shortUrl} from "../app/utils";
 const routes = {
     login: "/login",
     signup: "/signup",
-    resetPassword: "/reset-password", // Not used (yet)
     app: config.app_root,
     account: "/account",
     settings: "/settings",

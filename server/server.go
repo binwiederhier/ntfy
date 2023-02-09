@@ -39,7 +39,8 @@ import (
   - api
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
-- MEDIUM: disallowed-topics
+- MEDIUM: uploading attachments leads to 404 -- race
+- MEDIUM: Do not call tiers endoint when payments is not enabled
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
 
@@ -103,7 +104,6 @@ var (
 	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
-	disallowedTopics                                     = []string{"docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"} // If updated, also update in Android and web app
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
@@ -496,7 +496,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
 		EnableReservations: s.config.EnableReservations,
-		DisallowedTopics:   disallowedTopics,
+		DisallowedTopics:   s.config.DisallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
@@ -1260,7 +1260,7 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	defer s.mu.Unlock()
 	topics := make([]*topic, 0)
 	for _, id := range ids {
-		if util.Contains(disallowedTopics, id) {
+		if util.Contains(s.config.DisallowedTopics, id) {
 			return nil, errHTTPBadRequestTopicDisallowed
 		}
 		if _, ok := s.topics[id]; !ok {

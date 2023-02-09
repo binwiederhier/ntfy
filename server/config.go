@@ -58,6 +58,10 @@ const (
 var (
 	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
 	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+
+	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
+	// extended using the server.yml config. If updated, also update in Android and web app.
+	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "account", "settings", "signup", "login"}
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
@@ -87,6 +91,7 @@ type Config struct {
 	AttachmentExpiryDuration             time.Duration
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
+	DisallowedTopics                     []string
 	WebRootIsApp                         bool
 	DelayedSenderInterval                time.Duration
 	FirebaseKeepaliveInterval            time.Duration

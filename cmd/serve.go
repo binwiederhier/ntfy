@@ -58,6 +58,7 @@ var flagsServe = append(
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: server.DefaultAttachmentExpiryDuration, DefaultText: "3h", Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
+	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "disallowed-topics", Aliases: []string{"disallowed_topics"}, EnvVars: []string{"NTFY_DISALLOWED_TOPICS"}, Usage: "topics that are not allowed to be used"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", Aliases: []string{"web_root"}, EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "app", Usage: "sets web root to landing page (home), web app (app) or disabled (disable)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "allows users to sign up via the web app, or API"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-login", Aliases: []string{"enable_login"}, EnvVars: []string{"NTFY_ENABLE_LOGIN"}, Value: false, Usage: "allows users to log in via the web app, or API"}),
@@ -132,6 +133,7 @@ func execServe(c *cli.Context) error {
 	attachmentExpiryDuration := c.Duration("attachment-expiry-duration")
 	keepaliveInterval := c.Duration("keepalive-interval")
 	managerInterval := c.Duration("manager-interval")
+	disallowedTopics := c.StringSlice("disallowed-topics")
 	webRoot := c.String("web-root")
 	enableSignup := c.Bool("enable-signup")
 	enableLogin := c.Bool("enable-login")
@@ -251,6 +253,9 @@ func execServe(c *cli.Context) error {
 		stripe.Key = stripeSecretKey
 	}
 
+	// Add default forbidden topics
+	disallowedTopics = append(disallowedTopics, server.DefaultDisallowedTopics...)
+
 	// Run server
 	conf := server.NewConfig()
 	conf.File = config
@@ -276,6 +281,7 @@ func execServe(c *cli.Context) error {
 	conf.AttachmentExpiryDuration = attachmentExpiryDuration
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
+	conf.DisallowedTopics = disallowedTopics
 	conf.WebRootIsApp = webRootIsApp
 	conf.UpstreamBaseURL = upstreamBaseURL
 	conf.SMTPSenderAddr = smtpSenderAddr

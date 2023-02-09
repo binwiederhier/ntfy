@@ -158,6 +158,19 @@ func TestServer_PublishAndSubscribe(t *testing.T) {
 	require.Equal(t, []string{"tag1", "tag 2", "tag3"}, messages[2].Tags)
 }
 
+func TestServer_Publish_Disallowed_Topic(t *testing.T) {
+	c := newTestConfig(t)
+	c.DisallowedTopics = []string{"about", "time", "this", "got", "added"}
+	s := newTestServer(t, c)
+
+	rr := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "PUT", "/about", "another message", nil)
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 40010, toHTTPError(t, rr.Body.String()).Code)
+}
+
 func TestServer_StaticSites(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

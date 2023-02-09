@@ -1431,10 +1431,6 @@ func (s *Server) execManager() {
 		Info("Server stats")
 }
 
-func (s *Server) expireVisitors() {
-
-}
-
 func (s *Server) runSMTPServer() error {
 	s.smtpServerBackend = newMailBackend(s.config, s.handle)
 	s.smtpServer = smtp.NewServer(s.smtpServerBackend)

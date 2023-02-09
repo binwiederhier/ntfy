@@ -229,6 +229,9 @@ cli-build-results:
 check: test fmt-check vet lint staticcheck
 
 test: .PHONY
+	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+
+testv: .PHONY
 	go test -v $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
 
 race: .PHONY

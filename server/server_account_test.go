@@ -724,5 +724,5 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	u, err = s.userManager.User("phil")
 	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages) // v.EnqueueStats had run!
+	require.Equal(t, int64(0), u.Stats.Messages) // v.EnqueueUserStats had run!
 }

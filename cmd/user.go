@@ -141,7 +141,7 @@ Example:
 
 This command is an alias to calling 'ntfy access' (display access control list).
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.
 `,
 		},

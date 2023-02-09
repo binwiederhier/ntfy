@@ -314,7 +314,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	logvr(v, r).Tag(tagAccount).Debug("Changing account settings for user %s", u.Name)
-	if err := s.userManager.ChangeSettings(u); err != nil {
+	if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -338,7 +338,8 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 	}
 	if newSubscription.ID == "" {
 		newSubscription.ID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
-		u.Prefs.Subscriptions = append(u.Prefs.Subscriptions, newSubscription)
+		prefs := u.Prefs
+		prefs.Subscriptions = append(prefs.Subscriptions, newSubscription)
 		logvr(v, r).
 			Tag(tagAccount).
 			Fields(log.Context{
@@ -346,7 +347,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 				"topic":    newSubscription.Topic,
 			}).
 			Debug("Adding subscription for user %s", u.Name)
-		if err := s.userManager.ChangeSettings(u); err != nil {
+		if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 			return err
 		}
 	}
@@ -367,8 +368,9 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if u.Prefs == nil || u.Prefs.Subscriptions == nil {
 		return errHTTPNotFound
 	}
+	prefs := u.Prefs
 	var subscription *user.Subscription
-	for _, sub := range u.Prefs.Subscriptions {
+	for _, sub := range prefs.Subscriptions {
 		if sub.ID == subscriptionID {
 			sub.DisplayName = updatedSubscription.DisplayName
 			subscription = sub
@@ -386,7 +388,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 			"display_name": subscription.DisplayName,
 		}).
 		Debug("Changing subscription for user %s", u.Name)
-	if err := s.userManager.ChangeSettings(u); err != nil {
+	if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 		return err
 	}
 	return s.writeJSON(w, subscription)
@@ -417,8 +419,9 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 		}
 	}
 	if len(newSubscriptions) < len(u.Prefs.Subscriptions) {
-		u.Prefs.Subscriptions = newSubscriptions
-		if err := s.userManager.ChangeSettings(u); err != nil {
+		prefs := u.Prefs
+		prefs.Subscriptions = newSubscriptions
+		if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 			return err
 		}
 	}

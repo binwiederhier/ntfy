@@ -13,6 +13,7 @@ import (
 const (
 	tagField        = "tag"
 	errorField      = "error"
+	timeTakenField  = "time_taken_ms"
 	exitCodeField   = "exit_code"
 	timestampFormat = "2006-01-02T15:04:05.999Z07:00"
 )
@@ -78,6 +79,13 @@ func (e *Event) Tag(tag string) *Event {
 func (e *Event) Time(t time.Time) *Event {
 	e.time = t
 	return e
+}
+
+// Timing runs f and records the time if took to execute it in "time_taken_ms"
+func (e *Event) Timing(f func()) *Event {
+	start := time.Now()
+	f()
+	return e.Field(timeTakenField, time.Since(start).Milliseconds())
 }
 
 // Err adds an "error" field to the log event

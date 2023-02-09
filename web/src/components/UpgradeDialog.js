@@ -212,7 +212,7 @@ const TierCard = (props) => {
                             }}>{labelText}</div>
                         }
                         <Typography variant="h5" component="div">
-                            {tier.name || t("account_usage_tier_free")}
+                            {tier.name || t("account_basics_tier_free")}
                         </Typography>
                         <List dense>
                             {tier.limits.reservations > 0 && <FeatureItem>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations })}</FeatureItem>}

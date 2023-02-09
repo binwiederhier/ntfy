@@ -42,6 +42,9 @@ User access tokens can be used to publish, subscribe, or perform any other user-
 Tokens have full access, and can perform any task a user can do. They are meant to be used to 
 avoid spreading the password to various places.
 
+This is a server-only command. It directly reads from user.db as defined in the server config
+file server.yml. The command only works if 'auth-file' is properly defined.
+
 Examples:
   ntfy token add phil                   # Create token for user phil which never expires
   ntfy token add --expires=2d phil      # Create token for user phil which expires in 2 days
@@ -66,7 +69,7 @@ Example:
 			Action:  execTokenList,
 			Description: `Shows a list of all tokens.
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.`,
 		},
 	},

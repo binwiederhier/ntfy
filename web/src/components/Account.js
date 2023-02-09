@@ -198,7 +198,7 @@ const ChangePasswordDialog = (props) => {
                 />
             </DialogContent>
             <DialogFooter status={error}>
-                <Button onClick={props.onClose}>{t("account_basics_password_dialog_button_cancel")}</Button>
+                <Button onClick={props.onClose}>{t("common_cancel")}</Button>
                 <Button
                     onClick={handleDialogSubmit}
                     disabled={newPassword.length === 0 || currentPassword.length === 0 || newPassword !== confirmPassword}
@@ -242,10 +242,10 @@ const AccountType = () => {
 
     let accountType;
     if (account.role === Role.ADMIN) {
-        const tierSuffix = (account.tier) ? `(with ${account.tier.name} tier)` : `(no tier)`;
-        accountType = `${t("account_usage_tier_admin")} ${tierSuffix}`;
+        const tierSuffix = (account.tier) ? t("account_basics_tier_admin_suffix_with_tier", { tier: account.tier.name }) : t("account_basics_tier_admin_suffix_no_tier");
+        accountType = `${t("account_basics_tier_admin")} ${tierSuffix}`;
     } else if (!account.tier) {
-        accountType = (config.enable_payments) ? t("account_usage_tier_free") : t("account_usage_tier_basic");
+        accountType = (config.enable_payments) ? t("account_basics_tier_free") : t("account_basics_tier_basic");
     } else {
         accountType = account.tier.name;
     }
@@ -253,13 +253,13 @@ const AccountType = () => {
     return (
         <Pref
             alignTop={account.billing?.status === SubscriptionStatus.PAST_DUE || account.billing?.cancel_at > 0}
-            title={t("account_usage_tier_title")}
-            description={t("account_usage_tier_description")}
+            title={t("account_basics_tier_title")}
+            description={t("account_basics_tier_description")}
         >
             <div>
                 {accountType}
                 {account.billing?.paid_until && !account.billing?.cancel_at &&
-                    <Tooltip title={t("account_usage_tier_paid_until", { date: formatShortDate(account.billing?.paid_until) })}>
+                    <Tooltip title={t("account_basics_tier_paid_until", { date: formatShortDate(account.billing?.paid_until) })}>
                         <span><InfoIcon/></span>
                     </Tooltip>
                 }
@@ -270,7 +270,7 @@ const AccountType = () => {
                         startIcon={<CelebrationIcon sx={{ color: "#55b86e" }}/>}
                         onClick={handleUpgradeClick}
                         sx={{ml: 1}}
-                    >{t("account_usage_tier_upgrade_button")}</Button>
+                    >{t("account_basics_tier_upgrade_button")}</Button>
                 }
                 {config.enable_payments && account.role === Role.USER && account.billing?.subscription &&
                     <Button
@@ -278,7 +278,7 @@ const AccountType = () => {
                         size="small"
                         onClick={handleUpgradeClick}
                         sx={{ml: 1}}
-                    >{t("account_usage_tier_change_button")}</Button>
+                    >{t("account_basics_tier_change_button")}</Button>
                 }
                 {config.enable_payments && account.role === Role.USER && account.billing?.customer &&
                     <Button
@@ -286,19 +286,21 @@ const AccountType = () => {
                         size="small"
                         onClick={handleManageBilling}
                         sx={{ml: 1}}
-                    >{t("account_usage_manage_billing_button")}</Button>
+                    >{t("account_basics_tier_manage_billing_button")}</Button>
                 }
-                <UpgradeDialog
-                    key={`upgradeDialogFromAccount${upgradeDialogKey}`}
-                    open={upgradeDialogOpen}
-                    onCancel={() => setUpgradeDialogOpen(false)}
-                />
+                {config.enable_payments &&
+                    <UpgradeDialog
+                        key={`upgradeDialogFromAccount${upgradeDialogKey}`}
+                        open={upgradeDialogOpen}
+                        onCancel={() => setUpgradeDialogOpen(false)}
+                    />
+                }
             </div>
             {account.billing?.status === SubscriptionStatus.PAST_DUE &&
-                <Alert severity="error" sx={{mt: 1}}>{t("account_usage_tier_payment_overdue")}</Alert>
+                <Alert severity="error" sx={{mt: 1}}>{t("account_basics_tier_payment_overdue")}</Alert>
             }
             {account.billing?.cancel_at > 0 &&
-                <Alert severity="warning" sx={{mt: 1}}>{t("account_usage_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
+                <Alert severity="warning" sx={{mt: 1}}>{t("account_basics_tier_canceled_subscription", { date: formatShortDate(account.billing.cancel_at) })}</Alert>
             }
             <Portal>
                 <Snackbar

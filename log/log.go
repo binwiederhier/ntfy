@@ -78,6 +78,11 @@ func Time(time time.Time) *Event {
 	return newEvent().Time(time)
 }
 
+// Timing runs f and records the time if took to execute it in "time_taken_ms"
+func Timing(f func()) *Event {
+	return newEvent().Timing(f)
+}
+
 // CurrentLevel returns the current log level
 func CurrentLevel() Level {
 	mu.Lock()

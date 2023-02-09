@@ -164,6 +164,7 @@ func NewConfig() *Config {
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
+		DisallowedTopics:                     DefaultDisallowedTopics,
 		WebRootIsApp:                         false,
 		DelayedSenderInterval:                DefaultDelayedSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,

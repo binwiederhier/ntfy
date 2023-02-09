@@ -562,7 +562,7 @@ func TestManager_EnqueueStats(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(0), u.Stats.Messages)
 	require.Equal(t, int64(0), u.Stats.Emails)
-	a.EnqueueStats(u.ID, &Stats{
+	a.EnqueueUserStats(u.ID, &Stats{
 		Messages: 11,
 		Emails:   2,
 	})
@@ -595,7 +595,7 @@ func TestManager_ChangeSettings(t *testing.T) {
 	require.Nil(t, u.Prefs.Language)
 
 	// Save with new settings
-	u.Prefs = &Prefs{
+	prefs := &Prefs{
 		Language: util.String("de"),
 		Notification: &NotificationPrefs{
 			Sound:       util.String("ding"),
@@ -610,7 +610,7 @@ func TestManager_ChangeSettings(t *testing.T) {
 			},
 		},
 	}
-	require.Nil(t, a.ChangeSettings(u))
+	require.Nil(t, a.ChangeSettings(u.ID, prefs))
 
 	// Read again
 	u, err = a.User("ben")

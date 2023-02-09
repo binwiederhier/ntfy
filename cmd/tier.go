@@ -61,7 +61,7 @@ var cmdTier = &cli.Command{
 Tiers can be used to grant users higher limits, such as daily message limits, attachment size, or
 make it possible for users to reserve topics.
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.
 
 Examples:
@@ -102,7 +102,7 @@ Examples:
 After updating a tier, you may have to restart the ntfy server to apply them 
 to all visitors. 
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.
 
 Examples:
@@ -124,7 +124,7 @@ Examples:
 You cannot remove a tier if there are users associated with a tier. Use "ntfy user change-tier"
 to remove or switch their tier first.
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.
 
 Example:
@@ -138,7 +138,7 @@ Example:
 			Action:  execTierList,
 			Description: `Shows a list of all configured tiers.
 
-This is a server-only command. It directly reads from the user.db as defined in the server config
+This is a server-only command. It directly reads from user.db as defined in the server config
 file server.yml. The command only works if 'auth-file' is properly defined.
 `,
 		},

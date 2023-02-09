@@ -27,6 +27,7 @@ class AccountApi {
     constructor() {
         this.timer = null;
         this.listener = null; // Fired when account is fetched from remote
+        this.tiers = null; // Cached
     }
 
     registerListener(listener) {
@@ -148,11 +149,7 @@ class AccountApi {
         console.log(`[AccountApi] Extending user access token ${url}`);
         await fetchOrThrow(url, {
             method: "PATCH",
-            headers: withBearerAuth({}, session.token()),
-            body: JSON.stringify({
-                token: session.token(),
-                expires: Math.floor(Date.now() / 1000) + 6220800 // FIXME
-            })
+            headers: withBearerAuth({}, session.token())
         });
     }
 
@@ -239,10 +236,14 @@ class AccountApi {
     }
 
     async billingTiers() {
+        if (this.tiers) {
+            return this.tiers;
+        }
         const url = tiersUrl(config.base_url);
         console.log(`[AccountApi] Fetching billing tiers`);
         const response = await fetchOrThrow(url); // No auth needed!
-        return await response.json(); // May throw SyntaxError
+        this.tiers = await response.json(); // May throw SyntaxError
+        return this.tiers;
     }
 
     async createBillingSubscription(tier) {

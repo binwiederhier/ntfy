@@ -51,6 +51,8 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
 		CREATE INDEX IF NOT EXISTS idx_expires ON messages (expires);
+		CREATE INDEX IF NOT EXISTS idx_sender ON messages (sender);
+		CREATE INDEX IF NOT EXISTS idx_user ON messages (user);
 		CREATE INDEX IF NOT EXISTS idx_attachment_expires ON messages (attachment_expires);
 		COMMIT;
 	`
@@ -215,6 +217,8 @@ const (
 		ALTER TABLE messages ADD COLUMN attachment_deleted INT NOT NULL DEFAULT('0');
 		ALTER TABLE messages ADD COLUMN expires INT NOT NULL DEFAULT('0');
 		CREATE INDEX IF NOT EXISTS idx_expires ON messages (expires);
+		CREATE INDEX IF NOT EXISTS idx_sender ON messages (sender);
+		CREATE INDEX IF NOT EXISTS idx_user ON messages (user);
 		CREATE INDEX IF NOT EXISTS idx_attachment_expires ON messages (attachment_expires);
 	`
 	migrate9To10UpdateMessageExpiryQuery = `UPDATE messages SET expires = time + ?`
@@ -883,8 +887,5 @@ func migrateFrom9(db *sql.DB, cacheDuration time.Duration) error {
 	if _, err := tx.Exec(updateSchemaVersion, 10); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	return nil // Update this when a new version is added
+	return tx.Commit()
 }

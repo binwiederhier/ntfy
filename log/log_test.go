@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -129,6 +130,25 @@ func TestLog_NoAllocIfNotPrinted(t *testing.T) {
 {"time":"1970-01-01T00:02:04Z","level":"TRACE","message":"some trace message with override","user_id":"u_abc","visitor_ip":"1.2.3.4"}
 `
 	require.Equal(t, expected, out.String())
+}
+
+func TestLog_Timing(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+	SetFormat(JSONFormat)
+
+	Timing(func() { time.Sleep(300 * time.Millisecond) }).
+		Time(time.Unix(12, 0).UTC()).
+		Info("A thing that takes a while")
+
+	var ev struct {
+		TimeTakenMs int64 `json:"time_taken_ms"`
+	}
+	require.Nil(t, json.Unmarshal(out.Bytes(), &ev))
+	require.True(t, ev.TimeTakenMs >= 300)
+	require.Contains(t, out.String(), `{"time":"1970-01-01T00:00:12Z","level":"INFO","message":"A thing that takes a while","time_taken_ms":`)
 }
 
 type fakeError struct {

@@ -37,12 +37,13 @@ import (
 - HIGH Docs
   - tiers
   - api
+  - tokens
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: uploading attachments leads to 404 -- race
-- MEDIUM: Do not call tiers endoint when payments is not enabled
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
+- LOW: Menu item -> popup click should not open page
 
 */
 
@@ -140,6 +141,7 @@ const (
 const (
 	tagStartup      = "startup"
 	tagPublish      = "publish"
+	tagSubscribe    = "subscribe"
 	tagFirebase     = "firebase"
 	tagEmail        = "email" // Send email
 	tagSMTP         = "smtp"  // Receive email
@@ -649,7 +651,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
-		go s.userManager.EnqueueStats(u.ID, v.Stats())
+		go s.userManager.EnqueueUserStats(u.ID, v.Stats())
 	}
 	s.mu.Lock()
 	s.messages++
@@ -956,8 +958,8 @@ func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request, v *v
 }
 
 func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *visitor, contentType string, encoder messageEncoder) error {
-	logvr(v, r).Debug("HTTP stream connection opened")
-	defer logvr(v, r).Debug("HTTP stream connection closed")
+	logvr(v, r).Tag(tagSubscribe).Debug("HTTP stream connection opened")
+	defer logvr(v, r).Tag(tagSubscribe).Debug("HTTP stream connection closed")
 	if !v.SubscriptionAllowed() {
 		return errHTTPTooManyRequestsLimitSubscriptions
 	}
@@ -1025,7 +1027,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		case <-r.Context().Done():
 			return nil
 		case <-time.After(s.config.KeepaliveInterval):
-			logvr(v, r).Trace("Sending keepalive message")
+			logvr(v, r).Tag(tagSubscribe).Trace("Sending keepalive message")
 			v.Keepalive()
 			if err := sub(v, newKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
@@ -1283,70 +1285,86 @@ func (s *Server) topicFromID(id string) (*topic, error) {
 }
 
 func (s *Server) execManager() {
-	log.Tag(tagManager).Debug("Starting manager")
-	defer log.Tag(tagManager).Debug("Finished manager")
-
 	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
 	//          there is no mutex for the entire function.
 
 	// Expire visitors from rate visitors map
-	s.mu.Lock()
 	staleVisitors := 0
-	for ip, v := range s.visitors {
-		if v.Stale() {
-			log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
-			delete(s.visitors, ip)
-			staleVisitors++
-		}
-	}
-	s.mu.Unlock()
-	log.Tag(tagManager).Field("stale_visitors", staleVisitors).Debug("Deleted %d stale visitor(s)", staleVisitors)
+	log.
+		Tag(tagManager).
+		Timing(func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			for ip, v := range s.visitors {
+				if v.Stale() {
+					log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
+					delete(s.visitors, ip)
+					staleVisitors++
+				}
+			}
+		}).
+		Field("stale_visitors", staleVisitors).
+		Debug("Deleted %d stale visitor(s)", staleVisitors)
 
 	// Delete expired user tokens and users
 	if s.userManager != nil {
-		if err := s.userManager.RemoveExpiredTokens(); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Error expiring user tokens")
-		}
-		if err := s.userManager.RemoveDeletedUsers(); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Error deleting soft-deleted users")
-		}
+		log.
+			Tag(tagManager).
+			Timing(func() {
+				if err := s.userManager.RemoveExpiredTokens(); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error expiring user tokens")
+				}
+				if err := s.userManager.RemoveDeletedUsers(); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error deleting soft-deleted users")
+				}
+			}).
+			Debug("Removed expired tokens and users")
 	}
 
 	// Delete expired attachments
 	if s.fileCache != nil {
-		ids, err := s.messageCache.AttachmentsExpired()
-		if err != nil {
-			log.Tag(tagManager).Err(err).Warn("Error retrieving expired attachments")
-		} else if len(ids) > 0 {
-			if log.Tag(tagManager).IsDebug() {
-				log.Tag(tagManager).Debug("Deleting attachments %s", strings.Join(ids, ", "))
-			}
-			if err := s.fileCache.Remove(ids...); err != nil {
-				log.Tag(tagManager).Err(err).Warn("Error deleting attachments")
-			}
-			if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
-				log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
-			}
-		} else {
-			log.Tag(tagManager).Debug("No expired attachments to delete")
-		}
+		log.
+			Tag(tagManager).
+			Timing(func() {
+				ids, err := s.messageCache.AttachmentsExpired()
+				if err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error retrieving expired attachments")
+				} else if len(ids) > 0 {
+					if log.Tag(tagManager).IsDebug() {
+						log.Tag(tagManager).Debug("Deleting attachments %s", strings.Join(ids, ", "))
+					}
+					if err := s.fileCache.Remove(ids...); err != nil {
+						log.Tag(tagManager).Err(err).Warn("Error deleting attachments")
+					}
+					if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
+						log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
+					}
+				} else {
+					log.Tag(tagManager).Debug("No expired attachments to delete")
+				}
+			}).
+			Debug("Deleted expired attachments")
 	}
 
 	// Prune messages
-	log.Tag(tagManager).Debug("Manager: Pruning messages")
-	expiredMessageIDs, err := s.messageCache.MessagesExpired()
-	if err != nil {
-		log.Tag(tagManager).Err(err).Warn("Error retrieving expired messages")
-	} else if len(expiredMessageIDs) > 0 {
-		if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Error deleting attachments for expired messages")
-		}
-		if err := s.messageCache.DeleteMessages(expiredMessageIDs...); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
-		}
-	} else {
-		log.Tag(tagManager).Debug("No expired messages to delete")
-	}
+	log.
+		Tag(tagManager).
+		Timing(func() {
+			expiredMessageIDs, err := s.messageCache.MessagesExpired()
+			if err != nil {
+				log.Tag(tagManager).Err(err).Warn("Error retrieving expired messages")
+			} else if len(expiredMessageIDs) > 0 {
+				if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error deleting attachments for expired messages")
+				}
+				if err := s.messageCache.DeleteMessages(expiredMessageIDs...); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
+				}
+			} else {
+				log.Tag(tagManager).Debug("No expired messages to delete")
+			}
+		}).
+		Debug("Pruned messages")
 
 	// Message count per topic
 	var messagesCached int
@@ -1360,20 +1378,26 @@ func (s *Server) execManager() {
 	}
 
 	// Remove subscriptions without subscribers
-	s.mu.Lock()
-	var subscribers int
-	for _, t := range s.topics {
-		subs := t.SubscribersCount()
-		log.Tag(tagManager).Trace("- topic %s: %d subscribers", t.ID, subs)
-		msgs, exists := messageCounts[t.ID]
-		if subs == 0 && (!exists || msgs == 0) {
-			log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)
-			delete(s.topics, t.ID)
-			continue
-		}
-		subscribers += subs
-	}
-	s.mu.Unlock()
+	var emptyTopics, subscribers int
+	log.
+		Tag(tagManager).
+		Timing(func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			for _, t := range s.topics {
+				subs := t.SubscribersCount()
+				log.Tag(tagManager).Trace("- topic %s: %d subscribers", t.ID, subs)
+				msgs, exists := messageCounts[t.ID]
+				if subs == 0 && (!exists || msgs == 0) {
+					log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)
+					emptyTopics++
+					delete(s.topics, t.ID)
+					continue
+				}
+				subscribers += subs
+			}
+		}).
+		Debug("Removed %d empty topic(s)", emptyTopics)
 
 	// Mail stats
 	var receivedMailTotal, receivedMailSuccess, receivedMailFailure int64
@@ -1407,6 +1431,10 @@ func (s *Server) execManager() {
 		Info("Server stats")
 }
 
+func (s *Server) expireVisitors() {
+
+}
+
 func (s *Server) runSMTPServer() error {
 	s.smtpServerBackend = newMailBackend(s.config, s.handle)
 	s.smtpServer = smtp.NewServer(s.smtpServerBackend)
@@ -1424,7 +1452,10 @@ func (s *Server) runManager() {
 	for {
 		select {
 		case <-time.After(s.config.ManagerInterval):
-			s.execManager()
+			log.
+				Tag(tagManager).
+				Timing(s.execManager).
+				Debug("Manager finished")
 		case <-s.closeChan:
 			return
 		}

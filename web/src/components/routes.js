@@ -1,8 +1,6 @@
 import config from "../app/config";
 import {shortUrl} from "../app/utils";
 
-// Remember to also update the "disallowedTopics" list!
-
 const routes = {
     login: "/login",
     signup: "/signup",

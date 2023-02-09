@@ -1,4 +1,3 @@
-// Package user deals with authentication and authorization against topics
 package user
 
 import (

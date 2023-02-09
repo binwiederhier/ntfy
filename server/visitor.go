@@ -27,7 +27,7 @@ const (
 )
 
 // Constants used to convert a tier-user's MessageLimit (see user.Tier) into adequate request limiter
-// values (token bucket).
+// values (token bucket). This is only used to increase the values in server.yml, never decrease them.
 //
 // Example: Assuming a user.Tier's MessageLimit is 10,000:
 // - the allowed burst is 500 (= 10,000 * 5%), which is < 1000 (the max)
@@ -59,7 +59,7 @@ type visitor struct {
 	subscriptionLimiter *util.FixedLimiter // Fixed limiter for active subscriptions (ongoing connections)
 	bandwidthLimiter    *util.RateLimiter  // Limiter for attachment bandwidth downloads
 	accountLimiter      *rate.Limiter      // Rate limiter for account creation, may be nil
-	authLimiter         *rate.Limiter      // Limiter for incorrect login attempts
+	authLimiter         *rate.Limiter      // Limiter for incorrect login attempts, may be nil
 	firebase            time.Time          // Next allowed Firebase message
 	seen                time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
 	mu                  sync.Mutex
@@ -360,7 +360,7 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool
 		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
 	if enqueueUpdate && v.user != nil {
-		go v.userManager.EnqueueStats(v.user.ID, &user.Stats{
+		go v.userManager.EnqueueUserStats(v.user.ID, &user.Stats{
 			Messages: messages,
 			Emails:   emails,
 		})

@@ -27,8 +27,26 @@ func TestCLI_Tier_AddListChangeDelete(t *testing.T) {
 	require.Contains(t, stderr.String(), "- Message limit: 1234")
 
 	app, _, _, stderr = newTestApp()
-	require.Nil(t, runTierCommand(app, conf, "change", "--message-limit", "999", "pro"))
+	require.Nil(t, runTierCommand(app, conf, "change",
+		"--message-limit=999",
+		"--message-expiry-duration=99h",
+		"--email-limit=91",
+		"--reservation-limit=98",
+		"--attachment-file-size-limit=100m",
+		"--attachment-expiry-duration=7h",
+		"--attachment-total-size-limit=10G",
+		"--attachment-bandwidth-limit=100G",
+		"--stripe-price-id=price_991",
+		"pro",
+	))
 	require.Contains(t, stderr.String(), "- Message limit: 999")
+	require.Contains(t, stderr.String(), "- Message expiry duration: 99h")
+	require.Contains(t, stderr.String(), "- Email limit: 91")
+	require.Contains(t, stderr.String(), "- Reservation limit: 98")
+	require.Contains(t, stderr.String(), "- Attachment file size limit: 100.0 MB")
+	require.Contains(t, stderr.String(), "- Attachment expiry duration: 7h")
+	require.Contains(t, stderr.String(), "- Attachment total size limit: 10.0 GB")
+	require.Contains(t, stderr.String(), "- Stripe price: price_991")
 
 	app, _, _, stderr = newTestApp()
 	require.Nil(t, runTierCommand(app, conf, "remove", "pro"))

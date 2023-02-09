@@ -938,7 +938,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
-	s.userManager.EnqueueStats(u.ID, &user.Stats{
+	s.userManager.EnqueueUserStats(u.ID, &user.Stats{
 		Messages: 123456,
 		Emails:   999,
 	})

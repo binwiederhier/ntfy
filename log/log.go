@@ -20,7 +20,7 @@ var (
 	format              = DefaultFormat
 	overrides           = make(map[string]*levelOverride)
 	output    io.Writer = DefaultOutput
-	mu                  = &sync.Mutex{}
+	mu                  = &sync.RWMutex{}
 )
 
 // Fatal prints the given message, and exits the program
@@ -85,8 +85,8 @@ func Timing(f func()) *Event {
 
 // CurrentLevel returns the current log level
 func CurrentLevel() Level {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	return level
 }
 
@@ -111,10 +111,10 @@ func ResetLevelOverrides() {
 	overrides = make(map[string]*levelOverride)
 }
 
-// CurrentFormat returns the current log formt
+// CurrentFormat returns the current log format
 func CurrentFormat() Format {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	return format
 }
 
@@ -138,8 +138,8 @@ func SetOutput(w io.Writer) {
 
 // File returns the log file, if any, or an empty string otherwise
 func File() string {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	if f, ok := output.(*os.File); ok {
 		return f.Name()
 	}
@@ -148,8 +148,8 @@ func File() string {
 
 // IsFile returns true if the output is a non-default file
 func IsFile() bool {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	if _, ok := output.(*os.File); ok && output != DefaultOutput {
 		return true
 	}

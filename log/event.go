@@ -197,9 +197,9 @@ func (e *Event) shouldLog(l Level) bool {
 }
 
 func (e *Event) globalLevelWithOverride() Level {
-	mu.Lock()
+	mu.RLock()
 	l, ov := level, overrides
-	mu.Unlock()
+	mu.RUnlock()
 	if e.fields == nil {
 		return l
 	}
@@ -217,9 +217,9 @@ func (e *Event) globalLevelWithOverride() Level {
 }
 
 func (e *Event) maybeApplyContexters() bool {
-	mu.Lock()
+	mu.RLock()
 	hasOverrides := len(overrides) > 0
-	mu.Unlock()
+	mu.RUnlock()
 	if hasOverrides {
 		e.applyContexters()
 	}

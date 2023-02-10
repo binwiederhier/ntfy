@@ -62,7 +62,7 @@ type visitor struct {
 	authLimiter         *rate.Limiter      // Limiter for incorrect login attempts, may be nil
 	firebase            time.Time          // Next allowed Firebase message
 	seen                time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
-	mu                  sync.Mutex
+	mu                  sync.RWMutex
 }
 
 type visitorInfo struct {
@@ -133,8 +133,8 @@ func newVisitor(conf *Config, messageCache *messageCache, userManager *user.Mana
 }
 
 func (v *visitor) Context() log.Context {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.contextNoLock()
 }
 
@@ -184,14 +184,14 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 
 }
 func (v *visitor) RequestAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.requestLimiter.Allow()
 }
 
 func (v *visitor) FirebaseAllowed() bool {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return !time.Now().Before(v.firebase)
 }
 
@@ -202,27 +202,27 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 }
 
 func (v *visitor) MessageAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.messagesLimiter.Allow()
 }
 
 func (v *visitor) EmailAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.emailsLimiter.Allow()
 }
 
 func (v *visitor) SubscriptionAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.subscriptionLimiter.Allow()
 }
 
 // AuthAllowed returns true if an auth request can be attempted (> 1 token available)
 func (v *visitor) AuthAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	if v.authLimiter == nil {
 		return true
 	}
@@ -231,8 +231,8 @@ func (v *visitor) AuthAllowed() bool {
 
 // AuthFailed records an auth failure
 func (v *visitor) AuthFailed() {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	if v.authLimiter != nil {
 		v.authLimiter.Allow()
 	}
@@ -240,8 +240,8 @@ func (v *visitor) AuthFailed() {
 
 // AccountCreationAllowed returns true if a new account can be created
 func (v *visitor) AccountCreationAllowed() bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	if v.accountLimiter == nil || (v.accountLimiter != nil && v.accountLimiter.Tokens() < 1) {
 		return false
 	}
@@ -250,22 +250,22 @@ func (v *visitor) AccountCreationAllowed() bool {
 
 // AccountCreated decreases the account limiter. This is to be called after an account was created.
 func (v *visitor) AccountCreated() {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	if v.accountLimiter != nil {
 		v.accountLimiter.Allow()
 	}
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.bandwidthLimiter.AllowN(bytes)
 }
 
 func (v *visitor) RemoveSubscription() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	v.subscriptionLimiter.AllowN(-1)
 }
 
@@ -276,20 +276,20 @@ func (v *visitor) Keepalive() {
 }
 
 func (v *visitor) BandwidthLimiter() util.Limiter {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return v.bandwidthLimiter
 }
 
 func (v *visitor) Stale() bool {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return time.Since(v.seen) > visitorExpungeAfter
 }
 
 func (v *visitor) Stats() *user.Stats {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	return &user.Stats{
 		Messages: v.messagesLimiter.Value(),
 		Emails:   v.emailsLimiter.Value(),
@@ -297,30 +297,30 @@ func (v *visitor) Stats() *user.Stats {
 }
 
 func (v *visitor) ResetStats() {
-	v.mu.Lock() // limiters could be replaced!
-	defer v.mu.Unlock()
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
 	v.emailsLimiter.Reset()
 	v.messagesLimiter.Reset()
 }
 
 // User returns the visitor user, or nil if there is none
 func (v *visitor) User() *user.User {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.user // May be nil
 }
 
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.ip
 }
 
 // Authenticated returns true if a user successfully authenticated
 func (v *visitor) Authenticated() bool {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.user != nil
 }
 
@@ -338,8 +338,8 @@ func (v *visitor) SetUser(u *user.User) {
 // MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,
 // an empty string is returned.
 func (v *visitor) MaybeUserID() string {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	if v.user != nil {
 		return v.user.ID
 	}
@@ -369,8 +369,8 @@ func (v *visitor) resetLimitersNoLock(messages, emails int64, enqueueUpdate bool
 }
 
 func (v *visitor) Limits() *visitorLimits {
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.limitsNoLock()
 }
 
@@ -422,9 +422,9 @@ func configBasedVisitorLimits(conf *Config) *visitorLimits {
 }
 
 func (v *visitor) Info() (*visitorInfo, error) {
-	v.mu.Lock()
+	v.mu.RLock()
 	info := v.infoLightNoLock()
-	v.mu.Unlock()
+	v.mu.RUnlock()
 
 	// Attachment stats from database
 	var attachmentsBytesUsed int64

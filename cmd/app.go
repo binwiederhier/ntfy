@@ -28,7 +28,7 @@ var flagsDefault = []cli.Flag{
 }
 
 var (
-	logLevelOverrideRegex = regexp.MustCompile(`(?i)^([^=]+)\s*=\s*(\S+)\s*->\s*(TRACE|DEBUG|INFO|WARN|ERROR)$`)
+	logLevelOverrideRegex = regexp.MustCompile(`(?i)^([^=\s]+)(?:\s*=\s*(\S+))?\s*->\s*(TRACE|DEBUG|INFO|WARN|ERROR)$`)
 )
 
 // New creates a new CLI application
@@ -76,11 +76,15 @@ func initLogFunc(c *cli.Context) error {
 func applyLogLevelOverrides(rawOverrides []string) error {
 	for _, override := range rawOverrides {
 		m := logLevelOverrideRegex.FindStringSubmatch(override)
-		if len(m) != 4 {
+		if len(m) == 4 {
+			field, value, level := m[1], m[2], m[3]
+			log.SetLevelOverride(field, value, log.ToLevel(level))
+		} else if len(m) == 3 {
+			field, level := m[1], m[2]
+			log.SetLevelOverride(field, "", log.ToLevel(level)) // Matches any value
+		} else {
 			return fmt.Errorf(`invalid log level override "%s", must be "field=value -> loglevel", e.g. "user_id=u_123 -> DEBUG"`, override)
 		}
-		field, value, level := m[1], m[2], m[3]
-		log.SetLevelOverride(field, value, log.ToLevel(level))
 	}
 	return nil
 }

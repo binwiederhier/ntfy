@@ -206,9 +206,7 @@ func (e *Event) globalLevelWithOverride() Level {
 	for field, override := range ov {
 		value, exists := e.fields[field]
 		if exists {
-			if value == override.value {
-				return override.level
-			} else if fmt.Sprintf("%v", value) == override.value {
+			if override.value == "" || override.value == value || override.value == fmt.Sprintf("%v", value) {
 				return override.level
 			}
 		}

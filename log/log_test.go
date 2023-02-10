@@ -151,6 +151,27 @@ func TestLog_Timing(t *testing.T) {
 	require.Contains(t, out.String(), `{"time":"1970-01-01T00:00:12Z","level":"INFO","message":"A thing that takes a while","time_taken_ms":`)
 }
 
+func TestLog_LevelOverrideAny(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+	SetFormat(JSONFormat)
+	SetLevelOverride("this_one", "", DebugLevel)
+	SetLevelOverride("time_taken_ms", "", TraceLevel)
+
+	Time(time.Unix(11, 0).UTC()).Field("this_one", "11").Debug("this is logged")
+	Time(time.Unix(12, 0).UTC()).Field("not_this", "11").Debug("this is not logged")
+	Time(time.Unix(13, 0).UTC()).Field("this_too", "11").Info("this is also logged")
+	Time(time.Unix(14, 0).UTC()).Field("time_taken_ms", 0).Info("this is also logged")
+
+	expected := `{"time":"1970-01-01T00:00:11Z","level":"DEBUG","message":"this is logged","this_one":"11"}
+{"time":"1970-01-01T00:00:13Z","level":"INFO","message":"this is also logged","this_too":"11"}
+{"time":"1970-01-01T00:00:14Z","level":"INFO","message":"this is also logged","time_taken_ms":0}
+`
+	require.Equal(t, expected, out.String())
+}
+
 type fakeError struct {
 	Code    int
 	Message string

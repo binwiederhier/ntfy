@@ -44,6 +44,7 @@ import (
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: Menu item -> popup click should not open page
+- LOW: get rid of reservation id, replace with DELETE X-Topic: ...
 
 */
 
@@ -143,8 +144,8 @@ const (
 	tagPublish      = "publish"
 	tagSubscribe    = "subscribe"
 	tagFirebase     = "firebase"
-	tagEmail        = "email" // Send email
 	tagSMTP         = "smtp"  // Receive email
+	tagEmail        = "email" // Send email
 	tagFileCache    = "file_cache"
 	tagMessageCache = "message_cache"
 	tagStripe       = "stripe"
@@ -323,48 +324,61 @@ func (s *Server) closeDatabases() {
 	s.messageCache.Close()
 }
 
+// handle is the main entry point for all HTTP requests
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	v, err := s.maybeAuthenticate(r) // Note: Always returns v, even when error is returned
-	if err == nil {
-		logvr(v, r).Debug("Dispatching request")
-		if log.IsTrace() {
-			logvr(v, r).Trace("Entire request (headers and body):\n%s", renderHTTPRequest(r))
-		}
-		err = s.handleInternal(w, r, v)
-	}
 	if err != nil {
-		if websocket.IsWebSocketUpgrade(r) {
-			isNormalError := strings.Contains(err.Error(), "i/o timeout")
-			if isNormalError {
-				logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
-			} else {
-				logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Info("WebSocket error: %s", err.Error())
-			}
-			return // Do not attempt to write to upgraded connection
-		}
-		if matrixErr, ok := err.(*errMatrix); ok {
-			writeMatrixError(w, r, v, matrixErr)
-			return
-		}
-		httpErr, ok := err.(*errHTTP)
-		if !ok {
-			httpErr = errHTTPInternalError
-		}
-		isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest || httpErr.HTTPCode == http.StatusTooManyRequests
-		if isNormalError {
-			logvr(v, r).
-				Err(httpErr).
-				Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
-		} else {
-			logvr(v, r).
-				Err(httpErr).
-				Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
-		w.WriteHeader(httpErr.HTTPCode)
-		io.WriteString(w, httpErr.JSON()+"\n")
+		s.handleError(w, r, v, err)
+		return
 	}
+
+	if log.IsTrace() {
+		logvr(v, r).Field("http_request", renderHTTPRequest(r)).Trace("HTTP request started")
+	} else if log.IsDebug() {
+		logvr(v, r).Debug("HTTP request started")
+	}
+	logvr(v, r).
+		Timing(func() {
+			if err := s.handleInternal(w, r, v); err != nil {
+				s.handleError(w, r, v, err)
+				return
+			}
+		}).
+		Debug("HTTP request finished")
+}
+
+func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor, err error) {
+	if websocket.IsWebSocketUpgrade(r) {
+		isNormalError := strings.Contains(err.Error(), "i/o timeout")
+		if isNormalError {
+			logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
+		} else {
+			logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Info("WebSocket error: %s", err.Error())
+		}
+		return // Do not attempt to write to upgraded connection
+	}
+	if matrixErr, ok := err.(*errMatrix); ok {
+		writeMatrixError(w, r, v, matrixErr)
+		return
+	}
+	httpErr, ok := err.(*errHTTP)
+	if !ok {
+		httpErr = errHTTPInternalError
+	}
+	isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest || httpErr.HTTPCode == http.StatusTooManyRequests
+	if isNormalError {
+		logvr(v, r).
+			Err(httpErr).
+			Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+	} else {
+		logvr(v, r).
+			Err(httpErr).
+			Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
+	w.WriteHeader(httpErr.HTTPCode)
+	io.WriteString(w, httpErr.JSON()+"\n")
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {

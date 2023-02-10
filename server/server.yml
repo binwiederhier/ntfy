@@ -257,7 +257,9 @@
 #   Be aware that "debug" (and particularly "trace") can be VERY CHATTY. Only turn them on briefly for debugging purposes.
 # - log-level-overrides lets you override the log level if certain fields match. This is incredibly powerful
 #   for debugging certain parts of the system (e.g. only the account management, or only a certain visitor).
-#   This is an array of strings in the format "field=value -> level", e.g. "tag=manager -> trace".
+#   This is an array of strings in the format:
+#      - "field=value -> level" to match a value exactly, e.g. "tag=manager -> trace"
+#      - "field -> level" to match any value, e.g. "time_taken_ms -> debug"
 #   Warning: Using log-level-overrides has a performance penalty. Only use it for temporary debugging.
 #
 # Example (good for production):
@@ -269,6 +271,7 @@
 #   log-level-overrides:
 #      - "tag=manager -> trace"
 #      - "visitor_ip=1.2.3.4 -> debug"
+#      - "time_taken_ms -> debug"
 #
 # log-level: info
 # log-level-overrides:

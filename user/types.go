@@ -32,13 +32,13 @@ func (u *User) TierID() string {
 	return u.Tier.ID
 }
 
-// Admin returns true if the user is an admin
-func (u *User) Admin() bool {
+// IsAdmin returns true if the user is an admin
+func (u *User) IsAdmin() bool {
 	return u != nil && u.Role == RoleAdmin
 }
 
-// User returns true if the user is a regular user, not an admin
-func (u *User) User() bool {
+// IsUser returns true if the user is a regular user, not an admin
+func (u *User) IsUser() bool {
 	return u != nil && u.Role == RoleUser
 }
 

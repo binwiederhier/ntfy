@@ -20,7 +20,7 @@ const (
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	if !u.Admin() { // u may be nil, but that's fine
+	if !u.IsAdmin() { // u may be nil, but that's fine
 		if !s.config.EnableSignup {
 			return errHTTPBadRequestSignupNotEnabled
 		} else if u != nil {
@@ -445,11 +445,11 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		return errHTTPBadRequestPermissionInvalid
 	}
 	// Check if we are allowed to reserve this topic
-	if u.User() && u.Tier == nil {
+	if u.IsUser() && u.Tier == nil {
 		return errHTTPUnauthorized
 	} else if err := s.userManager.CheckAllowAccess(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
-	} else if u.User() {
+	} else if u.IsUser() {
 		hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)
 		if err != nil {
 			return err

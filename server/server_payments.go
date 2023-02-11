@@ -121,11 +121,8 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 		return errNotAPaidTier
 	}
 	logvr(v, r).
+		With(tier).
 		Tag(tagStripe).
-		Fields(log.Context{
-			"tier":            tier,
-			"stripe_price_id": tier.StripePriceID,
-		}).
 		Info("Creating Stripe checkout flow")
 	var stripeCustomerID *string
 	if u.Billing.StripeCustomerID != "" {
@@ -196,11 +193,9 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	}
 	v.SetUser(u)
 	logvr(v, r).
+		With(tier).
 		Tag(tagStripe).
 		Fields(log.Context{
-			"tier_id":                        tier.ID,
-			"tier_name":                      tier.Name,
-			"stripe_price_id":                tier.StripePriceID,
 			"stripe_customer_id":             sess.Customer.ID,
 			"stripe_subscription_id":         sub.ID,
 			"stripe_subscription_status":     string(sub.Status),
@@ -273,7 +268,8 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 }
 
 // handleAccountBillingSubscriptionDelete facilitates downgrading a paid user to a tier-less user,
-// and cancelling the Stripe subscription entirely
+// and cancelling the Stripe subscription entirely. Note that this does not actually change the tier.
+// That is done by a webhook at the period end (in X days).
 func (s *Server) handleAccountBillingSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	logvr(v, r).Tag(tagStripe).Info("Deleting Stripe subscription")
 	u := v.User()

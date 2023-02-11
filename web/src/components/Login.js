@@ -43,7 +43,7 @@ const Login = () => {
     if (!config.enable_login) {
         return (
             <AvatarBox>
-                <Typography sx={{ typography: 'h6' }}>{t("Login is disabled")}</Typography>
+                <Typography sx={{ typography: 'h6' }}>{t("login_disabled")}</Typography>
             </AvatarBox>
         );
     }

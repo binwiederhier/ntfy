@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"github.com/stripe/stripe-go/v74"
+	"heckel.io/ntfy/log"
 	"net/netip"
 	"regexp"
 	"time"
@@ -90,6 +91,14 @@ type Tier struct {
 	AttachmentExpiryDuration time.Duration // Duration after which attachments will be deleted
 	AttachmentBandwidthLimit int64         // Daily bandwidth limit for the user
 	StripePriceID            string        // Price ID for paid tiers (price_...)
+}
+
+func (t *Tier) Context() log.Context {
+	return log.Context{
+		"tier_id":         t.ID,
+		"tier_name":       t.Name,
+		"stripe_price_id": t.StripePriceID,
+	}
 }
 
 // Subscription represents a user's topic subscription

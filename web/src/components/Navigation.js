@@ -177,6 +177,7 @@ const NavList = (props) => {
 };
 
 const UpgradeBanner = () => {
+    const { t } = useTranslation();
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -198,8 +199,8 @@ const UpgradeBanner = () => {
                 <ListItemIcon><CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large"/></ListItemIcon>
                 <ListItemText
                     sx={{ ml: 1 }}
-                    primary={"Upgrade to ntfy Pro"}
-                    secondary={"Reserve topics, more messages & emails, and larger attachments"}
+                    primary={t("nav_upgrade_banner_label")}
+                    secondary={t("nav_upgrade_banner_description")}
                     primaryTypographyProps={{
                         style: {
                             fontWeight: 500,

@@ -42,6 +42,7 @@ import (
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
+- MEDIUM: Tests for manager.go
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: Menu item -> popup click should not open page
 - LOW: get rid of reservation id, replace with DELETE X-Topic: ...

@@ -412,8 +412,8 @@ const UserDialog = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onCancel}>{t("prefs_users_dialog_button_cancel")}</Button>
-                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? t("prefs_users_dialog_button_save") : t("prefs_users_dialog_button_add")}</Button>
+                <Button onClick={props.onCancel}>{t("common_cancel")}</Button>
+                <Button onClick={handleSubmit} disabled={!addButtonEnabled}>{editMode ? t("common_save") : t("common_add")}</Button>
             </DialogActions>
         </Dialog>
     );

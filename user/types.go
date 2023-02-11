@@ -93,6 +93,7 @@ type Tier struct {
 	StripePriceID            string        // Price ID for paid tiers (price_...)
 }
 
+// Context returns fields for the log
 func (t *Tier) Context() log.Context {
 	return log.Context{
 		"tier_id":         t.ID,

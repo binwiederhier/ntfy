@@ -1,6 +1,7 @@
 {
   "common_cancel": "Cancel",
   "common_save": "Save",
+  "common_add": "Add",
   "signup_title": "Create a ntfy account",
   "signup_form_username": "Username",
   "signup_form_password": "Password",
@@ -299,9 +300,6 @@
   "prefs_users_dialog_base_url_label": "Service URL, e.g. https://ntfy.sh",
   "prefs_users_dialog_username_label": "Username, e.g. phil",
   "prefs_users_dialog_password_label": "Password",
-  "prefs_users_dialog_button_cancel": "Cancel",
-  "prefs_users_dialog_button_add": "Add",
-  "prefs_users_dialog_button_save": "Save",
   "prefs_appearance_title": "Appearance",
   "prefs_appearance_language_title": "Language",
   "prefs_reservations_title": "Reserved topics",

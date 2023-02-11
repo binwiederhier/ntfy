@@ -76,8 +76,8 @@ export const ReserveAddDialog = (props) => {
                 />
             </DialogContent>
             <DialogFooter status={error}>
-                <Button onClick={props.onClose}>{t("prefs_users_dialog_button_cancel")}</Button>
-                <Button onClick={handleSubmit} disabled={!submitButtonEnabled}>{t("prefs_users_dialog_button_add")}</Button>
+                <Button onClick={props.onClose}>{t("common_cancel")}</Button>
+                <Button onClick={handleSubmit} disabled={!submitButtonEnabled}>{t("common_add")}</Button>
             </DialogFooter>
         </Dialog>
     );

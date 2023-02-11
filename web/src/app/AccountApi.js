@@ -8,7 +8,7 @@ import {
     accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
-    accountUrl,
+    accountUrl, maybeWithBearerAuth,
     tiersUrl,
     withBasicAuth,
     withBearerAuth
@@ -78,7 +78,7 @@ class AccountApi {
         const url = accountUrl(config.base_url);
         console.log(`[AccountApi] Fetching user account ${url}`);
         const response = await fetchOrThrow(url, {
-            headers: withBearerAuth({}, session.token())
+            headers: maybeWithBearerAuth({}, session.token()) // GET /v1/account endpoint can be called by anonymous
         });
         const account = await response.json(); // May throw SyntaxError
         console.log(`[AccountApi] Account`, account);

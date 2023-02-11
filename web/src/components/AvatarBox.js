@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {Avatar} from "@mui/material";
 import Box from "@mui/material/Box";
-import logo from "../img/ntfy2.svg";
+import logo from "../img/ntfy-filled.svg";
 
 const AvatarBox = (props) => {
     return (

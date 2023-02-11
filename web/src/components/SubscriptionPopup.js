@@ -39,7 +39,7 @@ export const SubscriptionPopup = (props) => {
     const reservations = account?.reservations || [];
 
     const showReservationAdd = config.enable_reservations && !subscription?.reservation && account?.stats.reservations_remaining > 0;
-    const showReservationAddDisabled = config.enable_reservations && !subscription?.reservation && (config.enable_payments || account?.stats.reservations_remaining === 0);
+    const showReservationAddDisabled = !showReservationAdd && config.enable_reservations && !subscription?.reservation && (config.enable_payments || account?.stats.reservations_remaining === 0);
     const showReservationEdit = config.enable_reservations && !!subscription?.reservation;
     const showReservationDelete = config.enable_reservations && !!subscription?.reservation;
 
@@ -258,7 +258,7 @@ export const ReserveLimitChip = () => {
     if (account?.stats.reservations_remaining > 0) {
         return <></>;
     } else if (config.enable_payments) {
-        return <ProChip/>;
+        return (account?.limits.reservations > 0) ? <LimitReachedChip/> : <ProChip/>;
     } else if (account) {
         return <LimitReachedChip/>;
     }

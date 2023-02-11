@@ -34,6 +34,7 @@ import (
 
 /*
 
+- MEDIUM fail2ban to work with ntfy log not nginx log
 - HIGH Docs
   - tiers
   - api

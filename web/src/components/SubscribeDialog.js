@@ -6,7 +6,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Autocomplete, Checkbox, Chip, FormControlLabel, FormGroup, useMediaQuery} from "@mui/material";
+import {Autocomplete, Checkbox, FormControlLabel, FormGroup, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import api from "../app/Api";
 import {randomAlphanumericString, topicUrl, validTopic, validUrl} from "../app/utils";
@@ -21,6 +21,7 @@ import accountApi, {Role} from "../app/AccountApi";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
 import {TopicReservedError, UnauthorizedError} from "../app/errors";
+import {ReserveLimitChip} from "./SubscriptionPopup";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -33,7 +34,7 @@ const SubscribeDialog = (props) => {
     const handleSuccess = async () => {
         console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
         const actualBaseUrl = (baseUrl) ? baseUrl : config.base_url;
-        const subscription = subscribeTopic(actualBaseUrl, topic);
+        const subscription = await subscribeTopic(actualBaseUrl, topic);
         poller.pollInBackground(subscription); // Dangle!
         props.onSuccess(subscription);
     }
@@ -73,6 +74,7 @@ const SubscribePage = (props) => {
     const existingBaseUrls = Array
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
+    const showReserveTopicCheckbox = config.enable_reservations && session.exists() && !anotherServerVisible;
     const reserveTopicEnabled = session.exists() && account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0;
 
     const handleSubscribe = async () => {
@@ -163,7 +165,7 @@ const SubscribePage = (props) => {
                         {t("subscribe_dialog_subscribe_button_generate_topic_name")}
                     </Button>
                 </div>
-                {config.enable_reservations && session.exists() && !anotherServerVisible &&
+                {showReserveTopicCheckbox &&
                     <FormGroup>
                         <FormControlLabel
                             variant="standard"
@@ -181,7 +183,7 @@ const SubscribePage = (props) => {
                             label={
                                 <>
                                     {t("reserve_dialog_checkbox_label")}
-                                    <Chip label={t("action_bar_reservation_limit_reached")} variant="outlined" color="primary" sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}/>
+                                    <ReserveLimitChip/>
                                 </>
                             }
                         />

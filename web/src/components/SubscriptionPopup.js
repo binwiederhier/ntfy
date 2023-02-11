@@ -24,9 +24,8 @@ import {Clear} from "@mui/icons-material";
 import {AccountContext} from "./App";
 import {ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog} from "./ReserveDialogs";
 import {UnauthorizedError} from "../app/errors";
-import Box from "@mui/material/Box";
 
-const SubscriptionPopup = (props) => {
+export const SubscriptionPopup = (props) => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
     const navigate = useNavigate();
@@ -39,10 +38,10 @@ const SubscriptionPopup = (props) => {
     const placement = props.placement ?? "left";
     const reservations = account?.reservations || [];
 
-    const showReservationAdd = !subscription?.reservation && account?.stats.reservations_remaining > 0;
-    const showReservationAddDisabled = !subscription?.reservation && account?.stats.reservations_remaining === 0;
-    const showReservationEdit = !!subscription?.reservation;
-    const showReservationDelete = !!subscription?.reservation;
+    const showReservationAdd = config.enable_reservations && !subscription?.reservation && account?.stats.reservations_remaining > 0;
+    const showReservationAddDisabled = config.enable_reservations && !subscription?.reservation && (config.enable_payments || account?.stats.reservations_remaining === 0);
+    const showReservationEdit = config.enable_reservations && !!subscription?.reservation;
+    const showReservationDelete = config.enable_reservations && !!subscription?.reservation;
 
     const handleChangeDisplayName = async () => {
         setDisplayNameDialogOpen(true);
@@ -141,7 +140,7 @@ const SubscriptionPopup = (props) => {
                 {showReservationAddDisabled &&
                     <MenuItem sx={{ cursor: "default" }}>
                         <span style={{ opacity: 0.3 }}>{t("action_bar_reservation_add")}</span>
-                        <Chip label={t("action_bar_reservation_limit_reached")} variant="outlined" color="primary" sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}/>
+                        <ReserveLimitChip/>
                     </MenuItem>
                 }
                 {showReservationEdit && <MenuItem onClick={handleReserveEdit}>{t("action_bar_reservation_edit")}</MenuItem>}
@@ -254,4 +253,40 @@ const DisplayNameDialog = (props) => {
     );
 };
 
-export default SubscriptionPopup;
+export const ReserveLimitChip = () => {
+    const { account } = useContext(AccountContext);
+    if (account?.stats.reservations_remaining > 0) {
+        return <></>;
+    } else if (config.enable_payments) {
+        return <ProChip/>;
+    } else if (account) {
+        return <LimitReachedChip/>;
+    }
+    return <></>;
+};
+
+const LimitReachedChip = () => {
+    const { t } = useTranslation();
+    return (
+        <Chip
+            label={t("action_bar_reservation_limit_reached")}
+            variant="outlined"
+            color="primary"
+            sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}
+        />
+    );
+};
+
+const ProChip = () => {
+    const { t } = useTranslation();
+    return (
+        <Chip
+            label={"ntfy Pro"}
+            variant="outlined"
+            color="primary"
+            sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}
+        />
+    );
+};
+
+

@@ -11,9 +11,8 @@ import Divider from "@mui/material/Divider";
 import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import SubscribeDialog from "./SubscribeDialog";
-import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Menu, Portal, Tooltip} from "@mui/material";
+import {Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Portal, Tooltip} from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import {openUrl, topicDisplayName, topicUrl} from "../app/utils";
@@ -21,16 +20,7 @@ import routes from "./routes";
 import {ConnectionState} from "../app/Connection";
 import {useLocation, useNavigate} from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {
-    ChatBubble,
-    Lock, Logout,
-    MoreHoriz, MoreVert,
-    NotificationsOffOutlined,
-    Public,
-    PublicOff,
-    Send,
-    Settings
-} from "@mui/icons-material";
+import {ChatBubble, MoreVert, NotificationsOffOutlined, Send} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -43,9 +33,7 @@ import UpgradeDialog from "./UpgradeDialog";
 import {AccountContext} from "./App";
 import {PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite} from "./ReserveIcons";
 import IconButton from "@mui/material/IconButton";
-import MenuItem from "@mui/material/MenuItem";
-import PopupMenu from "./PopupMenu";
-import SubscriptionPopup from "./SubscriptionPopup";
+import { SubscriptionPopup } from "./SubscriptionPopup";
 
 const navWidth = 280;
 

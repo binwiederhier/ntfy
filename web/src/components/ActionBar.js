@@ -26,7 +26,7 @@ import {Logout, Person, Settings} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import accountApi from "../app/AccountApi";
 import PopupMenu from "./PopupMenu";
-import SubscriptionPopup from "./SubscriptionPopup";
+import { SubscriptionPopup } from "./SubscriptionPopup";
 
 const ActionBar = (props) => {
     const { t } = useTranslation();

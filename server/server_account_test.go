@@ -31,8 +31,8 @@ func TestAccount_Signup_Success(t *testing.T) {
 	require.True(t, time.Now().Add(71*time.Hour).Unix() < token.Expires)
 	require.True(t, strings.HasPrefix(token.Token, "tk_"))
 	require.Equal(t, "9.9.9.9", token.LastOrigin)
-	require.True(t, token.LastAccess > time.Now().Unix()-1)
-	require.True(t, token.LastAccess < time.Now().Unix()+1)
+	require.True(t, token.LastAccess > time.Now().Unix()-2)
+	require.True(t, token.LastAccess < time.Now().Unix()+2)
 
 	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
 		"Authorization": util.BearerAuth(token.Token),

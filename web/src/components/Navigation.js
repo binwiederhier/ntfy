@@ -291,7 +291,14 @@ const SubscriptionItem = (props) => {
                     </ListItemIcon>
                 }
                 <ListItemIcon edge="end" sx={{minWidth: "26px"}}>
-                    <IconButton size="small" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
+                    <IconButton
+                        size="small"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuAnchorEl(e.currentTarget);
+                        }}
+                    >
                         <MoreVert fontSize="small"/>
                     </IconButton>
                 </ListItemIcon>

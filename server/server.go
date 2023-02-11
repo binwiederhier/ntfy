@@ -41,7 +41,6 @@ import (
   - tokens
 - HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
-- MEDIUM: uploading attachments leads to 404 -- race
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: Menu item -> popup click should not open page
@@ -563,7 +562,16 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	//   - and also uses the higher bandwidth limits of a paying user
 	m, err := s.messageCache.Message(messageID)
 	if err == errMessageNotFound {
-		return errHTTPNotFound
+		if s.config.CacheBatchTimeout > 0 {
+			// Strange edge case: If we immediately after upload request the file (the web app does this for images),
+			// and messages are persisted asynchronously, retry fetching from the database
+			m, err = util.Retry(func() (*message, error) {
+				return s.messageCache.Message(messageID)
+			}, s.config.CacheBatchTimeout, 100*time.Millisecond, 300*time.Millisecond, 600*time.Millisecond)
+		}
+		if err != nil {
+			return errHTTPNotFound
+		}
 	} else if err != nil {
 		return err
 	}

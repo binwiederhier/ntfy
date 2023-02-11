@@ -1714,6 +1714,25 @@ func TestServer_PublishAttachmentBandwidthLimitUploadOnly(t *testing.T) {
 	require.Equal(t, 41301, err.Code)
 }
 
+func TestServer_PublishAttachmentAndImmediatelyGetItWithCacheTimeout(t *testing.T) {
+	// This tests the awkward util.Retry in handleFile: Due to the async persisting of messages,
+	// the message is not immediately available when attempting to download it.
+
+	c := newTestConfig(t)
+	c.CacheBatchTimeout = 500 * time.Millisecond
+	c.CacheBatchSize = 10
+	s := newTestServer(t, c)
+	content := "this is an ATTACHMENT"
+	rr := request(t, s, "PUT", "/mytopic?f=myfile.txt", content, nil)
+	m := toMessage(t, rr.Body.String())
+	require.Equal(t, "myfile.txt", m.Attachment.Name)
+
+	path := strings.TrimPrefix(m.Attachment.URL, "http://127.0.0.1:12345")
+	rr = request(t, s, "GET", path, "", nil)
+	require.Equal(t, 200, rr.Code) // Not 404!
+	require.Equal(t, content, rr.Body.String())
+}
+
 func TestServer_PublishAttachmentAccountStats(t *testing.T) {
 	content := util.RandomString(4999) // > 4096
 

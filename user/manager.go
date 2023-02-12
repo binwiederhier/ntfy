@@ -1017,9 +1017,9 @@ func (a *Manager) checkReservationsLimit(username string, reservationsLimit int6
 	return nil
 }
 
-// CheckAllowAccess tests if a user may create an access control entry for the given topic.
+// AllowReservation tests if a user may create an access control entry for the given topic.
 // If there are any ACL entries that are not owned by the user, an error is returned.
-func (a *Manager) CheckAllowAccess(username string, topic string) error {
+func (a *Manager) AllowReservation(username string, topic string) error {
 	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopic(topic) {
 		return ErrInvalidArgument
 	}

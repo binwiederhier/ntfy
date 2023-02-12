@@ -447,7 +447,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	// Check if we are allowed to reserve this topic
 	if u.IsUser() && u.Tier == nil {
 		return errHTTPUnauthorized
-	} else if err := s.userManager.CheckAllowAccess(u.Name, req.Topic); err != nil {
+	} else if err := s.userManager.AllowReservation(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
 	} else if u.IsUser() {
 		hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)

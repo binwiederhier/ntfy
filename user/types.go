@@ -6,6 +6,7 @@ import (
 	"heckel.io/ntfy/log"
 	"net/netip"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -97,7 +98,7 @@ type Tier struct {
 func (t *Tier) Context() log.Context {
 	return log.Context{
 		"tier_id":         t.ID,
-		"tier_name":       t.Name,
+		"tier_code":       t.Code,
 		"stripe_price_id": t.StripePriceID,
 	}
 }
@@ -170,7 +171,7 @@ func NewPermission(read, write bool) Permission {
 
 // ParsePermission parses the string representation and returns a Permission
 func ParsePermission(s string) (Permission, error) {
-	switch s {
+	switch strings.ToLower(s) {
 	case "read-write", "rw":
 		return NewPermission(true, true), nil
 	case "read-only", "read", "ro":

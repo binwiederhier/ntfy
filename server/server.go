@@ -39,7 +39,6 @@ import (
   - tiers
   - api
   - tokens
-- HIGH Self-review
 - MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
 - MEDIUM: Tests for manager.go

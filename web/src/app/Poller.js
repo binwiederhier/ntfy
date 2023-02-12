@@ -1,7 +1,7 @@
 import api from "./Api";
 import subscriptionManager from "./SubscriptionManager";
 
-const delayMillis = 8000; // 8 seconds
+const delayMillis = 2000; // 2 seconds
 const intervalMillis = 300000; // 5 minutes
 
 class Poller {

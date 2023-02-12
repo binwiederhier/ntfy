@@ -100,11 +100,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
                 const subscription = await subscriptionManager.add(baseUrl, params.topic);
                 if (session.exists()) {
                     try {
-                        const remoteSubscription = await accountApi.addSubscription({
-                            base_url: baseUrl,
-                            topic: params.topic
-                        });
-                        await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+                        await accountApi.addSubscription(baseUrl, params.topic);
                     } catch (e) {
                         console.log(`[Hooks] Auto-subscribing failed`, e);
                         if (e instanceof UnauthorizedError) {

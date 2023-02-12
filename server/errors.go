@@ -76,6 +76,7 @@ var (
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication"}
 	errHTTPConflictUserExists                        = &errHTTP{40901, http.StatusConflict, "conflict: user already exists", ""}
 	errHTTPConflictTopicReserved                     = &errHTTP{40902, http.StatusConflict, "conflict: access control entry for topic or topic pattern already exists", ""}
+	errHTTPConflictSubscriptionExists                = &errHTTP{40903, http.StatusConflict, "conflict: topic subscription already exists", ""}
 	errHTTPEntityTooLargeAttachment                  = &errHTTP{41301, http.StatusRequestEntityTooLarge, "attachment too large, or bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations"}
 	errHTTPEntityTooLargeMatrixRequest               = &errHTTP{41302, http.StatusRequestEntityTooLarge, "Matrix request is larger than the max allowed length", ""}
 	errHTTPEntityTooLargeJSONBody                    = &errHTTP{41303, http.StatusRequestEntityTooLarge, "JSON body too large", ""}

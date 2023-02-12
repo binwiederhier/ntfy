@@ -726,7 +726,6 @@ func TestManager_ChangeSettings(t *testing.T) {
 		},
 		Subscriptions: []*Subscription{
 			{
-				ID:          "someID",
 				BaseURL:     "https://ntfy.sh",
 				Topic:       "mytopic",
 				DisplayName: util.String("My Topic"),
@@ -742,7 +741,6 @@ func TestManager_ChangeSettings(t *testing.T) {
 	require.Equal(t, util.String("ding"), u.Prefs.Notification.Sound)
 	require.Equal(t, util.Int(2), u.Prefs.Notification.MinPriority)
 	require.Nil(t, u.Prefs.Notification.DeleteAfter)
-	require.Equal(t, "someID", u.Prefs.Subscriptions[0].ID)
 	require.Equal(t, "https://ntfy.sh", u.Prefs.Subscriptions[0].BaseURL)
 	require.Equal(t, "mytopic", u.Prefs.Subscriptions[0].Topic)
 	require.Equal(t, util.String("My Topic"), u.Prefs.Subscriptions[0].DisplayName)

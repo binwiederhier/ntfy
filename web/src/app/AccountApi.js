@@ -173,9 +173,12 @@ class AccountApi {
         });
     }
 
-    async addSubscription(payload) {
+    async addSubscription(baseUrl, topic) {
         const url = accountSubscriptionUrl(config.base_url);
-        const body = JSON.stringify(payload);
+        const body = JSON.stringify({
+            base_url: baseUrl,
+            topic: topic
+        });
         console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
         const response = await fetchOrThrow(url, {
             method: "POST",
@@ -187,9 +190,13 @@ class AccountApi {
         return subscription;
     }
 
-    async updateSubscription(remoteId, payload) {
-        const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
-        const body = JSON.stringify(payload);
+    async updateSubscription(baseUrl, topic, payload) {
+        const url = accountSubscriptionUrl(config.base_url);
+        const body = JSON.stringify({
+            base_url: baseUrl,
+            topic: topic,
+            ...payload
+        });
         console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
         const response = await fetchOrThrow(url, {
             method: "PATCH",
@@ -201,12 +208,16 @@ class AccountApi {
         return subscription;
     }
 
-    async deleteSubscription(remoteId) {
-        const url = accountSubscriptionSingleUrl(config.base_url, remoteId);
+    async deleteSubscription(baseUrl, topic) {
+        const url = accountSubscriptionUrl(config.base_url);
         console.log(`[AccountApi] Removing user subscription ${url}`);
+        const headers = {
+            "X-BaseURL": baseUrl,
+            "X-Topic":  topic,
+        }
         await fetchOrThrow(url, {
             method: "DELETE",
-            headers: withBearerAuth({}, session.token())
+            headers: withBearerAuth(headers, session.token()),
         });
     }
 

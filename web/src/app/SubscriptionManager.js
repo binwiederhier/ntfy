@@ -29,7 +29,6 @@ class SubscriptionManager {
             topic: topic,
             mutedUntil: 0,
             last: null,
-            remoteId: null,
             internal: internal || false
         };
         await db.subscriptions.put(subscription);
@@ -40,24 +39,23 @@ class SubscriptionManager {
         console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
         // Add remote subscriptions
-        let remoteIds = [];
+        let remoteIds = []; // = topicUrl(baseUrl, topic)
         for (let i = 0; i < remoteSubscriptions.length; i++) {
             const remote = remoteSubscriptions[i];
-            const local = await this.add(remote.base_url, remote.topic);
+            const local = await this.add(remote.base_url, remote.topic, false);
             const reservation = remoteReservations?.find(r => remote.base_url === config.base_url && remote.topic === r.topic) || null;
             await this.update(local.id, {
-                remoteId: remote.id,
                 displayName: remote.display_name, // May be undefined
                 reservation: reservation // May be null!
             });
-            remoteIds.push(remote.id);
+            remoteIds.push(local.id);
         }
 
         // Remove local subscriptions that do not exist remotely
         const localSubscriptions = await db.subscriptions.toArray();
         for (let i = 0; i < localSubscriptions.length; i++) {
             const local = localSubscriptions[i];
-            const remoteExists = local.remoteId && remoteIds.includes(local.remoteId);
+            const remoteExists = remoteIds.includes(local.id);
             if (!local.internal && !remoteExists) {
                 await this.remove(local.id);
             }
@@ -171,12 +169,6 @@ class SubscriptionManager {
     async setDisplayName(subscriptionId, displayName) {
         await db.subscriptions.update(subscriptionId, {
             displayName: displayName
-        });
-    }
-
-    async setRemoteId(subscriptionId, remoteId) {
-        await db.subscriptions.update(subscriptionId, {
-            remoteId: remoteId
         });
     }
 

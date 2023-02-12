@@ -23,7 +23,6 @@ export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
 export const accountSettingsUrl = (baseUrl) => `${baseUrl}/v1/account/settings`;
 export const accountSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/subscription`;
-export const accountSubscriptionSingleUrl = (baseUrl, id) => `${baseUrl}/v1/account/subscription/${id}`;
 export const accountReservationUrl = (baseUrl) => `${baseUrl}/v1/account/reservation`;
 export const accountReservationSingleUrl = (baseUrl, topic) => `${baseUrl}/v1/account/reservation/${topic}`;
 export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/billing/subscription`;

@@ -214,13 +214,11 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, 1, len(account.Subscriptions))
-	require.NotEmpty(t, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
 	require.Equal(t, "def", account.Subscriptions[0].Topic)
 	require.Nil(t, account.Subscriptions[0].DisplayName)
 
-	subscriptionID := account.Subscriptions[0].ID
-	rr = request(t, s, "PATCH", "/v1/account/subscription/"+subscriptionID, `{"display_name": "ding dong"}`, map[string]string{
+	rr = request(t, s, "PATCH", "/v1/account/subscription", `{"base_url": "http://abc.com", "topic": "def", "display_name": "ding dong"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -231,13 +229,14 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, 1, len(account.Subscriptions))
-	require.Equal(t, subscriptionID, account.Subscriptions[0].ID)
 	require.Equal(t, "http://abc.com", account.Subscriptions[0].BaseURL)
 	require.Equal(t, "def", account.Subscriptions[0].Topic)
 	require.Equal(t, util.String("ding dong"), account.Subscriptions[0].DisplayName)
 
-	rr = request(t, s, "DELETE", "/v1/account/subscription/"+subscriptionID, "", map[string]string{
+	rr = request(t, s, "DELETE", "/v1/account/subscription", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
+		"X-BaseURL":     "http://abc.com",
+		"X-Topic":       "def",
 	})
 	require.Equal(t, 200, rr.Code)
 

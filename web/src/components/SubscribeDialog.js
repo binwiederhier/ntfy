@@ -299,11 +299,7 @@ export const subscribeTopic = async (baseUrl, topic) => {
     const subscription = await subscriptionManager.add(baseUrl, topic);
     if (session.exists()) {
         try {
-            const remoteSubscription = await accountApi.addSubscription({
-                base_url: baseUrl,
-                topic: topic
-            });
-            await subscriptionManager.setRemoteId(subscription.id, remoteSubscription.id);
+            await accountApi.addSubscription(baseUrl, topic);
         } catch (e) {
             console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
             if (e instanceof UnauthorizedError) {

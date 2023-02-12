@@ -109,9 +109,9 @@ export const SubscriptionPopup = (props) => {
     const handleUnsubscribe = async () => {
         console.log(`[SubscriptionPopup] Unsubscribing from ${props.subscription.id}`, props.subscription);
         await subscriptionManager.remove(props.subscription.id);
-        if (session.exists() && props.subscription.remoteId) {
+        if (session.exists() && !subscription.internal) {
             try {
-                await accountApi.deleteSubscription(props.subscription.remoteId);
+                await accountApi.deleteSubscription(props.subscription.baseUrl, props.subscription.topic);
             } catch (e) {
                 console.log(`[SubscriptionPopup] Error unsubscribing`, e);
                 if (e instanceof UnauthorizedError) {
@@ -198,10 +198,10 @@ const DisplayNameDialog = (props) => {
 
     const handleSave = async () => {
         await subscriptionManager.setDisplayName(subscription.id, displayName);
-        if (session.exists() && subscription.remoteId) {
+        if (session.exists() && !subscription.internal) {
             try {
                 console.log(`[SubscriptionSettingsDialog] Updating subscription display name to ${displayName}`);
-                await accountApi.updateSubscription(subscription.remoteId, { display_name: displayName });
+                await accountApi.updateSubscription(subscription.baseUrl, subscription.topic, { display_name: displayName });
             } catch (e) {
                 console.log(`[SubscriptionSettingsDialog] Error updating subscription`, e);
                 if (e instanceof UnauthorizedError) {

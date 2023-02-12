@@ -105,10 +105,17 @@ func (t *Tier) Context() log.Context {
 
 // Subscription represents a user's topic subscription
 type Subscription struct {
-	ID          string  `json:"id"`
 	BaseURL     string  `json:"base_url"`
 	Topic       string  `json:"topic"`
 	DisplayName *string `json:"display_name"`
+}
+
+// Context returns fields for the log
+func (s *Subscription) Context() log.Context {
+	return log.Context{
+		"base_url": s.BaseURL,
+		"topic":    s.Topic,
+	}
 }
 
 // NotificationPrefs represents the user's notification settings

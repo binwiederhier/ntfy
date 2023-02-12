@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	subscriptionIDLength      = 16
-	subscriptionIDPrefix      = "su_"
 	syncTopicAccountSyncEvent = "sync"
 	tokenExpiryDuration       = 72 * time.Hour // Extend tokens by this much
 )
@@ -323,52 +321,36 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 		return err
 	}
 	u := v.User()
-	if u.Prefs == nil {
-		u.Prefs = &user.Prefs{}
+	prefs := u.Prefs
+	if prefs == nil {
+		prefs = &user.Prefs{}
 	}
-	newSubscription.ID = "" // Client cannot set ID
-	for _, subscription := range u.Prefs.Subscriptions {
+	for _, subscription := range prefs.Subscriptions {
 		if newSubscription.BaseURL == subscription.BaseURL && newSubscription.Topic == subscription.Topic {
-			newSubscription = subscription
-			break
+			return errHTTPConflictSubscriptionExists
 		}
 	}
-	if newSubscription.ID == "" {
-		newSubscription.ID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
-		prefs := u.Prefs
-		prefs.Subscriptions = append(prefs.Subscriptions, newSubscription)
-		logvr(v, r).
-			Tag(tagAccount).
-			Fields(log.Context{
-				"base_url": newSubscription.BaseURL,
-				"topic":    newSubscription.Topic,
-			}).
-			Debug("Adding subscription for user %s", u.Name)
-		if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
-			return err
-		}
+	prefs.Subscriptions = append(prefs.Subscriptions, newSubscription)
+	logvr(v, r).Tag(tagAccount).With(newSubscription).Debug("Adding subscription for user %s", u.Name)
+	if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
+		return err
 	}
 	return s.writeJSON(w, newSubscription)
 }
 
 func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := apiAccountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
-	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidPath
-	}
-	subscriptionID := matches[1]
 	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
 	u := v.User()
-	if u.Prefs == nil || u.Prefs.Subscriptions == nil {
+	prefs := u.Prefs
+	if prefs == nil || prefs.Subscriptions == nil {
 		return errHTTPNotFound
 	}
-	prefs := u.Prefs
 	var subscription *user.Subscription
 	for _, sub := range prefs.Subscriptions {
-		if sub.ID == subscriptionID {
+		if sub.BaseURL == updatedSubscription.BaseURL && sub.Topic == updatedSubscription.Topic {
 			sub.DisplayName = updatedSubscription.DisplayName
 			subscription = sub
 			break
@@ -377,14 +359,7 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 	if subscription == nil {
 		return errHTTPNotFound
 	}
-	logvr(v, r).
-		Tag(tagAccount).
-		Fields(log.Context{
-			"base_url":     subscription.BaseURL,
-			"topic":        subscription.Topic,
-			"display_name": subscription.DisplayName,
-		}).
-		Debug("Changing subscription for user %s", u.Name)
+	logvr(v, r).Tag(tagAccount).With(subscription).Debug("Changing subscription for user %s", u.Name)
 	if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 		return err
 	}
@@ -392,31 +367,23 @@ func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	matches := apiAccountSubscriptionSingleRegex.FindStringSubmatch(r.URL.Path)
-	if len(matches) != 2 {
-		return errHTTPInternalErrorInvalidPath
-	}
-	subscriptionID := matches[1]
+	// DELETEs cannot have a body, and we don't want it in the path
+	deleteBaseURL := readParam(r, "X-BaseURL", "BaseURL")
+	deleteTopic := readParam(r, "X-Topic", "Topic")
 	u := v.User()
-	if u.Prefs == nil || u.Prefs.Subscriptions == nil {
+	prefs := u.Prefs
+	if prefs == nil || prefs.Subscriptions == nil {
 		return nil
 	}
 	newSubscriptions := make([]*user.Subscription, 0)
-	for _, subscription := range u.Prefs.Subscriptions {
-		if subscription.ID == subscriptionID {
-			logvr(v, r).
-				Tag(tagAccount).
-				Fields(log.Context{
-					"base_url": subscription.BaseURL,
-					"topic":    subscription.Topic,
-				}).
-				Debug("Removing subscription for user %s", u.Name)
+	for _, sub := range u.Prefs.Subscriptions {
+		if sub.BaseURL == deleteBaseURL && sub.Topic == deleteTopic {
+			logvr(v, r).Tag(tagAccount).With(sub).Debug("Removing subscription for user %s", u.Name)
 		} else {
-			newSubscriptions = append(newSubscriptions, subscription)
+			newSubscriptions = append(newSubscriptions, sub)
 		}
 	}
-	if len(newSubscriptions) < len(u.Prefs.Subscriptions) {
-		prefs := u.Prefs
+	if len(newSubscriptions) < len(prefs.Subscriptions) {
 		prefs.Subscriptions = newSubscriptions
 		if err := s.userManager.ChangeSettings(u.ID, prefs); err != nil {
 			return err

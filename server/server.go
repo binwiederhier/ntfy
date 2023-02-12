@@ -39,8 +39,6 @@ import (
   - tiers
   - api
   - tokens
-- LOW: UI: Flickering upgrade banner when logging in
-- LOW: get rid of reservation id, replace with DELETE X-Topic: ...
 
 */
 
@@ -98,7 +96,6 @@ var (
 	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
 	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
 	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
-	apiAccountSubscriptionSingleRegex                    = regexp.MustCompile(`^/v1/account/subscription/([-_A-Za-z0-9]{16})$`)
 	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -404,9 +401,9 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.withAccountSync(s.handleAccountSettingsChange))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountSubscriptionPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionAdd))(w, r, v)
-	} else if r.Method == http.MethodPatch && apiAccountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountSubscriptionPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionChange))(w, r, v)
-	} else if r.Method == http.MethodDelete && apiAccountSubscriptionSingleRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountSubscriptionPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSubscriptionDelete))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountReservationPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountReservationAdd))(w, r, v)

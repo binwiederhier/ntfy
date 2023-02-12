@@ -12,5 +12,5 @@ var config = {
     enable_signup: true,
     enable_payments: true,
     enable_reservations: true,
-    disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "pricing", "signup", "login", "reset-password"]
+    disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login"]
 };

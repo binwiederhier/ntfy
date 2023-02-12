@@ -17,7 +17,7 @@ import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
-import accountApi, {Role} from "../app/AccountApi";
+import accountApi, {Permission, Role} from "../app/AccountApi";
 import ReserveTopicSelect from "./ReserveTopicSelect";
 import {AccountContext} from "./App";
 import {TopicReservedError, UnauthorizedError} from "../app/errors";
@@ -67,7 +67,7 @@ const SubscribePage = (props) => {
     const [error, setError] = useState("");
     const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
     const [anotherServerVisible, setAnotherServerVisible] = useState(false);
-    const [everyone, setEveryone] = useState("deny-all");
+    const [everyone, setEveryone] = useState(Permission.DENY_ALL);
     const baseUrl = (anotherServerVisible) ? props.baseUrl : config.base_url;
     const topic = props.topic;
     const existingTopicUrls = props.subscriptions.map(s => topicUrl(s.baseUrl, s.topic));
@@ -99,7 +99,6 @@ const SubscribePage = (props) => {
             console.log(`[SubscribeDialog] Reserving topic ${topic} with everyone access ${everyone}`);
             try {
                 await accountApi.upsertReservation(topic, everyone);
-                // Account sync later after it was added
             } catch (e) {
                 console.log(`[SubscribeDialog] Error reserving topic`, e);
                 if (e instanceof UnauthorizedError) {

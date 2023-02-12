@@ -33,13 +33,10 @@ const UpgradeDialog = (props) => {
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
     useEffect(() => {
-        (async () => {
-            try {
-                setTiers(await accountApi.billingTiers());
-            } catch (e) {
-                setError(e.message);
-            }
-        })();
+        const fetchTiers = async () => {
+            setTiers(await accountApi.billingTiers());
+        }
+        fetchTiers(); // Dangle
     }, []);
 
     if (!tiers) {

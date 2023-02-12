@@ -8,6 +8,7 @@ import (
 	"heckel.io/ntfy/util"
 	"io"
 	"net/netip"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -597,6 +598,80 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 	// Publish a message (as anonymous)
 	rr = request(t, s, "POST", "/mytopic", `Howdy`, nil)
 	require.Equal(t, 403, rr.Code)
+}
+
+func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t)
+	conf.AuthDefault = user.PermissionReadWrite
+	s := newTestServer(t, conf)
+
+	// Create user with tier
+	require.Nil(t, s.userManager.AddUser("phil", "mypass", user.RoleUser))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:                     "pro",
+		MessageLimit:             20,
+		MessageExpiryDuration:    time.Hour,
+		ReservationLimit:         2,
+		AttachmentTotalSizeLimit: 10000,
+		AttachmentFileSizeLimit:  10000,
+		AttachmentExpiryDuration: time.Hour,
+		AttachmentBandwidthLimit: 10000,
+	}))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+
+	// Reserve two topics "mytopic1" and "mytopic2"
+	rr := request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic1", "everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "POST", "/v1/account/reservation", `{"topic": "mytopic2", "everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Publish a message with attachment to each topic
+	rr = request(t, s, "POST", "/mytopic1?f=attach.txt", `Howdy`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+	m1 := toMessage(t, rr.Body.String())
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m1.ID))
+
+	rr = request(t, s, "POST", "/mytopic2?f=attach.txt", `Howdy`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+	m2 := toMessage(t, rr.Body.String())
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m2.ID))
+
+	// Delete reservation
+	rr = request(t, s, "DELETE", "/v1/account/reservation/mytopic1", ``, map[string]string{
+		"X-Delete-Messages": "true",
+		"Authorization":     util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "DELETE", "/v1/account/reservation/mytopic2", ``, map[string]string{
+		"X-Delete-Messages": "false",
+		"Authorization":     util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Verify that messages and attachments were deleted
+	time.Sleep(time.Second)
+	s.execManager()
+
+	ms, err := s.messageCache.Messages("mytopic1", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(ms))
+	require.NoFileExists(t, filepath.Join(s.config.AttachmentCacheDir, m1.ID))
+
+	ms, err = s.messageCache.Messages("mytopic2", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ms))
+	require.Equal(t, m2.ID, ms[0].ID)
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m2.ID))
 }
 
 func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {

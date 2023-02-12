@@ -1339,7 +1339,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 }
 
 func TestServer_PublishAttachment(t *testing.T) {
-	content := util.RandomString(5000) // > 4096
+	content := "text file!" + util.RandomString(4990) // > 4096
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "PUT", "/mytopic", content, nil)
 	msg := toMessage(t, response.Body.String())

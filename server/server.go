@@ -39,7 +39,6 @@ import (
   - tiers
   - api
   - tokens
-- MEDIUM: Test for expiring messages after reservation removal
 - MEDIUM: Test new token endpoints & never-expiring token
 - LOW: UI: Flickering upgrade banner when logging in
 - LOW: get rid of reservation id, replace with DELETE X-Topic: ...

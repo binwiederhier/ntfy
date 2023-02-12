@@ -2,6 +2,7 @@ package user
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/util"
@@ -380,6 +381,13 @@ func TestManager_Reservations(t *testing.T) {
 
 	err = a.AllowReservation("phil", "not-reserved")
 	require.Nil(t, err)
+
+	// Now remove them again
+	require.Nil(t, a.RemoveReservations("ben", "ztopic", "readme"))
+
+	count, err = a.ReservationsCount("ben")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), count)
 }
 
 func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
@@ -740,10 +748,23 @@ func TestManager_ChangeSettings(t *testing.T) {
 	require.Equal(t, util.String("My Topic"), u.Prefs.Subscriptions[0].DisplayName)
 }
 
-func TestManager_Tier_Create(t *testing.T) {
+func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
 	// Create tier and user
+	require.Nil(t, a.AddTier(&Tier{
+		Code:                     "supporter",
+		Name:                     "Supporter",
+		MessageLimit:             1,
+		MessageExpiryDuration:    time.Second,
+		EmailLimit:               1,
+		ReservationLimit:         1,
+		AttachmentFileSizeLimit:  1,
+		AttachmentTotalSizeLimit: 1,
+		AttachmentExpiryDuration: time.Second,
+		AttachmentBandwidthLimit: 1,
+		StripePriceID:            "price_1",
+	}))
 	require.Nil(t, a.AddTier(&Tier{
 		Code:                     "pro",
 		Name:                     "Pro",
@@ -755,6 +776,7 @@ func TestManager_Tier_Create(t *testing.T) {
 		AttachmentTotalSizeLimit: 123123,
 		AttachmentExpiryDuration: 10800 * time.Second,
 		AttachmentBandwidthLimit: 21474836480,
+		StripePriceID:            "price_2",
 	}))
 	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
 	require.Nil(t, a.ChangeTier("phil", "pro"))
@@ -780,6 +802,68 @@ func TestManager_Tier_Create(t *testing.T) {
 	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
 	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
+	require.Equal(t, "price_2", ti.StripePriceID)
+
+	// Update tier
+	ti.EmailLimit = 999999
+	require.Nil(t, a.UpdateTier(ti))
+
+	// List tiers
+	tiers, err := a.Tiers()
+	require.Nil(t, err)
+	require.Equal(t, 2, len(tiers))
+
+	ti = tiers[0]
+	require.Equal(t, "supporter", ti.Code)
+	require.Equal(t, "Supporter", ti.Name)
+	require.Equal(t, int64(1), ti.MessageLimit)
+	require.Equal(t, time.Second, ti.MessageExpiryDuration)
+	require.Equal(t, int64(1), ti.EmailLimit)
+	require.Equal(t, int64(1), ti.ReservationLimit)
+	require.Equal(t, int64(1), ti.AttachmentFileSizeLimit)
+	require.Equal(t, int64(1), ti.AttachmentTotalSizeLimit)
+	require.Equal(t, time.Second, ti.AttachmentExpiryDuration)
+	require.Equal(t, int64(1), ti.AttachmentBandwidthLimit)
+	require.Equal(t, "price_1", ti.StripePriceID)
+
+	ti = tiers[1]
+	require.Equal(t, "pro", ti.Code)
+	require.Equal(t, "Pro", ti.Name)
+	require.Equal(t, int64(123), ti.MessageLimit)
+	require.Equal(t, 86400*time.Second, ti.MessageExpiryDuration)
+	require.Equal(t, int64(999999), ti.EmailLimit) // Updatedd!
+	require.Equal(t, int64(2), ti.ReservationLimit)
+	require.Equal(t, int64(1231231), ti.AttachmentFileSizeLimit)
+	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
+	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
+	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
+	require.Equal(t, "price_2", ti.StripePriceID)
+
+	ti, err = a.TierByStripePrice("price_1")
+	require.Nil(t, err)
+	require.Equal(t, "supporter", ti.Code)
+	require.Equal(t, "Supporter", ti.Name)
+	require.Equal(t, int64(1), ti.MessageLimit)
+	require.Equal(t, time.Second, ti.MessageExpiryDuration)
+	require.Equal(t, int64(1), ti.EmailLimit)
+	require.Equal(t, int64(1), ti.ReservationLimit)
+	require.Equal(t, int64(1), ti.AttachmentFileSizeLimit)
+	require.Equal(t, int64(1), ti.AttachmentTotalSizeLimit)
+	require.Equal(t, time.Second, ti.AttachmentExpiryDuration)
+	require.Equal(t, int64(1), ti.AttachmentBandwidthLimit)
+	require.Equal(t, "price_1", ti.StripePriceID)
+
+	// Cannot remove tier, since user has this tier
+	require.Error(t, a.RemoveTier("pro"))
+
+	// CAN remove this tier
+	require.Nil(t, a.RemoveTier("supporter"))
+
+	tiers, err = a.Tiers()
+	require.Nil(t, err)
+	require.Equal(t, 1, len(tiers))
+	require.Equal(t, "pro", tiers[0].Code)
+	require.Equal(t, "pro", tiers[0].Code)
 }
 
 func TestAccount_Tier_Create_With_ID(t *testing.T) {
@@ -793,6 +877,43 @@ func TestAccount_Tier_Create_With_ID(t *testing.T) {
 	ti, err := a.Tier("pro")
 	require.Nil(t, err)
 	require.Equal(t, "ti_123", ti.ID)
+}
+
+func TestManager_Tier_Change_And_Reset(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	// Create tier and user
+	require.Nil(t, a.AddTier(&Tier{
+		Code:             "supporter",
+		Name:             "Supporter",
+		ReservationLimit: 3,
+	}))
+	require.Nil(t, a.AddTier(&Tier{
+		Code:             "pro",
+		Name:             "Pro",
+		ReservationLimit: 4,
+	}))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.ChangeTier("phil", "pro"))
+
+	// Add 10 reservations (pro tier allows that)
+	for i := 0; i < 4; i++ {
+		require.Nil(t, a.AddReservation("phil", fmt.Sprintf("topic%d", i), PermissionWrite))
+	}
+
+	// Downgrading will not work (too many reservations)
+	require.Equal(t, ErrTooManyReservations, a.ChangeTier("phil", "supporter"))
+
+	// Downgrade after removing a reservation
+	require.Nil(t, a.RemoveReservations("phil", "topic0"))
+	require.Nil(t, a.ChangeTier("phil", "supporter"))
+
+	// Resetting will not work (too many reservations)
+	require.Equal(t, ErrTooManyReservations, a.ResetTier("phil"))
+
+	// Resetting after removing all reservations
+	require.Nil(t, a.RemoveReservations("phil", "topic1", "topic2", "topic3"))
+	require.Nil(t, a.ResetTier("phil"))
 }
 
 func TestSqliteCache_Migration_From1(t *testing.T) {

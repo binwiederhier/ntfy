@@ -313,6 +313,17 @@ func TestAccount_ExtendToken(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, token.Token, extendedToken.Token)
 	require.True(t, token.Expires < extendedToken.Expires)
+
+	expires := time.Now().Add(999 * time.Hour)
+	body := fmt.Sprintf(`{"token":"%s", "label":"some label", "expires": %d}`, token.Token, expires.Unix())
+	rr = request(t, s, "PATCH", "/v1/account/token", body, map[string]string{
+		"Authorization": util.BearerAuth(token.Token),
+	})
+	require.Equal(t, 200, rr.Code)
+	token, err = util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+	require.Nil(t, err)
+	require.Equal(t, "some label", token.Label)
+	require.Equal(t, expires.Unix(), token.Expires)
 }
 
 func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {

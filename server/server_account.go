@@ -192,7 +192,6 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	// TODO rate limit
 	req, err := readJSONWithLimit[apiAccountTokenIssueRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
 	if err != nil {
 		return err
@@ -228,7 +227,6 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	// TODO rate limit
 	u := v.User()
 	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
 	if err != nil {
@@ -267,7 +265,6 @@ func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	// TODO rate limit
 	u := v.User()
 	token := readParam(r, "X-Token", "Token") // DELETEs cannot have a body, and we don't want it in the path
 	if token == "" {

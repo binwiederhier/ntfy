@@ -479,6 +479,7 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 		if err := s.messageCache.ExpireMessages(topic); err != nil {
 			return err
 		}
+		s.pruneMessages()
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }

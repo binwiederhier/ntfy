@@ -669,8 +669,8 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Verify that messages and attachments were deleted
+	// This does not explicitly call the manager!
 	time.Sleep(time.Second)
-	s.execManager()
 
 	ms, err := s.messageCache.Messages("mytopic1", sinceAllMessages, false)
 	require.Nil(t, err)
@@ -804,10 +804,27 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
+	account, _ := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, int64(1), account.Stats.Messages) // Is not reset!
+
+	// Publish another message
+	rr = request(t, s, "POST", "/mytopic", "hi", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
 
 	// Verify that message stats were persisted
 	time.Sleep(300 * time.Millisecond)
 	u, err = s.userManager.User("phil")
 	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages) // v.EnqueueUserStats had run!
+	require.Equal(t, int64(2), u.Stats.Messages) // v.EnqueueUserStats had run!
+
+	// Stats keep counting
+	rr = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
+	require.Equal(t, int64(2), account.Stats.Messages) // Is not reset!
+
 }

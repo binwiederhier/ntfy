@@ -325,7 +325,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if log.IsTrace() {
+	if logvr(v, r).IsTrace() {
 		logvr(v, r).Field("http_request", renderHTTPRequest(r)).Trace("HTTP request started")
 	} else if log.IsDebug() {
 		logvr(v, r).Debug("HTTP request started")
@@ -628,20 +628,18 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
-	logvrm(v, r, m).
+	ev := logvrm(v, r, m).
 		Tag(tagPublish).
 		Fields(log.Context{
 			"message_delayed":     delayed,
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
 			"message_email":       email,
-		}).
-		Debug("Received message")
-	if log.IsTrace() {
-		logvrm(v, r, m).
-			Tag(tagPublish).
-			Field("message_body", util.MaybeMarshalJSON(m)).
-			Trace("Message body")
+		})
+	if ev.IsTrace() {
+		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
+	} else if ev.IsDebug() {
+		ev.Debug("Received message")
 	}
 	if !delayed {
 		if err := t.Publish(v, m); err != nil {

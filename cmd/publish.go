@@ -35,6 +35,7 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
+	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_TOKEN"}, Usage: "access token used to auth against the server"},
 	&cli.IntFlag{Name: "wait-pid", Aliases: []string{"wait_pid", "pid"}, EnvVars: []string{"NTFY_WAIT_PID"}, Usage: "wait until PID exits before publishing"},
 	&cli.BoolFlag{Name: "wait-cmd", Aliases: []string{"wait_cmd", "cmd", "done"}, EnvVars: []string{"NTFY_WAIT_CMD"}, Usage: "run command and wait until it finishes before publishing"},
 	&cli.BoolFlag{Name: "no-cache", Aliases: []string{"no_cache", "C"}, EnvVars: []string{"NTFY_NO_CACHE"}, Usage: "do not cache message server-side"},
@@ -99,10 +100,18 @@ func execPublish(c *cli.Context) error {
 	file := c.String("file")
 	email := c.String("email")
 	user := c.String("user")
+	token := c.String("token")
 	noCache := c.Bool("no-cache")
 	noFirebase := c.Bool("no-firebase")
 	quiet := c.Bool("quiet")
 	pid := c.Int("wait-pid")
+
+	// Checks
+	if user != "" && token != "" {
+		return errors.New("cannot set both --user and --token")
+	}
+
+	// Do the things
 	topic, message, command, err := parseTopicMessageCommand(c)
 	if err != nil {
 		return err
@@ -143,6 +152,9 @@ func execPublish(c *cli.Context) error {
 	}
 	if noFirebase {
 		options = append(options, client.WithNoFirebase())
+	}
+	if token != "" {
+		options = append(options, client.WithBearerAuth(token))
 	}
 	if user != "" {
 		var pass string

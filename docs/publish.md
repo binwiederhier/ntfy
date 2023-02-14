@@ -2591,23 +2591,22 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
   <figcaption>Publishing a message via e-mail</figcaption>
 </figure>
 
-## Advanced features
-
-### Authentication
+## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
 To publish/subscribe to protected topics, you can: 
 
-* Use [basic auth](#basic-auth), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
-* or use the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
+* Use [username & password](#username-password) via Basic auth, e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+* Use [access tokens](#bearer-auth) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
+* or use either with the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 !!! warning
-    Base64 only encodes username and password. It **is not encrypting it**. For your self-hosted server, 
-    **be sure to use HTTPS to avoid eavesdropping** and exposing your password. 
+    When using Basic auth, base64 only encodes username and password. It **is not encrypting it**. For your 
+    self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing your password. 
 
-#### Basic auth
-Here's an example using [Basic auth](https://en.wikipedia.org/wiki/Basic_access_authentication), with a user `testuser` 
-and password `fakepassword`:
+### Username & password
+The simplest way to authenticate against a ntfy server is to use [Basic auth](https://en.wikipedia.org/wiki/Basic_access_authentication).
+Here's an example with a user `testuser` and password `fakepassword`:
 
 === "Command line (curl)"
     ```
@@ -2701,7 +2700,172 @@ The following command will generate the appropriate value for you on *nix system
 echo "Basic $(echo -n 'testuser:fakepassword' | base64)"
 ```
 
-#### Query param
+### Access tokens
+In addition to username/password auth, ntfy also provides authentication via access tokens. Access tokens are useful
+to avoid having to configure your password across multiple publishing/subscribing applications. For instance, you may
+want to use a dedicated token to publish from your backup host, and one from your home automation system.
+
+You can create access tokens using the `ntfy token` command, or in the web app in the "Account" section (when logged in).
+See [access tokens](config.md#access-tokens) for details.
+
+Once an access token is created, you can use it to authenticate against the ntfy server, e.g. when you publish or 
+subscribe to topics. Here's an example using [Bearer auth](https://swagger.io/docs/specification/authentication/bearer-authentication/),
+with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
+
+=== "Command line (curl)"
+    ```
+    curl \
+      -H "Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2" \
+      -d "Look ma, with auth" \
+      https://ntfy.example.com/mysecrets
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+      --token tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
+      ntfy.example.com/mysecrets \
+      "Look ma, with auth"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mysecrets HTTP/1.1
+    Host: ntfy.example.com
+    Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
+
+    Look ma, with auth
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mysecrets', {
+        method: 'POST', // PUT works too
+        body: 'Look ma, with auth',
+        headers: {
+            'Authorization': 'Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2'
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
+    strings.NewReader("Look ma, with auth"))
+    req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.example.com/mysecrets"
+    $headers = @{Authorization="Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"}
+    $message = "Look ma, with auth"
+    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mysecrets",
+    data="Look ma, with auth",
+    headers={
+        "Authorization": "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+    })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' =>
+                'Content-Type: text/plain\r\n' .
+                'Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2',
+            'content' => 'Look ma, with auth'
+        ]
+    ]));
+    ```
+
+Alternatively, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) to send the 
+access token. When sending an empty username, the basic auth password is treated by the ntfy server as an 
+access token. This is primarily useful to make `curl` calls easier, e.g. `curl -u:tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 ...`:
+
+=== "Command line (curl)"
+    ```
+    curl \
+      -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
+      -d "Look ma, with auth" \
+      https://ntfy.example.com/mysecrets
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+      --token tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
+      ntfy.example.com/mysecrets \
+      "Look ma, with auth"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mysecrets HTTP/1.1
+    Host: ntfy.example.com
+    Authorization: Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy
+
+    Look ma, with auth
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mysecrets', {
+        method: 'POST', // PUT works too
+        body: 'Look ma, with auth',
+        headers: {
+            'Authorization': 'Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy'
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
+    strings.NewReader("Look ma, with auth"))
+    req.Header.Set("Authorization", "Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $uri = "https://ntfy.example.com/mysecrets"
+    $headers = @{Authorization="Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"}
+    $message = "Look ma, with auth"
+    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mysecrets",
+    data="Look ma, with auth",
+    headers={
+        "Authorization": "Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"
+    })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' =>
+                'Content-Type: text/plain\r\n' .
+                'Authorization: Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy',
+            'content' => 'Look ma, with auth'
+        ]
+    ]));
+    ```
+
+
+### Query param
 Here's an example using the `auth` query parameter:
 
 === "Command line (curl)"
@@ -2785,6 +2949,8 @@ The following command will generate the appropriate value for you on *nix system
 ```
 echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='
 ```
+
+## Advanced features
 
 ### Message caching
 !!! info

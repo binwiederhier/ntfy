@@ -87,6 +87,11 @@ func WithBasicAuth(user, pass string) PublishOption {
 	return WithHeader("Authorization", util.BasicAuth(user, pass))
 }
 
+// WithBearerAuth adds the Authorization header for Bearer auth to the request
+func WithBearerAuth(token string) PublishOption {
+	return WithHeader("Authorization", fmt.Sprintf("Bearer %s", token))
+}
+
 // WithNoCache instructs the server not to cache the message server-side
 func WithNoCache() PublishOption {
 	return WithHeader("X-Cache", "no")

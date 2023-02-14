@@ -38,7 +38,6 @@ import (
 - HIGH Docs
   - tiers
   - api
-  - tokens
 
 */
 

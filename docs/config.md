@@ -222,6 +222,39 @@ User `ben` has three topic-specific entries. He can read, but not write to topic
 to topic `garagedoor` and all topics starting with the word `alerts` (wildcards). Clients that are not authenticated
 (called `*`/`everyone`) only have read access to the `announcements` and `server-stats` topics.
 
+### Access tokens
+In addition to username/password auth, ntfy also provides authentication via access tokens. Access tokens are useful
+to avoid having to configure your password across multiple publishing/subscribing applications. For instance, you may
+want to use a dedicated token to publish from your backup host, and one from your home automation system.
+
+!!! info
+    As of today, access tokens grant users **full access to the user account**. Aside from changing the password,
+    and deleting the account, every action can be performed with a token. Granular access tokens are on the roadmap,
+    but not yet implemented.
+
+The `ntfy token` command can be used to manage access tokens for users. Tokens can have labels, and they can expire
+automatically (or never expire). Each user can have up to 20 tokens (hardcoded). 
+
+**Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
+```
+ntfy token list                      # Shows list of tokens for all users
+ntfy token list phil                 # Shows list of tokens for user phil
+ntfy token add phil                  # Create token for user phil which never expires
+ntfy token add --expires=2d phil     # Create token for user phil which expires in 2 days
+ntfy token remove phil tk_th2sxr...  # Delete token
+```
+
+**Creating an access token:**
+```
+$ ntfy token add --expires=30d --label="backups" phil
+$ ntfy token list
+user phil
+- tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 (backups), expires 15 Mar 23 14:33 EDT, accessed from 0.0.0.0 at 13 Feb 23 13:33 EST
+```
+
+Once an access token is created, you can **use it to authenticate against the ntfy server, e.g. when you publish or
+subscribe to topics**. To learn how, check out [authenticate via access tokens](publish.md#access-tokens).
+
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
 

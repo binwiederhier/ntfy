@@ -246,7 +246,7 @@
 
 # Logging options
 #
-# By default, ntfy logs to the console (stderr), with a "info" log level, and in a human-readable text format.
+# By default, ntfy logs to the console (stderr), with an "info" log level, and in a human-readable text format.
 # ntfy supports five different log levels, can also write to a file, log as JSON, and even supports granular
 # log level overrides for easier debugging. Some options (log-level and log-level-overrides) can be hot reloaded
 # by calling "kill -HUP $pid" or "systemctl reload ntfy".

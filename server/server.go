@@ -35,9 +35,8 @@ import (
 /*
 
 - MEDIUM fail2ban to work with ntfy log not nginx log
-- HIGH Docs
-  - tiers
-  - api
+- HIGH test for delayed sending
+- LOW https://github.com/binwiederhier/ntfy/actions/runs/4169886276/jobs/7218312719
 
 */
 

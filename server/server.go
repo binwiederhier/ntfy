@@ -1420,8 +1420,12 @@ func (s *Server) execManager() {
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
 				subs := t.SubscribersCount()
-				expiryTime := time.Until(t.lastVisitorExpires)
-				log.Tag(tagManager).Trace("- topic %s: %d subscribers, expires in %s", t.ID, subs, expiryTime)
+				expiryMessage := ""
+				if subs == 0 {
+					expiryTime := time.Until(t.lastVisitorExpires)
+					expiryMessage = ", expires in " + expiryTime.String()
+				}
+				log.Tag(tagManager).Trace("- topic %s: %d subscribers%s", t.ID, subs, expiryMessage)
 				msgs, exists := messageCounts[t.ID]
 				if t.Stale() && (!exists || msgs == 0) {
 					log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)

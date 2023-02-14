@@ -15,8 +15,8 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	userID     string // User ID associated with this subscription, may be empty
 	subscriber subscriber
+	visitor    *visitor // User ID associated with this subscription, may be empty
 	cancel     func()
 }
 
@@ -32,12 +32,12 @@ func newTopic(id string) *topic {
 }
 
 // Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, userID string, cancel func()) int {
+func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func()) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	subscriberID := rand.Int()
 	t.subscribers[subscriberID] = &topicSubscriber{
-		userID:     userID, // May be empty
+		visitor:    visitor, // May be empty
 		subscriber: s,
 		cancel:     cancel,
 	}
@@ -87,8 +87,9 @@ func (t *topic) CancelSubscribers(exceptUserID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, s := range t.subscribers {
-		if s.userID != exceptUserID {
-			log.Tag(tagSubscribe).Field("topic", t.ID).Debug("Canceling subscriber %s", s.userID)
+		if s.visitor.MaybeUserID() != exceptUserID {
+			// TODO: Shouldn't this log the IP for anonymous visitors? It was s.userID before my change.
+			log.Tag(tagSubscribe).Field("topic", t.ID).Debug("Canceling subscriber %s", s.visitor.MaybeUserID())
 			s.cancel()
 		}
 	}
@@ -101,7 +102,7 @@ func (t *topic) subscribersCopy() map[int]*topicSubscriber {
 	subscribers := make(map[int]*topicSubscriber)
 	for k, sub := range t.subscribers {
 		subscribers[k] = &topicSubscriber{
-			userID:     sub.userID,
+			visitor:    sub.visitor,
 			subscriber: sub.subscriber,
 			cancel:     sub.cancel,
 		}

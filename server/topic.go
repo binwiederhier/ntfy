@@ -1,17 +1,21 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
 	"math/rand"
 	"sync"
+	"time"
+
+	"heckel.io/ntfy/log"
 )
 
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID          string
-	subscribers map[int]*topicSubscriber
-	mu          sync.Mutex
+	ID                 string
+	subscribers        map[int]*topicSubscriber
+	lastVisitor        *visitor
+	lastVisitorExpires time.Time
+	mu                 sync.Mutex
 }
 
 type topicSubscriber struct {
@@ -44,10 +48,30 @@ func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func()) int {
 	return subscriberID
 }
 
+func (t *topic) Stale() bool {
+	return t.getBillee() == nil
+}
+
+func (t *topic) getBillee() *visitor {
+	for _, this_subscriber := range t.subscribers {
+		return this_subscriber.visitor
+	}
+	if t.lastVisitor != nil && t.lastVisitorExpires.After(time.Now()) {
+		t.lastVisitor = nil
+	}
+	return t.lastVisitor
+
+}
+
 // Unsubscribe removes the subscription from the list of subscribers
 func (t *topic) Unsubscribe(id int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if len(t.subscribers) == 1 {
+		t.lastVisitor = t.subscribers[id].visitor
+		t.lastVisitorExpires = time.Now().Add(subscriberBilledValidity)
+	}
 	delete(t.subscribers, id)
 }
 

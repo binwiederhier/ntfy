@@ -114,13 +114,15 @@ var (
 )
 
 const (
-	firebaseControlTopic     = "~control"                // See Android if changed
-	firebasePollTopic        = "~poll"                   // See iOS if changed
-	emptyMessageBody         = "triggered"               // Used if message body is empty
-	newMessageBody           = "New message"             // Used in poll requests as generic message
-	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
-	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
-	jsonBodyBytesLimit       = 16384
+	firebaseControlTopic        = "~control"                // See Android if changed
+	firebasePollTopic           = "~poll"                   // See iOS if changed
+	emptyMessageBody            = "triggered"               // Used if message body is empty
+	newMessageBody              = "New message"             // Used in poll requests as generic message
+	defaultAttachmentMessage    = "You received a file: %s" // Used if message body is empty, and there is an attachment
+	encodingBase64              = "base64"                  // Used mainly for binary UnifiedPush messages
+	jsonBodyBytesLimit          = 16384
+	subscriberBilledTopicPrefix = "up_"
+	subscriberBilledValidity    = 12 * time.Hour
 )
 
 // WebSocket constants

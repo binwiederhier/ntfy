@@ -324,6 +324,18 @@ func TestServer_PublishAt(t *testing.T) {
 	require.Equal(t, "9.9.9.9", messages[0].Sender.String()) // It's stored in the DB though!
 }
 
+func TestServer_PublishAt_Expires(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+		"In": "2 days",
+	})
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.True(t, m.Expires > time.Now().Add(12*time.Hour+48*time.Hour-time.Minute).Unix())
+	require.True(t, m.Expires < time.Now().Add(12*time.Hour+48*time.Hour+time.Minute).Unix())
+}
+
 func TestServer_PublishAtWithCacheError(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

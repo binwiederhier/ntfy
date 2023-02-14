@@ -32,6 +32,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Gatus](https://gatus.io/) ⭐ - Automated service health dashboard
 - [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative / workflow automation tool
 - [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
+- [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
+- [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
@@ -54,6 +56,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy-dotnet](https://github.com/nwithan8/ntfy-dotnet) - .NET client library to interact with a ntfy server (C# / .NET)
 - [node-ntfy-publish](https://github.com/cityssm/node-ntfy-publish) - A Node package to publish notifications to an ntfy server (Node)
 - [ntfy](https://github.com/jonocarroll/ntfy) - Wraps the ntfy API with pipe-friendly tooling (R)
+- [ntfy-for-delphi](https://github.com/hazzelnuts/ntfy-for-delphi) - A friendly library to push instant notifications ntfy (Delphi)
+- [ntfy](https://github.com/ffflorian/ntfy) - Send notifications over ntfy (JS)
 
 ## CLIs + GUIs
 
@@ -102,9 +106,16 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost 
 - [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline (Shell)
 - [ignition-ntfy-module](https://github.com/Kyvis-Labs/ignition-ntfy-module) - Adds support for sending notifications via a ntfy server to Ignition (Java)
+- [maubot-ntfy](https://gitlab.com/999eagle/maubot-ntfy) - Matrix bot to subscribe to ntfy topics and send messages to Matrix (Python)
+- [ntfy-wrapper](https://github.com/vict0rsch/ntfy-wrapper) - Wrapper around ntfy (Python)
+- [nodebb-plugin-ntfy](https://github.com/NodeBB/nodebb-plugin-ntfy) - Push notifications for NodeBB forums
+- [n8n-ntfy](https://github.com/raghavanand98/n8n-ntfy.sh) - n8n community node that lets you use ntfy in your workflows
 
 ## Blog + forum posts
 
+- [January 2023 Developer Update](https://community.nodebb.org/topic/16908/january-2023-developer-update) - nodebb.org - 1/2023
+- [Comment envoyer des notifications push sur votre téléphone facilement et gratuitement?](https://korben.info/notifications-push-telephone.html) - 1/2023
+- [UnifiedPush: a decentralized, open-source push notification protocol](https://f-droid.org/en/2022/12/18/unifiedpush.html) ⭐ - 12/2022
 - [ntfy setup instructions](https://docs.benjamin-altpeter.de/network/vms/1001029-ntfy/) - benjamin-altpeter.de - 12/2022
 - [Ntfy Self-Hosted Push Notifications](https://lachlanlife.net/posts/2022-12-ntfy/) - lachlanlife.net - 12/2022 
 - [ntfy.sh](https://paramdeo.com/til/ntfy-sh) - paramdeo.com - 11/2022
@@ -120,6 +131,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Ntfy.sh – Send push notifications to your phone via PUT/POST](https://news.ycombinator.com/item?id=33517944) ⭐ - news.ycombinator.com - 11/2022
 - [Ntfy et Jeedom : un plugin](https://lunarok-domotique.com/2022/11/ntfy-et-jeedom/) - lunarok-domotique.com - 11/2022
 - [Crea tu propio servidor de notificaciones con Ntfy](https://blog.parravidales.es/crea-tu-propio-servidor-de-notificaciones-con-ntfy/) - blog.parravidales.es - 11/2022
+- [unRAID Notifications with ntfy.sh](https://lder.dev/posts/ntfy-Notifications-With-unRAID/) - lder.dev - 10/2022
 - [Zero-cost push notifications to your phone or desktop via PUT/POST ](https://lobste.rs/s/41dq13/zero_cost_push_notifications_your_phone) - lobste.rs - 10/2022
 - [A nifty push notification system: ntfy](https://jpmens.net/2022/10/30/a-nifty-push-notification-system-ntfy/) - jpmens.net - 10/2022 
 - [Alarmanlage der dritten Art (YouTube video)](https://www.youtube.com/watch?v=altb5QLHbaU&feature=youtu.be) - youtube.com - 10/2022

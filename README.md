@@ -61,9 +61,9 @@ for the server and the Android app. Or, if you'd like to help translate 🇩🇪
 </a>
 
 ## Sponsors
-I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier). 
-I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much 
-appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
+I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier),
+and [Liberapay](https://liberapay.com/ntfy). I would be humbled if you helped me carry the server and developer 
+account costs. Even small donations are very much appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
@@ -108,11 +108,20 @@ appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
 <a href="https://github.com/vinhdizzo"><img src="https://github.com/vinhdizzo.png" width="40px" /></a>
 <a href="https://github.com/Ge0rg3"><img src="https://github.com/Ge0rg3.png" width="40px" /></a>
 <a href="https://github.com/biopsin"><img src="https://github.com/biopsin.png" width="40px" /></a>
+<a href="https://github.com/thebino"><img src="https://github.com/thebino.png" width="40px" /></a>
+<a href="https://github.com/sky4055"><img src="https://github.com/sky4055.png" width="40px" /></a>
+<a href="https://github.com/julianlam"><img src="https://github.com/julianlam.png" width="40px" /></a>
+<a href="https://github.com/andreapx"><img src="https://github.com/andreapx.png" width="40px" /></a>
+<a href="https://github.com/billycao"><img src="https://github.com/billycao.png" width="40px" /></a>
+<a href="https://github.com/zoic21"><img src="https://github.com/zoic21.png" width="40px" /></a>
+<a href="https://github.com/IanKulin"><img src="https://github.com/IanKulin.png" width="40px" /></a>
+<a href="https://github.com/Joachim256"><img src="https://github.com/Joachim256.png" width="40px" /></a>
+<a href="https://github.com/overtone1000"><img src="https://github.com/overtone1000.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
-and [DigitalOcean](https://www.digitalocean.com/) for supporting the project with $60/yr:
+and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:
 
-<a href="https://www.digitalocean.com/"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
+<a href="https://m.do.co/c/442b929528db"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
 
 ## Code of Conduct
 We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, color, religion, or sexual identity and orientation.

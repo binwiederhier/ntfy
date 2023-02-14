@@ -88,7 +88,6 @@ build-deps-ubuntu:
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
-		upx \
 		jq
 	which pip3 || sudo apt install -y python3-pip
 
@@ -201,7 +200,6 @@ cli-deps-static-sites:
 	touch server/docs/index.html server/site/app.html
 
 cli-deps-all:
-	which upx || { echo "ERROR: upx not installed. On Ubuntu, run: apt install upx"; exit 1; }
 	go install github.com/goreleaser/goreleaser@latest
 
 cli-deps-gcc-armv6-armv7:

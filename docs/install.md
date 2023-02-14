@@ -287,7 +287,7 @@ services:
     restart: unless-stopped
 ```
 
-If using a non-root user when running the docker version, be sure to chown the server.yml, user.db, and cache.db files to the same uid/gid.
+If using a non-root user when running the docker version, be sure to chown the server.yml, user.db, and cache.db files and attachments directory to the same uid/gid.
 
 Alternatively, you may wish to build a customized Docker image that can be run with fewer command-line arguments and without delivering the configuration file separately.
 ```
@@ -371,7 +371,7 @@ unmanned pod.
           containers:
           - name: ntfy
             image: binwiederhier/ntfy
-            args: ["serve", "--cache-file /var/cache/ntfy/cache.db"]
+            args: ["serve", "--cache-file", "/var/cache/ntfy/cache.db"]
             ports:
             - containerPort: 80
               name: http
@@ -379,6 +379,8 @@ unmanned pod.
             - name: config
               mountPath: "/etc/ntfy"
               readOnly: true
+            - name: cache
+              mountPath: "/var/cache/ntfy"
           volumes:
             - name: config
               configMap:

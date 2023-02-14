@@ -20,6 +20,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Small wording change for `client.yml` ([#562](https://github.com/binwiederhier/ntfy/pull/562), thanks to [@fleopaulD](https://github.com/fleopaulD))
 * Fix K8s install docs ([#582](https://github.com/binwiederhier/ntfy/pull/582), thanks to [@Remedan](https://github.com/Remedan))
 * Updated Jellyseer docs ([#604](https://github.com/binwiederhier/ntfy/pull/604), thanks to [@Y0ngg4n](https://github.com/Y0ngg4n))
+* Updated iOS developer docs ([#605](https://github.com/binwiederhier/ntfy/pull/605), thanks to [@SticksDev](https://github.com/SticksDev))
 
 **Additional languages:**
 

@@ -622,7 +622,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	}
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
-	m.Expires = time.Now().Add(v.Limits().MessageExpiryDuration).Unix()
+	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	if err := s.handlePublishBody(r, v, m, body, unifiedpush); err != nil {
 		return nil, err
 	}
@@ -666,6 +666,8 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
+	} else {
+		m.Expires = m.Time
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
@@ -1404,9 +1406,10 @@ func (s *Server) execManager() {
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
 				subs := t.SubscribersCount()
-				log.Tag(tagManager).Trace("- topic %s: %d subscribers", t.ID, subs)
+				expiryTime := time.Until(t.lastVisitorExpires)
+				log.Tag(tagManager).Trace("- topic %s: %d subscribers, expires in %s", t.ID, subs, expiryTime)
 				msgs, exists := messageCounts[t.ID]
-				if subs == 0 && (!exists || msgs == 0) {
+				if t.Stale() && (!exists || msgs == 0) {
 					log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)
 					emptyTopics++
 					delete(s.topics, t.ID)

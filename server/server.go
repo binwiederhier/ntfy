@@ -372,6 +372,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
+	w.Header().Set("TTL", "0")                                                       // if message is not being stored because of an error, tell them
 	w.WriteHeader(httpErr.HTTPCode)
 	io.WriteString(w, httpErr.JSON()+"\n")
 }
@@ -605,6 +606,14 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
+	v_old := v
+	if strings.HasPrefix(t.ID, subscriberBilledTopicPrefix) {
+		v = t.getBillee()
+		if v == nil {
+			return nil, errHTTPWontStoreMessage
+		}
+	}
+
 	if !v.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	}
@@ -639,8 +648,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			"message_email":       email,
 		}).
 		Debug("Received message")
+		//Where should I log the original visitor vs the billing visitor
 	if log.IsTrace() {
-		logvrm(v, r, m).
+		logvrm(v_old, r, m).
 			Tag(tagPublish).
 			Field("message_body", util.MaybeMarshalJSON(m)).
 			Trace("Message body")
@@ -684,6 +694,10 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
+
+	w.Header().Set("TTL", strconv.FormatInt(m.Expires-m.Time, 10)) // return how long a message will be stored for
+
+	// using m.Time, not time.Now() so the value isn't negative if the request is processed at a second boundary
 	return s.writeJSON(w, m)
 }
 

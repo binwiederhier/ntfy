@@ -451,7 +451,7 @@ const Tokens = () => {
                     <Trans
                         i18nKey="account_tokens_description"
                         components={{
-                            Link: <Link href="/docs"/>
+                            Link: <Link href="/docs/publish/#access-tokens"/>
                         }}
                     />
                 </Paragraph>

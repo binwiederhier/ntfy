@@ -838,7 +838,7 @@ config options:
 * `stripe-secret-key` is the key used for the Stripe API communication. Setting this values
    enables payments in the ntfy web app (e.g. Upgrade dialog). See [API keys](https://dashboard.stripe.com/apikeys).
 * `stripe-webhook-key` is the key required to validate the authenticity of incoming webhooks from Stripe.
-   Webhooks are essential up keep the local database in sync with the payment provider. See [Webhooks](https://dashboard.stripe.com/webhooks).
+   Webhooks are essential to keep the local database in sync with the payment provider. See [Webhooks](https://dashboard.stripe.com/webhooks).
 
 In addition to setting these two options, you also need to define a [Stripe webhook](https://dashboard.stripe.com/webhooks)
 for the `customer.subscription.updated` and `customer.subscription.deleted` event, which points 

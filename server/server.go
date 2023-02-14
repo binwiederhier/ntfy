@@ -32,14 +32,6 @@ import (
 	"unicode/utf8"
 )
 
-/*
-
-- MEDIUM fail2ban to work with ntfy log not nginx log
-- HIGH test for delayed sending
-- LOW https://github.com/binwiederhier/ntfy/actions/runs/4169886276/jobs/7218312719
-
-*/
-
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config

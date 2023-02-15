@@ -694,9 +694,6 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 
-	w.Header().Set("TTL", strconv.FormatInt(m.Expires-m.Time, 10)) // return how long a message will be stored for
-
-	// using m.Time, not time.Now() so the value isn't negative if the request is processed at a second boundary
 	return s.writeJSON(w, m)
 }
 

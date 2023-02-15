@@ -8,7 +8,6 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"fmt"
 	"google.golang.org/api/option"
-	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"strings"
@@ -46,16 +45,15 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 	if err != nil {
 		return err
 	}
-	if log.Tag(tagFirebase).IsTrace() {
-		logvm(v, m).
-			Tag(tagFirebase).
-			Field("firebase_message", util.MaybeMarshalJSON(fbm)).
-			Trace("Firebase message")
+	ev := logvm(v, m).Tag(tagFirebase)
+	if ev.IsTrace() {
+		ev.Field("firebase_message", util.MaybeMarshalJSON(fbm)).Trace("Firebase message")
 	}
 	err = c.sender.Send(fbm)
 	if err == errFirebaseQuotaExceeded {
 		logvm(v, m).
 			Tag(tagFirebase).
+			Err(err).
 			Warn("Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor")
 		v.FirebaseTemporarilyDeny()
 	}

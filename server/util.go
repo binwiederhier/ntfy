@@ -1,7 +1,6 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
@@ -55,7 +54,7 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 		if err != nil {
 			ip = netip.IPv4Unspecified()
 			if remoteAddr != "@" || !behindProxy { // RemoteAddr is @ when unix socket is used
-				log.Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created %s", remoteAddr, err)
+				logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", remoteAddr)
 			}
 		}
 	}
@@ -66,7 +65,7 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
 		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
 		if err != nil {
-			log.Error("invalid IP address %s received in X-Forwarded-For header: %s", ip, err.Error())
+			logr(r).Err(err).Error("invalid IP address %s received in X-Forwarded-For header", ip)
 			// Fall back to regular remote address if X-Forwarded-For is damaged
 		} else {
 			ip = realIP

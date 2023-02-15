@@ -121,24 +121,6 @@ const (
 	wsPongWait   = 15 * time.Second
 )
 
-// Log tags
-const (
-	tagStartup      = "startup"
-	tagPublish      = "publish"
-	tagSubscribe    = "subscribe"
-	tagFirebase     = "firebase"
-	tagSMTP         = "smtp"  // Receive email
-	tagEmail        = "email" // Send email
-	tagFileCache    = "file_cache"
-	tagMessageCache = "message_cache"
-	tagStripe       = "stripe"
-	tagAccount      = "account"
-	tagManager      = "manager"
-	tagResetter     = "resetter"
-	tagWebsocket    = "websocket"
-	tagMatrix       = "matrix"
-)
-
 // New instantiates a new Server. It creates the cache and adds a Firebase
 // subscriber (if configured).
 func New(conf *Config) (*Server, error) {
@@ -314,11 +296,11 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		s.handleError(w, r, v, err)
 		return
 	}
-
-	if logvr(v, r).IsTrace() {
-		logvr(v, r).Field("http_request", renderHTTPRequest(r)).Trace("HTTP request started")
-	} else if log.IsDebug() {
-		logvr(v, r).Debug("HTTP request started")
+	ev := logvr(v, r)
+	if ev.IsTrace() {
+		ev.Field("http_request", renderHTTPRequest(r)).Trace("HTTP request started")
+	} else if logvr(v, r).IsDebug() {
+		ev.Debug("HTTP request started")
 	}
 	logvr(v, r).
 		Timing(func() {

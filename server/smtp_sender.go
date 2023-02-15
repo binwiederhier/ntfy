@@ -37,18 +37,18 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 			return err
 		}
 		auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
-		logvm(v, m).
+		ev := logvm(v, m).
 			Tag(tagEmail).
 			Fields(log.Context{
 				"email_via":  s.config.SMTPSenderAddr,
 				"email_user": s.config.SMTPSenderUser,
 				"email_to":   to,
-			}).
-			Debug("Sending email")
-		logvm(v, m).
-			Tag(tagEmail).
-			Field("email_body", message).
-			Trace("Email body")
+			})
+		if ev.IsTrace() {
+			ev.Field("email_body", message).Trace("Sending email")
+		} else if ev.IsDebug() {
+			ev.Debug("Sending email")
+		}
 		return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
 	})
 }

@@ -372,7 +372,6 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
-	w.Header().Set("TTL", "0")                                                       // if message is not being stored because of an error, tell them
 	w.WriteHeader(httpErr.HTTPCode)
 	io.WriteString(w, httpErr.JSON()+"\n")
 }

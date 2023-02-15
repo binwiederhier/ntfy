@@ -2,12 +2,17 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v1.31.0 (UNRELEASED)
-Released XXXX
+## ntfy server v2.0.0 (UNRELEASED)
 
 This is the biggest ntfy server release I've ever done. This release adds the ability to sign-up for accounts, log-in
 via the web app, synchronize accounts between devices (web only for now), introduces user access tokens, user tiers,
 and Stripe payments integration to support paid tiers (don't worry, [everything will stay open source](https://ntfy.sh/docs/faq/)).
+
+**Bug fixes + maintenance:**
+
+* `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
+
+## ntfy server v1.31.0 (UNRELEASED)
 
 **Features:**
 
@@ -19,7 +24,7 @@ and Stripe payments integration to support paid tiers (don't worry, [everything 
 
 * Fix `chown` issues with RHEL-like based systems ([#566](https://github.com/binwiederhier/ntfy/issues/566)/[#565](https://github.com/binwiederhier/ntfy/pull/565), thanks to [@danieldemus](https://github.com/danieldemus))
 * Removed `upx` (binary packing) for all builds due to false virus warnings ([#576](https://github.com/binwiederhier/ntfy/issues/576), thanks to [@shawnhwei](https://github.com/shawnhwei) for reporting)
-* `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
+* Upgraded `go-smtp` library and tests to v0.16.0 ([#569](https://github.com/binwiederhier/ntfy/issues/569))
 
 **Documentation:**
 
@@ -27,6 +32,7 @@ and Stripe payments integration to support paid tiers (don't worry, [everything 
 * Small wording change for `client.yml` ([#562](https://github.com/binwiederhier/ntfy/pull/562), thanks to [@fleopaulD](https://github.com/fleopaulD))
 * Fix K8s install docs ([#582](https://github.com/binwiederhier/ntfy/pull/582), thanks to [@Remedan](https://github.com/Remedan))
 * Updated Jellyseer docs ([#604](https://github.com/binwiederhier/ntfy/pull/604), thanks to [@Y0ngg4n](https://github.com/Y0ngg4n))
+* Updated iOS developer docs ([#605](https://github.com/binwiederhier/ntfy/pull/605), thanks to [@SticksDev](https://github.com/SticksDev))
 
 **Additional languages:**
 

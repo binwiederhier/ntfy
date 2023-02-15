@@ -37,13 +37,12 @@ func logvm(v *visitor, m *message) *log.Event {
 }
 
 // logem creates a new log event with email fields
-func logem(state *smtp.ConnectionState) *log.Event {
-	return log.
-		Tag(tagSMTP).
-		Fields(log.Context{
-			"smtp_hostname":    state.Hostname,
-			"smtp_remote_addr": state.RemoteAddr.String(),
-		})
+func logem(smtpConn *smtp.Conn) *log.Event {
+	ev := log.Tag(tagSMTP).Field("smtp_hostname", smtpConn.Hostname())
+	if smtpConn.Conn() != nil {
+		ev.Field("smtp_remote_addr", smtpConn.Conn().RemoteAddr().String())
+	}
+	return ev
 }
 
 func httpContext(r *http.Request) log.Context {

@@ -847,7 +847,7 @@ to `https://ntfy.example.com/v1/account/billing/webhook`.
 Here's an example:
 
 ``` yaml
-stripe-secret-key: "sk_live_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
+stripe-secret-key: "sk_test_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
 stripe-webhook-key: "whsec_ZnNkZnNIRExBSFNES0hBRFNmaHNka2ZsaGR"
 ```
 

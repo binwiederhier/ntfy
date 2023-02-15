@@ -12,7 +12,13 @@ and Stripe payments integration to support paid tiers (don't worry, [everything 
 
 * `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
 
-## ntfy server v1.31.0 (UNRELEASED)
+## ntfy server v1.31.0
+Released February 14, 2023
+
+This is a tiny release before the really big release, and also the last before the big v2.0.0. The most interesting 
+things in this release are the new preliminary health endpoint to allow monitoring in K8s (and others), and the removal
+of `upx` binary packing (which was causing erroneous virus flagging). Aside from that, the `go-smtp` library did a 
+breaking-change upgrade, which required some work to get working again.
 
 **Features:**
 

@@ -13,6 +13,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Fix `chown` issues with RHEL-like based systems ([#566](https://github.com/binwiederhier/ntfy/issues/566)/[#565](https://github.com/binwiederhier/ntfy/pull/565), thanks to [@danieldemus](https://github.com/danieldemus))
 * Removed `upx` (binary packing) for all builds due to false virus warnings ([#576](https://github.com/binwiederhier/ntfy/issues/576), thanks to [@shawnhwei](https://github.com/shawnhwei) for reporting)
+* Upgraded `go-smtp` library and tests to v0.16.0 ([#569](https://github.com/binwiederhier/ntfy/issues/569))
 
 **Documentation:**
 

@@ -2,7 +2,13 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v1.31.0 (UNRELEASED)
+## ntfy server v1.31.0
+Released February 14, 2023
+
+This is a tiny release before the really big release, and also the last before the big v2.0.0. The most interesting 
+things in this release are the new preliminary health endpoint to allow monitoring in K8s (and others), and the removal
+of `upx` binary packing (which was causing erroneous virus flagging). Aside from that, the `go-smtp` library did a 
+breaking-change upgrade, which required some work to get working again.
 
 **Features:**
 

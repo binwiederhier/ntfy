@@ -18,3 +18,10 @@ is to pin the tab so that it's always open, but sort of out of the way:
   ![pinned](../static/img/web-pin.png){ width=500 }
   <figcaption>Pin web app to move it out of the way</figcaption>
 </figure>
+
+If topic reservations are enabled, you can claim ownership over topics and define access to it:
+
+<div id="reserve-screenshots" class="screenshots">
+    <a href="../../static/img/web-reserve-topic.png"><img src="../../static/img/web-reserve-topic.png"/></a> 
+    <a href="../../static/img/web-reserve-topic-dialog.png"><img src="../../static/img/web-reserve-topic-dialog.png"/></a>
+</div>

@@ -4,12 +4,63 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v2.0.0 (UNRELEASED)
 
-This is the biggest ntfy server release I've ever done. This release adds the ability to sign-up for accounts, log-in
-via the web app, synchronize accounts between devices (web only for now), introduces user access tokens, user tiers,
-and Stripe payments integration to support paid tiers (don't worry, [everything will stay open source](https://ntfy.sh/docs/faq/)).
+This is the biggest ntfy server release I've ever done 🥳 . Lots of new and exciting features. 
 
-**Bug fixes + maintenance:**
+**Brand-new features:**
 
+* **User signup/login & account sync**: If enabled, users can now register to create a user account, and then login to 
+  the web app. Once logged in, topic subscriptions and user settings are stored server-side in the user account (as 
+  opposed to only in the browser storage). So far, this is implemented only in the web app only. Once it's in the Android/iOS
+  app, you can easily keep your account in sync. Relevant [config options](config.md#config-options) are `enable-signup` and 
+  `enable-login`.
+  <div id="account-screenshots" class="screenshots">
+    <a href="../../static/img/web-signup.png"><img src="../../static/img/web-signup.png"/></a>
+    <a href="../../static/img/web-account.png"><img src="../../static/img/web-account.png"/></a>
+  </div>
+* **Topic reservations** 🎉: If enabled, users can now **reserve topics and restrict access to other users**.
+  Once this is fully rolled out, you may reserve `ntfy.sh/philbackups` and define access so that only you can publish/subscribe
+  to the topic. Reservations let you claim ownership of a topic, and you can define access permissions for others as
+  `deny-all` (only you have full access), `read-only` (you can publish/subscribe, others can subscribe), `write-only` (you 
+  can publish/subscribe, others can publish), `read-write` (everyone can publish/subscribe, but you remain the owner).
+  Topic reservations can be [configured](config.md#config-options) in the web app if `enable-reservations` is enabled, and 
+  only if the user has a [tier](config.md#tiers) that supports reservations.
+  <div id="reserve-screenshots" class="screenshots">
+    <a href="../../static/img/web-reserve-topic.png"><img src="../../static/img/web-reserve-topic.png"/></a> 
+    <a href="../../static/img/web-reserve-topic-dialog.png"><img src="../../static/img/web-reserve-topic-dialog.png"/></a>
+  </div>
+* **Access tokens:** It is now possible to create user access tokens for a user account. Access tokens are useful
+  to avoid having to paste your password to various applications or scripts. For instance, you may want to use a 
+  dedicated token to publish from your backup host, and one from your home automation system. Tokens can be configured
+  in the web app, or via the `ntfy token` command. See [creating tokens](config.md#access-tokens),
+  and [publishing using tokens](publish.md#access-tokens).
+  <div id="token-screenshots" class="screenshots">
+    <a href="../../static/img/web-token-create.png"><img src="../../static/img/web-token-create.png"/></a> 
+    <a href="../../static/img/web-token-list.png"><img src="../../static/img/web-token-list.png"/></a>
+  </div>
+* **Structured logging:** I've redone a lot of the logging to make it more structured, and to make it easier to debug and
+  troubleshoot. Logs can now be written to a file, and as JSON (if configured). Each log event carries context fields
+  that you can filter and search on using tools like `jq`. On top of that, you can override the log level if certain fields
+  match. For instance, you can say `user_name=phil -> debug` to log everything related to a certain user with debug level.
+  See [logging & debugging](config.md#logging--debugging).
+* **Tiers:** You can now define and associate usage tiers to users. Tiers can be used to grant users higher limits, such as
+  daily message limits, attachment size, or make it possible for users to reserve topics. You could, for instance, have
+  a tier `Standard` that allows 500 messages/day, 15 MB attachments and 5 allowed topic reservations, and another
+  tier `Friends & Family` with much higher limits. For ntfy.sh, I'll mostly use these tiers to facilitate paid plans (see below).
+  Tiers can be configured via the `ntfy tier ...` command. See [tiers](config.md#tiers).
+* **Paid tiers:** Starting very soon, I will be offering paid tiers for ntfy.sh on top of the free service. You'll be
+  able to subscribe to tiers with higher rate limits (more daily messages, bigger attachments) and topic reservations.
+  Paid tiers are facilitated by integrating [Stripe](https://stripe.com) as a payment provider. See [payments](config.md#payments)
+  for details.
+
+**ntfy is forever open source!**   
+Yes, I will be offering some paid plans. But you don't need to panic! I won't be taking any features away, and everything 
+will remain forever open source, so you can self-host if you like. Similar to the donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), paid plans will help pay for the service and keep me motivated to keep
+going. It'll only make ntfy better.
+
+**Other tickets:**
+
+* User account signup, login, topic reservations, access tokens, tiers etc. ([#522](https://github.com/binwiederhier/ntfy/issues/522))
 * `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
 
 ## ntfy server v1.31.0
@@ -22,7 +73,6 @@ breaking-change upgrade, which required some work to get working again.
 
 **Features:**
 
-* ⭐ User account signup, login, topic reservations, access tokens, tiers etc. ⭐ ([#522](https://github.com/binwiederhier/ntfy/issues/522))
 * Preliminary `/v1/health` API endpoint for service monitoring (no ticket)
 * Add basic health check to `Dockerfile` ([#555](https://github.com/binwiederhier/ntfy/pull/555), thanks to [@bt90](https://github.com/bt90))
 

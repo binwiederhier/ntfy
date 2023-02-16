@@ -313,8 +313,12 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor, err error) {
+	httpErr, ok := err.(*errHTTP)
+	if !ok {
+		httpErr = errHTTPInternalError
+	}
+	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains([]int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized}, httpErr.HTTPCode)
 	if websocket.IsWebSocketUpgrade(r) {
-		isNormalError := strings.Contains(err.Error(), "i/o timeout")
 		if isNormalError {
 			logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
 		} else {
@@ -323,22 +327,15 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		return // Do not attempt to write to upgraded connection
 	}
 	if matrixErr, ok := err.(*errMatrix); ok {
-		writeMatrixError(w, r, v, matrixErr)
+		if err := writeMatrixError(w, r, v, matrixErr); err != nil {
+			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Writing Matrix error failed")
+		}
 		return
 	}
-	httpErr, ok := err.(*errHTTP)
-	if !ok {
-		httpErr = errHTTPInternalError
-	}
-	isNormalError := httpErr.HTTPCode == http.StatusNotFound || httpErr.HTTPCode == http.StatusBadRequest || httpErr.HTTPCode == http.StatusTooManyRequests
 	if isNormalError {
-		logvr(v, r).
-			Err(httpErr).
-			Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+		logvr(v, r).Err(httpErr).Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	} else {
-		logvr(v, r).
-			Err(httpErr).
-			Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+		logvr(v, r).Err(httpErr).Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests

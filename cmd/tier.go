@@ -55,6 +55,7 @@ var cmdTier = &cli.Command{
 				&cli.DurationFlag{Name: "attachment-expiry-duration", Value: defaultAttachmentExpiryDuration, Usage: "duration after which attachments are deleted"},
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Value: defaultAttachmentBandwidthLimit, Usage: "daily bandwidth limit for attachment uploads/downloads"},
 				&cli.StringFlag{Name: "stripe-price-id", Usage: "Stripe price ID for paid tiers (e.g. price_12345)"},
+				&cli.BoolFlag{Name: "ignore-exists", Usage: "if the tier already exists, perform no action and exit"},
 			},
 			Description: `Add a new tier to the ntfy user database.
 
@@ -171,6 +172,10 @@ func execTierAdd(c *cli.Context) error {
 		return err
 	}
 	if tier, _ := manager.Tier(code); tier != nil {
+		if c.Bool("ignore-exists") {
+			fmt.Fprintf(c.App.ErrWriter, "tier %s already exists (exited successfully)\n", code)
+			return nil
+		}
 		return fmt.Errorf("tier %s already exists", code)
 	}
 	name := c.String("name")

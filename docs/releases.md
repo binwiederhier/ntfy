@@ -41,7 +41,7 @@ This is the biggest ntfy server release I've ever done 🥳 . Lots of new and ex
   troubleshoot. Logs can now be written to a file, and as JSON (if configured). Each log event carries context fields
   that you can filter and search on using tools like `jq`. On top of that, you can override the log level if certain fields
   match. For instance, you can say `user_name=phil -> debug` to log everything related to a certain user with debug level.
-  See [logging & debugging](config.md#logging--debugging).
+  See [logging & debugging](config.md#logging-debugging).
 * **Tiers:** You can now define and associate usage tiers to users. Tiers can be used to grant users higher limits, such as
   daily message limits, attachment size, or make it possible for users to reserve topics. You could, for instance, have
   a tier `Standard` that allows 500 messages/day, 15 MB attachments and 5 allowed topic reservations, and another

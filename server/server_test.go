@@ -1498,7 +1498,7 @@ func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *
 	c.VisitorAttachmentTotalSizeLimit = 10000
 	s := newTestServer(t, c)
 
-	response := request(t, s, "PUT", "/mytopic", util.RandomString(5000), nil)
+	response := request(t, s, "PUT", "/mytopic", "text file!"+util.RandomString(4990), nil)
 	msg := toMessage(t, response.Body.String())
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "You received a file: attachment.txt", msg.Message)

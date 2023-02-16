@@ -13,7 +13,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/olebedev/when v0.0.0-20221205223600-4d190b02b8d8
 	github.com/stretchr/testify v1.8.1
-	github.com/urfave/cli/v2 v2.24.3
+	github.com/urfave/cli/v2 v2.24.4
 	golang.org/x/crypto v0.6.0
 	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/sync v0.1.0

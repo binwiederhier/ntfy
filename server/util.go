@@ -1,11 +1,14 @@
 package server
 
 import (
+	"bufio"
 	"heckel.io/ntfy/util"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -84,4 +87,58 @@ func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, 
 		return nil, err
 	}
 	return obj, nil
+}
+
+type httpResponseWriter struct {
+	w             http.ResponseWriter
+	headerWritten bool
+	mu            sync.Mutex
+}
+
+type httpResponseWriterWithHijacker struct {
+	httpResponseWriter
+}
+
+var _ http.ResponseWriter = (*httpResponseWriter)(nil)
+var _ http.Flusher = (*httpResponseWriter)(nil)
+var _ http.Hijacker = (*httpResponseWriterWithHijacker)(nil)
+
+func newHTTPResponseWriter(w http.ResponseWriter) http.ResponseWriter {
+	if _, ok := w.(http.Hijacker); ok {
+		return &httpResponseWriterWithHijacker{httpResponseWriter: httpResponseWriter{w: w}}
+	}
+	return &httpResponseWriter{w: w}
+}
+
+func (w *httpResponseWriter) Header() http.Header {
+	return w.w.Header()
+}
+
+func (w *httpResponseWriter) Write(bytes []byte) (int, error) {
+	w.mu.Lock()
+	w.headerWritten = true
+	w.mu.Unlock()
+	return w.w.Write(bytes)
+}
+
+func (w *httpResponseWriter) WriteHeader(statusCode int) {
+	w.mu.Lock()
+	if w.headerWritten {
+		w.mu.Unlock()
+		return
+	}
+	w.headerWritten = true
+	w.mu.Unlock()
+	w.w.WriteHeader(statusCode)
+}
+
+func (w *httpResponseWriter) Flush() {
+	if f, ok := w.w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *httpResponseWriterWithHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, _ := w.w.(http.Hijacker)
+	return h.Hijack()
 }

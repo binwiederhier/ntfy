@@ -291,6 +291,7 @@ func (s *Server) closeDatabases() {
 
 // handle is the main entry point for all HTTP requests
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	w = newHTTPResponseWriter(w)     // Avoid logging "superfluous response.WriteHeader call" warning
 	v, err := s.maybeAuthenticate(r) // Note: Always returns v, even when error is returned
 	if err != nil {
 		s.handleError(w, r, v, err)

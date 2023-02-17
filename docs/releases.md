@@ -2,6 +2,12 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v2.0.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Avoid panic in manager when `attachment-cache-dir` is not set ([#617](https://github.com/binwiederhier/ntfy/issues/617), thanks to [@ksurl](https://github.com/ksurl))  
+
 ## ntfy server v2.0.0
 Released February 16, 2023
 
@@ -64,6 +70,11 @@ going. It'll only make ntfy better.
 * User account signup, login, topic reservations, access tokens, tiers etc. ([#522](https://github.com/binwiederhier/ntfy/issues/522))
 * `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
 
+**Special thanks:**
+
+A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
+suggestions, and bug reports. Thank you, @nwithan8, @deadcade, @xenrox, @cmeis, and the others who I forgot.
+
 ## ntfy server v1.31.0
 Released February 14, 2023
 
@@ -94,11 +105,6 @@ breaking-change upgrade, which required some work to get working again.
 **Additional languages:**
 
 * Portuguese (thanks to [@ssantos](https://hosted.weblate.org/user/ssantos/))
-
-**Special thanks:**
-
-A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
-suggestions, and bug reports. Thank you, @nwithan8, @deadcade, and @xenrox.
 
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅

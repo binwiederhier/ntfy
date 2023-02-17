@@ -506,6 +506,7 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 	if err := s.messageCache.ExpireMessages(topics...); err != nil {
 		return err
 	}
+	go s.pruneMessages()
 	return nil
 }
 

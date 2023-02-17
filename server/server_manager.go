@@ -116,29 +116,30 @@ func (s *Server) pruneTokens() {
 }
 
 func (s *Server) pruneAttachments() {
-	if s.fileCache != nil {
-		log.
-			Tag(tagManager).
-			Timing(func() {
-				ids, err := s.messageCache.AttachmentsExpired()
-				if err != nil {
-					log.Tag(tagManager).Err(err).Warn("Error retrieving expired attachments")
-				} else if len(ids) > 0 {
-					if log.Tag(tagManager).IsDebug() {
-						log.Tag(tagManager).Debug("Deleting attachments %s", strings.Join(ids, ", "))
-					}
-					if err := s.fileCache.Remove(ids...); err != nil {
-						log.Tag(tagManager).Err(err).Warn("Error deleting attachments")
-					}
-					if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
-						log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
-					}
-				} else {
-					log.Tag(tagManager).Debug("No expired attachments to delete")
-				}
-			}).
-			Debug("Deleted expired attachments")
+	if s.fileCache == nil {
+		return
 	}
+	log.
+		Tag(tagManager).
+		Timing(func() {
+			ids, err := s.messageCache.AttachmentsExpired()
+			if err != nil {
+				log.Tag(tagManager).Err(err).Warn("Error retrieving expired attachments")
+			} else if len(ids) > 0 {
+				if log.Tag(tagManager).IsDebug() {
+					log.Tag(tagManager).Debug("Deleting attachments %s", strings.Join(ids, ", "))
+				}
+				if err := s.fileCache.Remove(ids...); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error deleting attachments")
+				}
+				if err := s.messageCache.MarkAttachmentsDeleted(ids...); err != nil {
+					log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")
+				}
+			} else {
+				log.Tag(tagManager).Debug("No expired attachments to delete")
+			}
+		}).
+		Debug("Deleted expired attachments")
 }
 
 func (s *Server) pruneMessages() {
@@ -149,8 +150,10 @@ func (s *Server) pruneMessages() {
 			if err != nil {
 				log.Tag(tagManager).Err(err).Warn("Error retrieving expired messages")
 			} else if len(expiredMessageIDs) > 0 {
-				if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
-					log.Tag(tagManager).Err(err).Warn("Error deleting attachments for expired messages")
+				if s.fileCache != nil {
+					if err := s.fileCache.Remove(expiredMessageIDs...); err != nil {
+						log.Tag(tagManager).Err(err).Warn("Error deleting attachments for expired messages")
+					}
 				}
 				if err := s.messageCache.DeleteMessages(expiredMessageIDs...); err != nil {
 					log.Tag(tagManager).Err(err).Warn("Error marking attachments deleted")

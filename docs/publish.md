@@ -2930,7 +2930,7 @@ Here's an example using the `auth` query parameter:
     ]));
     ```
 
-To generate the value of the `auth` parameter, encode the value of the `Authorization` header (see anove) using 
+To generate the value of the `auth` parameter, encode the value of the `Authorization` header (see above) using 
 **raw base64 encoding** (like base64, but strip any trailing `=`). Here's some pseudo-code that hopefully 
 explains it better:
 

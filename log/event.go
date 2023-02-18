@@ -129,20 +129,13 @@ func (e *Event) With(contexts ...Contexter) *Event {
 	return e
 }
 
-// maybeLog logs the event to the defined output. The event is only logged, if
-// either the global log level is >= l, or if the log level in one of the overrides matches
+// Render returns the rendered log event as a string, or an empty string. The event is only rendered,
+// if either the global log level is >= l, or if the log level in one of the overrides matches
 // the level.
 //
 // If no overrides are defined (default), the Contexter array is not applied unless the event
 // is actually logged. If overrides are defined, then Contexters have to be applied in any case
 // to determine if they match. This is super complicated, but required for efficiency.
-func (e *Event) maybeLog(l Level, message string, v ...any) {
-	m := e.Render(l, message, v...)
-	if m != "" {
-		log.Println(m)
-	}
-}
-
 func (e *Event) Render(l Level, message string, v ...any) string {
 	appliedContexters := e.maybeApplyContexters()
 	if !e.shouldLog(l) {
@@ -158,6 +151,13 @@ func (e *Event) Render(l Level, message string, v ...any) string {
 		return e.JSON()
 	}
 	return e.String()
+}
+
+// maybeLog logs the event to the defined output, or does nothing if Render returns an empty string
+func (e *Event) maybeLog(l Level, message string, v ...any) {
+	if m := e.Render(l, message, v...); m != "" {
+		log.Println(m)
+	}
 }
 
 // Loggable returns true if the given log level is lower or equal to the current log level

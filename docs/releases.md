@@ -2,7 +2,10 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.0.1 (UNRELEASED)
+## ntfy server v2.0.1
+Released February 17, 2023
+
+This is a quick bugfix release to address a panic that happens when `attachment-cache-dir` is not set.
 
 **Bug fixes + maintenance:**
 

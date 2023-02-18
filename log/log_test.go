@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/stretchr/testify/require"
+	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -170,6 +173,51 @@ func TestLog_LevelOverrideAny(t *testing.T) {
 {"time":"1970-01-01T00:00:14Z","level":"INFO","message":"this is also logged","time_taken_ms":0}
 `
 	require.Equal(t, expected, out.String())
+	require.False(t, IsFile())
+	require.Equal(t, "", File())
+}
+
+func TestLog_UsingStdLogger_JSON(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+	SetFormat(JSONFormat)
+
+	log.Println("Some other library is using the standard Go logger")
+	require.Contains(t, out.String(), `,"level":"INFO","message":"Some other library is using the standard Go logger","tag":"stdlog"}`+"\n")
+}
+
+func TestLog_UsingStdLogger_Text(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+
+	log.Println("Some other library is using the standard Go logger")
+	require.Contains(t, out.String(), `Some other library is using the standard Go logger`+"\n")
+	require.NotContains(t, out.String(), `{`)
+}
+
+func TestLog_File(t *testing.T) {
+	t.Cleanup(resetState)
+
+	logfile := filepath.Join(t.TempDir(), "ntfy.log")
+	f, err := os.OpenFile(logfile, os.O_CREATE|os.O_WRONLY, 0600)
+	require.Nil(t, err)
+	SetOutput(f)
+	SetFormat(JSONFormat)
+	require.True(t, IsFile())
+	require.Equal(t, logfile, File())
+
+	Time(time.Unix(11, 0).UTC()).Field("this_one", "11").Info("this is logged")
+	require.Nil(t, f.Close())
+
+	f, err = os.Open(logfile)
+	require.Nil(t, err)
+	contents, err := io.ReadAll(f)
+	require.Nil(t, err)
+	require.Equal(t, `{"time":"1970-01-01T00:00:11Z","level":"INFO","message":"this is logged","this_one":"11"}`+"\n", string(contents))
 }
 
 type fakeError struct {

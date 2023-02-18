@@ -7,6 +7,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Avoid panic in manager when `attachment-cache-dir` is not set ([#617](https://github.com/binwiederhier/ntfy/issues/617), thanks to [@ksurl](https://github.com/ksurl))  
+* Ensure that calls to standard logger `log.Println` also output JSON (no ticket)
 
 ## ntfy server v2.0.0
 Released February 16, 2023

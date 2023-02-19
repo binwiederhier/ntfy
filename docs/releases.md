@@ -77,7 +77,7 @@ going. It'll only make ntfy better.
 **Special thanks:**
 
 A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
-suggestions, and bug reports. Thank you, @nwithan8, @deadcade, @xenrox, @cmeis, and the others who I forgot.
+suggestions, and bug reports. Thank you, @nwithan8, @deadcade, @xenrox, @cmeis, @wunter8 and the others who I forgot.
 
 ## ntfy server v1.31.0
 Released February 14, 2023

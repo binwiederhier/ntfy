@@ -149,6 +149,8 @@ func TestServer_PublishAndSubscribe(t *testing.T) {
 	require.Equal(t, "", messages[1].Title)
 	require.Equal(t, 0, messages[1].Priority)
 	require.Nil(t, messages[1].Tags)
+	require.True(t, time.Now().Add(12*time.Hour-5*time.Second).Unix() < messages[1].Expires)
+	require.True(t, time.Now().Add(12*time.Hour+5*time.Second).Unix() > messages[1].Expires)
 
 	require.Equal(t, messageEvent, messages[2].Event)
 	require.Equal(t, "mytopic", messages[2].Topic)
@@ -287,6 +289,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, "this message is not cached", msg.Message)
+	require.Equal(t, 0, msg.Expires)
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages := toMessages(t, response.Body.String())

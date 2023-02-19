@@ -456,6 +456,7 @@ const Language = () => {
             <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
                 <Select value={lang} onChange={handleChange} aria-labelledby={labelId}>
                     <MenuItem value="en">English</MenuItem>
+                    <MenuItem value="ar">العربية</MenuItem>
                     <MenuItem value="id">Bahasa Indonesia</MenuItem>
                     <MenuItem value="bg">Български</MenuItem>
                     <MenuItem value="cs">Čeština</MenuItem>

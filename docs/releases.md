@@ -4,6 +4,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v2.0.2 (UNRELEASED)
 
+**Bug fixes + maintenance:**
+
+* Support for base64 encoded emails ([#610](https://github.com/binwiederhier/ntfy/issues/610), thanks to [@Robert-litts](https://github.com/Robert-litts))
+
 **Additional languages:**
 
 * Arabic (thanks to [@ButterflyOfFire](https://hosted.weblate.org/user/ButterflyOfFire/))

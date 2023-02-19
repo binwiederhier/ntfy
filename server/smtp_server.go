@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
@@ -204,26 +205,18 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 
 func readMailBody(msg *mail.Message) (string, error) {
 	if msg.Header.Get("Content-Type") == "" {
-		return readPlainTextMailBody(msg)
+		return readPlainTextMailBody(msg.Body, msg.Header.Get("Content-Transfer-Encoding"))
 	}
 	contentType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
 	if err != nil {
 		return "", err
 	}
-	if contentType == "text/plain" {
-		return readPlainTextMailBody(msg)
-	} else if strings.HasPrefix(contentType, "multipart/") {
+	if strings.ToLower(contentType) == "text/plain" {
+		return readPlainTextMailBody(msg.Body, msg.Header.Get("Content-Transfer-Encoding"))
+	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
 		return readMultipartMailBody(msg, params)
 	}
 	return "", errUnsupportedContentType
-}
-
-func readPlainTextMailBody(msg *mail.Message) (string, error) {
-	body, err := io.ReadAll(msg.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
 }
 
 func readMultipartMailBody(msg *mail.Message, params map[string]string) (string, error) {
@@ -236,14 +229,20 @@ func readMultipartMailBody(msg *mail.Message, params map[string]string) (string,
 		partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
 		if err != nil {
 			return "", err
-		}
-		if partContentType != "text/plain" {
+		} else if strings.ToLower(partContentType) != "text/plain" {
 			continue
 		}
-		body, err := io.ReadAll(part)
-		if err != nil {
-			return "", err
-		}
-		return string(body), nil
+		return readPlainTextMailBody(part, part.Header.Get("Content-Transfer-Encoding"))
 	}
+}
+
+func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, error) {
+	if strings.ToLower(transferEncoding) == "base64" {
+		reader = base64.NewDecoder(base64.StdEncoding, reader)
+	}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }

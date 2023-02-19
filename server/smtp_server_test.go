@@ -390,10 +390,8 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
-/*
-	func TestSmtpBackend_NestedMultipartBase64(t *testing.T) {
-		email := `EHLO example.com
-
+func TestSmtpBackend_NestedMultipartBase64(t *testing.T) {
+	email := `EHLO example.com
 MAIL FROM: test@mydomain.me
 RCPT TO: ntfy-mytopic@ntfy.sh
 DATA
@@ -431,14 +429,69 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 .
 `
 
-		s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
-			t.Fatal("This should not be called")
-		})
-		defer s.Close()
-		defer c.Close()
-		writeAndReadUntilLine(t, email, c, scanner, "451 4.0.0 invalid address")
-	}
-*/
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "TrueNAS truenas.local: TrueNAS Test Message hostname: truenas.local", r.Header.Get("Title"))
+		require.Equal(t, "This is a test message from TrueNAS CORE.", readAll(t, r.Body))
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
+func TestSmtpBackend_NestedMultipartTooDeep(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: test@mydomain.me
+RCPT TO: ntfy-mytopic@ntfy.sh
+DATA
+Content-Type: multipart/mixed; boundary="===============1=="
+MIME-Version: 1.0
+Subject: TrueNAS truenas.local: TrueNAS Test Message hostname: truenas.local
+From: =?utf-8?q?Robbie?= <test@mydomain.me>
+To: test@mydomain.me
+Date: Thu, 16 Feb 2023 01:04:00 -0000
+Message-ID: <truenas-20230216.010400.344514.b'8jfL'@truenas.local>
+
+This is a multi-part message in MIME format.
+--===============1==
+Content-Type: multipart/alternative; boundary="===============2=="
+MIME-Version: 1.0
+
+--===============2==
+Content-Type: multipart/alternative; boundary="===============3=="
+MIME-Version: 1.0
+
+--===============3==
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+VGhpcyBpcyBhIHRlc3QgbWVzc2FnZSBmcm9tIFRydWVOQVMgQ09SRS4=
+
+--===============3==
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PCFET0NUWVBFIEhUTUwgUFVCTElDICItLy9XM0MvL0RURCBIVE1MIDQuMCBUcmFuc2l0aW9uYWwv
+L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
+
+--===============3==--
+
+--===============2==--
+
+--===============1==--
+.
+`
+
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("This should not be called")
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
+}
+
 type smtpHandlerFunc func(http.ResponseWriter, *http.Request)
 
 func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c net.Conn, conf *Config, scanner *bufio.Scanner) {

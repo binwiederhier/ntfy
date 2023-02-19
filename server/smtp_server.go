@@ -22,7 +22,12 @@ var (
 	errInvalidAddress         = errors.New("invalid address")
 	errInvalidTopic           = errors.New("invalid topic")
 	errTooManyRecipients      = errors.New("too many recipients")
+	errMultipartNestedTooDeep = errors.New("multipart message nested too deep")
 	errUnsupportedContentType = errors.New("unsupported content type")
+)
+
+const (
+	maxMultipartDepth = 2
 )
 
 // smtpBackend implements SMTP server methods.
@@ -121,7 +126,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		body, err := readMailBody(msg)
+		body, err := readMailBody(msg.Body, msg.Header)
 		if err != nil {
 			return err
 		}
@@ -203,36 +208,42 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	return err
 }
 
-func readMailBody(msg *mail.Message) (string, error) {
-	if msg.Header.Get("Content-Type") == "" {
-		return readPlainTextMailBody(msg.Body, msg.Header.Get("Content-Transfer-Encoding"))
+func readMailBody(body io.Reader, header mail.Header) (string, error) {
+	if header.Get("Content-Type") == "" {
+		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
 	}
-	contentType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	contentType, params, err := mime.ParseMediaType(header.Get("Content-Type"))
 	if err != nil {
 		return "", err
 	}
 	if strings.ToLower(contentType) == "text/plain" {
-		return readPlainTextMailBody(msg.Body, msg.Header.Get("Content-Transfer-Encoding"))
+		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
 	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
-		return readMultipartMailBody(msg, params)
+		return readMultipartMailBody(body, params, 0)
 	}
 	return "", errUnsupportedContentType
 }
 
-func readMultipartMailBody(msg *mail.Message, params map[string]string) (string, error) {
-	mr := multipart.NewReader(msg.Body, params["boundary"])
+func readMultipartMailBody(body io.Reader, params map[string]string, depth int) (string, error) {
+	if depth >= maxMultipartDepth {
+		return "", errMultipartNestedTooDeep
+	}
+	mr := multipart.NewReader(body, params["boundary"])
 	for {
 		part, err := mr.NextPart()
 		if err != nil { // may be io.EOF
 			return "", err
 		}
-		partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
+		partContentType, partParams, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
 		if err != nil {
 			return "", err
-		} else if strings.ToLower(partContentType) != "text/plain" {
-			continue
 		}
-		return readPlainTextMailBody(part, part.Header.Get("Content-Transfer-Encoding"))
+		if strings.ToLower(partContentType) == "text/plain" {
+			return readPlainTextMailBody(part, part.Header.Get("Content-Transfer-Encoding"))
+		} else if strings.HasPrefix(strings.ToLower(partContentType), "multipart/") {
+			return readMultipartMailBody(part, partParams, depth+1)
+		}
+		// Continue with next part
 	}
 }
 

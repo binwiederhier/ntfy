@@ -289,7 +289,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, "this message is not cached", msg.Message)
-	require.Equal(t, 0, msg.Expires)
+	require.Equal(t, int64(0), msg.Expires)
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages := toMessages(t, response.Body.String())

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
-	"github.com/k3a/html2text"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -14,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -219,10 +219,10 @@ func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	}
 	if strings.ToLower(contentType) == "text/plain" {
 		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
-	} else if strings.ToLower(contentType) == "text/html" {
-		return readHTMLMailBody(body, header.Get("Content-Transfer-Encoding"))
 	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
 		return readMultipartMailBody(body, params, 0)
+	} else if strings.ToLower(contentType) == "text/html" {
+		return readHTMLMailBody(body, header.Get("Content-Transfer-Encoding"))
 	}
 	return "", errUnsupportedContentType
 }
@@ -269,6 +269,14 @@ func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	body := html2text.HTML2Text(string(html))
+
+	// Strip HTML
+	re := regexp.MustCompile("<[^>]*>")
+	body := re.ReplaceAllString(string(html), "")
+
+	// Cleanup potential empty lines
+	re2 := regexp.MustCompile("(?m)^[ \t]*\r?\n")
+	body = re2.ReplaceAllString(body, "")
+
 	return string(body), nil
 }

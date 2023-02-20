@@ -115,6 +115,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [Carnet IP动态解析以及通过ntfy推送IP信息](https://blog.wslll.cn/index.php/archives/201/) - blog.wslll.cn - 2/2023 
+- [Open-Source-Brieftaube: ntfy verschickt Push-Meldungen auf Smartphone und PC](https://www.heise.de/news/Open-Source-Brieftaube-ntfy-verschickt-Push-Meldungen-auf-Smartphone-und-PC-7521583.html) ⭐ - heise.de - 2/2023 
 - [Video: Simple Push Notifications ntfy](https://www.youtube.com/watch?v=u9EcWrsjE20) ⭐ - youtube.com - 2/2023
 - [Use ntfy.sh with Home Assistant](https://diecknet.de/en/2023/02/12/ntfy-sh-with-homeassistant/) - diecknet.de - 2/2023 
 - [On installe Ntfy sur Synology Docker](https://www.maison-et-domotique.com/140356-serveur-notification-jeedom-ntfy-synology-docker/) - maison-et-domotique.co - 1/2023 

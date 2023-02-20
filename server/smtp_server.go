@@ -94,7 +94,7 @@ func (s *smtpSession) Rcpt(to string) error {
 		if !strings.HasSuffix(to, "@"+conf.SMTPServerDomain) {
 			return errInvalidDomain
 		}
-		// remove @ntfy.sh from end of email
+		// Remove @ntfy.sh from end of email
 		to = strings.TrimSuffix(to, "@"+conf.SMTPServerDomain)
 		if conf.SMTPServerAddrPrefix != "" {
 			if !strings.HasPrefix(to, conf.SMTPServerAddrPrefix) {
@@ -103,7 +103,7 @@ func (s *smtpSession) Rcpt(to string) error {
 			// remove ntfy- from beginning of email
 			to = strings.TrimPrefix(to, conf.SMTPServerAddrPrefix)
 		}
-		// if email contains token, split topic and token
+		// If email contains token, split topic and token
 		if strings.Contains(to, "+") {
 			parts := strings.Split(to, "+")
 			to = parts[0]
@@ -175,7 +175,6 @@ func (s *smtpSession) publishMessage(m *message) error {
 	if err != nil {
 		remoteAddr = s.conn.Conn().RemoteAddr().String()
 	}
-
 	// Call HTTP handler with fake HTTP request
 	url := fmt.Sprintf("%s/%s", s.backend.config.BaseURL, m.Topic)
 	req, err := http.NewRequest("POST", url, strings.NewReader(m.Message))

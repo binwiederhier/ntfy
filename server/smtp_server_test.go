@@ -492,6 +492,27 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
 }
 
+func TestSmtpBackend_PlaintextWithToken(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: phil@example.com
+RCPT TO: ntfy-mytopic+tk_KLORUqSqvNRLpY11DfkHVbHu9NGG2@ntfy.sh
+DATA
+Subject: Very short mail
+
+what's up
+.
+`
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "Very short mail", r.Header.Get("Title"))
+		require.Equal(t, "Bearer tk_KLORUqSqvNRLpY11DfkHVbHu9NGG2", r.Header.Get("Authorization"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
 type smtpHandlerFunc func(http.ResponseWriter, *http.Request)
 
 func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c net.Conn, conf *Config, scanner *bufio.Scanner) {

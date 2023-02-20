@@ -187,5 +187,8 @@
     "subscribe_dialog_subscribe_base_url_label": "Tjeneste-URL",
     "prefs_users_table": "Brukertabell",
     "prefs_users_edit_button": "Rediger bruker",
-    "error_boundary_unsupported_indexeddb_title": "Privat surfing støttes ikke"
+    "error_boundary_unsupported_indexeddb_title": "Privat surfing støttes ikke",
+    "action_bar_account": "Konto",
+    "action_bar_profile_settings": "Innstillinger",
+    "nav_button_account": "Konto"
 }

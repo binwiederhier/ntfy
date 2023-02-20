@@ -675,8 +675,6 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
-	} else {
-		m.Expires = m.Time
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
@@ -1416,12 +1414,15 @@ func (s *Server) execManager() {
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
 				subs := t.SubscribersCount()
-				expiryMessage := ""
-				if subs == 0 {
-					expiryTime := time.Until(t.lastVisitorExpires)
-					expiryMessage = ", expires in " + expiryTime.String()
+				ev := log.Tag(tagManager)
+				if ev.IsTrace() {
+					expiryMessage := ""
+					if subs == 0 {
+						expiryTime := time.Until(t.lastVisitorExpires)
+						expiryMessage = ", expires in " + expiryTime.String()
+					}
+					ev.Trace("- topic %s: %d subscribers%s", t.ID, subs, expiryMessage)
 				}
-				log.Tag(tagManager).Trace("- topic %s: %d subscribers%s", t.ID, subs, expiryMessage)
 				msgs, exists := messageCounts[t.ID]
 				if t.Stale() && (!exists || msgs == 0) {
 					log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)

@@ -2582,6 +2582,11 @@ format is:
 ntfy-$topic@ntfy.sh
 ```
 
+If [access control](config.md#access-control) is enabled, and the target topic does not support anonymous writes, e-mail publishing won't work without providing an authorized access token. That will change the format of the e-mail's recipient address to
+```
+ntfy-$topic+$token@ntfy.sh
+```
+
 As of today, e-mail publishing only supports adding a [message title](#message-title) (the e-mail subject). Tags, priority,
 delay and other features are not supported (yet). Here's an example that will publish a message with the 
 title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://ntfy.sh/sometopic)):

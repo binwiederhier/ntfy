@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
+	"github.com/k3a/html2text"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -218,6 +219,8 @@ func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	}
 	if strings.ToLower(contentType) == "text/plain" {
 		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
+	} else if strings.ToLower(contentType) == "text/html" {
+		return readHTMLMailBody(body, header.Get("Content-Transfer-Encoding"))
 	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
 		return readMultipartMailBody(body, params, 0)
 	}
@@ -255,5 +258,17 @@ func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, e
 	if err != nil {
 		return "", err
 	}
+	return string(body), nil
+}
+
+func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error) {
+	if strings.ToLower(transferEncoding) == "base64" {
+		reader = base64.NewDecoder(base64.StdEncoding, reader)
+	}
+	html, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	body := html2text.HTML2Text(string(html))
 	return string(body), nil
 }

@@ -27,6 +27,7 @@ require github.com/pkg/errors v0.9.1 // indirect
 
 require (
 	firebase.google.com/go/v4 v4.10.0
+	github.com/k3a/html2text v1.1.0
 	github.com/stripe/stripe-go/v74 v74.8.0
 )
 
@@ -40,7 +41,7 @@ require (
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emersion/go-sasl v0.0.0-20220912192320-0145f2c60ead // indirect
-	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

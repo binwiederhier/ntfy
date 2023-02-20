@@ -110,6 +110,65 @@ what's up
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
+func TestSmtpBackend_TextHtml(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: phil@example.com
+RCPT TO: mytopic@ntfy.sh
+DATA
+Date: Tue, 28 Dec 2021 00:30:10 +0100
+Message-ID: <CAAvm79YP0C=Rt1N=KWmSUBB87KK2rRChmdzKqF1vCwMEUiVzLQ@mail.gmail.com>
+Subject: and one more
+From: Phil <phil@example.com>
+To: mytopic@ntfy.sh
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 7bit
+
+<!DOCTYPE html>
+<html>
+<body>
+what's up
+</body>
+</html>
+.
+`
+	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "and one more", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
+	})
+	conf.SMTPServerAddrPrefix = ""
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
+func TestSmtpBackend_TextHtmlBase64(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: phil@example.com
+RCPT TO: mytopic@ntfy.sh
+DATA
+Date: Tue, 28 Dec 2021 00:30:10 +0100
+Message-ID: <CAAvm79YP0C=Rt1N=KWmSUBB87KK2rRChmdzKqF1vCwMEUiVzLQ@mail.gmail.com>
+Subject: and one more
+From: Phil <phil@example.com>
+To: mytopic@ntfy.sh
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: base64
+
+PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8Ym9keT4Kd2hhdCdzIHVwCjwvYm9keT4KPC9odG1sPg==
+.
+`
+	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "and one more", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
+	})
+	conf.SMTPServerAddrPrefix = ""
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
 func TestSmtpBackend_Plaintext_No_ContentType(t *testing.T) {
 	email := `EHLO example.com
 MAIL FROM: phil@example.com

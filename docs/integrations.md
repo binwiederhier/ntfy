@@ -35,6 +35,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
 - [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
+- [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

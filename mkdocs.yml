@@ -10,6 +10,7 @@ edit_uri: blob/main/docs/
 theme:
   name: material
   language: en
+  custom_dir: docs/_overrides
   logo: static/img/ntfy.png
   favicon: static/img/favicon.png
   include_search_page: false

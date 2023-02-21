@@ -9,6 +9,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Support for publishing to protected topics via email with access tokens ([#612](https://github.com/binwiederhier/ntfy/pull/621), thanks to [@tamcore](https://github.com/tamcore))
 * Support for base64-encoded and nested multipart emails ([#610](https://github.com/binwiederhier/ntfy/issues/610), thanks to [@Robert-litts](https://github.com/Robert-litts))
 
+**Bug fixes + maintenance:**
+
+* Web: Do not disable "Reserve topic" checkbox for admins (no ticket, thanks to @xenrox for reporting)
+
 **Additional languages:**
 
 * Arabic (thanks to [@ButterflyOfFire](https://hosted.weblate.org/user/ButterflyOfFire/))

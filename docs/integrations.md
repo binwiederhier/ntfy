@@ -36,6 +36,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
+- [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

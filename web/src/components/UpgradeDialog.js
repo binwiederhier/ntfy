@@ -111,16 +111,21 @@ const UpgradeDialog = (props) => {
     }
 
     // Figure out discount
-    let discount;
+    let discount = 0, upto = false;
     if (newTier?.prices) {
         discount = Math.round(((newTier.prices.month*12/newTier.prices.year)-1)*100);
     } else {
+        let n = 0;
         for (const t of tiers) {
             if (t.prices) {
-                discount = Math.round(((t.prices.month*12/t.prices.year)-1)*100);
-                break;
+                const tierDiscount = Math.round(((t.prices.month*12/t.prices.year)-1)*100);
+                if (tierDiscount > discount) {
+                    discount = tierDiscount;
+                    n++;
+                }
             }
         }
+        upto = n > 1;
     }
 
     return (
@@ -145,7 +150,15 @@ const UpgradeDialog = (props) => {
                             onChange={(ev) => setInterval(ev.target.checked ? SubscriptionInterval.YEAR : SubscriptionInterval.MONTH)}
                         />
                         <Typography component="span" variant="subtitle1">{t("account_upgrade_dialog_interval_yearly")}</Typography>
-                        {discount > 0 && <Chip label={`-${discount}%`} color="primary" size="small" variant={interval === SubscriptionInterval.YEAR ? "filled" : "outlined"} sx={{ marginLeft: "5px" }}/>}
+                        {discount > 0 &&
+                            <Chip
+                                label={upto ? t("account_upgrade_dialog_interval_yearly_discount_save_up_to", { discount: discount }) : t("account_upgrade_dialog_interval_yearly_discount_save", { discount: discount })}
+                                color="primary"
+                                size="small"
+                                variant={interval === SubscriptionInterval.YEAR ? "filled" : "outlined"}
+                                sx={{ marginLeft: "5px" }}
+                            />
+                        }
                     </div>
                 </div>
             </DialogTitle>

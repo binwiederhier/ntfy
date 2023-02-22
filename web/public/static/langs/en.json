@@ -219,6 +219,8 @@
   "account_upgrade_dialog_title": "Change account tier",
   "account_upgrade_dialog_interval_monthly": "Monthly",
   "account_upgrade_dialog_interval_yearly": "Annually",
+  "account_upgrade_dialog_interval_yearly_discount_save": "save {{discount}}%",
+  "account_upgrade_dialog_interval_yearly_discount_save_up_to": "save up to {{discount}}%",
   "account_upgrade_dialog_cancel_warning": "This will <strong>cancel your subscription</strong>, and downgrade your account on {{date}}. On that date, topic reservations as well as messages cached on the server <strong>will be deleted</strong>.",
   "account_upgrade_dialog_proration_info": "<strong>Proration</strong>: When upgrading between paid plans, the price difference will be <strong>charged immediately</strong>. When downgrading to a lower tier, the balance will be used to pay for future billing periods.",
   "account_upgrade_dialog_reservations_warning_one": "The selected tier allows fewer reserved topics than your current tier. Before changing your tier, <strong>please delete at least one reservation</strong>. You can remove reservations in the <Link>Settings</Link>.",

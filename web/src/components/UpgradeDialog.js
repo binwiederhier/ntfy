@@ -145,7 +145,7 @@ const UpgradeDialog = (props) => {
                             onChange={(ev) => setInterval(ev.target.checked ? SubscriptionInterval.YEAR : SubscriptionInterval.MONTH)}
                         />
                         <Typography component="span" variant="subtitle1">{t("account_upgrade_dialog_interval_yearly")}</Typography>
-                        {discount > 0 && <Chip label={`-${discount}%`} color="primary" size="small" sx={{ marginLeft: "5px" }}/>}
+                        {discount > 0 && <Chip label={`-${discount}%`} color="primary" size="small" variant={interval === SubscriptionInterval.YEAR ? "filled" : "outlined"} sx={{ marginLeft: "5px" }}/>}
                     </div>
                 </div>
             </DialogTitle>

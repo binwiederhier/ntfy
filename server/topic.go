@@ -19,9 +19,10 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	subscriber subscriber
-	visitor    *visitor // User ID associated with this subscription, may be empty
-	cancel     func()
+	subscriber          subscriber
+	visitor             *visitor // User ID associated with this subscription, may be empty
+	cancel              func()
+	subscriberRateLimit bool
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -36,31 +37,36 @@ func newTopic(id string) *topic {
 }
 
 // Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func()) int {
+func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func(), subscriberRateLimit bool) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	subscriberID := rand.Int()
 	t.subscribers[subscriberID] = &topicSubscriber{
-		visitor:    visitor, // May be empty
-		subscriber: s,
-		cancel:     cancel,
+		visitor:             visitor, // May be empty
+		subscriber:          s,
+		cancel:              cancel,
+		subscriberRateLimit: subscriberRateLimit,
 	}
+
+	// if no subscriber is already handling the rate limit
+	if t.lastVisitor == nil && subscriberRateLimit {
+		t.lastVisitor = visitor
+		t.lastVisitorExpires = time.Time{}
+	}
+
 	return subscriberID
 }
 
 func (t *topic) Stale() bool {
-	return t.getBillee() == nil
-}
-
-func (t *topic) getBillee() *visitor {
-	for _, this_subscriber := range t.subscribers {
-		return this_subscriber.visitor
-	}
-	if t.lastVisitor != nil && t.lastVisitorExpires.After(time.Now()) {
+	// if Time is initialized (not the zero value) and the expiry time has passed
+	if !t.lastVisitorExpires.IsZero() && t.lastVisitorExpires.Before(time.Now()) {
 		t.lastVisitor = nil
 	}
-	return t.lastVisitor
+	return len(t.subscribers) == 0 && t.lastVisitor == nil
+}
 
+func (t *topic) Billee() *visitor {
+	return t.lastVisitor
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -68,11 +74,23 @@ func (t *topic) Unsubscribe(id int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if len(t.subscribers) == 1 {
-		t.lastVisitor = t.subscribers[id].visitor
+	deletingSub := t.subscribers[id]
+	delete(t.subscribers, id)
+
+	// look for an active subscriber (in random order) that wants to handle the rate limit
+	for _, v := range t.subscribers {
+		if v.subscriberRateLimit {
+			t.lastVisitor = v.visitor
+			t.lastVisitorExpires = time.Time{}
+			return
+		}
+	}
+
+	// if no active subscriber is found, count it towards the leaving subscriber
+	if deletingSub.subscriberRateLimit {
+		t.lastVisitor = deletingSub.visitor
 		t.lastVisitorExpires = time.Now().Add(subscriberBilledValidity)
 	}
-	delete(t.subscribers, id)
 }
 
 // Publish asynchronously publishes to all subscribers

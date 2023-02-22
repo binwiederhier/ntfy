@@ -1,12 +1,13 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
 	"net/netip"
 	"strings"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -15,6 +16,17 @@ func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
 		return defaultValue
 	}
 	return value == "1" || value == "yes" || value == "true"
+}
+
+func readCommaSeperatedParam(r *http.Request, names ...string) (params []string) {
+	paramStr := readParam(r, names...)
+	if paramStr != "" {
+		params = make([]string, 0)
+		for _, s := range util.SplitNoEmpty(paramStr, ",") {
+			params = append(params, strings.TrimSpace(s))
+		}
+	}
+	return params
 }
 
 func readParam(r *http.Request, names ...string) string {
@@ -33,6 +45,13 @@ func readHeaderParam(r *http.Request, names ...string) string {
 		}
 	}
 	return ""
+}
+
+func readHeaderParamValues(r *http.Request, names ...string) (values []string) {
+	for _, name := range names {
+		values = append(values, r.Header.Values(name)...)
+	}
+	return
 }
 
 func readQueryParam(r *http.Request, names ...string) string {

@@ -250,6 +250,7 @@ func execServe(c *cli.Context) error {
 
 	// Stripe things
 	if stripeSecretKey != "" {
+		stripe.EnableTelemetry = false // Whoa!
 		stripe.Key = stripeSecretKey
 	}
 

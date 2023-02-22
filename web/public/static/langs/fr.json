@@ -207,5 +207,7 @@
     "signup_form_username": "Identifiant",
     "signup_form_button_submit": "S'inscrire",
     "signup_already_have_account": "Vous avez déjà un compte, connectez-vous.",
-    "action_bar_profile_logout": "Se déconnecter"
+    "action_bar_profile_logout": "Se déconnecter",
+    "signup_form_toggle_password_visibility": "Afficher le mot de passe",
+    "action_bar_change_display_name": "Changer le nom affiché"
 }

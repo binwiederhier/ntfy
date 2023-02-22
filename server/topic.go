@@ -58,6 +58,8 @@ func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func(), subscri
 }
 
 func (t *topic) Stale() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	// if Time is initialized (not the zero value) and the expiry time has passed
 	if !t.lastVisitorExpires.IsZero() && t.lastVisitorExpires.Before(time.Now()) {
 		t.lastVisitor = nil
@@ -66,6 +68,8 @@ func (t *topic) Stale() bool {
 }
 
 func (t *topic) Billee() *visitor {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.lastVisitor
 }
 

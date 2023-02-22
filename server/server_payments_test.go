@@ -37,7 +37,9 @@ func TestPayments_Tiers(t *testing.T) {
 		On("ListPrices", mock.Anything).
 		Return([]*stripe.Price{
 			{ID: "price_123", UnitAmount: 500},
+			{ID: "price_124", UnitAmount: 5000},
 			{ID: "price_456", UnitAmount: 1000},
+			{ID: "price_457", UnitAmount: 10000},
 			{ID: "price_999", UnitAmount: 9999},
 		}, nil)
 
@@ -58,7 +60,8 @@ func TestPayments_Tiers(t *testing.T) {
 		AttachmentFileSizeLimit:  999,
 		AttachmentTotalSizeLimit: 888,
 		AttachmentExpiryDuration: time.Minute,
-		StripePriceID:            "price_123",
+		StripeMonthlyPriceID:     "price_123",
+		StripeYearlyPriceID:      "price_124",
 	}))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_444",
@@ -71,7 +74,8 @@ func TestPayments_Tiers(t *testing.T) {
 		AttachmentFileSizeLimit:  999111,
 		AttachmentTotalSizeLimit: 888111,
 		AttachmentExpiryDuration: time.Hour,
-		StripePriceID:            "price_456",
+		StripeMonthlyPriceID:     "price_456",
+		StripeYearlyPriceID:      "price_457",
 	}))
 	response := request(t, s, "GET", "/v1/tiers", "", nil)
 	require.Equal(t, 200, response.Code)
@@ -98,6 +102,8 @@ func TestPayments_Tiers(t *testing.T) {
 	require.Equal(t, "pro", tier.Code)
 	require.Equal(t, "Pro", tier.Name)
 	require.Equal(t, "tier", tier.Limits.Basis)
+	require.Equal(t, int64(500), tier.Prices.Month)
+	require.Equal(t, int64(5000), tier.Prices.Year)
 	require.Equal(t, int64(777), tier.Limits.Reservations)
 	require.Equal(t, int64(1000), tier.Limits.Messages)
 	require.Equal(t, int64(3600), tier.Limits.MessagesExpiryDuration)
@@ -109,6 +115,8 @@ func TestPayments_Tiers(t *testing.T) {
 	tier = tiers[2]
 	require.Equal(t, "business", tier.Code)
 	require.Equal(t, "Business", tier.Name)
+	require.Equal(t, int64(1000), tier.Prices.Month)
+	require.Equal(t, int64(10000), tier.Prices.Year)
 	require.Equal(t, "tier", tier.Limits.Basis)
 	require.Equal(t, int64(777333), tier.Limits.Reservations)
 	require.Equal(t, int64(2000), tier.Limits.Messages)
@@ -136,14 +144,14 @@ func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:            "ti_123",
-		Code:          "pro",
-		StripePriceID: "price_123",
+		ID:                   "ti_123",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_123",
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
 	// Create subscription
-	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro"}`, map[string]string{
+	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro", "interval": "month"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, response.Code)
@@ -172,9 +180,9 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:            "ti_123",
-		Code:          "pro",
-		StripePriceID: "price_123",
+		ID:                   "ti_123",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_123",
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
@@ -187,7 +195,7 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 	require.Nil(t, s.userManager.ChangeBilling(u.Name, billing))
 
 	// Create subscription
-	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro"}`, map[string]string{
+	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro", "interval": "month"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, response.Code)
@@ -214,9 +222,9 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:            "ti_123",
-		Code:          "pro",
-		StripePriceID: "price_123",
+		ID:                   "ti_123",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_123",
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 
@@ -267,7 +275,7 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                    "ti_123",
 		Code:                  "starter",
-		StripePriceID:         "price_1234",
+		StripeMonthlyPriceID:  "price_1234",
 		ReservationLimit:      1,
 		MessageLimit:          220, // 220 * 5% = 11 requests before rate limiting kicks in
 		MessageExpiryDuration: time.Hour,
@@ -298,7 +306,12 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 			Items: &stripe.SubscriptionItemList{
 				Data: []*stripe.SubscriptionItem{
 					{
-						Price: &stripe.Price{ID: "price_1234"},
+						Price: &stripe.Price{
+							ID: "price_1234",
+							Recurring: &stripe.PriceRecurring{
+								Interval: stripe.PriceRecurringIntervalMonth,
+							},
+						},
 					},
 				},
 			},
@@ -333,6 +346,7 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	require.Equal(t, "", u.Billing.StripeCustomerID)
 	require.Equal(t, "", u.Billing.StripeSubscriptionID)
 	require.Equal(t, stripe.SubscriptionStatus(""), u.Billing.StripeSubscriptionStatus)
+	require.Equal(t, stripe.PriceRecurringInterval(""), u.Billing.StripeSubscriptionInterval)
 	require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
 	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
 	require.Equal(t, int64(0), u.Stats.Messages) // Messages and emails are not persisted for no-tier users!
@@ -349,6 +363,7 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 	require.Equal(t, "acct_5555", u.Billing.StripeCustomerID)
 	require.Equal(t, "sub_1234", u.Billing.StripeSubscriptionID)
 	require.Equal(t, stripe.SubscriptionStatusActive, u.Billing.StripeSubscriptionStatus)
+	require.Equal(t, stripe.PriceRecurringIntervalMonth, u.Billing.StripeSubscriptionInterval)
 	require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 	require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
 	require.Equal(t, int64(0), u.Stats.Messages)
@@ -423,7 +438,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_1",
 		Code:                     "starter",
-		StripePriceID:            "price_1234", // !
+		StripeMonthlyPriceID:     "price_1234", // !
 		ReservationLimit:         1,            // !
 		MessageLimit:             100,
 		MessageExpiryDuration:    time.Hour,
@@ -435,7 +450,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		ID:                       "ti_2",
 		Code:                     "pro",
-		StripePriceID:            "price_1111", // !
+		StripeMonthlyPriceID:     "price_1111", // !
 		ReservationLimit:         3,            // !
 		MessageLimit:             200,
 		MessageExpiryDuration:    time.Hour,
@@ -457,6 +472,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		StripeCustomerID:            "acct_5555",
 		StripeSubscriptionID:        "sub_1234",
 		StripeSubscriptionStatus:    stripe.SubscriptionStatusPastDue,
+		StripeSubscriptionInterval:  stripe.PriceRecurringIntervalMonth,
 		StripeSubscriptionPaidUntil: time.Unix(123, 0),
 		StripeSubscriptionCancelAt:  time.Unix(456, 0),
 	}
@@ -499,9 +515,10 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 	require.Equal(t, "starter", u.Tier.Code) // Not "pro"
 	require.Equal(t, "acct_5555", u.Billing.StripeCustomerID)
 	require.Equal(t, "sub_1234", u.Billing.StripeSubscriptionID)
-	require.Equal(t, stripe.SubscriptionStatusActive, u.Billing.StripeSubscriptionStatus) // Not "past_due"
-	require.Equal(t, int64(1674268231), u.Billing.StripeSubscriptionPaidUntil.Unix())     // Updated
-	require.Equal(t, int64(1674299999), u.Billing.StripeSubscriptionCancelAt.Unix())      // Updated
+	require.Equal(t, stripe.SubscriptionStatusActive, u.Billing.StripeSubscriptionStatus)     // Not "past_due"
+	require.Equal(t, stripe.PriceRecurringIntervalYear, u.Billing.StripeSubscriptionInterval) // Not "month"
+	require.Equal(t, int64(1674268231), u.Billing.StripeSubscriptionPaidUntil.Unix())         // Updated
+	require.Equal(t, int64(1674299999), u.Billing.StripeSubscriptionCancelAt.Unix())          // Updated
 
 	// Verify that reservations were deleted
 	r, err := s.userManager.Reservations("phil")
@@ -546,10 +563,10 @@ func TestPayments_Webhook_Subscription_Deleted(t *testing.T) {
 
 	// Create a user with a Stripe subscription and 3 reservations
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:               "ti_1",
-		Code:             "pro",
-		StripePriceID:    "price_1234",
-		ReservationLimit: 1,
+		ID:                   "ti_1",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_1234",
+		ReservationLimit:     1,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
@@ -562,6 +579,7 @@ func TestPayments_Webhook_Subscription_Deleted(t *testing.T) {
 		StripeCustomerID:            "acct_5555",
 		StripeSubscriptionID:        "sub_1234",
 		StripeSubscriptionStatus:    stripe.SubscriptionStatusPastDue,
+		StripeSubscriptionInterval:  stripe.PriceRecurringIntervalMonth,
 		StripeSubscriptionPaidUntil: time.Unix(123, 0),
 		StripeSubscriptionCancelAt:  time.Unix(0, 0),
 	}))
@@ -615,11 +633,11 @@ func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 	stripeMock.
 		On("UpdateSubscription", "sub_123", &stripe.SubscriptionParams{
 			CancelAtPeriodEnd: stripe.Bool(false),
-			ProrationBehavior: stripe.String(string(stripe.SubscriptionSchedulePhaseProrationBehaviorCreateProrations)),
+			ProrationBehavior: stripe.String(string(stripe.SubscriptionSchedulePhaseProrationBehaviorAlwaysInvoice)),
 			Items: []*stripe.SubscriptionItemsParams{
 				{
 					ID:    stripe.String("someid_123"),
-					Price: stripe.String("price_456"),
+					Price: stripe.String("price_457"),
 				},
 			},
 		}).
@@ -627,14 +645,16 @@ func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 
 	// Create tier and user
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:            "ti_123",
-		Code:          "pro",
-		StripePriceID: "price_123",
+		ID:                   "ti_123",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_123",
+		StripeYearlyPriceID:  "price_124",
 	}))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		ID:            "ti_456",
-		Code:          "business",
-		StripePriceID: "price_456",
+		ID:                   "ti_456",
+		Code:                 "business",
+		StripeMonthlyPriceID: "price_456",
+		StripeYearlyPriceID:  "price_457",
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
@@ -644,7 +664,7 @@ func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 	}))
 
 	// Call endpoint to change subscription
-	rr := request(t, s, "PUT", "/v1/account/billing/subscription", `{"tier":"business"}`, map[string]string{
+	rr := request(t, s, "PUT", "/v1/account/billing/subscription", `{"tier":"business","interval":"year"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -795,7 +815,10 @@ const subscriptionUpdatedEventJSON = `
 				"data": [
 					{
 						"price": {
-							"id": "price_1234"
+							"id": "price_1234",
+							"recurring": {
+								"interval": "year"
+							}
 						}
 					}
 				]
@@ -818,7 +841,10 @@ const subscriptionDeletedEventJSON = `
 				"data": [
 					{
 						"price": {
-							"id": "price_1234"
+							"id": "price_1234",
+							"recurring": {
+								"interval": "month"
+							}
 						}
 					}
 				]

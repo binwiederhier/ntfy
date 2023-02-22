@@ -91,15 +91,17 @@ type Tier struct {
 	AttachmentTotalSizeLimit int64         // Total file size for all files of this user (bytes)
 	AttachmentExpiryDuration time.Duration // Duration after which attachments will be deleted
 	AttachmentBandwidthLimit int64         // Daily bandwidth limit for the user
-	StripePriceID            string        // Price ID for paid tiers (price_...)
+	StripeMonthlyPriceID     string        // Monthly price ID for paid tiers (price_...)
+	StripeYearlyPriceID      string        // Yearly price ID for paid tiers (price_...)
 }
 
 // Context returns fields for the log
 func (t *Tier) Context() log.Context {
 	return log.Context{
-		"tier_id":         t.ID,
-		"tier_code":       t.Code,
-		"stripe_price_id": t.StripePriceID,
+		"tier_id":                 t.ID,
+		"tier_code":               t.Code,
+		"stripe_monthly_price_id": t.StripeMonthlyPriceID,
+		"stripe_yearly_price_id":  t.StripeYearlyPriceID,
 	}
 }
 
@@ -136,6 +138,7 @@ type Billing struct {
 	StripeCustomerID            string
 	StripeSubscriptionID        string
 	StripeSubscriptionStatus    stripe.SubscriptionStatus
+	StripeSubscriptionInterval  stripe.PriceRecurringInterval
 	StripeSubscriptionPaidUntil time.Time
 	StripeSubscriptionCancelAt  time.Time
 }

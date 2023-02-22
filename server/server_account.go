@@ -100,6 +100,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				Customer:     true,
 				Subscription: u.Billing.StripeSubscriptionID != "",
 				Status:       string(u.Billing.StripeSubscriptionStatus),
+				Interval:     string(u.Billing.StripeSubscriptionInterval),
 				PaidUntil:    u.Billing.StripeSubscriptionPaidUntil.Unix(),
 				CancelAt:     u.Billing.StripeSubscriptionCancelAt.Unix(),
 			}

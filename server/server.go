@@ -45,11 +45,11 @@ type Server struct {
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
 	messages          int64
-	userManager       *user.Manager                        // Might be nil!
-	messageCache      *messageCache                        // Database that stores the messages
-	fileCache         *fileCache                           // File system based cache that stores attachments
-	stripe            stripeAPI                            // Stripe API, can be replaced with a mock
-	priceCache        *util.LookupCache[map[string]string] // Stripe price ID -> formatted price
+	userManager       *user.Manager                       // Might be nil!
+	messageCache      *messageCache                       // Database that stores the messages
+	fileCache         *fileCache                          // File system based cache that stores attachments
+	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
+	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	closeChan         chan bool
 	mu                sync.Mutex
 }

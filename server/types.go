@@ -309,6 +309,7 @@ type apiAccountBilling struct {
 	Customer     bool   `json:"customer"`
 	Subscription bool   `json:"subscription"`
 	Status       string `json:"status,omitempty"`
+	Interval     string `json:"interval,omitempty"`
 	PaidUntil    int64  `json:"paid_until,omitempty"`
 	CancelAt     int64  `json:"cancel_at,omitempty"`
 }
@@ -343,11 +344,16 @@ type apiConfigResponse struct {
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
+type apiAccountBillingPrices struct {
+	Month int64 `json:"month"`
+	Year  int64 `json:"year"`
+}
+
 type apiAccountBillingTier struct {
-	Code   string            `json:"code,omitempty"`
-	Name   string            `json:"name,omitempty"`
-	Price  string            `json:"price,omitempty"`
-	Limits *apiAccountLimits `json:"limits"`
+	Code   string                   `json:"code,omitempty"`
+	Name   string                   `json:"name,omitempty"`
+	Prices *apiAccountBillingPrices `json:"prices,omitempty"`
+	Limits *apiAccountLimits        `json:"limits"`
 }
 
 type apiAccountBillingSubscriptionCreateResponse struct {
@@ -355,7 +361,8 @@ type apiAccountBillingSubscriptionCreateResponse struct {
 }
 
 type apiAccountBillingSubscriptionChangeRequest struct {
-	Tier string `json:"tier"`
+	Tier     string `json:"tier"`
+	Interval string `json:"interval"`
 }
 
 type apiAccountBillingPortalRedirectResponse struct {
@@ -385,7 +392,10 @@ type apiStripeSubscriptionUpdatedEvent struct {
 	Items            *struct {
 		Data []*struct {
 			Price *struct {
-				ID string `json:"id"`
+				ID        string `json:"id"`
+				Recurring *struct {
+					Interval string `json:"interval"`
+				} `json:"recurring"`
 			} `json:"price"`
 		} `json:"data"`
 	} `json:"items"`

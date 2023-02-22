@@ -54,7 +54,8 @@ var cmdTier = &cli.Command{
 				&cli.StringFlag{Name: "attachment-total-size-limit", Value: defaultAttachmentTotalSizeLimit, Usage: "total size limit of attachments for the user"},
 				&cli.DurationFlag{Name: "attachment-expiry-duration", Value: defaultAttachmentExpiryDuration, Usage: "duration after which attachments are deleted"},
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Value: defaultAttachmentBandwidthLimit, Usage: "daily bandwidth limit for attachment uploads/downloads"},
-				&cli.StringFlag{Name: "stripe-price-id", Usage: "Stripe price ID for paid tiers (e.g. price_12345)"},
+				&cli.StringFlag{Name: "stripe-monthly-price-id", Usage: "Monthly Stripe price ID for paid tiers (e.g. price_12345)"},
+				&cli.StringFlag{Name: "stripe-yearly-price-id", Usage: "Yearly Stripe price ID for paid tiers (e.g. price_12345)"},
 				&cli.BoolFlag{Name: "ignore-exists", Usage: "if the tier already exists, perform no action and exit"},
 			},
 			Description: `Add a new tier to the ntfy user database.
@@ -96,7 +97,8 @@ Examples:
 				&cli.StringFlag{Name: "attachment-total-size-limit", Usage: "total size limit of attachments for the user"},
 				&cli.DurationFlag{Name: "attachment-expiry-duration", Usage: "duration after which attachments are deleted"},
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Usage: "daily bandwidth limit for attachment uploads/downloads"},
-				&cli.StringFlag{Name: "stripe-price-id", Usage: "Stripe price ID for paid tiers (e.g. price_12345)"},
+				&cli.StringFlag{Name: "stripe-monthly-price-id", Usage: "Monthly Stripe price ID for paid tiers (e.g. price_12345)"},
+				&cli.StringFlag{Name: "stripe-yearly-price-id", Usage: "Yearly Stripe price ID for paid tiers (e.g. price_12345)"},
 			},
 			Description: `Updates a tier to change the limits.
 
@@ -110,7 +112,8 @@ Examples:
   ntfy tier change --name="Pro" pro        # Update the name of an existing tier
   ntfy tier change \                       # Update multiple limits and fields
     --message-expiry-duration=24h \
-    --stripe-price-id=price_1234 \
+    --stripe-monthly-price-id=price_1234 \
+    --stripe-monthly-price-id=price_5678 \
     pro
 `,
 		},
@@ -166,6 +169,10 @@ func execTierAdd(c *cli.Context) error {
 		return errors.New("tier code expected, type 'ntfy tier add --help' for help")
 	} else if !user.AllowedTier(code) {
 		return errors.New("tier code must consist only of numbers and letters")
+	} else if c.String("stripe-monthly-price-id") != "" && c.String("stripe-yearly-price-id") == "" {
+		return errors.New("if stripe-monthly-price-id is set, stripe-yearly-price-id must also be set")
+	} else if c.String("stripe-monthly-price-id") == "" && c.String("stripe-yearly-price-id") != "" {
+		return errors.New("if stripe-yearly-price-id is set, stripe-monthly-price-id must also be set")
 	}
 	manager, err := createUserManager(c)
 	if err != nil {
@@ -206,7 +213,8 @@ func execTierAdd(c *cli.Context) error {
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit,
 		AttachmentExpiryDuration: c.Duration("attachment-expiry-duration"),
 		AttachmentBandwidthLimit: attachmentBandwidthLimit,
-		StripePriceID:            c.String("stripe-price-id"),
+		StripeMonthlyPriceID:     c.String("stripe-monthly-price-id"),
+		StripeYearlyPriceID:      c.String("stripe-yearly-price-id"),
 	}
 	if err := manager.AddTier(tier); err != nil {
 		return err
@@ -273,8 +281,16 @@ func execTierChange(c *cli.Context) error {
 			return err
 		}
 	}
-	if c.IsSet("stripe-price-id") {
-		tier.StripePriceID = c.String("stripe-price-id")
+	if c.IsSet("stripe-monthly-price-id") {
+		tier.StripeMonthlyPriceID = c.String("stripe-monthly-price-id")
+	}
+	if c.IsSet("stripe-yearly-price-id") {
+		tier.StripeYearlyPriceID = c.String("stripe-yearly-price-id")
+	}
+	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID == "" {
+		return errors.New("if stripe-monthly-price-id is set, stripe-yearly-price-id must also be set")
+	} else if tier.StripeMonthlyPriceID == "" && tier.StripeYearlyPriceID != "" {
+		return errors.New("if stripe-yearly-price-id is set, stripe-monthly-price-id must also be set")
 	}
 	if err := manager.UpdateTier(tier); err != nil {
 		return err
@@ -319,9 +335,9 @@ func execTierList(c *cli.Context) error {
 }
 
 func printTier(c *cli.Context, tier *user.Tier) {
-	stripePriceID := tier.StripePriceID
-	if stripePriceID == "" {
-		stripePriceID = "(none)"
+	prices := "(none)"
+	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID != "" {
+		prices = fmt.Sprintf("%s / %s", tier.StripeMonthlyPriceID, tier.StripeYearlyPriceID)
 	}
 	fmt.Fprintf(c.App.ErrWriter, "tier %s (id: %s)\n", tier.Code, tier.ID)
 	fmt.Fprintf(c.App.ErrWriter, "- Name: %s\n", tier.Name)
@@ -333,5 +349,5 @@ func printTier(c *cli.Context, tier *user.Tier) {
 	fmt.Fprintf(c.App.ErrWriter, "- Attachment total size limit: %s\n", util.FormatSize(tier.AttachmentTotalSizeLimit))
 	fmt.Fprintf(c.App.ErrWriter, "- Attachment expiry duration: %s (%d seconds)\n", tier.AttachmentExpiryDuration.String(), int64(tier.AttachmentExpiryDuration.Seconds()))
 	fmt.Fprintf(c.App.ErrWriter, "- Attachment daily bandwidth limit: %s\n", util.FormatSize(tier.AttachmentBandwidthLimit))
-	fmt.Fprintf(c.App.ErrWriter, "- Stripe price: %s\n", stripePriceID)
+	fmt.Fprintf(c.App.ErrWriter, "- Stripe prices (monthly/yearly): %s\n", prices)
 }

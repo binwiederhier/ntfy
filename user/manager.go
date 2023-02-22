@@ -46,7 +46,8 @@ var (
 
 // Manager-related queries
 const (
-	createTablesQueriesNoTx = `
+	createTablesQueries = `
+		BEGIN;
 		CREATE TABLE IF NOT EXISTS tier (
 			id TEXT PRIMARY KEY,
 			code TEXT NOT NULL,
@@ -59,10 +60,12 @@ const (
 			attachment_total_size_limit INT NOT NULL,
 			attachment_expiry_duration INT NOT NULL,
 			attachment_bandwidth_limit INT NOT NULL,
-			stripe_price_id TEXT
+			stripe_monthly_price_id TEXT,
+			stripe_yearly_price_id TEXT
 		);
 		CREATE UNIQUE INDEX idx_tier_code ON tier (code);
-		CREATE UNIQUE INDEX idx_tier_price_id ON tier (stripe_price_id);
+		CREATE UNIQUE INDEX idx_tier_stripe_monthly_price_id ON tier (stripe_monthly_price_id);
+		CREATE UNIQUE INDEX idx_tier_stripe_yearly_price_id ON tier (stripe_yearly_price_id);
 		CREATE TABLE IF NOT EXISTS user (
 		    id TEXT PRIMARY KEY,
 			tier_id TEXT,
@@ -76,6 +79,7 @@ const (
 			stripe_customer_id TEXT,
 			stripe_subscription_id TEXT,
 			stripe_subscription_status TEXT,
+			stripe_subscription_interval TEXT,
 			stripe_subscription_paid_until INT,
 			stripe_subscription_cancel_at INT,
 			created INT NOT NULL,
@@ -112,33 +116,33 @@ const (
 		INSERT INTO user (id, user, pass, role, sync_topic, created)
 		VALUES ('` + everyoneID + `', '*', '', 'anonymous', '', UNIXEPOCH())
 		ON CONFLICT (id) DO NOTHING;
+		COMMIT;
 	`
-	createTablesQueries   = `BEGIN; ` + createTablesQueriesNoTx + ` COMMIT;`
 	builtinStartupQueries = `
 		PRAGMA foreign_keys = ON;
 	`
 
 	selectUserByIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.id = ?
 	`
 	selectUserByNameQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE user = ?
 	`
 	selectUserByTokenQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		JOIN user_token tk on u.id = tk.user_id
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE tk.token = ? AND (tk.expires = 0 OR tk.expires >= ?)
 	`
 	selectUserByStripeCustomerIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.stats_messages, u.stats_emails, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.stripe_customer_id = ?
@@ -246,27 +250,27 @@ const (
 	`
 
 	insertTierQuery = `
-		INSERT INTO tier (id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO tier (id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	updateTierQuery = `
 		UPDATE tier
-		SET name = ?, messages_limit = ?, messages_expiry_duration = ?, emails_limit = ?, reservations_limit = ?, attachment_file_size_limit = ?, attachment_total_size_limit = ?, attachment_expiry_duration = ?, attachment_bandwidth_limit = ?, stripe_price_id = ?
+		SET name = ?, messages_limit = ?, messages_expiry_duration = ?, emails_limit = ?, reservations_limit = ?, attachment_file_size_limit = ?, attachment_total_size_limit = ?, attachment_expiry_duration = ?, attachment_bandwidth_limit = ?, stripe_monthly_price_id = ?, stripe_yearly_price_id = ?
 		WHERE code = ?
 	`
 	selectTiersQuery = `
-		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id
+		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id
 		FROM tier
 	`
 	selectTierByCodeQuery = `
-		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id
+		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id
 		FROM tier
 		WHERE code = ?
 	`
 	selectTierByPriceIDQuery = `
-		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_price_id
+		SELECT id, code, name, messages_limit, messages_expiry_duration, emails_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id
 		FROM tier
-		WHERE stripe_price_id = ?
+		WHERE (stripe_monthly_price_id = ? OR stripe_yearly_price_id = ?)
 	`
 	updateUserTierQuery = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	deleteUserTierQuery = `UPDATE user SET tier_id = null WHERE user = ?`
@@ -274,21 +278,86 @@ const (
 
 	updateBillingQuery = `
 		UPDATE user
-		SET stripe_customer_id = ?, stripe_subscription_id = ?, stripe_subscription_status = ?, stripe_subscription_paid_until = ?, stripe_subscription_cancel_at = ?
+		SET stripe_customer_id = ?, stripe_subscription_id = ?, stripe_subscription_status = ?, stripe_subscription_interval = ?, stripe_subscription_paid_until = ?, stripe_subscription_cancel_at = ?
 		WHERE user = ?
 	`
 )
 
 // Schema management queries
 const (
-	currentSchemaVersion     = 2
+	currentSchemaVersion     = 3
 	insertSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
 	updateSchemaVersion      = `UPDATE schemaVersion SET version = ? WHERE id = 1`
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
 
 	// 1 -> 2 (complex migration!)
-	migrate1To2RenameUserTableQueryNoTx = `
+	migrate1To2CreateTablesQueries = `
 		ALTER TABLE user RENAME TO user_old;
+		CREATE TABLE IF NOT EXISTS tier (
+			id TEXT PRIMARY KEY,
+			code TEXT NOT NULL,
+			name TEXT NOT NULL,
+			messages_limit INT NOT NULL,
+			messages_expiry_duration INT NOT NULL,
+			emails_limit INT NOT NULL,
+			reservations_limit INT NOT NULL,
+			attachment_file_size_limit INT NOT NULL,
+			attachment_total_size_limit INT NOT NULL,
+			attachment_expiry_duration INT NOT NULL,
+			attachment_bandwidth_limit INT NOT NULL,
+			stripe_price_id TEXT
+		);
+		CREATE UNIQUE INDEX idx_tier_code ON tier (code);
+		CREATE UNIQUE INDEX idx_tier_price_id ON tier (stripe_price_id);
+		CREATE TABLE IF NOT EXISTS user (
+		    id TEXT PRIMARY KEY,
+			tier_id TEXT,
+			user TEXT NOT NULL,
+			pass TEXT NOT NULL,
+			role TEXT CHECK (role IN ('anonymous', 'admin', 'user')) NOT NULL,
+			prefs JSON NOT NULL DEFAULT '{}',
+			sync_topic TEXT NOT NULL,
+			stats_messages INT NOT NULL DEFAULT (0),
+			stats_emails INT NOT NULL DEFAULT (0),
+			stripe_customer_id TEXT,
+			stripe_subscription_id TEXT,
+			stripe_subscription_status TEXT,
+			stripe_subscription_paid_until INT,
+			stripe_subscription_cancel_at INT,
+			created INT NOT NULL,
+			deleted INT,
+		    FOREIGN KEY (tier_id) REFERENCES tier (id)
+		);
+		CREATE UNIQUE INDEX idx_user ON user (user);
+		CREATE UNIQUE INDEX idx_user_stripe_customer_id ON user (stripe_customer_id);
+		CREATE UNIQUE INDEX idx_user_stripe_subscription_id ON user (stripe_subscription_id);
+		CREATE TABLE IF NOT EXISTS user_access (
+			user_id TEXT NOT NULL,
+			topic TEXT NOT NULL,
+			read INT NOT NULL,
+			write INT NOT NULL,
+			owner_user_id INT,
+			PRIMARY KEY (user_id, topic),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+		    FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE TABLE IF NOT EXISTS user_token (
+			user_id TEXT NOT NULL,
+			token TEXT NOT NULL,
+			label TEXT NOT NULL,
+			last_access INT NOT NULL,
+			last_origin TEXT NOT NULL,
+			expires INT NOT NULL,
+			PRIMARY KEY (user_id, token),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE TABLE IF NOT EXISTS schemaVersion (
+			id INT PRIMARY KEY,
+			version INT NOT NULL
+		);
+		INSERT INTO user (id, user, pass, role, sync_topic, created)
+		VALUES ('u_everyone', '*', '', 'anonymous', '', UNIXEPOCH())
+		ON CONFLICT (id) DO NOTHING;
 	`
 	migrate1To2SelectAllOldUsernamesNoTx = `SELECT user FROM user_old`
 	migrate1To2InsertUserNoTx            = `
@@ -304,11 +373,22 @@ const (
 		DROP TABLE access;
 		DROP TABLE user_old;
 	`
+
+	// 2 -> 3
+	migrate2To3UpdateQueries = `
+		ALTER TABLE user ADD COLUMN stripe_subscription_interval TEXT;
+		ALTER TABLE tier RENAME COLUMN stripe_price_id TO stripe_monthly_price_id;
+		ALTER TABLE tier ADD COLUMN stripe_yearly_price_id TEXT;
+		DROP INDEX IF EXISTS idx_tier_price_id;
+		CREATE UNIQUE INDEX idx_tier_stripe_monthly_price_id ON tier (stripe_monthly_price_id);
+		CREATE UNIQUE INDEX idx_tier_stripe_yearly_price_id ON tier (stripe_yearly_price_id);
+	`
 )
 
 var (
 	migrations = map[int]func(db *sql.DB) error{
 		1: migrateFrom1,
+		2: migrateFrom2,
 	}
 )
 
@@ -805,13 +885,13 @@ func (a *Manager) userByToken(token string) (*User, error) {
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	var id, username, hash, role, prefs, syncTopic string
-	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripePriceID, tierID, tierCode, tierName sql.NullString
+	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripeSubscriptionInterval, stripeMonthlyPriceID, stripeYearlyPriceID, tierID, tierCode, tierName sql.NullString
 	var messages, emails int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, attachmentBandwidthLimit, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt, deleted sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrUserNotFound
 	}
-	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripePriceID); err != nil {
+	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &messages, &emails, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionInterval, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -828,11 +908,12 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			Emails:   emails,
 		},
 		Billing: &Billing{
-			StripeCustomerID:            stripeCustomerID.String,                                    // May be empty
-			StripeSubscriptionID:        stripeSubscriptionID.String,                                // May be empty
-			StripeSubscriptionStatus:    stripe.SubscriptionStatus(stripeSubscriptionStatus.String), // May be empty
-			StripeSubscriptionPaidUntil: time.Unix(stripeSubscriptionPaidUntil.Int64, 0),            // May be zero
-			StripeSubscriptionCancelAt:  time.Unix(stripeSubscriptionCancelAt.Int64, 0),             // May be zero
+			StripeCustomerID:            stripeCustomerID.String,                                          // May be empty
+			StripeSubscriptionID:        stripeSubscriptionID.String,                                      // May be empty
+			StripeSubscriptionStatus:    stripe.SubscriptionStatus(stripeSubscriptionStatus.String),       // May be empty
+			StripeSubscriptionInterval:  stripe.PriceRecurringInterval(stripeSubscriptionInterval.String), // May be empty
+			StripeSubscriptionPaidUntil: time.Unix(stripeSubscriptionPaidUntil.Int64, 0),                  // May be zero
+			StripeSubscriptionCancelAt:  time.Unix(stripeSubscriptionCancelAt.Int64, 0),                   // May be zero
 		},
 		Deleted: deleted.Valid,
 	}
@@ -853,7 +934,8 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 			AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 			AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
 			AttachmentBandwidthLimit: attachmentBandwidthLimit.Int64,
-			StripePriceID:            stripePriceID.String, // May be empty
+			StripeMonthlyPriceID:     stripeMonthlyPriceID.String, // May be empty
+			StripeYearlyPriceID:      stripeYearlyPriceID.String,  // May be empty
 		}
 	}
 	return user, nil
@@ -1134,7 +1216,7 @@ func (a *Manager) AddTier(tier *Tier) error {
 	if tier.ID == "" {
 		tier.ID = util.RandomStringPrefix(tierIDPrefix, tierIDLength)
 	}
-	if _, err := a.db.Exec(insertTierQuery, tier.ID, tier.Code, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripePriceID)); err != nil {
+	if _, err := a.db.Exec(insertTierQuery, tier.ID, tier.Code, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripeMonthlyPriceID), nullString(tier.StripeYearlyPriceID)); err != nil {
 		return err
 	}
 	return nil
@@ -1142,7 +1224,7 @@ func (a *Manager) AddTier(tier *Tier) error {
 
 // UpdateTier updates a tier's properties in the database
 func (a *Manager) UpdateTier(tier *Tier) error {
-	if _, err := a.db.Exec(updateTierQuery, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripePriceID), tier.Code); err != nil {
+	if _, err := a.db.Exec(updateTierQuery, tier.Name, tier.MessageLimit, int64(tier.MessageExpiryDuration.Seconds()), tier.EmailLimit, tier.ReservationLimit, tier.AttachmentFileSizeLimit, tier.AttachmentTotalSizeLimit, int64(tier.AttachmentExpiryDuration.Seconds()), tier.AttachmentBandwidthLimit, nullString(tier.StripeMonthlyPriceID), nullString(tier.StripeYearlyPriceID), tier.Code); err != nil {
 		return err
 	}
 	return nil
@@ -1162,7 +1244,7 @@ func (a *Manager) RemoveTier(code string) error {
 
 // ChangeBilling updates a user's billing fields, namely the Stripe customer ID, and subscription information
 func (a *Manager) ChangeBilling(username string, billing *Billing) error {
-	if _, err := a.db.Exec(updateBillingQuery, nullString(billing.StripeCustomerID), nullString(billing.StripeSubscriptionID), nullString(string(billing.StripeSubscriptionStatus)), nullInt64(billing.StripeSubscriptionPaidUntil.Unix()), nullInt64(billing.StripeSubscriptionCancelAt.Unix()), username); err != nil {
+	if _, err := a.db.Exec(updateBillingQuery, nullString(billing.StripeCustomerID), nullString(billing.StripeSubscriptionID), nullString(string(billing.StripeSubscriptionStatus)), nullString(string(billing.StripeSubscriptionInterval)), nullInt64(billing.StripeSubscriptionPaidUntil.Unix()), nullInt64(billing.StripeSubscriptionCancelAt.Unix()), username); err != nil {
 		return err
 	}
 	return nil
@@ -1200,7 +1282,7 @@ func (a *Manager) Tier(code string) (*Tier, error) {
 
 // TierByStripePrice returns a Tier based on the Stripe price ID, or ErrTierNotFound if it does not exist
 func (a *Manager) TierByStripePrice(priceID string) (*Tier, error) {
-	rows, err := a.db.Query(selectTierByPriceIDQuery, priceID)
+	rows, err := a.db.Query(selectTierByPriceIDQuery, priceID, priceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1210,12 +1292,12 @@ func (a *Manager) TierByStripePrice(priceID string) (*Tier, error) {
 
 func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 	var id, code, name string
-	var stripePriceID sql.NullString
+	var stripeMonthlyPriceID, stripeYearlyPriceID sql.NullString
 	var messagesLimit, messagesExpiryDuration, emailsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, attachmentBandwidthLimit sql.NullInt64
 	if !rows.Next() {
 		return nil, ErrTierNotFound
 	}
-	if err := rows.Scan(&id, &code, &name, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripePriceID); err != nil {
+	if err := rows.Scan(&id, &code, &name, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -1233,7 +1315,8 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit.Int64,
 		AttachmentExpiryDuration: time.Duration(attachmentExpiryDuration.Int64) * time.Second,
 		AttachmentBandwidthLimit: attachmentBandwidthLimit.Int64,
-		StripePriceID:            stripePriceID.String, // May be empty
+		StripeMonthlyPriceID:     stripeMonthlyPriceID.String, // May be empty
+		StripeYearlyPriceID:      stripeYearlyPriceID.String,  // May be empty
 	}, nil
 }
 
@@ -1313,10 +1396,7 @@ func migrateFrom1(db *sql.DB) error {
 	}
 	defer tx.Rollback()
 	// Rename user -> user_old, and create new tables
-	if _, err := tx.Exec(migrate1To2RenameUserTableQueryNoTx); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(createTablesQueriesNoTx); err != nil {
+	if _, err := tx.Exec(migrate1To2CreateTablesQueries); err != nil {
 		return err
 	}
 	// Insert users from user_old into new user table, with ID and sync_topic
@@ -1354,6 +1434,22 @@ func migrateFrom1(db *sql.DB) error {
 		return err
 	}
 	return nil
+}
+
+func migrateFrom2(db *sql.DB) error {
+	log.Tag(tag).Info("Migrating user database schema: from 2 to 3")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate2To3UpdateQueries); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 3); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func nullString(s string) sql.NullString {

@@ -257,23 +257,24 @@ class AccountApi {
         return this.tiers;
     }
 
-    async createBillingSubscription(tier) {
-        console.log(`[AccountApi] Creating billing subscription with ${tier}`);
-        return await this.upsertBillingSubscription("POST", tier)
+    async createBillingSubscription(tier, interval) {
+        console.log(`[AccountApi] Creating billing subscription with ${tier} and interval ${interval}`);
+        return await this.upsertBillingSubscription("POST", tier, interval)
     }
 
-    async updateBillingSubscription(tier) {
-        console.log(`[AccountApi] Updating billing subscription with ${tier}`);
-        return await this.upsertBillingSubscription("PUT", tier)
+    async updateBillingSubscription(tier, interval) {
+        console.log(`[AccountApi] Updating billing subscription with ${tier} and interval ${interval}`);
+        return await this.upsertBillingSubscription("PUT", tier, interval)
     }
 
-    async upsertBillingSubscription(method, tier) {
+    async upsertBillingSubscription(method, tier, interval) {
         const url = accountBillingSubscriptionUrl(config.base_url);
         const response = await fetchOrThrow(url, {
             method: method,
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
-                tier: tier
+                tier: tier,
+                interval: interval
             })
         });
         return await response.json(); // May throw SyntaxError
@@ -369,6 +370,12 @@ export const LimitBasis = {
 export const SubscriptionStatus = {
     ACTIVE: "active",
     PAST_DUE: "past_due"
+};
+
+// Maps to stripe.PriceRecurringInterval
+export const SubscriptionInterval = {
+    MONTH: "month",
+    YEAR: "year"
 };
 
 // Maps to user.Permission in user/types.go

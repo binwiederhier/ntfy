@@ -3,20 +3,20 @@ import {useContext, useEffect, useState} from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Alert, CardActionArea, CardContent, ListItem, useMediaQuery} from "@mui/material";
+import {Alert, Badge, CardActionArea, CardContent, Chip, ListItem, Stack, Switch, useMediaQuery} from "@mui/material";
 import theme from "./theme";
 import DialogFooter from "./DialogFooter";
 import Button from "@mui/material/Button";
-import accountApi from "../app/AccountApi";
+import accountApi, {SubscriptionInterval} from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import {AccountContext} from "./App";
-import {formatBytes, formatNumber, formatShortDate} from "../app/utils";
+import {formatBytes, formatNumber, formatPrice, formatShortDate} from "../app/utils";
 import {Trans, useTranslation} from "react-i18next";
 import List from "@mui/material/List";
-import {Check} from "@mui/icons-material";
+import {Check, Close} from "@mui/icons-material";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Box from "@mui/material/Box";
@@ -28,6 +28,7 @@ const UpgradeDialog = (props) => {
     const { account } = useContext(AccountContext); // May be undefined!
     const [error, setError] = useState("");
     const [tiers, setTiers] = useState(null);
+    const [interval, setInterval] = useState(account?.billing?.interval || SubscriptionInterval.YEAR);
     const [newTierCode, setNewTierCode] = useState(account?.tier?.code); // May be undefined
     const [loading, setLoading] = useState(false);
     const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -46,6 +47,7 @@ const UpgradeDialog = (props) => {
     const tiersMap = Object.assign(...tiers.map(tier => ({[tier.code]: tier})));
     const newTier = tiersMap[newTierCode]; // May be undefined
     const currentTier = account?.tier; // May be undefined
+    const currentInterval = account?.billing?.interval; // May be undefined
     const currentTierCode = currentTier?.code; // May be undefined
 
     // Figure out buttons, labels and the submit action
@@ -54,7 +56,7 @@ const UpgradeDialog = (props) => {
         submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
         submitAction = Action.REDIRECT_SIGNUP;
         banner = null;
-    } else if (currentTierCode === newTierCode) {
+    } else if (currentTierCode === newTierCode && currentInterval === interval) {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
         submitAction = null;
         banner = (currentTierCode) ? Banner.PRORATION_INFO : null;
@@ -88,10 +90,10 @@ const UpgradeDialog = (props) => {
         try {
             setLoading(true);
             if (submitAction === Action.CREATE_SUBSCRIPTION) {
-                const response = await accountApi.createBillingSubscription(newTierCode);
+                const response = await accountApi.createBillingSubscription(newTierCode, interval);
                 window.location.href = response.redirect_url;
             } else if (submitAction === Action.UPDATE_SUBSCRIPTION) {
-                await accountApi.updateBillingSubscription(newTierCode);
+                await accountApi.updateBillingSubscription(newTierCode, interval);
             } else if (submitAction === Action.CANCEL_SUBSCRIPTION) {
                 await accountApi.deleteBillingSubscription();
             }
@@ -108,15 +110,45 @@ const UpgradeDialog = (props) => {
         }
     }
 
+    // Figure out discount
+    let discount;
+    if (newTier?.prices) {
+        discount = Math.round(((newTier.prices.month*12/newTier.prices.year)-1)*100);
+    } else {
+        for (const t of tiers) {
+            if (t.prices) {
+                discount = Math.round(((t.prices.month*12/t.prices.year)-1)*100);
+                break;
+            }
+        }
+    }
+
     return (
         <Dialog
             open={props.open}
             onClose={props.onCancel}
-            maxWidth="md"
-            fullWidth
+            maxWidth="lg"
             fullScreen={fullScreen}
         >
-            <DialogTitle>{t("account_upgrade_dialog_title")}</DialogTitle>
+            <DialogTitle>
+                <div style={{ display: "flex", flexDirection: "row" }}>
+                    <div style={{ flexGrow: 1 }}>{t("account_upgrade_dialog_title")}</div>
+                    <div style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginTop: "4px"
+                    }}>
+                        <Typography component="span" variant="subtitle1">{t("account_upgrade_dialog_interval_monthly")}</Typography>
+                        <Switch
+                            checked={interval === SubscriptionInterval.YEAR}
+                            onChange={(ev) => setInterval(ev.target.checked ? SubscriptionInterval.YEAR : SubscriptionInterval.MONTH)}
+                        />
+                        <Typography component="span" variant="subtitle1">{t("account_upgrade_dialog_interval_yearly")}</Typography>
+                        {discount > 0 && <Chip label={`-${discount}%`} color="primary" size="small" sx={{ marginLeft: "5px" }}/>}
+                    </div>
+                </div>
+            </DialogTitle>
             <DialogContent>
                 <div style={{
                     display: "flex",
@@ -130,24 +162,25 @@ const UpgradeDialog = (props) => {
                             tier={tier}
                             current={currentTierCode === tier.code} // tier.code or currentTierCode may be undefined!
                             selected={newTierCode === tier.code} // tier.code may be undefined!
+                            interval={interval}
                             onClick={() => setNewTierCode(tier.code)} // tier.code may be undefined!
                         />
                     )}
                 </div>
                 {banner === Banner.CANCEL_WARNING &&
-                    <Alert severity="warning">
+                    <Alert severity="warning" sx={{ fontSize: "1rem" }}>
                         <Trans
                             i18nKey="account_upgrade_dialog_cancel_warning"
                             values={{ date: formatShortDate(account?.billing?.paid_until || 0) }} />
                     </Alert>
                 }
                 {banner === Banner.PRORATION_INFO &&
-                    <Alert severity="info">
+                    <Alert severity="info" sx={{ fontSize: "1rem" }}>
                         <Trans i18nKey="account_upgrade_dialog_proration_info" />
                     </Alert>
                 }
                 {banner === Banner.RESERVATIONS_WARNING &&
-                    <Alert severity="warning">
+                    <Alert severity="warning" sx={{ fontSize: "1rem" }}>
                         <Trans
                             i18nKey="account_upgrade_dialog_reservations_warning"
                             count={account?.reservations.length - newTier?.limits.reservations}
@@ -169,28 +202,37 @@ const UpgradeDialog = (props) => {
 const TierCard = (props) => {
     const { t } = useTranslation();
     const tier = props.tier;
+
     let cardStyle, labelStyle, labelText;
     if (props.selected) {
-        cardStyle = { background: "#eee", border: "2px solid #338574" };
+        cardStyle = { background: "#eee", border: "3px solid #338574" };
         labelStyle = { background: "#338574", color: "white" };
         labelText = t("account_upgrade_dialog_tier_selected_label");
     } else if (props.current) {
-        cardStyle = { border: "2px solid #eee" };
+        cardStyle = { border: "3px solid #eee" };
         labelStyle = { background: "#eee", color: "black" };
         labelText = t("account_upgrade_dialog_tier_current_label");
     } else {
-        cardStyle = { border: "2px solid transparent" };
+        cardStyle = { border: "3px solid transparent" };
+    }
+
+    let monthlyPrice;
+    if (!tier.prices) {
+        monthlyPrice = 0;
+    } else if (props.interval === SubscriptionInterval.YEAR) {
+        monthlyPrice = tier.prices.year/12;
+    } else if (props.interval === SubscriptionInterval.MONTH) {
+        monthlyPrice = tier.prices.month;
     }
 
     return (
         <Box sx={{
             m: "7px",
-            minWidth: "190px",
-            maxWidth: "250px",
+            minWidth: "240px",
             flexGrow: 1,
             flexShrink: 1,
             flexBasis: 0,
-            borderRadius: "3px",
+            borderRadius: "5px",
             "&:first-of-type": { ml: 0 },
             "&:last-of-type": { mr: 0 },
             ...cardStyle
@@ -208,19 +250,29 @@ const TierCard = (props) => {
                                 ...labelStyle
                             }}>{labelText}</div>
                         }
-                        <Typography variant="h5" component="div">
+                        <Typography variant="subtitle1" component="div">
                             {tier.name || t("account_basics_tier_free")}
                         </Typography>
+                        <div>
+                            <Typography component="span" variant="h4" sx={{ fontWeight: 500, marginRight: "3px" }}>{formatPrice(monthlyPrice)}</Typography>
+                            {monthlyPrice > 0 && <>/ {t("account_upgrade_dialog_tier_price_per_month")}</>}
+                        </div>
                         <List dense>
-                            {tier.limits.reservations > 0 && <FeatureItem>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations })}</FeatureItem>}
-                            <FeatureItem>{t("account_upgrade_dialog_tier_features_messages", { messages: formatNumber(tier.limits.messages) })}</FeatureItem>
-                            <FeatureItem>{t("account_upgrade_dialog_tier_features_emails", { emails: formatNumber(tier.limits.emails) })}</FeatureItem>
-                            <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}</FeatureItem>
-                            <FeatureItem>{t("account_upgrade_dialog_tier_features_attachment_total_size", { totalsize: formatBytes(tier.limits.attachment_total_size, 0) })}</FeatureItem>
+                            {tier.limits.reservations > 0 && <Feature>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations })}</Feature>}
+                            {tier.limits.reservations === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_reservations")}</NoFeature>}
+                            <Feature>{t("account_upgrade_dialog_tier_features_messages", { messages: formatNumber(tier.limits.messages) })}</Feature>
+                            <Feature>{t("account_upgrade_dialog_tier_features_emails", { emails: formatNumber(tier.limits.emails) })}</Feature>
+                            <Feature>{t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}</Feature>
+                            <Feature>{t("account_upgrade_dialog_tier_features_attachment_total_size", { totalsize: formatBytes(tier.limits.attachment_total_size, 0) })}</Feature>
                         </List>
-                        {tier.price &&
-                            <Typography variant="subtitle1" sx={{fontWeight: 500}}>
-                                {tier.price} / month
+                        {tier.prices && props.interval === SubscriptionInterval.MONTH &&
+                            <Typography variant="body2" color="gray">
+                                {t("account_upgrade_dialog_tier_price_billed_monthly", { price: formatPrice(tier.prices.month*12) })}
+                            </Typography>
+                        }
+                        {tier.prices && props.interval === SubscriptionInterval.YEAR &&
+                            <Typography variant="body2" color="gray">
+                                {t("account_upgrade_dialog_tier_price_billed_yearly", { price: formatPrice(tier.prices.year), save: formatPrice(tier.prices.month*12-tier.prices.year) })}
                             </Typography>
                         }
                     </CardContent>
@@ -231,16 +283,25 @@ const TierCard = (props) => {
     );
 }
 
+const Feature = (props) => {
+    return <FeatureItem feature={true}>{props.children}</FeatureItem>;
+}
+
+const NoFeature = (props) => {
+    return <FeatureItem feature={false}>{props.children}</FeatureItem>;
+}
+
 const FeatureItem = (props) => {
     return (
         <ListItem disableGutters sx={{m: 0, p: 0}}>
             <ListItemIcon sx={{minWidth: "24px"}}>
-                <Check fontSize="small" sx={{ color: "#338574" }}/>
+                {props.feature && <Check fontSize="small" sx={{ color: "#338574" }}/>}
+                {!props.feature && <Close fontSize="small" sx={{ color: "gray" }}/>}
             </ListItemIcon>
             <ListItemText
                 sx={{mt: "2px", mb: "2px"}}
                 primary={
-                    <Typography variant="body2">
+                    <Typography variant="body1">
                         {props.children}
                     </Typography>
                 }

@@ -1417,7 +1417,7 @@ func (s *Server) execManager() {
 				if ev.IsTrace() {
 					expiryMessage := ""
 					if subs == 0 {
-						expiryTime := time.Until(t.lastVisitorExpires)
+						expiryTime := time.Until(t.vRateExpires)
 						expiryMessage = ", expires in " + expiryTime.String()
 					}
 					ev.Trace("- topic %s: %d subscribers%s", t.ID, subs, expiryMessage)

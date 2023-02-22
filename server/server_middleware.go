@@ -1,8 +1,10 @@
 package server
 
 import (
-	"heckel.io/ntfy/util"
+	"context"
 	"net/http"
+
+	"heckel.io/ntfy/util"
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
@@ -10,6 +12,28 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if !v.RequestAllowed() {
+			return errHTTPTooManyRequestsLimitRequests
+		}
+		return next(w, r, v)
+	}
+}
+
+// limitRequestsWithTopic limits requests with a topic and stores the rate-limiting-subscriber and topic into request.Context
+func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		t, err := s.topicFromPath(r.URL.Path)
+		if err != nil {
+			return err
+		}
+		vRate := v
+		if topicCountsAgainst := t.Billee(); topicCountsAgainst != nil {
+			vRate = topicCountsAgainst
+		}
+		r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vRate), "topic", t))
+
+		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+			return next(w, r, v)
+		} else if !vRate.RequestAllowed() {
 			return errHTTPTooManyRequestsLimitRequests
 		}
 		return next(w, r, v)

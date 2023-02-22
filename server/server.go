@@ -437,13 +437,14 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodOptions {
 		return s.limitRequests(s.handleOptions)(w, r, v) // Should work even if the web app is not enabled, see #598
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
-		return s.limitRequests(s.transformBodyJSON(s.authorizeTopicWrite(s.handlePublish)))(w, r, v)
+		// So I don't *really* have to switch this order, since this is unrelated to UP; But, making this and matrix inconsistent is just calling for confusion, no?
+		return s.transformBodyJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish)))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
-		return s.limitRequests(s.transformMatrixJSON(s.authorizeTopicWrite(s.handlePublishMatrix)))(w, r, v)
+		return s.transformMatrixJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublishMatrix)))(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
-		return s.limitRequests(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
+		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
-		return s.limitRequests(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
+		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && jsonPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authorizeTopicRead(s.handleSubscribeJSON))(w, r, v)
 	} else if r.Method == http.MethodGet && ssePathRegex.MatchString(r.URL.Path) {
@@ -602,20 +603,17 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 }
 
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
-	t, err := s.topicFromPath(r.URL.Path)
-	if err != nil {
-		return nil, err
+	vRate, ok := r.Context().Value("vRate").(*visitor)
+	if !ok {
+		return nil, errHTTPInternalError
 	}
-	vRate := v
-	if topicCountsAgainst := t.Billee(); topicCountsAgainst != nil {
-		vRate = topicCountsAgainst
+	t, ok := r.Context().Value("topic").(*topic)
+	if !ok {
+		return nil, errHTTPInternalError
 	}
 
 	if !vRate.MessageAllowed() {
-		vRate = v
-		if !v.MessageAllowed() {
-			return nil, errHTTPTooManyRequestsLimitMessages
-		}
+		return nil, errHTTPTooManyRequestsLimitMessages
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {

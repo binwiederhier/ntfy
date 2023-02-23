@@ -3,9 +3,8 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-
 	"heckel.io/ntfy/log"
+	"net/http"
 )
 
 // errHTTP is a generic HTTP error for any non-200 HTTP error

@@ -8,6 +8,10 @@ import (
 	"heckel.io/ntfy/log"
 )
 
+const (
+	rateVisitorExpiryDuration = 12 * time.Hour
+)
+
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {

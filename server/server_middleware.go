@@ -1,10 +1,16 @@
 package server
 
 import (
-	"context"
 	"net/http"
 
 	"heckel.io/ntfy/util"
+)
+
+type contextKey int
+
+const (
+	contextRateVisitor contextKey = iota + 2586
+	contextTopic
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
@@ -29,8 +35,10 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
 			vrate = rateVisitor
 		}
-		r = r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vrate), "topic", t))
-
+		r = withContext(r, map[contextKey]any{
+			contextRateVisitor: vrate,
+			contextTopic:       t,
+		})
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
 		} else if !vrate.RequestAllowed() {

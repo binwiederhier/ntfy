@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
@@ -43,13 +44,6 @@ func readHeaderParam(r *http.Request, names ...string) string {
 		}
 	}
 	return ""
-}
-
-func readHeaderParamValues(r *http.Request, names ...string) (values []string) {
-	for _, name := range names {
-		values = append(values, r.Header.Values(name)...)
-	}
-	return
 }
 
 func readQueryParam(r *http.Request, names ...string) string {
@@ -102,4 +96,12 @@ func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, 
 		return nil, err
 	}
 	return obj, nil
+}
+
+func withContext(r *http.Request, ctx map[contextKey]any) *http.Request {
+	c := r.Context()
+	for k, v := range ctx {
+		c = context.WithValue(c, k, v)
+	}
+	return r.WithContext(c)
 }

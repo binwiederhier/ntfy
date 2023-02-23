@@ -1899,7 +1899,7 @@ func TestServer_SubscriberRateLimiting(t *testing.T) {
 		r.RemoteAddr = "1.2.3.4"
 	}
 	rr := request(t, s, "GET", "/subscriber1topic/json?poll=1", "", map[string]string{
-		"Subscriber-Rate-Limit-Topics": "subscriber1topic",
+		"Rate-Topics": "subscriber1topic",
 	}, subscriber1Fn)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())

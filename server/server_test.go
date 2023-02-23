@@ -796,6 +796,25 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	require.Equal(t, 401, response.Code)
 }
 
+func TestServer_Auth_NonBasicHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": "WebPush not-supported",
+	})
+	require.Equal(t, 200, response.Code)
+
+	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": "Bearer supported",
+	})
+	require.Equal(t, 401, response.Code)
+
+	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": "basic supported",
+	})
+	require.Equal(t, 401, response.Code)
+}
+
 func TestServer_StatsResetter(t *testing.T) {
 	// This tests the stats resetter for
 	// - an anonymous user

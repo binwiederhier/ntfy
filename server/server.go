@@ -1528,7 +1528,8 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // maybeAuthenticate reads the "Authorization" header and will try to authenticate the user
 // if it is set.
 //
-//   - If the header is not set, an IP-based visitor is returned
+//   - If the header is not set or not supported (anything non-Basic and non-Bearer),
+//     an IP-based visitor is returned
 //   - If the header is set, authenticate will be called to check the username/password (Basic auth),
 //     or the token (Bearer auth), and read the user from the database
 //
@@ -1541,7 +1542,7 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	header, err := readAuthHeader(r)
 	if err != nil {
 		return vip, err
-	} else if header == "" {
+	} else if !supportedAuthHeader(header) {
 		return vip, nil
 	} else if s.userManager == nil {
 		return vip, errHTTPUnauthorized
@@ -1584,6 +1585,14 @@ func readAuthHeader(r *http.Request) (string, error) {
 		value = strings.TrimSpace(string(a))
 	}
 	return value, nil
+}
+
+// supportedAuthHeader returns true only if the Authorization header value starts
+// with "Basic" or "Bearer". In particular, an empty value is not supported, and neither
+// are things like "WebPush", or "vapid" (see #629).
+func supportedAuthHeader(value string) bool {
+	value = strings.ToLower(value)
+	return strings.HasPrefix(value, "basic ") || strings.HasPrefix(value, "bearer ")
 }
 
 func (s *Server) authenticateBasicAuth(r *http.Request, value string) (user *user.User, err error) {

@@ -1996,6 +1996,8 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	}
 }
 
+// FIXME add test for rate visitor expiration
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

@@ -1,11 +1,10 @@
 package server
 
 import (
+	"heckel.io/ntfy/log"
 	"math/rand"
 	"sync"
 	"time"
-
-	"heckel.io/ntfy/log"
 )
 
 const (

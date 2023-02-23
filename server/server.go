@@ -1169,7 +1169,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 // Note: This TEMPORARILY also registers all topics starting with "up" (= UnifiedPush). This is to ease the transition
 // until the Android app will send the "Rate-Topics" header.
 func registerRateVisitors(topics []*topic, rateTopics []string, v *visitor) {
-	if len(rateTopics) > 0 && rateTopics[0] == rateTopicsWildcard {
+	if len(rateTopics) == 1 && rateTopics[0] == rateTopicsWildcard {
 		for _, t := range topics {
 			t.SetRateVisitor(v)
 		}

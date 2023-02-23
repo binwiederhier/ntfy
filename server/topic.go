@@ -19,10 +19,9 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	subscriber          subscriber
-	visitor             *visitor // User ID associated with this subscription, may be empty
-	cancel              func()
-	subscriberRateLimit bool
+	subscriber subscriber
+	visitor    *visitor // User ID associated with this subscription, may be empty
+	cancel     func()
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -37,39 +36,40 @@ func newTopic(id string) *topic {
 }
 
 // Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func(), subscriberRateLimit bool) int {
+func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func()) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	subscriberID := rand.Int()
 	t.subscribers[subscriberID] = &topicSubscriber{
-		visitor:             visitor, // May be empty
-		subscriber:          s,
-		cancel:              cancel,
-		subscriberRateLimit: subscriberRateLimit,
+		visitor:    visitor, // May be empty
+		subscriber: s,
+		cancel:     cancel,
 	}
-
-	// if no subscriber is already handling the rate limit
-	if t.rateVisitor == nil && subscriberRateLimit {
-		t.rateVisitor = visitor
-		t.rateVisitorExpires = time.Time{}
-	}
-
 	return subscriberID
 }
 
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	// if Time is initialized (not the zero value) and the expiry time has passed
-	if !t.rateVisitorExpires.IsZero() && t.rateVisitorExpires.Before(time.Now()) {
+	if t.rateVisitorExpires.Before(time.Now()) {
 		t.rateVisitor = nil
 	}
 	return len(t.subscribers) == 0 && t.rateVisitor == nil
 }
 
-func (t *topic) Billee() *visitor {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+func (t *topic) SetRateVisitor(v *visitor) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateVisitor = v
+	t.rateVisitorExpires = time.Now().Add(rateVisitorExpiryDuration)
+}
+
+func (t *topic) RateVisitor() *visitor {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateVisitorExpires.Before(time.Now()) {
+		t.rateVisitor = nil
+	}
 	return t.rateVisitor
 }
 
@@ -77,24 +77,7 @@ func (t *topic) Billee() *visitor {
 func (t *topic) Unsubscribe(id int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	deletingSub := t.subscribers[id]
 	delete(t.subscribers, id)
-
-	// look for an active subscriber (in random order) that wants to handle the rate limit
-	for _, v := range t.subscribers {
-		if v.subscriberRateLimit {
-			t.rateVisitor = v.visitor
-			t.rateVisitorExpires = time.Time{}
-			return
-		}
-	}
-
-	// if no active subscriber is found, count it towards the leaving subscriber
-	if deletingSub.subscriberRateLimit {
-		t.rateVisitor = deletingSub.visitor
-		t.rateVisitorExpires = time.Now().Add(rateVisitorExpiryDuration)
-	}
 }
 
 // Publish asynchronously publishes to all subscribers

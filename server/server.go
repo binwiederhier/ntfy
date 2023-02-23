@@ -571,7 +571,7 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 }
 
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
-	vRate, ok := r.Context().Value("vRate").(*visitor)
+	vrate, ok := r.Context().Value("vRate").(*visitor)
 	if !ok {
 		return nil, errHTTPInternalError
 	}
@@ -579,8 +579,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if !ok {
 		return nil, errHTTPInternalError
 	}
-
-	if !vRate.MessageAllowed() {
+	if !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
@@ -588,7 +587,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, vRate, m)
+	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, vrate, m)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +606,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
-	ev := logvrm(vRate, r, m).
+	ev := logvrm(vrate, r, m).
 		Tag(tagPublish).
 		Fields(log.Context{
 			"message_delayed":     delayed,
@@ -625,7 +624,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 		if s.firebaseClient != nil && firebase {
-			go s.sendToFirebase(vRate, m)
+			go s.sendToFirebase(vrate, m)
 		}
 		if s.smtpSender != nil && email != "" {
 			go s.sendEmail(v, m, email)
@@ -657,7 +656,6 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	if err != nil {
 		return err
 	}
-
 	return s.writeJSON(w, m)
 }
 
@@ -766,7 +764,7 @@ func (s *Server) parsePublishParams(r *http.Request, vRate *visitor, m *message)
 	if err != nil {
 		return false, false, "", false, errHTTPBadRequestPriorityInvalid
 	}
-	m.Tags = readCommaSeperatedParam(r, "x-tags", "tags", "tag", "ta")
+	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
@@ -986,6 +984,12 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
+	for _, t := range topics {
+		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
+		if subscriberRateLimited {
+			t.SetRateVisitor(v)
+		}
+	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8")                    // Android/Volley client needs charset!
 	if poll {
@@ -995,8 +999,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	defer cancel()
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel, subscriberRateLimited))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1122,14 +1125,19 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
+	for _, t := range topics {
+		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
+		if subscriberRateLimited {
+			t.SetRateVisitor(v)
+		}
+	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel, subscriberRateLimited))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1161,7 +1169,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	if err != nil {
 		return
 	}
-	subscriberTopics = readCommaSeperatedParam(r, "subscriber-rate-limit-topics", "x-subscriber-rate-limit-topics", "srlt")
+	subscriberTopics = readCommaSeparatedParam(r, "subscriber-rate-limit-topics", "x-subscriber-rate-limit-topics", "srlt")
 	return
 }
 

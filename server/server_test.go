@@ -1894,15 +1894,17 @@ func TestServer_SubscriberRateLimiting(t *testing.T) {
 	c.VisitorRequestLimitBurst = 3
 	s := newTestServer(t, c)
 
+	// "Register" visitor 1.2.3.4 to topic "subscriber1topic" as a rate limit visitor
 	subscriber1Fn := func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4"
 	}
 	rr := request(t, s, "GET", "/subscriber1topic/json?poll=1", "", map[string]string{
-		"Subscriber-Rate-Limit-Topics": "mytopic1",
+		"Subscriber-Rate-Limit-Topics": "subscriber1topic",
 	}, subscriber1Fn)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
 
+	// "Register" visitor 8.7.7.1 to topic "upSUB2topic" as a rate limit visitor (implicitly via topic name)
 	subscriber2Fn := func(r *http.Request) {
 		r.RemoteAddr = "8.7.7.1"
 	}
@@ -1910,20 +1912,28 @@ func TestServer_SubscriberRateLimiting(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
 
-	for i := 0; i < 3; i++ {
+	// Publish 2 messages to "subscriber1topic" as visitor 9.9.9.9. It'd be 3 normally, but the
+	// GET request before is also counted towards the request limiter.
+	for i := 0; i < 2; i++ {
 		rr := request(t, s, "PUT", "/subscriber1topic", "some message", nil)
 		require.Equal(t, 200, rr.Code)
 	}
 	rr = request(t, s, "PUT", "/subscriber1topic", "some message", nil)
 	require.Equal(t, 429, rr.Code)
 
-	for i := 0; i < 3; i++ {
+	// Publish another 2 messages to "upSUB2topic" as visitor 9.9.9.9
+	for i := 0; i < 2; i++ {
 		rr := request(t, s, "PUT", "/upSUB2topic", "some message", nil)
 		require.Equal(t, 200, rr.Code) // If we fail here, handlePublish is using the wrong visitor!
 	}
 	rr = request(t, s, "PUT", "/upSUB2topic", "some message", nil)
 	require.Equal(t, 429, rr.Code)
 
+	// Hurray! At this point, visitor 9.9.9.9 has published 4 messages, even though
+	// VisitorRequestLimitBurst is 3. That means it's working.
+
+	// Now let's confirm that so far we haven't used up any of visitor 9.9.9.9's request limiter
+	// by publishing another 3 requests from it.
 	for i := 0; i < 3; i++ {
 		rr := request(t, s, "PUT", "/some-other-topic", "some message", nil)
 		require.Equal(t, 200, rr.Code)
@@ -1959,18 +1969,18 @@ func newTestServer(t *testing.T, config *Config) *Server {
 
 func request(t *testing.T, s *Server, method, url, body string, headers map[string]string, fn ...func(r *http.Request)) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
-	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	r, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.RemoteAddr = "9.9.9.9" // Used for tests
+	r.RemoteAddr = "9.9.9.9" // Used for tests
 	for k, v := range headers {
-		req.Header.Set(k, v)
+		r.Header.Set(k, v)
 	}
 	for _, f := range fn {
-		f(req)
+		f(r)
 	}
-	s.handle(rr, req)
+	s.handle(rr, r)
 	return rr
 }
 

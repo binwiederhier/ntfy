@@ -26,8 +26,8 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 			return err
 		}
 		vrate := v
-		if topicCountsAgainst := t.Billee(); topicCountsAgainst != nil {
-			vrate = topicCountsAgainst
+		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
+			vrate = rateVisitor
 		}
 		r = r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vrate), "topic", t))
 

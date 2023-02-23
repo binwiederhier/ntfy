@@ -16,7 +16,7 @@ func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
 	return value == "1" || value == "yes" || value == "true"
 }
 
-func readCommaSeperatedParam(r *http.Request, names ...string) (params []string) {
+func readCommaSeparatedParam(r *http.Request, names ...string) (params []string) {
 	paramStr := readParam(r, names...)
 	if paramStr != "" {
 		params = make([]string, 0)

@@ -15,6 +15,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Web: Do not disable "Reserve topic" checkbox for admins (no ticket, thanks to @xenrox for reporting)
 * UnifiedPush: Treat non-Basic/Bearer `Authorization` header like header was not sent ([#629](https://github.com/binwiederhier/ntfy/issues/629), thanks to [@Boebbele](https://github.com/Boebbele) and [@S1m](https://github.com/S1m) for reporting)
 
+**Documentation:**
+
+* Added example for [Traccar](https://ntfy.sh/docs/examples/#traccar) ([#631](https://github.com/binwiederhier/ntfy/pull/631), thanks to [tamcore](https://github.com/tamcore))
+
 **Additional languages:**
 
 * Arabic (thanks to [@ButterflyOfFire](https://hosted.weblate.org/user/ButterflyOfFire/))

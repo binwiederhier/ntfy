@@ -10,6 +10,7 @@ edit_uri: blob/main/docs/
 theme:
   name: material
   language: en
+  custom_dir: docs/_overrides
   logo: static/img/ntfy.png
   favicon: static/img/favicon.png
   include_search_page: false
@@ -76,7 +77,7 @@ nav:
   - "Sending messages": publish.md
 - "Subscribing":
   - "From your phone": subscribe/phone.md
-  - "From the Web UI": subscribe/web.md
+  - "From the Web app": subscribe/web.md
   - "From the CLI": subscribe/cli.md
   - "Using the API": subscribe/api.md
 - "Self-hosting":

@@ -2,16 +2,109 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v1.31.0 (UNRELEASED)
-Released XXXX
-
-This is the biggest ntfy server release I've ever done. This release adds the ability to sign-up for accounts, log-in
-via the web app, synchronize accounts between devices (web only for now), introduces user access tokens, user tiers,
-and Stripe payments integration to support paid tiers (don't worry, [everything will stay open source](https://ntfy.sh/docs/faq/)).
+## ntfy server v2.0.2 (UNRELEASED)
 
 **Features:**
 
-* ⭐ User account signup, login, topic reservations, access tokens, tiers etc. ⭐ ([#522](https://github.com/binwiederhier/ntfy/issues/522))
+* Support for publishing to protected topics via email with access tokens ([#612](https://github.com/binwiederhier/ntfy/pull/621), thanks to [@tamcore](https://github.com/tamcore))
+* Support for base64-encoded and nested multipart emails ([#610](https://github.com/binwiederhier/ntfy/issues/610), thanks to [@Robert-litts](https://github.com/Robert-litts))
+* Add support for annual billing intervals (no ticket)
+
+**Bug fixes + maintenance:**
+
+* Web: Do not disable "Reserve topic" checkbox for admins (no ticket, thanks to @xenrox for reporting)
+
+**Additional languages:**
+
+* Arabic (thanks to [@ButterflyOfFire](https://hosted.weblate.org/user/ButterflyOfFire/))
+
+## ntfy server v2.0.1
+Released February 17, 2023
+
+This is a quick bugfix release to address a panic that happens when `attachment-cache-dir` is not set.
+
+**Bug fixes + maintenance:**
+
+* Avoid panic in manager when `attachment-cache-dir` is not set ([#617](https://github.com/binwiederhier/ntfy/issues/617), thanks to [@ksurl](https://github.com/ksurl))  
+* Ensure that calls to standard logger `log.Println` also output JSON (no ticket)
+
+## ntfy server v2.0.0
+Released February 16, 2023
+
+This is the biggest ntfy server release I've ever done 🥳 . Lots of new and exciting features. 
+
+**Brand-new features:**
+
+* **User signup/login & account sync**: If enabled, users can now register to create a user account, and then login to 
+  the web app. Once logged in, topic subscriptions and user settings are stored server-side in the user account (as 
+  opposed to only in the browser storage). So far, this is implemented only in the web app only. Once it's in the Android/iOS
+  app, you can easily keep your account in sync. Relevant [config options](config.md#config-options) are `enable-signup` and 
+  `enable-login`.
+  <div id="account-screenshots" class="screenshots">
+    <a href="../../static/img/web-signup.png"><img src="../../static/img/web-signup.png"/></a>
+    <a href="../../static/img/web-account.png"><img src="../../static/img/web-account.png"/></a>
+  </div>
+* **Topic reservations** 🎉: If enabled, users can now **reserve topics and restrict access to other users**.
+  Once this is fully rolled out, you may reserve `ntfy.sh/philbackups` and define access so that only you can publish/subscribe
+  to the topic. Reservations let you claim ownership of a topic, and you can define access permissions for others as
+  `deny-all` (only you have full access), `read-only` (you can publish/subscribe, others can subscribe), `write-only` (you 
+  can publish/subscribe, others can publish), `read-write` (everyone can publish/subscribe, but you remain the owner).
+  Topic reservations can be [configured](config.md#config-options) in the web app if `enable-reservations` is enabled, and 
+  only if the user has a [tier](config.md#tiers) that supports reservations.
+  <div id="reserve-screenshots" class="screenshots">
+    <a href="../../static/img/web-reserve-topic.png"><img src="../../static/img/web-reserve-topic.png"/></a> 
+    <a href="../../static/img/web-reserve-topic-dialog.png"><img src="../../static/img/web-reserve-topic-dialog.png"/></a>
+  </div>
+* **Access tokens:** It is now possible to create user access tokens for a user account. Access tokens are useful
+  to avoid having to paste your password to various applications or scripts. For instance, you may want to use a 
+  dedicated token to publish from your backup host, and one from your home automation system. Tokens can be configured
+  in the web app, or via the `ntfy token` command. See [creating tokens](config.md#access-tokens),
+  and [publishing using tokens](publish.md#access-tokens).
+  <div id="token-screenshots" class="screenshots">
+    <a href="../../static/img/web-token-create.png"><img src="../../static/img/web-token-create.png"/></a> 
+    <a href="../../static/img/web-token-list.png"><img src="../../static/img/web-token-list.png"/></a>
+  </div>
+* **Structured logging:** I've redone a lot of the logging to make it more structured, and to make it easier to debug and
+  troubleshoot. Logs can now be written to a file, and as JSON (if configured). Each log event carries context fields
+  that you can filter and search on using tools like `jq`. On top of that, you can override the log level if certain fields
+  match. For instance, you can say `user_name=phil -> debug` to log everything related to a certain user with debug level.
+  See [logging & debugging](config.md#logging-debugging).
+* **Tiers:** You can now define and associate usage tiers to users. Tiers can be used to grant users higher limits, such as
+  daily message limits, attachment size, or make it possible for users to reserve topics. You could, for instance, have
+  a tier `Standard` that allows 500 messages/day, 15 MB attachments and 5 allowed topic reservations, and another
+  tier `Friends & Family` with much higher limits. For ntfy.sh, I'll mostly use these tiers to facilitate paid plans (see below).
+  Tiers can be configured via the `ntfy tier ...` command. See [tiers](config.md#tiers).
+* **Paid tiers:** Starting very soon, I will be offering paid tiers for ntfy.sh on top of the free service. You'll be
+  able to subscribe to tiers with higher rate limits (more daily messages, bigger attachments) and topic reservations.
+  Paid tiers are facilitated by integrating [Stripe](https://stripe.com) as a payment provider. See [payments](config.md#payments)
+  for details.
+
+**ntfy is forever open source!**   
+Yes, I will be offering some paid plans. But you don't need to panic! I won't be taking any features away, and everything 
+will remain forever open source, so you can self-host if you like. Similar to the donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), paid plans will help pay for the service and keep me motivated to keep
+going. It'll only make ntfy better.
+
+**Other tickets:**
+
+* User account signup, login, topic reservations, access tokens, tiers etc. ([#522](https://github.com/binwiederhier/ntfy/issues/522))
+* `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
+
+**Special thanks:**
+
+A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
+suggestions, and bug reports. Thank you, @nwithan8, @deadcade, @xenrox, @cmeis, @wunter8 and the others who I forgot.
+
+## ntfy server v1.31.0
+Released February 14, 2023
+
+This is a tiny release before the really big release, and also the last before the big v2.0.0. The most interesting 
+things in this release are the new preliminary health endpoint to allow monitoring in K8s (and others), and the removal
+of `upx` binary packing (which was causing erroneous virus flagging). Aside from that, the `go-smtp` library did a 
+breaking-change upgrade, which required some work to get working again.
+
+**Features:**
+
 * Preliminary `/v1/health` API endpoint for service monitoring (no ticket)
 * Add basic health check to `Dockerfile` ([#555](https://github.com/binwiederhier/ntfy/pull/555), thanks to [@bt90](https://github.com/bt90))
 
@@ -19,7 +112,7 @@ and Stripe payments integration to support paid tiers (don't worry, [everything 
 
 * Fix `chown` issues with RHEL-like based systems ([#566](https://github.com/binwiederhier/ntfy/issues/566)/[#565](https://github.com/binwiederhier/ntfy/pull/565), thanks to [@danieldemus](https://github.com/danieldemus))
 * Removed `upx` (binary packing) for all builds due to false virus warnings ([#576](https://github.com/binwiederhier/ntfy/issues/576), thanks to [@shawnhwei](https://github.com/shawnhwei) for reporting)
-* `OPTIONS` method calls are not serviced when the UI is disabled ([#598](https://github.com/binwiederhier/ntfy/issues/598), thanks to [@enticedwanderer](https://github.com/enticedwanderer) for reporting)
+* Upgraded `go-smtp` library and tests to v0.16.0 ([#569](https://github.com/binwiederhier/ntfy/issues/569))
 
 **Documentation:**
 
@@ -27,15 +120,11 @@ and Stripe payments integration to support paid tiers (don't worry, [everything 
 * Small wording change for `client.yml` ([#562](https://github.com/binwiederhier/ntfy/pull/562), thanks to [@fleopaulD](https://github.com/fleopaulD))
 * Fix K8s install docs ([#582](https://github.com/binwiederhier/ntfy/pull/582), thanks to [@Remedan](https://github.com/Remedan))
 * Updated Jellyseer docs ([#604](https://github.com/binwiederhier/ntfy/pull/604), thanks to [@Y0ngg4n](https://github.com/Y0ngg4n))
+* Updated iOS developer docs ([#605](https://github.com/binwiederhier/ntfy/pull/605), thanks to [@SticksDev](https://github.com/SticksDev))
 
 **Additional languages:**
 
 * Portuguese (thanks to [@ssantos](https://hosted.weblate.org/user/ssantos/))
-
-**Special thanks:**
-
-A big Thank-you goes to everyone who tested the user account and payments work. I very much appreciate all the feedback,
-suggestions, and bug reports. Thank you, @nwithan8, @deadcade, and @xenrox.
 
 ## ntfy server v1.30.1
 Released December 23, 2022 🎅

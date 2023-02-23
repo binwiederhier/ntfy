@@ -49,12 +49,15 @@ func TestAllowedTier(t *testing.T) {
 
 func TestTierContext(t *testing.T) {
 	tier := &Tier{
-		ID:            "ti_abc",
-		Code:          "pro",
-		StripePriceID: "price_123",
+		ID:                   "ti_abc",
+		Code:                 "pro",
+		StripeMonthlyPriceID: "price_123",
+		StripeYearlyPriceID:  "price_456",
 	}
 	context := tier.Context()
 	require.Equal(t, "ti_abc", context["tier_id"])
 	require.Equal(t, "pro", context["tier_code"])
-	require.Equal(t, "price_123", context["stripe_price_id"])
+	require.Equal(t, "price_123", context["stripe_monthly_price_id"])
+	require.Equal(t, "price_456", context["stripe_yearly_price_id"])
+
 }

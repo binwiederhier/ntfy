@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	tagField        = "tag"
-	errorField      = "error"
-	timeTakenField  = "time_taken_ms"
-	exitCodeField   = "exit_code"
+	fieldTag        = "tag"
+	fieldError      = "error"
+	fieldTimeTaken  = "time_taken_ms"
+	fieldExitCode   = "exit_code"
+	tagStdLog       = "stdlog"
 	timestampFormat = "2006-01-02T15:04:05.999Z07:00"
 )
 
@@ -40,7 +41,7 @@ func newEvent() *Event {
 
 // Fatal logs the event as FATAL, and exits the program with exit code 1
 func (e *Event) Fatal(message string, v ...any) {
-	e.Field(exitCodeField, 1).maybeLog(FatalLevel, message, v...)
+	e.Field(fieldExitCode, 1).maybeLog(FatalLevel, message, v...)
 	fmt.Fprintf(os.Stderr, message+"\n", v...) // Always output error to stderr
 	os.Exit(1)
 }
@@ -72,7 +73,7 @@ func (e *Event) Trace(message string, v ...any) {
 
 // Tag adds a "tag" field to the log event
 func (e *Event) Tag(tag string) *Event {
-	return e.Field(tagField, tag)
+	return e.Field(fieldTag, tag)
 }
 
 // Time sets the time field
@@ -85,7 +86,7 @@ func (e *Event) Time(t time.Time) *Event {
 func (e *Event) Timing(f func()) *Event {
 	start := time.Now()
 	f()
-	return e.Field(timeTakenField, time.Since(start).Milliseconds())
+	return e.Field(fieldTimeTaken, time.Since(start).Milliseconds())
 }
 
 // Err adds an "error" field to the log event
@@ -95,7 +96,7 @@ func (e *Event) Err(err error) *Event {
 	} else if c, ok := err.(Contexter); ok {
 		return e.With(c)
 	}
-	return e.Field(errorField, err.Error())
+	return e.Field(fieldError, err.Error())
 }
 
 // Field adds a custom field and value to the log event
@@ -128,17 +129,17 @@ func (e *Event) With(contexts ...Contexter) *Event {
 	return e
 }
 
-// maybeLog logs the event to the defined output. The event is only logged, if
-// either the global log level is >= l, or if the log level in one of the overrides matches
+// Render returns the rendered log event as a string, or an empty string. The event is only rendered,
+// if either the global log level is >= l, or if the log level in one of the overrides matches
 // the level.
 //
 // If no overrides are defined (default), the Contexter array is not applied unless the event
 // is actually logged. If overrides are defined, then Contexters have to be applied in any case
 // to determine if they match. This is super complicated, but required for efficiency.
-func (e *Event) maybeLog(l Level, message string, v ...any) {
+func (e *Event) Render(l Level, message string, v ...any) string {
 	appliedContexters := e.maybeApplyContexters()
 	if !e.shouldLog(l) {
-		return
+		return ""
 	}
 	e.Message = fmt.Sprintf(message, v...)
 	e.Level = l
@@ -147,9 +148,15 @@ func (e *Event) maybeLog(l Level, message string, v ...any) {
 		e.applyContexters()
 	}
 	if CurrentFormat() == JSONFormat {
-		log.Println(e.JSON())
-	} else {
-		log.Println(e.String())
+		return e.JSON()
+	}
+	return e.String()
+}
+
+// maybeLog logs the event to the defined output, or does nothing if Render returns an empty string
+func (e *Event) maybeLog(l Level, message string, v ...any) {
+	if m := e.Render(l, message, v...); m != "" {
+		log.Println(m)
 	}
 }
 

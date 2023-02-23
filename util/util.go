@@ -379,7 +379,7 @@ func String(v string) *string {
 	return &v
 }
 
-// Int turns a string into a pointer of an int
+// Int turns an int into a pointer of an int
 func Int(v int) *int {
 	return &v
 }

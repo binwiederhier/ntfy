@@ -11,7 +11,7 @@ import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import {useTranslation} from "react-i18next";
-import accountApi from "../app/AccountApi";
+import accountApi, {Role} from "../app/AccountApi";
 import session from "../app/Session";
 import routes from "./routes";
 import MenuItem from "@mui/material/MenuItem";
@@ -255,7 +255,7 @@ const DisplayNameDialog = (props) => {
 
 export const ReserveLimitChip = () => {
     const { account } = useContext(AccountContext);
-    if (account?.stats.reservations_remaining > 0) {
+    if (account?.role === Role.ADMIN || account?.stats.reservations_remaining > 0) {
         return <></>;
     } else if (config.enable_payments) {
         return (account?.limits.reservations > 0) ? <LimitReachedChip/> : <ProChip/>;

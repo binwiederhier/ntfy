@@ -100,6 +100,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				Customer:     true,
 				Subscription: u.Billing.StripeSubscriptionID != "",
 				Status:       string(u.Billing.StripeSubscriptionStatus),
+				Interval:     string(u.Billing.StripeSubscriptionInterval),
 				PaidUntil:    u.Billing.StripeSubscriptionPaidUntil.Unix(),
 				CancelAt:     u.Billing.StripeSubscriptionCancelAt.Unix(),
 			}
@@ -479,6 +480,7 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 		if err := s.messageCache.ExpireMessages(topic); err != nil {
 			return err
 		}
+		s.pruneMessages()
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -505,6 +507,7 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 	if err := s.messageCache.ExpireMessages(topics...); err != nil {
 		return err
 	}
+	go s.pruneMessages()
 	return nil
 }
 

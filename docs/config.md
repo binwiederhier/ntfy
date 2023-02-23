@@ -161,6 +161,7 @@ ntfy user add --role=admin phil    # Add admin user phil
 ntfy user del phil                 # Delete user phil
 ntfy user change-pass phil         # Change password for user phil
 ntfy user change-role phil admin   # Make user phil an admin
+ntfy user change-tier phil pro     # Change phil's tier to "pro"
 ```
 
 ### Access control list (ACL)
@@ -221,6 +222,39 @@ In this example, `phil` has the role `admin`, so he has read-write access to all
 User `ben` has three topic-specific entries. He can read, but not write to topic `furnace`, and has read-write access
 to topic `garagedoor` and all topics starting with the word `alerts` (wildcards). Clients that are not authenticated
 (called `*`/`everyone`) only have read access to the `announcements` and `server-stats` topics.
+
+### Access tokens
+In addition to username/password auth, ntfy also provides authentication via access tokens. Access tokens are useful
+to avoid having to configure your password across multiple publishing/subscribing applications. For instance, you may
+want to use a dedicated token to publish from your backup host, and one from your home automation system.
+
+!!! info
+    As of today, access tokens grant users **full access to the user account**. Aside from changing the password,
+    and deleting the account, every action can be performed with a token. Granular access tokens are on the roadmap,
+    but not yet implemented.
+
+The `ntfy token` command can be used to manage access tokens for users. Tokens can have labels, and they can expire
+automatically (or never expire). Each user can have up to 20 tokens (hardcoded). 
+
+**Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
+```
+ntfy token list                      # Shows list of tokens for all users
+ntfy token list phil                 # Shows list of tokens for user phil
+ntfy token add phil                  # Create token for user phil which never expires
+ntfy token add --expires=2d phil     # Create token for user phil which expires in 2 days
+ntfy token remove phil tk_th2sxr...  # Delete token
+```
+
+**Creating an access token:**
+```
+$ ntfy token add --expires=30d --label="backups" phil
+$ ntfy token list
+user phil
+- tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 (backups), expires 15 Mar 23 14:33 EDT, accessed from 0.0.0.0 at 13 Feb 23 13:33 EST
+```
+
+Once an access token is created, you can **use it to authenticate against the ntfy server, e.g. when you publish or
+subscribe to topics**. To learn how, check out [authenticate via access tokens](publish.md#access-tokens).
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
@@ -754,6 +788,69 @@ Note that the self-hosted server literally sends the message `New message` for e
 may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
 it'll show `New message` as a popup.
 
+## Tiers
+ntfy supports associating users to pre-defined tiers. Tiers can be used to grant users higher limits, such as 
+daily message limits, attachment size, or make it possible for users to reserve topics. If [payments are enabled](#payments),
+tiers can be paid or unpaid, and users can upgrade/downgrade between them. If payments are disabled, then the only way
+to switch between tiers is with the `ntfy user change-tier` command (see [users and roles](#users-and-roles)).
+
+By default, **newly created users have no tier**, and all usage limits are read from the `server.yml` config file.
+Once a user is associated with a tier, some limits are overridden based on the tier.
+
+The `ntfy tier` command can be used to manage all available tiers. By default, there are no pre-defined tiers.
+
+**Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
+```
+ntfy tier add pro                     # Add tier with code "pro", using the defaults
+ntfy tier change --name="Pro" pro     # Update the name of an existing tier
+ntfy tier del starter                 # Delete an existing tier
+ntfy user change-tier phil pro        # Switch user "phil" to tier "pro"
+```
+
+**Creating a tier (full example):**
+```
+ntfy tier add \
+  --name="Pro" \
+  --message-limit=10000 \
+  --message-expiry-duration=24h \
+  --email-limit=50 \
+  --reservation-limit=10 \
+  --attachment-file-size-limit=100M \
+  --attachment-total-size-limit=1G \
+  --attachment-expiry-duration=12h \
+  --attachment-bandwidth-limit=5G \
+  --stripe-price-id=price_123456 \
+  pro
+```
+
+## Payments
+ntfy supports paid [tiers](#tiers) via [Stripe](https://stripe.com/) as a payment provider. If payments are enabled,
+users can register, login and switch plans in the web app. The web app will behave slightly differently if payments 
+are enabled (e.g. showing an upgrade banner, or "ntfy Pro" tags).
+
+!!! info
+    The ntfy payments integration is very tailored to ntfy.sh and Stripe. I do not intend to support arbitrary use
+    cases.
+
+To enable payments, sign up with [Stripe](https://stripe.com/), set the `stripe-secret-key` and `stripe-webhook-key`
+config options: 
+
+* `stripe-secret-key` is the key used for the Stripe API communication. Setting this values
+   enables payments in the ntfy web app (e.g. Upgrade dialog). See [API keys](https://dashboard.stripe.com/apikeys).
+* `stripe-webhook-key` is the key required to validate the authenticity of incoming webhooks from Stripe.
+   Webhooks are essential to keep the local database in sync with the payment provider. See [Webhooks](https://dashboard.stripe.com/webhooks).
+
+In addition to setting these two options, you also need to define a [Stripe webhook](https://dashboard.stripe.com/webhooks)
+for the `customer.subscription.updated` and `customer.subscription.deleted` event, which points 
+to `https://ntfy.example.com/v1/account/billing/webhook`.
+
+Here's an example:
+
+``` yaml
+stripe-secret-key: "sk_test_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
+stripe-webhook-key: "whsec_ZnNkZnNIRExBSFNES0hBRFNmaHNka2ZsaGR"
+```
+
 ## Rate limiting
 !!! info
     Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 
@@ -788,7 +885,15 @@ request every 5s (defined by `visitor-request-limit-replenish`)
 * `visitor-request-limit-replenish` is the rate at which the bucket is refilled (one request per x). Defaults to 5s.
 * `visitor-request-limit-exempt-hosts` is a comma-separated list of hostnames and IPs to be exempt from request rate 
   limiting; hostnames are resolved at the time the server is started. Defaults to an empty list.
- 
+
+### Message limits
+By default, the number of messages a visitor can send is governed entirely by the [request limit](#request-limits). 
+For instance, if the request limit allows for 15,000 requests per day, and all of those requests are POST/PUT requests
+to publish messages, then that is the daily message limit.
+
+To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
+of messages a visitor can send in a day. This counter is reset every day at midnight (UTC).
+
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
 per-visitor limits:
@@ -962,18 +1067,57 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     maxretry = 10
     ```
 
-## Debugging/tracing
+## Logging & debugging
+By default, ntfy logs to the console (stderr), with an `info` log level, and in a human-readable text format.
+
+ntfy supports five different log levels, can also write to a file, log as JSON, and even supports granular
+log level overrides for easier debugging. Some options (`log-level` and `log-level-overrides`) can be hot reloaded
+by calling `kill -HUP $pid` or `systemctl reload ntfy`.
+
+The following config options define the logging behavior:
+
+* `log-format` defines the output format, can be `text` (default) or `json`
+* `log-file` is a filename to write logs to. If this is not set, ntfy logs to stderr.
+* `log-level` defines the default log level, can be one of `trace`, `debug`, `info` (default), `warn` or `error`.
+  Be aware that `debug` (and particularly `trace`) can be **very verbose**. Only turn them on briefly for debugging purposes.
+* `log-level-overrides` lets you override the log level if certain fields match. This is incredibly powerful
+  for debugging certain parts of the system (e.g. only the account management, or only a certain visitor).
+  This is an array of strings in the format:
+    - `field=value -> level` to match a value exactly, e.g. `tag=manager -> trace`
+    - `field -> level` to match any value, e.g. `time_taken_ms -> debug`
+
+**Logging config (good for production use):**
+``` yaml
+log-level: info
+log-format: json
+log-file: /var/log/ntfy.log
+```
+
+**Temporary debugging:**   
 If something's not working right, you can debug/trace through what the ntfy server is doing by setting the `log-level`
-to `DEBUG` or `TRACE`. The `DEBUG` setting will output information about each published message, but not the message 
-contents. The `TRACE` setting will also print the message contents. 
+to `debug` or `trace`. The `debug` setting will output information about each published message, but not the message
+contents. The `trace` setting will also print the message contents.
+
+Alternatively, you can set `log-level-overrides` for only certain fields, such as a visitor's IP address (`visitor_ip`), 
+a username (`user_name`), or a tag (`tag`). There are dozens of fields you can use to override log levels. To learn what 
+they are, either turn the log-level to `trace` and observe, or reference the [source code](https://github.com/binwiederhier/ntfy).
+
+Here's an example that will output only `info` log events, except when they match either of the defined overrides:
+``` yaml
+log-level: info
+log-level-overrides:
+  - "tag=manager -> trace"
+  - "visitor_ip=1.2.3.4 -> debug"
+  - "time_taken_ms -> debug"
+```
 
 !!! warning
-    Both options are very verbose and should only be enabled in production for short periods of time. Otherwise, 
-    you're going to run out of disk space pretty quickly.
+    The `debug` and `trace` log levels are very verbose, and using `log-level-overrides` has a 
+    performance penalty. Only use it for temporary debugging.
 
-You can also hot-reload the `log-level` by sending the `SIGHUP` signal to the process after editing the `server.yml` file.
-You can do so by calling `systemctl reload ntfy` (if ntfy is running inside systemd), or by calling `kill -HUP $(pidof ntfy)`. 
-If successful, you'll see something like this:
+You can also hot-reload the `log-level` and `log-level-overrides` by sending the `SIGHUP` signal to the process after 
+editing the `server.yml` file. You can do so by calling `systemctl reload ntfy` (if ntfy is running inside systemd), 
+or by calling `kill -HUP $(pidof ntfy)`. If successful, you'll see something like this:
 
 ```
 $ ntfy serve
@@ -1029,14 +1173,15 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*                                              | 500M              | Rate limiting: Total daily attachment download/upload traffic limit per visitor. This is to protect your bandwidth costs from exploding.                                                                                        |
 | `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*                                            | 16                | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                              |
 | `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*                                          | 1h                | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                        |
+| `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every day at midnight (UTC). By default, this value is unset.                                                                                              |
 | `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*                                            | 60                | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                           |
 | `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 5s                | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
 | `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP list*                      | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                |
 | `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*                                            | 30                | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | `app`, `home` or `disable`                          | `app`             | Sets web root to landing page (home), web app (app) or disables the web app entirely (disable)                                                                                                                                  |
-| `enable-signup`                            | `NTFY_SIGNUP`                                   | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                 |
-| `enable-login`                             | `NTFY_LOGIN`                                    | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                  |
-| `enable-reservations`                      | `NTFY_RESERVATIONS`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to reserve topics (if their tier allows it)                                                                                                                                                                        |
+| `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                 |
+| `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                  |
+| `enable-reservations`                      | `NTFY_ENABLE_RESERVATIONS`                      | *boolean* (`true` or `false`)                       | `false`           | Allows users to reserve topics (if their tier allows it)                                                                                                                                                                        |
 | `stripe-secret-key`                        | `NTFY_STRIPE_SECRET_KEY`                        | *string*                                            | -                 | Payments: Key used for the Stripe API communication, this enables payments                                                                                                                                                      |
 | `stripe-webhook-key`                       | `NTFY_STRIPE_WEBHOOK_KEY`                       | *string*                                            | -                 | Payments: Key required to validate the authenticity of incoming webhooks from Stripe                                                                                                                                            |
 
@@ -1057,58 +1202,71 @@ CATEGORY:
 
 DESCRIPTION:
    Run the ntfy server and listen for incoming requests
-   
+
    The command will load the configuration from /etc/ntfy/server.yml. Config options can 
    be overridden using the command line options.
-   
+
    Examples:
      ntfy serve                      # Starts server in the foreground (on port 80)
      ntfy serve --listen-http :8080  # Starts server with alternate port
 
 OPTIONS:
-   --attachment-cache-dir value, --attachment_cache_dir value                                          cache directory for attached files [$NTFY_ATTACHMENT_CACHE_DIR]
-   --attachment-expiry-duration value, --attachment_expiry_duration value, -X value                    duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: 3h) [$NTFY_ATTACHMENT_EXPIRY_DURATION]
-   --attachment-file-size-limit value, --attachment_file_size_limit value, -Y value                    per-file attachment size limit (e.g. 300k, 2M, 100M) (default: 15M) [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
-   --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                  limit of the on-disk attachment cache (default: 5G) [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
-   --auth-default-access value, --auth_default_access value, -p value                                  default permissions if no matching entries in the auth database are found (default: "read-write") [$NTFY_AUTH_DEFAULT_ACCESS]
-   --auth-file value, --auth_file value, -H value                                                      auth database file used for access control [$NTFY_AUTH_FILE]
-   --base-url value, --base_url value, -B value                                                        externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
-   --behind-proxy, --behind_proxy, -P                                                                  if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
-   --cache-duration since, --cache_duration since, -b since                                            buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
-   --cache-file value, --cache_file value, -C value                                                    cache file used for message caching [$NTFY_CACHE_FILE]
-   --cache-batch-size value, --cache_batch_size value                                                  max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]
-   --cache-batch-timeout value, --cache_batch_timeout value                                            timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]   
-   --cache-startup-queries value, --cache_startup_queries value                                        queries run when the cache database is initialized [$NTFY_CACHE_STARTUP_QUERIES]
-   --cert-file value, --cert_file value, -E value                                                      certificate file, if listen-https is set [$NTFY_CERT_FILE]
-   --config value, -c value                                                                            config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
-   --debug, -d                                                                                         enable debug logging (default: false) [$NTFY_DEBUG]
-   --firebase-key-file value, --firebase_key_file value, -F value                                      Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
-   --global-topic-limit value, --global_topic_limit value, -T value                                    total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
-   --keepalive-interval value, --keepalive_interval value, -k value                                    interval of keepalive messages (default: 45s) [$NTFY_KEEPALIVE_INTERVAL]
-   --key-file value, --key_file value, -K value                                                        private key file, if listen-https is set [$NTFY_KEY_FILE]
-   --listen-http value, --listen_http value, -l value                                                  ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
-   --listen-https value, --listen_https value, -L value                                                ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
-   --listen-unix value, --listen_unix value, -U value                                                  listen on unix socket path [$NTFY_LISTEN_UNIX]
-   --log-level value, --log_level value                                                                set log level (default: "INFO") [$NTFY_LOG_LEVEL]
-   --manager-interval value, --manager_interval value, -m value                                        interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
-   --no-log-dates, --no_log_dates                                                                      disable the date/time prefix (default: false) [$NTFY_NO_LOG_DATES]
-   --smtp-sender-addr value, --smtp_sender_addr value                                                  SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
-   --smtp-sender-from value, --smtp_sender_from value                                                  SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_FROM]
-   --smtp-sender-pass value, --smtp_sender_pass value                                                  SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
-   --smtp-sender-user value, --smtp_sender_user value                                                  SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
-   --smtp-server-addr-prefix value, --smtp_server_addr_prefix value                                    SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
-   --smtp-server-domain value, --smtp_server_domain value                                              SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
-   --smtp-server-listen value, --smtp_server_listen value                                              SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
-   --trace                                                                                             enable tracing (very verbose, be careful) (default: false) [$NTFY_TRACE]
-   --upstream-base-url value, --upstream_base_url value                                                forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers [$NTFY_UPSTREAM_BASE_URL]
-   --visitor-attachment-daily-bandwidth-limit value, --visitor_attachment_daily_bandwidth_limit value  total daily attachment download/upload bandwidth limit per visitor (default: "500M") [$NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT]
-   --visitor-attachment-total-size-limit value, --visitor_attachment_total_size_limit value            total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
-   --visitor-email-limit-burst value, --visitor_email_limit_burst value                                initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
-   --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                        interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
-   --visitor-request-limit-burst value, --visitor_request_limit_burst value                            initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
-   --visitor-request-limit-exempt-hosts value, --visitor_request_limit_exempt_hosts value              hostnames and/or IP addresses of hosts that will be exempt from the visitor request limit [$NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS]
-   --visitor-request-limit-replenish value, --visitor_request_limit_replenish value                    interval at which burst limit is replenished (one per x) (default: 5s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
-   --visitor-subscription-limit value, --visitor_subscription_limit value                              number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
-   --web-root value, --web_root value                                                                  sets web root to landing page (home), web app (app) or disabled (disable) (default: "app") [$NTFY_WEB_ROOT]
+   --debug, -d                                                                                                            enable debug logging (default: false) [$NTFY_DEBUG]
+   --trace                                                                                                                enable tracing (very verbose, be careful) (default: false) [$NTFY_TRACE]
+   --no-log-dates, --no_log_dates                                                                                         disable the date/time prefix (default: false) [$NTFY_NO_LOG_DATES]
+   --log-level value, --log_level value                                                                                   set log level (default: "INFO") [$NTFY_LOG_LEVEL]
+   --log-level-overrides value, --log_level_overrides value [ --log-level-overrides value, --log_level_overrides value ]  set log level overrides [$NTFY_LOG_LEVEL_OVERRIDES]
+   --log-format value, --log_format value                                                                                 set log format (default: "text") [$NTFY_LOG_FORMAT]
+   --log-file value, --log_file value                                                                                     set log file, default is STDOUT [$NTFY_LOG_FILE]
+   --config value, -c value                                                                                               config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
+   --base-url value, --base_url value, -B value                                                                           externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
+   --listen-http value, --listen_http value, -l value                                                                     ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-https value, --listen_https value, -L value                                                                   ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
+   --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
+   --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
+   --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
+   --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
+   --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
+   --cache-file value, --cache_file value, -C value                                                                       cache file used for message caching [$NTFY_CACHE_FILE]
+   --cache-duration since, --cache_duration since, -b since                                                               buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
+   --cache-batch-size value, --cache_batch_size value                                                                     max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]
+   --cache-batch-timeout value, --cache_batch_timeout value                                                               timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]
+   --cache-startup-queries value, --cache_startup_queries value                                                           queries run when the cache database is initialized [$NTFY_CACHE_STARTUP_QUERIES]
+   --auth-file value, --auth_file value, -H value                                                                         auth database file used for access control [$NTFY_AUTH_FILE]
+   --auth-startup-queries value, --auth_startup_queries value                                                             queries run when the auth database is initialized [$NTFY_AUTH_STARTUP_QUERIES]
+   --auth-default-access value, --auth_default_access value, -p value                                                     default permissions if no matching entries in the auth database are found (default: "read-write") [$NTFY_AUTH_DEFAULT_ACCESS]
+   --attachment-cache-dir value, --attachment_cache_dir value                                                             cache directory for attached files [$NTFY_ATTACHMENT_CACHE_DIR]
+   --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                                     limit of the on-disk attachment cache (default: 5G) [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
+   --attachment-file-size-limit value, --attachment_file_size_limit value, -Y value                                       per-file attachment size limit (e.g. 300k, 2M, 100M) (default: 15M) [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
+   --attachment-expiry-duration value, --attachment_expiry_duration value, -X value                                       duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: 3h) [$NTFY_ATTACHMENT_EXPIRY_DURATION]
+   --keepalive-interval value, --keepalive_interval value, -k value                                                       interval of keepalive messages (default: 45s) [$NTFY_KEEPALIVE_INTERVAL]
+   --manager-interval value, --manager_interval value, -m value                                                           interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
+   --disallowed-topics value, --disallowed_topics value [ --disallowed-topics value, --disallowed_topics value ]          topics that are not allowed to be used [$NTFY_DISALLOWED_TOPICS]
+   --web-root value, --web_root value                                                                                     sets web root to landing page (home), web app (app) or disabled (disable) (default: "app") [$NTFY_WEB_ROOT]
+   --enable-signup, --enable_signup                                                                                       allows users to sign up via the web app, or API (default: false) [$NTFY_ENABLE_SIGNUP]
+   --enable-login, --enable_login                                                                                         allows users to log in via the web app, or API (default: false) [$NTFY_ENABLE_LOGIN]
+   --enable-reservations, --enable_reservations                                                                           allows users to reserve topics (if their tier allows it) (default: false) [$NTFY_ENABLE_RESERVATIONS]
+   --upstream-base-url value, --upstream_base_url value                                                                   forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers [$NTFY_UPSTREAM_BASE_URL]
+   --smtp-sender-addr value, --smtp_sender_addr value                                                                     SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
+   --smtp-sender-user value, --smtp_sender_user value                                                                     SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
+   --smtp-sender-pass value, --smtp_sender_pass value                                                                     SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
+   --smtp-sender-from value, --smtp_sender_from value                                                                     SMTP sender address (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_FROM]
+   --smtp-server-listen value, --smtp_server_listen value                                                                 SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
+   --smtp-server-domain value, --smtp_server_domain value                                                                 SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
+   --smtp-server-addr-prefix value, --smtp_server_addr_prefix value                                                       SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
+   --global-topic-limit value, --global_topic_limit value, -T value                                                       total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
+   --visitor-subscription-limit value, --visitor_subscription_limit value                                                 number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
+   --visitor-attachment-total-size-limit value, --visitor_attachment_total_size_limit value                               total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
+   --visitor-attachment-daily-bandwidth-limit value, --visitor_attachment_daily_bandwidth_limit value                     total daily attachment download/upload bandwidth limit per visitor (default: "500M") [$NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT]
+   --visitor-request-limit-burst value, --visitor_request_limit_burst value                                               initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
+   --visitor-request-limit-replenish value, --visitor_request_limit_replenish value                                       interval at which burst limit is replenished (one per x) (default: 5s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
+   --visitor-request-limit-exempt-hosts value, --visitor_request_limit_exempt_hosts value                                 hostnames and/or IP addresses of hosts that will be exempt from the visitor request limit [$NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS]
+   --visitor-message-daily-limit value, --visitor_message_daily_limit value                                               max messages per visitor per day, derived from request limit if unset (default: 0) [$NTFY_VISITOR_MESSAGE_DAILY_LIMIT]
+   --visitor-email-limit-burst value, --visitor_email_limit_burst value                                                   initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
+   --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                                           interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
+   --behind-proxy, --behind_proxy, -P                                                                                     if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+   --stripe-secret-key value, --stripe_secret_key value                                                                   key used for the Stripe API communication, this enables payments [$NTFY_STRIPE_SECRET_KEY]
+   --stripe-webhook-key value, --stripe_webhook_key value                                                                 key required to validate the authenticity of incoming webhooks from Stripe [$NTFY_STRIPE_WEBHOOK_KEY]
+   --help, -h                                                                                                             show help (default: false)
 ```
 

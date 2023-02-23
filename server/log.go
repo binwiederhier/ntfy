@@ -11,19 +11,38 @@ import (
 	"unicode/utf8"
 )
 
+// Log tags
+const (
+	tagStartup      = "startup"
+	tagHTTP         = "http"
+	tagPublish      = "publish"
+	tagSubscribe    = "subscribe"
+	tagFirebase     = "firebase"
+	tagSMTP         = "smtp"  // Receive email
+	tagEmail        = "email" // Send email
+	tagFileCache    = "file_cache"
+	tagMessageCache = "message_cache"
+	tagStripe       = "stripe"
+	tagAccount      = "account"
+	tagManager      = "manager"
+	tagResetter     = "resetter"
+	tagWebsocket    = "websocket"
+	tagMatrix       = "matrix"
+)
+
 // logr creates a new log event with HTTP request fields
 func logr(r *http.Request) *log.Event {
-	return log.Fields(httpContext(r))
+	return log.Tag(tagHTTP).Fields(httpContext(r)) // Tag may be overwritten
 }
 
-// logr creates a new log event with visitor fields
+// logv creates a new log event with visitor fields
 func logv(v *visitor) *log.Event {
 	return log.With(v)
 }
 
-// logr creates a new log event with HTTP request and visitor fields
+// logvr creates a new log event with HTTP request and visitor fields
 func logvr(v *visitor, r *http.Request) *log.Event {
-	return logv(v).Fields(httpContext(r))
+	return logr(r).With(v)
 }
 
 // logvrm creates a new log event with HTTP request, visitor fields and message fields
@@ -37,13 +56,12 @@ func logvm(v *visitor, m *message) *log.Event {
 }
 
 // logem creates a new log event with email fields
-func logem(state *smtp.ConnectionState) *log.Event {
-	return log.
-		Tag(tagSMTP).
-		Fields(log.Context{
-			"smtp_hostname":    state.Hostname,
-			"smtp_remote_addr": state.RemoteAddr.String(),
-		})
+func logem(smtpConn *smtp.Conn) *log.Event {
+	ev := log.Tag(tagSMTP).Field("smtp_hostname", smtpConn.Hostname())
+	if smtpConn.Conn() != nil {
+		ev.Field("smtp_remote_addr", smtpConn.Conn().RemoteAddr().String())
+	}
+	return ev
 }
 
 func httpContext(r *http.Request) log.Context {

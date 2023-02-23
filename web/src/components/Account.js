@@ -35,7 +35,7 @@ import TextField from "@mui/material/TextField";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
 import {formatBytes, formatShortDate, formatShortDateTime, openUrl} from "../app/utils";
-import accountApi, {LimitBasis, Role, SubscriptionStatus} from "../app/AccountApi";
+import accountApi, {LimitBasis, Role, SubscriptionInterval, SubscriptionStatus} from "../app/AccountApi";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {Pref, PrefGroup} from "./Pref";
 import db from "../app/db";
@@ -248,6 +248,11 @@ const AccountType = () => {
         accountType = (config.enable_payments) ? t("account_basics_tier_free") : t("account_basics_tier_basic");
     } else {
         accountType = account.tier.name;
+        if (account.billing?.interval === SubscriptionInterval.MONTH) {
+            accountType += ` (${t("account_basics_tier_interval_monthly")})`;
+        } else if (account.billing?.interval === SubscriptionInterval.YEAR) {
+            accountType += ` (${t("account_basics_tier_interval_yearly")})`;
+        }
     }
 
     return (
@@ -451,7 +456,7 @@ const Tokens = () => {
                     <Trans
                         i18nKey="account_tokens_description"
                         components={{
-                            Link: <Link href="/docs"/>
+                            Link: <Link href="/docs/publish/#access-tokens"/>
                         }}
                     />
                 </Paragraph>

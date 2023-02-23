@@ -46,6 +46,7 @@ var cmdUser = &cli.Command{
 			Action:    execUserAdd,
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "role", Aliases: []string{"r"}, Value: string(user.RoleUser), Usage: "user role"},
+				&cli.BoolFlag{Name: "ignore-exists", Usage: "if the user already exists, perform no action and exit"},
 			},
 			Description: `Add a new user to the ntfy user database.
 
@@ -186,6 +187,10 @@ func execUserAdd(c *cli.Context) error {
 		return err
 	}
 	if user, _ := manager.User(username); user != nil {
+		if c.Bool("ignore-exists") {
+			fmt.Fprintf(c.App.ErrWriter, "user %s already exists (exited successfully)\n", username)
+			return nil
+		}
 		return fmt.Errorf("user %s already exists", username)
 	}
 	if password == "" {

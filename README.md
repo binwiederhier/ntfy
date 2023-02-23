@@ -13,11 +13,9 @@
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 [![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
-**ntfy** (pronounce: *notify*) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service.
-It allows you to **send notifications to your phone or desktop via scripts** from any computer, entirely **without signup or cost**.
-It's also open source (as you can plainly see) if you want to run your own.
+**ntfy** (pronounced "*notify*") is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service. With ntfy, you can **send notifications to your phone or desktop via scripts** from any computer, **without having to sign up or pay any fees**. If you'd like to run your own instance of the service, you can easily do so since ntfy is open source.
 
-I run a free version of it at **[ntfy.sh](https://ntfy.sh)**. There's also an [open source Android app](https://github.com/binwiederhier/ntfy-android) (see [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/)), and an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) (see [App Store](https://apps.apple.com/us/app/ntfy/id1625396347)).
+You can access the free version of ntfy at **[ntfy.sh](https://ntfy.sh)**. There is also an [open source Android app](https://github.com/binwiederhier/ntfy-android) available on [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/), as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) available on the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
 <p>
   <img src="web/public/static/img/screenshot-curl.png" height="180">
@@ -115,6 +113,12 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/billycao"><img src="https://github.com/billycao.png" width="40px" /></a>
 <a href="https://github.com/zoic21"><img src="https://github.com/zoic21.png" width="40px" /></a>
 <a href="https://github.com/IanKulin"><img src="https://github.com/IanKulin.png" width="40px" /></a>
+<a href="https://github.com/Joachim256"><img src="https://github.com/Joachim256.png" width="40px" /></a>
+<a href="https://github.com/overtone1000"><img src="https://github.com/overtone1000.png" width="40px" /></a>
+<a href="https://github.com/oakd"><img src="https://github.com/oakd.png" width="40px" /></a>
+<a href="https://github.com/KucharczykL"><img src="https://github.com/KucharczykL.png" width="40px" /></a>
+<a href="https://github.com/hansbickhofe"><img src="https://github.com/hansbickhofe.png" width="40px" /></a>
+<a href="https://github.com/caseodilla"><img src="https://github.com/caseodilla.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

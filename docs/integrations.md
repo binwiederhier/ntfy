@@ -35,6 +35,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
 - [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
+- [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
+- [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 
@@ -72,6 +74,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 ## Projects + scripts 
 
 - [Grafana-to-ntfy](https://github.com/kittyandrew/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Rust)
+- [Grafana-ntfy-webhook-integration](https://github.com/academo/grafana-alerting-ntfy-webhook-integration) - Integrates Grafana alerts webhooks (Go)
 - [ntfy-long-zsh-command](https://github.com/robfox92/ntfy-long-zsh-command) - Notifies you once a long-running command completes (zsh)
 - [ntfy-shellscripts](https://github.com/nickexyz/ntfy-shellscripts) - A few scripts for the ntfy project (Shell)
 - [QuickStatus](https://github.com/corneliusroot/QuickStatus) - A shell script to alert to any immediate problems upon login (Shell)
@@ -110,9 +113,16 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy-wrapper](https://github.com/vict0rsch/ntfy-wrapper) - Wrapper around ntfy (Python)
 - [nodebb-plugin-ntfy](https://github.com/NodeBB/nodebb-plugin-ntfy) - Push notifications for NodeBB forums
 - [n8n-ntfy](https://github.com/raghavanand98/n8n-ntfy.sh) - n8n community node that lets you use ntfy in your workflows
+- [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 
 ## Blog + forum posts
 
+- [enviar notificaciones automáticas usando ntfy.sh](https://osiux.com/2023-02-15-send-automatic-notifications-using-ntfy.html) - osiux.com - 2/2023 
+- [Carnet IP动态解析以及通过ntfy推送IP信息](https://blog.wslll.cn/index.php/archives/201/) - blog.wslll.cn - 2/2023 
+- [Open-Source-Brieftaube: ntfy verschickt Push-Meldungen auf Smartphone und PC](https://www.heise.de/news/Open-Source-Brieftaube-ntfy-verschickt-Push-Meldungen-auf-Smartphone-und-PC-7521583.html) ⭐ - heise.de - 2/2023 
+- [Video: Simple Push Notifications ntfy](https://www.youtube.com/watch?v=u9EcWrsjE20) ⭐ - youtube.com - 2/2023
+- [Use ntfy.sh with Home Assistant](https://diecknet.de/en/2023/02/12/ntfy-sh-with-homeassistant/) - diecknet.de - 2/2023 
+- [On installe Ntfy sur Synology Docker](https://www.maison-et-domotique.com/140356-serveur-notification-jeedom-ntfy-synology-docker/) - maison-et-domotique.co - 1/2023 
 - [January 2023 Developer Update](https://community.nodebb.org/topic/16908/january-2023-developer-update) - nodebb.org - 1/2023
 - [Comment envoyer des notifications push sur votre téléphone facilement et gratuitement?](https://korben.info/notifications-push-telephone.html) - 1/2023
 - [UnifiedPush: a decentralized, open-source push notification protocol](https://f-droid.org/en/2022/12/18/unifiedpush.html) ⭐ - 12/2022

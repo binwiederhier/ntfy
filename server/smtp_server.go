@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
@@ -21,7 +22,12 @@ var (
 	errInvalidAddress         = errors.New("invalid address")
 	errInvalidTopic           = errors.New("invalid topic")
 	errTooManyRecipients      = errors.New("too many recipients")
+	errMultipartNestedTooDeep = errors.New("multipart message nested too deep")
 	errUnsupportedContentType = errors.New("unsupported content type")
+)
+
+const (
+	maxMultipartDepth = 2
 )
 
 // smtpBackend implements SMTP server methods.
@@ -33,6 +39,9 @@ type smtpBackend struct {
 	mu      sync.Mutex
 }
 
+var _ smtp.Backend = (*smtpBackend)(nil)
+var _ smtp.Session = (*smtpSession)(nil)
+
 func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Request)) *smtpBackend {
 	return &smtpBackend{
 		config:  conf,
@@ -40,14 +49,9 @@ func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Reques
 	}
 }
 
-func (b *smtpBackend) Login(state *smtp.ConnectionState, username, _ string) (smtp.Session, error) {
-	logem(state).Debug("Incoming mail, login with user %s", username)
-	return &smtpSession{backend: b, state: state}, nil
-}
-
-func (b *smtpBackend) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	logem(state).Debug("Incoming mail, anonymous login")
-	return &smtpSession{backend: b, state: state}, nil
+func (b *smtpBackend) NewSession(conn *smtp.Conn) (smtp.Session, error) {
+	logem(conn).Debug("Incoming mail")
+	return &smtpSession{backend: b, conn: conn}, nil
 }
 
 func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
@@ -59,24 +63,26 @@ func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
 // smtpSession is returned after EHLO.
 type smtpSession struct {
 	backend *smtpBackend
-	state   *smtp.ConnectionState
+	conn    *smtp.Conn
 	topic   string
+	token   string
 	mu      sync.Mutex
 }
 
-func (s *smtpSession) AuthPlain(username, password string) error {
-	logem(s.state).Debug("AUTH PLAIN (with username %s)", username)
+func (s *smtpSession) AuthPlain(username, _ string) error {
+	logem(s.conn).Field("smtp_username", username).Debug("AUTH PLAIN (with username %s)", username)
 	return nil
 }
 
-func (s *smtpSession) Mail(from string, opts smtp.MailOptions) error {
-	logem(s.state).Debug("MAIL FROM: %s (with options: %#v)", from, opts)
+func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
+	logem(s.conn).Field("smtp_mail_from", from).Debug("MAIL FROM: %s", from)
 	return nil
 }
 
 func (s *smtpSession) Rcpt(to string) error {
-	logem(s.state).Debug("RCPT TO: %s", to)
+	logem(s.conn).Field("smtp_rcpt_to", to).Debug("RCPT TO: %s", to)
 	return s.withFailCount(func() error {
+		token := ""
 		conf := s.backend.config
 		addressList, err := mail.ParseAddressList(to)
 		if err != nil {
@@ -88,18 +94,27 @@ func (s *smtpSession) Rcpt(to string) error {
 		if !strings.HasSuffix(to, "@"+conf.SMTPServerDomain) {
 			return errInvalidDomain
 		}
+		// Remove @ntfy.sh from end of email
 		to = strings.TrimSuffix(to, "@"+conf.SMTPServerDomain)
 		if conf.SMTPServerAddrPrefix != "" {
 			if !strings.HasPrefix(to, conf.SMTPServerAddrPrefix) {
 				return errInvalidAddress
 			}
+			// remove ntfy- from beginning of email
 			to = strings.TrimPrefix(to, conf.SMTPServerAddrPrefix)
+		}
+		// If email contains token, split topic and token
+		if strings.Contains(to, "+") {
+			parts := strings.Split(to, "+")
+			to = parts[0]
+			token = parts[1]
 		}
 		if !topicRegex.MatchString(to) {
 			return errInvalidTopic
 		}
 		s.mu.Lock()
 		s.topic = to
+		s.token = token
 		s.mu.Unlock()
 		return nil
 	})
@@ -112,17 +127,17 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		ev := logem(s.state).Tag(tagSMTP)
+		ev := logem(s.conn)
 		if ev.IsTrace() {
 			ev.Field("smtp_data", string(b)).Trace("DATA")
 		} else if ev.IsDebug() {
-			ev.Debug("DATA: %d byte(s)", len(b))
+			ev.Field("smtp_data_len", len(b)).Debug("DATA")
 		}
 		msg, err := mail.ReadMessage(bytes.NewReader(b))
 		if err != nil {
 			return err
 		}
-		body, err := readMailBody(msg)
+		body, err := readMailBody(msg.Body, msg.Header)
 		if err != nil {
 			return err
 		}
@@ -156,11 +171,10 @@ func (s *smtpSession) Data(r io.Reader) error {
 
 func (s *smtpSession) publishMessage(m *message) error {
 	// Extract remote address (for rate limiting)
-	remoteAddr, _, err := net.SplitHostPort(s.state.RemoteAddr.String())
+	remoteAddr, _, err := net.SplitHostPort(s.conn.Conn().RemoteAddr().String())
 	if err != nil {
-		remoteAddr = s.state.RemoteAddr.String()
+		remoteAddr = s.conn.Conn().RemoteAddr().String()
 	}
-
 	// Call HTTP handler with fake HTTP request
 	url := fmt.Sprintf("%s/%s", s.backend.config.BaseURL, m.Topic)
 	req, err := http.NewRequest("POST", url, strings.NewReader(m.Message))
@@ -172,6 +186,9 @@ func (s *smtpSession) publishMessage(m *message) error {
 	}
 	if m.Title != "" {
 		req.Header.Set("Title", m.Title)
+	}
+	if s.token != "" {
+		req.Header.Add("Authorization", "Bearer "+s.token)
 	}
 	rr := httptest.NewRecorder()
 	s.backend.handler(rr, req)
@@ -198,54 +215,58 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	if err != nil {
 		// Almost all of these errors are parse errors, and user input errors.
 		// We do not want to spam the log with WARN messages.
-		logem(s.state).Err(err).Debug("Incoming mail error")
+		logem(s.conn).Err(err).Debug("Incoming mail error")
 		s.backend.failure++
 	}
 	return err
 }
 
-func readMailBody(msg *mail.Message) (string, error) {
-	if msg.Header.Get("Content-Type") == "" {
-		return readPlainTextMailBody(msg)
+func readMailBody(body io.Reader, header mail.Header) (string, error) {
+	if header.Get("Content-Type") == "" {
+		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
 	}
-	contentType, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	contentType, params, err := mime.ParseMediaType(header.Get("Content-Type"))
 	if err != nil {
 		return "", err
 	}
-	if contentType == "text/plain" {
-		return readPlainTextMailBody(msg)
-	} else if strings.HasPrefix(contentType, "multipart/") {
-		return readMultipartMailBody(msg, params)
+	if strings.ToLower(contentType) == "text/plain" {
+		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
+	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
+		return readMultipartMailBody(body, params, 0)
 	}
 	return "", errUnsupportedContentType
 }
 
-func readPlainTextMailBody(msg *mail.Message) (string, error) {
-	body, err := io.ReadAll(msg.Body)
-	if err != nil {
-		return "", err
+func readMultipartMailBody(body io.Reader, params map[string]string, depth int) (string, error) {
+	if depth >= maxMultipartDepth {
+		return "", errMultipartNestedTooDeep
 	}
-	return string(body), nil
-}
-
-func readMultipartMailBody(msg *mail.Message, params map[string]string) (string, error) {
-	mr := multipart.NewReader(msg.Body, params["boundary"])
+	mr := multipart.NewReader(body, params["boundary"])
 	for {
 		part, err := mr.NextPart()
 		if err != nil { // may be io.EOF
 			return "", err
 		}
-		partContentType, _, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
+		partContentType, partParams, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
 		if err != nil {
 			return "", err
 		}
-		if partContentType != "text/plain" {
-			continue
+		if strings.ToLower(partContentType) == "text/plain" {
+			return readPlainTextMailBody(part, part.Header.Get("Content-Transfer-Encoding"))
+		} else if strings.HasPrefix(strings.ToLower(partContentType), "multipart/") {
+			return readMultipartMailBody(part, partParams, depth+1)
 		}
-		body, err := io.ReadAll(part)
-		if err != nil {
-			return "", err
-		}
-		return string(body), nil
+		// Continue with next part
 	}
+}
+
+func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, error) {
+	if strings.ToLower(transferEncoding) == "base64" {
+		reader = base64.NewDecoder(base64.StdEncoding, reader)
+	}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }

@@ -75,7 +75,7 @@ const SubscribePage = (props) => {
         .from(new Set([publicBaseUrl, ...props.subscriptions.map(s => s.baseUrl)]))
         .filter(s => s !== config.base_url);
     const showReserveTopicCheckbox = config.enable_reservations && !anotherServerVisible && (config.enable_payments || account);
-    const reserveTopicEnabled = session.exists() && account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0;
+    const reserveTopicEnabled = session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
 
     const handleSubscribe = async () => {
         const user = await userManager.get(baseUrl); // May be undefined

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"github.com/stripe/stripe-go/v74"
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/util"
 	"net/netip"
@@ -113,7 +114,8 @@ func TestManager_AddUser_And_Query(t *testing.T) {
 	require.Nil(t, a.ChangeBilling("user", &Billing{
 		StripeCustomerID:            "acct_123",
 		StripeSubscriptionID:        "sub_123",
-		StripeSubscriptionStatus:    "active",
+		StripeSubscriptionStatus:    stripe.SubscriptionStatusActive,
+		StripeSubscriptionInterval:  stripe.PriceRecurringIntervalMonth,
 		StripeSubscriptionPaidUntil: time.Now().Add(time.Hour),
 		StripeSubscriptionCancelAt:  time.Unix(0, 0),
 	}))
@@ -395,7 +397,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	require.Nil(t, a.AddTier(&Tier{
 		Code:                     "pro",
 		Name:                     "ntfy Pro",
-		StripePriceID:            "price123",
+		StripeMonthlyPriceID:     "price123",
 		MessageLimit:             5_000,
 		MessageExpiryDuration:    3 * 24 * time.Hour,
 		EmailLimit:               50,
@@ -761,7 +763,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 		AttachmentTotalSizeLimit: 1,
 		AttachmentExpiryDuration: time.Second,
 		AttachmentBandwidthLimit: 1,
-		StripePriceID:            "price_1",
+		StripeMonthlyPriceID:     "price_1",
 	}))
 	require.Nil(t, a.AddTier(&Tier{
 		Code:                     "pro",
@@ -774,7 +776,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 		AttachmentTotalSizeLimit: 123123,
 		AttachmentExpiryDuration: 10800 * time.Second,
 		AttachmentBandwidthLimit: 21474836480,
-		StripePriceID:            "price_2",
+		StripeMonthlyPriceID:     "price_2",
 	}))
 	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
 	require.Nil(t, a.ChangeTier("phil", "pro"))
@@ -800,7 +802,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
 	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
-	require.Equal(t, "price_2", ti.StripePriceID)
+	require.Equal(t, "price_2", ti.StripeMonthlyPriceID)
 
 	// Update tier
 	ti.EmailLimit = 999999
@@ -822,7 +824,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 	require.Equal(t, int64(1), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, time.Second, ti.AttachmentExpiryDuration)
 	require.Equal(t, int64(1), ti.AttachmentBandwidthLimit)
-	require.Equal(t, "price_1", ti.StripePriceID)
+	require.Equal(t, "price_1", ti.StripeMonthlyPriceID)
 
 	ti = tiers[1]
 	require.Equal(t, "pro", ti.Code)
@@ -835,7 +837,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 	require.Equal(t, int64(123123), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, 10800*time.Second, ti.AttachmentExpiryDuration)
 	require.Equal(t, int64(21474836480), ti.AttachmentBandwidthLimit)
-	require.Equal(t, "price_2", ti.StripePriceID)
+	require.Equal(t, "price_2", ti.StripeMonthlyPriceID)
 
 	ti, err = a.TierByStripePrice("price_1")
 	require.Nil(t, err)
@@ -849,7 +851,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 	require.Equal(t, int64(1), ti.AttachmentTotalSizeLimit)
 	require.Equal(t, time.Second, ti.AttachmentExpiryDuration)
 	require.Equal(t, int64(1), ti.AttachmentBandwidthLimit)
-	require.Equal(t, "price_1", ti.StripePriceID)
+	require.Equal(t, "price_1", ti.StripeMonthlyPriceID)
 
 	// Cannot remove tier, since user has this tier
 	require.Error(t, a.RemoveTier("pro"))

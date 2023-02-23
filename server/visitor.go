@@ -159,8 +159,9 @@ func (v *visitor) contextNoLock() log.Context {
 		fields["user_id"] = v.user.ID
 		fields["user_name"] = v.user.Name
 		if v.user.Tier != nil {
-			fields["tier_id"] = v.user.Tier.ID
-			fields["tier_name"] = v.user.Tier.Name
+			for field, value := range v.user.Tier.Context() {
+				fields[field] = value
+			}
 		}
 		if v.user.Billing.StripeCustomerID != "" {
 			fields["stripe_customer_id"] = v.user.Billing.StripeCustomerID
@@ -329,9 +330,13 @@ func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	v.user = u
+	v.user = u                                           // u may be nil!
 	if shouldResetLimiters {
-		v.resetLimitersNoLock(0, 0, true)
+		var messages, emails int64
+		if u != nil {
+			messages, emails = u.Stats.Messages, u.Stats.Emails
+		}
+		v.resetLimitersNoLock(messages, emails, true)
 	}
 }
 

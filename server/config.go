@@ -61,7 +61,7 @@ var (
 
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
-	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "account", "settings", "signup", "login"}
+	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"}
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.

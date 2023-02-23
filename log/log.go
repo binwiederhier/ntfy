@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,7 +13,7 @@ import (
 var (
 	DefaultLevel  = InfoLevel
 	DefaultFormat = TextFormat
-	DefaultOutput = os.Stderr
+	DefaultOutput = &peekLogWriter{os.Stderr}
 )
 
 var (
@@ -20,8 +21,17 @@ var (
 	format              = DefaultFormat
 	overrides           = make(map[string]*levelOverride)
 	output    io.Writer = DefaultOutput
+	filename            = ""
 	mu                  = &sync.RWMutex{}
 )
+
+// init sets the default log output (including log.SetOutput)
+//
+// This has to be explicitly called, because DefaultOutput is a peekLogWriter,
+// which wraps os.Stderr.
+func init() {
+	SetOutput(DefaultOutput)
+}
 
 // Fatal prints the given message, and exits the program
 func Fatal(message string, v ...any) {
@@ -132,28 +142,27 @@ func SetFormat(newFormat Format) {
 func SetOutput(w io.Writer) {
 	mu.Lock()
 	defer mu.Unlock()
-	log.SetOutput(w)
-	output = w
+	output = &peekLogWriter{w}
+	if f, ok := w.(*os.File); ok {
+		filename = f.Name()
+	} else {
+		filename = ""
+	}
+	log.SetOutput(output)
 }
 
 // File returns the log file, if any, or an empty string otherwise
 func File() string {
 	mu.RLock()
 	defer mu.RUnlock()
-	if f, ok := output.(*os.File); ok {
-		return f.Name()
-	}
-	return ""
+	return filename
 }
 
 // IsFile returns true if the output is a non-default file
 func IsFile() bool {
 	mu.RLock()
 	defer mu.RUnlock()
-	if _, ok := output.(*os.File); ok && output != DefaultOutput {
-		return true
-	}
-	return false
+	return filename != ""
 }
 
 // DisableDates disables the date/time prefix
@@ -174,4 +183,21 @@ func IsTrace() bool {
 // IsDebug returns true if the current log level is DebugLevel or below
 func IsDebug() bool {
 	return Loggable(DebugLevel)
+}
+
+// peekLogWriter is an io.Writer which will peek at the rendered log event,
+// and ensure that the rendered output is valid JSON. This is a hack!
+type peekLogWriter struct {
+	w io.Writer
+}
+
+func (w *peekLogWriter) Write(p []byte) (n int, err error) {
+	if len(p) == 0 || p[0] == '{' || CurrentFormat() == TextFormat {
+		return w.w.Write(p)
+	}
+	m := newEvent().Tag(tagStdLog).Render(InfoLevel, strings.TrimSpace(string(p)))
+	if m == "" {
+		return 0, nil
+	}
+	return w.w.Write([]byte(m + "\n"))
 }

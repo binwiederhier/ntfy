@@ -29,7 +29,7 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		if topicCountsAgainst := t.Billee(); topicCountsAgainst != nil {
 			vRate = topicCountsAgainst
 		}
-		r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vRate), "topic", t))
+		r = r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vRate), "topic", t))
 
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)

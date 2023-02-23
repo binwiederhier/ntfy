@@ -212,6 +212,13 @@ export const formatNumber = (n) => {
     return n;
 }
 
+export const formatPrice = (n) => {
+    if (n % 100 === 0) {
+        return `$${n/100}`;
+    }
+    return `$${(n/100).toPrecision(2)}`;
+}
+
 export const openUrl = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
 };

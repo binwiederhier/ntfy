@@ -536,7 +536,7 @@ func (c *messageCache) ExpireMessages(topics ...string) error {
 	}
 	defer tx.Rollback()
 	for _, t := range topics {
-		if _, err := tx.Exec(updateMessagesForTopicExpiryQuery, time.Now().Unix(), t); err != nil {
+		if _, err := tx.Exec(updateMessagesForTopicExpiryQuery, time.Now().Unix()-1, t); err != nil {
 			return err
 		}
 	}

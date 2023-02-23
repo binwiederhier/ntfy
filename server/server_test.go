@@ -149,6 +149,8 @@ func TestServer_PublishAndSubscribe(t *testing.T) {
 	require.Equal(t, "", messages[1].Title)
 	require.Equal(t, 0, messages[1].Priority)
 	require.Nil(t, messages[1].Tags)
+	require.True(t, time.Now().Add(12*time.Hour-5*time.Second).Unix() < messages[1].Expires)
+	require.True(t, time.Now().Add(12*time.Hour+5*time.Second).Unix() > messages[1].Expires)
 
 	require.Equal(t, messageEvent, messages[2].Event)
 	require.Equal(t, "mytopic", messages[2].Topic)
@@ -287,6 +289,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.NotEmpty(t, msg.ID)
 	require.Equal(t, "this message is not cached", msg.Message)
+	require.Equal(t, int64(0), msg.Expires)
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages := toMessages(t, response.Body.String())
@@ -322,6 +325,18 @@ func TestServer_PublishAt(t *testing.T) {
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "a message", messages[0].Message)
 	require.Equal(t, "9.9.9.9", messages[0].Sender.String()) // It's stored in the DB though!
+}
+
+func TestServer_PublishAt_Expires(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+		"In": "2 days",
+	})
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.True(t, m.Expires > time.Now().Add(12*time.Hour+48*time.Hour-time.Minute).Unix())
+	require.True(t, m.Expires < time.Now().Add(12*time.Hour+48*time.Hour+time.Minute).Unix())
 }
 
 func TestServer_PublishAtWithCacheError(t *testing.T) {
@@ -1486,7 +1501,7 @@ func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *
 	c.VisitorAttachmentTotalSizeLimit = 10000
 	s := newTestServer(t, c)
 
-	response := request(t, s, "PUT", "/mytopic", util.RandomString(5000), nil)
+	response := request(t, s, "PUT", "/mytopic", "text file!"+util.RandomString(4990), nil)
 	msg := toMessage(t, response.Body.String())
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, "You received a file: attachment.txt", msg.Message)

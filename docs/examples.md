@@ -572,4 +572,27 @@ Example `template.html`:
 Add notification on Rundeck (attachment type must be: `Attached as file to email`):
 ![Rundeck](static/img/rundeck.png)
 
+## Traccar
+This will only work on selfhosted [traccar](https://www.traccar.org/) ([Github](https://github.com/traccar/traccar)) instances, as you need to be able to set `sms.http.*` keys, which is not possible through the UI attributes
 
+The easiest way to integrate traccar with ntfy, is to configure ntfy as the SMS provider for your instance. You then can set your ntfy topic as your account's phone number in traccar. Sending the email notifications to ntfy will not work, as ntfy does not support HTML emails.
+
+**Caution:** JSON publishing is only possible, when POST-ing to the root URL of the ntfy instance. (see [documentation](publish.md#publish-as-json))
+```xml
+        <entry key='sms.http.url'>https://ntfy.sh</entry>
+        <entry key='sms.http.template'>
+            {
+                "topic": "{phone}",
+                "message": "{message}"
+            }
+        </entry>
+```
+If [access control](config.md#access-control) is enabled, and the target topic does not support anonymous writes, you'll also have to provide an authorization header, for example in form of a privileged token
+```xml
+        <entry key='sms.http.authorization'>Bearer tk_JhbsnoMrgy2FcfHeofv97Pi5uXaZZ</entry>
+```
+or by simply providing traccar with a valid username/password combination.
+```xml
+        <entry key='sms.http.user'>phil</entry>
+        <entry key='sms.http.password'>mypass</entry>
+```

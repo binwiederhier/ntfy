@@ -2,7 +2,7 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.0.2 (UNRELEASED)
+## ntfy server v2.1.0 (UNRELEASED)
 
 **Features:**
 
@@ -13,6 +13,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Web: Do not disable "Reserve topic" checkbox for admins (no ticket, thanks to @xenrox for reporting)
+* UnifiedPush: Treat non-Basic/Bearer `Authorization` header like header was not sent ([#629](https://github.com/binwiederhier/ntfy/issues/629), thanks to [@Boebbele](https://github.com/Boebbele) and [@S1m](https://github.com/S1m) for reporting)
 
 **Additional languages:**
 

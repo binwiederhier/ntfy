@@ -9,6 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
 	"io"
 	"net"
 	"net/http"
@@ -24,13 +30,6 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
-
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
 )
 
 // Server is the main server, providing the UI and API for ntfy
@@ -105,15 +104,15 @@ var (
 )
 
 const (
-	firebaseControlTopic        = "~control"                // See Android if changed
-	firebasePollTopic           = "~poll"                   // See iOS if changed
-	emptyMessageBody            = "triggered"               // Used if message body is empty
-	newMessageBody              = "New message"             // Used in poll requests as generic message
-	defaultAttachmentMessage    = "You received a file: %s" // Used if message body is empty, and there is an attachment
-	encodingBase64              = "base64"                  // Used mainly for binary UnifiedPush messages
-	jsonBodyBytesLimit          = 16384
-	subscriberBilledTopicPrefix = "up_"
-	subscriberBilledValidity    = 12 * time.Hour
+	firebaseControlTopic      = "~control"                // See Android if changed
+	firebasePollTopic         = "~poll"                   // See iOS if changed
+	emptyMessageBody          = "triggered"               // Used if message body is empty
+	newMessageBody            = "New message"             // Used in poll requests as generic message
+	defaultAttachmentMessage  = "You received a file: %s" // Used if message body is empty, and there is an attachment
+	encodingBase64            = "base64"                  // Used mainly for binary UnifiedPush messages
+	jsonBodyBytesLimit        = 16384
+	unifiedPushTopicPrefix    = "up" // Temporarily, we rate limit all "up*" topics based on the subscriber
+	rateVisitorExpiryDuration = 12 * time.Hour
 )
 
 // WebSocket constants
@@ -996,7 +995,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	defer cancel()
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, subscriberBilledTopicPrefix) // temporarily do prefix as well
+		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel, subscriberRateLimited))
 	}
 	defer func() {
@@ -1129,7 +1128,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, subscriberBilledTopicPrefix) // temporarily do prefix as well
+		subscriberRateLimited := util.Contains(subscriberRateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) // temporarily do prefix as well
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel, subscriberRateLimited))
 	}
 	defer func() {
@@ -1162,7 +1161,6 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	if err != nil {
 		return
 	}
-
 	subscriberTopics = readCommaSeperatedParam(r, "subscriber-rate-limit-topics", "x-subscriber-rate-limit-topics", "srlt")
 	return
 }

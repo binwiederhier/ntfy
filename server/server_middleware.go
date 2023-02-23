@@ -25,15 +25,15 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		if err != nil {
 			return err
 		}
-		vRate := v
+		vrate := v
 		if topicCountsAgainst := t.Billee(); topicCountsAgainst != nil {
-			vRate = topicCountsAgainst
+			vrate = topicCountsAgainst
 		}
-		r = r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vRate), "topic", t))
+		r = r.WithContext(context.WithValue(context.WithValue(r.Context(), "vRate", vrate), "topic", t))
 
 		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
 			return next(w, r, v)
-		} else if !vRate.RequestAllowed() {
+		} else if !vrate.RequestAllowed() {
 			return errHTTPTooManyRequestsLimitRequests
 		}
 		return next(w, r, v)

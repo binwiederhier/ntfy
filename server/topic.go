@@ -11,11 +11,11 @@ import (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID           string
-	subscribers  map[int]*topicSubscriber
-	vRate        *visitor
-	vRateExpires time.Time
-	mu           sync.Mutex
+	ID                 string
+	subscribers        map[int]*topicSubscriber
+	rateVisitor        *visitor
+	rateVisitorExpires time.Time
+	mu                 sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -49,9 +49,9 @@ func (t *topic) Subscribe(s subscriber, visitor *visitor, cancel func(), subscri
 	}
 
 	// if no subscriber is already handling the rate limit
-	if t.vRate == nil && subscriberRateLimit {
-		t.vRate = visitor
-		t.vRateExpires = time.Time{}
+	if t.rateVisitor == nil && subscriberRateLimit {
+		t.rateVisitor = visitor
+		t.rateVisitorExpires = time.Time{}
 	}
 
 	return subscriberID
@@ -61,16 +61,16 @@ func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	// if Time is initialized (not the zero value) and the expiry time has passed
-	if !t.vRateExpires.IsZero() && t.vRateExpires.Before(time.Now()) {
-		t.vRate = nil
+	if !t.rateVisitorExpires.IsZero() && t.rateVisitorExpires.Before(time.Now()) {
+		t.rateVisitor = nil
 	}
-	return len(t.subscribers) == 0 && t.vRate == nil
+	return len(t.subscribers) == 0 && t.rateVisitor == nil
 }
 
 func (t *topic) Billee() *visitor {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.vRate
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.rateVisitor
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -84,16 +84,16 @@ func (t *topic) Unsubscribe(id int) {
 	// look for an active subscriber (in random order) that wants to handle the rate limit
 	for _, v := range t.subscribers {
 		if v.subscriberRateLimit {
-			t.vRate = v.visitor
-			t.vRateExpires = time.Time{}
+			t.rateVisitor = v.visitor
+			t.rateVisitorExpires = time.Time{}
 			return
 		}
 	}
 
 	// if no active subscriber is found, count it towards the leaving subscriber
 	if deletingSub.subscriberRateLimit {
-		t.vRate = deletingSub.visitor
-		t.vRateExpires = time.Now().Add(subscriberBilledValidity)
+		t.rateVisitor = deletingSub.visitor
+		t.rateVisitorExpires = time.Now().Add(rateVisitorExpiryDuration)
 	}
 }
 
@@ -123,8 +123,8 @@ func (t *topic) Publish(v *visitor, m *message) error {
 
 // SubscribersCount returns the number of subscribers to this topic
 func (t *topic) SubscribersCount() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return len(t.subscribers)
 }
 

@@ -405,7 +405,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodOptions {
 		return s.limitRequests(s.handleOptions)(w, r, v) // Should work even if the web app is not enabled, see #598
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == "/" {
-		// So I don't *really* have to switch this order, since this is unrelated to UP; But, making this and matrix inconsistent is just calling for confusion, no?
 		return s.transformBodyJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish)))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
 		return s.transformMatrixJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublishMatrix)))(w, r, v)
@@ -1487,10 +1486,11 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
 		if err != nil {
-			logvr(v, r).Tag(tagMatrix).Err(err).Trace("Invalid Matrix request")
+			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Invalid Matrix request")
 			return err
 		}
 		if err := next(w, newRequest, v); err != nil {
+			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Error handling Matrix request")
 			return &errMatrix{pushKey: newRequest.Header.Get(matrixPushKeyHeader), err: err}
 		}
 		return nil

@@ -147,6 +147,11 @@ func writeMatrixDiscoveryResponse(w http.ResponseWriter) error {
 // writeMatrixError logs and writes the errMatrix to the given http.ResponseWriter as a matrixResponse
 func writeMatrixError(w http.ResponseWriter, r *http.Request, v *visitor, err *errMatrix) error {
 	logvr(v, r).Tag(tagMatrix).Err(err).Debug("Matrix gateway error")
+	if httpErr, ok := err.err.(*errHTTP); ok {
+		w.Header().Set("X-Ntfy-Error-Code", fmt.Sprintf("%d", httpErr.Code))
+		w.Header().Set("X-Ntfy-Error-Message", httpErr.Message)
+		w.WriteHeader(httpErr.HTTPCode)
+	}
 	return writeMatrixResponse(w, err.pushKey)
 }
 

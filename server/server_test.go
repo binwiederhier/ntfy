@@ -1206,8 +1206,10 @@ func TestServer_MatrixGateway_Push_Failure_InvalidPushkey(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	notification := `{"notification":{"devices":[{"pushkey":"http://wrong-base-url.com/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-	require.Equal(t, 200, response.Code)
+	require.Equal(t, 400, response.Code)
 	require.Equal(t, `{"rejected":["http://wrong-base-url.com/mytopic?up=1"]}`+"\n", response.Body.String())
+	require.Equal(t, "40020", response.Header().Get("X-Ntfy-Error-Code"))
+	require.Equal(t, "invalid request: push key must be prefixed with base URL, received push key: http://wrong-base-url.com/mytopic?up=1, configured base URL: http://127.0.0.1:12345", response.Header().Get("X-Ntfy-Error-Message"))
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
@@ -1277,6 +1279,22 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)
 	require.True(t, m.Time < time.Now().Unix()+31*60)
+}
+
+func TestServer_PublishAsJSON_RateLimit(t *testing.T) {
+	// Publishing as JSON follows a different path. This ensures that rate
+	// limiting works for this endpoint as well
+	c := newTestConfig(t)
+	c.VisitorMessageDailyLimit = 3
+	s := newTestServer(t, c)
+
+	for i := 0; i < 3; i++ {
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message"}`, nil)
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message"}`, nil)
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42908, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
@@ -2008,9 +2026,6 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		}
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 429, response.Code, notification)
-		// FIXME this is because we switched the order of the "limitRequests" handler
-		// FIXME there should be tests for the 429s on the "/" and "/_matrix.." endpoint
-
 		require.Equal(t, fmt.Sprintf(`{"rejected":["http://127.0.0.1:12345/upsomething%d?up=1"]}`+"\n", i), response.Body.String())
 	}
 }

@@ -4,6 +4,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v2.1.0 (UNRELEASED)
 
+This release now supports sending emails to protected topics, and it ships code to support annual billing cycles (not live yet).
+Most importantly, it fixes an issue with UnifiedPush (mostly Mastodon servers) that send an `Authorization` header, which ntfy
+rejects with an HTTP 401.
+
 **Features:**
 
 * Support for publishing to protected topics via email with access tokens ([#612](https://github.com/binwiederhier/ntfy/pull/621), thanks to [@tamcore](https://github.com/tamcore))

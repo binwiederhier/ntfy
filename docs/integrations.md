@@ -38,6 +38,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Watchtower](https://containrrr.dev/watchtower/) ⭐ - A container-based solution for automating Docker container base image updates
+- [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway for Apprise notifications
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
@@ -104,4 +105,12 @@ func withContext(r *http.Request, ctx map[contextKey]any) *http.Request {
 		c = context.WithValue(c, k, v)
 	}
 	return r.WithContext(c)
+}
+
+func fromContext[T any](r *http.Request, key contextKey) *T {
+	t, ok := r.Context().Value(key).(*T)
+	if !ok {
+		panic(fmt.Sprintf("cannot find key %v in request context", key))
+	}
+	return t
 }

@@ -2030,7 +2030,40 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	}
 }
 
-// FIXME add test for rate visitor expiration
+func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 3
+	s := newTestServer(t, c)
+
+	// "Register" rate visitor
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4"
+	}
+	rr := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"rate-topics": "*",
+	}, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "1.2.3.4", s.topics["mytopic"].rateVisitor.ip.String())
+	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["mytopic"].rateVisitor)
+
+	// Publish message, observe rate visitor tokens being decreased
+	response := request(t, s, "POST", "/mytopic", "some message", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
+	require.Equal(t, int64(1), s.topics["mytopic"].rateVisitor.messagesLimiter.Value())
+	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["mytopic"].rateVisitor)
+
+	// Expire visitor
+	s.visitors["ip:1.2.3.4"].seen = time.Now().Add(-1 * 25 * time.Hour)
+	s.pruneVisitors()
+
+	// Publish message again, observe that rateVisitor is not used anymore and is reset
+	response = request(t, s, "POST", "/mytopic", "some message", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
+	require.Nil(t, s.topics["mytopic"].rateVisitor)
+	require.Nil(t, s.visitors["ip:1.2.3.4"])
+}
 
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()

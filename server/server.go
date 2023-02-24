@@ -570,14 +570,8 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 }
 
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
-	vrate, ok := r.Context().Value(contextRateVisitor).(*visitor)
-	if !ok {
-		return nil, errHTTPInternalError
-	}
-	t, ok := r.Context().Value(contextTopic).(*topic)
-	if !ok {
-		return nil, errHTTPInternalError
-	}
+	t := fromContext[topic](r, contextTopic)
+	vrate := fromContext[visitor](r, contextRateVisitor)
 	if !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	}
@@ -586,9 +580,12 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, vrate, m)
+	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, m)
 	if err != nil {
 		return nil, err
+	}
+	if email != "" && !vrate.EmailAllowed() {
+		return nil, errHTTPTooManyRequestsLimitEmails
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
@@ -605,13 +602,15 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		m.Message = emptyMessageBody
 	}
 	delayed := m.Time > time.Now().Unix()
-	ev := logvrm(vrate, r, m).
+	ev := logvrm(v, r, m).
 		Tag(tagPublish).
 		Fields(log.Context{
 			"message_delayed":     delayed,
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
 			"message_email":       email,
+			"rate_visitor_ip":     vrate.IP().String(),
+			"rate_user_id":        vrate.MaybeUserID(),
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
@@ -623,7 +622,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 			return nil, err
 		}
 		if s.firebaseClient != nil && firebase {
-			go s.sendToFirebase(vrate, m)
+			go s.sendToFirebase(v, m)
 		}
 		if s.smtpSender != nil && email != "" {
 			go s.sendEmail(v, m, email)
@@ -708,7 +707,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, vrate *visitor, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
@@ -747,11 +746,6 @@ func (s *Server) parsePublishParams(r *http.Request, vrate *visitor, m *message)
 		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
-	if email != "" {
-		if !vrate.EmailAllowed() {
-			return false, false, "", false, errHTTPTooManyRequestsLimitEmails
-		}
-	}
 	if s.smtpSender == nil && email != "" {
 		return false, false, "", false, errHTTPBadRequestEmailDisabled
 	}
@@ -993,7 +987,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	defer cancel()
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1126,7 +1120,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v, cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {

@@ -3,7 +3,6 @@ package server
 import (
 	"heckel.io/ntfy/log"
 	"strings"
-	"time"
 )
 
 func (s *Server) execManager() {
@@ -38,16 +37,23 @@ func (s *Server) execManager() {
 				subs := t.SubscribersCount()
 				ev := log.Tag(tagManager)
 				if ev.IsTrace() {
-					expiryMessage := ""
-					if subs == 0 {
-						expiryTime := time.Until(t.expires)
-						expiryMessage = ", expires in " + expiryTime.String()
+					vrate := t.RateVisitor()
+					if vrate != nil {
+						ev.Fields(log.Context{
+							"rate_visitor_ip":      vrate.IP(),
+							"rate_visitor_user_id": vrate.MaybeUserID(),
+						})
 					}
-					ev.Trace("- topic %s: %d subscribers%s", t.ID, subs, expiryMessage)
+					ev.
+						Fields(log.Context{
+							"message_topic":             t.ID,
+							"message_topic_subscribers": subs,
+						}).
+						Trace("- topic %s: %d subscribers", t.ID, subs)
 				}
 				msgs, exists := messageCounts[t.ID]
 				if t.Stale() && (!exists || msgs == 0) {
-					log.Tag(tagManager).Trace("Deleting empty topic %s", t.ID)
+					log.Tag(tagManager).Field("message_topic", t.ID).Trace("Deleting empty topic %s", t.ID)
 					emptyTopics++
 					delete(s.topics, t.ID)
 					continue

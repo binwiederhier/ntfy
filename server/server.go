@@ -604,12 +604,12 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	ev := logvrm(v, r, m).
 		Tag(tagPublish).
 		Fields(log.Context{
-			"message_delayed":     delayed,
-			"message_firebase":    firebase,
-			"message_unifiedpush": unifiedpush,
-			"message_email":       email,
-			"rate_visitor_ip":     vrate.IP().String(),
-			"rate_user_id":        vrate.MaybeUserID(),
+			"message_delayed":      delayed,
+			"message_firebase":     firebase,
+			"message_unifiedpush":  unifiedpush,
+			"message_email":        email,
+			"rate_visitor_ip":      vrate.IP().String(),
+			"rate_visitor_user_id": vrate.MaybeUserID(),
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")

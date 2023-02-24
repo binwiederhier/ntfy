@@ -4,15 +4,21 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v2.1.0 (UNRELEASED)
 
-This release now supports sending emails to protected topics, and it ships code to support annual billing cycles (not live yet).
-Most importantly, it fixes an issue with UnifiedPush (mostly Mastodon servers) that send an `Authorization` header, which ntfy
-rejects with an HTTP 401.
+This release changes the way UnifiedPush (UP) topics are rate limited from publisher-based rate limiting to subscriber-based
+rate limiting. This allows UP application servers to send higher volumes, since the subscribers carry the rate limits.
+
+We also fixed another issue with UnifiedPush: Some Mastodon servers were sending unsupported `Authorization` headers, 
+which ntfy rejected with an HTTP 401. We now ignore unsupported header values. 
+
+As of this release, ntfy also supports sending emails to protected topics, and it ships code to support annual billing
+cycles (not live yet). 
 
 **Features:**
 
+* UnifiedPush: Subscriber-based rate limiting for `up*` topics ([#584](https://github.com/binwiederhier/ntfy/pull/584)/[#609](https://github.com/binwiederhier/ntfy/pull/609)/[#633](https://github.com/binwiederhier/ntfy/pull/633), thanks to [@karmanyaahm](https://github.com/karmanyaahm)))
 * Support for publishing to protected topics via email with access tokens ([#612](https://github.com/binwiederhier/ntfy/pull/621), thanks to [@tamcore](https://github.com/tamcore))
 * Support for base64-encoded and nested multipart emails ([#610](https://github.com/binwiederhier/ntfy/issues/610), thanks to [@Robert-litts](https://github.com/Robert-litts))
-* Add support for annual billing intervals (no ticket)
+* Payments: Add support for annual billing intervals (no ticket)
 
 **Bug fixes + maintenance:**
 

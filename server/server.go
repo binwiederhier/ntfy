@@ -112,7 +112,6 @@ const (
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
 	jsonBodyBytesLimit       = 16384
 	unifiedPushTopicPrefix   = "up" // Temporarily, we rate limit all "up*" topics based on the subscriber
-	rateTopicsWildcard       = "*"  // Allows defining all topics in the request subscriber-rate-limited topics
 )
 
 // WebSocket constants
@@ -977,7 +976,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	registerRateVisitors(topics, rateTopics, v)
+	if err := s.maybeSetRateVisitors(r, v, topics, rateTopics); err != nil {
+		return err
+	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8")                    // Android/Volley client needs charset!
 	if poll {
@@ -1113,7 +1114,9 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
-	registerRateVisitors(topics, rateTopics, v)
+	if err := s.maybeSetRateVisitors(r, v, topics, rateTopics); err != nil {
+		return err
+	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
@@ -1156,23 +1159,62 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	return
 }
 
-// registerRateVisitors sets the rate visitor on a topic, indicating that all messages published to that topic
-// will be rate limited against the rate visitor instead of the publishing visitor.
+// maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
+// to that topic will be rate limited against the rate visitor instead of the publishing visitor.
+//
+// Setting the rate visitor is ony allowed if
+// - auth-file is not set (everything is open by default)
+// - the topic is reserved, and v.user is the owner
+// - the topic is not reserved, and v.user has write access
 //
 // Note: This TEMPORARILY also registers all topics starting with "up" (= UnifiedPush). This is to ease the transition
 // until the Android app will send the "Rate-Topics" header.
-func registerRateVisitors(topics []*topic, rateTopics []string, v *visitor) {
-	if len(rateTopics) == 1 && rateTopics[0] == rateTopicsWildcard {
-		for _, t := range topics {
-			t.SetRateVisitor(v)
-		}
-	} else {
-		for _, t := range topics {
-			if util.Contains(rateTopics, t.ID) || strings.HasPrefix(t.ID, unifiedPushTopicPrefix) {
-				t.SetRateVisitor(v)
-			}
+func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, rateTopics []string) error {
+	// Make a list of topics that we'll actually set the RateVisitor on
+	eligibleRateTopics := make([]*topic, 0)
+	for _, t := range topics {
+		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) || util.Contains(rateTopics, t.ID) {
+			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
+	if len(eligibleRateTopics) == 0 {
+		return nil
+	}
+
+	// If access controls are turned off, v has access to everything, and we can set the rate visitor
+	if s.userManager == nil {
+		return s.setRateVisitors(r, v, eligibleRateTopics)
+	}
+
+	// If access controls are enabled, only set rate visitor if
+	// - topic is reserved, and v.user is the owner
+	// - topic is not reserved, and v.user has write access
+	writableRateTopics := make([]*topic, 0)
+	for _, t := range topics {
+		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
+		if err != nil {
+			return err
+		}
+		if ownerUserID == "" {
+			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
+				writableRateTopics = append(writableRateTopics, t)
+			}
+		} else if ownerUserID == v.MaybeUserID() {
+			writableRateTopics = append(writableRateTopics, t)
+		}
+	}
+	return s.setRateVisitors(r, v, writableRateTopics)
+}
+
+func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
+	for _, t := range rateTopics {
+		logvr(v, r).
+			Tag(tagSubscribe).
+			Field("message_topic", t.ID).
+			Debug("Setting visitor as rate visitor for topic %s", t.ID)
+		t.SetRateVisitor(v)
+	}
+	return nil
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the

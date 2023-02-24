@@ -141,6 +141,7 @@ func (v *visitor) Context() log.Context {
 func (v *visitor) contextNoLock() log.Context {
 	info := v.infoLightNoLock()
 	fields := log.Context{
+		"visitor_id":                     visitorID(v.ip, v.user),
 		"visitor_ip":                     v.ip.String(),
 		"visitor_messages":               info.Stats.Messages,
 		"visitor_messages_limit":         info.Limits.MessageLimit,

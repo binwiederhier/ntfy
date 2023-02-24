@@ -2040,7 +2040,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		r.RemoteAddr = "1.2.3.4"
 	}
 	rr := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"rate-topics": "*",
+		"rate-topics": "mytopic",
 	}, subscriberFn)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "1.2.3.4", s.topics["mytopic"].rateVisitor.ip.String())
@@ -2063,6 +2063,72 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
 	require.Nil(t, s.topics["mytopic"].rateVisitor)
 	require.Nil(t, s.visitors["ip:1.2.3.4"])
+}
+
+func TestServer_SubscriberRateLimiting_ProtectedTopics(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, c)
+
+	// Create some ACLs
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 5,
+	}))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("ben", "test"))
+	require.Nil(t, s.userManager.AllowAccess("ben", "announcements", user.PermissionReadWrite))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "public_topic", user.PermissionReadWrite))
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	require.Nil(t, s.userManager.AddReservation("phil", "reserved-for-phil", user.PermissionReadWrite))
+
+	// Set rate visitor as user "phil" on topic
+	// - "reserved-for-phil": Allowed, because I am the owner
+	// - "public_topic": Allowed, because it has read-write permissions for everyone
+	// - "announcements": NOT allowed, because it has read-only permissions for everyone
+	rr := request(t, s, "GET", "/reserved-for-phil,public_topic,announcements/json?poll=1", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Rate-Topics":   "reserved-for-phil,public_topic,announcements",
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "phil", s.topics["reserved-for-phil"].rateVisitor.user.Name)
+	require.Equal(t, "phil", s.topics["public_topic"].rateVisitor.user.Name)
+	require.Nil(t, s.topics["announcements"].rateVisitor)
+
+	// Set rate visitor as user "ben" on topic
+	// - "reserved-for-phil": NOT allowed, because I am not the owner
+	// - "public_topic": Allowed, because it has read-write permissions for everyone
+	// - "announcements": Allowed, because I have read-write permissions
+	rr = request(t, s, "GET", "/reserved-for-phil,public_topic,announcements/json?poll=1", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+		"Rate-Topics":   "reserved-for-phil,public_topic,announcements",
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "phil", s.topics["reserved-for-phil"].rateVisitor.user.Name)
+	require.Equal(t, "ben", s.topics["public_topic"].rateVisitor.user.Name)
+	require.Equal(t, "ben", s.topics["announcements"].rateVisitor.user.Name)
+}
+
+func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.AuthDefault = user.PermissionReadWrite
+	s := newTestServer(t, c)
+
+	// Create some ACLs
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
+
+	// Set rate visitor as ip:1.2.3.4 on topic
+	// - "up1234": Allowed, because no ACLs and nobody owns the topic
+	// - "announcements": NOT allowed, because it has read-only permissions for everyone
+	rr := request(t, s, "GET", "/up1234,announcements/json?poll=1", "", nil, func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4"
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "1.2.3.4", s.topics["up1234"].rateVisitor.ip.String())
+	require.Nil(t, s.topics["announcements"].rateVisitor)
 }
 
 func newTestConfig(t *testing.T) *Config {

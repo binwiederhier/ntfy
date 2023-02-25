@@ -1141,7 +1141,14 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 
 	s := newTestServer(t, newTestConfig(t))
 
-	response := request(t, s, "PUT", "/up123456789012?up=1", string(b), nil)
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/up123456789012/json?poll=1", "", map[string]string{
+		"Rate-Topics": "up123456789012",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish message to topic
+	response = request(t, s, "PUT", "/up123456789012?up=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1150,6 +1157,7 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, b, b2)
 
+	// Retrieve and check published message
 	response = request(t, s, "GET", "/up123456789012/json?poll=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 	m = toMessage(t, response.Body.String())
@@ -1165,7 +1173,15 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 	require.Nil(t, err)
 
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
+
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Rate-Topics": "mytopic",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish message to topic
+	response = request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1179,7 +1195,14 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 func TestServer_PublishUnifiedPushText(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
-	response := request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Rate-Topics": "mytopic",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish UnifiedPush text message
+	response = request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())

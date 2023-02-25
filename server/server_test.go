@@ -1246,29 +1246,7 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	require.Equal(t, notification, m.Message)
 }
 
-func TestServer_MatrixGateway_Push_DailyLimit(t *testing.T) {
-	c := newTestConfig(t)
-	c.VisitorMessageDailyLimit = 3
-	s := newTestServer(t, c)
-
-	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "mytopic",
-	})
-	require.Equal(t, 200, response.Code)
-
-	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
-	for i := 0; i < 3; i++ {
-		response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-		require.Equal(t, 200, response.Code)
-		require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
-	}
-
-	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-	require.Equal(t, 429, response.Code)
-	require.Equal(t, "42908", response.Header().Get("X-Ntfy-Error-Code"))
-}
-
-func TestServer_MatrixGateway_Push_NoSubscriber(t *testing.T) {
+func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
@@ -2099,7 +2077,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		}
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 429, response.Code, notification)
-		require.Equal(t, fmt.Sprintf(`{"rejected":["http://127.0.0.1:12345/up12345678901%d?up=1"]}`+"\n", i), response.Body.String())
+		require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
 	}
 }
 

@@ -71,27 +71,18 @@ type matrixResponse struct {
 	Rejected []string `json:"rejected"`
 }
 
-// errMatrix represents an error when handing Matrix gateway messages
+// errMatrixPushkeyRejected represents an error when handing Matrix gateway messages
 //
-// If the pushKey is set, the app server will remove it and will never send messages using the same
+// If the push key is set, the app server will remove it and will never send messages using the same
 // push key again, until the user repairs it.
-type errMatrix struct {
-	pushKey string
-	err     error
+type errMatrixPushkeyRejected struct {
+	rejectedPushKey   string
+	configuredBaseURL string
 }
 
-func (e errMatrix) Error() string {
-	if e.err != nil {
-		return fmt.Sprintf("message with push key %s rejected: %s", e.pushKey, e.err.Error())
-	}
-	return fmt.Sprintf("message with push key %s rejected", e.pushKey)
+func (e errMatrixPushkeyRejected) Error() string {
+	return fmt.Sprintf("push key must be prefixed with base URL, received push key: %s, configured base URL: %s", e.rejectedPushKey, e.configuredBaseURL)
 }
-
-const (
-	// matrixPushKeyHeader is a header that's used internally to pass the Matrix push key (from the matrixRequest)
-	// along with the request. The push key is only used if an error occurs down the line.
-	matrixPushKeyHeader = "X-Matrix-Pushkey"
-)
 
 // newRequestFromMatrixJSON reads the request body as a Matrix JSON message, parses the "pushkey", and creates a new
 // HTTP request that looks like a normal ntfy request from it.
@@ -125,17 +116,16 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	}
 	pushKey := m.Notification.Devices[0].PushKey // We ignore other devices for now, see discussion in #316
 	if !strings.HasPrefix(pushKey, baseURL+"/") {
-		return nil, &errMatrix{pushKey: pushKey, err: wrapErrHTTP(errHTTPBadRequestMatrixPushkeyBaseURLMismatch, "received push key: %s, configured base URL: %s", pushKey, baseURL)}
+		return nil, &errMatrixPushkeyRejected{rejectedPushKey: pushKey, configuredBaseURL: baseURL}
 	}
 	newRequest, err := http.NewRequest(http.MethodPost, pushKey, io.NopCloser(bytes.NewReader(body.PeekedBytes)))
 	if err != nil {
-		return nil, &errMatrix{pushKey: pushKey, err: err}
+		return nil, err
 	}
 	newRequest.RemoteAddr = r.RemoteAddr // Not strictly necessary, since visitor was already extracted
 	if r.Header.Get("X-Forwarded-For") != "" {
 		newRequest.Header.Set("X-Forwarded-For", r.Header.Get("X-Forwarded-For"))
 	}
-	newRequest.Header.Set(matrixPushKeyHeader, pushKey)
 	return newRequest, nil
 }
 
@@ -145,17 +135,6 @@ func writeMatrixDiscoveryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	_, err := io.WriteString(w, `{"unifiedpush":{"gateway":"matrix"}}`+"\n")
 	return err
-}
-
-// writeMatrixError logs and writes the errMatrix to the given http.ResponseWriter as a matrixResponse
-func writeMatrixError(w http.ResponseWriter, r *http.Request, v *visitor, err *errMatrix) error {
-	logvr(v, r).Tag(tagMatrix).Err(err).Debug("Matrix gateway error")
-	if httpErr, ok := err.err.(*errHTTP); ok {
-		w.Header().Set("X-Ntfy-Error-Code", fmt.Sprintf("%d", httpErr.Code))
-		w.Header().Set("X-Ntfy-Error-Message", httpErr.Message)
-		w.WriteHeader(httpErr.HTTPCode)
-	}
-	return writeMatrixResponse(w, err.pushKey)
 }
 
 // writeMatrixSuccess writes a successful matrixResponse (no rejected push key) to the given http.ResponseWriter

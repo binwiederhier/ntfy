@@ -1231,7 +1231,7 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
 	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "mytopic",
+		"Rate-Topics": "mytopic", // Register first!
 	})
 	require.Equal(t, 200, response.Code)
 
@@ -1251,17 +1251,15 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
-	require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
+	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_MatrixGateway_Push_Failure_InvalidPushkey(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	notification := `{"notification":{"devices":[{"pushkey":"http://wrong-base-url.com/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-	require.Equal(t, 400, response.Code)
+	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"rejected":["http://wrong-base-url.com/mytopic?up=1"]}`+"\n", response.Body.String())
-	require.Equal(t, "40020", response.Header().Get("X-Ntfy-Error-Code"))
-	require.Equal(t, "invalid request: push key must be prefixed with base URL, received push key: http://wrong-base-url.com/mytopic?up=1, configured base URL: http://127.0.0.1:12345", response.Header().Get("X-Ntfy-Error-Message"))
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
@@ -1273,9 +1271,12 @@ func TestServer_MatrixGateway_Push_Failure_EverythingIsWrong(t *testing.T) {
 	notification := `{"message":"this is not really a Matrix message"}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 400, response.Code)
-	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 40019, err.Code)
-	require.Equal(t, 400, err.HTTPCode)
+	require.Equal(t, 40019, toHTTPError(t, response.Body.String()).Code)
+
+	notification = `this isn't even JSON'`
+	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40019, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_MatrixGateway_Push_Failure_Unconfigured(t *testing.T) {
@@ -1285,9 +1286,7 @@ func TestServer_MatrixGateway_Push_Failure_Unconfigured(t *testing.T) {
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 500, response.Code)
-	err := toHTTPError(t, response.Body.String())
-	require.Equal(t, 50003, err.Code)
-	require.Equal(t, 500, err.HTTPCode)
+	require.Equal(t, 50003, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishActions_AndPoll(t *testing.T) {
@@ -2077,7 +2076,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		}
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 429, response.Code, notification)
-		require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
+		require.Equal(t, 42901, toHTTPError(t, response.Body.String()).Code)
 	}
 }
 

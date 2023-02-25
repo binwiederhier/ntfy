@@ -328,12 +328,6 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		}
 		return // Do not attempt to write to upgraded connection
 	}
-	if matrixErr, ok := err.(*errMatrix); ok {
-		if err := writeMatrixError(w, r, v, matrixErr); err != nil {
-			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Writing Matrix error failed")
-		}
-		return
-	}
 	if isNormalError {
 		logvr(v, r).Err(err).Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	} else {
@@ -582,6 +576,10 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		return nil, err
 	}
 	if unifiedpush && t.RateVisitor() == nil {
+		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
+		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
+		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
+		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
 		return nil, errHTTPInsufficientStorage
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
@@ -1525,12 +1523,14 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
 		if err != nil {
 			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Invalid Matrix request")
+			if e, ok := err.(*errMatrixPushkeyRejected); ok {
+				return writeMatrixResponse(w, e.rejectedPushKey)
+			}
 			return err
 		}
 		if err := next(w, newRequest, v); err != nil {
 			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Error handling Matrix request")
-			// No normal error should cause pushKey rejection; don't set errMatrix.pushKey.
-			return &errMatrix{err: err}
+			return err
 		}
 		return nil
 	}

@@ -72,6 +72,9 @@ type matrixResponse struct {
 }
 
 // errMatrix represents an error when handing Matrix gateway messages
+//
+// If the pushKey is set, the app server will remove it and will never send messages using the same
+// push key again, until the user repairs it.
 type errMatrix struct {
 	pushKey string
 	err     error

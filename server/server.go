@@ -581,10 +581,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
-	/*if unifiedpush && t.RateVisitor() == nil {
-		return nil, errHTTPConflictCannotPublishWithoutRateVisitor
-	} else*/
-	if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
+	if unifiedpush && t.RateVisitor() == nil {
+		return nil, errHTTPInsufficientStorage
+	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails

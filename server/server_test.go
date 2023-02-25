@@ -1141,7 +1141,14 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 
 	s := newTestServer(t, newTestConfig(t))
 
-	response := request(t, s, "PUT", "/up123456789012?up=1", string(b), nil)
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/up123456789012/json?poll=1", "", map[string]string{
+		"Rate-Topics": "up123456789012",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish message to topic
+	response = request(t, s, "PUT", "/up123456789012?up=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1150,6 +1157,7 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, b, b2)
 
+	// Retrieve and check published message
 	response = request(t, s, "GET", "/up123456789012/json?poll=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 	m = toMessage(t, response.Body.String())
@@ -1165,7 +1173,15 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 	require.Nil(t, err)
 
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
+
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Rate-Topics": "mytopic",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish message to topic
+	response = request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1179,7 +1195,14 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 func TestServer_PublishUnifiedPushText(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
-	response := request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
+	// Register a UnifiedPush subscriber
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Rate-Topics": "mytopic",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Publish UnifiedPush text message
+	response = request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1206,8 +1229,14 @@ func TestServer_MatrixGateway_Discovery_Failure_Unconfigured(t *testing.T) {
 
 func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Rate-Topics": "mytopic",
+	})
+	require.Equal(t, 200, response.Code)
+
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
-	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
 
@@ -1215,6 +1244,14 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, notification, m.Message)
+}
+
+func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 507, response.Code)
+	require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
 }
 
 func TestServer_MatrixGateway_Push_Failure_InvalidPushkey(t *testing.T) {
@@ -2040,7 +2077,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		}
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 429, response.Code, notification)
-		require.Equal(t, fmt.Sprintf(`{"rejected":["http://127.0.0.1:12345/up12345678901%d?up=1"]}`+"\n", i), response.Body.String())
+		require.Equal(t, `{"rejected":[]}`+"\n", response.Body.String())
 	}
 }
 

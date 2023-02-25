@@ -661,7 +661,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishWithoutResponse(r, v)
 	if err != nil {
-		return &errMatrix{pushKey: r.Header.Get(matrixPushKeyHeader), err: err}
+		return err
 	}
 	return writeMatrixSuccess(w)
 }
@@ -1529,7 +1529,8 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 		}
 		if err := next(w, newRequest, v); err != nil {
 			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Error handling Matrix request")
-			return &errMatrix{pushKey: newRequest.Header.Get(matrixPushKeyHeader), err: err}
+			// No normal error should cause pushKey rejection; don't set errMatrix.pushKey.
+			return &errMatrix{err: err}
 		}
 		return nil
 	}

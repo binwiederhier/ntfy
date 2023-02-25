@@ -112,6 +112,7 @@ const (
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
 	jsonBodyBytesLimit       = 16384
 	unifiedPushTopicPrefix   = "up" // Temporarily, we rate limit all "up*" topics based on the subscriber
+	unifiedPushTopicLength   = 14
 )
 
 // WebSocket constants
@@ -571,9 +572,6 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
 	t := fromContext[topic](r, contextTopic)
 	vrate := fromContext[visitor](r, contextRateVisitor)
-	if !vrate.MessageAllowed() {
-		return nil, errHTTPTooManyRequestsLimitMessages
-	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {
 		return nil, err
@@ -583,7 +581,12 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if err != nil {
 		return nil, err
 	}
-	if email != "" && !vrate.EmailAllowed() {
+	/*if unifiedpush && t.RateVisitor() == nil {
+		return nil, errHTTPConflictCannotPublishWithoutRateVisitor
+	} else*/
+	if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
+		return nil, errHTTPTooManyRequestsLimitMessages
+	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails
 	}
 	if m.PollID != "" {
@@ -1173,7 +1176,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) || util.Contains(rateTopics, t.ID) {
+		if (strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength) || util.Contains(rateTopics, t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}

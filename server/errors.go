@@ -93,3 +93,6 @@ var (
 	errHTTPInternalErrorInvalidPath                  = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid path", ""}
 	errHTTPInternalErrorMissingBaseURL               = &errHTTP{50003, http.StatusInternalServerError, "internal server error: base-url must be be configured for this feature", "https://ntfy.sh/docs/config/"}
 )
+
+// errHTTPConflictCannotPublishWithoutRateVisitor   = &errHTTP{40904, http.StatusConflict, "conflict: cannot publish to UnifiedPush topic without active subscriber", ""}
+	

@@ -1028,10 +1028,23 @@ func TestServer_PublishTooRequests_Defaults(t *testing.T) {
 
 func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
 	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 3
 	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
-	for i := 0; i < 65; i++ { // > 60
+	for i := 0; i < 5; i++ { // > 3
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
+		require.Equal(t, 200, response.Code)
+	}
+}
+
+func TestServer_PublishTooRequests_Defaults_ExemptHosts_MessageDailyLimit(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 10
+	c.VisitorMessageDailyLimit = 4
+	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+	s := newTestServer(t, c)
+	for i := 0; i < 8; i++ { // 4
+		response := request(t, s, "PUT", "/mytopic", "message", nil)
 		require.Equal(t, 200, response.Code)
 	}
 }
@@ -1127,7 +1140,8 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	require.Nil(t, err)
 
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic?up=1", string(b), nil)
+
+	response := request(t, s, "PUT", "/up123456789012?up=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
@@ -1136,7 +1150,7 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, b, b2)
 
-	response = request(t, s, "GET", "/mytopic/json?poll=1", string(b), nil)
+	response = request(t, s, "GET", "/up123456789012/json?poll=1", string(b), nil)
 	require.Equal(t, 200, response.Code)
 	m = toMessage(t, response.Body.String())
 	require.Equal(t, "base64", m.Encoding)
@@ -1164,6 +1178,7 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 
 func TestServer_PublishUnifiedPushText(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
+
 	response := request(t, s, "PUT", "/mytopic?up=1", "this is a unifiedpush text message", nil)
 	require.Equal(t, 200, response.Code)
 
@@ -1281,7 +1296,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.True(t, m.Time < time.Now().Unix()+31*60)
 }
 
-func TestServer_PublishAsJSON_RateLimit(t *testing.T) {
+func TestServer_PublishAsJSON_RateLimit_MessageDailyLimit(t *testing.T) {
 	// Publishing as JSON follows a different path. This ensures that rate
 	// limiting works for this endpoint as well
 	c := newTestConfig(t)
@@ -1926,7 +1941,7 @@ func TestServer_AnonymousUser_And_NonTierUser_Are_Same_Visitor(t *testing.T) {
 	require.Equal(t, int64(2), account.Stats.Messages)
 }
 
-func TestServer_SubscriberRateLimiting(t *testing.T) {
+func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.VisitorRequestLimitBurst = 3
 	s := newTestServer(t, c)
@@ -1941,11 +1956,11 @@ func TestServer_SubscriberRateLimiting(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
 
-	// "Register" visitor 8.7.7.1 to topic "upSUB2topic" as a rate limit visitor (implicitly via topic name)
+	// "Register" visitor 8.7.7.1 to topic "up012345678912" as a rate limit visitor (implicitly via topic name)
 	subscriber2Fn := func(r *http.Request) {
 		r.RemoteAddr = "8.7.7.1"
 	}
-	rr = request(t, s, "GET", "/upSUB2topic/json?poll=1", "", nil, subscriber2Fn)
+	rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, subscriber2Fn)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
 
@@ -1958,12 +1973,12 @@ func TestServer_SubscriberRateLimiting(t *testing.T) {
 	rr = request(t, s, "PUT", "/subscriber1topic", "some message", nil)
 	require.Equal(t, 429, rr.Code)
 
-	// Publish another 2 messages to "upSUB2topic" as visitor 9.9.9.9
+	// Publish another 2 messages to "up012345678912" as visitor 9.9.9.9
 	for i := 0; i < 2; i++ {
-		rr := request(t, s, "PUT", "/upSUB2topic", "some message", nil)
+		rr := request(t, s, "PUT", "/up012345678912", "some message", nil)
 		require.Equal(t, 200, rr.Code) // If we fail here, handlePublish is using the wrong visitor!
 	}
-	rr = request(t, s, "PUT", "/upSUB2topic", "some message", nil)
+	rr = request(t, s, "PUT", "/up012345678912", "some message", nil)
 	require.Equal(t, 429, rr.Code)
 
 	// Hurray! At this point, visitor 9.9.9.9 has published 4 messages, even though
@@ -1989,14 +2004,14 @@ func TestServer_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		subscriberFn := func(r *http.Request) {
 			r.RemoteAddr = fmt.Sprintf("1.2.3.%d", i+1)
 		}
-		rr := request(t, s, "GET", fmt.Sprintf("/upsomething%d/json?poll=1", i), "", nil, subscriberFn)
+		rr := request(t, s, "GET", fmt.Sprintf("/up12345678901%d/json?poll=1", i), "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
 	}
 
 	// Publish 2 messages per topic
 	for i := 0; i < 5; i++ {
 		for j := 0; j < 2; j++ {
-			rr := request(t, s, "PUT", fmt.Sprintf("/upsomething%d?up=1", i), "some message", nil)
+			rr := request(t, s, "PUT", fmt.Sprintf("/up12345678901%d?up=1", i), "some message", nil)
 			require.Equal(t, 200, rr.Code)
 		}
 	}
@@ -2009,16 +2024,15 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 
 	// "Register" 5 different UnifiedPush visitors
 	for i := 0; i < 5; i++ {
-		subscriberFn := func(r *http.Request) {
+		rr := request(t, s, "GET", fmt.Sprintf("/up12345678901%d/json?poll=1", i), "", nil, func(r *http.Request) {
 			r.RemoteAddr = fmt.Sprintf("1.2.3.%d", i+1)
-		}
-		rr := request(t, s, "GET", fmt.Sprintf("/upsomething%d/json?poll=1", i), "", nil, subscriberFn)
+		})
 		require.Equal(t, 200, rr.Code)
 	}
 
 	// Publish 2 messages per topic
 	for i := 0; i < 5; i++ {
-		notification := fmt.Sprintf(`{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/upsomething%d?up=1"}]}}`, i)
+		notification := fmt.Sprintf(`{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/up12345678901%d?up=1"}]}}`, i)
 		for j := 0; j < 2; j++ {
 			response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 			require.Equal(t, 200, response.Code)
@@ -2026,7 +2040,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 		}
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 429, response.Code, notification)
-		require.Equal(t, fmt.Sprintf(`{"rejected":["http://127.0.0.1:12345/upsomething%d?up=1"]}`+"\n", i), response.Body.String())
+		require.Equal(t, fmt.Sprintf(`{"rejected":["http://127.0.0.1:12345/up12345678901%d?up=1"]}`+"\n", i), response.Body.String())
 	}
 }
 
@@ -2121,13 +2135,13 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
 
 	// Set rate visitor as ip:1.2.3.4 on topic
-	// - "up1234": Allowed, because no ACLs and nobody owns the topic
+	// - "up123456789012": Allowed, because no ACLs and nobody owns the topic
 	// - "announcements": NOT allowed, because it has read-only permissions for everyone
-	rr := request(t, s, "GET", "/up1234,announcements/json?poll=1", "", nil, func(r *http.Request) {
+	rr := request(t, s, "GET", "/up123456789012,announcements/json?poll=1", "", nil, func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4"
 	})
 	require.Equal(t, 200, rr.Code)
-	require.Equal(t, "1.2.3.4", s.topics["up1234"].rateVisitor.ip.String())
+	require.Equal(t, "1.2.3.4", s.topics["up123456789012"].rateVisitor.ip.String())
 	require.Nil(t, s.topics["announcements"].rateVisitor)
 }
 

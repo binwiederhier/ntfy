@@ -30,6 +30,10 @@ const (
 	tagMatrix       = "matrix"
 )
 
+var (
+	normalErrorCodes = []int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized, http.StatusInsufficientStorage}
+)
+
 // logr creates a new log event with HTTP request fields
 func logr(r *http.Request) *log.Event {
 	return log.Tag(tagHTTP).Fields(httpContext(r)) // Tag may be overwritten

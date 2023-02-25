@@ -319,19 +319,21 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	if !ok {
 		httpErr = errHTTPInternalError
 	}
-	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains([]int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized}, httpErr.HTTPCode)
+	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
+	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
+		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
 		if isNormalError {
-			logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
+			ev.Debug("WebSocket error (this error is okay, it happens a lot): %s", err.Error())
 		} else {
-			logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Info("WebSocket error: %s", err.Error())
+			ev.Info("WebSocket error: %s", err.Error())
 		}
 		return // Do not attempt to write to upgraded connection
 	}
 	if isNormalError {
-		logvr(v, r).Err(err).Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	} else {
-		logvr(v, r).Err(err).Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+		ev.Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests

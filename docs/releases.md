@@ -6,6 +6,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 This release changes the way UnifiedPush (UP) topics are rate limited from publisher-based rate limiting to subscriber-based
 rate limiting. This allows UP application servers to send higher volumes, since the subscribers carry the rate limits.
+However, it also means that UP clients have to subscribe to a topic first before they are allowed to publish. If they do
+no, clients will receive an HTTP 507 response from the server.
 
 We also fixed another issue with UnifiedPush: Some Mastodon servers were sending unsupported `Authorization` headers, 
 which ntfy rejected with an HTTP 401. We now ignore unsupported header values. 

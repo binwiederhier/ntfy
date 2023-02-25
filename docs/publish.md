@@ -1292,7 +1292,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 The required/optional fields for each action depend on the type of the action itself. Please refer to 
-[`view` action](#open-websiteapp), [`broadcasst` action](#send-android-broadcast), and [`http` action](#send-http-request) 
+[`view` action](#open-websiteapp), [`broadcast` action](#send-android-broadcast), and [`http` action](#send-http-request) 
 for details.
 
 ### Open website/app

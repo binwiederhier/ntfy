@@ -35,17 +35,7 @@ func (s *Server) execManager() {
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
 				subs := t.SubscribersCount()
-				ev := log.Tag(tagManager)
-				if ev.IsTrace() {
-					vrate := t.RateVisitor()
-					if vrate != nil {
-						ev.Fields(log.Context{
-							"rate_visitor_ip":      vrate.IP(),
-							"rate_visitor_user_id": vrate.MaybeUserID(),
-						})
-					}
-					ev.With(t).Trace("- topic %s: %d subscribers", t.ID, subs)
-				}
+				log.Tag(tagManager).With(t).Trace("- topic %s: %d subscribers", t.ID, subs)
 				msgs, exists := messageCounts[t.ID]
 				if t.Stale() && (!exists || msgs == 0) {
 					log.Tag(tagManager).With(t).Trace("Deleting empty topic %s", t.ID)

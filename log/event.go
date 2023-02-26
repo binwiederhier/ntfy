@@ -119,12 +119,12 @@ func (e *Event) Fields(fields Context) *Event {
 	return e
 }
 
-// With adds the fields of the given Contexter structs to the log event by calling their With method
-func (e *Event) With(contexts ...Contexter) *Event {
+// With adds the fields of the given Contexter structs to the log event by calling their Context method
+func (e *Event) With(contexters ...Contexter) *Event {
 	if e.contexters == nil {
-		e.contexters = contexts
+		e.contexters = contexters
 	} else {
-		e.contexters = append(e.contexters, contexts...)
+		e.contexters = append(e.contexters, contexters...)
 	}
 	return e
 }

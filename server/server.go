@@ -573,9 +573,9 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, err := s.parsePublishParams(r, m)
-	if err != nil {
-		return nil, err
+	cache, firebase, email, unifiedpush, e := s.parsePublishParams(r, m)
+	if e != nil {
+		return nil, e.With(t)
 	}
 	if unifiedpush && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
@@ -607,12 +607,10 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		Tag(tagPublish).
 		With(t).
 		Fields(log.Context{
-			"message_delayed":      delayed,
-			"message_firebase":     firebase,
-			"message_unifiedpush":  unifiedpush,
-			"message_email":        email,
-			"rate_visitor_ip":      vrate.IP().String(),
-			"rate_visitor_user_id": vrate.MaybeUserID(),
+			"message_delayed":     delayed,
+			"message_firebase":    firebase,
+			"message_unifiedpush": unifiedpush,
+			"message_email":       email,
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
@@ -709,7 +707,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err error) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
@@ -755,8 +753,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if messageStr != "" {
 		m.Message = messageStr
 	}
-	m.Priority, err = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
-	if err != nil {
+	var e error
+	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
+	if e != nil {
 		return false, false, "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
@@ -780,9 +779,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	actionsStr := readParam(r, "x-actions", "actions", "action")
 	if actionsStr != "" {
-		m.Actions, err = parseActions(actionsStr)
-		if err != nil {
-			return false, false, "", false, errHTTPBadRequestActionsInvalid.Wrap(err.Error())
+		m.Actions, e = parseActions(actionsStr)
+		if e != nil {
+			return false, false, "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!

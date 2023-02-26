@@ -2,7 +2,8 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.1.0 (UNRELEASED)
+## ntfy server v2.1.0
+Released February 25, 2023
 
 This release changes the way UnifiedPush (UP) topics are rate limited from publisher-based rate limiting to subscriber-based
 rate limiting. This allows UP application servers to send higher volumes, since the subscribers carry the rate limits.
@@ -13,11 +14,11 @@ We also fixed another issue with UnifiedPush: Some Mastodon servers were sending
 which ntfy rejected with an HTTP 401. We now ignore unsupported header values. 
 
 As of this release, ntfy also supports sending emails to protected topics, and it ships code to support annual billing
-cycles (not live yet). 
+cycles (not live yet).
 
 **Features:**
 
-* UnifiedPush: Subscriber-based rate limiting for `up*` topics ([#584](https://github.com/binwiederhier/ntfy/pull/584)/[#609](https://github.com/binwiederhier/ntfy/pull/609)/[#633](https://github.com/binwiederhier/ntfy/pull/633), thanks to [@karmanyaahm](https://github.com/karmanyaahm)))
+* UnifiedPush: Subscriber-based rate limiting for `up*` topics ([#584](https://github.com/binwiederhier/ntfy/pull/584)/[#609](https://github.com/binwiederhier/ntfy/pull/609)/[#633](https://github.com/binwiederhier/ntfy/pull/633), thanks to [@karmanyaahm](https://github.com/karmanyaahm))
 * Support for publishing to protected topics via email with access tokens ([#612](https://github.com/binwiederhier/ntfy/pull/621), thanks to [@tamcore](https://github.com/tamcore))
 * Support for base64-encoded and nested multipart emails ([#610](https://github.com/binwiederhier/ntfy/issues/610), thanks to [@Robert-litts](https://github.com/Robert-litts))
 * Payments: Add support for annual billing intervals (no ticket)

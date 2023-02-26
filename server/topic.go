@@ -133,8 +133,9 @@ func (t *topic) Context() log.Context {
 		"topic_subscribers": len(t.subscribers),
 	}
 	if t.rateVisitor != nil {
-		fields["topic_rate_visitor_ip"] = t.rateVisitor.IP().String()
-		fields["topic_rate_visitor_user_id"] = t.rateVisitor.MaybeUserID()
+		for k, v := range t.rateVisitor.Context() {
+			fields["topic_rate_"+k] = v
+		}
 	}
 	return fields
 }

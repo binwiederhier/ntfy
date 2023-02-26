@@ -102,6 +102,13 @@ type Contexter interface {
 // Context represents an object's state in the form of key-value pairs
 type Context map[string]any
 
+// Merge merges other into this context
+func (c Context) Merge(other Context) {
+	for k, v := range other {
+		c[k] = v
+	}
+}
+
 type levelOverride struct {
 	value string
 	level Level

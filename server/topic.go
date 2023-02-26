@@ -115,14 +115,28 @@ func (t *topic) CancelSubscribers(exceptUserID string) {
 		if s.userID != exceptUserID {
 			log.
 				Tag(tagSubscribe).
+				With(t).
 				Fields(log.Context{
-					"message_topic": t.ID,
-					"user_id":       s.userID,
+					"user_id": s.userID,
 				}).
 				Debug("Canceling subscriber %s", s.userID)
 			s.cancel()
 		}
 	}
+}
+
+func (t *topic) Context() log.Context {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	fields := map[string]any{
+		"topic":             t.ID,
+		"topic_subscribers": len(t.subscribers),
+	}
+	if t.rateVisitor != nil {
+		fields["topic_rate_visitor_ip"] = t.rateVisitor.IP().String()
+		fields["topic_rate_visitor_user_id"] = t.rateVisitor.MaybeUserID()
+	}
+	return fields
 }
 
 // subscribersCopy returns a shallow copy of the subscribers map

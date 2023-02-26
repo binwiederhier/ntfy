@@ -188,13 +188,13 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	} else if sess.Customer == nil || sess.Subscription == nil || sess.ClientReferenceID == "" {
-		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "customer or subscription not found")
+		return errHTTPBadRequestBillingRequestInvalid.Wrap("customer or subscription not found")
 	}
 	sub, err := s.stripe.GetSubscription(sess.Subscription.ID)
 	if err != nil {
 		return err
 	} else if sub.Items == nil || len(sub.Items.Data) != 1 || sub.Items.Data[0].Price == nil || sub.Items.Data[0].Price.Recurring == nil {
-		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "more than one line item in existing subscription")
+		return errHTTPBadRequestBillingRequestInvalid.Wrap("more than one line item in existing subscription")
 	}
 	priceID, interval := sub.Items.Data[0].Price.ID, sub.Items.Data[0].Price.Recurring.Interval
 	tier, err := s.userManager.TierByStripePrice(priceID)
@@ -273,7 +273,7 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 	if err != nil {
 		return err
 	} else if sub.Items == nil || len(sub.Items.Data) != 1 {
-		return wrapErrHTTP(errHTTPBadRequestBillingRequestInvalid, "no items, or more than one item")
+		return errHTTPBadRequestBillingRequestInvalid.Wrap("no items, or more than one item")
 	}
 	params := &stripe.SubscriptionParams{
 		CancelAtPeriodEnd: stripe.Bool(false),

@@ -45,10 +45,10 @@ type message struct {
 
 func (m *message) Context() log.Context {
 	fields := map[string]any{
+		"topic":             m.Topic,
 		"message_id":        m.ID,
 		"message_time":      m.Time,
 		"message_event":     m.Event,
-		"message_topic":     m.Topic,
 		"message_body_size": len(m.Message),
 	}
 	if m.Sender.IsValid() {

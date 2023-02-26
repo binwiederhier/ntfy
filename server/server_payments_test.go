@@ -415,6 +415,8 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 }
 
 func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(t *testing.T) {
+	t.Parallel()
+
 	// This tests incoming webhooks from Stripe to update a subscription:
 	// - All Stripe columns are updated in the user table
 	// - When downgrading, excess reservations are deleted, including messages and attachments in

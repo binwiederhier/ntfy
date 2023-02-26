@@ -582,11 +582,11 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
-		return nil, errHTTPInsufficientStorage
+		return nil, errHTTPInsufficientStorage.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
-		return nil, errHTTPTooManyRequestsLimitMessages
+		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
-		return nil, errHTTPTooManyRequestsLimitEmails
+		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
@@ -605,6 +605,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	delayed := m.Time > time.Now().Unix()
 	ev := logvrm(v, r, m).
 		Tag(tagPublish).
+		With(t).
 		Fields(log.Context{
 			"message_delayed":      delayed,
 			"message_firebase":     firebase,
@@ -781,7 +782,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, err = parseActions(actionsStr)
 		if err != nil {
-			return false, false, "", false, wrapErrHTTP(errHTTPBadRequestActionsInvalid, err.Error())
+			return false, false, "", false, errHTTPBadRequestActionsInvalid.Wrap(err.Error())
 		}
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -845,7 +846,7 @@ func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedRead
 
 func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser) error {
 	if !utf8.Valid(body.PeekedBytes) {
-		return errHTTPBadRequestMessageNotUTF8
+		return errHTTPBadRequestMessageNotUTF8.With(m)
 	}
 	if len(body.PeekedBytes) > 0 { // Empty body should not override message (publish via GET!)
 		m.Message = strings.TrimSpace(string(body.PeekedBytes)) // Truncates the message to the peek limit if required
@@ -858,7 +859,7 @@ func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser
 
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser) error {
 	if s.fileCache == nil || s.config.BaseURL == "" || s.config.AttachmentCacheDir == "" {
-		return errHTTPBadRequestAttachmentsDisallowed
+		return errHTTPBadRequestAttachmentsDisallowed.With(m)
 	}
 	vinfo, err := v.Info()
 	if err != nil {
@@ -895,7 +896,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
 	if err == util.ErrLimitReached {
-		return errHTTPEntityTooLargeAttachment
+		return errHTTPEntityTooLargeAttachment.With(m)
 	} else if err != nil {
 		return err
 	}
@@ -1212,7 +1213,7 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
-			Field("message_topic", t.ID).
+			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
 		t.SetRateVisitor(v)
 	}
@@ -1558,8 +1559,8 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 		u := v.User()
 		for _, t := range topics {
 			if err := s.userManager.Authorize(u, t.ID, perm); err != nil {
-				logvr(v, r).Err(err).Field("message_topic", t.ID).Debug("Access to topic %s not authorized", t.ID)
-				return errHTTPForbidden
+				logvr(v, r).With(t).Err(err).Debug("Access to topic %s not authorized", t.ID)
+				return errHTTPForbidden.With(t)
 			}
 		}
 		return next(w, r, v)

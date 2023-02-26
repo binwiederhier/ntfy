@@ -290,6 +290,7 @@ func TestAccount_ChangePassword_NoAccount(t *testing.T) {
 }
 
 func TestAccount_ExtendToken(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
@@ -611,6 +612,7 @@ func TestAccount_Reservation_PublishByAnonymousFails(t *testing.T) {
 }
 
 func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
+	t.Parallel()
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
 	s := newTestServer(t, conf)
@@ -685,6 +687,7 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 }
 
 func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
+	t.Parallel()
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
 	conf.EnableSignup = true
@@ -766,6 +769,7 @@ func TestAccount_Reservation_Add_Kills_Other_Subscribers(t *testing.T) {
 }
 
 func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
+	t.Parallel()
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
 	conf.AuthStatsQueueWriterInterval = 200 * time.Millisecond

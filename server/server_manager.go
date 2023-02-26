@@ -44,16 +44,11 @@ func (s *Server) execManager() {
 							"rate_visitor_user_id": vrate.MaybeUserID(),
 						})
 					}
-					ev.
-						Fields(log.Context{
-							"message_topic":             t.ID,
-							"message_topic_subscribers": subs,
-						}).
-						Trace("- topic %s: %d subscribers", t.ID, subs)
+					ev.With(t).Trace("- topic %s: %d subscribers", t.ID, subs)
 				}
 				msgs, exists := messageCounts[t.ID]
 				if t.Stale() && (!exists || msgs == 0) {
-					log.Tag(tagManager).Field("message_topic", t.ID).Trace("Deleting empty topic %s", t.ID)
+					log.Tag(tagManager).With(t).Trace("Deleting empty topic %s", t.ID)
 					emptyTopics++
 					delete(s.topics, t.ID)
 					continue

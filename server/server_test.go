@@ -84,6 +84,7 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 }
 
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
+	t.Parallel()
 	c := newTestConfig(t)
 	c.KeepaliveInterval = time.Second
 	s := newTestServer(t, c)
@@ -122,6 +123,7 @@ func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 }
 
 func TestServer_PublishAndSubscribe(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
 
 	subscribeRR := httptest.NewRecorder()
@@ -297,6 +299,7 @@ func TestServer_PublishNoCache(t *testing.T) {
 }
 
 func TestServer_PublishAt(t *testing.T) {
+	t.Parallel()
 	c := newTestConfig(t)
 	c.MinDelay = time.Second
 	c.DelayedSenderInterval = 100 * time.Millisecond
@@ -452,6 +455,7 @@ func TestServer_PublishWithNopCache(t *testing.T) {
 }
 
 func TestServer_PublishAndPollSince(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
 
 	request(t, s, "PUT", "/mytopic", "test 1", nil)
@@ -632,6 +636,7 @@ func TestServer_PollWithQueryFilters(t *testing.T) {
 }
 
 func TestServer_SubscribeWithQueryFilters(t *testing.T) {
+	t.Parallel()
 	c := newTestConfig(t)
 	c.KeepaliveInterval = 800 * time.Millisecond
 	s := newTestServer(t, c)
@@ -816,6 +821,7 @@ func TestServer_Auth_NonBasicHeader(t *testing.T) {
 }
 
 func TestServer_StatsResetter(t *testing.T) {
+	t.Parallel()
 	// This tests the stats resetter for
 	// - an anonymous user
 	// - a user without a tier (treated like the same as the anonymous user)
@@ -956,6 +962,8 @@ func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
 }
 
 func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
+	t.Parallel()
+
 	// This tests that the daily message quota is prefilled originally from the database,
 	// if the visitor is unknown
 
@@ -1050,6 +1058,7 @@ func TestServer_PublishTooRequests_Defaults_ExemptHosts_MessageDailyLimit(t *tes
 }
 
 func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
+	t.Parallel()
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 60
 	c.VisitorRequestLimitReplenish = time.Second
@@ -1082,6 +1091,7 @@ func TestServer_PublishTooManyEmails_Defaults(t *testing.T) {
 }
 
 func TestServer_PublishTooManyEmails_Replenish(t *testing.T) {
+	t.Parallel()
 	c := newTestConfig(t)
 	c.VisitorEmailLimitReplenish = 500 * time.Millisecond
 	s := newTestServer(t, c)
@@ -1349,6 +1359,7 @@ func TestServer_PublishAsJSON_RateLimit_MessageDailyLimit(t *testing.T) {
 }
 
 func TestServer_PublishAsJSON_WithEmail(t *testing.T) {
+	t.Parallel()
 	mailer := &testMailer{}
 	s := newTestServer(t, newTestConfig(t))
 	s.smtpSender = mailer
@@ -1604,6 +1615,7 @@ func TestServer_PublishAttachmentTooLargeBodyVisitorAttachmentTotalSizeLimit(t *
 }
 
 func TestServer_PublishAttachmentAndExpire(t *testing.T) {
+	t.Parallel()
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfig(t)
@@ -1631,6 +1643,7 @@ func TestServer_PublishAttachmentAndExpire(t *testing.T) {
 }
 
 func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
+	t.Parallel()
 	content := util.RandomString(5000) // > 4096
 
 	c := newTestConfigWithAuthFile(t)
@@ -1898,6 +1911,7 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 }
 
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
+	t.Parallel()
 	count := 50000
 	c := newTestConfig(t)
 	c.TotalTopicLimit = 50001

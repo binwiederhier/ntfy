@@ -86,6 +86,7 @@ func TestCLI_Publish_All_The_Things(t *testing.T) {
 }
 
 func TestCLI_Publish_Wait_PID_And_Cmd(t *testing.T) {
+	t.Parallel()
 	s, port := test.StartServer(t)
 	defer test.StopServer(t, s, port)
 	topic := fmt.Sprintf("http://127.0.0.1:%d/mytopic", port)

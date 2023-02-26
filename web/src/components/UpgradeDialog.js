@@ -56,7 +56,7 @@ const UpgradeDialog = (props) => {
         submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
         submitAction = Action.REDIRECT_SIGNUP;
         banner = null;
-    } else if (currentTierCode === newTierCode && currentInterval === interval) {
+    } else if (currentTierCode === newTierCode && (currentInterval === undefined || currentInterval === interval)) {
         submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
         submitAction = null;
         banner = (currentTierCode) ? Banner.PRORATION_INFO : null;

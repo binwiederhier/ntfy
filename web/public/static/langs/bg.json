@@ -217,5 +217,16 @@
     "action_bar_reservation_edit": "Промяна на резервацията",
     "action_bar_sign_up": "Регистриране",
     "account_basics_title": "Профил",
-    "alert_not_supported_context_description": "Известията се поддържат само през HTTPS. Това е ограничение на <mdnLink>Notifications API</mdnLink>."
+    "alert_not_supported_context_description": "Известията се поддържат само през HTTPS. Това е ограничение на <mdnLink>Notifications API</mdnLink>.",
+    "display_name_dialog_description": "Изберете друго име за темата, което да се показва в списъка с абонаменти. Помага за по-лесното разпознаване на теми със сложни имена.",
+    "subscribe_dialog_error_topic_already_reserved": "Темата вече е резервирана",
+    "nav_upgrade_banner_description": "Резервиране на теми, повече съобщения и имейли и по-големи прикачени файлове",
+    "display_name_dialog_placeholder": "Наименование",
+    "reserve_dialog_checkbox_label": "Резервиране на тема и настройки за достъп",
+    "subscribe_dialog_subscribe_button_generate_topic_name": "Произволно име",
+    "account_basics_username_title": "Потребител",
+    "account_basics_username_description": "Хей, това сте вие ❤",
+    "account_basics_username_admin_tooltip": "Вие сте администратор",
+    "account_basics_password_title": "Парола",
+    "account_delete_dialog_label": "Парола"
 }

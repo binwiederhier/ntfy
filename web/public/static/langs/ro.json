@@ -7,5 +7,7 @@
     "action_bar_logo_alt": "logo-ul ntfy",
     "action_bar_toggle_mute": "Oprire/activare notificări",
     "message_bar_type_message": "Scrie un mesaj aici",
-    "message_bar_error_publishing": "Eroare la publicarea notificării"
+    "message_bar_error_publishing": "Eroare la publicarea notificării",
+    "action_bar_profile_title": "Profil",
+    "action_bar_profile_settings": "Setări"
 }

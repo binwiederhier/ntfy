@@ -82,7 +82,7 @@
     "publish_dialog_attach_placeholder": "Datei von URL anhängen, z.B. https://f-droid.org/F-Droid.apk",
     "publish_dialog_filename_placeholder": "Dateiname des Anhangs",
     "publish_dialog_delay_label": "Verzögerung",
-    "publish_dialog_email_placeholder": "E-Mail-Adresse, an die die Benachrichtigung gesendet werden soll, z.B. phil@example.com",
+    "publish_dialog_email_placeholder": "E-Mail-Adresse, an die die Benachrichtigung gesendet werden soll, z. B. phil@example.com",
     "publish_dialog_chip_click_label": "Klick-URL",
     "publish_dialog_button_cancel_sending": "Senden abbrechen",
     "publish_dialog_drop_file_here": "Datei hierher ziehen",

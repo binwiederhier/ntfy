@@ -177,6 +177,27 @@ func TestLog_LevelOverrideAny(t *testing.T) {
 	require.Equal(t, "", File())
 }
 
+func TestLog_LevelOverride_ManyOnSameField(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+	SetFormat(JSONFormat)
+	SetLevelOverride("tag", "manager", DebugLevel)
+	SetLevelOverride("tag", "publish", DebugLevel)
+
+	Time(time.Unix(11, 0).UTC()).Field("tag", "manager").Debug("this is logged")
+	Time(time.Unix(12, 0).UTC()).Field("tag", "no-match").Debug("this is not logged")
+	Time(time.Unix(13, 0).UTC()).Field("tag", "publish").Info("this is also logged")
+
+	expected := `{"time":"1970-01-01T00:00:11Z","level":"DEBUG","message":"this is logged","tag":"manager"}
+{"time":"1970-01-01T00:00:13Z","level":"INFO","message":"this is also logged","tag":"publish"}
+`
+	require.Equal(t, expected, out.String())
+	require.False(t, IsFile())
+	require.Equal(t, "", File())
+}
+
 func TestLog_UsingStdLogger_JSON(t *testing.T) {
 	t.Cleanup(resetState)
 

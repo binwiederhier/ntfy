@@ -6,8 +6,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* Upgrade dialog: Disable submit button for free tier (no ticket)
 * Remove health check from `Dockerfile` and [document it](config.md#health-checks) ([#635](https://github.com/binwiederhier/ntfy/issues/635), thanks to [@Andersbiha](https://github.com/Andersbiha)) 
+* Upgrade dialog: Disable submit button for free tier (no ticket)
+* Allow multiple `log-level-overrides` on the same field (no ticket)
 
 ## ntfy server v2.1.0
 Released February 25, 2023

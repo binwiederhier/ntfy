@@ -19,7 +19,7 @@ var (
 var (
 	level               = DefaultLevel
 	format              = DefaultFormat
-	overrides           = make(map[string]*levelOverride)
+	overrides           = make(map[string][]*levelOverride)
 	output    io.Writer = DefaultOutput
 	filename            = ""
 	mu                  = &sync.RWMutex{}
@@ -111,14 +111,17 @@ func SetLevel(newLevel Level) {
 func SetLevelOverride(field string, value string, level Level) {
 	mu.Lock()
 	defer mu.Unlock()
-	overrides[field] = &levelOverride{value: value, level: level}
+	if _, ok := overrides[field]; !ok {
+		overrides[field] = make([]*levelOverride, 0)
+	}
+	overrides[field] = append(overrides[field], &levelOverride{value: value, level: level})
 }
 
 // ResetLevelOverrides removes all log level overrides
 func ResetLevelOverrides() {
 	mu.Lock()
 	defer mu.Unlock()
-	overrides = make(map[string]*levelOverride)
+	overrides = make(map[string][]*levelOverride)
 }
 
 // CurrentFormat returns the current log format

@@ -772,7 +772,7 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	t.Parallel()
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
-	conf.AuthStatsQueueWriterInterval = 200 * time.Millisecond
+	conf.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 	s := newTestServer(t, conf)
 	defer s.closeDatabases()
 
@@ -795,7 +795,7 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Wait for stats queue writer
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Verify that message stats were persisted
 	u, err := s.userManager.User("phil")
@@ -818,7 +818,7 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Verify that message stats were persisted
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	u, err = s.userManager.User("phil")
 	require.Nil(t, err)
 	require.Equal(t, int64(2), u.Stats.Messages) // v.EnqueueUserStats had run!

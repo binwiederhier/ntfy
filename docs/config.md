@@ -1068,14 +1068,14 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     ```
 
 ## Health checks
-A preliminary health check API endpoint is exposed at `"/v1/health"`. The endpoint returns a `json` response in the format shown below.
+A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
 If a non-200 HTTP status code is returned or if the returned `health` field is `false` the ntfy service should be considered as unhealthy.
 
 ```json
 {"health":true}
 ```
 
-See [Installalation/Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
+See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
 
 ## Logging & debugging
 By default, ntfy logs to the console (stderr), with an `info` log level, and in a human-readable text format.

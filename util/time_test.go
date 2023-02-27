@@ -78,3 +78,17 @@ func TestParseFutureTime_UnixTime(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, time.Date(2021, 12, 11, 0, 51, 51, 0, time.UTC), d)
 }
+
+func TestParseDuration(t *testing.T) {
+	d, err := ParseDuration("2d")
+	require.Nil(t, err)
+	require.Equal(t, 48*time.Hour, d)
+
+	d, err = ParseDuration("2h")
+	require.Nil(t, err)
+	require.Equal(t, 2*time.Hour, d)
+
+	d, err = ParseDuration("0")
+	require.Nil(t, err)
+	require.Equal(t, time.Duration(0), d)
+}

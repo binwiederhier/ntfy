@@ -29,11 +29,11 @@ func TestCLI_Tier_AddListChangeDelete(t *testing.T) {
 	app, _, _, stderr = newTestApp()
 	require.Nil(t, runTierCommand(app, conf, "change",
 		"--message-limit=999",
-		"--message-expiry-duration=99h",
+		"--message-expiry-duration=2d",
 		"--email-limit=91",
 		"--reservation-limit=98",
 		"--attachment-file-size-limit=100m",
-		"--attachment-expiry-duration=7h",
+		"--attachment-expiry-duration=1d",
 		"--attachment-total-size-limit=10G",
 		"--attachment-bandwidth-limit=100G",
 		"--stripe-monthly-price-id=price_991",
@@ -41,11 +41,11 @@ func TestCLI_Tier_AddListChangeDelete(t *testing.T) {
 		"pro",
 	))
 	require.Contains(t, stderr.String(), "- Message limit: 999")
-	require.Contains(t, stderr.String(), "- Message expiry duration: 99h")
+	require.Contains(t, stderr.String(), "- Message expiry duration: 48h")
 	require.Contains(t, stderr.String(), "- Email limit: 91")
 	require.Contains(t, stderr.String(), "- Reservation limit: 98")
 	require.Contains(t, stderr.String(), "- Attachment file size limit: 100.0 MB")
-	require.Contains(t, stderr.String(), "- Attachment expiry duration: 7h")
+	require.Contains(t, stderr.String(), "- Attachment expiry duration: 24h")
 	require.Contains(t, stderr.String(), "- Attachment total size limit: 10.0 GB")
 	require.Contains(t, stderr.String(), "- Stripe prices (monthly/yearly): price_991 / price_992")
 

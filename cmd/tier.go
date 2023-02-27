@@ -8,7 +8,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
-	"time"
 )
 
 func init() {
@@ -17,12 +16,12 @@ func init() {
 
 const (
 	defaultMessageLimit             = 5000
-	defaultMessageExpiryDuration    = 12 * time.Hour
+	defaultMessageExpiryDuration    = "12h"
 	defaultEmailLimit               = 20
 	defaultReservationLimit         = 3
 	defaultAttachmentFileSizeLimit  = "15M"
 	defaultAttachmentTotalSizeLimit = "100M"
-	defaultAttachmentExpiryDuration = 6 * time.Hour
+	defaultAttachmentExpiryDuration = "6h"
 	defaultAttachmentBandwidthLimit = "1G"
 )
 
@@ -47,12 +46,12 @@ var cmdTier = &cli.Command{
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "name", Usage: "tier name"},
 				&cli.Int64Flag{Name: "message-limit", Value: defaultMessageLimit, Usage: "daily message limit"},
-				&cli.DurationFlag{Name: "message-expiry-duration", Value: defaultMessageExpiryDuration, Usage: "duration after which messages are deleted"},
+				&cli.StringFlag{Name: "message-expiry-duration", Value: defaultMessageExpiryDuration, Usage: "duration after which messages are deleted"},
 				&cli.Int64Flag{Name: "email-limit", Value: defaultEmailLimit, Usage: "daily email limit"},
 				&cli.Int64Flag{Name: "reservation-limit", Value: defaultReservationLimit, Usage: "topic reservation limit"},
 				&cli.StringFlag{Name: "attachment-file-size-limit", Value: defaultAttachmentFileSizeLimit, Usage: "per-attachment file size limit"},
 				&cli.StringFlag{Name: "attachment-total-size-limit", Value: defaultAttachmentTotalSizeLimit, Usage: "total size limit of attachments for the user"},
-				&cli.DurationFlag{Name: "attachment-expiry-duration", Value: defaultAttachmentExpiryDuration, Usage: "duration after which attachments are deleted"},
+				&cli.StringFlag{Name: "attachment-expiry-duration", Value: defaultAttachmentExpiryDuration, Usage: "duration after which attachments are deleted"},
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Value: defaultAttachmentBandwidthLimit, Usage: "daily bandwidth limit for attachment uploads/downloads"},
 				&cli.StringFlag{Name: "stripe-monthly-price-id", Usage: "Monthly Stripe price ID for paid tiers (e.g. price_12345)"},
 				&cli.StringFlag{Name: "stripe-yearly-price-id", Usage: "Yearly Stripe price ID for paid tiers (e.g. price_12345)"},
@@ -90,12 +89,12 @@ Examples:
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "name", Usage: "tier name"},
 				&cli.Int64Flag{Name: "message-limit", Usage: "daily message limit"},
-				&cli.DurationFlag{Name: "message-expiry-duration", Usage: "duration after which messages are deleted"},
+				&cli.StringFlag{Name: "message-expiry-duration", Usage: "duration after which messages are deleted"},
 				&cli.Int64Flag{Name: "email-limit", Usage: "daily email limit"},
 				&cli.Int64Flag{Name: "reservation-limit", Usage: "topic reservation limit"},
 				&cli.StringFlag{Name: "attachment-file-size-limit", Usage: "per-attachment file size limit"},
 				&cli.StringFlag{Name: "attachment-total-size-limit", Usage: "total size limit of attachments for the user"},
-				&cli.DurationFlag{Name: "attachment-expiry-duration", Usage: "duration after which attachments are deleted"},
+				&cli.StringFlag{Name: "attachment-expiry-duration", Usage: "duration after which attachments are deleted"},
 				&cli.StringFlag{Name: "attachment-bandwidth-limit", Usage: "daily bandwidth limit for attachment uploads/downloads"},
 				&cli.StringFlag{Name: "stripe-monthly-price-id", Usage: "Monthly Stripe price ID for paid tiers (e.g. price_12345)"},
 				&cli.StringFlag{Name: "stripe-yearly-price-id", Usage: "Yearly Stripe price ID for paid tiers (e.g. price_12345)"},
@@ -189,6 +188,10 @@ func execTierAdd(c *cli.Context) error {
 	if name == "" {
 		name = code
 	}
+	messageExpiryDuration, err := util.ParseDuration(c.String("message-expiry-duration"))
+	if err != nil {
+		return err
+	}
 	attachmentFileSizeLimit, err := util.ParseSize(c.String("attachment-file-size-limit"))
 	if err != nil {
 		return err
@@ -201,17 +204,21 @@ func execTierAdd(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	attachmentExpiryDuration, err := util.ParseDuration(c.String("attachment-expiry-duration"))
+	if err != nil {
+		return err
+	}
 	tier := &user.Tier{
 		ID:                       "", // Generated
 		Code:                     code,
 		Name:                     name,
 		MessageLimit:             c.Int64("message-limit"),
-		MessageExpiryDuration:    c.Duration("message-expiry-duration"),
+		MessageExpiryDuration:    messageExpiryDuration,
 		EmailLimit:               c.Int64("email-limit"),
 		ReservationLimit:         c.Int64("reservation-limit"),
 		AttachmentFileSizeLimit:  attachmentFileSizeLimit,
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit,
-		AttachmentExpiryDuration: c.Duration("attachment-expiry-duration"),
+		AttachmentExpiryDuration: attachmentExpiryDuration,
 		AttachmentBandwidthLimit: attachmentBandwidthLimit,
 		StripeMonthlyPriceID:     c.String("stripe-monthly-price-id"),
 		StripeYearlyPriceID:      c.String("stripe-yearly-price-id"),
@@ -252,7 +259,10 @@ func execTierChange(c *cli.Context) error {
 		tier.MessageLimit = c.Int64("message-limit")
 	}
 	if c.IsSet("message-expiry-duration") {
-		tier.MessageExpiryDuration = c.Duration("message-expiry-duration")
+		tier.MessageExpiryDuration, err = util.ParseDuration(c.String("message-expiry-duration"))
+		if err != nil {
+			return err
+		}
 	}
 	if c.IsSet("email-limit") {
 		tier.EmailLimit = c.Int64("email-limit")
@@ -273,7 +283,10 @@ func execTierChange(c *cli.Context) error {
 		}
 	}
 	if c.IsSet("attachment-expiry-duration") {
-		tier.AttachmentExpiryDuration = c.Duration("attachment-expiry-duration")
+		tier.AttachmentExpiryDuration, err = util.ParseDuration(c.String("attachment-expiry-duration"))
+		if err != nil {
+			return err
+		}
 	}
 	if c.IsSet("attachment-bandwidth-limit") {
 		tier.AttachmentBandwidthLimit, err = util.ParseSize(c.String("attachment-bandwidth-limit"))

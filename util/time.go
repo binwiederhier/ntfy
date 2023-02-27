@@ -45,15 +45,9 @@ func ParseFutureTime(s string, now time.Time) (time.Time, error) {
 	return time.Time{}, errUnparsableTime
 }
 
-func parseFromDuration(s string, now time.Time) (time.Time, error) {
-	d, err := parseDuration(s)
-	if err == nil {
-		return now.Add(d), nil
-	}
-	return time.Time{}, errUnparsableTime
-}
-
-func parseDuration(s string) (time.Duration, error) {
+// ParseDuration is like time.ParseDuration, except that it also understands days (d), which
+// translates to 24 hours, e.g. "2d" or "20h".
+func ParseDuration(s string) (time.Duration, error) {
 	d, err := time.ParseDuration(s)
 	if err == nil {
 		return d, nil
@@ -78,6 +72,14 @@ func parseDuration(s string) (time.Duration, error) {
 		}
 	}
 	return 0, errUnparsableTime
+}
+
+func parseFromDuration(s string, now time.Time) (time.Time, error) {
+	d, err := ParseDuration(s)
+	if err == nil {
+		return now.Add(d), nil
+	}
+	return time.Time{}, errUnparsableTime
 }
 
 func parseUnixTime(s string, now time.Time) (time.Time, error) {

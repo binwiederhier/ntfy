@@ -266,7 +266,7 @@ docker run \
   serve
 ```
 
-Using docker-compose with non-root user:
+Using docker-compose with non-root user and healthchecks enabled:
 ```yaml
 version: "2.1"
 
@@ -284,6 +284,12 @@ services:
       - /etc/ntfy:/etc/ntfy
     ports:
       - 80:80
+    healthcheck: # optional: remember to adapt the host:port to your environment
+        test: ["CMD-SHELL", "wget -q --tries=1 http://localhost:80/v1/health -O - | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
+        interval: 60s
+        timeout: 10s
+        retries: 3
+        start_period: 40s
     restart: unless-stopped
 ```
 

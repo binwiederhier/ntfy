@@ -22,6 +22,10 @@ which ntfy rejected with an HTTP 401. We now ignore unsupported header values.
 As of this release, ntfy also supports sending emails to protected topics, and it ships code to support annual billing
 cycles (not live yet).
 
+As part of this release, I also enabled sign-up and login (free accounts only), and I also started reducing the rate 
+limits for anonymous & free users a bit. With the next release and the launch of the paid plan, I'll reduce the limits
+a bit more. For 90% of users, you should not feel the difference.
+
 **Features:**
 
 * UnifiedPush: Subscriber-based rate limiting for `up*` topics ([#584](https://github.com/binwiederhier/ntfy/pull/584)/[#609](https://github.com/binwiederhier/ntfy/pull/609)/[#633](https://github.com/binwiederhier/ntfy/pull/633), thanks to [@karmanyaahm](https://github.com/karmanyaahm))

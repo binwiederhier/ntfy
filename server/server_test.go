@@ -83,6 +83,32 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 	require.Equal(t, "my first message", sender.Messages()[0].APNS.Payload.CustomData["message"])
 }
 
+func TestServer_PublishWithFirebase_WithoutUsers_AndWithoutPanic(t *testing.T) {
+	// This tests issue #641, which used to panic before the fix
+
+	firebaseKeyFile := filepath.Join(t.TempDir(), "firebase.json")
+	contents := `{
+  "type": "service_account",
+  "project_id": "ntfy-test",
+  "private_key_id": "fsfhskjdfhskdhfskdjfhsdf",
+  "private_key": "lalala",
+  "client_email": "firebase-adminsdk-muv04@ntfy-test.iam.gserviceaccount.com",
+  "client_id": "123123213",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-muv04%40ntfy-test.iam.gserviceaccount.com"
+}
+`
+	require.Nil(t, os.WriteFile(firebaseKeyFile, []byte(contents), 0600))
+	c := newTestConfig(t)
+	c.FirebaseKeyFile = firebaseKeyFile
+	s := newTestServer(t, c)
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", nil)
+	require.Equal(t, "my first message", toMessage(t, response.Body.String()).Message)
+}
+
 func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig(t)

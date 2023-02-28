@@ -162,7 +162,13 @@ func New(conf *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		firebaseClient = newFirebaseClient(sender, userManager)
+		// This awkward logic is required because Go is weird about nil types and interfaces.
+		// See issue #641, and https://go.dev/play/p/uur1flrv1t3 for an example
+		var auther user.Auther
+		if userManager != nil {
+			auther = userManager
+		}
+		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s := &Server{
 		config:         conf,

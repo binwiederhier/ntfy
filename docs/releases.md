@@ -7,6 +7,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Remove health check from `Dockerfile` and [document it](config.md#health-checks) ([#635](https://github.com/binwiederhier/ntfy/issues/635), thanks to [@Andersbiha](https://github.com/Andersbiha)) 
+* Fix panic when using Firebase without users ([#641](https://github.com/binwiederhier/ntfy/issues/641), thanks to [u/heavybell](https://www.reddit.com/user/heavybell/) for reporting)
 * Upgrade dialog: Disable submit button for free tier (no ticket)
 * Allow multiple `log-level-overrides` on the same field (no ticket)
 

@@ -22,7 +22,6 @@ func init() {
 }
 
 func TestCLI_Serve_Unix_Curl(t *testing.T) {
-	t.Parallel()
 	sockFile := filepath.Join(t.TempDir(), "ntfy.sock")
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
 	go func() {

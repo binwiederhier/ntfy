@@ -3,13 +3,24 @@ Binaries for all releases can be found on the GitHub releases pages for the [ntf
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## ntfy server v2.1.1 (UNRELEASED)
+Released March 1, 2023
+
+This is a tiny release with a few bug fixes, but it's big for me personally. After almost three months of work, today 
+I am finally launching the paid plans on ntfy.sh: You are now able to purchase three different plans that'll give you
+higher rate limits (messages, emails, attachment sizes, ...), and also give you the ability to reserve topic names for
+your personal use. You can check out the pricing, and [purchase plans through the web app](https://ntfy.sh/app) (use
+promo code `MYTOPIC` for a **50% discount**, limited time only).
+
+And as I've said many times: Do not worry. **ntfy will always stay open source**, and that includes all features. There
+are no closed-source features. So if you'd like to run your own server, you can!
 
 **Bug fixes + maintenance:**
 
-* Remove health check from `Dockerfile` and [document it](config.md#health-checks) ([#635](https://github.com/binwiederhier/ntfy/issues/635), thanks to [@Andersbiha](https://github.com/Andersbiha)) 
 * Fix panic when using Firebase without users ([#641](https://github.com/binwiederhier/ntfy/issues/641), thanks to [u/heavybell](https://www.reddit.com/user/heavybell/) for reporting)
+* Remove health check from `Dockerfile` and [document it](config.md#health-checks) ([#635](https://github.com/binwiederhier/ntfy/issues/635), thanks to [@Andersbiha](https://github.com/Andersbiha)) 
 * Upgrade dialog: Disable submit button for free tier (no ticket)
 * Allow multiple `log-level-overrides` on the same field (no ticket)
+* Actually remove `ntfy publish --env-topic` flag (as per [deprecations](deprecations.md), no ticket)
 
 ## ntfy server v2.1.0
 Released February 25, 2023

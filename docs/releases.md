@@ -5,10 +5,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## ntfy server v2.1.1 (UNRELEASED)
 Released March 1, 2023
 
-This is a tiny release with a few bug fixes, but it's big for me personally. After almost three months of work, today 
-I am finally launching the paid plans on ntfy.sh: You are now able to purchase three different plans that'll give you
-higher rate limits (messages, emails, attachment sizes, ...), and also give you the ability to reserve topic names for
-your personal use. You can check out the pricing, and [purchase plans through the web app](https://ntfy.sh/app) (use
+This is a tiny release with a few bug fixes, but it's big for me personally. After almost three months of work, 
+**today I am finally launching the paid plans on ntfy.sh** 🥳 🎉. 
+
+You are now able to purchase one of three plans that'll give you **higher rate limits** (messages, emails, attachment sizes, ...), 
+as well as the ability to **reserve topic names** for your personal use, while at the same time supporting me and the
+ntfy open source project ❤️. You can check out the pricing, and [purchase plans through the web app](https://ntfy.sh/app) (use
 promo code `MYTOPIC` for a **50% discount**, limited time only).
 
 And as I've said many times: Do not worry. **ntfy will always stay open source**, and that includes all features. There

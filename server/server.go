@@ -485,6 +485,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
 		EnableReservations: s.config.EnableReservations,
+		BillingContact:     s.config.BillingContact,
 		DisallowedTopics:   s.config.DisallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")

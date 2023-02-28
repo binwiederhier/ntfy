@@ -21,6 +21,7 @@ are no closed-source features. So if you'd like to run your own server, you can!
 * Upgrade dialog: Disable submit button for free tier (no ticket)
 * Allow multiple `log-level-overrides` on the same field (no ticket)
 * Actually remove `ntfy publish --env-topic` flag (as per [deprecations](deprecations.md), no ticket)
+* Added `billing-contact` config option (no ticket)
 
 ## ntfy server v2.1.0
 Released February 25, 2023

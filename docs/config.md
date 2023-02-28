@@ -839,6 +839,8 @@ config options:
    enables payments in the ntfy web app (e.g. Upgrade dialog). See [API keys](https://dashboard.stripe.com/apikeys).
 * `stripe-webhook-key` is the key required to validate the authenticity of incoming webhooks from Stripe.
    Webhooks are essential to keep the local database in sync with the payment provider. See [Webhooks](https://dashboard.stripe.com/webhooks).
+* `billing-contact` is an email address or website displayed in the "Upgrade tier" dialog to let people reach
+   out with billing questions. If unset, nothing will be displayed.
 
 In addition to setting these two options, you also need to define a [Stripe webhook](https://dashboard.stripe.com/webhooks)
 for the `customer.subscription.updated` and `customer.subscription.deleted` event, which points 
@@ -849,6 +851,7 @@ Here's an example:
 ``` yaml
 stripe-secret-key: "sk_test_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
 stripe-webhook-key: "whsec_ZnNkZnNIRExBSFNES0hBRFNmaHNka2ZsaGR"
+billing-contact: "phil@example.com"
 ```
 
 ## Rate limiting
@@ -1194,6 +1197,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `enable-reservations`                      | `NTFY_ENABLE_RESERVATIONS`                      | *boolean* (`true` or `false`)                       | `false`           | Allows users to reserve topics (if their tier allows it)                                                                                                                                                                        |
 | `stripe-secret-key`                        | `NTFY_STRIPE_SECRET_KEY`                        | *string*                                            | -                 | Payments: Key used for the Stripe API communication, this enables payments                                                                                                                                                      |
 | `stripe-webhook-key`                       | `NTFY_STRIPE_WEBHOOK_KEY`                       | *string*                                            | -                 | Payments: Key required to validate the authenticity of incoming webhooks from Stripe                                                                                                                                            |
+| `billing-contact`                          | `NTFY_BILLING_CONTACT`                          | *email address* or *website*                        | -                 | Payments: Email or website displayed in Upgrade dialog as a billing contact                                                                                                                                                     |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
@@ -1277,6 +1281,7 @@ OPTIONS:
    --behind-proxy, --behind_proxy, -P                                                                                     if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
    --stripe-secret-key value, --stripe_secret_key value                                                                   key used for the Stripe API communication, this enables payments [$NTFY_STRIPE_SECRET_KEY]
    --stripe-webhook-key value, --stripe_webhook_key value                                                                 key required to validate the authenticity of incoming webhooks from Stripe [$NTFY_STRIPE_WEBHOOK_KEY]
+   --billing-contact value, --billing_contact value                                                                       e-mail or website to display in upgrade dialog (only if payments are enabled) [$NTFY_BILLING_CONTACT]   
    --help, -h                                                                                                             show help (default: false)
 ```
 

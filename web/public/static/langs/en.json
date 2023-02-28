@@ -236,6 +236,8 @@
   "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} billed annually. Save {{save}}.",
   "account_upgrade_dialog_tier_selected_label": "Selected",
   "account_upgrade_dialog_tier_current_label": "Current",
+  "account_upgrade_dialog_billing_contact_email": "For billing questions, please <Link>contact us</Link> directly.",
+  "account_upgrade_dialog_billing_contact_website": "For billing questions, please refer to our <Link>website</Link>.",
   "account_upgrade_dialog_button_cancel": "Cancel",
   "account_upgrade_dialog_button_redirect_signup": "Sign up now",
   "account_upgrade_dialog_button_pay_now": "Pay now and subscribe",

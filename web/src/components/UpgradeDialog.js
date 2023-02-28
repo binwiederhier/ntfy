@@ -3,9 +3,8 @@ import {useContext, useEffect, useState} from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import {Alert, Badge, CardActionArea, CardContent, Chip, ListItem, Stack, Switch, useMediaQuery} from "@mui/material";
+import {Alert, CardActionArea, CardContent, Chip, Link, ListItem, Switch, useMediaQuery} from "@mui/material";
 import theme from "./theme";
-import DialogFooter from "./DialogFooter";
 import Button from "@mui/material/Button";
 import accountApi, {SubscriptionInterval} from "../app/AccountApi";
 import session from "../app/Session";
@@ -22,6 +21,8 @@ import ListItemText from "@mui/material/ListItemText";
 import Box from "@mui/material/Box";
 import {NavLink} from "react-router-dom";
 import {UnauthorizedError} from "../app/errors";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
 
 const UpgradeDialog = (props) => {
     const { t } = useTranslation();
@@ -204,10 +205,35 @@ const UpgradeDialog = (props) => {
                     </Alert>
                 }
             </DialogContent>
-            <DialogFooter status={error}>
-                <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
-                <Button onClick={handleSubmit} disabled={!submitAction}>{submitButtonLabel}</Button>
-            </DialogFooter>
+            <Box sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingLeft: '24px',
+                paddingBottom: '8px',
+            }}>
+                <DialogContentText
+                    component="div"
+                    aria-live="polite"
+                    sx={{
+                        margin: '0px',
+                        paddingTop: '12px',
+                        paddingBottom: '4px'
+                    }}
+                >
+                    {config.billing_contact.indexOf('@') !== -1 &&
+                        <><Trans i18nKey="account_upgrade_dialog_billing_contact_email" components={{ Link: <Link href={`mailto:${config.billing_contact}`}/> }}/>{" "}</>
+                    }
+                    {config.billing_contact.match(`^http?s://`) &&
+                        <><Trans i18nKey="account_upgrade_dialog_billing_contact_website" components={{ Link: <Link href={config.billing_contact} target="_blank"/> }}/>{" "}</>
+                    }
+                    {error}
+                </DialogContentText>
+                <DialogActions sx={{paddingRight: 2}}>
+                    <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
+                    <Button onClick={handleSubmit} disabled={!submitAction}>{submitButtonLabel}</Button>
+                </DialogActions>
+            </Box>
         </Dialog>
     );
 };

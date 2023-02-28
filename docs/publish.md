@@ -3161,16 +3161,20 @@ There are a few limitations to the API to prevent abuse and to keep the server h
 are configurable via the server side [rate limiting settings](config.md#rate-limiting). Most of these limits you won't run into,
 but just in case, let's list them all:
 
-| Limit                      | Description                                                                                                                                                              |
-|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Message length**         | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                  |
-| **Requests**               | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds. |
-| **E-mails**                | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour.         |
-| **Subscription limit**     | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                    |
-| **Attachment size limit**  | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors.                                     |
-| **Attachment expiry**      | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                             |
-| **Attachment bandwidth**   | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected.                        |
-| **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                |
+| Limit                           | Description                                                                                                                                                                                                             |
+|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Message length**              | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                                                                 |
+| **Requests**                    | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds.                                                |
+| **Daily messages**              | By default, the number of messages is governed by the request limits. This can be overridden. On ntfy.sh, the daily message limit is 1,000.                                                                             |
+| **E-mails**                     | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour. On ntfy.sh, the daily limit is 10.                     |
+| **Subscription limit**          | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                                                                   |
+| **Attachment size limit**       | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors. On ntfy.sh, the attachment size limit is 5 MB, and the per-visitor total is 50 MB. |
+| **Attachment expiry**           | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                                                                            |
+| **Attachment bandwidth**        | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected. On ntfy.sh, the daily bandwidth limit is 200 MB.                      |
+| **Total number of topics**      | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                                                               |
+
+These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
+a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
 
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,

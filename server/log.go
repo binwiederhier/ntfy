@@ -31,7 +31,8 @@ const (
 )
 
 var (
-	normalErrorCodes = []int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized, http.StatusInsufficientStorage}
+	normalErrorCodes       = []int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized, http.StatusInsufficientStorage}
+	rateLimitingErrorCodes = []int{http.StatusTooManyRequests, http.StatusRequestEntityTooLarge}
 )
 
 // logr creates a new log event with HTTP request fields

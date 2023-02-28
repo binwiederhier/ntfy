@@ -319,6 +319,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	if !ok {
 		httpErr = errHTTPInternalError
 	}
+	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
@@ -334,6 +335,12 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
 	} else {
 		ev.Info("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
+	}
+	if isRateLimiting && s.config.StripeSecretKey != "" {
+		u := v.User()
+		if u == nil || u.Tier == nil {
+			httpErr = httpErr.Wrap("increase your limits with a paid plan, see %s", s.config.BaseURL)
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -509,7 +516,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
 	stat, err := os.Stat(file)
 	if err != nil {
-		return errHTTPNotFound
+		return errHTTPNotFound.Fields(log.Context{
+			"message_id":    messageID,
+			"error_context": "filesystem",
+		})
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
@@ -530,7 +540,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 			}, s.config.CacheBatchTimeout, 100*time.Millisecond, 300*time.Millisecond, 600*time.Millisecond)
 		}
 		if err != nil {
-			return errHTTPNotFound
+			return errHTTPNotFound.Fields(log.Context{
+				"message_id":    messageID,
+				"error_context": "message_cache",
+			})
 		}
 	} else if err != nil {
 		return err
@@ -546,7 +559,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		bandwidthVisitor = s.visitor(m.Sender, nil)
 	}
 	if !bandwidthVisitor.BandwidthAllowed(stat.Size()) {
-		return errHTTPTooManyRequestsLimitAttachmentBandwidth
+		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m)
 	}
 	// Actually send file
 	f, err := os.Open(file)
@@ -866,13 +879,17 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 	}
 	attachmentExpiry := time.Now().Add(vinfo.Limits.AttachmentExpiryDuration).Unix()
 	if m.Time > attachmentExpiry {
-		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery
+		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery.With(m)
 	}
 	contentLengthStr := r.Header.Get("Content-Length")
 	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
 		if err == nil && (contentLength > vinfo.Stats.AttachmentTotalSizeRemaining || contentLength > vinfo.Limits.AttachmentFileSizeLimit) {
-			return errHTTPEntityTooLargeAttachment
+			return errHTTPEntityTooLargeAttachment.With(m).Fields(log.Context{
+				"message_content_length":          contentLength,
+				"attachment_total_size_remaining": vinfo.Stats.AttachmentTotalSizeRemaining,
+				"attachment_file_size_limit":      vinfo.Limits.AttachmentFileSizeLimit,
+			})
 		}
 	}
 	if m.Attachment == nil {

@@ -2,7 +2,7 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.1.1 (UNRELEASED)
+## ntfy server v2.1.1
 Released March 1, 2023
 
 This is a tiny release with a few bug fixes, but it's big for me personally. After almost three months of work, 

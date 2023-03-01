@@ -914,7 +914,15 @@ func TestServer_StatsResetter(t *testing.T) {
 	require.Equal(t, int64(2), account.Stats.Messages)
 
 	// Wait for stats resetter to run
-	time.Sleep(2200 * time.Millisecond)
+	waitFor(t, func() bool {
+		response = request(t, s, "GET", "/v1/account", "", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+		require.Nil(t, err)
+		return account.Stats.Messages == 0
+	})
 
 	// User stats show 0 messages now!
 	response = request(t, s, "GET", "/v1/account", "", map[string]string{
@@ -1661,9 +1669,10 @@ func TestServer_PublishAttachmentAndExpire(t *testing.T) {
 	require.Equal(t, content, response.Body.String())
 
 	// Prune and makes sure it's gone
-	time.Sleep(time.Second) // Sigh ...
-	s.execManager()
-	require.NoFileExists(t, file)
+	waitFor(t, func() bool {
+		s.execManager() // May run many times
+		return !util.FileExists(file)
+	})
 	response = request(t, s, "GET", path, "", nil)
 	require.Equal(t, 404, response.Code)
 }
@@ -2310,4 +2319,19 @@ func readAll(t *testing.T, rc io.ReadCloser) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func waitFor(t *testing.T, f func() bool) {
+	waitForWithMaxWait(t, 5*time.Second, f)
+}
+
+func waitForWithMaxWait(t *testing.T, maxWait time.Duration, f func() bool) {
+	start := time.Now()
+	for time.Since(start) < maxWait {
+		if f() {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("Function f did not succeed after %v", maxWait)
 }

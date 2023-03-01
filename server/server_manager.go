@@ -3,6 +3,7 @@ package server
 import (
 	"heckel.io/ntfy/log"
 	"strings"
+	"time"
 )
 
 func (s *Server) execManager() {
@@ -34,16 +35,20 @@ func (s *Server) execManager() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
-				subs := t.SubscribersCount()
-				log.Tag(tagManager).With(t).Trace("- topic %s: %d subscribers", t.ID, subs)
-				msgs, exists := messageCounts[t.ID]
-				if t.Stale() && (!exists || msgs == 0) {
-					log.Tag(tagManager).With(t).Trace("Deleting empty topic %s", t.ID)
+				subs, lastAccess := t.Stats()
+				ev := log.Tag(tagManager).With(t)
+				if t.Stale() {
+					if ev.IsTrace() {
+						ev.Trace("- topic %s: Deleting stale topic (%d subscribers, accessed %s)", t.ID, subs, lastAccess.Format(time.RFC822))
+					}
 					emptyTopics++
 					delete(s.topics, t.ID)
-					continue
+				} else {
+					if ev.IsTrace() {
+						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, lastAccess.Format(time.RFC822))
+					}
+					subscribers += subs
 				}
-				subscribers += subs
 			}
 		}).
 		Debug("Removed %d empty topic(s)", emptyTopics)

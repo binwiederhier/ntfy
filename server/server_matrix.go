@@ -126,6 +126,7 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	if r.Header.Get("X-Forwarded-For") != "" {
 		newRequest.Header.Set("X-Forwarded-For", r.Header.Get("X-Forwarded-For"))
 	}
+	newRequest.Header.Set("X-Matrix-Pushkey", pushKey)
 	return newRequest, nil
 }
 

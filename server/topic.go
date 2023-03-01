@@ -4,6 +4,11 @@ import (
 	"heckel.io/ntfy/log"
 	"math/rand"
 	"sync"
+	"time"
+)
+
+const (
+	topicExpiryDuration = 6 * time.Hour
 )
 
 // topic represents a channel to which subscribers can subscribe, and publishers
@@ -12,6 +17,7 @@ type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
 	rateVisitor *visitor
+	lastAccess  time.Time
 	mu          sync.RWMutex
 }
 
@@ -29,6 +35,7 @@ func newTopic(id string) *topic {
 	return &topic{
 		ID:          id,
 		subscribers: make(map[int]*topicSubscriber),
+		lastAccess:  time.Now(),
 	}
 }
 
@@ -42,6 +49,7 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) int {
 		subscriber: s,
 		cancel:     cancel,
 	}
+	t.lastAccess = time.Now()
 	return subscriberID
 }
 
@@ -51,13 +59,14 @@ func (t *topic) Stale() bool {
 	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
 		return false
 	}
-	return len(t.subscribers) == 0
+	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpiryDuration
 }
 
 func (t *topic) SetRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.rateVisitor = v
+	t.lastAccess = time.Now()
 }
 
 func (t *topic) RateVisitor() *visitor {
@@ -96,15 +105,23 @@ func (t *topic) Publish(v *visitor, m *message) error {
 		} else {
 			logvm(v, m).Tag(tagPublish).Trace("No stream or WebSocket subscribers, not forwarding")
 		}
+		t.Keepalive()
 	}()
 	return nil
 }
 
-// SubscribersCount returns the number of subscribers to this topic
-func (t *topic) SubscribersCount() int {
+// Stats returns the number of subscribers and last access to this topic
+func (t *topic) Stats() (int, time.Time) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return len(t.subscribers)
+	return len(t.subscribers), t.lastAccess
+}
+
+// Keepalive sets the last access time and ensures that Stale does not return true
+func (t *topic) Keepalive() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.lastAccess = time.Now()
 }
 
 // CancelSubscribers calls the cancel function for all subscribers, forcing

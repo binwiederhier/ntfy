@@ -8,6 +8,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Support SMTP servers without auth ([#645](https://github.com/binwiederhier/ntfy/issues/645), thanks to [@Sharknoon](https://github.com/Sharknoon) for reporting)
 
+**Additional languages:**
+
+* Danish (thanks to [@Andersbiha](https://hosted.weblate.org/user/Andersbiha/))
+
 ## ntfy server v2.1.1
 Released March 1, 2023
 

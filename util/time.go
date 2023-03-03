@@ -14,6 +14,15 @@ var (
 	durationStrRegex  = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
 )
 
+const (
+	timestampFormat = "2006-01-02T15:04:05.999Z07:00" // Like RFC3339, but with milliseconds
+)
+
+// FormatTime formats a time.Time in a RFC339-like format that includes milliseconds
+func FormatTime(t time.Time) string {
+	return t.Format(timestampFormat)
+}
+
 // NextOccurrenceUTC takes a time of day (e.g. 9:00am), and returns the next occurrence
 // of that time from the current time (in UTC).
 func NextOccurrenceUTC(timeOfDay, base time.Time) time.Time {

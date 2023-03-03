@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/util"
 	"log"
 	"os"
 	"sort"
@@ -11,12 +12,11 @@ import (
 )
 
 const (
-	fieldTag        = "tag"
-	fieldError      = "error"
-	fieldTimeTaken  = "time_taken_ms"
-	fieldExitCode   = "exit_code"
-	tagStdLog       = "stdlog"
-	timestampFormat = "2006-01-02T15:04:05.999Z07:00"
+	fieldTag       = "tag"
+	fieldError     = "error"
+	fieldTimeTaken = "time_taken_ms"
+	fieldExitCode  = "exit_code"
+	tagStdLog      = "stdlog"
 )
 
 // Event represents a single log event
@@ -143,7 +143,7 @@ func (e *Event) Render(l Level, message string, v ...any) string {
 	}
 	e.Message = fmt.Sprintf(message, v...)
 	e.Level = l
-	e.Timestamp = e.time.Format(timestampFormat)
+	e.Timestamp = util.FormatTime(e.time)
 	if !appliedContexters {
 		e.applyContexters()
 	}

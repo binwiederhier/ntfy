@@ -8,6 +8,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Support SMTP servers without auth ([#645](https://github.com/binwiederhier/ntfy/issues/645), thanks to [@Sharknoon](https://github.com/Sharknoon) for reporting)
 
+**Bug fixes + maintenance:**
+
+* Token auth doesn't work if default user credentials are defined in `client.yml` ([#650](https://github.com/binwiederhier/ntfy/issues/650), thanks to [@Xinayder](https://github.com/Xinayder))
+
 **Additional languages:**
 
 * Danish (thanks to [@Andersbiha](https://hosted.weblate.org/user/Andersbiha/))

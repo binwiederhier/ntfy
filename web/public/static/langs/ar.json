@@ -283,5 +283,18 @@
     "publish_dialog_details_examples_description": "للحصول على أمثلة ووصف مُفصّل لجميع ميزات الإرسال، يرجى الاستناد إلى <docsLink>الدليل</docsLink>.",
     "subscribe_dialog_subscribe_description": "قد لا تكون الموضوعات محمية بكلمة سر لذا اختر اسمًا ليس من السهل تخمينه وبمجرد اشتراكك، يمكنك الحصول على إشعارات عبر \"PUT/POST\".",
     "prefs_notifications_sound_description_some": "تقوم الإشعارات بتشغيل صوت {{sound}} عند وصولها",
-    "notifications_none_for_topic_description": "لإرسال إشعارات إلى هذا الموضوع، ما عليك سوى PUT أو POST إلى عنوان URL الخاص بالموضوع."
+    "notifications_none_for_topic_description": "لإرسال إشعارات إلى هذا الموضوع، ما عليك سوى PUT أو POST إلى عنوان URL الخاص بالموضوع.",
+    "priority_low": "منخفضة",
+    "signup_form_toggle_password_visibility": "تبديل رؤية كلمة المرور",
+    "account_usage_limits_reset_daily": "يعاد تحديد حدود الاستخدام يوميا في منتصف الليل (UTC)",
+    "account_tokens_table_label_header": "المُلصَقة",
+    "account_upgrade_dialog_button_redirect_signup": "تسجيل فوري",
+    "account_upgrade_dialog_tier_current_label": "الحالي",
+    "account_tokens_dialog_expires_x_days": "تنتهي صلاحية الرمز المميز في غضون {{days}} أيام",
+    "prefs_reservations_dialog_title_add": "حجز موضوع",
+    "prefs_reservations_description": "يمكنك حجز أسماء الموضوعات للاستخدام الشخصي هنا. يمنحك حجز موضوع ما ملكية الموضوع، ويسمح لك بتحديد تصريحات الوصول للمستخدمين الآخرين إلى الموضوع.",
+    "prefs_users_description_no_sync": "لا تتم مزامنة المستخدمين وكلمات المرور مع حسابك.",
+    "reservation_delete_dialog_action_delete_description": "سيتم حذف الرسائل والمرفقات المخزنة مؤقتا نهائيا. لا يمكن التراجع عن هذا الإجراء.",
+    "notifications_actions_http_request_title": "إرسال طلب HTTP {{method}} إلى {{url}}",
+    "notifications_none_for_any_description": "لإرسال إشعارات إلى موضوع ما، ما عليك سوى إرسال طلب PUT أو POST إلى الرابط التشعبي URL للموضوع. إليك مثال باستخدام أحد مواضيعك."
 }

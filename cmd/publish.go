@@ -171,7 +171,7 @@ func execPublish(c *cli.Context) error {
 			fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
-	} else if conf.DefaultUser != "" && conf.DefaultPassword != nil {
+	} else if token == "" && conf.DefaultUser != "" && conf.DefaultPassword != nil {
 		options = append(options, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
 	}
 	if pid > 0 {

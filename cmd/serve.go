@@ -63,6 +63,7 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "allows users to sign up via the web app, or API"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-login", Aliases: []string{"enable_login"}, EnvVars: []string{"NTFY_ENABLE_LOGIN"}, Value: false, Usage: "allows users to log in via the web app, or API"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-reservations", Aliases: []string{"enable_reservations"}, EnvVars: []string{"NTFY_ENABLE_RESERVATIONS"}, Value: false, Usage: "allows users to reserve topics (if their tier allows it)"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-rate-visitor", Aliases: []string{"enable_rate_visitor"}, EnvVars: []string{"NTFY_ENABLE_RATE_VISITOR"}, Value: false, Usage: "enables subscriber-based rate limiting for UnifiedPush topics"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-base-url", Aliases: []string{"upstream_base_url"}, EnvVars: []string{"NTFY_UPSTREAM_BASE_URL"}, Value: "", Usage: "forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", Aliases: []string{"smtp_sender_addr"}, EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
@@ -139,6 +140,7 @@ func execServe(c *cli.Context) error {
 	enableSignup := c.Bool("enable-signup")
 	enableLogin := c.Bool("enable-login")
 	enableReservations := c.Bool("enable-reservations")
+	enableRateVisitor := c.Bool("enable-rate-visitor")
 	upstreamBaseURL := c.String("upstream-base-url")
 	smtpSenderAddr := c.String("smtp-sender-addr")
 	smtpSenderUser := c.String("smtp-sender-user")
@@ -312,6 +314,7 @@ func execServe(c *cli.Context) error {
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
 	conf.EnableReservations = enableReservations
+	conf.EnableRateVisitor = enableRateVisitor
 	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config

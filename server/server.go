@@ -597,7 +597,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && t.RateVisitor() == nil {
+	if unifiedpush && s.config.EnableRateVisitor && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
 		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1188,14 +1188,19 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 // maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
 // to that topic will be rate limited against the rate visitor instead of the publishing visitor.
 //
-// Setting the rate visitor is ony allowed if
+// Setting the rate visitor is ony allowed if the `enable-rate-visitor` setting is enabled, AND
 // - auth-file is not set (everything is open by default)
-// - the topic is reserved, and v.user is the owner
-// - the topic is not reserved, and v.user has write access
+// - or the topic is reserved, and v.user is the owner
+// - or the topic is not reserved, and v.user has write access
 //
 // Note: This TEMPORARILY also registers all topics starting with "up" (= UnifiedPush). This is to ease the transition
 // until the Android app will send the "Rate-Topics" header.
 func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, rateTopics []string) error {
+	// Bail out if not enabled
+	if !s.config.EnableRateVisitor {
+		return nil
+	}
+
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {

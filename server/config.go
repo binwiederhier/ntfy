@@ -133,6 +133,7 @@ type Config struct {
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
 	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
+	EnableRateVisitor                    bool   // Enable subscriber-based rate limiting for UnifiedPush topics
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
 }

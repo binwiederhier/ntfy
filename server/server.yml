@@ -235,6 +235,20 @@
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
 
+# Rate limiting: Enable subscriber-based rate limiting (mostly used for UnifiedPush)
+#
+# If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
+# to the publisher's rate limits. This is especially useful to increase the amount of messages that UnifiedPush
+# publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+#
+# Once enabled, a client may send a "Rate-Topics: <topic1>,<topic2>,..." header when subscribing to topics via
+# HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
+# to use when publishing on this topic.
+#
+# For your home server, you likely DO NOT NEED THIS setting.
+#
+# enable-rate-visitors: false
+
 # Payments integration via Stripe
 #
 # - stripe-secret-key is the key used for the Stripe API communication. Setting this values

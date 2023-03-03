@@ -15,6 +15,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -1291,7 +1292,9 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 }
 
 func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
-	s := newTestServer(t, newTestConfig(t))
+	c := newTestConfig(t)
+	c.EnableRateVisitor = true
+	s := newTestServer(t, c)
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
@@ -2029,6 +2032,7 @@ func TestServer_AnonymousUser_And_NonTierUser_Are_Same_Visitor(t *testing.T) {
 func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.VisitorRequestLimitBurst = 3
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// "Register" visitor 1.2.3.4 to topic "subscriber1topic" as a rate limit visitor
@@ -2082,6 +2086,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 func TestServer_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.VisitorRequestLimitBurst = 3
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// "Register" 5 different UnifiedPush visitors
@@ -2105,6 +2110,7 @@ func TestServer_SubscriberRateLimiting_UP_Only(t *testing.T) {
 func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 3
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// "Register" 5 different UnifiedPush visitors
@@ -2132,6 +2138,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 3
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// "Register" rate visitor
@@ -2167,6 +2174,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 func TestServer_SubscriberRateLimiting_ProtectedTopics(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionDenyAll
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// Create some ACLs
@@ -2214,6 +2222,7 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics(t *testing.T) {
 func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.AuthDefault = user.PermissionReadWrite
+	c.EnableRateVisitor = true
 	s := newTestServer(t, c)
 
 	// Create some ACLs
@@ -2333,5 +2342,5 @@ func waitForWithMaxWait(t *testing.T, maxWait time.Duration, f func() bool) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("Function f did not succeed after %v", maxWait)
+	t.Fatalf("Function f did not succeed after %v: %s", maxWait, debug.Stack())
 }

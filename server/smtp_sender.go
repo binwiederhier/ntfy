@@ -36,7 +36,10 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 		if err != nil {
 			return err
 		}
-		auth := smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+		var auth smtp.Auth
+		if s.config.SMTPSenderUser != "" {
+			auth = smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+		}
 		ev := logvm(v, m).
 			Tag(tagEmail).
 			Fields(log.Context{

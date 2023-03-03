@@ -117,18 +117,19 @@
 # attachment-expiry-duration: "3h"
 
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
-# messages will additionally be sent out as e-mail using an external SMTP server. As of today, only
-# SMTP servers with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
-# below (visitor-email-limit-burst & visitor-email-limit-burst).
+# messages will additionally be sent out as e-mail using an external SMTP server.
+#
+# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTLS are supported.
+# Please also refer to the rate limiting settings below (visitor-email-limit-burst & visitor-email-limit-burst).
 #
 # - smtp-sender-addr is the hostname:port of the SMTP server
-# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user
 # - smtp-sender-from is the e-mail address of the sender
+# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user (leave blank for no auth)
 #
 # smtp-sender-addr:
+# smtp-sender-from:
 # smtp-sender-user:
 # smtp-sender-pass:
-# smtp-sender-from:
 
 # If enabled, ntfy will launch a lightweight SMTP server for incoming messages. Once configured, users can send
 # emails to a topic e-mail address to publish messages to a topic.

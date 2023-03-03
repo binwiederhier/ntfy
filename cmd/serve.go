@@ -177,8 +177,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, certificate file must exist")
 	} else if listenHTTPS != "" && (keyFile == "" || certFile == "") {
 		return errors.New("if listen-https is set, both key-file and cert-file must be set")
-	} else if smtpSenderAddr != "" && (baseURL == "" || smtpSenderUser == "" || smtpSenderPass == "" || smtpSenderFrom == "") {
-		return errors.New("if smtp-sender-addr is set, base-url, smtp-sender-user, smtp-sender-pass and smtp-sender-from must also be set")
+	} else if smtpSenderAddr != "" && (baseURL == "" || smtpSenderFrom == "") {
+		return errors.New("if smtp-sender-addr is set, base-url, and smtp-sender-from must also be set")
 	} else if smtpServerListen != "" && smtpServerDomain == "" {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {

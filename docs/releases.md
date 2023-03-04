@@ -7,11 +7,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Support SMTP servers without auth ([#645](https://github.com/binwiederhier/ntfy/issues/645), thanks to [@Sharknoon](https://github.com/Sharknoon) for reporting)
-* Add `visitor-subscriber-rate-limiting` flag to allow enabling subscriber-based rate limiting (off by default now, [#655](https://github.com/binwiederhier/ntfy/pull/655), thanks to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)
 
 **Bug fixes + maintenance:**
 
 * Token auth doesn't work if default user credentials are defined in `client.yml` ([#650](https://github.com/binwiederhier/ntfy/issues/650), thanks to [@Xinayder](https://github.com/Xinayder))
+* Add `visitor-subscriber-rate-limiting` flag to allow enabling subscriber-based rate limiting (off by default now, [#649](https://github.com/binwiederhier/ntfy/issues/649)/[#655](https://github.com/binwiederhier/ntfy/pull/655), thanks to [@barathrm](https://github.com/barathrm) for reporting, and to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)
+* Reject Matrix pushkey after 12 hours of inactivity on a topic, if `visitor-subscriber-rate-limiting` is enabled ([#643](https://github.com/binwiederhier/ntfy/pull/643), thanks to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)  
 
 **Additional languages:**
 

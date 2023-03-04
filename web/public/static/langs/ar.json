@@ -39,7 +39,7 @@
     "message_bar_type_message": "اكتب رسالة هنا",
     "alert_not_supported_title": "الإشعارات غير مدعومة",
     "alert_not_supported_description": "الإشعارات غير مدعومة في متصفحك.",
-    "message_bar_error_publishing": "خطأ أثناء نشر الإشعار",
+    "message_bar_error_publishing": "خطأ خلال نشر الإشعار",
     "notifications_delete": "حذف",
     "notifications_copied_to_clipboard": "تم نسخه إلى الحافظة",
     "action_bar_toggle_mute": "كتم / إلغاء كتم الإشعارات",
@@ -277,5 +277,11 @@
     "prefs_reservations_table_click_to_subscribe": "انقر للاشتراك",
     "reservation_delete_dialog_action_keep_title": "الاحتفاظ بالرسائل والمرفقات المخزنة مؤقتًا",
     "action_bar_reservation_delete": "إزالة الحجز",
-    "display_name_dialog_description": "قم بتعيين اسم بديل للموضوع المعروض في قائمة الاشتراك. يساعد هذا في تحديد الموضوعات ذات الأسماء المعقدة بسهولة أكبر."
+    "display_name_dialog_description": "قم بتعيين اسم بديل للموضوع المعروض في قائمة الاشتراك. يساعد هذا في تحديد الموضوعات ذات الأسماء المعقدة بسهولة أكبر.",
+    "prefs_users_description": "إضافة / إزالة المستخدمين لمواضيعك المحمية هنا. يرجى الأخذ بعين الاعتبار أنه يتم تخزين اسم المستخدم وكلمة المرور في التخزين المحلي للمتصفح.",
+    "notifications_more_details": "لمزيد من المعلومات، الرجاء الاطّلاع على <websiteLink>موقع الويب</websiteLink> أو على <docsLink>الدليل</docsLink>.",
+    "publish_dialog_details_examples_description": "للحصول على أمثلة ووصف مُفصّل لجميع ميزات الإرسال، يرجى الاستناد إلى <docsLink>الدليل</docsLink>.",
+    "subscribe_dialog_subscribe_description": "قد لا تكون الموضوعات محمية بكلمة سر لذا اختر اسمًا ليس من السهل تخمينه وبمجرد اشتراكك، يمكنك الحصول على إشعارات عبر \"PUT/POST\".",
+    "prefs_notifications_sound_description_some": "تقوم الإشعارات بتشغيل صوت {{sound}} عند وصولها",
+    "notifications_none_for_topic_description": "لإرسال إشعارات إلى هذا الموضوع، ما عليك سوى PUT أو POST إلى عنوان URL الخاص بالموضوع."
 }

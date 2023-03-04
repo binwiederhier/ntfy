@@ -124,6 +124,7 @@ type Config struct {
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
+	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
 	BehindProxy                          bool
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
@@ -198,10 +199,12 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
+		VisitorSubscriberRateLimiting:        false,
 		BehindProxy:                          false,
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,
+		BillingContact:                       "",
 		EnableWeb:                            true,
 		EnableSignup:                         false,
 		EnableLogin:                          false,

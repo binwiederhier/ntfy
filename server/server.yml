@@ -117,18 +117,19 @@
 # attachment-expiry-duration: "3h"
 
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
-# messages will additionally be sent out as e-mail using an external SMTP server. As of today, only
-# SMTP servers with plain text auth and STARTLS are supported. Please also refer to the rate limiting settings
-# below (visitor-email-limit-burst & visitor-email-limit-burst).
+# messages will additionally be sent out as e-mail using an external SMTP server.
+#
+# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTLS are supported.
+# Please also refer to the rate limiting settings below (visitor-email-limit-burst & visitor-email-limit-burst).
 #
 # - smtp-sender-addr is the hostname:port of the SMTP server
-# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user
 # - smtp-sender-from is the e-mail address of the sender
+# - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user (leave blank for no auth)
 #
 # smtp-sender-addr:
+# smtp-sender-from:
 # smtp-sender-user:
 # smtp-sender-pass:
-# smtp-sender-from:
 
 # If enabled, ntfy will launch a lightweight SMTP server for incoming messages. Once configured, users can send
 # emails to a topic e-mail address to publish messages to a topic.
@@ -233,6 +234,21 @@
 #
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"
+
+# Rate limiting: Enable subscriber-based rate limiting (mostly used for UnifiedPush)
+#
+# If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
+# to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
+# publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+#
+# Once enabled, a client may send a "Rate-Topics: <topic1>,<topic2>,..." header when subscribing to topics via
+# HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
+# to use when publishing on this topic. Note: Setting the rate visitor requires READ-WRITE permission on the topic.
+#
+# UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to a HTTP 507 response if
+# no "rate visitor" has been previously registered. This is to avoid burning the publisher's "visitor-message-daily-limit".
+#
+# visitor-subscriber-rate-limiting: false
 
 # Payments integration via Stripe
 #

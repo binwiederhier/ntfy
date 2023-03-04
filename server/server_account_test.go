@@ -657,6 +657,17 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	m2 := toMessage(t, rr.Body.String())
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m2.ID))
 
+	// Pre-verify message count and file
+	ms, err := s.messageCache.Messages("mytopic1", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ms))
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m1.ID))
+
+	ms, err = s.messageCache.Messages("mytopic2", sinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(ms))
+	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m2.ID))
+
 	// Delete reservation
 	rr = request(t, s, "DELETE", "/v1/account/reservation/mytopic1", ``, map[string]string{
 		"X-Delete-Messages": "true",
@@ -672,9 +683,13 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 
 	// Verify that messages and attachments were deleted
 	// This does not explicitly call the manager!
-	time.Sleep(time.Second)
+	waitFor(t, func() bool {
+		ms, err := s.messageCache.Messages("mytopic1", sinceAllMessages, false)
+		require.Nil(t, err)
+		return len(ms) == 0 && !util.FileExists(filepath.Join(s.config.AttachmentCacheDir, m1.ID))
+	})
 
-	ms, err := s.messageCache.Messages("mytopic1", sinceAllMessages, false)
+	ms, err = s.messageCache.Messages("mytopic1", sinceAllMessages, false)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(ms))
 	require.NoFileExists(t, filepath.Join(s.config.AttachmentCacheDir, m1.ID))
@@ -712,13 +727,12 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 
-	// Wait for stats queue writer
-	time.Sleep(600 * time.Millisecond)
-
-	// Verify that message stats were persisted
-	u, err := s.userManager.User("phil")
-	require.Nil(t, err)
-	require.Equal(t, int64(1), u.Stats.Messages)
+	// Wait for stats queue writer, verify that message stats were persisted
+	waitFor(t, func() bool {
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		return int64(1) == u.Stats.Messages
+	})
 
 	// Change tier, make a request (to reset limiters)
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
@@ -736,10 +750,11 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Verify that message stats were persisted
-	time.Sleep(600 * time.Millisecond)
-	u, err = s.userManager.User("phil")
-	require.Nil(t, err)
-	require.Equal(t, int64(2), u.Stats.Messages) // v.EnqueueUserStats had run!
+	waitFor(t, func() bool {
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		return int64(2) == u.Stats.Messages // v.EnqueueUserStats had run!
+	})
 
 	// Stats keep counting
 	rr = request(t, s, "GET", "/v1/account", "", map[string]string{

@@ -932,6 +932,25 @@ If this ever happens, there will be a log message that looks something like this
 WARN Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor
 ```
 
+### Subscriber-based rate limiting
+By default, ntfy puts almost all rate limits on the message publisher, e.g. number of messages, requests, and attachment
+size are all based on the visitor who publishes a message. **Subscriber-based rate limiting is a way to use the rate limits
+of a topic's subscriber, instead of the limits of the publisher.**
+
+If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
+to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
+publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+
+Once enabled, a client may send a `Rate-Topics: <topic1>,<topic2>,...` header when subscribing to topics via
+HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
+to use when publishing on this topic. Note that setting the rate visitor requires **read-write permission** on the topic.
+
+UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
+response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
+`visitor-message-daily-limit`.
+
+To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
+
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,
 if it's not behind a proxy, the ntfy server can keep about **as many connections as the open file limit allows**.
@@ -1191,6 +1210,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 5s                | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
 | `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP list*                      | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                |
 | `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*                                            | 30                | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
+| `visitor-subscriber-rate-limiting`         | `NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING`         | *bool*                                              | `false`           | Rate limiting: Enables subscriber-based rate limiting                                                                                                                                                                           |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | `app`, `home` or `disable`                          | `app`             | Sets web root to landing page (home), web app (app) or disables the web app entirely (disable)                                                                                                                                  |
 | `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                 |
 | `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                  |

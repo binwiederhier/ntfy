@@ -143,6 +143,7 @@ func (v *visitor) contextNoLock() log.Context {
 	fields := log.Context{
 		"visitor_id":                     visitorID(v.ip, v.user),
 		"visitor_ip":                     v.ip.String(),
+		"visitor_seen":                   util.FormatTime(v.seen),
 		"visitor_messages":               info.Stats.Messages,
 		"visitor_messages_limit":         info.Limits.MessageLimit,
 		"visitor_messages_remaining":     info.Stats.MessagesRemaining,

@@ -1172,6 +1172,56 @@ func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {
 	require.Equal(t, 400, response.Code)
 }
 
+func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+
+	subFn := func(v *visitor, msg *message) error {
+		return nil
+	}
+
+	// Publish and check last access
+	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"Cache": "no",
+	})
+	require.Equal(t, 200, response.Code)
+	require.True(t, s.topics["mytopic"].lastAccess.Unix() >= time.Now().Unix()-2)
+	require.True(t, s.topics["mytopic"].lastAccess.Unix() <= time.Now().Unix()+2)
+
+	// Topic won't get pruned
+	s.execManager()
+	require.NotNil(t, s.topics["mytopic"])
+
+	// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
+	subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+	s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+	s.execManager()
+	require.NotNil(t, s.topics["mytopic"])
+
+	// It'll finally get pruned now that there are no subscribers and last access is 17 hours ago
+	s.topics["mytopic"].Unsubscribe(subID)
+	s.execManager()
+	require.Nil(t, s.topics["mytopic"])
+}
+
+func TestServer_TopicKeepaliveOnPoll(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+
+	// Create topic by polling once
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+
+	// Mess with last access time
+	s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+
+	// Poll again and check keepalive time
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.True(t, s.topics["mytopic"].lastAccess.Unix() >= time.Now().Unix()-2)
+	require.True(t, s.topics["mytopic"].lastAccess.Unix() <= time.Now().Unix()+2)
+}
+
 func TestServer_UnifiedPushDiscovery(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "GET", "/mytopic?up=1", "", nil)
@@ -1299,6 +1349,32 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
 	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
+
+	// No success if no rate visitor set (this also creates the topic in memory
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 507, response.Code)
+	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
+	require.Nil(t, s.topics["mytopic"].rateVisitor)
+
+	// Fake: This topic has been around for 13 hours without a rate visitor
+	s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
+
+	// Same request should now return HTTP 200 with a rejected pushkey
+	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`, strings.TrimSpace(response.Body.String()))
+
+	// Slightly unrelated: Test that topic is pruned after 16 hours
+	s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+	s.execManager()
+	require.Nil(t, s.topics["mytopic"])
 }
 
 func TestServer_MatrixGateway_Push_Failure_InvalidPushkey(t *testing.T) {

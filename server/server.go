@@ -585,9 +585,9 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*message, error) {
-	t := fromContext[topic](r, contextTopic)
-	vrate := fromContext[visitor](r, contextRateVisitor)
+func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, error) {
+	t := fromContext[*topic](r, contextTopic)
+	vrate := fromContext[*visitor](r, contextRateVisitor)
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {
 		return nil, err
@@ -670,7 +670,7 @@ func (s *Server) handlePublishWithoutResponse(r *http.Request, v *visitor) (*mes
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	m, err := s.handlePublishWithoutResponse(r, v)
+	m, err := s.handlePublishInternal(r, v)
 	if err != nil {
 		return err
 	}
@@ -678,10 +678,14 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	_, err := s.handlePublishWithoutResponse(r, v)
+	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
 		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			return writeMatrixResponse(w, e.rejectedPushKey)
+			topic := fromContext[*topic](r, contextTopic)
+			pushKey := fromContext[string](r, contextMatrixPushKey)
+			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
+				return writeMatrixResponse(w, pushKey)
+			}
 		}
 		return err
 	}
@@ -1011,6 +1015,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8")                    // Android/Volley client needs charset!
 	if poll {
+		for _, t := range topics {
+			t.Keepalive()
+		}
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1037,7 +1044,12 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		case <-r.Context().Done():
 			return nil
 		case <-time.After(s.config.KeepaliveInterval):
-			logvr(v, r).Tag(tagSubscribe).Trace("Sending keepalive message")
+			ev := logvr(v, r).Tag(tagSubscribe)
+			if len(topics) == 1 {
+				ev.With(topics[0]).Trace("Sending keepalive message to %s", topics[0].ID)
+			} else {
+				ev.Trace("Sending keepalive message to %d topics", len(topics))
+			}
 			v.Keepalive()
 			for _, t := range topics {
 				t.Keepalive()
@@ -1154,6 +1166,9 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
+		for _, t := range topics {
+			t.Keepalive()
+		}
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)

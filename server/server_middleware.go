@@ -11,6 +11,7 @@ type contextKey int
 const (
 	contextRateVisitor contextKey = iota + 2586
 	contextTopic
+	contextMatrixPushKey
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {

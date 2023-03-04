@@ -2,13 +2,18 @@ package server
 
 import (
 	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 	"math/rand"
 	"sync"
 	"time"
 )
 
 const (
-	topicExpiryDuration = 6 * time.Hour
+	// topicExpungeAfter defines how long a topic is active before it is removed from memory.
+	//
+	// This must be larger than matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter to give
+	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
+	topicExpungeAfter = 16 * time.Hour
 )
 
 // topic represents a channel to which subscribers can subscribe, and publishers
@@ -59,7 +64,13 @@ func (t *topic) Stale() bool {
 	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
 		return false
 	}
-	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpiryDuration
+	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
+}
+
+func (t *topic) LastAccess() time.Time {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.lastAccess
 }
 
 func (t *topic) SetRateVisitor(v *visitor) {
@@ -148,6 +159,7 @@ func (t *topic) Context() log.Context {
 	fields := map[string]any{
 		"topic":             t.ID,
 		"topic_subscribers": len(t.subscribers),
+		"topic_last_access": util.FormatTime(t.lastAccess),
 	}
 	if t.rateVisitor != nil {
 		for k, v := range t.rateVisitor.Context() {

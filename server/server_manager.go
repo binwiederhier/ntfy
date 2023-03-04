@@ -2,8 +2,8 @@ package server
 
 import (
 	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 	"strings"
-	"time"
 )
 
 func (s *Server) execManager() {
@@ -39,13 +39,13 @@ func (s *Server) execManager() {
 				ev := log.Tag(tagManager).With(t)
 				if t.Stale() {
 					if ev.IsTrace() {
-						ev.Trace("- topic %s: Deleting stale topic (%d subscribers, accessed %s)", t.ID, subs, lastAccess.Format(time.RFC822))
+						ev.Trace("- topic %s: Deleting stale topic (%d subscribers, accessed %s)", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					emptyTopics++
 					delete(s.topics, t.ID)
 				} else {
 					if ev.IsTrace() {
-						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, lastAccess.Format(time.RFC822))
+						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					subscribers += subs
 				}

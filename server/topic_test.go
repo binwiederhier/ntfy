@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestTopic_CancelSubscribers(t *testing.T) {
@@ -27,4 +28,14 @@ func TestTopic_CancelSubscribers(t *testing.T) {
 	to.CancelSubscribers("u_phil")
 	require.True(t, canceled1.Load())
 	require.False(t, canceled2.Load())
+}
+
+func TestTopic_Keepalive(t *testing.T) {
+	t.Parallel()
+
+	to := newTopic("mytopic")
+	to.lastAccess = time.Now().Add(-1 * time.Hour)
+	to.Keepalive()
+	require.True(t, to.LastAccess().Unix() >= time.Now().Unix()-2)
+	require.True(t, to.LastAccess().Unix() <= time.Now().Unix()+2)
 }

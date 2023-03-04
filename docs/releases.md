@@ -7,6 +7,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Support SMTP servers without auth ([#645](https://github.com/binwiederhier/ntfy/issues/645), thanks to [@Sharknoon](https://github.com/Sharknoon) for reporting)
+* Add `visitor-subscriber-rate-limiting` flag to allow enabling subscriber-based rate limiting (off by default now, [#655](https://github.com/binwiederhier/ntfy/pull/655), thanks to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)
 
 **Bug fixes + maintenance:**
 

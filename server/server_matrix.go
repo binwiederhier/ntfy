@@ -76,7 +76,7 @@ const (
 	// matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter is the time after which a Matrix response
 	// will return an HTTP 200 with the push key (i.e. "rejected":["<pushkey>"]}), if no rate visitor has been set on
 	// the topic. Rejecting the push key will instruct the Matrix server to invalidate the pushkey and stop sending
-	// messages to it. See https://spec.matrix.org/v1.6/push-gateway-api/
+	// messages to it. This must be longer than topicExpungeAfter. See https://spec.matrix.org/v1.6/push-gateway-api/
 	matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter = 12 * time.Hour
 )
 

@@ -705,7 +705,7 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	t.Parallel()
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
-	conf.AuthStatsQueueWriterInterval = 100 * time.Millisecond
+	conf.AuthStatsQueueWriterInterval = 300 * time.Millisecond
 	s := newTestServer(t, conf)
 	defer s.closeDatabases()
 

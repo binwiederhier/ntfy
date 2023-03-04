@@ -10,7 +10,6 @@ import (
 
 const (
 	// topicExpungeAfter defines how long a topic is active before it is removed from memory.
-	//
 	// This must be larger than matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter to give
 	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
 	topicExpungeAfter = 16 * time.Hour

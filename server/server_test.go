@@ -1357,7 +1357,7 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 	s := newTestServer(t, c)
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 
-	// No success if no rate visitor set (this also creates the topic in memory
+	// No success if no rate visitor set (this also creates the topic in memory)
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
 	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)

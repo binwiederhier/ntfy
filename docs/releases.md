@@ -2,7 +2,15 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.2.0 (UNRELEASED)
+## ntfy server v2.1.2
+Released March 4, 2023
+
+This is a hotfix release, mostly to combat the ridiculous amount of Matrix requests with invalid/dead pushkeys, and the
+corresponding HTTP 507 responses the ntfy.sh server is sending out. We're up to >600k HTTP 507 responses 🤦. This release
+solves this issue by rejecting Matrix pushkeys, if nobody has subscribed to the corresponding topic to 12 hours.
+
+The release furthermore reverts the default rate limiting behavior for UnifiedPush to be publisher-based, and introduces
+a flag to enable [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting) for high volume servers.
 
 **Features:**
 
@@ -11,7 +19,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Token auth doesn't work if default user credentials are defined in `client.yml` ([#650](https://github.com/binwiederhier/ntfy/issues/650), thanks to [@Xinayder](https://github.com/Xinayder))
-* Add `visitor-subscriber-rate-limiting` flag to allow enabling subscriber-based rate limiting (off by default now, [#649](https://github.com/binwiederhier/ntfy/issues/649)/[#655](https://github.com/binwiederhier/ntfy/pull/655), thanks to [@barathrm](https://github.com/barathrm) for reporting, and to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)
+* Add `visitor-subscriber-rate-limiting` flag to allow enabling [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting) (off by default now, [#649](https://github.com/binwiederhier/ntfy/issues/649)/[#655](https://github.com/binwiederhier/ntfy/pull/655), thanks to [@barathrm](https://github.com/barathrm) for reporting, and to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)
 * Reject Matrix pushkey after 12 hours of inactivity on a topic, if `visitor-subscriber-rate-limiting` is enabled ([#643](https://github.com/binwiederhier/ntfy/pull/643), thanks to [@karmanyaahm](https://github.com/karmanyaahm) and [@p1gp1g](https://github.com/p1gp1g) for help with the design)  
 
 **Additional languages:**

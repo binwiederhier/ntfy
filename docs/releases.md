@@ -7,7 +7,7 @@ Released March 4, 2023
 
 This is a hotfix release, mostly to combat the ridiculous amount of Matrix requests with invalid/dead pushkeys, and the
 corresponding HTTP 507 responses the ntfy.sh server is sending out. We're up to >600k HTTP 507 responses per day 🤦. This 
-release solves this issue by rejecting Matrix pushkeys, if nobody has subscribed to the corresponding topic to 12 hours.
+release solves this issue by rejecting Matrix pushkeys, if nobody has subscribed to the corresponding topic for 12 hours.
 
 The release furthermore reverts the default rate limiting behavior for UnifiedPush to be publisher-based, and introduces
 a flag to enable [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting) for high volume servers.

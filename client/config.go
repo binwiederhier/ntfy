@@ -15,11 +15,13 @@ type Config struct {
 	DefaultHost     string  `yaml:"default-host"`
 	DefaultUser     string  `yaml:"default-user"`
 	DefaultPassword *string `yaml:"default-password"`
+	DefaultToken    string  `yaml:"default-token"`
 	DefaultCommand  string  `yaml:"default-command"`
 	Subscribe       []struct {
 		Topic    string            `yaml:"topic"`
 		User     string            `yaml:"user"`
 		Password *string           `yaml:"password"`
+		Token    string            `yaml:"token"`
 		Command  string            `yaml:"command"`
 		If       map[string]string `yaml:"if"`
 	} `yaml:"subscribe"`
@@ -31,6 +33,7 @@ func NewConfig() *Config {
 		DefaultHost:     DefaultBaseURL,
 		DefaultUser:     "",
 		DefaultPassword: nil,
+		DefaultToken:    "",
 		DefaultCommand:  "",
 		Subscribe:       nil,
 	}

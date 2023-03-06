@@ -1622,6 +1622,7 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // maybeAuthenticate reads the "Authorization" header and will try to authenticate the user
 // if it is set.
 //
+//   - If auth-db is not configured, immediately return an IP-based visitor
 //   - If the header is not set or not supported (anything non-Basic and non-Bearer),
 //     an IP-based visitor is returned
 //   - If the header is set, authenticate will be called to check the username/password (Basic auth),
@@ -1633,13 +1634,14 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	// Read "Authorization" header value, and exit out early if it's not set
 	ip := extractIPAddress(r, s.config.BehindProxy)
 	vip := s.visitor(ip, nil)
+	if s.userManager == nil {
+		return vip, nil
+	}
 	header, err := readAuthHeader(r)
 	if err != nil {
 		return vip, err
 	} else if !supportedAuthHeader(header) {
 		return vip, nil
-	} else if s.userManager == nil {
-		return vip, errHTTPUnauthorized
 	}
 	// If we're trying to auth, check the rate limiter first
 	if !vip.AuthAllowed() {

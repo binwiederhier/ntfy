@@ -30,6 +30,7 @@ var flagsSubscribe = append(
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "client config file"},
 	&cli.StringFlag{Name: "since", Aliases: []string{"s"}, Usage: "return events since `SINCE` (Unix timestamp, or all)"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
+	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_TOKEN"}, Usage: "access token used to auth against the server"},
 	&cli.BoolFlag{Name: "from-config", Aliases: []string{"from_config", "C"}, Usage: "read subscriptions from config file (service mode)"},
 	&cli.BoolFlag{Name: "poll", Aliases: []string{"p"}, Usage: "return events and exit, do not listen for new events"},
 	&cli.BoolFlag{Name: "scheduled", Aliases: []string{"sched", "S"}, Usage: "also return scheduled/delayed events"},
@@ -97,17 +98,27 @@ func execSubscribe(c *cli.Context) error {
 	cl := client.New(conf)
 	since := c.String("since")
 	user := c.String("user")
+	token := c.String("token")
 	poll := c.Bool("poll")
 	scheduled := c.Bool("scheduled")
 	fromConfig := c.Bool("from-config")
 	topic := c.Args().Get(0)
 	command := c.Args().Get(1)
+
+	// Checks
+	if user != "" && token != "" {
+		return errors.New("cannot set both --user and --token")
+	}
+
 	if !fromConfig {
 		conf.Subscribe = nil // wipe if --from-config not passed
 	}
 	var options []client.SubscribeOption
 	if since != "" {
 		options = append(options, client.WithSince(since))
+	}
+	if token != "" {
+		options = append(options, client.WithBearerAuth(token))
 	}
 	if user != "" {
 		var pass string
@@ -175,21 +186,32 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		for filter, value := range s.If {
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
 		}
-		var user string
-		var password *string
-		if s.User != "" {
-			user = s.User
-		} else if conf.DefaultUser != "" {
-			user = conf.DefaultUser
+
+		// check for subscription token then subscription user:pass
+		var authSet bool
+		if s.Token != "" {
+			topicOptions = append(topicOptions, client.WithBearerAuth(s.Token))
+			authSet = true
+		} else {
+			if s.User != "" && s.Password != nil {
+				topicOptions = append(topicOptions, client.WithBasicAuth(s.User, *s.Password))
+				authSet = true
+			}
 		}
-		if s.Password != nil {
-			password = s.Password
-		} else if conf.DefaultPassword != nil {
-			password = conf.DefaultPassword
+
+		// if no subscription token nor subscription user:pass, check for default token then default user:pass
+		if !authSet {
+			if conf.DefaultToken != "" {
+				topicOptions = append(topicOptions, client.WithBearerAuth(conf.DefaultToken))
+				authSet = true
+			} else {
+				if conf.DefaultUser != "" && conf.DefaultPassword != nil {
+					topicOptions = append(topicOptions, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
+					authSet = true
+				}
+			}
 		}
-		if user != "" && password != nil {
-			topicOptions = append(topicOptions, client.WithBasicAuth(user, *password))
-		}
+
 		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
 		if s.Command != "" {
 			cmds[subscriptionID] = s.Command

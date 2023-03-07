@@ -228,5 +228,14 @@
     "account_basics_username_description": "Хей, това сте вие ❤",
     "account_basics_username_admin_tooltip": "Вие сте администратор",
     "account_basics_password_title": "Парола",
-    "account_delete_dialog_label": "Парола"
+    "account_delete_dialog_label": "Парола",
+    "account_basics_password_dialog_title": "Смяна на парола",
+    "account_basics_password_dialog_current_password_label": "Текуща парола",
+    "account_basics_password_dialog_new_password_label": "Нова парола",
+    "account_basics_password_dialog_confirm_password_label": "Парола отново",
+    "account_basics_password_dialog_button_submit": "Смяна на парола",
+    "account_usage_title": "Употреба",
+    "account_usage_of_limit": "от {{limit}}",
+    "account_usage_unlimited": "Неограничено",
+    "account_usage_limits_reset_daily": "Ограниченията се нулират всеки ден в полунощ (UTC)"
 }

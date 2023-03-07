@@ -5,10 +5,12 @@
 #
 # default-host: https://ntfy.sh
 
-# Default username and password will be used with "ntfy publish" if no credentials are provided on command line
-# Default username and password will be used with "ntfy subscribe" if no credentials are provided in subscription below
-# For an empty password, use empty double-quotes ("")
-#
+# Default credentials will be used with "ntfy publish" and "ntfy subscribe" if no other credentials are provided.
+# You can set a default token to use or a default user:password combination, but not both. For an empty password,
+# use empty double-quotes ("")
+
+# default-token:
+
 # default-user:
 # default-password:
 
@@ -30,6 +32,8 @@
 #         command: 'notify-send "$m"'
 #         user: phill
 #         password: mypass
+#       - topic: token_topic
+#         token: tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
 #
 # Variables:
 #     Variable        Aliases               Description

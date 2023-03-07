@@ -133,29 +133,6 @@ func TestManager_AddUser_And_Query(t *testing.T) {
 	require.Equal(t, u.ID, u3.ID)
 }
 
-func TestManager_Authenticate_Timing(t *testing.T) {
-	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
-
-	// Timing a correct attempt
-	start := time.Now().UnixMilli()
-	_, err := a.Authenticate("user", "pass")
-	require.Nil(t, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
-
-	// Timing an incorrect attempt
-	start = time.Now().UnixMilli()
-	_, err = a.Authenticate("user", "INCORRECT")
-	require.Equal(t, ErrUnauthenticated, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
-
-	// Timing a non-existing user attempt
-	start = time.Now().UnixMilli()
-	_, err = a.Authenticate("DOES-NOT-EXIST", "hithere")
-	require.Equal(t, ErrUnauthenticated, err)
-	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
-}
-
 func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 

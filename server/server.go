@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
@@ -37,6 +38,7 @@ type Server struct {
 	config            *Config
 	httpServer        *http.Server
 	httpsServer       *http.Server
+	httpMetricsServer *http.Server
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
@@ -256,6 +258,12 @@ func (s *Server) Run() error {
 			errChan <- httpServer.Serve(s.unixListener)
 		}()
 	}
+	if s.config.ListenMetricsHTTP != "" {
+		s.httpMetricsServer = &http.Server{Addr: s.config.ListenMetricsHTTP, Handler: promhttp.Handler()}
+		go func() {
+			errChan <- s.httpMetricsServer.ListenAndServe()
+		}()
+	}
 	if s.config.SMTPServerListen != "" {
 		go func() {
 			errChan <- s.runSMTPServer()
@@ -316,6 +324,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 				s.handleError(w, r, v, err)
 				return
 			}
+			metrics.httpRequests.WithLabelValues("200", "20000", r.Method).Inc()
 		}).
 		Debug("HTTP request finished")
 }
@@ -325,6 +334,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	if !ok {
 		httpErr = errHTTPInternalError
 	}
+	metrics.httpRequests.WithLabelValues(fmt.Sprintf("%d", httpErr.HTTPCode), fmt.Sprintf("%d", httpErr.Code), r.Method).Inc()
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
 	ev := logvr(v, r).Err(err)
@@ -672,14 +682,17 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	m, err := s.handlePublishInternal(r, v)
 	if err != nil {
+		metrics.messagesPublishedFailure.Inc()
 		return err
 	}
+	metrics.messagesPublishedSuccess.Inc()
 	return s.writeJSON(w, m)
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
+		metrics.messagesPublishedFailure.Inc()
 		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
 			topic := fromContext[*topic](r, contextTopic)
 			pushKey := fromContext[string](r, contextMatrixPushKey)
@@ -689,25 +702,32 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 		}
 		return err
 	}
+	metrics.messagesPublishedSuccess.Inc()
 	return writeMatrixSuccess(w)
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
 	logvm(v, m).Tag(tagFirebase).Debug("Publishing to Firebase")
 	if err := s.firebaseClient.Send(v, m); err != nil {
+		metrics.firebasePublishedFailure.Inc()
 		if err == errFirebaseTemporarilyBanned {
 			logvm(v, m).Tag(tagFirebase).Err(err).Debug("Unable to publish to Firebase: %v", err.Error())
 		} else {
 			logvm(v, m).Tag(tagFirebase).Err(err).Warn("Unable to publish to Firebase: %v", err.Error())
 		}
+		return
 	}
+	metrics.firebasePublishedSuccess.Inc()
 }
 
 func (s *Server) sendEmail(v *visitor, m *message, email string) {
 	logvm(v, m).Tag(tagEmail).Field("email", email).Debug("Sending email to %s", email)
 	if err := s.smtpSender.Send(v, m, email); err != nil {
 		logvm(v, m).Tag(tagEmail).Field("email", email).Err(err).Warn("Unable to send email to %s: %v", email, err.Error())
+		metrics.emailsPublishedFailure.Inc()
+		return
 	}
+	metrics.emailsPublishedSuccess.Inc()
 }
 
 func (s *Server) forwardPollRequest(v *visitor, m *message) {

@@ -37,9 +37,10 @@ var flagsServe = append(
 	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, DefaultText: defaultServerConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used to as HTTP listen address"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used to as HTTPS listen address"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-metrics-http", Aliases: []string{"listen_metrics_http"}, EnvVars: []string{"NTFY_LISTEN_METRICS_HTTP"}, Usage: "ip:port used to expose the metrics endpoint"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, DefaultText: "system default", Usage: "file permissions of unix socket, e.g. 0700"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
@@ -118,6 +119,7 @@ func execServe(c *cli.Context) error {
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
 	listenUnixMode := c.Int("listen-unix-mode")
+	listenMetricsHTTP := c.String("listen-metrics-http")
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
@@ -269,6 +271,7 @@ func execServe(c *cli.Context) error {
 	conf.ListenHTTPS = listenHTTPS
 	conf.ListenUnix = listenUnix
 	conf.ListenUnixMode = fs.FileMode(listenUnixMode)
+	conf.ListenMetricsHTTP = listenMetricsHTTP
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile
 	conf.FirebaseKeyFile = firebaseKeyFile

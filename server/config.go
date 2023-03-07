@@ -72,6 +72,7 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	ListenMetricsHTTP                    string
 	KeyFile                              string
 	CertFile                             string
 	FirebaseKeyFile                      string

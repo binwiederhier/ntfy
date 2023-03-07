@@ -12,19 +12,22 @@ const (
 
 // Config is the config struct for a Client
 type Config struct {
-	DefaultHost     string  `yaml:"default-host"`
-	DefaultUser     string  `yaml:"default-user"`
-	DefaultPassword *string `yaml:"default-password"`
-	DefaultToken    string  `yaml:"default-token"`
-	DefaultCommand  string  `yaml:"default-command"`
-	Subscribe       []struct {
-		Topic    string            `yaml:"topic"`
-		User     string            `yaml:"user"`
-		Password *string           `yaml:"password"`
-		Token    string            `yaml:"token"`
-		Command  string            `yaml:"command"`
-		If       map[string]string `yaml:"if"`
-	} `yaml:"subscribe"`
+	DefaultHost     string      `yaml:"default-host"`
+	DefaultUser     string      `yaml:"default-user"`
+	DefaultPassword *string     `yaml:"default-password"`
+	DefaultToken    string      `yaml:"default-token"`
+	DefaultCommand  string      `yaml:"default-command"`
+	Subscribe       []Subscribe `yaml:"subscribe"`
+}
+
+// Subscribe is the struct for a Subscription within Config
+type Subscribe struct {
+	Topic    string            `yaml:"topic"`
+	User     string            `yaml:"user"`
+	Password *string           `yaml:"password"`
+	Token    string            `yaml:"token"`
+	Command  string            `yaml:"command"`
+	If       map[string]string `yaml:"if"`
 }
 
 // NewConfig creates a new Config struct for a Client

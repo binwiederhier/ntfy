@@ -156,6 +156,9 @@ func execSubscribe(c *cli.Context) error {
 
 func doPoll(c *cli.Context, cl *client.Client, conf *client.Config, topic, command string, options ...client.SubscribeOption) error {
 	for _, s := range conf.Subscribe { // may be nil
+		if auth := maybeAddAuthHeader(s, conf); auth != nil {
+			options = append(options, auth)
+		}
 		if err := doPollSingle(c, cl, s.Topic, s.Command, options...); err != nil {
 			return err
 		}
@@ -187,29 +190,8 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			topicOptions = append(topicOptions, client.WithFilter(filter, value))
 		}
 
-		// check for subscription token then subscription user:pass
-		var authSet bool
-		if s.Token != "" {
-			topicOptions = append(topicOptions, client.WithBearerAuth(s.Token))
-			authSet = true
-		} else {
-			if s.User != "" && s.Password != nil {
-				topicOptions = append(topicOptions, client.WithBasicAuth(s.User, *s.Password))
-				authSet = true
-			}
-		}
-
-		// if no subscription token nor subscription user:pass, check for default token then default user:pass
-		if !authSet {
-			if conf.DefaultToken != "" {
-				topicOptions = append(topicOptions, client.WithBearerAuth(conf.DefaultToken))
-				authSet = true
-			} else {
-				if conf.DefaultUser != "" && conf.DefaultPassword != nil {
-					topicOptions = append(topicOptions, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
-					authSet = true
-				}
-			}
+		if auth := maybeAddAuthHeader(s, conf); auth != nil {
+			topicOptions = append(topicOptions, auth)
 		}
 
 		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
@@ -232,6 +214,25 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		}
 		log.Debug("%s Dispatching received message: %s", logMessagePrefix(m), m.Raw)
 		printMessageOrRunCommand(c, m, cmd)
+	}
+	return nil
+}
+
+func maybeAddAuthHeader(s client.Subscribe, conf *client.Config) client.SubscribeOption {
+	// check for subscription token then subscription user:pass
+	if s.Token != "" {
+		return client.WithBearerAuth(s.Token)
+	}
+	if s.User != "" && s.Password != nil {
+		return client.WithBasicAuth(s.User, *s.Password)
+	}
+
+	// if no subscription token nor subscription user:pass, check for default token then default user:pass
+	if conf.DefaultToken != "" {
+		return client.WithBearerAuth(conf.DefaultToken)
+	}
+	if conf.DefaultUser != "" && conf.DefaultPassword != nil {
+		return client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword)
 	}
 	return nil
 }

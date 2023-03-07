@@ -285,7 +285,7 @@
     "account_delete_dialog_button_submit": "Trvale odstranit účet",
     "account_delete_dialog_billing_warning": "Odstraněním účtu se také okamžitě zruší vaše předplatné. Nebudete již mít přístup k fakturačnímu panelu.",
     "account_upgrade_dialog_title": "Změna úrovně účtu",
-    "account_upgrade_dialog_proration_info": "<strong>Prohlášení</strong>: Při přechodu mezi placenými úrovněmi bude rozdíl v ceně účtován nebo vrácen v následující faktuře. Další fakturu obdržíte až na konci dalšího zúčtovacího období.",
+    "account_upgrade_dialog_proration_info": "<strong>Prohlášení</strong>: Při přechodu mezi placenými úrovněmi bude rozdíl v ceně <strong>zaúčtován okamžitě</strong>. Při přechodu na nižší úroveň se zůstatek použije na platbu za budoucí zúčtovací období.",
     "account_upgrade_dialog_reservations_warning_one": "Vybraná úroveň umožňuje méně rezervovaných témat než vaše aktuální úroveň. Než změníte svou úroveň, <strong>odstraňte alespoň jednu rezervaci</strong>. Rezervace můžete odstranit v <Link>Nastavení</Link>.",
     "account_upgrade_dialog_tier_features_reservations": "{{reservations}} rezervovaných témat",
     "account_upgrade_dialog_tier_features_messages": "{{messages}} denních zpráv",
@@ -340,5 +340,17 @@
     "reservation_delete_dialog_action_keep_description": "Zprávy a přílohy, které jsou uloženy v mezipaměti serveru, se stanou veřejně viditelnými pro osoby, které znají název tématu.",
     "reservation_delete_dialog_action_delete_title": "Odstranění zpráv a příloh uložených v mezipaměti",
     "reservation_delete_dialog_action_delete_description": "Zprávy a přílohy uložené v mezipaměti budou trvale odstraněny. Tuto akci nelze vrátit zpět.",
-    "reservation_delete_dialog_submit_button": "Odstranit rezervaci"
+    "reservation_delete_dialog_submit_button": "Odstranit rezervaci",
+    "account_basics_tier_interval_yearly": "roční",
+    "account_upgrade_dialog_interval_yearly_discount_save": "ušetříte {{discount}}%",
+    "account_upgrade_dialog_tier_price_per_month": "měsíc",
+    "account_upgrade_dialog_tier_features_no_reservations": "Žádná rezervovaná témata",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "ušetříte až {{discount}}%",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} účtováno ročně. Ušetříte {{save}}.",
+    "account_basics_tier_interval_monthly": "měsíční",
+    "account_upgrade_dialog_interval_monthly": "Měsíční",
+    "account_upgrade_dialog_interval_yearly": "Roční",
+    "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} za rok. Účtuje se měsíčně.",
+    "account_upgrade_dialog_billing_contact_email": "V případě dotazů týkajících se fakturace nás prosím <Link>kontaktujte</Link> přímo.",
+    "account_upgrade_dialog_billing_contact_website": "Otázky týkající se fakturace naleznete na našich <Link>webových stránkách</Link>."
 }

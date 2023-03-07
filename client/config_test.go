@@ -116,3 +116,25 @@ subscribe:
 	require.Equal(t, "phil", conf.Subscribe[0].User)
 	require.Nil(t, conf.Subscribe[0].Password)
 }
+
+func TestConfig_DefaultToken(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "client.yml")
+	require.Nil(t, os.WriteFile(filename, []byte(`
+default-host: http://localhost
+default-token: tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
+subscribe:
+  - topic: mytopic
+`), 0600))
+
+	conf, err := client.LoadConfig(filename)
+	require.Nil(t, err)
+	require.Equal(t, "http://localhost", conf.DefaultHost)
+	require.Equal(t, "", conf.DefaultUser)
+	require.Nil(t, conf.DefaultPassword)
+	require.Equal(t, "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2", conf.DefaultToken)
+	require.Equal(t, 1, len(conf.Subscribe))
+	require.Equal(t, "mytopic", conf.Subscribe[0].Topic)
+	require.Equal(t, "", conf.Subscribe[0].User)
+	require.Nil(t, conf.Subscribe[0].Password)
+	require.Equal(t, "", conf.Subscribe[0].Token)
+}

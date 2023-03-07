@@ -48,8 +48,13 @@ func readHeaderParam(r *http.Request, names ...string) string {
 }
 
 func readQueryParam(r *http.Request, names ...string) string {
+	lowerQueryParams := make(map[string]string, 0)
+	for k, vs := range r.URL.Query() {
+		lowerQueryParams[strings.ToLower(k)] = vs[0]
+	}
+
 	for _, name := range names {
-		value := r.URL.Query().Get(strings.ToLower(name))
+		value := lowerQueryParams[strings.ToLower(name)]
 		if value != "" {
 			return strings.TrimSpace(value)
 		}

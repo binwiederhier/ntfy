@@ -309,6 +309,18 @@ func TestServer_PublishGETOnlyOneTopic(t *testing.T) {
 	require.Equal(t, 404, response.Code)
 }
 
+func TestServer_PublishCaseInsensitiveQueryParam(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "GET", "/mytopic/publish?MESSAGE=testing", "", nil)
+	require.Equal(t, "testing", toMessage(t, response.Body.String()).Message)
+}
+
+func TestServer_PublishInvalidQueryParam(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "GET", "/mytopic/publish?MESSAGE=testing&fakeParam=test", "", nil)
+	require.Equal(t, "testing", toMessage(t, response.Body.String()).Message)
+}
+
 func TestServer_PublishNoCache(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 

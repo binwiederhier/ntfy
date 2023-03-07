@@ -237,5 +237,16 @@
     "account_usage_title": "Употреба",
     "account_usage_of_limit": "от {{limit}}",
     "account_usage_unlimited": "Неограничено",
-    "account_usage_limits_reset_daily": "Ограниченията се нулират всеки ден в полунощ (UTC)"
+    "account_usage_limits_reset_daily": "Ограниченията се нулират всеки ден в полунощ (UTC)",
+    "account_basics_tier_interval_monthly": "месечно",
+    "account_basics_tier_interval_yearly": "годишно",
+    "account_basics_password_description": "Промяна на паролата на профила",
+    "account_basics_tier_title": "Вид на профила",
+    "account_basics_tier_admin": "Администратор",
+    "account_basics_tier_admin_suffix_with_tier": "(с {{tier}} ниво)",
+    "account_basics_tier_admin_suffix_no_tier": "(без ниво)",
+    "account_basics_tier_free": "безплатен",
+    "account_basics_tier_basic": "базов",
+    "account_basics_tier_change_button": "Променяне",
+    "account_basics_tier_paid_until": "Абонаментът е платен до {{date}} и автоматично ще се поднови"
 }

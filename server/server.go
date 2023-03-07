@@ -1622,7 +1622,7 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // maybeAuthenticate reads the "Authorization" header and will try to authenticate the user
 // if it is set.
 //
-//   - If auth-db is not configured, immediately return an IP-based visitor
+//   - If auth-file is not configured, immediately return an IP-based visitor
 //   - If the header is not set or not supported (anything non-Basic and non-Bearer),
 //     an IP-based visitor is returned
 //   - If the header is set, authenticate will be called to check the username/password (Basic auth),

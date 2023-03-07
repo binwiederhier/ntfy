@@ -154,28 +154,26 @@ func execPublish(c *cli.Context) error {
 	}
 	if token != "" {
 		options = append(options, client.WithBearerAuth(token))
-	} else {
-		if user != "" {
-			var pass string
-			parts := strings.SplitN(user, ":", 2)
-			if len(parts) == 2 {
-				user = parts[0]
-				pass = parts[1]
-			} else {
-				fmt.Fprint(c.App.ErrWriter, "Enter Password: ")
-				p, err := util.ReadPassword(c.App.Reader)
-				if err != nil {
-					return err
-				}
-				pass = string(p)
-				fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
+	} else if user != "" {
+		var pass string
+		parts := strings.SplitN(user, ":", 2)
+		if len(parts) == 2 {
+			user = parts[0]
+			pass = parts[1]
+		} else {
+			fmt.Fprint(c.App.ErrWriter, "Enter Password: ")
+			p, err := util.ReadPassword(c.App.Reader)
+			if err != nil {
+				return err
 			}
-			options = append(options, client.WithBasicAuth(user, pass))
-		} else if conf.DefaultToken != "" {
-			options = append(options, client.WithBearerAuth(conf.DefaultToken))
-		} else if conf.DefaultUser != "" && conf.DefaultPassword != nil {
-			options = append(options, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
+			pass = string(p)
+			fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
 		}
+		options = append(options, client.WithBasicAuth(user, pass))
+	} else if conf.DefaultToken != "" {
+		options = append(options, client.WithBearerAuth(conf.DefaultToken))
+	} else if conf.DefaultUser != "" && conf.DefaultPassword != nil {
+		options = append(options, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
 	}
 	if pid > 0 {
 		newMessage, err := waitForProcess(pid)

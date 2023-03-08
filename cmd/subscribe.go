@@ -137,9 +137,6 @@ func execSubscribe(c *cli.Context) error {
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
 	}
-	if poll {
-		options = append(options, client.WithPoll())
-	}
 	if scheduled {
 		options = append(options, client.WithScheduled())
 	}

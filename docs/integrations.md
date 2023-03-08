@@ -117,6 +117,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [Start-Job,Variables, and ntfy.sh](https://klingele.dev/2023/03/01/start-jobvariables-and-ntfy-sh/) - klingele.dev - 3/2023 
 - [enviar notificaciones automáticas usando ntfy.sh](https://osiux.com/2023-02-15-send-automatic-notifications-using-ntfy.html) - osiux.com - 2/2023 
 - [Carnet IP动态解析以及通过ntfy推送IP信息](https://blog.wslll.cn/index.php/archives/201/) - blog.wslll.cn - 2/2023 
 - [Open-Source-Brieftaube: ntfy verschickt Push-Meldungen auf Smartphone und PC](https://www.heise.de/news/Open-Source-Brieftaube-ntfy-verschickt-Push-Meldungen-auf-Smartphone-und-PC-7521583.html) ⭐ - heise.de - 2/2023 

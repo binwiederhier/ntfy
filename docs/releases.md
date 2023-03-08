@@ -12,6 +12,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * `ntfy sub --poll --from-config` will now include authentication headers from client.yml (if applicable) ([#658](https://github.com/binwiederhier/ntfy/issues/658), thanks to [@wunter8](https://github.com/wunter8))
 
+**Documentation:**
+
+* Make query parameter description more clear ([#630](https://github.com/binwiederhier/ntfy/issues/630), thanks to [@bbaa-bbaa](https://github.com/bbaa-bbaa) for reporting, and to [@wunter8](https://github.com/wunter8) for a fix)
+
 ## ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

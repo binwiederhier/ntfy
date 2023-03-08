@@ -49,7 +49,7 @@ const (
 	DefaultVisitorEmailLimitReplenish           = time.Hour
 	DefaultVisitorAccountCreationLimitBurst     = 3
 	DefaultVisitorAccountCreationLimitReplenish = 24 * time.Hour
-	DefaultVisitorAuthFailureLimitBurst         = 10
+	DefaultVisitorAuthFailureLimitBurst         = 30
 	DefaultVisitorAuthFailureLimitReplenish     = time.Minute
 	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB
 	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB

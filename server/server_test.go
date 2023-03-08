@@ -796,6 +796,7 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 
 func TestServer_Auth_Fail_Rate_Limiting(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
+	c.VisitorAuthFailureLimitBurst = 10
 	s := newTestServer(t, c)
 
 	for i := 0; i < 10; i++ {

@@ -11,6 +11,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * `ntfy sub --poll --from-config` will now include authentication headers from client.yml (if applicable) ([#658](https://github.com/binwiederhier/ntfy/issues/658), thanks to [@wunter8](https://github.com/wunter8))
+* Increase allowed auth failure attempts per IP address to 30 (no ticket)
+* Web app: Increase maximum incremental backoff retry interval to 2 minutes (no ticket)
 
 **Documentation:**
 

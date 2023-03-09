@@ -308,5 +308,14 @@
     "account_upgrade_dialog_button_pay_now": "Zapłać i aktywuj subskrypcję",
     "account_tokens_dialog_button_cancel": "Anuluj",
     "account_tokens_dialog_expires_label": "Token dostępowy wygasa po",
-    "account_tokens_dialog_expires_unchanged": "Pozostaw termin ważności bez zmian"
+    "account_tokens_dialog_expires_unchanged": "Pozostaw termin ważności bez zmian",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} rezerwacja tematu",
+    "account_upgrade_dialog_tier_features_reservations_few": "{{reservations}} rezerwacje tematów",
+    "account_upgrade_dialog_tier_features_reservations_many": "{{reservations}} rezerwacji tematów",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} mail dziennie",
+    "account_upgrade_dialog_tier_features_emails_few": "{{emails}} maile dziennie",
+    "account_upgrade_dialog_tier_features_emails_many": "{{emails}} maili dziennie",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} wiadomość dziennie",
+    "account_upgrade_dialog_tier_features_messages_few": "{{messages}} wiadomości dziennie",
+    "account_upgrade_dialog_tier_features_messages_many": "{{messages}} wiadomości dziennie"
 }

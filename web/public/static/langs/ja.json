@@ -240,7 +240,7 @@
     "account_delete_dialog_billing_warning": "アカウントを削除するとサブスクリプション支払いも即時キャンセルされます。支払いダッシュボードにもアクセスできなくなります。",
     "account_upgrade_dialog_title": "アカウントティアを変更",
     "account_upgrade_dialog_cancel_warning": "これにより<strong>サブスクリプションをキャンセルし</strong>{{date}}にアカウントをダウングレードします。同日、トピック予約およびサーバーにキャッシュされたメッセージは<strong>削除されます</strong>。",
-    "account_upgrade_dialog_proration_info": "<strong>追記</strong>。有料プランを切り替える場合、価格差は次の請求書で請求または返金されます。次の請求期間の終わりまで、別の請求書を受け取ることはありません。",
+    "account_upgrade_dialog_proration_info": "<strong>追記</strong>。有料プランをアップグレードする場合、価格差は<strong>即座に請求されます</strong>。ダウングレードする場合、差額は次の請求期間の支払いに利用されます。",
     "account_upgrade_dialog_tier_features_reservations": "予約のトピック{{reservations}}件",
     "account_upgrade_dialog_tier_features_emails": "日次メール{{emails}}件",
     "account_upgrade_dialog_tier_features_messages": "日次メッセージ{{messages}}件",
@@ -340,5 +340,17 @@
     "prefs_reservations_dialog_title_add": "トピックを予約",
     "prefs_reservations_dialog_description": "トピックを予約する事でそのトピックの所有権が付与され、他のユーザーにアクセス権を付与する事ができるようになります。",
     "reservation_delete_dialog_description": "予約を削除するとトピックの所有権を失い、他の人が予約できるようになります。既存のメッセージや添付ファイルは保持または削除することができます。",
-    "reservation_delete_dialog_submit_button": "予約を削除"
+    "reservation_delete_dialog_submit_button": "予約を削除",
+    "account_basics_tier_interval_monthly": "毎月",
+    "account_upgrade_dialog_interval_monthly": "毎月",
+    "account_upgrade_dialog_interval_yearly": "毎年",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "最大{{discount}}%節約",
+    "account_upgrade_dialog_tier_features_no_reservations": "予約トピックなし",
+    "account_upgrade_dialog_billing_contact_email": "支払いについての問い合わせは、直接<Link>お問い合わせください</Link>。",
+    "account_upgrade_dialog_interval_yearly_discount_save": "{{discount}}%節約",
+    "account_basics_tier_interval_yearly": "毎年",
+    "account_upgrade_dialog_tier_price_per_month": "月",
+    "account_upgrade_dialog_tier_price_billed_monthly": "年間{{price}}。月毎の支払い。",
+    "account_upgrade_dialog_tier_price_billed_yearly": "年間{{price}}の支払い。{{save}}節約。",
+    "account_upgrade_dialog_billing_contact_website": "支払いに関する質問は、<Link>ウェブサイト</Link>を参照して下さい。"
 }

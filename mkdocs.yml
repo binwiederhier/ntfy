@@ -9,6 +9,7 @@ edit_uri: blob/main/docs/
 
 theme:
   name: material
+  font: false
   language: en
   custom_dir: docs/_overrides
   logo: static/img/ntfy.png

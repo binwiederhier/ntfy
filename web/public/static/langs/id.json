@@ -256,7 +256,7 @@
     "account_usage_cannot_create_portal_session": "Tidak dapat membuka portal tagihan",
     "account_delete_dialog_billing_warning": "Menghapus akun Anda juga membatalkan tagihan langganan dengan segera. Anda tidak akan memiliki akses lagi ke dasbor tagihan.",
     "account_upgrade_dialog_title": "Ubah peringkat akun",
-    "account_upgrade_dialog_proration_info": "<strong>Prorasi</strong>: Ketika mengubah rencana berbayar, perubahan harga akan ditagih atau dikembalikan di faktur berikutnya. Anda tidak akan menerima faktur lain sampai akhir periode tagihan.",
+    "account_upgrade_dialog_proration_info": "<strong>Prorasi</strong>: Saat melakukan upgrade antar paket berbayar, selisih harga akan <strong>langsung dibebankan ke</strong>. Saat menurunkan ke tingkat yang lebih rendah, saldo akan digunakan untuk membayar periode penagihan di masa mendatang.",
     "account_upgrade_dialog_reservations_warning_other": "Peringkat yang dipilih memperbolehkan lebih sedikit reservasi topik daripada peringkat Anda saat ini. Sebelum mengubah peringkat Anda, <strong>silakan menghapus setidaknya {{count}} reservasi</strong>. Anda dapat menghapus reservasi di <Link>Pengaturan</Link>.",
     "account_upgrade_dialog_tier_features_reservations": "{{reservations}} topik yang telah direservasi",
     "account_upgrade_dialog_tier_features_messages": "{{messages}} pesan harian",
@@ -340,5 +340,17 @@
     "prefs_reservations_dialog_description": "Mereservasikan sebuah topik memberikan Anda kemilikan pada topik, dan memungkinkan Anda untuk mendefinisikan perizinan akses untuk pengguna lain melalui topik.",
     "prefs_reservations_dialog_topic_label": "Topik",
     "prefs_reservations_dialog_access_label": "Akses",
-    "reservation_delete_dialog_description": "Menghapus sebuah reservasi menghapus kemilikan pada topik, dan memperbolehkan orang-orang lain untuk mereservasinya."
+    "reservation_delete_dialog_description": "Menghapus sebuah reservasi menghapus kemilikan pada topik, dan memperbolehkan orang-orang lain untuk mereservasinya.",
+    "account_upgrade_dialog_interval_yearly": "Setiap tahun",
+    "account_upgrade_dialog_tier_price_billed_yearly": "Ditagih {{price}} setiap tahun. Hemat {{save}}.",
+    "account_upgrade_dialog_interval_yearly_discount_save": "hemat {{discount}}%",
+    "account_upgrade_dialog_interval_monthly": "Setiap bulan",
+    "account_basics_tier_interval_monthly": "setiap bulan",
+    "account_basics_tier_interval_yearly": "setiap tahun",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "hemat sampai {{discount}}%",
+    "account_upgrade_dialog_tier_features_no_reservations": "Tidak ada topik yang direservasi",
+    "account_upgrade_dialog_tier_price_per_month": "bulan",
+    "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} per bulan. Ditagih setiap bulan.",
+    "account_upgrade_dialog_billing_contact_email": "Untuk pertanyaan penagihan, silakan <Link>hubungi kami</Link> secara langsung.",
+    "account_upgrade_dialog_billing_contact_website": "Untuk pertanyaan penagihan, silakan menuju ke <Link>situs web</Link> kami."
 }

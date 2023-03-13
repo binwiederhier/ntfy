@@ -3177,10 +3177,11 @@ These limits can be changed on a per-user basis using [tiers](config.md#tiers). 
 a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
 
 ## List of all parameters
-The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**,
-and can be passed as **HTTP headers** or **query parameters in the URL**. They are listed in the table in their canonical form.
+The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
+when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
+table in their canonical form.
 
-| Parameter       | Aliases (case-insensitive)                 | Description                                                                                   |
+| Parameter       | Aliases                                    | Description                                                                                   |
 |-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|
 | `X-Message`     | `Message`, `m`                             | Main body of the message as shown in the notification                                         |
 | `X-Title`       | `Title`, `t`                               | [Message title](#message-title)                                                               |

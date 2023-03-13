@@ -1,6 +1,6 @@
 import {basicAuth, bearerAuth, encodeBase64Url, topicShortUrl, topicUrlWs} from "./utils";
 
-const retryBackoffSeconds = [5, 10, 15, 20, 30];
+const retryBackoffSeconds = [5, 10, 20, 30, 60, 120];
 
 /**
  * A connection contains a single WebSocket connection for one topic. It handles its connection

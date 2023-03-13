@@ -293,7 +293,7 @@
     "account_delete_dialog_button_submit": "Eliminar permanentemente la cuenta",
     "account_upgrade_dialog_tier_features_reservations": "{{reservations}} tópicos reservados",
     "account_upgrade_dialog_cancel_warning": "Esto <strong>cancelará su suscripción</strong> y degradará su cuenta en {{date}}. En esa fecha, sus tópicos reservados y sus mensajes almacenados en caché en el servidor <strong>serán eliminados</strong>.",
-    "account_upgrade_dialog_proration_info": "<strong>Prorrateo</strong>: Al cambiar entre planes de pago, la diferencia de precio se cargará o reembolsará en la siguiente factura. No recibirá otra factura hasta el final del siguiente periodo de facturación.",
+    "account_upgrade_dialog_proration_info": "<strong>Prorrateo</strong>: al actualizar entre planes pagos, la diferencia de precio se <strong>cobrará de inmediato</strong>. Al cambiar a un nivel inferior, el saldo se utilizará para pagar futuros períodos de facturación.",
     "account_upgrade_dialog_reservations_warning_other": "El nivel seleccionado permite menos tópicos reservados que su nivel actual. Antes de cambiar de nivel, <strong>por favor elimine al menos {{count}} reservaciones</strong>. Puede eliminar reservaciones en <Link>Configuración</Link>.",
     "account_upgrade_dialog_tier_features_messages": "{{messages}} mensajes diarios",
     "account_upgrade_dialog_tier_features_emails": "{{emails}} correos diarios",
@@ -340,5 +340,17 @@
     "prefs_reservations_dialog_topic_label": "Tópico",
     "reservation_delete_dialog_description": "Al eliminar una reserva se renuncia a la propiedad sobre el tópico y se permite que otros lo reserven. Puede conservar o eliminar los mensajes y archivos adjuntos existentes.",
     "reservation_delete_dialog_action_delete_title": "Eliminar mensajes y archivos adjuntos en caché",
-    "reservation_delete_dialog_submit_button": "Eliminar reserva"
+    "reservation_delete_dialog_submit_button": "Eliminar reserva",
+    "account_basics_tier_interval_monthly": "mensualmente",
+    "account_basics_tier_interval_yearly": "anualmente",
+    "account_upgrade_dialog_interval_monthly": "Mensualmente",
+    "account_upgrade_dialog_interval_yearly": "Anualmente",
+    "account_upgrade_dialog_interval_yearly_discount_save": "ahorrar {{discount}}%",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "ahorra hasta un {{discount}}%",
+    "account_upgrade_dialog_tier_features_no_reservations": "Ningún tema reservado",
+    "account_upgrade_dialog_tier_price_per_month": "mes",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} facturado anualmente. Guardar {{save}}.",
+    "account_upgrade_dialog_billing_contact_website": "Si tiene preguntas sobre facturación, consulte nuestra <Link>página web</Link>.",
+    "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} al año. Facturación mensual.",
+    "account_upgrade_dialog_billing_contact_email": "Para preguntas sobre facturación, por favor <Link>contáctenos</Link> directamente."
 }

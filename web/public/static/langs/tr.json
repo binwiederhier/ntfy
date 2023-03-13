@@ -251,7 +251,7 @@
     "account_delete_dialog_button_submit": "Hesabı kalıcı olarak sil",
     "account_delete_dialog_billing_warning": "Hesabınızı silmek, faturalandırma aboneliğinizi de anında iptal eder. Artık faturalandırma sayfasına erişiminiz olmayacak.",
     "account_upgrade_dialog_title": "Hesap seviyesini değiştir",
-    "account_upgrade_dialog_proration_info": "<strong>Ödeme oranı</strong>: Ücretli planlar arasında geçiş yaparken, fiyat farkı bir sonraki faturada tahsil edilecek veya iade edilecektir. Bir sonraki fatura döneminin sonuna kadar başka bir fatura almayacaksınız.",
+    "account_upgrade_dialog_proration_info": "<strong>Fiyatlandırma</strong>: Ücretli planlar arasında yükseltme yaparken, fiyat farkı <strong>hemen tahsil edilecektir</strong>. Daha düşük bir seviyeye inildiğinde, bakiye gelecek faturalandırma dönemleri için ödeme yapmak üzere kullanılacaktır.",
     "account_upgrade_dialog_reservations_warning_other": "Seçilen seviye, geçerli seviyenizden daha az konu ayırtmaya izin veriyor. Seviyenizi değiştirmeden önce <strong>lütfen en az {{count}} ayırtmayı silin</strong>. Ayırtmaları <Link>Ayarlar</Link> sayfasından kaldırabilirsiniz.",
     "account_upgrade_dialog_tier_features_reservations": "{{reservations}} konu ayırtıldı",
     "account_upgrade_dialog_tier_features_messages": "{{messages}} günlük mesaj",
@@ -340,5 +340,17 @@
     "prefs_reservations_table_everyone_read_only": "Ben yayınlayabilir ve abone olabilirim, herkes abone olabilir",
     "prefs_reservations_table_not_subscribed": "Abone olunmadı",
     "prefs_reservations_table_everyone_read_write": "Herkes yayınlayabilir ve abone olabilir",
-    "reservation_delete_dialog_description": "Ayırtmanın kaldırılması, konu üzerindeki sahiplikten vazgeçer ve başkalarının onu ayırtmasına izin verir. Mevcut mesajları ve ekleri saklayabilir veya silebilirsiniz."
+    "reservation_delete_dialog_description": "Ayırtmanın kaldırılması, konu üzerindeki sahiplikten vazgeçer ve başkalarının onu ayırtmasına izin verir. Mevcut mesajları ve ekleri saklayabilir veya silebilirsiniz.",
+    "account_basics_tier_interval_yearly": "yıllık",
+    "account_upgrade_dialog_tier_features_no_reservations": "Ayırtılan konu yok",
+    "account_upgrade_dialog_tier_price_billed_monthly": "Yıllık {{price}}. Aylık faturalandırılır.",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} yıllık olarak faturalandırılır. {{save}} tasarruf edin.",
+    "account_upgrade_dialog_interval_yearly": "Yıllık",
+    "account_upgrade_dialog_interval_yearly_discount_save": "%{{discount}} tasarruf edin",
+    "account_upgrade_dialog_tier_price_per_month": "ay",
+    "account_upgrade_dialog_billing_contact_email": "Faturalama ile ilgili sorularınız için lütfen doğrudan <Link>bizimle iletişime geçin</Link>.",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "%{{discount}} kadar tasarruf edin",
+    "account_upgrade_dialog_interval_monthly": "Aylık",
+    "account_basics_tier_interval_monthly": "aylık",
+    "account_upgrade_dialog_billing_contact_website": "Faturalama ile ilgili sorularınız için lütfen <Link>web sitemizi ziyaret edin</Link>."
 }

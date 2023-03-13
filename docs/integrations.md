@@ -16,6 +16,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 Finland       |
 | [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
 | [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
+| [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.
@@ -75,6 +76,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 - [Grafana-to-ntfy](https://github.com/kittyandrew/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Rust)
 - [Grafana-ntfy-webhook-integration](https://github.com/academo/grafana-alerting-ntfy-webhook-integration) - Integrates Grafana alerts webhooks (Go)
+- [Grafana-to-ntfy](https://gitlab.com/Saibe1111/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Node Js)
 - [ntfy-long-zsh-command](https://github.com/robfox92/ntfy-long-zsh-command) - Notifies you once a long-running command completes (zsh)
 - [ntfy-shellscripts](https://github.com/nickexyz/ntfy-shellscripts) - A few scripts for the ntfy project (Shell)
 - [QuickStatus](https://github.com/corneliusroot/QuickStatus) - A shell script to alert to any immediate problems upon login (Shell)
@@ -117,6 +119,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [Start-Job,Variables, and ntfy.sh](https://klingele.dev/2023/03/01/start-jobvariables-and-ntfy-sh/) - klingele.dev - 3/2023 
 - [enviar notificaciones automáticas usando ntfy.sh](https://osiux.com/2023-02-15-send-automatic-notifications-using-ntfy.html) - osiux.com - 2/2023 
 - [Carnet IP动态解析以及通过ntfy推送IP信息](https://blog.wslll.cn/index.php/archives/201/) - blog.wslll.cn - 2/2023 
 - [Open-Source-Brieftaube: ntfy verschickt Push-Meldungen auf Smartphone und PC](https://www.heise.de/news/Open-Source-Brieftaube-ntfy-verschickt-Push-Meldungen-auf-Smartphone-und-PC-7521583.html) ⭐ - heise.de - 2/2023 

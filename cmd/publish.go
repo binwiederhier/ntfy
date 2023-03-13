@@ -154,8 +154,7 @@ func execPublish(c *cli.Context) error {
 	}
 	if token != "" {
 		options = append(options, client.WithBearerAuth(token))
-	}
-	if user != "" {
+	} else if user != "" {
 		var pass string
 		parts := strings.SplitN(user, ":", 2)
 		if len(parts) == 2 {
@@ -171,7 +170,9 @@ func execPublish(c *cli.Context) error {
 			fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
-	} else if token == "" && conf.DefaultUser != "" && conf.DefaultPassword != nil {
+	} else if conf.DefaultToken != "" {
+		options = append(options, client.WithBearerAuth(conf.DefaultToken))
+	} else if conf.DefaultUser != "" && conf.DefaultPassword != nil {
 		options = append(options, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
 	}
 	if pid > 0 {

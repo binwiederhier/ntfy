@@ -2,6 +2,38 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v2.2.0 (UNRELEASED)
+
+**Features:**
+
+* You can now use tokens in `client.yml` for publishing and subscribing ([#653](https://github.com/binwiederhier/ntfy/issues/653), thanks to [@wunter8](https://github.com/wunter8))
+
+**Bug fixes + maintenance:**
+
+* `ntfy sub --poll --from-config` will now include authentication headers from client.yml (if applicable) ([#658](https://github.com/binwiederhier/ntfy/issues/658), thanks to [@wunter8](https://github.com/wunter8))
+* Docs: Removed dependency on Google Fonts in docs ([#554](https://github.com/binwiederhier/ntfy/issues/554), thanks to [@bt90](https://github.com/bt90) for reporting, and [@ozskywalker](https://github.com/ozskywalker) for implementing)
+* Increase allowed auth failure attempts per IP address to 30 (no ticket)
+* Web app: Increase maximum incremental backoff retry interval to 2 minutes (no ticket)
+
+**Documentation:**
+
+* Make query parameter description more clear ([#630](https://github.com/binwiederhier/ntfy/issues/630), thanks to [@bbaa-bbaa](https://github.com/bbaa-bbaa) for reporting, and to [@wunter8](https://github.com/wunter8) for a fix)
+
+## ntfy Android app v1.16.1 (UNRELEASED)
+
+**Features:**
+
+* You can now disable UnifiedPush so ntfy does not act as a UnifiedPush distributor ([#646](https://github.com/binwiederhier/ntfy/issues/646), thanks to [@ollien](https://github.com/ollien) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+
+**Bug fixes + maintenance:**
+
+* UnifiedPush subscriptions now include the `Rate-Topics` header to facilitate subscriber-based billing ([#652](https://github.com/binwiederhier/ntfy/issues/652), thanks to [@wunter8](https://github.com/wunter8))
+* Subscriptions without icons no longer appear to use another subscription's icon ([#634](https://github.com/binwiederhier/ntfy/issues/634), thanks to [@topcaser](https://github.com/topcaser) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+
+**Additional languages:**
+
+* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
+
 ## ntfy server v2.1.2
 Released March 4, 2023
 

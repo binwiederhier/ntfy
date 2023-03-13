@@ -1,3 +1,4 @@
 # The documentation uses 'mkdocs', which is written in Python
 mkdocs-material
 mkdocs-minify-plugin
+mkdocs-simple-hooks

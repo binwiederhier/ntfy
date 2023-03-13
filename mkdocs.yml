@@ -9,6 +9,7 @@ edit_uri: blob/main/docs/
 
 theme:
   name: material
+  font: false
   language: en
   custom_dir: docs/_overrides
   logo: static/img/ntfy.png
@@ -70,6 +71,9 @@ plugins:
   - search
   - minify:
       minify_html: true
+  - mkdocs-simple-hooks:
+      hooks:
+        on_post_build: "docs.hooks:copy_fonts"
 
 nav:
 - "Getting started": index.md

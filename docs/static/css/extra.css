@@ -3,6 +3,8 @@
     --md-primary-fg-color--light: #338574;
     --md-primary-fg-color--dark:  #338574;
     --md-footer-bg-color:         #353744;
+    --md-text-font:               "Roboto";
+    --md-code-font:               "Roboto Mono";
 }
 
 .md-header__button.md-logo :is(img, svg) {
@@ -146,4 +148,58 @@ figure video {
 .lightbox .close-lightbox:hover::after,
 .lightbox .close-lightbox:hover::before {
     background-color: #fff;
+}
+
+/* roboto-300 - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 300;
+    src: url('../fonts/roboto-v30-latin-300.woff2') format('woff2');
+}
+
+/* roboto-regular - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/roboto-v30-latin-regular.woff2') format('woff2');
+}
+
+/* roboto-italic - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto';
+    font-style: italic;
+    font-weight: 400;
+    src: url('../fonts/roboto-v30-latin-italic.woff2') format('woff2');
+}
+
+/* roboto-500 - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 500;
+    src: url('../fonts/roboto-v30-latin-500.woff2') format('woff2');
+}
+
+/* roboto-700 - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 700;
+    src: url('../fonts/roboto-v30-latin-700.woff2') format('woff2');
+}
+
+/* roboto-mono - latin */
+@font-face {
+    font-display: swap;
+    font-family: 'Roboto Mono';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/roboto-mono-v22-latin-regular.woff2') format('woff2');
 }

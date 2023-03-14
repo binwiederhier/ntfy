@@ -248,5 +248,17 @@
     "account_basics_tier_free": "безплатен",
     "account_basics_tier_basic": "базов",
     "account_basics_tier_change_button": "Променяне",
-    "account_basics_tier_paid_until": "Абонаментът е платен до {{date}} и автоматично ще се поднови"
+    "account_basics_tier_paid_until": "Абонаментът е платен до {{date}} и автоматично ще се поднови",
+    "account_usage_attachment_storage_title": "Хранилище за прикачени файлове",
+    "account_delete_dialog_button_cancel": "Отказ",
+    "account_upgrade_dialog_interval_monthly": "Месечно",
+    "account_upgrade_dialog_tier_features_reservations": "{{reservations}} резервирани теми",
+    "account_upgrade_dialog_tier_features_no_reservations": "Няма резервирани теми",
+    "account_tokens_dialog_button_cancel": "Отказ",
+    "account_delete_title": "Премахване на профила",
+    "account_upgrade_dialog_title": "Промяна нивото на профила",
+    "account_usage_emails_title": "Изпратени съобщения",
+    "account_usage_reservations_title": "Резервирани теми",
+    "account_usage_reservations_none": "Няма резервирани теми",
+    "account_usage_cannot_create_portal_session": "Порталът за разплащане не може да бъде отворен"
 }

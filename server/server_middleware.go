@@ -12,6 +12,7 @@ const (
 	contextRateVisitor contextKey = iota + 2586
 	contextTopic
 	contextMatrixPushKey
+	contextUnifiedPush
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {

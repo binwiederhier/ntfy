@@ -9,17 +9,23 @@ var (
 )
 
 type serverMetrics struct {
-	messagesPublishedSuccess prometheus.Counter
-	messagesPublishedFailure prometheus.Counter
-	messagesCached           prometheus.Gauge
-	firebasePublishedSuccess prometheus.Counter
-	firebasePublishedFailure prometheus.Counter
-	emailsPublishedSuccess   prometheus.Counter
-	emailsPublishedFailure   prometheus.Counter
-	visitors                 prometheus.Gauge
-	subscribers              prometheus.Gauge
-	topics                   prometheus.Gauge
-	httpRequests             *prometheus.CounterVec
+	messagesPublishedSuccess    prometheus.Counter
+	messagesPublishedFailure    prometheus.Counter
+	messagesCached              prometheus.Gauge
+	firebasePublishedSuccess    prometheus.Counter
+	firebasePublishedFailure    prometheus.Counter
+	emailsPublishedSuccess      prometheus.Counter
+	emailsPublishedFailure      prometheus.Counter
+	emailsReceivedSuccess       prometheus.Counter
+	emailsReceivedFailure       prometheus.Counter
+	unifiedPushPublishedSuccess prometheus.Counter
+	matrixPublishedSuccess      prometheus.Counter
+	matrixPublishedFailure      prometheus.Counter
+	attachmentsTotalSize        prometheus.Gauge
+	visitors                    prometheus.Gauge
+	subscribers                 prometheus.Gauge
+	topics                      prometheus.Gauge
+	httpRequests                *prometheus.CounterVec
 }
 
 func newMetrics() *serverMetrics {
@@ -45,6 +51,24 @@ func newMetrics() *serverMetrics {
 		emailsPublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "ntfy_emails_sent_failure",
 		}),
+		emailsReceivedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ntfy_emails_received_success",
+		}),
+		emailsReceivedFailure: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ntfy_emails_received_failure",
+		}),
+		unifiedPushPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ntfy_unifiedpush_published_success",
+		}),
+		matrixPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ntfy_matrix_published_success",
+		}),
+		matrixPublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ntfy_matrix_published_failure",
+		}),
+		attachmentsTotalSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "ntfy_attachments_total_size",
+		}),
 		visitors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "ntfy_visitors_total",
 		}),
@@ -66,6 +90,12 @@ func newMetrics() *serverMetrics {
 		m.firebasePublishedFailure,
 		m.emailsPublishedSuccess,
 		m.emailsPublishedFailure,
+		m.emailsReceivedSuccess,
+		m.emailsReceivedFailure,
+		m.unifiedPushPublishedSuccess,
+		m.matrixPublishedSuccess,
+		m.matrixPublishedFailure,
+		m.attachmentsTotalSize,
 		m.visitors,
 		m.subscribers,
 		m.topics,

@@ -27,6 +27,7 @@ require github.com/pkg/errors v0.9.1 // indirect
 
 require (
 	firebase.google.com/go/v4 v4.10.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/stripe/stripe-go/v74 v74.10.0
 )
 
@@ -51,7 +52,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect

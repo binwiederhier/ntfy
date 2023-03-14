@@ -165,6 +165,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 		s.backend.mu.Lock()
 		s.backend.success++
 		s.backend.mu.Unlock()
+		metrics.emailsReceivedSuccess.Inc()
 		return nil
 	})
 }
@@ -217,6 +218,7 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 		// We do not want to spam the log with WARN messages.
 		logem(s.conn).Err(err).Debug("Incoming mail error")
 		s.backend.failure++
+		metrics.emailsReceivedFailure.Inc()
 	}
 	return err
 }

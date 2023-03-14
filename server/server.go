@@ -596,8 +596,14 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, error) {
-	t := fromContext[*topic](r, contextTopic)
-	vrate := fromContext[*visitor](r, contextRateVisitor)
+	t, err := fromContext[*topic](r, contextTopic)
+	if err != nil {
+		return nil, err
+	}
+	vrate, err := fromContext[*visitor](r, contextRateVisitor)
+	if err != nil {
+		return nil, err
+	}
 	body, err := util.Peek(r.Body, s.config.MessageLimit)
 	if err != nil {
 		return nil, err
@@ -676,6 +682,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
+	if unifiedpush {
+		metrics.unifiedPushPublishedSuccess.Inc()
+	}
 	return m, nil
 }
 
@@ -693,9 +702,16 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
 		metrics.messagesPublishedFailure.Inc()
+		metrics.matrixPublishedFailure.Inc()
 		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			topic := fromContext[*topic](r, contextTopic)
-			pushKey := fromContext[string](r, contextMatrixPushKey)
+			topic, err := fromContext[*topic](r, contextTopic)
+			if err != nil {
+				return err
+			}
+			pushKey, err := fromContext[string](r, contextMatrixPushKey)
+			if err != nil {
+				return err
+			}
 			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
 				return writeMatrixResponse(w, pushKey)
 			}
@@ -703,6 +719,7 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	metrics.messagesPublishedSuccess.Inc()
+	metrics.matrixPublishedSuccess.Inc()
 	return writeMatrixSuccess(w)
 }
 

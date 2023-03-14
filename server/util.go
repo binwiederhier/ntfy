@@ -107,10 +107,10 @@ func withContext(r *http.Request, ctx map[contextKey]any) *http.Request {
 	return r.WithContext(c)
 }
 
-func fromContext[T any](r *http.Request, key contextKey) T {
+func fromContext[T any](r *http.Request, key contextKey) (T, error) {
 	t, ok := r.Context().Value(key).(T)
 	if !ok {
-		panic(fmt.Sprintf("cannot find key %v in request context", key))
+		return t, fmt.Errorf("cannot find key %v in request context", key)
 	}
-	return t
+	return t, nil
 }

@@ -96,28 +96,16 @@ build-deps-ubuntu:
 docs: docs-deps docs-build
 
 docs-build: .PHONY
-	@if ! SUFFIX=$$(tools/get-best-python-for-docs-build.sh); then \
-		echo "ERROR: could not find a recent version of Python. mkdocs needs >= 3.8"; \
-		exit 1; \
-	fi; \
-	echo "python$$SUFFIX $$(which mkdocs) build"; \
-	"python$$SUFFIX" $$(which mkdocs) build
+	PY=$$(tools/get-python-bin.sh python) && MKDOCS=$$(which mkdocs) && \
+	$$PY $$MKDOCS build
 
 docs-deps: .PHONY
-	@if ! SUFFIX=$$(tools/get-best-python-for-docs-build.sh); then \
-		echo "ERROR: could not find a recent version of Python. mkdocs needs >= 3.8"; \
-		exit 1; \
-	fi; \
-	echo "pip$$SUFFIX install -r requirements.txt"; \
-	"pip$$SUFFIX" install -r requirements.txt
+	PIP=$$(tools/get-python-bin.sh pip) && \
+	$$PIP install -r requirements.txt
 
 docs-deps-update: .PHONY
-	@if ! SUFFIX=$$(tools/get-best-python-for-docs-build.sh); then \
-		echo "ERROR: could not find a recent version of Python. mkdocs needs >= 3.8"; \
-		exit 1; \
-	fi; \
-	echo "pip$$SUFFIX install -r requirements.txt --upgrade"; \
-	"pip$$SUFFIX" install -r requirements.txt --upgrade
+	PIP=$$(tools/get-python-bin.sh pip) && \
+	$$PIP install -r requirements.txt --upgrade
 
 # Web app
 

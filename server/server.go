@@ -52,6 +52,7 @@ type Server struct {
 	fileCache         *fileCache                          // File system based cache that stores attachments
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
+	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
 	mu                sync.Mutex
 }
@@ -74,6 +75,7 @@ var (
 	webConfigPath                                        = "/config.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
+	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
 	apiTiers                                             = "/v1/tiers"
 	apiAccountPath                                       = "/v1/account"
@@ -212,6 +214,9 @@ func (s *Server) Run() error {
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
+	if s.config.MetricsListenHTTP != "" {
+		listenStr += fmt.Sprintf(" %s[http/metrics]", s.config.MetricsListenHTTP)
+	}
 	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
 	if log.IsFile() {
 		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.Version)
@@ -258,11 +263,15 @@ func (s *Server) Run() error {
 			errChan <- httpServer.Serve(s.unixListener)
 		}()
 	}
-	if s.config.ListenMetricsHTTP != "" {
-		s.httpMetricsServer = &http.Server{Addr: s.config.ListenMetricsHTTP, Handler: promhttp.Handler()}
+	if s.config.MetricsListenHTTP != "" {
+		initMetrics()
+		s.httpMetricsServer = &http.Server{Addr: s.config.MetricsListenHTTP, Handler: promhttp.Handler()}
 		go func() {
 			errChan <- s.httpMetricsServer.ListenAndServe()
 		}()
+	} else if s.config.EnableMetrics {
+		initMetrics()
+		s.metricsHandler = promhttp.Handler()
 	}
 	if s.config.SMTPServerListen != "" {
 		go func() {
@@ -324,7 +333,9 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 				s.handleError(w, r, v, err)
 				return
 			}
-			metrics.httpRequests.WithLabelValues("200", "20000", r.Method).Inc()
+			if metricHTTPRequests != nil {
+				metricHTTPRequests.WithLabelValues("200", "20000", r.Method).Inc()
+			}
 		}).
 		Debug("HTTP request finished")
 }
@@ -334,7 +345,9 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	if !ok {
 		httpErr = errHTTPInternalError
 	}
-	metrics.httpRequests.WithLabelValues(fmt.Sprintf("%d", httpErr.HTTPCode), fmt.Sprintf("%d", httpErr.Code), r.Method).Inc()
+	if metricHTTPRequests != nil {
+		metricHTTPRequests.WithLabelValues(fmt.Sprintf("%d", httpErr.HTTPCode), fmt.Sprintf("%d", httpErr.Code), r.Method).Inc()
+	}
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
 	ev := logvr(v, r).Err(err)
@@ -415,6 +428,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
+	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
+		return s.handleMetrics(w, r, v)
 	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
@@ -505,6 +520,13 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "text/javascript")
 	_, err = io.WriteString(w, fmt.Sprintf("// Generated server configuration\nvar config = %s;\n", string(b)))
 	return err
+}
+
+// handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
+// and listen-metrics-http is not set.
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	s.metricsHandler.ServeHTTP(w, r)
+	return nil
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
@@ -683,7 +705,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	s.messages++
 	s.mu.Unlock()
 	if unifiedpush {
-		metrics.unifiedPushPublishedSuccess.Inc()
+		minc(metricUnifiedPushPublishedSuccess)
 	}
 	return m, nil
 }
@@ -691,18 +713,18 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	m, err := s.handlePublishInternal(r, v)
 	if err != nil {
-		metrics.messagesPublishedFailure.Inc()
+		minc(metricMessagesPublishedFailure)
 		return err
 	}
-	metrics.messagesPublishedSuccess.Inc()
+	minc(metricMessagesPublishedSuccess)
 	return s.writeJSON(w, m)
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
-		metrics.messagesPublishedFailure.Inc()
-		metrics.matrixPublishedFailure.Inc()
+		minc(metricMessagesPublishedFailure)
+		minc(metricMatrixPublishedFailure)
 		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
 			topic, err := fromContext[*topic](r, contextTopic)
 			if err != nil {
@@ -718,15 +740,15 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 		}
 		return err
 	}
-	metrics.messagesPublishedSuccess.Inc()
-	metrics.matrixPublishedSuccess.Inc()
+	minc(metricMessagesPublishedSuccess)
+	minc(metricMatrixPublishedSuccess)
 	return writeMatrixSuccess(w)
 }
 
 func (s *Server) sendToFirebase(v *visitor, m *message) {
 	logvm(v, m).Tag(tagFirebase).Debug("Publishing to Firebase")
 	if err := s.firebaseClient.Send(v, m); err != nil {
-		metrics.firebasePublishedFailure.Inc()
+		minc(metricFirebasePublishedFailure)
 		if err == errFirebaseTemporarilyBanned {
 			logvm(v, m).Tag(tagFirebase).Err(err).Debug("Unable to publish to Firebase: %v", err.Error())
 		} else {
@@ -734,17 +756,17 @@ func (s *Server) sendToFirebase(v *visitor, m *message) {
 		}
 		return
 	}
-	metrics.firebasePublishedSuccess.Inc()
+	minc(metricFirebasePublishedSuccess)
 }
 
 func (s *Server) sendEmail(v *visitor, m *message, email string) {
 	logvm(v, m).Tag(tagEmail).Field("email", email).Debug("Sending email to %s", email)
 	if err := s.smtpSender.Send(v, m, email); err != nil {
 		logvm(v, m).Tag(tagEmail).Field("email", email).Err(err).Warn("Unable to send email to %s: %v", email, err.Error())
-		metrics.emailsPublishedFailure.Inc()
+		minc(metricEmailsPublishedFailure)
 		return
 	}
-	metrics.emailsPublishedSuccess.Inc()
+	minc(metricEmailsPublishedSuccess)
 }
 
 func (s *Server) forwardPollRequest(v *visitor, m *message) {

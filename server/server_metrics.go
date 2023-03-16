@@ -5,101 +5,108 @@ import (
 )
 
 var (
-	metrics = newMetrics()
+	metricMessagesPublishedSuccess    prometheus.Counter
+	metricMessagesPublishedFailure    prometheus.Counter
+	metricMessagesCached              prometheus.Gauge
+	metricFirebasePublishedSuccess    prometheus.Counter
+	metricFirebasePublishedFailure    prometheus.Counter
+	metricEmailsPublishedSuccess      prometheus.Counter
+	metricEmailsPublishedFailure      prometheus.Counter
+	metricEmailsReceivedSuccess       prometheus.Counter
+	metricEmailsReceivedFailure       prometheus.Counter
+	metricUnifiedPushPublishedSuccess prometheus.Counter
+	metricMatrixPublishedSuccess      prometheus.Counter
+	metricMatrixPublishedFailure      prometheus.Counter
+	metricAttachmentsTotalSize        prometheus.Gauge
+	metricVisitors                    prometheus.Gauge
+	metricSubscribers                 prometheus.Gauge
+	metricTopics                      prometheus.Gauge
+	metricHTTPRequests                *prometheus.CounterVec
 )
 
-type serverMetrics struct {
-	messagesPublishedSuccess    prometheus.Counter
-	messagesPublishedFailure    prometheus.Counter
-	messagesCached              prometheus.Gauge
-	firebasePublishedSuccess    prometheus.Counter
-	firebasePublishedFailure    prometheus.Counter
-	emailsPublishedSuccess      prometheus.Counter
-	emailsPublishedFailure      prometheus.Counter
-	emailsReceivedSuccess       prometheus.Counter
-	emailsReceivedFailure       prometheus.Counter
-	unifiedPushPublishedSuccess prometheus.Counter
-	matrixPublishedSuccess      prometheus.Counter
-	matrixPublishedFailure      prometheus.Counter
-	attachmentsTotalSize        prometheus.Gauge
-	visitors                    prometheus.Gauge
-	subscribers                 prometheus.Gauge
-	topics                      prometheus.Gauge
-	httpRequests                *prometheus.CounterVec
+func initMetrics() {
+	metricMessagesPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_messages_published_success",
+	})
+	metricMessagesPublishedFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_messages_published_failure",
+	})
+	metricMessagesCached = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_messages_cached_total",
+	})
+	metricFirebasePublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_firebase_published_success",
+	})
+	metricFirebasePublishedFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_firebase_published_failure",
+	})
+	metricEmailsPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_emails_sent_success",
+	})
+	metricEmailsPublishedFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_emails_sent_failure",
+	})
+	metricEmailsReceivedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_emails_received_success",
+	})
+	metricEmailsReceivedFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_emails_received_failure",
+	})
+	metricUnifiedPushPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_unifiedpush_published_success",
+	})
+	metricMatrixPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_matrix_published_success",
+	})
+	metricMatrixPublishedFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_matrix_published_failure",
+	})
+	metricAttachmentsTotalSize = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_attachments_total_size",
+	})
+	metricVisitors = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_visitors_total",
+	})
+	metricSubscribers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_subscribers_total",
+	})
+	metricTopics = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_topics_total",
+	})
+	metricHTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_http_requests_total",
+	}, []string{"http_code", "ntfy_code", "http_method"})
+	prometheus.MustRegister(
+		metricMessagesPublishedSuccess,
+		metricMessagesPublishedFailure,
+		metricMessagesCached,
+		metricFirebasePublishedSuccess,
+		metricFirebasePublishedFailure,
+		metricEmailsPublishedSuccess,
+		metricEmailsPublishedFailure,
+		metricEmailsReceivedSuccess,
+		metricEmailsReceivedFailure,
+		metricUnifiedPushPublishedSuccess,
+		metricMatrixPublishedSuccess,
+		metricMatrixPublishedFailure,
+		metricAttachmentsTotalSize,
+		metricVisitors,
+		metricSubscribers,
+		metricTopics,
+		metricHTTPRequests,
+	)
 }
 
-func newMetrics() *serverMetrics {
-	m := &serverMetrics{
-		messagesPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_messages_published_success",
-		}),
-		messagesPublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_messages_published_failure",
-		}),
-		messagesCached: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "ntfy_messages_cached_total",
-		}),
-		firebasePublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_firebase_published_success",
-		}),
-		firebasePublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_firebase_published_failure",
-		}),
-		emailsPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_emails_sent_success",
-		}),
-		emailsPublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_emails_sent_failure",
-		}),
-		emailsReceivedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_emails_received_success",
-		}),
-		emailsReceivedFailure: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_emails_received_failure",
-		}),
-		unifiedPushPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_unifiedpush_published_success",
-		}),
-		matrixPublishedSuccess: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_matrix_published_success",
-		}),
-		matrixPublishedFailure: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "ntfy_matrix_published_failure",
-		}),
-		attachmentsTotalSize: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "ntfy_attachments_total_size",
-		}),
-		visitors: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "ntfy_visitors_total",
-		}),
-		subscribers: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "ntfy_subscribers_total",
-		}),
-		topics: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "ntfy_topics_total",
-		}),
-		httpRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "ntfy_http_requests_total",
-		}, []string{"http_code", "ntfy_code", "http_method"}),
+// minc increments a prometheus.Counter if it is non-nil
+func minc(counter prometheus.Counter) {
+	if counter != nil {
+		counter.Inc()
 	}
-	prometheus.MustRegister(
-		m.messagesPublishedSuccess,
-		m.messagesPublishedFailure,
-		m.messagesCached,
-		m.firebasePublishedSuccess,
-		m.firebasePublishedFailure,
-		m.emailsPublishedSuccess,
-		m.emailsPublishedFailure,
-		m.emailsReceivedSuccess,
-		m.emailsReceivedFailure,
-		m.unifiedPushPublishedSuccess,
-		m.matrixPublishedSuccess,
-		m.matrixPublishedFailure,
-		m.attachmentsTotalSize,
-		m.visitors,
-		m.subscribers,
-		m.topics,
-		m.httpRequests,
-	)
-	return m
+}
+
+// mset sets a prometheus.Gauge if it is non-nil
+func mset[T int | int64 | float64](gauge prometheus.Gauge, value T) {
+	if gauge != nil {
+		gauge.Set(float64(value))
+	}
 }

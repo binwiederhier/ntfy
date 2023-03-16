@@ -83,12 +83,10 @@ func (s *Server) execManager() {
 			"emails_sent_failure":     sentMailFailure,
 		}).
 		Info("Server stats")
-	if s.httpMetricsServer != nil {
-		metrics.messagesCached.Set(float64(messagesCached))
-		metrics.visitors.Set(float64(visitorsCount))
-		metrics.subscribers.Set(float64(subscribers))
-		metrics.topics.Set(float64(topicsCount))
-	}
+	mset(metricMessagesCached, messagesCached)
+	mset(metricVisitors, visitorsCount)
+	mset(metricSubscribers, subscribers)
+	mset(metricTopics, topicsCount)
 }
 
 func (s *Server) pruneVisitors() {

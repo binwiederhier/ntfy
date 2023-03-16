@@ -61,7 +61,7 @@ var (
 
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
-	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"}
+	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
 )
 
 // Config is the main config struct for the application. Use New to instantiate a default config struct.
@@ -72,7 +72,6 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
-	ListenMetricsHTTP                    string
 	KeyFile                              string
 	CertFile                             string
 	FirebaseKeyFile                      string
@@ -106,6 +105,8 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
+	MetricsEnable                        bool
+	MetricsListenHTTP                    string
 	MessageLimit                         int
 	MinDelay                             time.Duration
 	MaxDelay                             time.Duration
@@ -134,7 +135,8 @@ type Config struct {
 	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
-	EnableReservations                   bool   // Allow users with role "user" to own/reserve topics
+	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
+	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
 }

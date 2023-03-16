@@ -1099,6 +1099,14 @@ If a non-200 HTTP status code is returned or if the returned `health` field is `
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
 
+## Metrics
+If configured, ntfy can expose a `/metrics` endpoint for [Prometheus](https://prometheus.io/), which can then be used to
+create dashboards and alerts (e.g. via [Grafana](https://grafana.com/)).
+
+To configure the metrics endpoint, set the `listen-metrics-http` option to a listen address
+
+XXXXXXXXXXXXXXXXXXX
+
 ## Logging & debugging
 By default, ntfy logs to the console (stderr), with an `info` log level, and in a human-readable text format.
 

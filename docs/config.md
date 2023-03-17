@@ -1111,12 +1111,12 @@ doing, and/or secure access to the endpoint in your reverse proxy.
 - `metrics-listen-http` exposes the metrics endpoint via a dedicated `[IP]:port`. If set, this option implicitly
   enables metrics as well, e.g. "10.0.1.1:9090" or ":9090"
 
-=== Using default port
+=== "Using default port"
     ```yaml
     enable-metrics: true
     ```
 
-=== Using dedicated IP/port
+=== "Using dedicated IP/port"
     ```yaml
     metrics-listen-http: "10.0.1.1:9090"
     ```

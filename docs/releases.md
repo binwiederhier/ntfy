@@ -6,6 +6,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Monitoring: ntfy now exposes a `/metrics` endpoint for [Prometheus](https://prometheus.io/) if [configured](config.md#monitoring) ([#210](https://github.com/binwiederhier/ntfy/issues/210), thanks to [@rogeliodh](https://github.com/rogeliodh) for reporting)
 * You can now use tokens in `client.yml` for publishing and subscribing ([#653](https://github.com/binwiederhier/ntfy/issues/653), thanks to [@wunter8](https://github.com/wunter8))
 
 **Bug fixes + maintenance:**

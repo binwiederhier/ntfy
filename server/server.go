@@ -618,6 +618,7 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, error) {
+	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
 	if err != nil {
 		return nil, err
@@ -707,6 +708,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if unifiedpush {
 		minc(metricUnifiedPushPublishedSuccess)
 	}
+	mset(metricMessagePublishDurationMillis, time.Since(start).Milliseconds())
 	return m, nil
 }
 

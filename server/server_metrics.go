@@ -5,23 +5,25 @@ import (
 )
 
 var (
-	metricMessagesPublishedSuccess    prometheus.Counter
-	metricMessagesPublishedFailure    prometheus.Counter
-	metricMessagesCached              prometheus.Gauge
-	metricFirebasePublishedSuccess    prometheus.Counter
-	metricFirebasePublishedFailure    prometheus.Counter
-	metricEmailsPublishedSuccess      prometheus.Counter
-	metricEmailsPublishedFailure      prometheus.Counter
-	metricEmailsReceivedSuccess       prometheus.Counter
-	metricEmailsReceivedFailure       prometheus.Counter
-	metricUnifiedPushPublishedSuccess prometheus.Counter
-	metricMatrixPublishedSuccess      prometheus.Counter
-	metricMatrixPublishedFailure      prometheus.Counter
-	metricAttachmentsTotalSize        prometheus.Gauge
-	metricVisitors                    prometheus.Gauge
-	metricSubscribers                 prometheus.Gauge
-	metricTopics                      prometheus.Gauge
-	metricHTTPRequests                *prometheus.CounterVec
+	metricMessagesPublishedSuccess     prometheus.Counter
+	metricMessagesPublishedFailure     prometheus.Counter
+	metricMessagesCached               prometheus.Gauge
+	metricMessagePublishDurationMillis prometheus.Gauge
+	metricFirebasePublishedSuccess     prometheus.Counter
+	metricFirebasePublishedFailure     prometheus.Counter
+	metricEmailsPublishedSuccess       prometheus.Counter
+	metricEmailsPublishedFailure       prometheus.Counter
+	metricEmailsReceivedSuccess        prometheus.Counter
+	metricEmailsReceivedFailure        prometheus.Counter
+	metricUnifiedPushPublishedSuccess  prometheus.Counter
+	metricMatrixPublishedSuccess       prometheus.Counter
+	metricMatrixPublishedFailure       prometheus.Counter
+	metricAttachmentsTotalSize         prometheus.Gauge
+	metricVisitors                     prometheus.Gauge
+	metricSubscribers                  prometheus.Gauge
+	metricTopics                       prometheus.Gauge
+	metricUsers                        prometheus.Gauge
+	metricHTTPRequests                 *prometheus.CounterVec
 )
 
 func initMetrics() {
@@ -33,6 +35,9 @@ func initMetrics() {
 	})
 	metricMessagesCached = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_messages_cached_total",
+	})
+	metricMessagePublishDurationMillis = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_message_publish_duration_ms",
 	})
 	metricFirebasePublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_firebase_published_success",
@@ -67,6 +72,9 @@ func initMetrics() {
 	metricVisitors = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_visitors_total",
 	})
+	metricUsers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_users_total",
+	})
 	metricSubscribers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_subscribers_total",
 	})
@@ -80,6 +88,7 @@ func initMetrics() {
 		metricMessagesPublishedSuccess,
 		metricMessagesPublishedFailure,
 		metricMessagesCached,
+		metricMessagePublishDurationMillis,
 		metricFirebasePublishedSuccess,
 		metricFirebasePublishedFailure,
 		metricEmailsPublishedSuccess,
@@ -91,6 +100,7 @@ func initMetrics() {
 		metricMatrixPublishedFailure,
 		metricAttachmentsTotalSize,
 		metricVisitors,
+		metricUsers,
 		metricSubscribers,
 		metricTopics,
 		metricHTTPRequests,

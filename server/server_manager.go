@@ -63,6 +63,15 @@ func (s *Server) execManager() {
 		sentMailTotal, sentMailSuccess, sentMailFailure = s.smtpSender.Counts()
 	}
 
+	// Users
+	var usersCount int64
+	if s.userManager != nil {
+		usersCount, err = s.userManager.UsersCount()
+		if err != nil {
+			log.Tag(tagManager).Err(err).Warn("Error counting users")
+		}
+	}
+
 	// Print stats
 	s.mu.Lock()
 	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
@@ -75,6 +84,7 @@ func (s *Server) execManager() {
 			"topics_active":           topicsCount,
 			"subscribers":             subscribers,
 			"visitors":                visitorsCount,
+			"users":                   usersCount,
 			"emails_received":         receivedMailTotal,
 			"emails_received_success": receivedMailSuccess,
 			"emails_received_failure": receivedMailFailure,
@@ -85,6 +95,7 @@ func (s *Server) execManager() {
 		Info("Server stats")
 	mset(metricMessagesCached, messagesCached)
 	mset(metricVisitors, visitorsCount)
+	mset(metricUsers, usersCount)
 	mset(metricSubscribers, subscribers)
 	mset(metricTopics, topicsCount)
 }

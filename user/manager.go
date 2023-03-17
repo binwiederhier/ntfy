@@ -169,6 +169,7 @@ const (
 				ELSE 2
 			END, user
 	`
+	selectUserCountQuery         = `SELECT COUNT(*) FROM user`
 	updateUserPassQuery          = `UPDATE user SET pass = ? WHERE user = ?`
 	updateUserRoleQuery          = `UPDATE user SET role = ? WHERE user = ?`
 	updateUserPrefsQuery         = `UPDATE user SET prefs = ? WHERE id = ?`
@@ -851,6 +852,23 @@ func (a *Manager) Users() ([]*User, error) {
 		users = append(users, user)
 	}
 	return users, nil
+}
+
+// UsersCount returns the number of users in the databsae
+func (a *Manager) UsersCount() (int64, error) {
+	rows, err := a.db.Query(selectUserCountQuery)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, errNoRows
+	}
+	var count int64
+	if err := rows.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // User returns the user with the given username if it exists, or ErrUserNotFound otherwise.

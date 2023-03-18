@@ -2,7 +2,21 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-## ntfy server v2.2.0 (UNRELEASED)
+## ntfy server v2.2.0
+Released March 17, 2023
+
+With this release, ntfy is now able to expose metrics via a `/metrics` endpoint for [Prometheus](https://prometheus.io/), if enabled.
+The endpoint exposes about 20 different counters and gauges, from the number of published messages and emails, to active subscribers,
+visitors and topics. If you'd like more metrics, pop in the Discord/Matrix or file an issue on GitHub. 
+
+On top of this, you can now use access tokens in the ntfy CLI (defined in the `client.yml` file), fixed a bug in `ntfy subscribe`,
+removed the dependency on Google Fonts, and more.
+
+🔥 Reminder: Purchase one of three **ntfy Pro plans** for **50% off** for a limited time (if you use promo code `MYTOPIC`). 
+ntfy Pro gives you higher rate limits and lets you reserve topic names. [Buy through web app](https://ntfy.sh/app).
+
+❤️ If you don't need ntfy Pro, please consider sponsoring ntfy via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/). ntfy will stay open source forever.
 
 **Features:**
 
@@ -19,21 +33,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * Make query parameter description more clear ([#630](https://github.com/binwiederhier/ntfy/issues/630), thanks to [@bbaa-bbaa](https://github.com/bbaa-bbaa) for reporting, and to [@wunter8](https://github.com/wunter8) for a fix)
-
-## ntfy Android app v1.16.1 (UNRELEASED)
-
-**Features:**
-
-* You can now disable UnifiedPush so ntfy does not act as a UnifiedPush distributor ([#646](https://github.com/binwiederhier/ntfy/issues/646), thanks to [@ollien](https://github.com/ollien) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
-
-**Bug fixes + maintenance:**
-
-* UnifiedPush subscriptions now include the `Rate-Topics` header to facilitate subscriber-based billing ([#652](https://github.com/binwiederhier/ntfy/issues/652), thanks to [@wunter8](https://github.com/wunter8))
-* Subscriptions without icons no longer appear to use another subscription's icon ([#634](https://github.com/binwiederhier/ntfy/issues/634), thanks to [@topcaser](https://github.com/topcaser) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
-
-**Additional languages:**
-
-* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
 
 ## ntfy server v2.1.2
 Released March 4, 2023
@@ -1119,3 +1118,20 @@ Released Dec 28, 2021
 ## Older releases
 For older releases, check out the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
+
+## Not released yet
+
+### ntfy Android app v1.16.1 (UNRELEASED)
+
+**Features:**
+
+* You can now disable UnifiedPush so ntfy does not act as a UnifiedPush distributor ([#646](https://github.com/binwiederhier/ntfy/issues/646), thanks to [@ollien](https://github.com/ollien) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+
+**Bug fixes + maintenance:**
+
+* UnifiedPush subscriptions now include the `Rate-Topics` header to facilitate subscriber-based billing ([#652](https://github.com/binwiederhier/ntfy/issues/652), thanks to [@wunter8](https://github.com/wunter8))
+* Subscriptions without icons no longer appear to use another subscription's icon ([#634](https://github.com/binwiederhier/ntfy/issues/634), thanks to [@topcaser](https://github.com/topcaser) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+
+**Additional languages:**
+
+* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))

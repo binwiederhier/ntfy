@@ -277,10 +277,10 @@ staticcheck: .PHONY
 
 # Releasing targets
 
-release: clean update cli-deps release-checks docs web check
+release: clean cli-deps release-checks docs web check
 	goreleaser release --clean
 
-release-snapshot: clean update cli-deps docs web check
+release-snapshot: clean cli-deps docs web check
 	goreleaser release --snapshot --skip-publish --clean
 
 release-checks:

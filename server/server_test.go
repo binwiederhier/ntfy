@@ -1186,8 +1186,13 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		"Cache": "no",
 	})
 	require.Equal(t, 200, response.Code)
-	require.True(t, s.topics["mytopic"].lastAccess.Unix() >= time.Now().Unix()-2)
-	require.True(t, s.topics["mytopic"].lastAccess.Unix() <= time.Now().Unix()+2)
+	waitFor(t, func() bool {
+		// .lastAccess set in t.Publish() -> t.Keepalive() in Goroutine
+		s.topics["mytopic"].mu.RLock()
+		defer s.topics["mytopic"].mu.RUnlock()
+		return s.topics["mytopic"].lastAccess.Unix() >= time.Now().Unix()-2 &&
+			s.topics["mytopic"].lastAccess.Unix() <= time.Now().Unix()+2
+	})
 
 	// Topic won't get pruned
 	s.execManager()
@@ -1195,7 +1200,9 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 
 	// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
 	subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+	s.topics["mytopic"].mu.Lock()
 	s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+	s.topics["mytopic"].mu.Unlock()
 	s.execManager()
 	require.NotNil(t, s.topics["mytopic"])
 

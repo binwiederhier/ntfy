@@ -260,5 +260,21 @@
     "account_usage_emails_title": "Изпратени съобщения",
     "account_usage_reservations_title": "Резервирани теми",
     "account_usage_reservations_none": "Няма резервирани теми",
-    "account_usage_cannot_create_portal_session": "Порталът за разплащане не може да бъде отворен"
+    "account_usage_cannot_create_portal_session": "Порталът за разплащане не може да бъде отворен",
+    "account_upgrade_dialog_interval_yearly": "Годишно",
+    "account_delete_description": "Безвъзвратно премахване на профила",
+    "account_delete_dialog_button_submit": "Безвъзвратно премахване на профила",
+    "account_upgrade_dialog_interval_yearly_discount_save": "отстъпка {{discount}}%",
+    "account_upgrade_dialog_button_cancel": "Отказ",
+    "account_upgrade_dialog_button_redirect_signup": "Регистриране",
+    "account_tokens_table_label_header": "Етикет",
+    "prefs_reservations_edit_button": "Настройки на достъпа",
+    "prefs_reservations_table_topic_header": "Тема",
+    "prefs_reservations_table_access_header": "Достъп",
+    "prefs_reservations_dialog_topic_label": "Тема",
+    "prefs_reservations_dialog_access_label": "Достъп",
+    "account_basics_password_dialog_current_password_incorrect": "Грешна парола",
+    "account_basics_tier_description": "Ниво на профила",
+    "account_basics_tier_upgrade_button": "Надграждане до Pro",
+    "account_usage_messages_title": "Публикувани съобщения"
 }

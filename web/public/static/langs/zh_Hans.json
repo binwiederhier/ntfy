@@ -293,7 +293,7 @@
     "account_delete_dialog_billing_warning": "删除您的帐户也会立即取消您的计费订阅。您将无法再访问计费仪表板。",
     "account_upgrade_dialog_title": "更改帐户等级",
     "account_upgrade_dialog_cancel_warning": "这将<strong>取消您的订阅</strong>，并在 {{date}} 降级您的帐户。在那一天，主题保留以及缓存在服务器上的消息<strong>将被删除</strong>。",
-    "account_upgrade_dialog_proration_info": "<strong>按比例分配</strong>：在付费计划之间切换时，差价将在下一次计费时收取或退还。在下一个计费周期结束之前，您不会收到另一张收据。",
+    "account_upgrade_dialog_proration_info": "<strong>按比例分配</strong>：在付费计划之间升级时，差价将被<strong>立刻收取</strong>。在降级到较低级别时，余额将被用于支付未来的账单周期。",
     "account_upgrade_dialog_reservations_warning_one": "所选等级允许的保留主题少于当前等级。在更改您的等级之前，<strong>请至少删除 1 项保留</strong>。您可以在<Link>设置</Link>中删除保留。",
     "account_upgrade_dialog_reservations_warning_other": "所选等级允许的保留主题少于当前等级。在更改您的等级之前，<strong>请至少删除 {{count}} 项保留</strong>。您可以在<Link>设置</Link>中删除保留。",
     "account_upgrade_dialog_tier_features_reservations": "{{reservations}} 条保留主题",
@@ -340,5 +340,17 @@
     "account_tokens_table_last_origin_tooltip": "于IP地址 {{ip}}，点击查找",
     "account_tokens_dialog_label": "标签，例如：Radarr 通知",
     "account_tokens_dialog_button_create": "创建令牌",
-    "account_tokens_dialog_button_update": "更新令牌"
+    "account_tokens_dialog_button_update": "更新令牌",
+    "account_basics_tier_interval_monthly": "每月",
+    "account_basics_tier_interval_yearly": "每年",
+    "account_upgrade_dialog_interval_monthly": "每月",
+    "account_upgrade_dialog_interval_yearly": "每年",
+    "account_upgrade_dialog_interval_yearly_discount_save": "节省 {{discount}}%",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "节省高达 {{discount}}%",
+    "account_upgrade_dialog_tier_features_no_reservations": "无保留主题",
+    "account_upgrade_dialog_tier_price_per_month": "月",
+    "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} 每年。按月计费。",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{价格}} 按年计费。节省 {{save}}。",
+    "account_upgrade_dialog_billing_contact_email": "有关账单问题，请直接<Link>联系我们 </Link>。",
+    "account_upgrade_dialog_billing_contact_website": "有关账单问题，请参考我们的<Link>网站 </Link>。"
 }

@@ -8,7 +8,7 @@ For some (many?) users, the iOS app is not refreshing the view when new notifica
 swipe down, you do not see the newly arrived messages, even though the popup appeared before.
 
 This is caused by some weirdness between the Notification Service Extension (NSE), SwiftUI and Core Data. I am entirely
-clueless on how to fix it, sadly, as it is ephemeral and now clear to me what is causing it.
+clueless on how to fix it, sadly, as it is ephemeral and not clear to me what is causing it.
 
 Please send experienced iOS developers my way to help me figure this out.
 

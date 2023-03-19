@@ -1121,6 +1121,13 @@ doing, and/or secure access to the endpoint in your reverse proxy.
     metrics-listen-http: "10.0.1.1:9090"
     ```
 
+Here's an example Grafana dashboard built from the metrics (see [Grafana JSON on GitHub](https://raw.githubusercontent.com/binwiederhier/ntfy/main/examples/grafana-dashboard/ntfy-grafana.json)):
+
+<figure markdown style="padding-left: 50px; padding-right: 50px">
+  <a href="../../static/img/grafana-dashboard.png" target="_blank"><img src="../../static/img/grafana-dashboard.png"/></a>
+  <figcaption>ntfy Grafana dashboard</figcaption>
+</figure>
+
 ## Logging & debugging
 By default, ntfy logs to the console (stderr), with an `info` log level, and in a human-readable text format.
 

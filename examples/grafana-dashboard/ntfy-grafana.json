@@ -129,8 +129,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_messages_published_success",
+          "editorMode": "code",
+          "expr": "ntfy_messages_published_success{job=\"$job\"}",
           "legendFormat": "Messages cached",
           "range": true,
           "refId": "A"
@@ -191,7 +191,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_messages_cached_total",
+          "expr": "ntfy_messages_cached_total{job=\"$job\"}",
           "legendFormat": "Messages cached",
           "range": true,
           "refId": "A"
@@ -252,7 +252,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_visitors_total",
+          "expr": "ntfy_visitors_total{job=\"$job\"}",
           "legendFormat": "Visitors",
           "range": true,
           "refId": "A"
@@ -318,7 +318,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_users_total",
+          "expr": "ntfy_users_total{job=\"$job\"}",
           "legendFormat": "Visitors",
           "range": true,
           "refId": "A"
@@ -380,7 +380,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_topics_total",
+          "expr": "ntfy_topics_total{job=\"$job\"}",
           "legendFormat": "Topics",
           "range": true,
           "refId": "A"
@@ -467,6 +467,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "description": "Number of successfully published messages, and messages that could not be published (due to rate limiting, bad formatting, etc.)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -509,15 +510,31 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "custom.axisColorMode",
+                "value": "text"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -525,7 +542,7 @@
         "x": 0,
         "y": 5
       },
-      "id": 14,
+      "id": 42,
       "options": {
         "legend": {
           "calcs": [],
@@ -544,9 +561,9 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_visitors_total",
-          "legendFormat": "Visitors",
+          "editorMode": "code",
+          "expr": "rate(ntfy_messages_published_success{job=\"$job\"}[$rate])",
+          "legendFormat": "Success",
           "range": true,
           "refId": "A"
         },
@@ -555,39 +572,15 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_topics_total",
+          "editorMode": "code",
+          "expr": "rate(ntfy_messages_published_failure{job=\"$job\"}[$rate])",
           "hide": false,
-          "legendFormat": "Topics",
+          "legendFormat": "Failed",
           "range": true,
           "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "builder",
-          "expr": "ntfy_subscribers_total",
-          "hide": false,
-          "legendFormat": "Subscribers",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "builder",
-          "expr": "ntfy_users_total",
-          "hide": false,
-          "legendFormat": "Users",
-          "range": true,
-          "refId": "D"
         }
       ],
-      "title": "Visitors, subscribers, topics",
+      "title": "Messages published (per second)",
       "type": "timeseries"
     },
     {
@@ -595,7 +588,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Number of messages published since last ntfy server restrart",
+      "description": "Number of messages published since last ntfy server restart",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -646,7 +639,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -674,7 +683,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_messages_published_success",
+          "expr": "ntfy_messages_published_success{job=\"$job\"}",
           "legendFormat": "Successful",
           "range": true,
           "refId": "A"
@@ -685,7 +694,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_messages_published_failure",
+          "expr": "ntfy_messages_published_failure{job=\"$job\"}",
           "hide": false,
           "legendFormat": "Failed",
           "range": true,
@@ -700,6 +709,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "description": "Number of messages currently stored in message cache",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -758,7 +768,7 @@
         "x": 12,
         "y": 5
       },
-      "id": 42,
+      "id": 2,
       "options": {
         "legend": {
           "calcs": [],
@@ -778,25 +788,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "rate(ntfy_messages_published_success[10m])",
-          "legendFormat": "Successful",
+          "expr": "ntfy_messages_cached_total{job=\"$job\"}",
+          "legendFormat": "Messages in database",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "builder",
-          "expr": "rate(ntfy_messages_published_failure[10m])",
-          "hide": false,
-          "legendFormat": "Failed",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "Messages published (per second)",
+      "title": "Messages cached",
       "type": "timeseries"
     },
     {
@@ -804,7 +802,6 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -863,7 +860,7 @@
         "x": 18,
         "y": 5
       },
-      "id": 2,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [],
@@ -883,13 +880,49 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_messages_cached_total",
-          "legendFormat": "Messages in database",
+          "expr": "ntfy_visitors_total{job=\"$job\"}",
+          "legendFormat": "Visitors",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "builder",
+          "expr": "ntfy_topics_total{job=\"$job\"}",
+          "hide": false,
+          "legendFormat": "Topics",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "builder",
+          "expr": "ntfy_subscribers_total{job=\"$job\"}",
+          "hide": false,
+          "legendFormat": "Subscribers",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "builder",
+          "expr": "ntfy_users_total{job=\"$job\"}",
+          "hide": false,
+          "legendFormat": "Users",
+          "range": true,
+          "refId": "D"
         }
       ],
-      "title": "Messages cached",
+      "title": "Visitors, subscribers, topics",
       "type": "timeseries"
     },
     {
@@ -974,8 +1007,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "sum by(job) (rate(ntfy_http_requests_total[10m]))",
+          "editorMode": "code",
+          "expr": "sum by(job) (rate(ntfy_http_requests_total{job=\"$job\"}[$rate]))",
           "legendFormat": "Requests per second",
           "range": true,
           "refId": "A"
@@ -1043,109 +1076,21 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 6,
+        "w": 9,
         "x": 6,
-        "y": 12
-      },
-      "id": 18,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "builder",
-          "expr": "sum by(http_code) (ntfy_http_requests_total{http_code=\"200\"})",
-          "legendFormat": "{{http_code}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "HTTP requests (success only)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 12,
         "y": 12
       },
       "id": 41,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "single",
@@ -1158,14 +1103,14 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "sum by(http_code) (ntfy_http_requests_total{http_code!=\"200\"})",
+          "editorMode": "code",
+          "expr": "sum by(http_code) (rate(ntfy_http_requests_total{job=\"$job\", http_code!=\"200\", http_code!=\"429\", http_code!=\"507\"}[$rate]))",
           "legendFormat": "{{http_code}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP requests (error only)",
+      "title": "HTTP errors (per second, excl. 429/507)",
       "type": "timeseries"
     },
     {
@@ -1227,17 +1172,21 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 6,
-        "x": 18,
+        "w": 9,
+        "x": 15,
         "y": 12
       },
       "id": 16,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "single",
@@ -1250,14 +1199,14 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "sum by(ntfy_code) (ntfy_http_requests_total{http_code!=\"200\"})",
+          "editorMode": "code",
+          "expr": "sum by(ntfy_code) (rate(ntfy_http_requests_total{http_code!=\"200\", job=\"$job\"}[$rate]))",
           "legendFormat": "{{http_method}} {{http_code}} {{ntfy_code}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP requests (error only, ntfy code)",
+      "title": "HTTP errors (per second, ntfy code)",
       "type": "timeseries"
     },
     {
@@ -1344,7 +1293,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_attachments_total_size",
+          "expr": "ntfy_attachments_total_size{job=\"$job\"}",
           "legendFormat": "Total size in MB",
           "range": true,
           "refId": "A"
@@ -1369,7 +1318,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "barAlignment": 0,
+            "barAlignment": -1,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1409,7 +1358,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1436,8 +1401,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_firebase_published_success",
+          "editorMode": "code",
+          "expr": "rate(ntfy_firebase_published_success{job=\"$job\"}[$rate])",
           "legendFormat": "Success",
           "range": true,
           "refId": "A"
@@ -1447,8 +1412,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_firebase_published_failure",
+          "editorMode": "code",
+          "expr": "rate(ntfy_firebase_published_failure{job=\"$job\"}[$rate])",
           "hide": false,
           "legendFormat": "Failure",
           "range": true,
@@ -1505,15 +1470,27 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rejected (HTTP 507)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1540,8 +1517,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_unifiedpush_published_success",
+          "editorMode": "code",
+          "expr": "rate(ntfy_unifiedpush_published_success{job=\"$job\"}[$rate])",
           "legendFormat": "Success",
           "range": true,
           "refId": "A"
@@ -1551,10 +1528,10 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_http_requests_total{ntfy_code=\"50701\"}",
+          "editorMode": "code",
+          "expr": "rate(ntfy_http_requests_total{job=\"$job\",http_code=\"507\"}[$rate])",
           "hide": false,
-          "legendFormat": "Rejected",
+          "legendFormat": "Rejected (HTTP 507)",
           "range": true,
           "refId": "B"
         }
@@ -1617,7 +1594,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1644,8 +1637,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_matrix_published_success",
+          "editorMode": "code",
+          "expr": "rate(ntfy_matrix_published_success{job=\"$job\"}[$rate])",
           "legendFormat": "Success",
           "range": true,
           "refId": "A"
@@ -1655,8 +1648,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "builder",
-          "expr": "ntfy_matrix_published_failure",
+          "editorMode": "code",
+          "expr": "rate(ntfy_matrix_published_failure{job=\"$job\"}[$rate])",
           "hide": false,
           "legendFormat": "Failure",
           "range": true,
@@ -1721,7 +1714,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1749,8 +1758,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_emails_sent_success",
-          "legendFormat": "Successful",
+          "expr": "ntfy_emails_sent_success{job=\"$job\"}",
+          "legendFormat": "Success",
           "range": true,
           "refId": "A"
         },
@@ -1760,7 +1769,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_emails_sent_failure",
+          "expr": "ntfy_emails_sent_failure{job=\"$job\"}",
           "hide": false,
           "legendFormat": "Failure",
           "range": true,
@@ -1825,7 +1834,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -1853,7 +1878,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_emails_received_success",
+          "expr": "ntfy_emails_received_success{job=\"$job\"}",
           "legendFormat": "Success",
           "range": true,
           "refId": "A"
@@ -1864,7 +1889,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_emails_received_failure",
+          "expr": "ntfy_emails_received_failure{job=\"$job\"}",
           "hide": false,
           "legendFormat": "Failure",
           "range": true,
@@ -1958,7 +1983,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "ntfy_message_publish_duration_ms",
+          "expr": "ntfy_message_publish_duration_ms{job=\"$job\"}",
           "legendFormat": "Duration",
           "range": true,
           "refId": "A"
@@ -2063,8 +2088,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "go_goroutines{job=\"ntfy\"}",
-          "legendFormat": "__auto",
+          "expr": "go_goroutines{job=\"$job\"}",
+          "legendFormat": "Go routines",
           "range": true,
           "refId": "A"
         }
@@ -2100,7 +2125,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 10,
+              "type": "symlog"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -2156,7 +2182,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "process_open_fds{job=\"ntfy\"}",
+          "expr": "process_open_fds{job=\"$job\"}",
           "legendFormat": "Open",
           "range": true,
           "refId": "A"
@@ -2167,7 +2193,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "process_max_fds{job=\"ntfy\"}",
+          "expr": "process_max_fds{job=\"$job\"}",
           "hide": false,
           "legendFormat": "Max",
           "range": true,
@@ -2261,8 +2287,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "process_resident_memory_bytes{job=\"ntfy\"}",
-          "legendFormat": "__auto",
+          "expr": "process_resident_memory_bytes{job=\"$job\"}",
+          "legendFormat": "Resident memory used by ntfy (RSS)",
           "range": true,
           "refId": "A"
         },
@@ -2272,9 +2298,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "builder",
-          "expr": "process_virtual_memory_bytes{job=\"ntfy\"}",
+          "expr": "process_virtual_memory_bytes{job=\"$job\"}",
           "hide": false,
-          "legendFormat": "__auto",
+          "legendFormat": "Virtual memory used by ntfy (VSS)",
           "range": true,
           "refId": "B"
         }
@@ -2283,13 +2309,83 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
+  "refresh": "10s",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(ntfy_visitors_total, job)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Job",
+        "multi": false,
+        "name": "job",
+        "options": [],
+        "query": {
+          "query": "label_values(ntfy_visitors_total, job)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "current": {
+          "selected": false,
+          "text": "30m",
+          "value": "30m"
+        },
+        "description": "Average per-second rates over values from this time span",
+        "hide": 0,
+        "label": "Rate",
+        "name": "rate",
+        "options": [
+          {
+            "selected": false,
+            "text": "1m",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "5m",
+            "value": "5m"
+          },
+          {
+            "selected": false,
+            "text": "10m",
+            "value": "10m"
+          },
+          {
+            "selected": true,
+            "text": "30m",
+            "value": "30m"
+          },
+          {
+            "selected": false,
+            "text": "1h",
+            "value": "1h"
+          }
+        ],
+        "query": "1m,5m,10m,30m,1h",
+        "queryValue": "",
+        "refresh": 2,
+        "skipUrlSync": false,
+        "type": "interval"
+      }
+    ]
   },
   "time": {
     "from": "now-24h",
@@ -2299,6 +2395,6 @@
   "timezone": "",
   "title": "ntfy App",
   "uid": "TO6HgexVz",
-  "version": 11,
+  "version": 24,
   "weekStart": ""
 }

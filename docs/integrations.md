@@ -116,6 +116,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [nodebb-plugin-ntfy](https://github.com/NodeBB/nodebb-plugin-ntfy) - Push notifications for NodeBB forums
 - [n8n-ntfy](https://github.com/raghavanand98/n8n-ntfy.sh) - n8n community node that lets you use ntfy in your workflows
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
+- [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 
 ## Blog + forum posts
 

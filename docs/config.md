@@ -1111,14 +1111,24 @@ doing, and/or secure access to the endpoint in your reverse proxy.
 - `metrics-listen-http` exposes the metrics endpoint via a dedicated `[IP]:port`. If set, this option implicitly
   enables metrics as well, e.g. "10.0.1.1:9090" or ":9090"
 
-=== "Using default port"
+=== "server.yml (Using default port)"
     ```yaml
     enable-metrics: true
     ```
 
-=== "Using dedicated IP/port"
+=== "server.yml (Using dedicated IP/port)"
     ```yaml
     metrics-listen-http: "10.0.1.1:9090"
+    ```
+
+In Prometheus, an example scrape config would look like this:
+
+=== "prometheus.yml"
+    ```yaml
+    scrape_configs:
+      - job_name: "ntfy"
+        static_configs:
+          - targets: ["10.0.1.1:9090"]
     ```
 
 Here's an example Grafana dashboard built from the metrics (see [Grafana JSON on GitHub](https://raw.githubusercontent.com/binwiederhier/ntfy/main/examples/grafana-dashboard/ntfy-grafana.json)):

@@ -93,6 +93,7 @@ nav:
   - "Integrations + projects": integrations.md
   - "Release notes": releases.md
   - "Emojis 🥳 🎉": emojis.md
+  - "Troubleshooting": troubleshooting.md
   - "Known issues": known-issues.md
   - "Deprecation notices": deprecations.md
   - "Development": develop.md

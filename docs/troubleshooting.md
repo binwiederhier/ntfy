@@ -19,9 +19,8 @@ boils down to setting `log-level: debug` or `log-level: trace` in the `server.ym
     ```
 
 If you're using environment variables, set `NTFY_LOG_LEVEL=debug` (or `trace`) instead. You can also pass `--debug` or `--trace`
-to the `ntfy serve` command, e.g. `ntfy serve --trace`. If you're using systemd (i.e. `systemctl`) to run ntfy, you can look at the logs using `journalctl -u ntfy -f`. 
-
-Assuming trace is enabled, the logs will look something like this:
+to the `ntfy serve` command, e.g. `ntfy serve --trace`. If you're using systemd (i.e. `systemctl`) to run ntfy, you can look at
+the logs using `journalctl -u ntfy -f`. The logs will look something like this:
 
 === "Example logs (debug)"
     ```
@@ -77,31 +76,47 @@ entries, which you can then copy or upload.
 When you copy or upload the logs, you can censor them to make it easier to share them with others. ntfy will replace all
 topics and hostnames with fruits. Here's an example:
 
-=== "Android log (censored)"
-    ```
-    This is a log of the ntfy Android app. The log shows up to 1,000 entries.
-    Server URLs (aside from ntfy.sh) and topics have been replaced with fruits 🍌🥝🍋🥥🥑🍊🍎🍑.
-    
-    Device info:
-    --
-    ntfy: 1.16.0 (play)
-    OS: 4.19.157-perf+
-    Android: 13 (SDK 33)
-    ...
-    
-    Logs
-    --
-    
-    1679339199507 2023-03-20 15:06:39.507 D NtfyMainActivity Battery: ignoring optimizations = true (we want this to be true); instant subscriptions = true; remind time reached = true; banner = false
-    1679339199507 2023-03-20 15:06:39.507 D NtfySubscriberMgr Enqueuing work to refresh subscriber service
-    1679339199589 2023-03-20 15:06:39.589 D NtfySubscriberMgr ServiceStartWorker: Starting foreground service with action START (work ID: a7eeeae9-9356-40df-afbd-236e5ed10a0b)
-    1679339199602 2023-03-20 15:06:39.602 D NtfySubscriberService onStartCommand executed with startId: 262
-    1679339199602 2023-03-20 15:06:39.602 D NtfySubscriberService using an intent with action START
-    1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService Refreshing subscriptions
-    1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService - Desired connections: [ConnectionId(baseUrl=https://ntfy.sh, topicsToSubscriptionIds={avocado=23801492, lemon=49013182, banana=1309176509201171073, peach=573300885184666424, pineapple=-5956897229801209316, durian=81453333, starfruit=30489279, fruit12=82532869}), ConnectionId(baseUrl=https://orange.example.com, topicsToSubscriptionIds={apple=4971265, dragonfruit=66809328})]
-    1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService - Active connections: [ConnectionId(baseUrl=https://orange.example.com, topicsToSubscriptionIds={apple=4971265, dragonfruit=66809328}), ConnectionId(baseUrl=https://ntfy.sh, topicsToSubscriptionIds={avocado=23801492, lemon=49013182, banana=1309176509201171073, peach=573300885184666424, pineapple=-5956897229801209316, durian=81453333, starfruit=30489279, fruit12=82532869})]
-    ...
-    ```
+```
+This is a log of the ntfy Android app. The log shows up to 1,000 entries.
+Server URLs (aside from ntfy.sh) and topics have been replaced with fruits 🍌🥝🍋🥥🥑🍊🍎🍑.
+
+Device info:
+--
+ntfy: 1.16.0 (play)
+OS: 4.19.157-perf+
+Android: 13 (SDK 33)
+...
+
+Logs
+--
+
+1679339199507 2023-03-20 15:06:39.507 D NtfyMainActivity Battery: ignoring optimizations = true (we want this to be true); instant subscriptions = true; remind time reached = true; banner = false
+1679339199507 2023-03-20 15:06:39.507 D NtfySubscriberMgr Enqueuing work to refresh subscriber service
+1679339199589 2023-03-20 15:06:39.589 D NtfySubscriberMgr ServiceStartWorker: Starting foreground service with action START (work ID: a7eeeae9-9356-40df-afbd-236e5ed10a0b)
+1679339199602 2023-03-20 15:06:39.602 D NtfySubscriberService onStartCommand executed with startId: 262
+1679339199602 2023-03-20 15:06:39.602 D NtfySubscriberService using an intent with action START
+1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService Refreshing subscriptions
+1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService - Desired connections: [ConnectionId(baseUrl=https://ntfy.sh, topicsToSubscriptionIds={avocado=23801492, lemon=49013182, banana=1309176509201171073, peach=573300885184666424, pineapple=-5956897229801209316, durian=81453333, starfruit=30489279, fruit12=82532869}), ConnectionId(baseUrl=https://orange.example.com, topicsToSubscriptionIds={apple=4971265, dragonfruit=66809328})]
+1679339199629 2023-03-20 15:06:39.629 D NtfySubscriberService - Active connections: [ConnectionId(baseUrl=https://orange.example.com, topicsToSubscriptionIds={apple=4971265, dragonfruit=66809328}), ConnectionId(baseUrl=https://ntfy.sh, topicsToSubscriptionIds={avocado=23801492, lemon=49013182, banana=1309176509201171073, peach=573300885184666424, pineapple=-5956897229801209316, durian=81453333, starfruit=30489279, fruit12=82532869})]
+...
+```
+
+To get live logs, or to get more advanced access to an Android phone, you can use [adb](https://developer.android.com/studio/command-line/adb).
+After you install and [enable adb debugging](https://developer.android.com/studio/command-line/adb#Enabling), you can
+get detailed logs like so:
+
+```
+# Connect to phone (enable Wireless debugging first)
+adb connect 192.168.1.137:39539
+
+# Print all logs; you may have to pass the -s option
+adb logcat
+adb -s 192.168.1.137:39539 logcat
+
+# Only list ntfy logs
+adb logcat --pid=$(adb shell pidof -s io.heckel.ntfy)
+adb -s 192.168.1.137:39539 logcat --pid=$(adb -s 192.168.1.137:39539 shell pidof -s io.heckel.ntfy)
+```
 
 ## Web app
 The web app logs everything to the **developer console**, which you can open by **pressing the F12 key** on your 
@@ -111,3 +126,6 @@ keyboard.
   ![Web app logs](static/img/web-logs.png)
   <figcaption>Web app logs in the developer console</figcaption>
 </figure>
+
+## iOS app
+Sorry, there is no way to debug or get the logs from the iOS app (yet), outside of running the app in Xcode.

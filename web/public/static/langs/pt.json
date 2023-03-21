@@ -31,7 +31,7 @@
     "notifications_attachment_copy_url_title": "Copiar URL do anexo para a área de transferência",
     "notifications_attachment_copy_url_button": "Copiar URL",
     "notifications_attachment_open_title": "Ir para {{url}}",
-    "notifications_attachment_link_expired": "a ligação de transferência expirou",
+    "notifications_attachment_link_expired": "a ligação de descarga expirou",
     "notifications_attachment_open_button": "Abrir anexo",
     "notifications_attachment_link_expires": "a ligação expira em {{date}}",
     "notifications_attachment_file_image": "ficheiro de imagem",

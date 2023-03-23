@@ -276,5 +276,7 @@
     "account_basics_password_dialog_current_password_incorrect": "Грешна парола",
     "account_basics_tier_description": "Ниво на профила",
     "account_basics_tier_upgrade_button": "Надграждане до Pro",
-    "account_usage_messages_title": "Публикувани съобщения"
+    "account_usage_messages_title": "Публикувани съобщения",
+    "account_tokens_table_last_access_header": "Последен достъп",
+    "account_basics_tier_payment_overdue": "Имате просрочено задължение. Обновете начина на плащане, защото в противен случай скоро профилът ви ще загуби предимствата на абонамента."
 }

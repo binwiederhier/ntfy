@@ -1541,7 +1541,7 @@ func (s *Server) sendDelayedMessages() error {
 	for _, m := range messages {
 		var u *user.User
 		if s.userManager != nil && m.User != "" {
-			u, err = s.userManager.User(m.User)
+			u, err = s.userManager.UserByID(m.User)
 			if err != nil {
 				log.With(m).Err(err).Warn("Error sending delayed message")
 				continue

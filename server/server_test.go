@@ -327,13 +327,10 @@ func TestServer_PublishNoCache(t *testing.T) {
 
 func TestServer_PublishAt(t *testing.T) {
 	t.Parallel()
-	c := newTestConfig(t)
-	c.MinDelay = time.Second
-	c.DelayedSenderInterval = 100 * time.Millisecond
-	s := newTestServer(t, c)
+	s := newTestServer(t, newTestConfig(t))
 
 	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
-		"In": "1s",
+		"In": "1h",
 	})
 	require.Equal(t, 200, response.Code)
 
@@ -341,20 +338,60 @@ func TestServer_PublishAt(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 0, len(messages))
 
-	time.Sleep(time.Second)
-	require.Nil(t, s.sendDelayedMessages())
+	// Update message time to the past
+	fakeTime := time.Now().Add(-10 * time.Second).Unix()
+	_, err := s.messageCache.db.Exec(`UPDATE messages SET time=?`, fakeTime)
+	require.Nil(t, err)
 
+	// Trigger delayed message sending
+	require.Nil(t, s.sendDelayedMessages())
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	messages = toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "a message", messages[0].Message)
 	require.Equal(t, netip.Addr{}, messages[0].Sender) // Never return the sender!
 
-	messages, err := s.messageCache.Messages("mytopic", sinceAllMessages, true)
+	messages, err = s.messageCache.Messages("mytopic", sinceAllMessages, true)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "a message", messages[0].Message)
 	require.Equal(t, "9.9.9.9", messages[0].Sender.String()) // It's stored in the DB though!
+}
+
+func TestServer_PublishAt_FromUser(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"In":            "1h",
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Message doesn't show up immediately
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Equal(t, 0, len(messages))
+
+	// Update message time to the past
+	fakeTime := time.Now().Add(-10 * time.Second).Unix()
+	_, err := s.messageCache.db.Exec(`UPDATE messages SET time=?`, fakeTime)
+	require.Nil(t, err)
+
+	// Trigger delayed message sending
+	require.Nil(t, s.sendDelayedMessages())
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, fakeTime, messages[0].Time)
+	require.Equal(t, "a message", messages[0].Message)
+
+	messages, err = s.messageCache.Messages("mytopic", sinceAllMessages, true)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "a message", messages[0].Message)
+	require.True(t, strings.HasPrefix(messages[0].User, "u_"))
 }
 
 func TestServer_PublishAt_Expires(t *testing.T) {

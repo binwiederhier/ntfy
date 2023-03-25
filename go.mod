@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	cloud.google.com/go/firestore v1.9.0 // indirect
-	cloud.google.com/go/storage v1.30.0 // indirect
+	cloud.google.com/go/storage v1.30.1 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/emersion/go-smtp v0.16.0
@@ -66,8 +66,8 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/appengine/v2 v2.0.2 // indirect
-	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
-	google.golang.org/grpc v1.53.0 // indirect
+	google.golang.org/genproto v0.0.0-20230322174352-cde4c949918d // indirect
+	google.golang.org/grpc v1.54.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

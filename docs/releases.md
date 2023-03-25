@@ -1141,3 +1141,4 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Fix delayed message sending from authenticated users ([#679](https://github.com/binwiederhier/ntfy/issues/679))
+* Fixed plural for Polish and other translations ([#678](https://github.com/binwiederhier/ntfy/pull/678), thanks to [@bmoczulski](https://github.com/bmoczulski)) 

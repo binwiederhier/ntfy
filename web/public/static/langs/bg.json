@@ -252,7 +252,7 @@
     "account_usage_attachment_storage_title": "Хранилище за прикачени файлове",
     "account_delete_dialog_button_cancel": "Отказ",
     "account_upgrade_dialog_interval_monthly": "Месечно",
-    "account_upgrade_dialog_tier_features_reservations": "{{reservations}} резервирани теми",
+    "account_upgrade_dialog_tier_features_reservations_other": "{{reservations}} резервирани теми",
     "account_upgrade_dialog_tier_features_no_reservations": "Няма резервирани теми",
     "account_tokens_dialog_button_cancel": "Отказ",
     "account_delete_title": "Премахване на профила",

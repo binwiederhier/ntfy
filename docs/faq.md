@@ -43,9 +43,9 @@ of the app and [self-host your own ntfy server](install.md).
 ## How much battery does the Android app use?
 If you use the ntfy.sh server, and you don't use the [instant delivery](subscribe/phone.md#instant-delivery) feature, 
 the Android/iOS app uses no additional battery, since Firebase Cloud Messaging (FCM) is used. If you use your own server, 
-or you use *instant delivery* (Android only), the app has to maintain a constant connection to the server, which consumes 
-about 0-1% of battery in 17h of use (on my phone). There has been a ton of testing and improvement around this. I think it's pretty 
-decent now.
+or you use *instant delivery* (Android only),  or install from F-droid ([which does not support FCM](https://f-droid.org/docs/Inclusion_Policy/)),
+the app has to maintain a constant connection to the server, which consumes about 0-1% of battery in 17h of use (on my phone). 
+There has been a ton of testing and improvement around this. I think it's pretty decent now.
 
 ## Paid plans? I thought it was open source?
 All of ntfy will remain open source, with a free software license (Apache 2.0 and GPLv2). If you'd like to self-host, you

@@ -19,6 +19,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"net/netip"
 	"net/url"
 	"os"
@@ -33,12 +34,15 @@ import (
 	"unicode/utf8"
 )
 
+import _ "net/http/pprof"
+
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
 	httpServer        *http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
+	httpProfileServer *http.Server
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
@@ -217,6 +221,9 @@ func (s *Server) Run() error {
 	if s.config.MetricsListenHTTP != "" {
 		listenStr += fmt.Sprintf(" %s[http/metrics]", s.config.MetricsListenHTTP)
 	}
+	if s.config.ProfileListenHTTP != "" {
+		listenStr += fmt.Sprintf(" %s[http/profile]", s.config.ProfileListenHTTP)
+	}
 	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
 	if log.IsFile() {
 		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.Version)
@@ -272,6 +279,18 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		initMetrics()
 		s.metricsHandler = promhttp.Handler()
+	}
+	if s.config.ProfileListenHTTP != "" {
+		profileMux := http.NewServeMux()
+		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
+		profileMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		profileMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		profileMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		profileMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		s.httpProfileServer = &http.Server{Addr: s.config.ProfileListenHTTP, Handler: profileMux}
+		go func() {
+			errChan <- s.httpProfileServer.ListenAndServe()
+		}()
 	}
 	if s.config.SMTPServerListen != "" {
 		go func() {

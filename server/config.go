@@ -107,6 +107,7 @@ type Config struct {
 	SMTPServerAddrPrefix                 string
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
+	ProfileListenHTTP                    string
 	MessageLimit                         int
 	MinDelay                             time.Duration
 	MaxDelay                             time.Duration

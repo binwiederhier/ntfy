@@ -1138,6 +1138,11 @@ Here's an example Grafana dashboard built from the metrics (see [Grafana JSON on
   <figcaption>ntfy Grafana dashboard</figcaption>
 </figure>
 
+## Profiling
+ntfy can expose Go's [net/http/pprof](https://pkg.go.dev/net/http/pprof) endpoints to support profiling of the ntfy server. 
+If enabled, ntfy will listen on a dedicated listen IP/port, which can be accessed via the web browser on `http://<ip>:<port>/debug/pprof/`.
+This can be helpful to expose bottlenecks, and visualize call flows. To enable, simply set the `profile-listen-http` config option.
+
 ## Logging & debugging
 By default, ntfy logs to the console (stderr), with an `info` log level, and in a human-readable text format.
 

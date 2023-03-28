@@ -1125,7 +1125,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* You can now disable UnifiedPush so ntfy does not act as a UnifiedPush distributor ([#646](https://github.com/binwiederhier/ntfy/issues/646), thanks to [@ollien](https://github.com/ollien) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+* You can now disable UnifiedPush so ntfy does not act as a UnifiedPush distributor ([#646](https://github.com/binwiederhier/ntfy/issues/646), thanks to [@ollien](https://github.com/ollien) for reporting and to [@wunter8](https://github.com/wunter8) for implementing) 
 
 **Bug fixes + maintenance:**
 
@@ -1137,6 +1137,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
 
 ## ntfy server v2.3.0 (UNRELEASED)
+
+**Features:**
+
+* ntfy now supports Go's `net/http/pprof` profiler, if enabled (relates to [#677](https://github.com/binwiederhier/ntfy/issues/677))
 
 **Bug fixes + maintenance:**
 

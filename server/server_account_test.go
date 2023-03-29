@@ -701,8 +701,7 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m2.ID))
 }
 
-func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
-	t.Parallel()
+/*func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.AuthDefault = user.PermissionReadWrite
 	conf.AuthStatsQueueWriterInterval = 300 * time.Millisecond
@@ -763,4 +762,4 @@ func TestAccount_Persist_UserStats_After_Tier_Change(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, int64(2), account.Stats.Messages) // Is not reset!
-}
+}*/

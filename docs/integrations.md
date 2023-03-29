@@ -17,6 +17,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
 | [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
 | [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
+| [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

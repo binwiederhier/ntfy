@@ -2,6 +2,22 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v2.3.0
+Released March 29, 2023
+
+This release primarily fixes an issue with delayed messages, and it adds support for Go's profiler (if enabled), which
+will allow investigating usage spikes in more detail. There will likely be a follow-up release this week to fix the
+actual spikes [caused by iOS devices](https://github.com/binwiederhier/ntfy/issues/677).
+
+**Features:**
+
+* ntfy now supports Go's `pprof` profiler, if enabled (relates to [#677](https://github.com/binwiederhier/ntfy/issues/677))
+
+**Bug fixes + maintenance:**
+
+* Fix delayed message sending from authenticated users ([#679](https://github.com/binwiederhier/ntfy/issues/679))
+* Fixed plural for Polish and other translations ([#678](https://github.com/binwiederhier/ntfy/pull/678), thanks to [@bmoczulski](https://github.com/bmoczulski))
+
 ## ntfy server v2.2.0
 Released March 17, 2023
 
@@ -1135,14 +1151,3 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
-
-## ntfy server v2.3.0 (UNRELEASED)
-
-**Features:**
-
-* ntfy now supports Go's `net/http/pprof` profiler, if enabled (relates to [#677](https://github.com/binwiederhier/ntfy/issues/677))
-
-**Bug fixes + maintenance:**
-
-* Fix delayed message sending from authenticated users ([#679](https://github.com/binwiederhier/ntfy/issues/679))
-* Fixed plural for Polish and other translations ([#678](https://github.com/binwiederhier/ntfy/pull/678), thanks to [@bmoczulski](https://github.com/bmoczulski)) 

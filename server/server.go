@@ -34,8 +34,6 @@ import (
 	"unicode/utf8"
 )
 
-import _ "net/http/pprof"
-
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config

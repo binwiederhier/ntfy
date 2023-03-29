@@ -121,6 +121,10 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [ntfy.sh](https://neo-sahara.com/wp/2023/03/25/ntfy-sh/) - neo-sahara.com - 3/2023 
+- [Using Ntfy to send and receive push notifications - Samuel Rosa de Oliveria - Delphicon 2023](https://www.youtube.com/watch?v=feu0skpI9QI) - youtube.com - 3/2023 
+- [ntfy: własny darmowy system powiadomień](https://sprawdzone.it/ntfy-wlasny-darmowy-system-powiadomien/) - sprawdzone.it - 3/2023 
+- [Deploying ntfy on railway](https://www.youtube.com/watch?v=auJICXtxoNA) - youtube.com - 3/2023
 - [Start-Job,Variables, and ntfy.sh](https://klingele.dev/2023/03/01/start-jobvariables-and-ntfy-sh/) - klingele.dev - 3/2023 
 - [enviar notificaciones automáticas usando ntfy.sh](https://osiux.com/2023-02-15-send-automatic-notifications-using-ntfy.html) - osiux.com - 2/2023 
 - [Carnet IP动态解析以及通过ntfy推送IP信息](https://blog.wslll.cn/index.php/archives/201/) - blog.wslll.cn - 2/2023 

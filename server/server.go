@@ -1529,8 +1529,14 @@ func (s *Server) runFirebaseKeepaliver() {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
 			s.sendToFirebase(v, newKeepaliveMessage(firebaseControlTopic))
-		case <-time.After(s.config.FirebasePollInterval):
-			s.sendToFirebase(v, newKeepaliveMessage(firebasePollTopic))
+		/*
+			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
+			       To solve this, we'd have to shard the iOS poll topics to spread out the polling evenly.
+			       Given that it's not really necessary to poll, turning it off for now should not have any impact.
+
+			case <-time.After(s.config.FirebasePollInterval):
+				s.sendToFirebase(v, newKeepaliveMessage(firebasePollTopic))
+		*/
 		case <-s.closeChan:
 			return
 		}

@@ -352,5 +352,8 @@
     "account_basics_tier_interval_monthly": "monatlich",
     "account_upgrade_dialog_interval_monthly": "Monatlich",
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} pro Jahr. Monatlich abgerechnet.",
-    "account_upgrade_dialog_interval_yearly": "Jährlich"
+    "account_upgrade_dialog_interval_yearly": "Jährlich",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} tägliche Nachricht",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} reserviertes Thema",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} tägliche E-Mail"
 }

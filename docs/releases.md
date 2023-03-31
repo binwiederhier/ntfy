@@ -2,6 +2,18 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.3.1 
+Released March 30, 2023
+
+This release disables server-initiated polling of iOS devices entirely, thereby eliminating the thundering herd problem
+on ntfy.sh that we observe every 20 minutes. The polling was never strictly necessary, and has actually caused duplicate
+delivery issues as well, so disabling it should not have any negative effects. iOS users, please reach out via Discord
+or Matrix if there are issues.
+
+**Bug fixes + maintenance:**
+
+* Disable iOS polling entirely ([#677](https://github.com/binwiederhier/ntfy/issues/677)/[#509](https://github.com/binwiederhier/ntfy/issues/509))
+
 ## ntfy server v2.3.0
 Released March 29, 2023
 
@@ -1151,14 +1163,3 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
-
-## ntfy server v2.3.1
-
-This release disables server-initiated polling of iOS devices entirely, thereby eliminating the thundering herd problem
-on ntfy.sh that we observe every 20 minutes. The polling was never strictly necessary, and has actually caused duplicate
-delivery issues as well, so disabling it should not have any negative effects. iOS users, please reach out via Discord
-or Matrix if there are issues.
-
-**Bug fixes + maintenance:**
-
-* Disable iOS polling entirely ([#677](https://github.com/binwiederhier/ntfy/issues/677))

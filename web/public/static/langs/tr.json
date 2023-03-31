@@ -352,5 +352,8 @@
     "account_upgrade_dialog_interval_yearly_discount_save_up_to": "%{{discount}} kadar tasarruf edin",
     "account_upgrade_dialog_interval_monthly": "Aylık",
     "account_basics_tier_interval_monthly": "aylık",
-    "account_upgrade_dialog_billing_contact_website": "Faturalama ile ilgili sorularınız için lütfen <Link>web sitemizi ziyaret edin</Link>."
+    "account_upgrade_dialog_billing_contact_website": "Faturalama ile ilgili sorularınız için lütfen <Link>web sitemizi ziyaret edin</Link>.",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} ayırtılan konu",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} günlük e-posta",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} günlük mesaj"
 }

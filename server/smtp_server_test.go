@@ -492,6 +492,131 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
 }
 
+func TestSmtpBackend_HTMLEmail(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: test@mydomain.me
+RCPT TO: ntfy-mytopic@ntfy.sh
+DATA
+Message-Id: <51610934ss4.mmailer@fritz.box>
+From: <email@email.com>
+To: <email@email.com>,
+	<ntfy-subjectatntfy@ntfy.sh>
+Date: Thu, 30 Mar 2023 02:56:53 +0000
+Subject: A HTML email
+Mime-Version: 1.0
+Content-Type: text/html;
+	charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<=21DOCTYPE html>
+<html>
+<head>
+<title>Alerttitle</title>
+<meta http-equiv=3D"content-type" content=3D"text/html;charset=3Dutf-8"/>
+</head>
+<body style=3D"color: =23000000; background-color: =23f0eee6;">
+<table width=3D"100%" align=3D"center" style=3D"border:solid 2px =23eeeeee=
+; border-collapse: collapse;">
+<tr>
+<td>
+<table style=3D"border-collapse: collapse;">
+
+
+
+
+
+
+
+<tr>
+<td style=3D"background: =23FFFFFF;">
+<table style=3D"color: =23FFFFFF; background-color: =23006EC0; border-coll=
+apse: collapse;">
+<tr>
+<td style=3D"width: 1000px; text-align: center; font-size: 18pt; font-fami=
+ly: Arial, Helvetica, sans-serif; padding: 10px;">
+
+
+headertext of table
+
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+
+
+
+
+
+
+<tr>
+<td style=3D"padding: 10px 20px; background: =23FFFFFF;">
+<table style=3D"border-collapse: collapse;">
+<tr>
+<td style=3D"width: 940px; font-size: 13pt; font-family: Arial, Helvetica,=
+ sans-serif; text-align: left;">
+" Very important information about a change in your
+home automation setup 
+
+Now the light is on
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+
+
+<tr>
+<td style=3D"padding: 10px 20px; background: =23FFFFFF;">
+<table>
+<tr>
+<td style=3D"width: 960px; font-size: 10pt; font-family: Arial, Helvetica,=
+ sans-serif; text-align: left;">
+<hr />
+If you don't want to recieve this message anymore, stop the push
+ services in your <a href=3D"https:fritzbox" target=3D"_=
+blank">FRITZ=21Box</a>=2E<br />
+Here you can see the active push services: "System > Push Service"=2E
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<table style=3D"color: =23FFFFFF; background-color: =23006EC0;">
+<tr>
+<td style=3D"width: 1000px; font-size: 10pt; font-family: Arial, Helvetica=
+, sans-serif; text-align: center; padding: 10px;">
+This mail has ben sent by your <a style=3D"color: =23FFFFFF;" href=3D"https:=
+//fritzbox" target=3D"_blank">FRITZ=21Box</a=
+> automatically=2E
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>
+.
+`
+
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "A HTML email", r.Header.Get("Title"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
 func TestSmtpBackend_PlaintextWithToken(t *testing.T) {
 	email := `EHLO example.com
 MAIL FROM: phil@example.com

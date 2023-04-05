@@ -438,14 +438,12 @@ const Language = () => {
     const labelId = "prefLanguage";
     const lang = i18n.language ?? "en";
 
-    // Country flags are displayed using emoji. Emoji rendereing is handled by platform fonts.
+    // Country flags are displayed using emoji. Emoji rendering is handled by platform fonts.
     // Windows in particular does not yet play nicely with flag emoji so for now, hide flags on Windows.
-    // Note: There are ways around this by using custom fonts. This appears to be implemented in Firefox...
-    //       Not worth the hassle.
     const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
     const showFlags = !navigator.userAgent.includes("Windows");
     let title = t("prefs_appearance_language_title");
-    if (showFlags === true) {
+    if (showFlags) {
         title += " " + randomFlags.join(" ");
     }
 

@@ -352,5 +352,8 @@
     "account_upgrade_dialog_interval_yearly": "Roční",
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} za rok. Účtuje se měsíčně.",
     "account_upgrade_dialog_billing_contact_email": "V případě dotazů týkajících se fakturace nás prosím <Link>kontaktujte</Link> přímo.",
-    "account_upgrade_dialog_billing_contact_website": "Otázky týkající se fakturace naleznete na našich <Link>webových stránkách</Link>."
+    "account_upgrade_dialog_billing_contact_website": "Otázky týkající se fakturace naleznete na našich <Link>webových stránkách</Link>.",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} rezervované téma",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} denní zpráva",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} denní e-mail"
 }

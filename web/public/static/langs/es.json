@@ -107,7 +107,7 @@
     "prefs_appearance_language_title": "Idioma",
     "error_boundary_title": "Oh no, ntfy tuvo un error",
     "error_boundary_button_copy_stack_trace": "Copiar el stack trace",
-    "error_boundary_stack_trace": "Stack trace",
+    "error_boundary_stack_trace": "Rastreo de pila",
     "error_boundary_gathering_info": "Reunir más información …",
     "notifications_example": "Ejemplo",
     "prefs_notifications_min_priority_title": "Prioridad mínima",
@@ -352,5 +352,8 @@
     "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} facturado anualmente. Guardar {{save}}.",
     "account_upgrade_dialog_billing_contact_website": "Si tiene preguntas sobre facturación, consulte nuestra <Link>página web</Link>.",
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} al año. Facturación mensual.",
-    "account_upgrade_dialog_billing_contact_email": "Para preguntas sobre facturación, por favor <Link>contáctenos</Link> directamente."
+    "account_upgrade_dialog_billing_contact_email": "Para preguntas sobre facturación, por favor <Link>contáctenos</Link> directamente.",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} mensaje diario",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} correo electrónico diario",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} tema reservado"
 }

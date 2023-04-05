@@ -38,7 +38,12 @@ Here's an example showing how to publish a simple message using a POST request:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/mytopic -Body "Backup successful" -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Body = "Backup successful"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -124,12 +129,17 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/phil_alerts"
-    $headers = @{ Title="Unauthorized access detected"
-                  Priority="urgent"
-                  Tags="warning,skull" }
-    $body = "Remote access to phils-laptop detected. Act right away."              
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/phil_alerts"
+      Headers = @{
+        Title = "Unauthorized access detected"
+	Priority = "urgent"
+	Tags = "warning,skull"
+      }
+      Body = "Remote access to phils-laptop detected. Act right away."
+    }             
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -242,18 +252,21 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mydoorbell"
-    $headers = @{ Click="https://home.nest.com/"
-                  Attach="https://nest.com/view/yAxkasd.jpg"
-                  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
-                  Email="phil@example.com" }
-    $body = @'
-    There's someone at the door. 🐶
-       
-    Please check if it's a good boy or a hooman.
-    Doggies have been known to ring the doorbell.
-    '@
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mydoorbell"
+      Headers = @{
+        Click = "https://home.nest.com"
+	Attach = "https://nest.com/view/yAxksd.jpg"
+	Actions = "http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
+	Email = "phil@example.com"
+      }
+      Body = "There's someone at the door. 🐶`n
+      `n
+      Please check if it's a good boy or a hooman.`n
+      Doggies have been known to ring the doorbell.`n"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -342,10 +355,15 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/controversial"
-    $headers = @{ Title="Dogs are better than cats" }
-    $body = "Oh my ..."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/controversial"
+      Headers = @{
+        Title = "Dogs are better than cats"
+      }
+      Body = "Oh my ..."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -432,10 +450,14 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/phil_alerts"
-    $headers = @{ Priority="5" }
-    $body = "An urgent message"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      URI = "https://ntfy.sh/phil_alerts"
+      Headers = @{
+        Priority = "5"
+      }
+      Body = "An urgent message"
+    }
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -553,10 +575,15 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/backups"
-    $headers = @{ Tags="warning,mailsrv13,daily-backup" }
-    $body = "Backup of mailsrv13 failed"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/backups"
+      Headers = @{
+        Tags = "warning,mailsrv13,daily-backup"
+      }
+      Body = "Backup of mailsrv13 failed"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -645,10 +672,15 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/hello"
-    $headers = @{ At="tomorrow, 10am" }
-    $body = "Good morning"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/hello"
+      Headers = @{
+        At = "tomorrow, 10am"
+      }
+      Body = "Good morning"
+    }
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -729,7 +761,7 @@ For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhoo
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/trigger"
+    Invoke-RestMethod "ntfy.sh/mywebhook/trigger"
     ```    
 
 === "Python"
@@ -778,7 +810,7 @@ Here's an example with a custom message, tags and a priority:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    Invoke-RestMethod "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
     ```
 
 === "Python"
@@ -883,25 +915,29 @@ is the only required one:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic    = "mytopic"
-        title    = "Low disk space alert"
-        message  = "Disk space is low at 5.1 GB"
-        priority = 4
-        attach   = "https://filesrv.lan/space.jpg"
-        filename = "diskspace.jpg"
-        tags     = @("warning", "cd")
-        click    = "https://homecamera.lan/xasds1h2xsSsa/"
-        actions  = @(
-            @{ 
-                action = "view"
-                label  = "Admin panel"
-                url    = "https://filesrv.lan/admin"
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = @{
+        Topic    = "mytopic"
+        Title    = "Low disk space alert"
+        Message  = "Disk space is low at 5.1 GB"
+        Priority = 4
+        Attach   = "https://filesrv.lan/space.jpg"
+        FileName = "diskspace.jpg"
+        Tags     = @("warning", "cd")
+        Click    = "https://homecamera.lan/xasds1h2xsSsa/"
+        Actions  = ConvertTo-JSON @(
+          @{ 
+            Action = "view"
+            Label  = "Admin panel"
+            URL    = "https://filesrv.lan/admin"
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1061,10 +1097,15 @@ As an example, here's how you can create the above notification using this forma
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'" }
-    $body = "You left the house. Turn down the A/C?"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'"
+      }
+      Body = "You left the house. Turn down the A/C?"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1214,26 +1255,30 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic   = "myhome"
-        message = "You left the house. Turn down the A/C?"
-        actions = @(
-            @{
-                action = "view"
-                label  = "Open portal"
-                url    = "https://home.nest.com/"
-                clear  = $true
-            },
-            @{
-                action = "http"
-                label  = "Turn down"
-                url    = "https://api.nest.com/"
-                body   = '{"temperature": 65}'
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic   = "myhome"
+        Message = "You left the house. Turn down the A/C?"
+        Actions = @(
+          @{
+            Action = "view"
+            Label  = "Open portal"
+            URL    = "https://home.nest.com/"
+            Clear  = $true
+          },
+          @{
+            Action = "http"
+            Label  = "Turn down"
+            URL    = "https://api.nest.com/"
+            Body   = '{"temperature": 65}'
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1358,10 +1403,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" }
-    $body = "Somebody retweeted your tweet."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions = "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392"
+      }
+      Body = "Somebody retweeted your tweet."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1474,19 +1524,23 @@ And the same example using [JSON publishing](#publish-as-json):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic = "myhome"
-        message = "Somebody retweeted your tweet."
-        actions = @(
-            @{
-                "action"="view"
-                "label"="Open Twitter"
-                "url"="https://twitter.com/binwiederhier/status/1467633927951163392"
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic = "myhome"
+        Message = "Somebody retweeted your tweet."
+        Actions = @(
+          @{
+            Action = "view"
+            Label  = "Open Twitter"
+            URL    = "https://twitter.com/binwiederhier/status/1467633927951163392"
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1600,10 +1654,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/wifey"
-    $headers = @{ Actions="broadcast, Take picture, extras.cmd=pic, extras.camera=front" }
-    $body = "Your wife requested you send a picture of yourself."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/wifey"
+      Headers = @{
+        Actions = "broadcast, Take picture, extras.cmd=pic, extras.camera=front"
+      }
+      Body = "Your wife requested you send a picture of yourself."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1733,23 +1792,26 @@ And the same example using [JSON publishing](#publish-as-json):
     ``` powershell
     # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras',
     # otherwise it will read System.Collections.Hashtable in the returned JSON
-
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic = "wifey"
-        message = "Your wife requested you send a picture of yourself."
-        actions = @(
-            @{
-                action = "broadcast"
-                label = "Take picture"
-                extras = @{
-                     cmd ="pic"
-                     camera = "front"
-                }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = @{
+        Topic = "wifey"
+        Message = "Your wife requested you send a picture of yourself."
+        Actions = ConvertTo-Json -Depth 3 @(
+          @{
+            Action = "broadcast"
+            Label = "Take picture"
+            Extras = @{
+              CMD ="pic"
+              Camera = "front"
             }
+          }
         )
-    } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1861,10 +1923,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" }
-    $body = "Garage door has been open for 15 minutes. Close it?"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}"
+      }
+      Body = "Garage door has been open for 15 minutes. Close it?"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2005,24 +2072,28 @@ And the same example using [JSON publishing](#publish-as-json):
     # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', 
     # otherwise it will read System.Collections.Hashtable in the returned JSON
 
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic   = "myhome"
-        message = "Garage door has been open for 15 minutes. Close it?"
-        actions = @(
-            @{
-                action  = "http"
-                label   = "Close door"
-                url     = "https://api.mygarage.lan/"
-                method  = "PUT"
-                headers = @{
-                    Authorization = "Bearer zAzsx1sk.."
-                }
-                body    = '{"action": "close"}'
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = @{
+        Topic   = "myhome"
+        Message = "Garage door has been open for 15 minutes. Close it?"
+        Actions = ConvertTo-Json -Depth 3 @(
+          @{
+            Action  = "http"
+            Label   = "Close door"
+            URL     = "https://api.mygarage.lan/"
+            Method  = "PUT"
+            Headers = @{
+              Authorization = "Bearer zAzsx1sk.."
             }
+            Body    = ConvertTo-JSON @{Action = "close"}
+          }
         )
-    } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2149,10 +2220,13 @@ Here's an example that will open Reddit when the notification is clicked:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/reddit_alerts"
-    $headers = @{ Click="https://www.reddit.com/message/messages" }
-    $body = "New messages on Reddit"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/reddit_alerts"
+      Headers = @{ Click="https://www.reddit.com/message/messages" }
+      Body = "New messages on Reddit"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2321,9 +2395,12 @@ Here's an example showing how to attach an APK file:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mydownloads"
-    $headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mydownloads"
+      Headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2414,12 +2491,17 @@ Here's an example showing how to include an icon:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/tvshows"
-    $headers = @{ Title"="Kodi: Resuming Playback"
-                  Tags="arrow_forward"
-                  Icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" }
-    $body = "The Wire, S01E01"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/tvshows"
+      Headers = @{
+        Title = "Kodi: Resuming Playback"
+        Tags = "arrow_forward"
+        Icon = "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+      }
+      Body = "The Wire, S01E01"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2525,13 +2607,18 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/alerts"
-    $headers = @{ Title"="Low disk space alert"
-                  Priority="high"
-                  Tags="warning,skull,backup-host,ssh-login")
-                  Email="phil@example.com" }
-    $body = "Unknown login from 5.31.23.83 to backups.example.com"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/alerts"
+      Headers = @{
+        Title = "Low disk space alert"
+        Priority = "high"
+        Tags = "warning,skull,backup-host,ssh-login")
+        Email = "phil@example.com"
+      }
+      Body = "Unknown login from 5.31.23.83 to backups.example.com"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2657,14 +2744,35 @@ Here's an example with a user `testuser` and password `fakepassword`:
     http.DefaultClient.Do(req)
     ```
 
-=== "PowerShell"
+=== "PowerShell 7+"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $credentials = 'testuser:fakepassword'
-    $encodedCredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($credentials))
-    $headers = @{Authorization="Basic $encodedCredentials"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # Get the credentials from the user
+    $Credential = Get-Credential testuser
+    # Alternatively, create a PSCredential object with the password from scratch
+    $Credential = [PSCredential]::new("testuser", (ConvertTo-SecureString "password" -AsPlainText -Force))
+    
+    # Note that the Authentication parameter requires PowerShell 7 or later
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Authentication = "Basic"
+      Credential = $Credential
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "PowerShell 5 and earlier"
+    # With PowerShell 5 or earlier, we need to create the base64 username:password string ourselves
+    $CredentialString = "$($Credential.Username):$($Credential.GetNetworkCredential().Password)"
+    $EncodedCredential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($CredentialString))
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{ Authorization = "Basic $EncodedCredential"}
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2761,12 +2869,28 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     http.DefaultClient.Do(req)
     ```
 
-=== "PowerShell"
+=== "PowerShell 7+"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $headers = @{Authorization="Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # With PowerShell 7 or greater, we can use the Authentication and Token parameters
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Authorization = "Bearer"
+      Token = "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "PowerShell 5 and earlier"
+    # In PowerShell 5 and below, we can only send the Bearer token as a string in the Headers
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{ Authorization = "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2" }
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2841,10 +2965,16 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $headers = @{Authorization="Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # Note that PSCredentials *must* have a username, so we fall back to placing the authorization in the Headers as with PowerShell 5
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{
+        Authorization = "Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"
+      }
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2913,9 +3043,12 @@ Here's an example using the `auth` query parameter:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message  -Method "Post" -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -3012,10 +3145,13 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mytopic"
-    $headers = @{ Cache="no" }
-    $body = "This message won't be stored server-side"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Headers = @{ Cache="no" }
+      Body = "This message won't be stored server-side"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -3092,10 +3228,13 @@ to `no`. This will instruct the server not to forward messages to Firebase.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mytopic"
-    $headers = @{ Firebase="no" }
-    $body = "This message won't be forwarded to FCM"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Headers = @{ Firebase="no" }
+      Body = "This message won't be forwarded to FCM"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"

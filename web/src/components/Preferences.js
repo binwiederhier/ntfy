@@ -436,9 +436,18 @@ const Appearance = () => {
 const Language = () => {
     const { t, i18n } = useTranslation();
     const labelId = "prefLanguage";
-    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
-    const title = t("prefs_appearance_language_title") + " " + randomFlags.join(" ");
     const lang = i18n.language ?? "en";
+
+    // Country flags are displayed using emoji. Emoji rendereing is handled by platform fonts.
+    // Windows in particular does not yet play nicely with flag emoji so for now, hide flags on Windows.
+    // Note: There are ways around this by using custom fonts. This appears to be implemented in Firefox...
+    //       Not worth the hassle.
+    const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
+    const showFlags = !navigator.userAgent.includes("Windows");
+    let title = t("prefs_appearance_language_title");
+    if (showFlags === true) {
+        title += " " + randomFlags.join(" ");
+    }
 
     const handleChange = async (ev) => {
         await i18n.changeLanguage(ev.target.value);

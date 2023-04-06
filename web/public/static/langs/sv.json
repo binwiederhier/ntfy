@@ -81,5 +81,7 @@
     "notifications_attachment_file_app": "Android app fil",
     "notifications_click_copy_url_title": "Kopiera länk till urklipp",
     "notifications_none_for_topic_title": "Du har inte fått några notiser för detta ämnet ännu.",
-    "notifications_none_for_topic_description": "För att kunna skicka notiser till detta ämnet, använd PUT eller POST till ämnets URL."
+    "notifications_none_for_topic_description": "För att kunna skicka notiser till detta ämnet, använd PUT eller POST till ämnets URL.",
+    "notifications_actions_http_request_title": "Skicka HTTP {{method}} till {{url}}",
+    "publish_dialog_progress_uploading": "Laddar upp…"
 }

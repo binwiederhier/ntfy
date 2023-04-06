@@ -76,5 +76,12 @@
     "signup_form_username": "Användarnamn",
     "signup_already_have_account": "Har du redan ett konto? Logga in!",
     "signup_disabled": "Registrering är inaktiverad",
-    "signup_error_username_taken": "Användarnamn [[username]] används redan"
+    "signup_error_username_taken": "Användarnamn [[username]] används redan",
+    "notifications_attachment_file_document": "annat dokument",
+    "notifications_attachment_file_app": "Android app fil",
+    "notifications_click_copy_url_title": "Kopiera länk till urklipp",
+    "notifications_none_for_topic_title": "Du har inte fått några notiser för detta ämnet ännu.",
+    "notifications_none_for_topic_description": "För att kunna skicka notiser till detta ämnet, använd PUT eller POST till ämnets URL.",
+    "notifications_actions_http_request_title": "Skicka HTTP {{method}} till {{url}}",
+    "publish_dialog_progress_uploading": "Laddar upp…"
 }

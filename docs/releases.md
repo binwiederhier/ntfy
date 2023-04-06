@@ -1169,3 +1169,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)
+
+**Documentation:**
+
+* Updated PowerShell examples ([#697](https://github.com/binwiederhier/ntfy/pull/697), thanks to [@Natfan](https://github.com/Natfan))

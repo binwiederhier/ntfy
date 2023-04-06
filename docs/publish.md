@@ -134,8 +134,8 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
       URI = "https://ntfy.sh/phil_alerts"
       Headers = @{
         Title = "Unauthorized access detected"
-	Priority = "urgent"
-	Tags = "warning,skull"
+        Priority = "urgent"
+        Tags = "warning,skull"
       }
       Body = "Remote access to phils-laptop detected. Act right away."
     }             
@@ -257,9 +257,9 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
       URI = "https://ntfy.sh/mydoorbell"
       Headers = @{
         Click = "https://home.nest.com"
-	Attach = "https://nest.com/view/yAxksd.jpg"
-	Actions = "http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
-	Email = "phil@example.com"
+        Attach = "https://nest.com/view/yAxksd.jpg"
+        Actions = "http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
+        Email = "phil@example.com"
       }
       Body = "There's someone at the door. 🐶`n
       `n
@@ -2748,6 +2748,7 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ``` powershell
     # Get the credentials from the user
     $Credential = Get-Credential testuser
+
     # Alternatively, create a PSCredential object with the password from scratch
     $Credential = [PSCredential]::new("testuser", (ConvertTo-SecureString "password" -AsPlainText -Force))
     
@@ -2883,6 +2884,7 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "PowerShell 5 and earlier"
+    ``` powershell
     # In PowerShell 5 and below, we can only send the Bearer token as a string in the Headers
     $Request = @{
       Method = "POST"

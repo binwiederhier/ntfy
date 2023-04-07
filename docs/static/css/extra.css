@@ -74,7 +74,7 @@ figure video {
     padding: 0 10px;
 }
 
-.emoji-table td {
+.emoji-table .c {
     vertical-align: middle !important;
 }
 
@@ -82,6 +82,7 @@ figure video {
     font-size: 2.5em;
     padding: 0 2px !important;
     text-align: center !important;
+    vertical-align: middle !important;
 }
 
 /* Lightbox; thanks to https://yossiabramov.com/blog/vanilla-js-lightbox */

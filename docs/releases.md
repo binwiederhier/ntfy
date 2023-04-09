@@ -1169,6 +1169,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)
+* `ntfy sub` now uses default auth credentials as defined in `client.yml` ([#698](https://github.com/binwiederhier/ntfy/issues/698), thanks to [@CrimsonFez](https://github.com/CrimsonFez) for reporting, and to [@wunter8](https://github.com/wunter8) for fixing it)
 
 **Documentation:**
 

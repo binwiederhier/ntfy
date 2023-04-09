@@ -310,3 +310,52 @@ func TestCLI_Subscribe_Token_And_UserPass(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, "cannot set both --user and --token", err.Error())
 }
+
+func TestCLI_Subscribe_Default_Token(t *testing.T) {
+	message := `{"id":"RXIQBFaieLVr","time":124,"expires":1124,"event":"message","topic":"mytopic","message":"triggered"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic/json", r.URL.Path)
+		require.Equal(t, "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2", r.Header.Get("Authorization"))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(message))
+	}))
+	defer server.Close()
+
+	filename := filepath.Join(t.TempDir(), "client.yml")
+	require.Nil(t, os.WriteFile(filename, []byte(fmt.Sprintf(`
+default-host: %s
+default-token: tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
+`, server.URL)), 0600))
+
+	app, _, stdout, _ := newTestApp()
+
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--config=" + filename, "mytopic"}))
+
+	require.Equal(t, message, strings.TrimSpace(stdout.String()))
+}
+
+func TestCLI_Subscribe_Default_UserPass(t *testing.T) {
+	message := `{"id":"RXIQBFaieLVr","time":124,"expires":1124,"event":"message","topic":"mytopic","message":"triggered"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic/json", r.URL.Path)
+		require.Equal(t, "Basic cGhpbGlwcDpteXBhc3M=", r.Header.Get("Authorization"))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(message))
+	}))
+	defer server.Close()
+
+	filename := filepath.Join(t.TempDir(), "client.yml")
+	require.Nil(t, os.WriteFile(filename, []byte(fmt.Sprintf(`
+default-host: %s
+default-user: philipp
+default-password: mypass
+`, server.URL)), 0600))
+
+	app, _, stdout, _ := newTestApp()
+
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--config=" + filename, "mytopic"}))
+
+	require.Equal(t, message, strings.TrimSpace(stdout.String()))
+}

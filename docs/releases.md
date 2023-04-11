@@ -1173,3 +1173,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Documentation:**
 
 * Updated PowerShell examples ([#697](https://github.com/binwiederhier/ntfy/pull/697), thanks to [@Natfan](https://github.com/Natfan))
+
+**Additional languages:**
+
+* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/Shjosan/))

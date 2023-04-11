@@ -483,6 +483,7 @@ const Language = () => {
                     <MenuItem value="pt_BR">Português (Brasil)</MenuItem>
                     <MenuItem value="pl">Polski</MenuItem>
                     <MenuItem value="ru">Русский</MenuItem>
+                    <MenuItem value="sv">Svenska</MenuItem>
                     <MenuItem value="tr">Türkçe</MenuItem>
                 </Select>
             </FormControl>

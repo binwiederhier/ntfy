@@ -1166,6 +1166,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.4.0 (UNRELEASED)
 
+**Features:**
+
+* [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
+
 **Bug fixes + maintenance:**
 
 * Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)

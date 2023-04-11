@@ -205,10 +205,16 @@ ntfy --help
 ```
 
 !!! info
-    There is a [GitHub issue](https://github.com/binwiederhier/ntfy/issues/286) about making ntfy installable via
-    [Homebrew](https://brew.sh/). I'll eventually get to that, but I'd also love if somebody else stepped up to do it. 
-    Also, you can build and run the ntfy server on macOS as well, though I don't officially support that. 
-    Check out the [build instructions](develop.md) for details.
+    Only the ntfy CLI is supported on macOS. ntfy server is currently not supported, but you can build and run it for 
+    development as well. Check out the [build instructions](develop.md) for details.
+
+## Homebrew
+To install the [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) via Homebrew (Linux and macOS),
+simply run:
+```
+brew install ntfy
+```
+
 
 ## Windows
 The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on Windows as well.

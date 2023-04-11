@@ -352,5 +352,8 @@
     "account_upgrade_dialog_tier_price_per_month": "bulan",
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} per bulan. Ditagih setiap bulan.",
     "account_upgrade_dialog_billing_contact_email": "Untuk pertanyaan penagihan, silakan <Link>hubungi kami</Link> secara langsung.",
-    "account_upgrade_dialog_billing_contact_website": "Untuk pertanyaan penagihan, silakan menuju ke <Link>situs web</Link> kami."
+    "account_upgrade_dialog_billing_contact_website": "Untuk pertanyaan penagihan, silakan menuju ke <Link>situs web</Link> kami.",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} topik yang direservasi",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} surel harian",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} pesan harian"
 }

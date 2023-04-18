@@ -14,6 +14,18 @@ builds:
     goos: [linux]
     goarch: [amd64]
   -
+    id: ntfy_linux_armv5
+    binary: ntfy
+    env:
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
+    tags: [sqlite_omit_load_extension,osusergo,netgo]
+    ldflags:
+      - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [linux]
+    goarch: [arm]
+    goarm: [5]
+  -
     id: ntfy_linux_armv6
     binary: ntfy
     env:
@@ -108,6 +120,7 @@ archives:
     id: ntfy_linux
     builds:
       - ntfy_linux_amd64
+      - ntfy_linux_armv5
       - ntfy_linux_armv6
       - ntfy_linux_armv7
       - ntfy_linux_arm64
@@ -190,6 +203,14 @@ dockers:
     goarm: 6
     build_flag_templates:
       - "--platform=linux/arm/v6"
+  - image_templates:
+      - &armv5_image "binwiederhier/ntfy:{{ .Tag }}-armv5"
+    use: buildx
+    dockerfile: Dockerfile
+    goarch: arm
+    goarm: 5
+    build_flag_templates:
+      - "--platform=linux/arm/v5"
 docker_manifests:
   - name_template: "binwiederhier/ntfy:latest"
     image_templates:
@@ -197,9 +218,11 @@ docker_manifests:
       - *arm64v8_image
       - *armv7_image
       - *armv6_image
+      - *armv5_image
   - name_template: "binwiederhier/ntfy:{{ .Tag }}"
     image_templates:
       - *amd64_image
       - *arm64v8_image
       - *armv7_image
       - *armv6_image
+      - *armv5_image

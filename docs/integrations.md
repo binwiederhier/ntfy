@@ -90,6 +90,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy-server-status](https://github.com/filip2cz/ntfy-server-status) -  Checking if server is online and reporting through ntfy (C)
 - [borg-based backup](https://github.com/davidhi7/backup) - Simple borg-based backup script with notifications based on ntfy.sh or Discord webhooks (Python/Shell)
 - [ntfy.sh *arr script](https://github.com/agent-squirrel/nfty-arr-script) - Quick and hacky script to get sonarr/radarr to notify the ntfy.sh service (Shell)
+- [website-watcher](https://github.com/muety/website-watcher) - A small tool to watch websites for changes (with XPath support) (Python)
 - [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)
 - [send_to_phone](https://github.com/whipped-cream/send_to_phone) - Scripts to upload a file to Transfer.sh and ping ntfy with the download link (Python)
 - [ntfy Discord bot](https://github.com/R0dn3yS/ntfy-bot) - WIP ntfy discord bot (TypeScript)

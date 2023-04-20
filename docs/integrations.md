@@ -35,6 +35,8 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative / workflow automation tool
 - [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
 - [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
+- [Netdata](https://learn.netdata.cloud/docs/alerts-and-notifications/notifications/agent-alert-notifications/ntfy) ⭐ - Real-time performance monitoring
+- [Deployer](https://github.com/deployphp/deployer) ⭐ - PHP deployment tool
 - [Scrt.link](https://scrt.link/) - Share a secret
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
@@ -62,6 +64,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy](https://github.com/jonocarroll/ntfy) - Wraps the ntfy API with pipe-friendly tooling (R)
 - [ntfy-for-delphi](https://github.com/hazzelnuts/ntfy-for-delphi) - A friendly library to push instant notifications ntfy (Delphi)
 - [ntfy](https://github.com/ffflorian/ntfy) - Send notifications over ntfy (JS)
+- [ntfy_dart](https://github.com/jr1221/ntfy_dart) - Dart wrapper around the ntfy API (Dart)
 
 ## CLIs + GUIs
 
@@ -119,6 +122,11 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 - [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 - [ntfy_ansible_role](https://github.com/stevenengland/ntfy_ansible_role) (on [Ansible Galaxy](https://galaxy.ansible.com/stevenengland/ntfy)) - Ansible role to install ntfy
+- [easy2ntfy](https://github.com/chromoxdor/easy2ntfy) - Gateway for ESPeasy to receive commands through ntfy and using easyfetch (HTML/JS)
+- [ntfy_lite](https://github.com/MPI-IS/ntfy_lite) - Minimalist python API for pushing ntfy notifications (Python)
+- [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)
+- [zpool-events](https://github.com/maglar0/zpool-events) - Notify on ZFS pool events (Python)
+- [ntfyd](https://github.com/joachimschmidt557/ntfyd) - ntfy desktop daemon (Zig)
 
 ## Blog + forum posts
 
@@ -143,6 +151,7 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Using ntfy to warn me when my computer is discharging](https://ulysseszh.github.io/programming/2022/11/28/ntfy-warn-discharge.html) - ulysseszh.github.io - 11/2022
 - [ntfy - Push Notification Service](https://dizzytech.de/posts/ntfy/) - dizzytech.de - 11/2022 
 - [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022
+- [How to make my phone buzz*](https://evbogue.com/howtomakemyphonebuzz) - evbogue.com - 11/2022
 - [MeshCentral - Ntfy Push Notifications ](https://www.youtube.com/watch?v=wyE4rtUd4Bg) - youtube.com - 11/2022
 - [Changelog | Tracking layoffs, tech worker demand still high, ntfy, ...](https://changelog.com/news/tracking-layoffs-tech-worker-demand-still-high-ntfy-devenv-markdoc-mike-bifulco-Y1jW) ⭐ - changelog.com - 11/2022
 - [Pointer | Issue #367](https://www.pointer.io/archives/a9495a2a6f/) - pointer.io - 11/2022

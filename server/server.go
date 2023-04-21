@@ -573,13 +573,15 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) 
 // handleStats returns the publicly available server stats
 func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	s.mu.RLock()
-	n := len(s.messagesHistory)
-	rate := float64(s.messagesHistory[n-1]-s.messagesHistory[0]) / (float64(n-1) * s.config.ManagerInterval.Seconds())
-	response := &apiStatsResponse{
-		Messages:     s.messages,
-		MessagesRate: rate,
+	messages, n, rate := s.messages, len(s.messagesHistory), float64(0)
+	if n > 1 {
+		rate = float64(s.messagesHistory[n-1]-s.messagesHistory[0]) / (float64(n-1) * s.config.ManagerInterval.Seconds())
 	}
 	s.mu.RUnlock()
+	response := &apiStatsResponse{
+		Messages:     messages,
+		MessagesRate: rate,
+	}
 	return s.writeJSON(w, response)
 }
 
@@ -1846,4 +1848,18 @@ func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Server) updateAndWriteStats(messagesCount int64) {
+	s.mu.Lock()
+	s.messagesHistory = append(s.messagesHistory, messagesCount)
+	if len(s.messagesHistory) > messagesHistoryMax {
+		s.messagesHistory = s.messagesHistory[1:]
+	}
+	s.mu.Unlock()
+	go func() {
+		if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+		}
+	}()
 }

@@ -2399,6 +2399,76 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 	require.Nil(t, s.topics["announcements"].rateVisitor)
 }
 
+func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
+	c := newTestConfig(t)
+	c.ManagerInterval = 2 * time.Second
+	s := newTestServer(t, c)
+
+	// Publish some messages, and get stats
+	for i := 0; i < 5; i++ {
+		response := request(t, s, "POST", "/mytopic", "some message", nil)
+		require.Equal(t, 200, response.Code)
+	}
+	require.Equal(t, int64(5), s.messages)
+	require.Equal(t, []int64{0}, s.messagesHistory)
+
+	response := request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":5,"messages_rate":0}`+"\n", response.Body.String())
+
+	// Run manager and see message history update
+	s.execManager()
+	require.Equal(t, []int64{0, 5}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":5,"messages_rate":2.5}`+"\n", response.Body.String()) // 5 messages in 2 seconds = 2.5 messages per second
+
+	// Publish some more messages
+	for i := 0; i < 10; i++ {
+		response := request(t, s, "POST", "/mytopic", "some message", nil)
+		require.Equal(t, 200, response.Code)
+	}
+	require.Equal(t, int64(15), s.messages)
+	require.Equal(t, []int64{0, 5}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":15,"messages_rate":2.5}`+"\n", response.Body.String()) // Rate did not update yet
+
+	// Run manager and see message history update
+	s.execManager()
+	require.Equal(t, []int64{0, 5, 15}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":15,"messages_rate":3.75}`+"\n", response.Body.String()) // 15 messages in 4 seconds = 3.75 messages per second
+}
+
+func TestServer_MessageHistoryMaxSize(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	for i := 0; i < 20; i++ {
+		s.messages = int64(i)
+		s.execManager()
+	}
+	require.Equal(t, []int64{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, s.messagesHistory)
+}
+
+func TestServer_MessageCountPersistence(t *testing.T) {
+	c := newTestConfig(t)
+	s := newTestServer(t, c)
+	s.messages = 1234
+	s.execManager()
+	waitFor(t, func() bool {
+		messages, err := s.messageCache.Stats()
+		require.Nil(t, err)
+		return messages == 1234
+	})
+
+	s = newTestServer(t, c)
+	require.Equal(t, int64(1234), s.messages)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

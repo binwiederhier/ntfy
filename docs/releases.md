@@ -1169,6 +1169,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
+* Added `v1/stats` endpoint to expose messages stats (no ticket)
 
 **Bug fixes + maintenance:**
 

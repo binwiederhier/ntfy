@@ -76,6 +76,11 @@ func (s *Server) execManager() {
 	s.mu.RLock()
 	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
 	s.mu.RUnlock()
+
+	// Update stats
+	s.updateAndWriteStats(messagesCount)
+
+	// Log stats
 	log.
 		Tag(tagManager).
 		Fields(log.Context{
@@ -98,19 +103,6 @@ func (s *Server) execManager() {
 	mset(metricUsers, usersCount)
 	mset(metricSubscribers, subscribers)
 	mset(metricTopics, topicsCount)
-
-	// Write stats
-	s.mu.Lock()
-	s.messagesHistory = append(s.messagesHistory, messagesCount)
-	if len(s.messagesHistory) > messagesHistoryMax {
-		s.messagesHistory = s.messagesHistory[1:]
-	}
-	s.mu.Unlock()
-	go func() {
-		if err := s.messageCache.UpdateStats(messagesCount); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
-		}
-	}()
 }
 
 func (s *Server) pruneVisitors() {

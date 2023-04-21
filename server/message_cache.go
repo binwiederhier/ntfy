@@ -17,6 +17,7 @@ import (
 var (
 	errUnexpectedMessageType = errors.New("unexpected message type")
 	errMessageNotFound       = errors.New("message not found")
+	errNoRows                = errors.New("no rows found")
 )
 
 // Messages cache
@@ -54,6 +55,11 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_sender ON messages (sender);
 		CREATE INDEX IF NOT EXISTS idx_user ON messages (user);
 		CREATE INDEX IF NOT EXISTS idx_attachment_expires ON messages (attachment_expires);
+		CREATE TABLE IF NOT EXISTS stats (
+			key TEXT PRIMARY KEY,
+			value INT
+		);
+		INSERT INTO stats (key, value) VALUES ('messages', 0);
 		COMMIT;
 	`
 	insertMessageQuery = `
@@ -108,11 +114,14 @@ const (
 	selectAttachmentsExpiredQuery      = `SELECT mid FROM messages WHERE attachment_expires > 0 AND attachment_expires <= ? AND attachment_deleted = 0`
 	selectAttachmentsSizeBySenderQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = '' AND sender = ? AND attachment_expires >= ?`
 	selectAttachmentsSizeByUserIDQuery = `SELECT IFNULL(SUM(attachment_size), 0) FROM messages WHERE user = ? AND attachment_expires >= ?`
+
+	selectStatsQuery = `SELECT value FROM stats WHERE key = 'messages'`
+	updateStatsQuery = `UPDATE stats SET value = ? WHERE key = 'messages'`
 )
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 10
+	currentSchemaVersion          = 11
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -222,20 +231,30 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_attachment_expires ON messages (attachment_expires);
 	`
 	migrate9To10UpdateMessageExpiryQuery = `UPDATE messages SET expires = time + ?`
+
+	// 10 -> 11
+	migrate10To11AlterMessagesTableQuery = `
+		CREATE TABLE IF NOT EXISTS stats (
+			key TEXT PRIMARY KEY,
+			value INT
+		);
+		INSERT INTO stats (key, value) VALUES ('messages', 0);
+	`
 )
 
 var (
 	migrations = map[int]func(db *sql.DB, cacheDuration time.Duration) error{
-		0: migrateFrom0,
-		1: migrateFrom1,
-		2: migrateFrom2,
-		3: migrateFrom3,
-		4: migrateFrom4,
-		5: migrateFrom5,
-		6: migrateFrom6,
-		7: migrateFrom7,
-		8: migrateFrom8,
-		9: migrateFrom9,
+		0:  migrateFrom0,
+		1:  migrateFrom1,
+		2:  migrateFrom2,
+		3:  migrateFrom3,
+		4:  migrateFrom4,
+		5:  migrateFrom5,
+		6:  migrateFrom6,
+		7:  migrateFrom7,
+		8:  migrateFrom8,
+		9:  migrateFrom9,
+		10: migrateFrom10,
 	}
 )
 
@@ -706,6 +725,26 @@ func readMessage(rows *sql.Rows) (*message, error) {
 	}, nil
 }
 
+func (c *messageCache) UpdateStats(messages int64) error {
+	_, err := c.db.Exec(updateStatsQuery, messages)
+	return err
+}
+
+func (c *messageCache) Stats() (messages int64, err error) {
+	rows, err := c.db.Query(selectStatsQuery)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, errNoRows
+	}
+	if err := rows.Scan(&messages); err != nil {
+		return 0, err
+	}
+	return messages, nil
+}
+
 func (c *messageCache) Close() error {
 	return c.db.Close()
 }
@@ -885,6 +924,22 @@ func migrateFrom9(db *sql.DB, cacheDuration time.Duration) error {
 		return err
 	}
 	if _, err := tx.Exec(updateSchemaVersion, 10); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func migrateFrom10(db *sql.DB, cacheDuration time.Duration) error {
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 10 to 11")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate10To11AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 11); err != nil {
 		return err
 	}
 	return tx.Commit()

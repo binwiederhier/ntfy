@@ -239,6 +239,11 @@ type apiHealthResponse struct {
 	Healthy bool `json:"healthy"`
 }
 
+type apiStatsResponse struct {
+	Messages     int64   `json:"messages"`
+	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
+}
+
 type apiAccountCreateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

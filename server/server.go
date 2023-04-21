@@ -48,7 +48,8 @@ type Server struct {
 	topics            map[string]*topic
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
-	messages          int64
+	messages          int64                               // Total number of messages (persisted if messageCache enabled)
+	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *messageCache                       // Database that stores the messages
 	fileCache         *fileCache                          // File system based cache that stores attachments
@@ -56,7 +57,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
-	mu                sync.Mutex
+	mu                sync.RWMutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -79,7 +80,8 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
-	apiTiers                                             = "/v1/tiers"
+	apiStatsPath                                         = "/v1/stats"
+	apiTiersPath                                         = "/v1/tiers"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
@@ -116,9 +118,10 @@ const (
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
-	jsonBodyBytesLimit       = 16384
-	unifiedPushTopicPrefix   = "up" // Temporarily, we rate limit all "up*" topics based on the subscriber
-	unifiedPushTopicLength   = 14
+	jsonBodyBytesLimit       = 16384                     // Max number of bytes for a JSON request body
+	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
+	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
+	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
 )
 
 // WebSocket constants
@@ -145,6 +148,10 @@ func New(conf *Config) (*Server, error) {
 		return nil, err
 	}
 	topics, err := messageCache.Topics()
+	if err != nil {
+		return nil, err
+	}
+	messages, err := messageCache.Stats()
 	if err != nil {
 		return nil, err
 	}
@@ -177,15 +184,17 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s := &Server{
-		config:         conf,
-		messageCache:   messageCache,
-		fileCache:      fileCache,
-		firebaseClient: firebaseClient,
-		smtpSender:     mailer,
-		topics:         topics,
-		userManager:    userManager,
-		visitors:       make(map[string]*visitor),
-		stripe:         stripe,
+		config:          conf,
+		messageCache:    messageCache,
+		fileCache:       fileCache,
+		firebaseClient:  firebaseClient,
+		smtpSender:      mailer,
+		topics:          topics,
+		userManager:     userManager,
+		messages:        messages,
+		messagesHistory: []int64{messages},
+		visitors:        make(map[string]*visitor),
+		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	return s, nil
@@ -441,7 +450,9 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiers {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
+		return s.handleStats(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
@@ -546,15 +557,30 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
+// handleStatic returns all static resources (excluding the docs), including the web app
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	r.URL.Path = webSiteDir + r.URL.Path
 	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
 	return nil
 }
 
+// handleDocs returns static resources related to the docs
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	util.Gzip(http.FileServer(http.FS(docsStaticCached))).ServeHTTP(w, r)
 	return nil
+}
+
+// handleStats returns the publicly available server stats
+func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	s.mu.RLock()
+	n := len(s.messagesHistory)
+	rate := float64(s.messagesHistory[n-1]-s.messagesHistory[0]) / (float64(n-1) * s.config.ManagerInterval.Seconds())
+	response := &apiStatsResponse{
+		Messages:     s.messages,
+		MessagesRate: rate,
+	}
+	s.mu.RUnlock()
+	return s.writeJSON(w, response)
 }
 
 // handleFile processes the download of attachment files. The method handles GET and HEAD requests against a file.
@@ -1580,9 +1606,9 @@ func (s *Server) sendDelayedMessages() error {
 
 func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	logvm(v, m).Debug("Sending delayed message")
-	s.mu.Lock()
+	s.mu.RLock()
 	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if ok {
 		go func() {
 			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler

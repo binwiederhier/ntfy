@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"heckel.io/ntfy/util"
 	"io"
+	"mime"
 	"net/http"
 	"net/netip"
 	"strings"
 )
+
+var mimeDecoder mime.WordDecoder
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
 	value := strings.ToLower(readParam(r, names...))

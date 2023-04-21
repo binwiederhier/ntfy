@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -2106,8 +2104,8 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	start = time.Now()
 	response := request(t, s, "PUT", "/mytopic", "some body", nil)
 	m := toMessage(t, response.Body.String())
-	assert.Equal(t, "some body", m.Message)
-	assert.True(t, time.Since(start) < 100*time.Millisecond)
+	require.Equal(t, "some body", m.Message)
+	require.True(t, time.Since(start) < 100*time.Millisecond)
 	log.Info("Done: Publishing message; took %s", time.Since(start).Round(time.Millisecond))
 
 	// Wait for all goroutines
@@ -2467,6 +2465,21 @@ func TestServer_MessageCountPersistence(t *testing.T) {
 
 	s = newTestServer(t, c)
 	require.Equal(t, int64(1234), s.messages)
+}
+
+func TestServer_PublishWithUTF8MimeHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/mytopic", "some attachment", map[string]string{
+		"X-Filename": "some attachment.txt",
+		"X-Message":  "=?UTF-8?B?8J+HqfCfh6o=?=",
+		"X-Title":    "=?UTF-8?B?bnRmeSDlvojmo5I=?=, no really I mean it! =?UTF-8?Q?This is q=C3=BC=C3=B6ted-print=C3=A4ble.?=",
+	})
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "🇩🇪", m.Message)
+	require.Equal(t, "ntfy 很棒, no really I mean it! This is qüöted-printäble.", m.Title)
+	require.Equal(t, "some attachment.txt", m.Attachment.Name)
 }
 
 func newTestConfig(t *testing.T) *Config {

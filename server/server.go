@@ -843,17 +843,10 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
+	m.Title = maybeDecodeHeader(readParam(r, "x-title", "title", "t"))
 	m.Click = readParam(r, "x-click", "click")
 	icon := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
-	title := readParam(r, "x-title", "title", "t")
-	if title != "" {
-		title, err := mimeDecoder.DecodeHeader(title)
-		if err != nil {
-			return false, false, "", false, errHTTPBadRequestInvalidMimeHeader.Wrap("invalid X-Title header: %s", err.Error())
-		}
-		m.Title = title
-	}
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
 		m.Attachment = &attachment{}
@@ -891,11 +884,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
-		messageStr, err := mimeDecoder.DecodeHeader(messageStr)
-		if err != nil {
-			return false, false, "", false, errHTTPBadRequestInvalidMimeHeader.Wrap("invalid X-Message header: %s", err.Error())
-		}
-		m.Message = messageStr
+		m.Message = maybeDecodeHeader(messageStr)
 	}
 	var e error
 	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))

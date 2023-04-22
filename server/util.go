@@ -117,3 +117,11 @@ func fromContext[T any](r *http.Request, key contextKey) (T, error) {
 	}
 	return t, nil
 }
+
+func maybeDecodeHeader(header string) string {
+	decoded, err := mimeDecoder.DecodeHeader(header)
+	if err != nil {
+		return header
+	}
+	return decoded
+}

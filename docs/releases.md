@@ -1170,6 +1170,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
 * Added `v1/stats` endpoint to expose messages stats (no ticket)
+* Support [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2) encoded headers (no ticket, honorable mention to [mqttwarn](https://github.com/jpmens/mqttwarn/pull/638) and [@amotl](https://github.com/amotl))
 
 **Bug fixes + maintenance:**
 

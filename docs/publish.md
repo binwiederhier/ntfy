@@ -391,6 +391,12 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
   <figcaption>Detail view of notification with title</figcaption>
 </figure>
 
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the `X-Title` or `X-Message`
+    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+
 ## Message priority
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
@@ -3321,6 +3327,12 @@ a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier li
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
 when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
 table in their canonical form.
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the `X-Title` or `X-Message`
+    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 | Parameter       | Aliases                                    | Description                                                                                   |
 |-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|

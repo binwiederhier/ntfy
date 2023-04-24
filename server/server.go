@@ -892,6 +892,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		return false, false, "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
+	for i, t := range m.Tags {
+		m.Tags[i] = maybeDecodeHeader(t)
+	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {

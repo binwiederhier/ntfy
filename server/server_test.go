@@ -2474,12 +2474,15 @@ func TestServer_PublishWithUTF8MimeHeader(t *testing.T) {
 		"X-Filename": "some attachment.txt",
 		"X-Message":  "=?UTF-8?B?8J+HqfCfh6o=?=",
 		"X-Title":    "=?UTF-8?B?bnRmeSDlvojmo5I=?=, no really I mean it! =?UTF-8?Q?This is q=C3=BC=C3=B6ted-print=C3=A4ble.?=",
+		"X-Tags":     "=?UTF-8?B?8J+HqfCfh6o=?=, =?UTF-8?B?bnRmeSDlvojmo5I=?=",
 	})
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, "🇩🇪", m.Message)
 	require.Equal(t, "ntfy 很棒, no really I mean it! This is qüöted-printäble.", m.Title)
 	require.Equal(t, "some attachment.txt", m.Attachment.Name)
+	require.Equal(t, "🇩🇪", m.Tags[0])
+	require.Equal(t, "ntfy 很棒", m.Tags[1])
 }
 
 func newTestConfig(t *testing.T) *Config {

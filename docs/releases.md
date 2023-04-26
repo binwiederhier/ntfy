@@ -10,7 +10,7 @@ This release adds a tiny `v1/stats` endpoint to expose how many messages have be
 
 ❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
 and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app). ntfy
-will always remain open source
+will always remain open source.
 
 **Features:**
 

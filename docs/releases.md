@@ -8,8 +8,9 @@ Released Apr 26, 2023
 This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds suport to encode the `X-Title`,
 `X-Message` and `X-Tags` header as RFC 2047. It's a pretty small release, and mainly enables the release of the new ntfy.sh website.
 
-❤️ If you like ntfy, please consider sponsoring me via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
-and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app).
+❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app). ntfy
+will always remain open source
 
 **Features:**
 

@@ -2,6 +2,34 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.4.0
+Released Apr 26, 2023
+
+This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds suport to encode the `X-Title`,
+`X-Message` and `X-Tags` header as RFC 2047. It's a pretty small release, and mainly enables the release of the new ntfy.sh website.
+
+❤️ If you like ntfy, please consider sponsoring me via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app).
+
+**Features:**
+
+* [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
+* Added `v1/stats` endpoint to expose messages stats (no ticket)
+* Support [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2) encoded headers (no ticket, honorable mention to [mqttwarn](https://github.com/jpmens/mqttwarn/pull/638) and [@amotl](https://github.com/amotl))
+
+**Bug fixes + maintenance:**
+
+* Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)
+* `ntfy sub` now uses default auth credentials as defined in `client.yml` ([#698](https://github.com/binwiederhier/ntfy/issues/698), thanks to [@CrimsonFez](https://github.com/CrimsonFez) for reporting, and to [@wunter8](https://github.com/wunter8) for fixing it)
+
+**Documentation:**
+
+* Updated PowerShell examples ([#697](https://github.com/binwiederhier/ntfy/pull/697), thanks to [@Natfan](https://github.com/Natfan))
+
+**Additional languages:**
+
+* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/Shjosan/))
+
 ### ntfy server v2.3.1 
 Released March 30, 2023
 
@@ -1163,24 +1191,3 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
-
-### ntfy server v2.4.0 (UNRELEASED)
-
-**Features:**
-
-* [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
-* Added `v1/stats` endpoint to expose messages stats (no ticket)
-* Support [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2) encoded headers (no ticket, honorable mention to [mqttwarn](https://github.com/jpmens/mqttwarn/pull/638) and [@amotl](https://github.com/amotl))
-
-**Bug fixes + maintenance:**
-
-* Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)
-* `ntfy sub` now uses default auth credentials as defined in `client.yml` ([#698](https://github.com/binwiederhier/ntfy/issues/698), thanks to [@CrimsonFez](https://github.com/CrimsonFez) for reporting, and to [@wunter8](https://github.com/wunter8) for fixing it)
-
-**Documentation:**
-
-* Updated PowerShell examples ([#697](https://github.com/binwiederhier/ntfy/pull/697), thanks to [@Natfan](https://github.com/Natfan))
-
-**Additional languages:**
-
-* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/Shjosan/))

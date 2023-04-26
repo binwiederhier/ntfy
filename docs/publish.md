@@ -617,6 +617,12 @@ them with a comma, e.g. `tag1,tag2,tag3`.
   <figcaption>Detail view of notifications with tags</figcaption>
 </figure>
 
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the `X-Title` or `X-Message`
+    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+
 ## Scheduled delivery
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 

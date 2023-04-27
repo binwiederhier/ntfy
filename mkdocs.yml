@@ -13,7 +13,7 @@ theme:
   language: en
   custom_dir: docs/_overrides
   logo: static/img/ntfy.png
-  favicon: static/img/favicon.png
+  favicon: static/img/favicon.ico
   include_search_page: false
   search_index_only: true
   palette:

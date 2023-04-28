@@ -132,6 +132,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/R-Gld"><img src="https://github.com/R-Gld.png" width="40px" /></a>
 <a href="https://github.com/FingerlessGlov3s"><img src="https://github.com/FingerlessGlov3s.png" width="40px" /></a>
 <a href="https://github.com/Twisterado"><img src="https://github.com/Twisterado.png" width="40px" /></a>
+<a href="https://github.com/ScrumpyJack"><img src="https://github.com/ScrumpyJack.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

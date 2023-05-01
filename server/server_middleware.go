@@ -51,7 +51,7 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 
 func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if !s.config.EnableWeb {
+		if s.config.WebRoot == "" {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)

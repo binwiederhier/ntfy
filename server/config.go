@@ -92,7 +92,7 @@ type Config struct {
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
 	DisallowedTopics                     []string
-	WebRootIsApp                         bool
+	WebRoot                              string // empty to disable
 	DelayedSenderInterval                time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	FirebasePollInterval                 time.Duration
@@ -133,7 +133,6 @@ type Config struct {
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
-	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
@@ -171,7 +170,7 @@ func NewConfig() *Config {
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
 		DisallowedTopics:                     DefaultDisallowedTopics,
-		WebRootIsApp:                         false,
+		WebRoot:                              "/",
 		DelayedSenderInterval:                DefaultDelayedSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
@@ -209,7 +208,6 @@ func NewConfig() *Config {
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,
 		BillingContact:                       "",
-		EnableWeb:                            true,
 		EnableSignup:                         false,
 		EnableLogin:                          false,
 		EnableReservations:                   false,

@@ -100,11 +100,10 @@ var (
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
 
 	//go:embed site
-	webFs        embed.FS
-	webFsCached  = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
-	webSiteDir   = "/site"
-	webHomeIndex = "/home.html" // Landing page, only if "web-root: home"
-	webAppIndex  = "/app.html"  // React app
+	webFs       embed.FS
+	webFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
+	webSiteDir  = "/site"
+	webAppIndex = "/app.html" // React app
 
 	//go:embed docs
 	docsStaticFs     embed.FS
@@ -404,8 +403,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if r.Method == http.MethodGet && r.URL.Path == "/" {
-		return s.ensureWebEnabled(s.handleHome)(w, r, v)
+	if r.Method == http.MethodGet && r.URL.Path == "/" && s.config.WebRoot == "/" {
+		return s.ensureWebEnabled(s.handleRoot)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
@@ -490,12 +489,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	return errHTTPNotFound
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if s.config.WebRootIsApp {
-		r.URL.Path = webAppIndex
-	} else {
-		r.URL.Path = webHomeIndex
-	}
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	r.URL.Path = webAppIndex
 	return s.handleStatic(w, r, v)
 }
 
@@ -527,13 +522,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 }
 
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	appRoot := "/"
-	if !s.config.WebRootIsApp {
-		appRoot = "/app"
-	}
 	response := &apiConfigResponse{
 		BaseURL:            "", // Will translate to window.location.origin
-		AppRoot:            appRoot,
+		AppRoot:            s.config.WebRoot,
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",

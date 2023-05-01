@@ -220,10 +220,6 @@ func TestServer_StaticSites(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow"/>`)
 
-	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
-	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `/* general styling */`)
-
 	rr = request(t, s, "GET", "/docs", "", nil)
 	require.Equal(t, 301, rr.Code)
 
@@ -232,7 +228,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 func TestServer_WebEnabled(t *testing.T) {
 	conf := newTestConfig(t)
-	conf.EnableWeb = false
+	conf.WebRoot = "" // Disable web app
 	s := newTestServer(t, conf)
 
 	rr := request(t, s, "GET", "/", "", nil)
@@ -245,16 +241,13 @@ func TestServer_WebEnabled(t *testing.T) {
 	require.Equal(t, 404, rr.Code)
 
 	conf2 := newTestConfig(t)
-	conf2.EnableWeb = true
+	conf2.WebRoot = "/"
 	s2 := newTestServer(t, conf2)
 
 	rr = request(t, s2, "GET", "/", "", nil)
 	require.Equal(t, 200, rr.Code)
 
 	rr = request(t, s2, "GET", "/config.js", "", nil)
-	require.Equal(t, 200, rr.Code)
-
-	rr = request(t, s2, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 200, rr.Code)
 }
 

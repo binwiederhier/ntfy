@@ -1178,6 +1178,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+## ntfy server v2.5.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Removed old ntfy website from ntfy entirely (no ticket)
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

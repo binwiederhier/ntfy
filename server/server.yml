@@ -167,11 +167,13 @@
 #
 # disallowed-topics:
 
-# Defines if the root route (/) is pointing to the landing page (as on ntfy.sh) or the
-# web app. If you self-host, you don't want to change this.
-# Can be "app" (default), "home" or "disable" to disable the web app entirely.
+# Defines the root path of the web app, or disables the web app entirely.
 #
-# web-root: app
+# Can be any simple path, e.g. "/", "/app", or "/ntfy". For backwards-compatibility reasons,
+# the values "app" (maps to "/"), "home" (maps to "/app"), or "disable" (maps to "") to disable
+# the web app entirely.
+#
+# web-root: /
 
 # Various feature flags used to control the web app, and API access, mainly around user and
 # account management.

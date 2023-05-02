@@ -1,10 +1,12 @@
 package server
 
 import (
-	"github.com/stretchr/testify/require"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTopic_CancelSubscribers(t *testing.T) {
@@ -38,4 +40,31 @@ func TestTopic_Keepalive(t *testing.T) {
 	to.Keepalive()
 	require.True(t, to.LastAccess().Unix() >= time.Now().Unix()-2)
 	require.True(t, to.LastAccess().Unix() <= time.Now().Unix()+2)
+}
+
+func TestTopic_Subscribe_duplicateID(t *testing.T) {
+	t.Parallel()
+
+	to := newTopic("mytopic")
+
+	// fix random seed to force same number generation
+	rand.Seed(1)
+	a := rand.Int()
+	to.subscribers[a] = &topicSubscriber{
+		userID:     "a",
+		subscriber: nil,
+		cancel:     func() {},
+	}
+
+	subFn := func(v *visitor, msg *message) error {
+		return nil
+	}
+
+	// force rand.Int to generate the same id once more
+	rand.Seed(1)
+	id := to.Subscribe(subFn, "b", func() {})
+	res := to.subscribers[id]
+
+	require.False(t, id == a)
+	require.True(t, res.userID == "b")
 }

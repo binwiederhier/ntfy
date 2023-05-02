@@ -1183,6 +1183,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Removed old ntfy website from ntfy entirely (no ticket)
+* Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

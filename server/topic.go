@@ -1,11 +1,12 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"math/rand"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 const (
@@ -45,9 +46,23 @@ func newTopic(id string) *topic {
 
 // Subscribe subscribes to this topic
 func (t *topic) Subscribe(s subscriber, userID string, cancel func()) int {
+	max_retries := 5
+	retries := 1
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	subscriberID := rand.Int()
+	// simple check for existing id in maps
+	for {
+		_, ok := t.subscribers[subscriberID]
+		if ok && retries <= max_retries {
+			subscriberID = rand.Int()
+			retries++
+		} else {
+			break
+		}
+	}
+
 	t.subscribers[subscriberID] = &topicSubscriber{
 		userID:     userID, // May be empty
 		subscriber: s,

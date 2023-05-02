@@ -42,12 +42,11 @@ func TestTopic_Keepalive(t *testing.T) {
 	require.True(t, to.LastAccess().Unix() <= time.Now().Unix()+2)
 }
 
-func TestTopic_Subscribe_duplicateID(t *testing.T) {
+func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 	t.Parallel()
-
 	to := newTopic("mytopic")
 
-	// fix random seed to force same number generation
+	// Fix random seed to force same number generation
 	rand.Seed(1)
 	a := rand.Int()
 	to.subscribers[a] = &topicSubscriber{
@@ -60,11 +59,11 @@ func TestTopic_Subscribe_duplicateID(t *testing.T) {
 		return nil
 	}
 
-	// force rand.Int to generate the same id once more
+	// Force rand.Int to generate the same id once more
 	rand.Seed(1)
 	id := to.Subscribe(subFn, "b", func() {})
 	res := to.subscribers[id]
 
-	require.False(t, id == a)
-	require.True(t, res.userID == "b")
+	require.NotEqual(t, id, a)
+	require.Equal(t, "b", res.userID, "b")
 }

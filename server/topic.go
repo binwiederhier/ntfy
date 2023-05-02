@@ -45,24 +45,16 @@ func newTopic(id string) *topic {
 }
 
 // Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, userID string, cancel func()) int {
-	max_retries := 5
-	retries := 1
+func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscriberID int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	subscriberID := rand.Int()
-	// simple check for existing id in maps
-	for {
-		_, ok := t.subscribers[subscriberID]
-		if ok && retries <= max_retries {
-			subscriberID = rand.Int()
-			retries++
-		} else {
+	for i := 0; i < 5; i++ { // Best effort retry
+		subscriberID = rand.Int()
+		_, exists := t.subscribers[subscriberID]
+		if !exists {
 			break
 		}
 	}
-
 	t.subscribers[subscriberID] = &topicSubscriber{
 		userID:     userID, // May be empty
 		subscriber: s,

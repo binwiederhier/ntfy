@@ -1,4 +1,4 @@
-![ntfy](web/public/static/img/ntfy.png)
+![ntfy](web/public/static/images/ntfy.png)
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
@@ -23,11 +23,11 @@ available on [Google Play](https://play.google.com/store/apps/details?id=io.heck
 as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) available on the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
 <p>
-  <img src="web/public/static/img/screenshot-curl.png" height="180">
-  <img src="web/public/static/img/screenshot-web-detail.png" height="180">
-  <img src="web/public/static/img/screenshot-phone-main.jpg" height="180">
-  <img src="web/public/static/img/screenshot-phone-detail.jpg" height="180">
-  <img src="web/public/static/img/screenshot-phone-notification.jpg" height="180">
+  <img src=".github/images/screenshot-curl.png" height="180">
+  <img src=".github/images/screenshot-web-detail.png" height="180">
+  <img src=".github/images/screenshot-phone-main.jpg" height="180">
+  <img src=".github/images/screenshot-phone-detail.jpg" height="180">
+  <img src=".github/images/screenshot-phone-notification.jpg" height="180">
 </p>
 
 ## **[Documentation](https://ntfy.sh/docs/)**

@@ -128,9 +128,14 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)
 - [zpool-events](https://github.com/maglar0/zpool-events) - Notify on ZFS pool events (Python)
 - [ntfyd](https://github.com/joachimschmidt557/ntfyd) - ntfy desktop daemon (Zig)
+- [ntfy-browser](https://github.com/johman10/ntfy-browser) - browser extension to receive notifications without having the page open (TypeScript)
+- [ntfy-electron](https://github.com/xdpirate/ntfy-electron) - Electron wrapper for the ntfy web app (JS)
 
 ## Blog + forum posts
 
+- [桌面通知：ntfy](https://www.cnblogs.com/xueweihan/archive/2023/05/04/17370060.html) - cnblogs.com - 5/2023 
+- [ntfy.sh - Open source push notifications via PUT/POST](https://lobste.rs/s/5drapz/ntfy_sh_open_source_push_notifications) - lobste.rs - 10/2022
+- [Install ntfy Inside Docker Container in Linux](https://lindevs.com/install-ntfy-inside-docker-container-in-linux) - lindevs.com - 4/2023 
 - [ntfy.sh](https://neo-sahara.com/wp/2023/03/25/ntfy-sh/) - neo-sahara.com - 3/2023 
 - [Using Ntfy to send and receive push notifications - Samuel Rosa de Oliveria - Delphicon 2023](https://www.youtube.com/watch?v=feu0skpI9QI) - youtube.com - 3/2023 
 - [ntfy: własny darmowy system powiadomień](https://sprawdzone.it/ntfy-wlasny-darmowy-system-powiadomien/) - sprawdzone.it - 3/2023 

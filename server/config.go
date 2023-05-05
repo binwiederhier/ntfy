@@ -105,6 +105,9 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
+	TwilioAccount                        string
+	TwilioAuthToken                      string
+	TwilioFromNumber                     string
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
@@ -183,6 +186,9 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
+		TwilioAccount:                        "",
+		TwilioAuthToken:                      "",
+		TwilioFromNumber:                     "",
 		MessageLimit:                         DefaultMessageLengthLimit,
 		MinDelay:                             DefaultMinDelay,
 		MaxDelay:                             DefaultMaxDelay,

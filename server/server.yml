@@ -144,6 +144,12 @@
 # smtp-server-domain:
 # smtp-server-addr-prefix:
 
+# If enabled, ntfy can send SMS text messages and do voice calls via Twilio, and the "X-SMS" and "X-Call" headers.
+#
+# twilio-account:
+# twilio-auth-token:
+# twilio-from-number:
+
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
 #

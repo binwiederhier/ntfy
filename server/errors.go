@@ -106,6 +106,8 @@ var (
 	errHTTPBadRequestNotAPaidUser                    = &errHTTP{40027, http.StatusBadRequest, "invalid request: not a paid user", "", nil}
 	errHTTPBadRequestBillingRequestInvalid           = &errHTTP{40028, http.StatusBadRequest, "invalid request: not a valid billing request", "", nil}
 	errHTTPBadRequestBillingSubscriptionExists       = &errHTTP{40029, http.StatusBadRequest, "invalid request: billing subscription already exists", "", nil}
+	errHTTPBadRequestTwilioDisabled                  = &errHTTP{40030, http.StatusBadRequest, "invalid request: SMS and calling is disabled", "https://ntfy.sh/docs/publish/#sms", nil}
+	errHTTPBadRequestPhoneNumberInvalid              = &errHTTP{40031, http.StatusBadRequest, "invalid request: phone number invalid", "https://ntfy.sh/docs/publish/#sms", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

@@ -105,6 +105,7 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
+	TwilioBaseURL                        string
 	TwilioAccount                        string
 	TwilioAuthToken                      string
 	TwilioFromNumber                     string
@@ -186,6 +187,7 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
+		TwilioBaseURL:                        "https://api.twilio.com", // Override for tests
 		TwilioAccount:                        "",
 		TwilioAuthToken:                      "",
 		TwilioFromNumber:                     "",

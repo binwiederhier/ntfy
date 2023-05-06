@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/xml"
 	"fmt"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -11,9 +13,10 @@ import (
 )
 
 const (
-	twilioMessageEndpoint = "Messages.json"
-	twilioCallEndpoint    = "Calls.json"
-	twilioCallTemplate    = `
+	twilioMessageEndpoint     = "Messages.json"
+	twilioMessageFooterFormat = "This message was sent by %s via %s"
+	twilioCallEndpoint        = "Calls.json"
+	twilioCallFormat          = `
 <Response>
 	<Pause length="1"/>
 	<Say>You have a message from notify on topic %s. Message:</Say>
@@ -37,7 +40,7 @@ func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
-	body := fmt.Sprintf(twilioCallTemplate, m.Topic, m.Message, s.messageFooter(m))
+	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(m)))
 	data := url.Values{}
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
@@ -73,7 +76,7 @@ func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, e
 }
 
 func (s *Server) performTwilioRequestInternal(endpoint string, data url.Values) (string, error) {
-	requestURL := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/%s", s.config.TwilioAccount, endpoint)
+	requestURL := fmt.Sprintf("%s/2010-04-01/Accounts/%s/%s", s.config.TwilioBaseURL, s.config.TwilioAccount, endpoint)
 	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
@@ -97,5 +100,11 @@ func (s *Server) messageFooter(m *message) string {
 	if m.User != "" {
 		sender = fmt.Sprintf("%s (%s)", m.User, m.Sender)
 	}
-	return fmt.Sprintf("This message was sent by %s via %s", sender, util.ShortTopicURL(topicURL))
+	return fmt.Sprintf(twilioMessageFooterFormat, sender, util.ShortTopicURL(topicURL))
+}
+
+func xmlEscapeText(text string) string {
+	var buf bytes.Buffer
+	_ = xml.EscapeText(&buf, []byte(text))
+	return buf.String()
 }

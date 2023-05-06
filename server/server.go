@@ -98,7 +98,7 @@ var (
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
-	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}`)
+	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
 
 	//go:embed site
 	webFs       embed.FS

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
 	"io"
@@ -36,7 +37,7 @@ func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
 	data.Set("Body", body)
-	s.performTwilioRequest(v, r, m, twilioMessageEndpoint, to, body, data)
+	s.performTwilioRequest(v, r, m, metricSMSSentSuccess, metricSMSSentFailure, twilioMessageEndpoint, to, body, data)
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
@@ -45,10 +46,10 @@ func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
 	data.Set("Twiml", body)
-	s.performTwilioRequest(v, r, m, twilioCallEndpoint, to, body, data)
+	s.performTwilioRequest(v, r, m, metricCallsMadeSuccess, metricCallsMadeFailure, twilioCallEndpoint, to, body, data)
 }
 
-func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, endpoint, to, body string, data url.Values) {
+func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, msuccess, mfailure prometheus.Counter, endpoint, to, body string, data url.Values) {
 	logContext := log.Context{
 		"twilio_from": s.config.TwilioFromNumber,
 		"twilio_to":   to,
@@ -66,6 +67,7 @@ func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, e
 			Field("twilio_response", response).
 			Err(err).
 			Warn("Error sending Twilio request")
+		minc(mfailure)
 		return
 	}
 	if ev.IsTrace() {
@@ -73,6 +75,7 @@ func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, e
 	} else if ev.IsDebug() {
 		ev.Debug("Received successful Twilio response")
 	}
+	minc(msuccess)
 }
 
 func (s *Server) performTwilioRequestInternal(endpoint string, data url.Values) (string, error) {

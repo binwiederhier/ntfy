@@ -20,6 +20,9 @@ To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` wh
 To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI](subscribe/cli.md)
 for details). 
 
+If you like video tutorials, check out :simple-youtube: [Kris Occhipinti's ntfy install guide](https://www.youtube.com/watch?v=bZzqrX05mNU). 
+It's short and to the point. _I am not affiliated with Kris, I just liked the video._
+
 ## Linux binaries
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
 deb/rpm packages.
@@ -28,7 +31,7 @@ deb/rpm packages.
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.4.0/ntfy_2.4.0_linux_x86_64.tar.gz
     tar zxvf ntfy_2.4.0_linux_x86_64.tar.gz
-    sudo cp -a ntfy_2.4.0_linux_x86_64/ntfy /usr/bin/ntfy
+    sudo cp -a ntfy_2.4.0_linux_x86_64/ntfy /usr/local/bin/ntfy
     sudo mkdir /etc/ntfy && sudo cp ntfy_2.4.0_linux_x86_64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```

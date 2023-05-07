@@ -133,8 +133,9 @@ and uptime of third party servers, so use of each server is **at your own discre
 
 ## Blog + forum posts
 
+- [ntfy: des notifications instantanées](https://blogmotion.fr/diy/ntfy-notification-push-domotique-20708) - blogmotion.fr - 5/2023
 - [桌面通知：ntfy](https://www.cnblogs.com/xueweihan/archive/2023/05/04/17370060.html) - cnblogs.com - 5/2023 
-- [ntfy.sh - Open source push notifications via PUT/POST](https://lobste.rs/s/5drapz/ntfy_sh_open_source_push_notifications) - lobste.rs - 10/2022
+- [ntfy.sh - Open source push notifications via PUT/POST](https://lobste.rs/s/5drapz/ntfy_sh_open_source_push_notifications) - lobste.rs - 5/2023 
 - [Install ntfy Inside Docker Container in Linux](https://lindevs.com/install-ntfy-inside-docker-container-in-linux) - lindevs.com - 4/2023 
 - [ntfy.sh](https://neo-sahara.com/wp/2023/03/25/ntfy-sh/) - neo-sahara.com - 3/2023 
 - [Using Ntfy to send and receive push notifications - Samuel Rosa de Oliveria - Delphicon 2023](https://www.youtube.com/watch?v=feu0skpI9QI) - youtube.com - 3/2023 

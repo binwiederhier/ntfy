@@ -683,6 +683,10 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
+	} else if sms != "" && !vrate.SMSAllowed() {
+		return nil, errHTTPTooManyRequestsLimitSMS.With(t)
+	} else if call != "" && !vrate.CallAllowed() {
+		return nil, errHTTPTooManyRequestsLimitCalls.With(t)
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
@@ -726,7 +730,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.config.TwilioAccount != "" && sms != "" {
 			go s.sendSMS(v, r, m, sms)
 		}
-		if call != "" {
+		if s.config.TwilioAccount != "" && call != "" {
 			go s.callPhone(v, r, m, call)
 		}
 		if s.config.UpstreamBaseURL != "" {

@@ -1180,6 +1180,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## ntfy server v2.5.0 (UNRELEASED)
 
+**Features:**
+
+* Support for SMS and voice calls using Twilio (no ticket)
+
 **Bug fixes + maintenance:**
 
 * Removed old ntfy website from ntfy entirely (no ticket)

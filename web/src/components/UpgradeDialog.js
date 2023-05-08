@@ -298,11 +298,14 @@ const TierCard = (props) => {
                         </div>
                         <List dense>
                             {tier.limits.reservations > 0 && <Feature>{t("account_upgrade_dialog_tier_features_reservations", { reservations: tier.limits.reservations, count: tier.limits.reservations })}</Feature>}
-                            {tier.limits.reservations === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_reservations")}</NoFeature>}
                             <Feature>{t("account_upgrade_dialog_tier_features_messages", { messages: formatNumber(tier.limits.messages), count: tier.limits.messages })}</Feature>
                             <Feature>{t("account_upgrade_dialog_tier_features_emails", { emails: formatNumber(tier.limits.emails), count: tier.limits.emails })}</Feature>
+                            {tier.limits.sms > 0 && <Feature>{t("account_upgrade_dialog_tier_features_sms", { sms: formatNumber(tier.limits.sms), count: tier.limits.sms })}</Feature>}
+                            {tier.limits.calls > 0 && <Feature>{t("account_upgrade_dialog_tier_features_calls", { calls: formatNumber(tier.limits.calls), count: tier.limits.calls })}</Feature>}
                             <Feature>{t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}</Feature>
-                            <Feature>{t("account_upgrade_dialog_tier_features_attachment_total_size", { totalsize: formatBytes(tier.limits.attachment_total_size, 0) })}</Feature>
+                            {tier.limits.reservations === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_reservations")}</NoFeature>}
+                            {tier.limits.sms === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_sms")}</NoFeature>}
+                            {tier.limits.calls === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_calls")}</NoFeature>}
                         </List>
                         {tier.prices && props.interval === SubscriptionInterval.MONTH &&
                             <Typography variant="body2" color="gray">

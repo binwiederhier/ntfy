@@ -45,6 +45,8 @@ const PublishDialog = (props) => {
     const [filename, setFilename] = useState("");
     const [filenameEdited, setFilenameEdited] = useState(false);
     const [email, setEmail] = useState("");
+    const [sms, setSms] = useState("");
+    const [call, setCall] = useState("");
     const [delay, setDelay] = useState("");
     const [publishAnother, setPublishAnother] = useState(false);
 
@@ -52,6 +54,8 @@ const PublishDialog = (props) => {
     const [showClickUrl, setShowClickUrl] = useState(false);
     const [showAttachUrl, setShowAttachUrl] = useState(false);
     const [showEmail, setShowEmail] = useState(false);
+    const [showSms, setShowSms] = useState(false);
+    const [showCall, setShowCall] = useState(false);
     const [showDelay, setShowDelay] = useState(false);
 
     const showAttachFile = !!attachFile && !showAttachUrl;
@@ -123,6 +127,12 @@ const PublishDialog = (props) => {
         }
         if (email.trim()) {
             url.searchParams.append("email", email.trim());
+        }
+        if (sms.trim()) {
+            url.searchParams.append("sms", sms.trim());
+        }
+        if (call.trim()) {
+            url.searchParams.append("call", call.trim());
         }
         if (delay.trim()) {
             url.searchParams.append("delay", delay.trim());
@@ -406,6 +416,48 @@ const PublishDialog = (props) => {
                             />
                         </ClosableRow>
                     }
+                    {showSms &&
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_sms_reset")} onClose={() => {
+                            setSms("");
+                            setShowSms(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label={t("publish_dialog_sms_label")}
+                                placeholder={t("publish_dialog_sms_placeholder")}
+                                value={sms}
+                                onChange={ev => setSms(ev.target.value)}
+                                disabled={disabled}
+                                type="tel"
+                                variant="standard"
+                                fullWidth
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_sms_label")
+                                }}
+                            />
+                        </ClosableRow>
+                    }
+                    {showCall &&
+                        <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_call_reset")} onClose={() => {
+                            setCall("");
+                            setShowCall(false);
+                        }}>
+                            <TextField
+                                margin="dense"
+                                label={t("publish_dialog_call_label")}
+                                placeholder={t("publish_dialog_call_placeholder")}
+                                value={call}
+                                onChange={ev => setCall(ev.target.value)}
+                                disabled={disabled}
+                                type="tel"
+                                variant="standard"
+                                fullWidth
+                                inputProps={{
+                                    "aria-label": t("publish_dialog_call_label")
+                                }}
+                            />
+                        </ClosableRow>
+                    }
                     {showAttachUrl &&
                         <ClosableRow disabled={disabled} closeLabel={t("publish_dialog_attach_reset")} onClose={() => {
                             setAttachUrl("");
@@ -510,6 +562,8 @@ const PublishDialog = (props) => {
                     <div>
                         {!showClickUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_click_label")} aria-label={t("publish_dialog_chip_click_label")} onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showEmail && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_email_label")} aria-label={t("publish_dialog_chip_email_label")} onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showSms && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_sms_label")} aria-label={t("publish_dialog_chip_sms_label")} onClick={() => setShowSms(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {!showCall && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_call_label")} aria-label={t("publish_dialog_chip_call_label")} onClick={() => setShowCall(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_url_label")} aria-label={t("publish_dialog_chip_attach_url_label")} onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_file_label")} aria-label={t("publish_dialog_chip_attach_file_label")} onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showDelay && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_delay_label")} aria-label={t("publish_dialog_chip_delay_label")} onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}

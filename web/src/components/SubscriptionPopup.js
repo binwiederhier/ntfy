@@ -277,14 +277,14 @@ const LimitReachedChip = () => {
     );
 };
 
-const ProChip = () => {
+export const ProChip = () => {
     const { t } = useTranslation();
     return (
         <Chip
             label={"ntfy Pro"}
             variant="outlined"
             color="primary"
-            sx={{ opacity: 0.8, borderWidth: "2px", height: "24px", marginLeft: "5px" }}
+            sx={{ opacity: 0.8, fontWeight: "bold", borderWidth: "2px", height: "24px", marginLeft: "5px" }}
         />
     );
 };

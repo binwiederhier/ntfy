@@ -51,6 +51,7 @@ import {ContentCopy, Public} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import DialogContentText from "@mui/material/DialogContentText";
 import {IncorrectPasswordError, UnauthorizedError} from "../app/errors";
+import {ProChip} from "./SubscriptionPopup";
 
 const Account = () => {
     if (!session.exists()) {
@@ -337,23 +338,18 @@ const Stats = () => {
                 {t("account_usage_title")}
             </Typography>
             <PrefGroup>
-                <Pref title={t("account_usage_reservations_title")}>
-                    {(account.role === Role.ADMIN || account.limits.reservations > 0) &&
-                        <>
-                            <div>
-                                <Typography variant="body2" sx={{float: "left"}}>{account.stats.reservations}</Typography>
-                                <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", {limit: account.limits.reservations}) : t("account_usage_unlimited")}</Typography>
-                            </div>
-                            <LinearProgress
-                                variant="determinate"
-                                value={account.role === Role.USER && account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
-                            />
-                        </>
-                    }
-                    {account.role === Role.USER && account.limits.reservations === 0 &&
-                        <em>{t("account_usage_reservations_none")}</em>
-                    }
-                </Pref>
+                {(account.role === Role.ADMIN || account.limits.reservations > 0) &&
+                    <Pref title={t("account_usage_reservations_title")}>
+                        <div>
+                            <Typography variant="body2" sx={{float: "left"}}>{account.stats.reservations.toLocaleString()}</Typography>
+                            <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.reservations.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
+                        </div>
+                        <LinearProgress
+                            variant="determinate"
+                            value={account.role === Role.USER && account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
+                        />
+                    </Pref>
+                }
                 <Pref title={
                     <>
                         {t("account_usage_messages_title")}
@@ -361,8 +357,8 @@ const Stats = () => {
                     </>
                 }>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.messages }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.messages.toLocaleString()}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.messages.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
@@ -376,14 +372,48 @@ const Stats = () => {
                     </>
                 }>
                     <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.emails }) : t("account_usage_unlimited")}</Typography>
+                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails.toLocaleString()}</Typography>
+                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.emails.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
                     </div>
                     <LinearProgress
                         variant="determinate"
                         value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100}
                     />
                 </Pref>
+                {(account.role === Role.ADMIN || account.limits.sms > 0) &&
+                    <Pref title={
+                        <>
+                            {t("account_usage_sms_title")}
+                            <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
+                        </>
+                    }>
+                        <div>
+                            <Typography variant="body2" sx={{float: "left"}}>{account.stats.sms.toLocaleString()}</Typography>
+                            <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.sms.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
+                        </div>
+                        <LinearProgress
+                            variant="determinate"
+                            value={account.role === Role.USER && account.limits.sms > 0 ? normalize(account.stats.sms, account.limits.sms) : 100}
+                        />
+                    </Pref>
+                }
+                {(account.role === Role.ADMIN || account.limits.calls > 0) &&
+                    <Pref title={
+                        <>
+                            {t("account_usage_calls_title")}
+                            <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
+                        </>
+                    }>
+                        <div>
+                            <Typography variant="body2" sx={{float: "left"}}>{account.stats.calls.toLocaleString()}</Typography>
+                            <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.calls.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
+                        </div>
+                        <LinearProgress
+                            variant="determinate"
+                            value={account.role === Role.USER && account.limits.sms > 0 ? normalize(account.stats.calls, account.limits.calls) : 100}
+                        />
+                    </Pref>
+                }
                 <Pref
                     alignTop
                     title={t("account_usage_attachment_storage_title")}
@@ -404,6 +434,21 @@ const Stats = () => {
                         value={account.role === Role.USER ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
                     />
                 </Pref>
+                {config.enable_reservations && account.role === Role.USER && account.limits.reservations === 0 &&
+                    <Pref title={<>{t("account_usage_reservations_title")}{config.enable_payments && <ProChip/>}</>}>
+                        <em>{t("account_usage_reservations_none")}</em>
+                    </Pref>
+                }
+                {config.enable_sms && account.role === Role.USER && account.limits.sms === 0 &&
+                    <Pref title={<>{t("account_usage_sms_title")}{config.enable_payments && <ProChip/>}</>}>
+                        <em>{t("account_usage_sms_none")}</em>
+                    </Pref>
+                }
+                {config.enable_calls && account.role === Role.USER && account.limits.calls === 0 &&
+                    <Pref title={<>{t("account_usage_calls_title")}{config.enable_payments && <ProChip/>}</>}>
+                        <em>{t("account_usage_calls_none")}</em>
+                    </Pref>
+                }
             </PrefGroup>
             {account.role === Role.USER && account.limits.basis === LimitBasis.IP &&
                 <Typography variant="body1">

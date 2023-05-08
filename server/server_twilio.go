@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
@@ -32,7 +33,7 @@ const (
 )
 
 func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
-	body := fmt.Sprintf("%s\n\n--\n%s", m.Message, s.messageFooter(m))
+	body := fmt.Sprintf("%s\n\n--\n%s", m.Message, s.messageFooter(v.User(), m))
 	data := url.Values{}
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
@@ -41,7 +42,7 @@ func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
-	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(m)))
+	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(v.User(), m)))
 	data := url.Values{}
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
@@ -97,11 +98,11 @@ func (s *Server) performTwilioRequestInternal(endpoint string, data url.Values) 
 	return string(response), nil
 }
 
-func (s *Server) messageFooter(m *message) string {
+func (s *Server) messageFooter(u *user.User, m *message) string { // u may be nil!
 	topicURL := s.config.BaseURL + "/" + m.Topic
 	sender := m.Sender.String()
-	if m.User != "" {
-		sender = fmt.Sprintf("%s (%s)", m.User, m.Sender)
+	if u != nil {
+		sender = fmt.Sprintf("%s (%s)", u.Name, m.Sender)
 	}
 	return fmt.Sprintf(twilioMessageFooterFormat, sender, util.ShortTopicURL(topicURL))
 }

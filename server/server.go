@@ -529,6 +529,8 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
+		EnableSMS:          s.config.TwilioAccount != "",
+		EnableCalls:        s.config.TwilioAccount != "",
 		EnableReservations: s.config.EnableReservations,
 		BillingContact:     s.config.BillingContact,
 		DisallowedTopics:   s.config.DisallowedTopics,

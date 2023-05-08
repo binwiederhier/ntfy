@@ -206,10 +206,12 @@ export const formatBytes = (bytes, decimals = 2) => {
 }
 
 export const formatNumber = (n) => {
-    if (n % 1000 === 0) {
+    if (n === 0) {
+        return n;
+    } else if (n % 1000 === 0) {
         return `${n/1000}k`;
     }
-    return n;
+    return n.toLocaleString();
 }
 
 export const formatPrice = (n) => {

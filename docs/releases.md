@@ -1184,6 +1184,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Removed old ntfy website from ntfy entirely (no ticket)
 * Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
+* Support for `quoted-printable` in incoming emails ([#719](https://github.com/binwiederhier/ntfy/pull/719), thanks to [@Aerion](https://github.com/Aerion))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

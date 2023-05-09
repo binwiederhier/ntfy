@@ -41,6 +41,13 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
+- [Watchtower](https://containrrr.dev/watchtower/) ⭐ - A container-based solution for automating Docker container base image updates
+- [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway for Apprise notifications
+
+## [JSON publishing](publish.md#publish-as-json) integrations
+- [Jellyfin](https://jellyfin.org/) ⭐ - The Free Software Media System
+- [Overseer](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool built to work with your existing Plex ecosystem
+- [Tautulli](https://github.com/Tautulli/Tautulli/wiki/Notification-Agents-Guide#webhook) ⭐ - A Python based monitoring and tracking tool for Plex Media Server
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

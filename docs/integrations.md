@@ -4,24 +4,6 @@ There are quite a few projects that work with ntfy, integrate ntfy, or have been
 
 I've added a ⭐ to projects or posts that have a significant following, or had a lot of interaction by the community.
 
-## Public ntfy servers
-
-Here's a list of public ntfy servers. As of right now, there is only one official server. The others are provided by the 
-ntfy community. Thanks to everyone running a public server. **You guys rock!**
-
-| URL                                               | Country            |
-|---------------------------------------------------|--------------------|
-| [ntfy.sh](https://ntfy.sh/) (*Official*)          | 🇺🇸 United States |
-| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 France        |
-| [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 Finland       |
-| [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
-| [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
-| [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
-| [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
-
-Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
-and uptime of third party servers, so use of each server is **at your own discretion**.
-
 ## Official integrations
 
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
@@ -41,6 +23,14 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
+
+## Integration via HTTP/SMTP/etc.
+
+- [Watchtower](https://containrrr.dev/watchtower/) ⭐ - Automating Docker container base image updates (see [integration example](examples.md#watchtower-shoutrrr))
+- [Jellyfin](https://jellyfin.org/) ⭐ - The Free Software Media System (see [integration example](examples.md#))
+- [Overseer](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
+- [Tautulli](https://github.com/Tautulli/Tautulli) ⭐ - Monitoring and tracking tool for Plex (integration [via webhook](https://github.com/Tautulli/Tautulli/wiki/Notification-Agents-Guide#webhook))
+- [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway (integration via [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy))
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 
@@ -196,3 +186,22 @@ and uptime of third party servers, so use of each server is **at your own discre
 - [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - ugeek.github.io - 11/2021
 - [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
 - [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021
+
+
+## Alternative ntfy servers
+
+Here's a list of public ntfy servers. As of right now, there is only one official server. The others are provided by the
+ntfy community. Thanks to everyone running a public server. **You guys rock!**
+
+| URL                                               | Country            |
+|---------------------------------------------------|--------------------|
+| [ntfy.sh](https://ntfy.sh/) (*Official*)          | 🇺🇸 United States |
+| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 France        |
+| [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 Finland       |
+| [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
+| [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
+| [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
+| [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
+
+Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
+and uptime of third party servers, so use of each server is **at your own discretion**.

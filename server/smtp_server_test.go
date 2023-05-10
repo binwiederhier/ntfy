@@ -423,7 +423,6 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
-
 func TestSmtpBackend_MultipartQuotedPrintable(t *testing.T) {
 	email := `EHLO example.com
 MAIL FROM: phil@example.com
@@ -457,7 +456,7 @@ up
 	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/mytopic", r.URL.Path)
 		require.Equal(t, "and one more", r.Header.Get("Title"))
-		require.Equal(t,  `what's
+		require.Equal(t, `what's
 à&é"'(-è_çà)
 =====
 up`, readAll(t, r.Body))

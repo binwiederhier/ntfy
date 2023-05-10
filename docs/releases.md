@@ -1178,7 +1178,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-## ntfy server v2.5.0 (UNRELEASED)
+### ntfy server v2.5.0 (UNRELEASED)
 
 **Bug fixes + maintenance:**
 

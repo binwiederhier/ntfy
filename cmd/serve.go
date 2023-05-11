@@ -74,6 +74,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-account", Aliases: []string{"twilio_account"}, EnvVars: []string{"NTFY_TWILIO_ACCOUNT"}, Usage: "Twilio account SID, used for SMS and calling, e.g. AC123..."}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-from-number", Aliases: []string{"twilio_from_number"}, EnvVars: []string{"NTFY_TWILIO_FROM_NUMBER"}, Usage: "Twilio number to use for outgoing calls and text messages"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-verify-service", Aliases: []string{"twilio_verify_service"}, EnvVars: []string{"NTFY_TWILIO_VERIFY_SERVICE"}, Usage: "Twilio Verify service ID, used for phone number verification"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"visitor_subscription_limit"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", Aliases: []string{"visitor_attachment_total_size_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "100M", Usage: "total storage limit used for attachments per visitor"}),
@@ -159,6 +160,7 @@ func execServe(c *cli.Context) error {
 	twilioAccount := c.String("twilio-account")
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioFromNumber := c.String("twilio-from-number")
+	twilioVerifyService := c.String("twilio-verify-service")
 	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorSubscriberRateLimiting := c.Bool("visitor-subscriber-rate-limiting")
@@ -323,6 +325,7 @@ func execServe(c *cli.Context) error {
 	conf.TwilioAccount = twilioAccount
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioFromNumber = twilioFromNumber
+	conf.TwilioVerifyService = twilioVerifyService
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit

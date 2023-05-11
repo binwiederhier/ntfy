@@ -277,6 +277,16 @@ type apiAccountTokenResponse struct {
 	Expires    int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
+type apiAccountPhoneNumberRequest struct {
+	Number string `json:"number"`
+	Code   string `json:"code,omitempty"` // Only supplied in "verify" call
+}
+
+type apiAccountPhoneNumberResponse struct {
+	Number   string `json:"number"`
+	Verified bool   `json:"verified"`
+}
+
 type apiAccountTier struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
@@ -326,18 +336,19 @@ type apiAccountBilling struct {
 }
 
 type apiAccountResponse struct {
-	Username      string                     `json:"username"`
-	Role          string                     `json:"role,omitempty"`
-	SyncTopic     string                     `json:"sync_topic,omitempty"`
-	Language      string                     `json:"language,omitempty"`
-	Notification  *user.NotificationPrefs    `json:"notification,omitempty"`
-	Subscriptions []*user.Subscription       `json:"subscriptions,omitempty"`
-	Reservations  []*apiAccountReservation   `json:"reservations,omitempty"`
-	Tokens        []*apiAccountTokenResponse `json:"tokens,omitempty"`
-	Tier          *apiAccountTier            `json:"tier,omitempty"`
-	Limits        *apiAccountLimits          `json:"limits,omitempty"`
-	Stats         *apiAccountStats           `json:"stats,omitempty"`
-	Billing       *apiAccountBilling         `json:"billing,omitempty"`
+	Username      string                           `json:"username"`
+	Role          string                           `json:"role,omitempty"`
+	SyncTopic     string                           `json:"sync_topic,omitempty"`
+	Language      string                           `json:"language,omitempty"`
+	Notification  *user.NotificationPrefs          `json:"notification,omitempty"`
+	Subscriptions []*user.Subscription             `json:"subscriptions,omitempty"`
+	Reservations  []*apiAccountReservation         `json:"reservations,omitempty"`
+	Tokens        []*apiAccountTokenResponse       `json:"tokens,omitempty"`
+	PhoneNumbers  []*apiAccountPhoneNumberResponse `json:"phone_numbers,omitempty"`
+	Tier          *apiAccountTier                  `json:"tier,omitempty"`
+	Limits        *apiAccountLimits                `json:"limits,omitempty"`
+	Stats         *apiAccountStats                 `json:"stats,omitempty"`
+	Billing       *apiAccountBilling               `json:"billing,omitempty"`
 }
 
 type apiAccountReservationRequest struct {
@@ -418,4 +429,8 @@ type apiStripeSubscriptionUpdatedEvent struct {
 type apiStripeSubscriptionDeletedEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
+}
+
+type apiTwilioVerifyResponse struct {
+	Status string `json:"status"`
 }

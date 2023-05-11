@@ -38,7 +38,7 @@ func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
 	data.Set("Body", body)
-	s.performTwilioRequest(v, r, m, metricSMSSentSuccess, metricSMSSentFailure, twilioMessageEndpoint, to, body, data)
+	s.twilioMessagingRequest(v, r, m, metricSMSSentSuccess, metricSMSSentFailure, twilioMessageEndpoint, to, body, data)
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
@@ -47,10 +47,72 @@ func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
 	data.Set("Twiml", body)
-	s.performTwilioRequest(v, r, m, metricCallsMadeSuccess, metricCallsMadeFailure, twilioCallEndpoint, to, body, data)
+	s.twilioMessagingRequest(v, r, m, metricCallsMadeSuccess, metricCallsMadeFailure, twilioCallEndpoint, to, body, data)
 }
 
-func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, msuccess, mfailure prometheus.Counter, endpoint, to, body string, data url.Values) {
+func (s *Server) verifyPhone(v *visitor, r *http.Request, phoneNumber string) error {
+	logvr(v, r).Tag(tagTwilio).Field("twilio_to", phoneNumber).Debug("Sending phone verification")
+	data := url.Values{}
+	data.Set("To", phoneNumber)
+	data.Set("Channel", "sms")
+	requestURL := fmt.Sprintf("%s/v2/Services/%s/Verifications", s.config.TwilioVerifyBaseURL, s.config.TwilioVerifyService)
+	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	response, err := io.ReadAll(resp.Body)
+	ev := logvr(v, r).Tag(tagTwilio)
+	if err != nil {
+		ev.Err(err).Warn("Error sending Twilio phone verification request")
+		return err
+	}
+	if ev.IsTrace() {
+		ev.Field("twilio_response", string(response)).Trace("Received successful Twilio phone verification response")
+	} else if ev.IsDebug() {
+		ev.Debug("Received successful Twilio phone verification response")
+	}
+	return nil
+}
+
+func (s *Server) checkVerifyPhone(v *visitor, r *http.Request, phoneNumber, code string) error {
+	logvr(v, r).Tag(tagTwilio).Field("twilio_to", phoneNumber).Debug("Checking phone verification")
+	data := url.Values{}
+	data.Set("To", phoneNumber)
+	data.Set("Code", code)
+	requestURL := fmt.Sprintf("%s/v2/Services/%s/VerificationCheck", s.config.TwilioVerifyBaseURL, s.config.TwilioAccount)
+	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	} else if resp.StatusCode != http.StatusOK {
+		return
+	}
+	response, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	ev := logvr(v, r).Tag(tagTwilio)
+	if ev.IsTrace() {
+		ev.Field("twilio_response", string(response)).Trace("Received successful Twilio phone verification response")
+	} else if ev.IsDebug() {
+		ev.Debug("Received successful Twilio phone verification response")
+	}
+	return nil
+}
+
+func (s *Server) twilioMessagingRequest(v *visitor, r *http.Request, m *message, msuccess, mfailure prometheus.Counter, endpoint, to, body string, data url.Values) {
 	logContext := log.Context{
 		"twilio_from": s.config.TwilioFromNumber,
 		"twilio_to":   to,
@@ -61,7 +123,7 @@ func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, m
 	} else if ev.IsDebug() {
 		ev.Debug("Sending Twilio request")
 	}
-	response, err := s.performTwilioRequestInternal(endpoint, data)
+	response, err := s.performTwilioMessagingRequestInternal(endpoint, data)
 	if err != nil {
 		ev.
 			Field("twilio_body", body).
@@ -79,8 +141,8 @@ func (s *Server) performTwilioRequest(v *visitor, r *http.Request, m *message, m
 	minc(msuccess)
 }
 
-func (s *Server) performTwilioRequestInternal(endpoint string, data url.Values) (string, error) {
-	requestURL := fmt.Sprintf("%s/2010-04-01/Accounts/%s/%s", s.config.TwilioBaseURL, s.config.TwilioAccount, endpoint)
+func (s *Server) performTwilioMessagingRequestInternal(endpoint string, data url.Values) (string, error) {
+	requestURL := fmt.Sprintf("%s/2010-04-01/Accounts/%s/%s", s.config.TwilioMessagingBaseURL, s.config.TwilioAccount, endpoint)
 	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err

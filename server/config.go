@@ -107,10 +107,12 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
-	TwilioBaseURL                        string
+	TwilioMessagingBaseURL               string
 	TwilioAccount                        string
 	TwilioAuthToken                      string
 	TwilioFromNumber                     string
+	TwilioVerifyBaseURL                  string
+	TwilioVerifyService                  string
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
@@ -191,10 +193,12 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
-		TwilioBaseURL:                        "https://api.twilio.com", // Override for tests
+		TwilioMessagingBaseURL:               "https://api.twilio.com", // Override for tests
 		TwilioAccount:                        "",
 		TwilioAuthToken:                      "",
 		TwilioFromNumber:                     "",
+		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
+		TwilioVerifyService:                  "",
 		MessageLimit:                         DefaultMessageLengthLimit,
 		MinDelay:                             DefaultMinDelay,
 		MaxDelay:                             DefaultMaxDelay,

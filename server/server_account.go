@@ -144,6 +144,19 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				})
 			}
 		}
+		phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+		if err != nil {
+			return err
+		}
+		if len(phoneNumbers) > 0 {
+			response.PhoneNumbers = make([]*apiAccountPhoneNumberResponse, 0)
+			for _, p := range phoneNumbers {
+				response.PhoneNumbers = append(response.PhoneNumbers, &apiAccountPhoneNumberResponse{
+					Number:   p.Number,
+					Verified: p.Verified,
+				})
+			}
+		}
 	} else {
 		response.Username = user.Everyone
 		response.Role = string(user.RoleAnonymous)
@@ -515,6 +528,80 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 	}
 	go s.pruneMessages()
 	return nil
+}
+
+func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	// Check user is allowed to add phone numbers
+	if u == nil || (u.IsUser() && u.Tier == nil) {
+		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier.SMSLimit == 0 && u.Tier.CallLimit == 0 {
+		return errHTTPUnauthorized
+	}
+	// Actually add the unverified number, and send verification
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"number": req.Number,
+		}).
+		Debug("Adding phone number, and sending verification")
+	if err := s.userManager.AddPhoneNumber(u.ID, req.Number); err != nil {
+		return err
+	}
+	if err := s.verifyPhone(v, r, req.Number); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	// Check user is allowed to add phone numbers
+	if u == nil {
+		return errHTTPUnauthorized
+	}
+	// Get phone numbers, and check if it's in the list
+	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, phoneNumber := range phoneNumbers {
+		if phoneNumber.Number == req.Number && phoneNumber.Verified {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	if err := s.checkVerifyPhone(v, r, req.Number, req.Code); err != nil {
+		return err
+	}
+	logvr(v, r).
+		Tag(tagAccount).
+		Fields(log.Context{
+			"number": req.Number,
+		}).
+		Debug("Marking phone number as verified")
+	if err := s.userManager.MarkPhoneNumberVerified(u.ID, req.Number); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 // publishSyncEventAsync kicks of a Go routine to publish a sync message to the user's sync topic

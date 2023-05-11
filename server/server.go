@@ -88,6 +88,7 @@ var (
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
+	apiAccountPhonePath                                  = "/v1/account/phone"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -450,6 +451,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberAdd))(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberVerify))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {

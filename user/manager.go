@@ -113,6 +113,14 @@ const (
 			PRIMARY KEY (user_id, token),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
+		CREATE TABLE IF NOT EXISTS user_phone (
+			user_id TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			verified INT NOT NULL,
+			PRIMARY KEY (user_id, phone_number),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE UNIQUE INDEX idx_user_phone_number ON user_phone (phone_number);
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
@@ -261,6 +269,10 @@ const (
 		)
 	`
 
+	selectPhoneNumbersQuery        = `SELECT phone_number, verified FROM user_phone WHERE user_id = ?`
+	insertPhoneNumberQuery         = `INSERT INTO user_phone (user_id, phone_number, verified) VALUES (?, ?, 0)`
+	updatePhoneNumberVerifiedQuery = `UPDATE user_phone SET verified=1 WHERE user_id = ? AND phone_number = ?`
+
 	insertTierQuery = `
 		INSERT INTO tier (id, code, name, messages_limit, messages_expiry_duration, emails_limit, sms_limit, calls_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -402,6 +414,14 @@ const (
 		ALTER TABLE tier ADD COLUMN calls_limit INT NOT NULL DEFAULT (0);
 		ALTER TABLE user ADD COLUMN stats_sms INT NOT NULL DEFAULT (0);
 		ALTER TABLE user ADD COLUMN stats_calls INT NOT NULL DEFAULT (0);
+		CREATE TABLE IF NOT EXISTS user_phone (
+			user_id TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			verified INT NOT NULL,
+			PRIMARY KEY (user_id, phone_number),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE UNIQUE INDEX idx_user_phone_number ON user_phone (phone_number);
 	`
 )
 
@@ -626,6 +646,56 @@ func (a *Manager) RemoveToken(userID, token string) error {
 // RemoveExpiredTokens deletes all expired tokens from the database
 func (a *Manager) RemoveExpiredTokens() error {
 	if _, err := a.db.Exec(deleteExpiredTokensQuery, time.Now().Unix()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *Manager) PhoneNumbers(userID string) ([]*PhoneNumber, error) {
+	rows, err := a.db.Query(selectPhoneNumbersQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	phoneNumbers := make([]*PhoneNumber, 0)
+	for {
+		phoneNumber, err := a.readPhoneNumber(rows)
+		if err == ErrPhoneNumberNotFound {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		phoneNumbers = append(phoneNumbers, phoneNumber)
+	}
+	return phoneNumbers, nil
+}
+
+func (a *Manager) readPhoneNumber(rows *sql.Rows) (*PhoneNumber, error) {
+	var phoneNumber string
+	var verified bool
+	if !rows.Next() {
+		return nil, ErrPhoneNumberNotFound
+	}
+	if err := rows.Scan(&phoneNumber, &verified); err != nil {
+		return nil, err
+	} else if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &PhoneNumber{
+		Number:   phoneNumber,
+		Verified: verified,
+	}, nil
+}
+
+func (a *Manager) AddPhoneNumber(userID string, phoneNumber string) error {
+	if _, err := a.db.Exec(insertPhoneNumberQuery, userID, phoneNumber); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *Manager) MarkPhoneNumberVerified(userID string, phoneNumber string) error {
+	if _, err := a.db.Exec(updatePhoneNumberVerifiedQuery, userID, phoneNumber); err != nil {
 		return err
 	}
 	return nil

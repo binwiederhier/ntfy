@@ -25,7 +25,7 @@ func TestServer_Twilio_SMS(t *testing.T) {
 
 	c := newTestConfig(t)
 	c.BaseURL = "https://ntfy.sh"
-	c.TwilioBaseURL = twilioServer.URL
+	c.TwilioMessagingBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -58,7 +58,7 @@ func TestServer_Twilio_SMS_With_User(t *testing.T) {
 
 	c := newTestConfigWithAuthFile(t)
 	c.BaseURL = "https://ntfy.sh"
-	c.TwilioBaseURL = twilioServer.URL
+	c.TwilioMessagingBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -104,7 +104,7 @@ func TestServer_Twilio_Call(t *testing.T) {
 	defer twilioServer.Close()
 
 	c := newTestConfig(t)
-	c.TwilioBaseURL = twilioServer.URL
+	c.TwilioMessagingBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -139,7 +139,7 @@ func TestServer_Twilio_Call_With_User(t *testing.T) {
 	defer twilioServer.Close()
 
 	c := newTestConfigWithAuthFile(t)
-	c.TwilioBaseURL = twilioServer.URL
+	c.TwilioMessagingBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -167,7 +167,7 @@ func TestServer_Twilio_Call_With_User(t *testing.T) {
 
 func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 	c := newTestConfig(t)
-	c.TwilioBaseURL = "https://127.0.0.1"
+	c.TwilioMessagingBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -181,7 +181,7 @@ func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 
 func TestServer_Twilio_SMS_InvalidNumber(t *testing.T) {
 	c := newTestConfig(t)
-	c.TwilioBaseURL = "https://127.0.0.1"
+	c.TwilioMessagingBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"

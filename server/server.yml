@@ -149,6 +149,7 @@
 # twilio-account:
 # twilio-auth-token:
 # twilio-from-number:
+# twilio-verify-service:
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.

@@ -71,6 +71,11 @@ type TokenUpdate struct {
 	LastOrigin netip.Addr
 }
 
+type PhoneNumber struct {
+	Number   string
+	Verified bool
+}
+
 // Prefs represents a user's configuration settings
 type Prefs struct {
 	Language      *string            `json:"language,omitempty"`
@@ -282,5 +287,6 @@ var (
 	ErrUserNotFound        = errors.New("user not found")
 	ErrTierNotFound        = errors.New("tier not found")
 	ErrTokenNotFound       = errors.New("token not found")
+	ErrPhoneNumberNotFound = errors.New("phone number not found")
 	ErrTooManyReservations = errors.New("new tier has lower reservation limit")
 )

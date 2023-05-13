@@ -4,14 +4,15 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"mime"
 	"net"
 	"net/smtp"
 	"strings"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 type mailer interface {
@@ -131,31 +132,23 @@ This message was sent by {ip} at {time} via {topicURL}`
 }
 
 var (
-	//go:embed "mailer_emoji.json"
+	//go:embed "mailer_emoji_map.json"
 	emojisJSON string
 )
 
-type emoji struct {
-	Emoji   string   `json:"emoji"`
-	Aliases []string `json:"aliases"`
-}
-
 func toEmojis(tags []string) (emojisOut []string, tagsOut []string, err error) {
-	var emojis []emoji
-	if err = json.Unmarshal([]byte(emojisJSON), &emojis); err != nil {
+	var emojiMap map[string]string
+	if err = json.Unmarshal([]byte(emojisJSON), &emojiMap); err != nil {
 		return nil, nil, err
 	}
 	tagsOut = make([]string, 0)
 	emojisOut = make([]string, 0)
-nextTag:
-	for _, t := range tags { // TODO Super inefficient; we should just create a .json file with a map
-		for _, e := range emojis {
-			if util.Contains(e.Aliases, t) {
-				emojisOut = append(emojisOut, e.Emoji)
-				continue nextTag
-			}
+	for _, t := range tags {
+		if emoji, ok := emojiMap[t]; ok {
+			emojisOut = append(emojisOut, emoji)
+		} else {
+			tagsOut = append(tagsOut, t)
 		}
-		tagsOut = append(tagsOut, t)
 	}
 	return
 }

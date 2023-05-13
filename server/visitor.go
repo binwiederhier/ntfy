@@ -24,6 +24,10 @@ const (
 	// visitorDefaultReservationsLimit is the amount of topic names a user without a tier is allowed to reserve.
 	// This number is zero, and changing it may have unintended consequences in the web app, or otherwise
 	visitorDefaultReservationsLimit = int64(0)
+
+	// visitorDefaultCallsLimit is the amount of calls a user without a tier is allowed to make.
+	// This number is zero, because phone numbers have to be verified first.
+	visitorDefaultCallsLimit = int64(0)
 )
 
 // Constants used to convert a tier-user's MessageLimit (see user.Tier) into adequate request limiter
@@ -444,7 +448,7 @@ func configBasedVisitorLimits(conf *Config) *visitorLimits {
 		EmailLimit:               replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish), // Approximation!
 		EmailLimitBurst:          conf.VisitorEmailLimitBurst,
 		EmailLimitReplenish:      rate.Every(conf.VisitorEmailLimitReplenish),
-		CallLimit:                int64(conf.VisitorCallDailyLimit),
+		CallLimit:                visitorDefaultCallsLimit,
 		ReservationsLimit:        visitorDefaultReservationsLimit,
 		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,

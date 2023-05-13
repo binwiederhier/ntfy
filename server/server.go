@@ -691,12 +691,18 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
-	} else if call != "" && !vrate.CallAllowed() {
-		return nil, errHTTPTooManyRequestsLimitCalls.With(t)
+	} else if call != "" {
+		call, err = s.convertPhoneNumber(v.User(), call)
+		if err != nil {
+			return nil, errHTTPBadRequestInvalidPhoneNumber.With(t)
+		}
+		if !vrate.CallAllowed() {
+			return nil, errHTTPTooManyRequestsLimitCalls.With(t)
+		}
 	}
 
 	// FIXME check allowed phone numbers
-	
+
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
@@ -893,7 +899,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	call = readParam(r, "x-call", "call")
 	if call != "" && s.config.TwilioAccount == "" {
 		return false, false, "", "", false, errHTTPBadRequestTwilioDisabled
-	} else if call != "" && !phoneNumberRegex.MatchString(call) {
+	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
 		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")

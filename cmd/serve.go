@@ -84,7 +84,6 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-request-limit-exempt-hosts", Aliases: []string{"visitor_request_limit_exempt_hosts"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS"}, Value: "", Usage: "hostnames and/or IP addresses of hosts that will be exempt from the visitor request limit"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-message-daily-limit", Aliases: []string{"visitor_message_daily_limit"}, EnvVars: []string{"NTFY_VISITOR_MESSAGE_DAILY_LIMIT"}, Value: server.DefaultVisitorMessageDailyLimit, Usage: "max messages per visitor per day, derived from request limit if unset"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", Aliases: []string{"visitor_email_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
-	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-call-daily-limit", Aliases: []string{"visitor_call_daily_limit"}, EnvVars: []string{"NTFY_VISITOR_CALL_DAILY_LIMIT"}, Value: server.DefaultVisitorCallDailyLimit, Usage: "max number of phone calls per visitor per day"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: server.DefaultVisitorEmailLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "visitor-subscriber-rate-limiting", Aliases: []string{"visitor_subscriber_rate_limiting"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING"}, Value: false, Usage: "enables subscriber-based rate limiting"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
@@ -171,7 +170,6 @@ func execServe(c *cli.Context) error {
 	visitorMessageDailyLimit := c.Int("visitor-message-daily-limit")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
 	visitorEmailLimitReplenish := c.Duration("visitor-email-limit-replenish")
-	visitorCallDailyLimit := c.Int("visitor-call-daily-limit")
 	behindProxy := c.Bool("behind-proxy")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
@@ -334,7 +332,6 @@ func execServe(c *cli.Context) error {
 	conf.VisitorMessageDailyLimit = visitorMessageDailyLimit
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
-	conf.VisitorCallDailyLimit = visitorCallDailyLimit
 	conf.VisitorSubscriberRateLimiting = visitorSubscriberRateLimiting
 	conf.BehindProxy = behindProxy
 	conf.StripeSecretKey = stripeSecretKey

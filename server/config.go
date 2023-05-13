@@ -129,7 +129,6 @@ type Config struct {
 	VisitorMessageDailyLimit             int
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
-	VisitorCallDailyLimit                int
 	VisitorAccountCreationLimitBurst     int
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int

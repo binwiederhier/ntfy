@@ -31,6 +31,16 @@ const (
 </Response>`
 )
 
+func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, error) {
+	if u == nil {
+		return "", fmt.Errorf("user is nil")
+	}
+	if s.config.TwilioPhoneNumberConverter == nil {
+		return phoneNumber, nil
+	}
+	return s.config.TwilioPhoneNumberConverter(u, phoneNumber)
+}
+
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(v.User(), m)))
 	data := url.Values{}

@@ -93,7 +93,7 @@
     "subscribe_dialog_error_user_not_authorized": "사용자 {{username}} 은(는) 인증되지 않았습니다",
     "subscribe_dialog_login_username_label": "사용자 이름, 예를 들면 phil",
     "subscribe_dialog_login_password_label": "비밀번호",
-    "subscribe_dialog_login_button_back": "뒤로가기",
+    "common_back": "뒤로가기",
     "subscribe_dialog_login_button_login": "로그인",
     "prefs_notifications_title": "알림",
     "prefs_notifications_sound_title": "알림 효과음",

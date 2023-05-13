@@ -455,6 +455,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberAdd))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPhonePath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberVerify))(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
@@ -692,6 +694,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	} else if call != "" && !vrate.CallAllowed() {
 		return nil, errHTTPTooManyRequestsLimitCalls.With(t)
 	}
+
+	// FIXME check allowed phone numbers
+	
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}

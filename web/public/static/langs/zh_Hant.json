@@ -70,7 +70,7 @@
     "subscribe_dialog_subscribe_button_subscribe": "訂閱",
     "emoji_picker_search_clear": "清除",
     "subscribe_dialog_login_password_label": "密碼",
-    "subscribe_dialog_login_button_back": "返回",
+    "common_back": "返回",
     "subscribe_dialog_login_button_login": "登入",
     "prefs_notifications_delete_after_never": "從不",
     "prefs_users_add_button": "新增使用者",

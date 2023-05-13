@@ -288,7 +288,7 @@ const LoginPage = (props) => {
                 />
             </DialogContent>
             <DialogFooter status={error}>
-                <Button onClick={props.onBack}>{t("subscribe_dialog_login_button_back")}</Button>
+                <Button onClick={props.onBack}>{t("common_back")}</Button>
                 <Button onClick={handleLogin}>{t("subscribe_dialog_login_button_login")}</Button>
             </DialogFooter>
         </>

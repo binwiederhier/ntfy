@@ -115,7 +115,6 @@ const (
 		CREATE TABLE IF NOT EXISTS user_phone (
 			user_id TEXT NOT NULL,
 			phone_number TEXT NOT NULL,
-			verified INT NOT NULL,
 			PRIMARY KEY (user_id, phone_number),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
@@ -268,9 +267,9 @@ const (
 		)
 	`
 
-	selectPhoneNumbersQuery        = `SELECT phone_number, verified FROM user_phone WHERE user_id = ?`
-	insertPhoneNumberQuery         = `INSERT INTO user_phone (user_id, phone_number, verified) VALUES (?, ?, 0)`
-	updatePhoneNumberVerifiedQuery = `UPDATE user_phone SET verified=1 WHERE user_id = ? AND phone_number = ?`
+	selectPhoneNumbersQuery = `SELECT phone_number FROM user_phone WHERE user_id = ?`
+	insertPhoneNumberQuery  = `INSERT INTO user_phone (user_id, phone_number) VALUES (?, ?)`
+	deletePhoneNumberQuery  = `DELETE FROM user_phone WHERE user_id = ? AND phone_number = ?`
 
 	insertTierQuery = `
 		INSERT INTO tier (id, code, name, messages_limit, messages_expiry_duration, emails_limit, calls_limit, reservations_limit, attachment_file_size_limit, attachment_total_size_limit, attachment_expiry_duration, attachment_bandwidth_limit, stripe_monthly_price_id, stripe_yearly_price_id)
@@ -414,7 +413,6 @@ const (
 		CREATE TABLE IF NOT EXISTS user_phone (
 			user_id TEXT NOT NULL,
 			phone_number TEXT NOT NULL,
-			verified INT NOT NULL,
 			PRIMARY KEY (user_id, phone_number),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
@@ -648,13 +646,14 @@ func (a *Manager) RemoveExpiredTokens() error {
 	return nil
 }
 
-func (a *Manager) PhoneNumbers(userID string) ([]*PhoneNumber, error) {
+// PhoneNumbers returns all phone numbers for the user with the given user ID
+func (a *Manager) PhoneNumbers(userID string) ([]string, error) {
 	rows, err := a.db.Query(selectPhoneNumbersQuery, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	phoneNumbers := make([]*PhoneNumber, 0)
+	phoneNumbers := make([]string, 0)
 	for {
 		phoneNumber, err := a.readPhoneNumber(rows)
 		if err == ErrPhoneNumberNotFound {
@@ -667,23 +666,20 @@ func (a *Manager) PhoneNumbers(userID string) ([]*PhoneNumber, error) {
 	return phoneNumbers, nil
 }
 
-func (a *Manager) readPhoneNumber(rows *sql.Rows) (*PhoneNumber, error) {
+func (a *Manager) readPhoneNumber(rows *sql.Rows) (string, error) {
 	var phoneNumber string
-	var verified bool
 	if !rows.Next() {
-		return nil, ErrPhoneNumberNotFound
+		return "", ErrPhoneNumberNotFound
 	}
-	if err := rows.Scan(&phoneNumber, &verified); err != nil {
-		return nil, err
+	if err := rows.Scan(&phoneNumber); err != nil {
+		return "", err
 	} else if err := rows.Err(); err != nil {
-		return nil, err
+		return "", err
 	}
-	return &PhoneNumber{
-		Number:   phoneNumber,
-		Verified: verified,
-	}, nil
+	return phoneNumber, nil
 }
 
+// AddPhoneNumber adds a phone number to the user with the given user ID
 func (a *Manager) AddPhoneNumber(userID string, phoneNumber string) error {
 	if _, err := a.db.Exec(insertPhoneNumberQuery, userID, phoneNumber); err != nil {
 		if sqliteErr, ok := err.(sqlite3.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
@@ -694,11 +690,10 @@ func (a *Manager) AddPhoneNumber(userID string, phoneNumber string) error {
 	return nil
 }
 
-func (a *Manager) MarkPhoneNumberVerified(userID string, phoneNumber string) error {
-	if _, err := a.db.Exec(updatePhoneNumberVerifiedQuery, userID, phoneNumber); err != nil {
-		return err
-	}
-	return nil
+// DeletePhoneNumber deletes a phone number from the user with the given user ID
+func (a *Manager) DeletePhoneNumber(userID string, phoneNumber string) error {
+	_, err := a.db.Exec(deletePhoneNumberQuery, userID, phoneNumber)
+	return err
 }
 
 // RemoveDeletedUsers deletes all users that have been marked deleted for

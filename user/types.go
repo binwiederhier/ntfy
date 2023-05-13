@@ -71,11 +71,6 @@ type TokenUpdate struct {
 	LastOrigin netip.Addr
 }
 
-type PhoneNumber struct {
-	Number   string
-	Verified bool
-}
-
 // Prefs represents a user's configuration settings
 type Prefs struct {
 	Language      *string            `json:"language,omitempty"`

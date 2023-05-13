@@ -146,13 +146,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			return err
 		}
 		if len(phoneNumbers) > 0 {
-			response.PhoneNumbers = make([]*apiAccountPhoneNumberResponse, 0)
-			for _, p := range phoneNumbers {
-				response.PhoneNumbers = append(response.PhoneNumbers, &apiAccountPhoneNumberResponse{
-					Number:   p.Number,
-					Verified: p.Verified,
-				})
-			}
+			response.PhoneNumbers = phoneNumbers
 		}
 	} else {
 		response.Username = user.Everyone
@@ -542,19 +536,15 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	} else if u.IsUser() && u.Tier.CallLimit == 0 {
 		return errHTTPUnauthorized
 	}
-	// Actually add the unverified number, and send verification
-	logvr(v, r).
-		Tag(tagAccount).
-		Fields(log.Context{
-			"number": req.Number,
-		}).
-		Debug("Adding phone number, and sending verification")
-	if err := s.userManager.AddPhoneNumber(u.ID, req.Number); err != nil {
-		if err == user.ErrPhoneNumberExists {
-			return errHTTPConflictPhoneNumberExists
-		}
+	// Check if phone number exists
+	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+	if err != nil {
 		return err
+	} else if util.Contains(phoneNumbers, req.Number) {
+		return errHTTPConflictPhoneNumberExists
 	}
+	// Actually add the unverified number, and send verification
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Sending phone number verification")
 	if err := s.verifyPhone(v, r, req.Number); err != nil {
 		return err
 	}
@@ -570,31 +560,27 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 	if !phoneNumberRegex.MatchString(req.Number) {
 		return errHTTPBadRequestPhoneNumberInvalid
 	}
-	// Get phone numbers, and check if it's in the list
-	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
-	if err != nil {
-		return err
-	}
-	found := false
-	for _, phoneNumber := range phoneNumbers {
-		if phoneNumber.Number == req.Number && !phoneNumber.Verified {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return errHTTPBadRequestPhoneNumberInvalid
-	}
 	if err := s.checkVerifyPhone(v, r, req.Number, req.Code); err != nil {
 		return err
 	}
-	logvr(v, r).
-		Tag(tagAccount).
-		Fields(log.Context{
-			"number": req.Number,
-		}).
-		Debug("Marking phone number as verified")
-	if err := s.userManager.MarkPhoneNumberVerified(u.ID, req.Number); err != nil {
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Adding phone number as verified")
+	if err := s.userManager.AddPhoneNumber(u.ID, req.Number); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Deleting phone number")
+	if err := s.userManager.DeletePhoneNumber(u.ID, req.Number); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

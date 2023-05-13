@@ -1,7 +1,7 @@
 import {
     accountBillingPortalUrl,
     accountBillingSubscriptionUrl,
-    accountPasswordUrl,
+    accountPasswordUrl, accountPhoneUrl,
     accountReservationSingleUrl,
     accountReservationUrl,
     accountSettingsUrl,
@@ -297,6 +297,43 @@ class AccountApi {
             headers: withBearerAuth({}, session.token())
         });
         return await response.json(); // May throw SyntaxError
+    }
+
+    async verifyPhone(phoneNumber) {
+        const url = accountPhoneUrl(config.base_url);
+        console.log(`[AccountApi] Sending phone verification ${url}`);
+        await fetchOrThrow(url, {
+            method: "PUT",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber
+            })
+        });
+    }
+
+    async checkVerifyPhone(phoneNumber, code) {
+        const url = accountPhoneUrl(config.base_url);
+        console.log(`[AccountApi] Checking phone verification code ${url}`);
+        await fetchOrThrow(url, {
+            method: "POST",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber,
+                code: code
+            })
+        });
+    }
+
+    async deletePhoneNumber(phoneNumber, code) {
+        const url = accountPhoneUrl(config.base_url);
+        console.log(`[AccountApi] Deleting phone number ${url}`);
+        await fetchOrThrow(url, {
+            method: "DELETE",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber
+            })
+        });
     }
 
     async sync() {

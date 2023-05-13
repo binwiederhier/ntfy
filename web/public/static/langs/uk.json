@@ -53,7 +53,7 @@
     "subscribe_dialog_subscribe_use_another_label": "Використовувати інший сервер",
     "subscribe_dialog_subscribe_base_url_label": "URL служби",
     "subscribe_dialog_login_password_label": "Пароль",
-    "subscribe_dialog_login_button_back": "Назад",
+    "common_back": "Назад",
     "subscribe_dialog_error_user_not_authorized": "{{username}} користувач не авторизований",
     "prefs_notifications_sound_description_none": "Сповіщення не відтворюють жодного звуку при надходженні",
     "prefs_notifications_sound_description_some": "Сповіщення відтворюють звук {{sound}}",

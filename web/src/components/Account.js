@@ -325,36 +325,182 @@ const AccountType = () => {
 const PhoneNumbers = () => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
+    const [dialogKey, setDialogKey] = useState(0);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [snackOpen, setSnackOpen] = useState(false);
     const labelId = "prefPhoneNumbers";
 
-    const handleAdd = () => {
-
+    const handleDialogOpen = () => {
+        setDialogKey(prev => prev+1);
+        setDialogOpen(true);
     };
 
-    const handleClick = () => {
-
+    const handleDialogClose = () => {
+        setDialogOpen(false);
     };
 
-    const handleDelete = () => {
-
+    const handleCopy = (phoneNumber) => {
+        navigator.clipboard.writeText(phoneNumber);
+        setSnackOpen(true);
     };
+
+    const handleDelete = async (phoneNumber) => {
+        try {
+            await accountApi.deletePhoneNumber(phoneNumber);
+        } catch (e) {
+            console.log(`[Account] Error deleting phone number`, e);
+            if (e instanceof UnauthorizedError) {
+                session.resetAndRedirect(routes.login);
+            }
+        }
+    };
+
+    if (!config.enable_calls) {
+        return null;
+    }
 
     return (
         <Pref labelId={labelId} title={t("account_basics_phone_numbers_title")} description={t("account_basics_phone_numbers_description")}>
             <div aria-labelledby={labelId}>
-                {account?.phone_numbers.map(p =>
-                    <Chip
-                        label={p.number}
-                        variant="outlined"
-                        onClick={() => navigator.clipboard.writeText(p.number)}
-                        onDelete={() => handleDelete(p.number)}
-                    />
+                {account?.phone_numbers?.map(phoneNumber =>
+                        <Chip
+                            label={
+                                <Tooltip title={t("common_copy_to_clipboard")}>
+                                   <span>{phoneNumber}</span>
+                                </Tooltip>
+                            }
+                            variant="outlined"
+                            onClick={() => handleCopy(phoneNumber)}
+                            onDelete={() => handleDelete(phoneNumber)}
+                        />
                 )}
-                <IconButton onClick={() => handleAdd()}><AddIcon/></IconButton>
+                {!account?.phone_numbers &&
+                    <em>{t("account_basics_phone_numbers_no_phone_numbers_yet")}</em>
+                }
+                <IconButton onClick={handleDialogOpen}><AddIcon/></IconButton>
             </div>
+            <AddPhoneNumberDialog
+                key={`addPhoneNumberDialog${dialogKey}`}
+                open={dialogOpen}
+                onClose={handleDialogClose}
+            />
+            <Portal>
+                <Snackbar
+                    open={snackOpen}
+                    autoHideDuration={3000}
+                    onClose={() => setSnackOpen(false)}
+                    message={t("account_basics_phone_numbers_copied_to_clipboard")}
+                />
+            </Portal>
         </Pref>
     )
 };
+
+const AddPhoneNumberDialog = (props) => {
+    const { t } = useTranslation();
+    const [error, setError] = useState("");
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [code, setCode] = useState("");
+    const [sending, setSending] = useState(false);
+    const [verificationCodeSent, setVerificationCodeSent] = useState(false);
+    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const handleDialogSubmit = async () => {
+        if (!verificationCodeSent) {
+            await verifyPhone();
+        } else {
+            await checkVerifyPhone();
+        }
+    };
+
+    const handleCancel = () => {
+        if (verificationCodeSent) {
+            setVerificationCodeSent(false);
+        } else {
+            props.onClose();
+        }
+    };
+
+    const verifyPhone = async () => {
+        try {
+            setSending(true);
+            await accountApi.verifyPhone(phoneNumber);
+            setVerificationCodeSent(true);
+        } catch (e) {
+            console.log(`[Account] Error sending verification`, e);
+            if (e instanceof UnauthorizedError) {
+                session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
+            }
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const checkVerifyPhone = async () => {
+        try {
+            setSending(true);
+            await accountApi.checkVerifyPhone(phoneNumber, code);
+            props.onClose();
+        } catch (e) {
+            console.log(`[Account] Error confirming verification`, e);
+            if (e instanceof UnauthorizedError) {
+                session.resetAndRedirect(routes.login);
+            } else {
+                setError(e.message);
+            }
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
+            <DialogTitle>{t("account_basics_phone_numbers_dialog_title")}</DialogTitle>
+            <DialogContent>
+                <DialogContentText>
+                    {t("account_basics_phone_numbers_dialog_description")}
+                </DialogContentText>
+                {!verificationCodeSent &&
+                    <TextField
+                        margin="dense"
+                        label={t("account_basics_phone_numbers_dialog_number_label")}
+                        aria-label={t("account_basics_phone_numbers_dialog_number_label")}
+                        placeholder={t("account_basics_phone_numbers_dialog_number_placeholder")}
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={ev => setPhoneNumber(ev.target.value)}
+                        fullWidth
+                        inputProps={{ inputMode: 'tel', pattern: '\+[0-9]*' }}
+                        variant="standard"
+                    />
+                }
+                {verificationCodeSent &&
+                    <TextField
+                        margin="dense"
+                        label={t("account_basics_phone_numbers_dialog_code_label")}
+                        aria-label={t("account_basics_phone_numbers_dialog_code_label")}
+                        placeholder={t("account_basics_phone_numbers_dialog_code_placeholder")}
+                        type="text"
+                        value={code}
+                        onChange={ev => setCode(ev.target.value)}
+                        fullWidth
+                        inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                        variant="standard"
+                    />
+                }
+            </DialogContent>
+            <DialogFooter status={error}>
+                <Button onClick={handleCancel}>{verificationCodeSent ? t("common_back") : t("common_cancel")}</Button>
+                <Button onClick={handleDialogSubmit} disabled={sending || !/^\+\d+$/.test(phoneNumber)}>
+                    {verificationCodeSent ?t("account_basics_phone_numbers_dialog_check_verification_button")  : t("account_basics_phone_numbers_dialog_send_verification_button")}
+                </Button>
+            </DialogFooter>
+        </Dialog>
+    );
+};
+
 
 const Stats = () => {
     const { t } = useTranslation();
@@ -594,7 +740,7 @@ const TokensTable = (props) => {
                             <span>
                                 <span style={{fontFamily: "Monospace", fontSize: "0.9rem"}}>{token.token.slice(0, 12)}</span>
                                 ...
-                                <Tooltip title={t("account_tokens_table_copy_to_clipboard")} placement="right">
+                                <Tooltip title={t("common_copy_to_clipboard")} placement="right">
                                     <IconButton onClick={() => handleCopy(token.token)}><ContentCopy/></IconButton>
                                 </Tooltip>
                             </span>

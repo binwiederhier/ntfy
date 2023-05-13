@@ -113,7 +113,7 @@
     "prefs_notifications_delete_after_one_week_description": "Merknader slettes automatisk etter én uke",
     "prefs_notifications_delete_after_one_month_description": "Merknader slettes automatisk etter én måned",
     "priority_min": "min.",
-    "subscribe_dialog_login_button_back": "Tilbake",
+    "common_back": "Tilbake",
     "prefs_notifications_delete_after_three_hours": "Etter tre timer",
     "prefs_users_table_base_url_header": "Tjeneste-nettadresse",
     "common_cancel": "Avbryt",

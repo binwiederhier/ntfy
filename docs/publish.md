@@ -2695,51 +2695,48 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
   <figcaption>Publishing a message via e-mail</figcaption>
 </figure>
 
-## Text message (SMS)
+## Phone calls
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can forward messages as text message (SMS) by specifying a phone number a header. Similar to email notifications,
-this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have the ntfy app
-installed on their phone.
+You can use ntfy to call a phone and **read the message out loud using text-to-speech**, by specifying a phone number a header. 
+Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have 
+the ntfy app installed on their phone.
 
-To forward a message as an SMS, pass a phone number in the `X-SMS` header (or its alias: `SMS`), prefixed with a plus sign
-and the country code, e.g. `+12223334444`.
+Phone numbers have to be previously verified (via the web app). To forward a message as a phone call, pass a phone number
+in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`. You may
+also simply pass `yes` as a value if you only have one verified phone number.
 
 On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) plans.
 
 === "Command line (curl)"
     ```
     curl \
-        -H "SMS: +12223334444" \
-        -d "Your garage seems to be on fire 🔥. You should probably check that out, and call 0118 999 881 999 119 725 3." \
+        -H "Call: +12223334444" \
+        -d "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help." \
         ntfy.sh/alerts
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --email=phil@example.com \
-        --tags=warning,skull,backup-host,ssh-login \
-        --priority=high \
-        alerts "Unknown login from 5.31.23.83 to backups.example.com"
+        --call=+12223334444 \
+        alerts "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."
     ```
 
 === "HTTP"
     ``` http
     POST /alerts HTTP/1.1
     Host: ntfy.sh
-    Email: phil@example.com
-    Tags: warning,skull,backup-host,ssh-login
-    Priority: high
+    Call: +12223334444
 
-    Unknown login from 5.31.23.83 to backups.example.com
+    Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/alerts', {
         method: 'POST',
-        body: "Unknown login from 5.31.23.83 to backups.example.com",
+        body: "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.",
         headers: { 
             'Email': 'phil@example.com',
             'Tags': 'warning,skull,backup-host,ssh-login',
@@ -2806,125 +2803,6 @@ Here's what that looks like in Google Mail:
   ![e-mail notification](static/img/screenshot-email.png){ width=600 }
   <figcaption>E-mail notification</figcaption>
 </figure>
-
-
-## Phone calls
-_Supported on:_ :material-android: :material-apple: :material-firefox:
-
-You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
-you'd like to persist longer, or to blast-notify yourself on all possible channels. 
-
-Usage is easy: Simply pass the `X-Email` header (or any of its aliases: `X-E-mail`, `Email`, `E-mail`, `Mail`, or `e`).
-Only one e-mail address is supported.
-
-Since ntfy does not provide auth (yet), the rate limiting is pretty strict (see [limitations](#limitations)). In the 
-default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of 
-that, your IP address appears in the e-mail body. This is to prevent abuse.
-
-=== "Command line (curl)"
-    ```
-    curl \
-        -H "Email: phil@example.com" \
-        -H "Tags: warning,skull,backup-host,ssh-login" \
-        -H "Priority: high" \
-        -d "Unknown login from 5.31.23.83 to backups.example.com" \
-        ntfy.sh/alerts
-    curl -H "Email: phil@example.com" -d "You've Got Mail" 
-    curl -d "You've Got Mail" "ntfy.sh/alerts?email=phil@example.com"
-    ```
-
-=== "ntfy CLI"
-    ```
-    ntfy publish \
-        --email=phil@example.com \
-        --tags=warning,skull,backup-host,ssh-login \
-        --priority=high \
-        alerts "Unknown login from 5.31.23.83 to backups.example.com"
-    ```
-
-=== "HTTP"
-    ``` http
-    POST /alerts HTTP/1.1
-    Host: ntfy.sh
-    Email: phil@example.com
-    Tags: warning,skull,backup-host,ssh-login
-    Priority: high
-
-    Unknown login from 5.31.23.83 to backups.example.com
-    ```
-
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.sh/alerts', {
-        method: 'POST',
-        body: "Unknown login from 5.31.23.83 to backups.example.com",
-        headers: { 
-            'Email': 'phil@example.com',
-            'Tags': 'warning,skull,backup-host,ssh-login',
-            'Priority': 'high'
-        }
-    })
-    ```
-
-=== "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
-        strings.NewReader("Unknown login from 5.31.23.83 to backups.example.com"))
-    req.Header.Set("Email", "phil@example.com")
-    req.Header.Set("Tags", "warning,skull,backup-host,ssh-login")
-    req.Header.Set("Priority", "high")
-    http.DefaultClient.Do(req)
-    ```
-
-=== "PowerShell"
-    ``` powershell
-    $Request = @{
-      Method = "POST"
-      URI = "https://ntfy.sh/alerts"
-      Headers = @{
-        Title = "Low disk space alert"
-        Priority = "high"
-        Tags = "warning,skull,backup-host,ssh-login")
-        Email = "phil@example.com"
-      }
-      Body = "Unknown login from 5.31.23.83 to backups.example.com"
-    }
-    Invoke-RestMethod @Request
-    ```
-
-=== "Python"
-    ``` python
-    requests.post("https://ntfy.sh/alerts",
-        data="Unknown login from 5.31.23.83 to backups.example.com",
-        headers={ 
-            "Email": "phil@example.com",
-            "Tags": "warning,skull,backup-host,ssh-login",
-            "Priority": "high"
-        })
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents('https://ntfy.sh/alerts', false, stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' =>
-                "Content-Type: text/plain\r\n" .
-                "Email: phil@example.com\r\n" .
-                "Tags: warning,skull,backup-host,ssh-login\r\n" .
-                "Priority: high",
-            'content' => 'Unknown login from 5.31.23.83 to backups.example.com'
-        ]
-    ]));
-    ```
-
-Here's what that looks like in Google Mail:
-
-<figure markdown>
-  ![e-mail notification](static/img/screenshot-email.png){ width=600 }
-  <figcaption>E-mail notification</figcaption>
-</figure>
-
 
 ## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics

@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	twilioMessageEndpoint     = "Messages.json"
 	twilioMessageFooterFormat = "This message was sent by %s via %s"
 	twilioCallEndpoint        = "Calls.json"
 	twilioCallFormat          = `
@@ -31,15 +30,6 @@ const (
 	<Pause length="1"/>
 </Response>`
 )
-
-func (s *Server) sendSMS(v *visitor, r *http.Request, m *message, to string) {
-	body := fmt.Sprintf("%s\n\n--\n%s", m.Message, s.messageFooter(v.User(), m))
-	data := url.Values{}
-	data.Set("From", s.config.TwilioFromNumber)
-	data.Set("To", to)
-	data.Set("Body", body)
-	s.twilioMessagingRequest(v, r, m, metricSMSSentSuccess, metricSMSSentFailure, twilioMessageEndpoint, to, body, data)
-}
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(v.User(), m)))
@@ -85,25 +75,38 @@ func (s *Server) checkVerifyPhone(v *visitor, r *http.Request, phoneNumber, code
 	data := url.Values{}
 	data.Set("To", phoneNumber)
 	data.Set("Code", code)
-	requestURL := fmt.Sprintf("%s/v2/Services/%s/VerificationCheck", s.config.TwilioVerifyBaseURL, s.config.TwilioAccount)
+	requestURL := fmt.Sprintf("%s/v2/Services/%s/VerificationCheck", s.config.TwilioVerifyBaseURL, s.config.TwilioVerifyService)
 	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	log.Fields(httpContext(req)).Field("http_body", data.Encode()).Info("Twilio call")
+	ev := logvr(v, r).
+		Tag(tagTwilio).
+		Field("twilio_to", phoneNumber)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	} else if resp.StatusCode != http.StatusOK {
-		return
+		if ev.IsTrace() {
+			response, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			ev.Field("twilio_response", string(response))
+		}
+		ev.Warn("Twilio phone verification failed with status code %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusNotFound {
+			return errHTTPGonePhoneVerificationExpired
+		}
+		return errHTTPInternalError
 	}
 	response, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-
-	ev := logvr(v, r).Tag(tagTwilio)
 	if ev.IsTrace() {
 		ev.Field("twilio_response", string(response)).Trace("Received successful Twilio phone verification response")
 	} else if ev.IsDebug() {

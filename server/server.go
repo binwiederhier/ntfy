@@ -534,7 +534,6 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
-		EnableSMS:          s.config.TwilioAccount != "",
 		EnableCalls:        s.config.TwilioAccount != "",
 		EnableReservations: s.config.EnableReservations,
 		BillingContact:     s.config.BillingContact,
@@ -676,7 +675,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, sms, call, unifiedpush, e := s.parsePublishParams(r, m)
+	cache, firebase, email, call, unifiedpush, e := s.parsePublishParams(r, m)
 	if e != nil {
 		return nil, e.With(t)
 	}
@@ -690,8 +689,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
-	} else if sms != "" && !vrate.SMSAllowed() {
-		return nil, errHTTPTooManyRequestsLimitSMS.With(t)
 	} else if call != "" && !vrate.CallAllowed() {
 		return nil, errHTTPTooManyRequestsLimitCalls.With(t)
 	}
@@ -733,9 +730,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		}
 		if s.smtpSender != nil && email != "" {
 			go s.sendEmail(v, m, email)
-		}
-		if s.config.TwilioAccount != "" && sms != "" {
-			go s.sendSMS(v, r, m, sms)
 		}
 		if s.config.TwilioAccount != "" && call != "" {
 			go s.callPhone(v, r, m, call)
@@ -849,7 +843,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, sms, call string, unifiedpush bool, err *errHTTP) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, call string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = maybeDecodeHeader(readParam(r, "x-title", "title", "t"))
@@ -865,7 +859,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if attach != "" {
 		if !urlRegex.MatchString(attach) {
-			return false, false, "", "", "", false, errHTTPBadRequestAttachmentURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
 		if m.Attachment.Name == "" {
@@ -883,25 +877,19 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if icon != "" {
 		if !urlRegex.MatchString(icon) {
-			return false, false, "", "", "", false, errHTTPBadRequestIconURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestIconURLInvalid
 		}
 		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if s.smtpSender == nil && email != "" {
-		return false, false, "", "", "", false, errHTTPBadRequestEmailDisabled
-	}
-	sms = readParam(r, "x-sms", "sms")
-	if sms != "" && s.config.TwilioAccount == "" {
-		return false, false, "", "", "", false, errHTTPBadRequestTwilioDisabled
-	} else if sms != "" && !phoneNumberRegex.MatchString(sms) {
-		return false, false, "", "", "", false, errHTTPBadRequestPhoneNumberInvalid
+		return false, false, "", "", false, errHTTPBadRequestEmailDisabled
 	}
 	call = readParam(r, "x-call", "call")
 	if call != "" && s.config.TwilioAccount == "" {
-		return false, false, "", "", "", false, errHTTPBadRequestTwilioDisabled
+		return false, false, "", "", false, errHTTPBadRequestTwilioDisabled
 	} else if call != "" && !phoneNumberRegex.MatchString(call) {
-		return false, false, "", "", "", false, errHTTPBadRequestPhoneNumberInvalid
+		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
@@ -910,7 +898,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	var e error
 	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if e != nil {
-		return false, false, "", "", "", false, errHTTPBadRequestPriorityInvalid
+		return false, false, "", "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	for i, t := range m.Tags {
@@ -919,18 +907,18 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayNoCache
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCache
 		}
 		if email != "" {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+			return false, false, "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayCannotParse
+			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayTooSmall
+			return false, false, "", "", false, errHTTPBadRequestDelayTooSmall
 		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayTooLarge
+			return false, false, "", "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
 	}
@@ -938,7 +926,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -952,7 +940,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		cache = false
 		email = ""
 	}
-	return cache, firebase, email, sms, call, unifiedpush, nil
+	return cache, firebase, email, call, unifiedpush, nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.

@@ -47,7 +47,6 @@ const (
 	DefaultVisitorMessageDailyLimit             = 0
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
-	DefaultVisitorSMSDailyLimit                 = 10
 	DefaultVisitorCallDailyLimit                = 10
 	DefaultVisitorAccountCreationLimitBurst     = 3
 	DefaultVisitorAccountCreationLimitReplenish = 24 * time.Hour
@@ -130,7 +129,6 @@ type Config struct {
 	VisitorMessageDailyLimit             int
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
-	VisitorSMSDailyLimit                 int
 	VisitorCallDailyLimit                int
 	VisitorAccountCreationLimitBurst     int
 	VisitorAccountCreationLimitReplenish time.Duration

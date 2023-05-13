@@ -91,7 +91,6 @@ type Tier struct {
 	MessageLimit             int64         // Daily message limit
 	MessageExpiryDuration    time.Duration // Cache duration for messages
 	EmailLimit               int64         // Daily email limit
-	SMSLimit                 int64         // Daily SMS limit
 	CallLimit                int64         // Daily phone call limit
 	ReservationLimit         int64         // Number of topic reservations allowed by user
 	AttachmentFileSizeLimit  int64         // Max file size per file (bytes)
@@ -138,7 +137,6 @@ type NotificationPrefs struct {
 type Stats struct {
 	Messages int64
 	Emails   int64
-	SMS      int64
 	Calls    int64
 }
 
@@ -285,8 +283,10 @@ var (
 	ErrUnauthorized        = errors.New("unauthorized")
 	ErrInvalidArgument     = errors.New("invalid argument")
 	ErrUserNotFound        = errors.New("user not found")
+	ErrUserExists          = errors.New("user already exists")
 	ErrTierNotFound        = errors.New("tier not found")
 	ErrTokenNotFound       = errors.New("token not found")
 	ErrPhoneNumberNotFound = errors.New("phone number not found")
 	ErrTooManyReservations = errors.New("new tier has lower reservation limit")
+	ErrPhoneNumberExists   = errors.New("phone number already exists")
 )

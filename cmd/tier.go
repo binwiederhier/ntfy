@@ -18,7 +18,6 @@ const (
 	defaultMessageLimit             = 5000
 	defaultMessageExpiryDuration    = "12h"
 	defaultEmailLimit               = 20
-	defaultSMSLimit                 = 10
 	defaultCallLimit                = 10
 	defaultReservationLimit         = 3
 	defaultAttachmentFileSizeLimit  = "15M"
@@ -50,7 +49,6 @@ var cmdTier = &cli.Command{
 				&cli.Int64Flag{Name: "message-limit", Value: defaultMessageLimit, Usage: "daily message limit"},
 				&cli.StringFlag{Name: "message-expiry-duration", Value: defaultMessageExpiryDuration, Usage: "duration after which messages are deleted"},
 				&cli.Int64Flag{Name: "email-limit", Value: defaultEmailLimit, Usage: "daily email limit"},
-				&cli.Int64Flag{Name: "sms-limit", Value: defaultSMSLimit, Usage: "daily SMS limit"},
 				&cli.Int64Flag{Name: "call-limit", Value: defaultCallLimit, Usage: "daily phone call limit"},
 				&cli.Int64Flag{Name: "reservation-limit", Value: defaultReservationLimit, Usage: "topic reservation limit"},
 				&cli.StringFlag{Name: "attachment-file-size-limit", Value: defaultAttachmentFileSizeLimit, Usage: "per-attachment file size limit"},
@@ -95,7 +93,6 @@ Examples:
 				&cli.Int64Flag{Name: "message-limit", Usage: "daily message limit"},
 				&cli.StringFlag{Name: "message-expiry-duration", Usage: "duration after which messages are deleted"},
 				&cli.Int64Flag{Name: "email-limit", Usage: "daily email limit"},
-				&cli.Int64Flag{Name: "sms-limit", Usage: "daily SMS limit"},
 				&cli.Int64Flag{Name: "call-limit", Usage: "daily phone call limit"},
 				&cli.Int64Flag{Name: "reservation-limit", Usage: "topic reservation limit"},
 				&cli.StringFlag{Name: "attachment-file-size-limit", Usage: "per-attachment file size limit"},
@@ -221,7 +218,6 @@ func execTierAdd(c *cli.Context) error {
 		MessageLimit:             c.Int64("message-limit"),
 		MessageExpiryDuration:    messageExpiryDuration,
 		EmailLimit:               c.Int64("email-limit"),
-		SMSLimit:                 c.Int64("sms-limit"),
 		CallLimit:                c.Int64("call-limit"),
 		ReservationLimit:         c.Int64("reservation-limit"),
 		AttachmentFileSizeLimit:  attachmentFileSizeLimit,
@@ -274,9 +270,6 @@ func execTierChange(c *cli.Context) error {
 	}
 	if c.IsSet("email-limit") {
 		tier.EmailLimit = c.Int64("email-limit")
-	}
-	if c.IsSet("sms-limit") {
-		tier.SMSLimit = c.Int64("sms-limit")
 	}
 	if c.IsSet("call-limit") {
 		tier.CallLimit = c.Int64("call-limit")
@@ -371,7 +364,6 @@ func printTier(c *cli.Context, tier *user.Tier) {
 	fmt.Fprintf(c.App.ErrWriter, "- Message limit: %d\n", tier.MessageLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Message expiry duration: %s (%d seconds)\n", tier.MessageExpiryDuration.String(), int64(tier.MessageExpiryDuration.Seconds()))
 	fmt.Fprintf(c.App.ErrWriter, "- Email limit: %d\n", tier.EmailLimit)
-	fmt.Fprintf(c.App.ErrWriter, "- SMS limit: %d\n", tier.SMSLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Phone call limit: %d\n", tier.CallLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Reservation limit: %d\n", tier.ReservationLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Attachment file size limit: %s\n", util.FormatSize(tier.AttachmentFileSizeLimit))

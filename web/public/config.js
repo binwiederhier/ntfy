@@ -12,7 +12,6 @@ var config = {
     enable_signup: true,
     enable_payments: true,
     enable_reservations: true,
-    enable_sms: true,
     enable_calls: true,
     billing_contact: "",
     disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"]

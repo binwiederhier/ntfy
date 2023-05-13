@@ -56,7 +56,6 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			Messages:                 limits.MessageLimit,
 			MessagesExpiryDuration:   int64(limits.MessageExpiryDuration.Seconds()),
 			Emails:                   limits.EmailLimit,
-			SMS:                      limits.SMSLimit,
 			Calls:                    limits.CallLimit,
 			Reservations:             limits.ReservationsLimit,
 			AttachmentTotalSize:      limits.AttachmentTotalSizeLimit,
@@ -69,8 +68,6 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			MessagesRemaining:            stats.MessagesRemaining,
 			Emails:                       stats.Emails,
 			EmailsRemaining:              stats.EmailsRemaining,
-			SMS:                          stats.SMS,
-			SMSRemaining:                 stats.SMSRemaining,
 			Calls:                        stats.Calls,
 			CallsRemaining:               stats.CallsRemaining,
 			Reservations:                 stats.Reservations,
@@ -542,7 +539,7 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	// Check user is allowed to add phone numbers
 	if u == nil || (u.IsUser() && u.Tier == nil) {
 		return errHTTPUnauthorized
-	} else if u.IsUser() && u.Tier.SMSLimit == 0 && u.Tier.CallLimit == 0 {
+	} else if u.IsUser() && u.Tier.CallLimit == 0 {
 		return errHTTPUnauthorized
 	}
 	// Actually add the unverified number, and send verification
@@ -553,6 +550,9 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 		}).
 		Debug("Adding phone number, and sending verification")
 	if err := s.userManager.AddPhoneNumber(u.ID, req.Number); err != nil {
+		if err == user.ErrPhoneNumberExists {
+			return errHTTPConflictPhoneNumberExists
+		}
 		return err
 	}
 	if err := s.verifyPhone(v, r, req.Number); err != nil {
@@ -570,10 +570,6 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 	if !phoneNumberRegex.MatchString(req.Number) {
 		return errHTTPBadRequestPhoneNumberInvalid
 	}
-	// Check user is allowed to add phone numbers
-	if u == nil {
-		return errHTTPUnauthorized
-	}
 	// Get phone numbers, and check if it's in the list
 	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
 	if err != nil {
@@ -581,7 +577,7 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 	}
 	found := false
 	for _, phoneNumber := range phoneNumbers {
-		if phoneNumber.Number == req.Number && phoneNumber.Verified {
+		if phoneNumber.Number == req.Number && !phoneNumber.Verified {
 			found = true
 			break
 		}

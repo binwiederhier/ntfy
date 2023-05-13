@@ -3,7 +3,7 @@ import {useContext, useState} from 'react';
 import {
     Alert,
     CardActions,
-    CardContent,
+    CardContent, Chip,
     FormControl,
     LinearProgress,
     Link,
@@ -52,6 +52,7 @@ import MenuItem from "@mui/material/MenuItem";
 import DialogContentText from "@mui/material/DialogContentText";
 import {IncorrectPasswordError, UnauthorizedError} from "../app/errors";
 import {ProChip} from "./SubscriptionPopup";
+import AddIcon from "@mui/icons-material/Add";
 
 const Account = () => {
     if (!session.exists()) {
@@ -80,6 +81,7 @@ const Basics = () => {
             <PrefGroup>
                 <Username/>
                 <ChangePassword/>
+                <PhoneNumbers/>
                 <AccountType/>
             </PrefGroup>
         </Card>
@@ -320,6 +322,40 @@ const AccountType = () => {
     )
 };
 
+const PhoneNumbers = () => {
+    const { t } = useTranslation();
+    const { account } = useContext(AccountContext);
+    const labelId = "prefPhoneNumbers";
+
+    const handleAdd = () => {
+
+    };
+
+    const handleClick = () => {
+
+    };
+
+    const handleDelete = () => {
+
+    };
+
+    return (
+        <Pref labelId={labelId} title={t("account_basics_phone_numbers_title")} description={t("account_basics_phone_numbers_description")}>
+            <div aria-labelledby={labelId}>
+                {account?.phone_numbers.map(p =>
+                    <Chip
+                        label={p.number}
+                        variant="outlined"
+                        onClick={() => navigator.clipboard.writeText(p.number)}
+                        onDelete={() => handleDelete(p.number)}
+                    />
+                )}
+                <IconButton onClick={() => handleAdd()}><AddIcon/></IconButton>
+            </div>
+        </Pref>
+    )
+};
+
 const Stats = () => {
     const { t } = useTranslation();
     const { account } = useContext(AccountContext);
@@ -380,23 +416,6 @@ const Stats = () => {
                         value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100}
                     />
                 </Pref>
-                {(account.role === Role.ADMIN || account.limits.sms > 0) &&
-                    <Pref title={
-                        <>
-                            {t("account_usage_sms_title")}
-                            <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
-                        </>
-                    }>
-                        <div>
-                            <Typography variant="body2" sx={{float: "left"}}>{account.stats.sms.toLocaleString()}</Typography>
-                            <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.sms.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
-                        </div>
-                        <LinearProgress
-                            variant="determinate"
-                            value={account.role === Role.USER && account.limits.sms > 0 ? normalize(account.stats.sms, account.limits.sms) : 100}
-                        />
-                    </Pref>
-                }
                 {(account.role === Role.ADMIN || account.limits.calls > 0) &&
                     <Pref title={
                         <>
@@ -410,7 +429,7 @@ const Stats = () => {
                         </div>
                         <LinearProgress
                             variant="determinate"
-                            value={account.role === Role.USER && account.limits.sms > 0 ? normalize(account.stats.calls, account.limits.calls) : 100}
+                            value={account.role === Role.USER && account.limits.calls > 0 ? normalize(account.stats.calls, account.limits.calls) : 100}
                         />
                     </Pref>
                 }
@@ -437,11 +456,6 @@ const Stats = () => {
                 {config.enable_reservations && account.role === Role.USER && account.limits.reservations === 0 &&
                     <Pref title={<>{t("account_usage_reservations_title")}{config.enable_payments && <ProChip/>}</>}>
                         <em>{t("account_usage_reservations_none")}</em>
-                    </Pref>
-                }
-                {config.enable_sms && account.role === Role.USER && account.limits.sms === 0 &&
-                    <Pref title={<>{t("account_usage_sms_title")}{config.enable_payments && <ProChip/>}</>}>
-                        <em>{t("account_usage_sms_none")}</em>
                     </Pref>
                 }
                 {config.enable_calls && account.role === Role.USER && account.limits.calls === 0 &&

@@ -2,7 +2,6 @@ package util
 
 import (
 	"errors"
-	"golang.org/x/time/rate"
 	"io"
 	"net/netip"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +48,11 @@ func TestContains(t *testing.T) {
 	s := []int{1, 2}
 	require.True(t, Contains(s, 2))
 	require.False(t, Contains(s, 3))
+}
+
+func TestContainsAll(t *testing.T) {
+	require.True(t, ContainsAll([]int{1, 2, 3}, []int{2, 3}))
+	require.False(t, ContainsAll([]int{1, 1}, []int{1, 2}))
 }
 
 func TestContainsIP(t *testing.T) {

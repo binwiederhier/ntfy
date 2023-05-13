@@ -244,6 +244,17 @@ type apiStatsResponse struct {
 	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
 }
 
+type apiAccessAllowRequest struct {
+	Username   string `json:"username"`
+	Topic      string `json:"topic"`
+	Permission string `json:"permission"`
+}
+
+type apiAccessResetRequest struct {
+	Username string `json:"username"`
+	Topic    string `json:"topic"`
+}
+
 type apiAccountCreateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

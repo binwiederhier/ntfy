@@ -82,6 +82,8 @@ var (
 	apiHealthPath                                        = "/v1/health"
 	apiStatsPath                                         = "/v1/stats"
 	apiTiersPath                                         = "/v1/tiers"
+	apiUserPath                                          = "/v1/user"
+	apiAccessPath                                        = "/v1/access"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
@@ -411,6 +413,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccessPath {
+		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccessPath {
+		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -1192,7 +1198,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	defer conn.Close()
 
-	// Subscription connections can be canceled externally, see topic.CancelSubscribers
+	// Subscription connections can be canceled externally, see topic.CancelSubscribersExceptUser
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1434,6 +1440,7 @@ func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visito
 	return nil
 }
 
+// topicFromPath returns the topic from a root path (e.g. /mytopic), creating it if it doesn't exist.
 func (s *Server) topicFromPath(path string) (*topic, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -1442,6 +1449,7 @@ func (s *Server) topicFromPath(path string) (*topic, error) {
 	return s.topicFromID(parts[1])
 }
 
+// topicFromID returns the topic from a root path (e.g. /mytopic,mytopic2), creating it if it doesn't exist.
 func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -1455,6 +1463,7 @@ func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	return topics, parts[1], nil
 }
 
+// topicsFromIDs returns the topics with the given IDs, creating them if they don't exist.
 func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1474,12 +1483,30 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	return topics, nil
 }
 
+// topicFromID returns the topic with the given ID, creating it if it doesn't exist.
 func (s *Server) topicFromID(id string) (*topic, error) {
 	topics, err := s.topicsFromIDs(id)
 	if err != nil {
 		return nil, err
 	}
 	return topics[0], nil
+}
+
+// topicsFromPattern returns a list of topics matching the given pattern, but it does not create them.
+func (s *Server) topicsFromPattern(pattern string) ([]*topic, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	patternRegexp, err := regexp.Compile("^" + strings.ReplaceAll(pattern, "*", ".*") + "$")
+	if err != nil {
+		return nil, err
+	}
+	topics := make([]*topic, 0)
+	for _, t := range s.topics {
+		if patternRegexp.MatchString(t.ID) {
+			topics = append(topics, t)
+		}
+	}
+	return topics, nil
 }
 
 func (s *Server) runSMTPServer() error {

@@ -444,7 +444,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribers(u.ID)
+	t.CancelSubscribersExceptUser(u.ID)
 	return s.writeJSON(w, newSuccessResponse())
 }
 

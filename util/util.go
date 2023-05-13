@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"io"
 	"math/rand"
 	"net/netip"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
@@ -67,15 +68,12 @@ func ContainsIP(haystack []netip.Prefix, needle netip.Addr) bool {
 
 // ContainsAll returns true if all needles are contained in haystack
 func ContainsAll[T comparable](haystack []T, needles []T) bool {
-	matches := 0
-	for _, s := range haystack {
-		for _, needle := range needles {
-			if s == needle {
-				matches++
-			}
+	for _, needle := range needles {
+		if !Contains(haystack, needle) {
+			return false
 		}
 	}
-	return matches == len(needles)
+	return true
 }
 
 // SplitNoEmpty splits a string using strings.Split, but filters out empty strings

@@ -244,6 +244,17 @@ type apiStatsResponse struct {
 	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
 }
 
+type apiUserAddRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Tier     string `json:"tier"`
+	// Do not add 'role' here. We don't want to add admins via the API.
+}
+
+type apiUserDeleteRequest struct {
+	Username string `json:"username"`
+}
+
 type apiAccessAllowRequest struct {
 	Username   string `json:"username"`
 	Topic      string `json:"topic"`

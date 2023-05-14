@@ -413,7 +413,11 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == apiAccessPath {
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUserPath {
+		return s.ensureAdmin(s.handleUserAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUserPath {
+		return s.ensureAdmin(s.handleUserDelete)(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiAccessPath {
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)

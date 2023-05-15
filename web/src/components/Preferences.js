@@ -541,8 +541,8 @@ const ReservationsTable = (props) => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const { subscriptions } = useOutletContext();
     const localSubscriptions = (subscriptions?.length > 0)
-        ? Object.assign(...subscriptions.filter(s => s.baseUrl === config.base_url).map(s => ({[s.topic]: s})))
-        : [];
+        ? Object.assign({}, ...subscriptions.filter(s => s.baseUrl === config.base_url).map(s => ({[s.topic]: s})))
+        : {};
 
     const handleEditClick = (reservation) => {
         setDialogKey(prev => prev+1);

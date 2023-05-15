@@ -34,7 +34,7 @@ export const ReserveAddDialog = (props) => {
     const handleSubmit = async () => {
         try {
             await accountApi.upsertReservation(topic, everyone);
-            console.debug(`[ReserveAddDialog] Added reservation for topic ${t}: ${everyone}`);
+            console.debug(`[ReserveAddDialog] Added reservation for topic ${topic}: ${everyone}`);
         } catch (e) {
             console.log(`[ReserveAddDialog] Error adding topic reservation.`, e);
             if (e instanceof UnauthorizedError) {

@@ -5,7 +5,39 @@ import (
 	"net/http"
 )
 
-func (s *Server) handleUserAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	users, err := s.userManager.Users()
+	if err != nil {
+		return err
+	}
+	grants, err := s.userManager.AllGrants()
+	if err != nil {
+		return err
+	}
+	usersResponse := make([]*apiUserResponse, len(users))
+	for i, u := range users {
+		tier := ""
+		if u.Tier != nil {
+			tier = u.Tier.Code
+		}
+		userGrants := make([]*apiUserGrantResponse, len(grants[u.ID]))
+		for i, g := range grants[u.ID] {
+			userGrants[i] = &apiUserGrantResponse{
+				Topic:      g.TopicPattern,
+				Permission: g.Allow.String(),
+			}
+		}
+		usersResponse[i] = &apiUserResponse{
+			Username: u.Name,
+			Role:     string(u.Role),
+			Tier:     tier,
+			Grants:   userGrants,
+		}
+	}
+	return s.writeJSON(w, usersResponse)
+}
+
+func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiUserAddRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
@@ -38,7 +70,7 @@ func (s *Server) handleUserAdd(w http.ResponseWriter, r *http.Request, v *visito
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) handleUserDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiUserDeleteRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
@@ -63,6 +95,12 @@ func (s *Server) handleUserDelete(w http.ResponseWriter, r *http.Request, v *vis
 func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiAccessAllowRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
+		return err
+	}
+	_, err = s.userManager.User(req.Username)
+	if err == user.ErrUserNotFound {
+		return errHTTPBadRequestUserNotFound
+	} else if err != nil {
 		return err
 	}
 	permission, err := user.ParsePermission(req.Permission)

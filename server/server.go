@@ -82,8 +82,8 @@ var (
 	apiHealthPath                                        = "/v1/health"
 	apiStatsPath                                         = "/v1/stats"
 	apiTiersPath                                         = "/v1/tiers"
-	apiUserPath                                          = "/v1/user"
-	apiAccessPath                                        = "/v1/access"
+	apiUsersPath                                         = "/v1/users"
+	apiUsersAccessPath                                   = "/v1/users/access"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
@@ -413,13 +413,15 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
-	} else if r.Method == http.MethodPut && r.URL.Path == apiUserPath {
-		return s.ensureAdmin(s.handleUserAdd)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == apiUserPath {
-		return s.ensureAdmin(s.handleUserDelete)(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiAccessPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccessPath {
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
@@ -1456,7 +1458,7 @@ func (s *Server) topicFromPath(path string) (*topic, error) {
 	return s.topicFromID(parts[1])
 }
 
-// topicFromID returns the topic from a root path (e.g. /mytopic,mytopic2), creating it if it doesn't exist.
+// topicsFromPath returns the topic from a root path (e.g. /mytopic,mytopic2), creating it if it doesn't exist.
 func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {

@@ -251,13 +251,25 @@ type apiUserAddRequest struct {
 	// Do not add 'role' here. We don't want to add admins via the API.
 }
 
+type apiUserResponse struct {
+	Username string                  `json:"username"`
+	Role     string                  `json:"role"`
+	Tier     string                  `json:"tier,omitempty"`
+	Grants   []*apiUserGrantResponse `json:"grants,omitempty"`
+}
+
+type apiUserGrantResponse struct {
+	Topic      string `json:"topic"` // This may be a pattern
+	Permission string `json:"permission"`
+}
+
 type apiUserDeleteRequest struct {
 	Username string `json:"username"`
 }
 
 type apiAccessAllowRequest struct {
 	Username   string `json:"username"`
-	Topic      string `json:"topic"`
+	Topic      string `json:"topic"` // This may be a pattern
 	Permission string `json:"permission"`
 }
 

@@ -1180,6 +1180,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.5.0 (UNRELEASED)
 
+**Features:**
+
+* Admin API to manage users and ACL, `v1/users` + `v1/users/access` ([#722](https://github.com/binwiederhier/ntfy/issues/722), thanks to [@CreativeWarlock](https://github.com/CreativeWarlock) for sponsoring this ticket)
+
 **Bug fixes + maintenance:**
 
 * Removed old ntfy website from ntfy entirely (no ticket)

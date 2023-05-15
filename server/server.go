@@ -652,6 +652,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return err
 	}
 	defer f.Close()
+	if m.Attachment.Name != "" {
+		w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(m.Attachment.Name))
+	}
 	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
 	return err
 }

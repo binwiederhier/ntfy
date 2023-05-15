@@ -14,12 +14,12 @@ require (
 	github.com/olebedev/when v0.0.0-20221205223600-4d190b02b8d8
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli/v2 v2.25.3
-	golang.org/x/crypto v0.8.0
-	golang.org/x/oauth2 v0.7.0 // indirect
+	golang.org/x/crypto v0.9.0
+	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.2.0
 	golang.org/x/term v0.8.0
 	golang.org/x/time v0.3.0
-	google.golang.org/api v0.121.0
+	google.golang.org/api v0.122.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -28,15 +28,15 @@ require github.com/pkg/errors v0.9.1 // indirect
 require (
 	firebase.google.com/go/v4 v4.11.0
 	github.com/prometheus/client_golang v1.15.1
-	github.com/stripe/stripe-go/v74 v74.17.0
+	github.com/stripe/stripe-go/v74 v74.18.0
 )
 
 require (
-	cloud.google.com/go v0.110.1 // indirect
-	cloud.google.com/go/compute v1.19.1 // indirect
+	cloud.google.com/go v0.110.2 // indirect
+	cloud.google.com/go/compute v1.19.2 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v1.0.0 // indirect
-	cloud.google.com/go/longrunning v0.4.1 // indirect
+	cloud.google.com/go/iam v1.0.1 // indirect
+	cloud.google.com/go/longrunning v0.4.2 // indirect
 	github.com/AlekSi/pointer v1.2.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect

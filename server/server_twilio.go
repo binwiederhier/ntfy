@@ -31,14 +31,27 @@ const (
 </Response>`
 )
 
-func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, error) {
+func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, *errHTTP) {
 	if u == nil {
-		return "", fmt.Errorf("user is nil")
+		return "", errHTTPBadRequestAnonymousCallsNotAllowed
 	}
-	if s.config.TwilioPhoneNumberConverter == nil {
+	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+	if err != nil {
+		return "", errHTTPInternalError
+	} else if len(phoneNumbers) == 0 {
+		return "", errHTTPBadRequestPhoneNumberNotVerified
+	}
+	if toBool(phoneNumber) {
+		return phoneNumbers[0], nil
+	} else if util.Contains(phoneNumbers, phoneNumber) {
 		return phoneNumber, nil
 	}
-	return s.config.TwilioPhoneNumberConverter(u, phoneNumber)
+	for _, p := range phoneNumbers {
+		if p == phoneNumber {
+			return phoneNumber, nil
+		}
+	}
+	return "", errHTTPBadRequestPhoneNumberNotVerified
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {

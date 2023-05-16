@@ -707,17 +707,14 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
 	} else if call != "" {
-		call, err = s.convertPhoneNumber(v.User(), call)
-		if err != nil {
-			return nil, errHTTPBadRequestInvalidPhoneNumber.With(t)
-		}
-		if !vrate.CallAllowed() {
+		var httpErr *errHTTP
+		call, httpErr = s.convertPhoneNumber(v.User(), call)
+		if httpErr != nil {
+			return nil, httpErr.With(t)
+		} else if !vrate.CallAllowed() {
 			return nil, errHTTPTooManyRequestsLimitCalls.With(t)
 		}
 	}
-
-	// FIXME check allowed phone numbers
-
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
 	}
@@ -741,6 +738,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
 			"message_email":       email,
+			"message_call":        call,
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
@@ -913,7 +911,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	call = readParam(r, "x-call", "call")
 	if call != "" && s.config.TwilioAccount == "" {
-		return false, false, "", "", false, errHTTPBadRequestTwilioDisabled
+		return false, false, "", "", false, errHTTPBadRequestPhoneCallsDisabled
 	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
 		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid
 	}

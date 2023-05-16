@@ -359,6 +359,14 @@ const PhoneNumbers = () => {
         return null;
     }
 
+    if (account?.limits.calls === 0) {
+        return (
+            <Pref title={<>{t("account_basics_phone_numbers_title")}{config.enable_payments && <ProChip/>}</>} description={t("account_basics_phone_numbers_description")}>
+                <em>{t("account_usage_calls_none")}</em>
+            </Pref>
+        )
+    }
+
     return (
         <Pref labelId={labelId} title={t("account_basics_phone_numbers_title")} description={t("account_basics_phone_numbers_description")}>
             <div aria-labelledby={labelId}>

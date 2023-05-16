@@ -108,8 +108,10 @@ var (
 	errHTTPBadRequestBillingSubscriptionExists       = &errHTTP{40029, http.StatusBadRequest, "invalid request: billing subscription already exists", "", nil}
 	errHTTPBadRequestTierInvalid                     = &errHTTP{40030, http.StatusBadRequest, "invalid request: tier does not exist", "", nil}
 	errHTTPBadRequestUserNotFound                    = &errHTTP{40031, http.StatusBadRequest, "invalid request: user does not exist", "", nil}
-	errHTTPBadRequestTwilioDisabled                  = &errHTTP{40032, http.StatusBadRequest, "invalid request: Calling is disabled", "https://ntfy.sh/docs/publish/#phone-calls", nil}
+	errHTTPBadRequestPhoneCallsDisabled              = &errHTTP{40032, http.StatusBadRequest, "invalid request: calling is disabled", "https://ntfy.sh/docs/publish/#phone-calls", nil}
 	errHTTPBadRequestPhoneNumberInvalid              = &errHTTP{40033, http.StatusBadRequest, "invalid request: phone number invalid", "https://ntfy.sh/docs/publish/#phone-calls", nil}
+	errHTTPBadRequestPhoneNumberNotVerified          = &errHTTP{40034, http.StatusBadRequest, "invalid request: phone number not verified, or no matching verified numbers found", "https://ntfy.sh/docs/publish/#phone-calls", nil}
+	errHTTPBadRequestAnonymousCallsNotAllowed        = &errHTTP{40035, http.StatusBadRequest, "invalid request: anonymous phone calls are not allowed", "https://ntfy.sh/docs/publish/#phone-calls", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

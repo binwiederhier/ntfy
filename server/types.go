@@ -455,7 +455,3 @@ type apiStripeSubscriptionDeletedEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
 }
-
-type apiTwilioVerifyResponse struct {
-	Status string `json:"status"`
-}

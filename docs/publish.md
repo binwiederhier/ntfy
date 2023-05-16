@@ -2718,7 +2718,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
     curl \
         -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
         -H "Call: +12223334444" \
-        -d "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help." \
+        -d "Your garage seems to be on fire. You should probably check that out." \
         ntfy.sh/alerts
     ```
 
@@ -2727,7 +2727,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
     ntfy publish \
         --token=tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
         --call=+12223334444 \
-        alerts "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."
+        alerts "Your garage seems to be on fire. You should probably check that out."
     ```
 
 === "HTTP"
@@ -2737,14 +2737,14 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
     Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
     Call: +12223334444
 
-    Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.
+    Your garage seems to be on fire. You should probably check that out.
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/alerts', {
         method: 'POST',
-        body: "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.",
+        body: "Your garage seems to be on fire. You should probably check that out.",
         headers: { 
             'Authorization': 'Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2',
             'Call': '+12223334444'
@@ -2755,7 +2755,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
-        strings.NewReader("Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."))
+        strings.NewReader("Your garage seems to be on fire. You should probably check that out."))
     req.Header.Set("Call", "+12223334444")
     req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
     http.DefaultClient.Do(req)
@@ -2770,7 +2770,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
         Authorization = "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
         Call = "+12223334444"
       }
-      Body = "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."
+      Body = "Your garage seems to be on fire. You should probably check that out."
     }
     Invoke-RestMethod @Request
     ```
@@ -2778,7 +2778,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/alerts",
-        data="Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.",
+        data="Your garage seems to be on fire. You should probably check that out.",
         headers={ 
             "Authorization": "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2",
             "Call": "+12223334444"
@@ -2794,10 +2794,23 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
                 "Content-Type: text/plain\r\n" .
                 "Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2\r\n" .
                 "Call: +12223334444",
-            'content' => 'Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.'
+            'content' => 'Your garage seems to be on fire. You should probably check that out.'
         ]
     ]));
     ```
+
+Here's what a phone call from ntfy sounds like:
+
+<audio controls>
+    <source src="../static/audio/ntfy-phone-call.mp3" type="audio/mpeg">
+    <source src="../static/audio/ntfy-phone-call.ogg" type="audio/ogg">
+</audio>
+
+Audio transcript:
+
+> You have a notification from ntfy on topic alerts.        
+> Message: Your garage seems to be on fire. You should probably check that out. End message.   
+> This message was sent by user phil. It will be repeated up to three times.
 
 ## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics

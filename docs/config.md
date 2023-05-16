@@ -814,6 +814,7 @@ ntfy tier add \
   --message-limit=10000 \
   --message-expiry-duration=24h \
   --email-limit=50 \
+  --call-limit=10 \
   --reservation-limit=10 \
   --attachment-file-size-limit=100M \
   --attachment-total-size-limit=1G \
@@ -853,6 +854,22 @@ stripe-secret-key: "sk_test_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
 stripe-webhook-key: "whsec_ZnNkZnNIRExBSFNES0hBRFNmaHNka2ZsaGR"
 billing-contact: "phil@example.com"
 ```
+
+## Phone calls
+ntfy supports phone calls via [Twilio](https://www.twilio.com/) as a phone call provider. If phone calls are enabled,
+users can verify and add a phone number, and then receive phone calls when publish a message with the `X-Call` header.
+See [publishing page](publish.md#phone-calls) for more details.
+
+To enable Twilio integration, sign up with [Twilio](https://www.twilio.com/), purchase a phone number (Toll free numbers
+are the easiest), and then configure the following options:
+
+* `twilio-account` is the Twilio account SID, e.g. AC12345beefbeef67890beefbeef122586
+* `twilio-auth-token` is the Twilio auth token, e.g. affebeef258625862586258625862586
+* `twilio-from-number` is the outgoing phone number you purchased, e.g. +18775132586 
+* `twilio-verify-service` is the Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586
+
+After you have configured phone calls, create a [tier](#tiers) with a call limit, and then assign it to a user.
+Users may then use the `X-Call` header to receive a phone call when publishing a message.
 
 ## Rate limiting
 !!! info

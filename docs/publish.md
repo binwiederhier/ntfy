@@ -2702,7 +2702,7 @@ You can use ntfy to call a phone and **read the message out loud using text-to-s
 Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have 
 the ntfy app installed on their phone.
 
-Phone numbers have to be previously verified (via the web app). To forward a message as a phone call, pass a phone number
+Phone numbers have to be previously verified (via the web app). To forward a message as a voice call, pass a phone number
 in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`. You may
 also simply pass `yes` as a value if you only have one verified phone number.
 

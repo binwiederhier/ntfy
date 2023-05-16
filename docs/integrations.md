@@ -104,6 +104,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy_on_a_chip](https://github.com/gergepalfi/ntfy_on_a_chip) - ESP8266 and ESP32 client code to communicate with ntfy
 - [ntfy-sdk](https://github.com/yukibtc/ntfy-sdk) - ntfy client library to send notifications (Rust)
 - [ntfy_ynh](https://github.com/YunoHost-Apps/ntfy_ynh) - ntfy app for YunoHost 
+- [woodpecker-ntfy](https://codeberg.org/l-x/woodpecker-ntfy)- Woodpecker CI plugin for sending ntfy notfication from a pipeline (Go)
 - [drone-ntfy](https://github.com/Clortox/drone-ntfy) - Drone.io plugin for sending ntfy notifications from a pipeline (Shell)
 - [ignition-ntfy-module](https://github.com/Kyvis-Labs/ignition-ntfy-module) - Adds support for sending notifications via a ntfy server to Ignition (Java)
 - [maubot-ntfy](https://gitlab.com/999eagle/maubot-ntfy) - Matrix bot to subscribe to ntfy topics and send messages to Matrix (Python)

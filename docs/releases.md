@@ -1182,13 +1182,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Support for SMS and voice calls using Twilio (no ticket)
+* Support for text-to-speech style [phone calls](publish.md#phone-calls) using the `X-Call` header (no ticket)
+* Admin API to manage users and ACL, `v1/users` + `v1/users/access` ([#722](https://github.com/binwiederhier/ntfy/issues/722), thanks to [@CreativeWarlock](https://github.com/CreativeWarlock) for sponsoring this ticket)
 
 **Bug fixes + maintenance:**
 
 * Removed old ntfy website from ntfy entirely (no ticket)
+* Make emoji lookup for emails more efficient ([#725](https://github.com/binwiederhier/ntfy/pull/725), thanks to [@adamantike](https://github.com/adamantike))
 * Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
 * Support for `quoted-printable` in incoming emails ([#719](https://github.com/binwiederhier/ntfy/pull/719), thanks to [@Aerion](https://github.com/Aerion))
+* Attachments with filenames that are downloaded using a browser will now download with the proper filename ([#726](https://github.com/binwiederhier/ntfy/issues/726), thanks to [@un99known99](https://github.com/un99known99) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
+* Fix web app i18n issue in account preferences ([#730](https://github.com/binwiederhier/ntfy/issues/730), thanks to [@codebude](https://github.com/codebude) for reporting)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

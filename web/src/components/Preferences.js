@@ -436,7 +436,7 @@ const Appearance = () => {
 const Language = () => {
     const { t, i18n } = useTranslation();
     const labelId = "prefLanguage";
-    const lang = i18n.language ?? "en";
+    const lang = i18n.resolvedLanguage ?? "en";
 
     // Country flags are displayed using emoji. Emoji rendering is handled by platform fonts.
     // Windows in particular does not yet play nicely with flag emoji so for now, hide flags on Windows.
@@ -541,8 +541,8 @@ const ReservationsTable = (props) => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const { subscriptions } = useOutletContext();
     const localSubscriptions = (subscriptions?.length > 0)
-        ? Object.assign(...subscriptions.filter(s => s.baseUrl === config.base_url).map(s => ({[s.topic]: s})))
-        : [];
+        ? Object.assign({}, ...subscriptions.filter(s => s.baseUrl === config.base_url).map(s => ({[s.topic]: s})))
+        : {};
 
     const handleEditClick = (reservation) => {
         setDialogKey(prev => prev+1);

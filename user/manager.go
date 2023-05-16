@@ -195,6 +195,11 @@ const (
 		ON CONFLICT (user_id, topic)
 		DO UPDATE SET read=excluded.read, write=excluded.write, owner_user_id=excluded.owner_user_id
 	`
+	selectUserAllAccessQuery = `
+		SELECT user_id, topic, read, write
+		FROM user_access
+		ORDER BY write DESC, read DESC, topic
+	`
 	selectUserAccessQuery = `
 		SELECT topic, read, write
 		FROM user_access
@@ -1048,6 +1053,33 @@ func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 		}
 	}
 	return user, nil
+}
+
+// AllGrants returns all user-specific access control entries, mapped to their respective user IDs
+func (a *Manager) AllGrants() (map[string][]Grant, error) {
+	rows, err := a.db.Query(selectUserAllAccessQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	grants := make(map[string][]Grant, 0)
+	for rows.Next() {
+		var userID, topic string
+		var read, write bool
+		if err := rows.Scan(&userID, &topic, &read, &write); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		if _, ok := grants[userID]; !ok {
+			grants[userID] = make([]Grant, 0)
+		}
+		grants[userID] = append(grants[userID], Grant{
+			TopicPattern: fromSQLWildcard(topic),
+			Allow:        NewPermission(read, write),
+		})
+	}
+	return grants, nil
 }
 
 // Grants returns all user-specific access control entries

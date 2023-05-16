@@ -21,8 +21,11 @@ class Api {
         const headers = maybeWithAuth({}, user);
         console.log(`[Api] Polling ${url}`);
         for await (let line of fetchLinesIterator(url, headers)) {
-            console.log(`[Api, ${shortUrl}] Received message ${line}`);
-            messages.push(JSON.parse(line));
+            const message = JSON.parse(line);
+            if (message.id) {
+                console.log(`[Api, ${shortUrl}] Received message ${line}`);
+                messages.push(message);
+            }
         }
         return messages;
     }

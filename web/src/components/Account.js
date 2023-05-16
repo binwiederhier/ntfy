@@ -585,7 +585,7 @@ const Stats = () => {
                     description={t("account_usage_attachment_storage_description", {
                         filesize: formatBytes(account.limits.attachment_file_size),
                         expiry: humanizeDuration(account.limits.attachment_expiry_duration * 1000, {
-                            language: i18n.language,
+                            language: i18n.resolvedLanguage,
                             fallbacks: ["en"]
                         })
                     })}

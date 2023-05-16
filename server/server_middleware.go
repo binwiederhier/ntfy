@@ -76,6 +76,15 @@ func (s *Server) ensureUser(next handleFunc) handleFunc {
 	})
 }
 
+func (s *Server) ensureAdmin(next handleFunc) handleFunc {
+	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if !v.User().IsAdmin() {
+			return errHTTPUnauthorized
+		}
+		return next(w, r, v)
+	})
+}
+
 func (s *Server) ensurePaymentsEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.config.StripeSecretKey == "" || s.stripe == nil {

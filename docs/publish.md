@@ -2698,19 +2698,25 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
 ## Phone calls
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can use ntfy to call a phone and **read the message out loud using text-to-speech**, by specifying a phone number a header. 
+You can use ntfy to call a phone and **read the message out loud using text-to-speech**. 
 Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have 
 the ntfy app installed on their phone.
 
-Phone numbers have to be previously verified (via the web app). To forward a message as a voice call, pass a phone number
-in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`. You may
-also simply pass `yes` as a value if you only have one verified phone number.
+**Phone numbers have to be previously verified** (via the web app), so this feature is **only available to authenticated users**. 
+To forward a message as a voice call, pass a phone number in the `X-Call` header (or its alias: `Call`), prefixed with a
+plus sign and the country code, e.g. `+12223334444`. You may also simply pass `yes` as a value to pick the first of your 
+verified phone numbers.
+
+!!! info
+    As of today, the text-to-speed voice used will only support English. If there is demand for other languages, we'll
+    be happy to add support for that. Please [open an issue on GitHub](https://github.com/binwiederhier/ntfy/issues).
 
 On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) plans.
 
 === "Command line (curl)"
     ```
     curl \
+        -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
         -H "Call: +12223334444" \
         -d "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help." \
         ntfy.sh/alerts
@@ -2719,6 +2725,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
 === "ntfy CLI"
     ```
     ntfy publish \
+        --token=tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
         --call=+12223334444 \
         alerts "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."
     ```
@@ -2727,6 +2734,7 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
     ``` http
     POST /alerts HTTP/1.1
     Host: ntfy.sh
+    Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
     Call: +12223334444
 
     Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.
@@ -2738,9 +2746,8 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
         method: 'POST',
         body: "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.",
         headers: { 
-            'Email': 'phil@example.com',
-            'Tags': 'warning,skull,backup-host,ssh-login',
-            'Priority': 'high'
+            'Authorization': 'Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2',
+            'Call': '+12223334444'
         }
     })
     ```
@@ -2748,10 +2755,9 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
 === "Go"
     ``` go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
-        strings.NewReader("Unknown login from 5.31.23.83 to backups.example.com"))
-    req.Header.Set("Email", "phil@example.com")
-    req.Header.Set("Tags", "warning,skull,backup-host,ssh-login")
-    req.Header.Set("Priority", "high")
+        strings.NewReader("Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."))
+    req.Header.Set("Call", "+12223334444")
+    req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
     http.DefaultClient.Do(req)
     ```
 
@@ -2761,12 +2767,10 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
       Method = "POST"
       URI = "https://ntfy.sh/alerts"
       Headers = @{
-        Title = "Low disk space alert"
-        Priority = "high"
-        Tags = "warning,skull,backup-host,ssh-login")
-        Email = "phil@example.com"
+        Authorization = "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+        Call = "+12223334444"
       }
-      Body = "Unknown login from 5.31.23.83 to backups.example.com"
+      Body = "Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help."
     }
     Invoke-RestMethod @Request
     ```
@@ -2774,11 +2778,10 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/alerts",
-        data="Unknown login from 5.31.23.83 to backups.example.com",
+        data="Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.",
         headers={ 
-            "Email": "phil@example.com",
-            "Tags": "warning,skull,backup-host,ssh-login",
-            "Priority": "high"
+            "Authorization": "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2",
+            "Call": "+12223334444"
         })
     ```
 
@@ -2789,20 +2792,12 @@ On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) pl
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Email: phil@example.com\r\n" .
-                "Tags: warning,skull,backup-host,ssh-login\r\n" .
-                "Priority: high",
-            'content' => 'Unknown login from 5.31.23.83 to backups.example.com'
+                "Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2\r\n" .
+                "Call: +12223334444",
+            'content' => 'Your garage seems to be on fire. You should probably check that out, and call 0118 999 881 999 119 725 3 for help.'
         ]
     ]));
     ```
-
-Here's what that looks like in Google Mail:
-
-<figure markdown>
-  ![e-mail notification](static/img/screenshot-email.png){ width=600 }
-  <figcaption>E-mail notification</figcaption>
-</figure>
 
 ## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics

@@ -15,19 +15,21 @@ import (
 )
 
 const (
-	twilioMessageFooterFormat = "This message was sent by %s via %s"
-	twilioCallEndpoint        = "Calls.json"
-	twilioCallFormat          = `
+	twilioCallEndpoint = "Calls.json"
+	twilioCallFormat   = `
 <Response>
 	<Pause length="1"/>
-	<Say>You have a message from notify on topic %s. Message:</Say>
-	<Pause length="1"/>
-	<Say>%s</Say>
-	<Pause length="1"/>
-	<Say>End message.</Say>
-	<Pause length="1"/>
-	<Say>%s</Say>
-	<Pause length="1"/>
+	<Say loop="5">
+		You have a notification from notify on topic %s. Message:
+		<break time="1s"/>
+		%s
+		<break time="1s"/>
+		End message.
+		<break time="1s"/>
+		This message was sent by user %s. It will be repeated up to five times.
+		<break time="3s"/>
+	</Say>
+	<Say>Goodbye.</Say>
 </Response>`
 )
 
@@ -55,7 +57,11 @@ func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, *
 }
 
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
-	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(s.messageFooter(v.User(), m)))
+	u, sender := v.User(), m.Sender.String()
+	if u != nil {
+		sender = u.Name
+	}
+	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(sender))
 	data := url.Values{}
 	data.Set("From", s.config.TwilioFromNumber)
 	data.Set("To", to)
@@ -184,15 +190,6 @@ func (s *Server) performTwilioMessagingRequestInternal(endpoint string, data url
 		return "", err
 	}
 	return string(response), nil
-}
-
-func (s *Server) messageFooter(u *user.User, m *message) string { // u may be nil!
-	topicURL := s.config.BaseURL + "/" + m.Topic
-	sender := m.Sender.String()
-	if u != nil {
-		sender = fmt.Sprintf("%s (%s)", u.Name, m.Sender)
-	}
-	return fmt.Sprintf(twilioMessageFooterFormat, sender, util.ShortTopicURL(topicURL))
 }
 
 func xmlEscapeText(text string) string {

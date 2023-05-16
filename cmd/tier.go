@@ -18,7 +18,7 @@ const (
 	defaultMessageLimit             = 5000
 	defaultMessageExpiryDuration    = "12h"
 	defaultEmailLimit               = 20
-	defaultCallLimit                = 10
+	defaultCallLimit                = 0
 	defaultReservationLimit         = 3
 	defaultAttachmentFileSizeLimit  = "15M"
 	defaultAttachmentTotalSizeLimit = "100M"

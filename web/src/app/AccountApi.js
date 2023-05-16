@@ -1,7 +1,7 @@
 import {
     accountBillingPortalUrl,
     accountBillingSubscriptionUrl,
-    accountPasswordUrl, accountPhoneUrl,
+    accountPasswordUrl, accountPhoneUrl, accountPhoneVerifyUrl,
     accountReservationSingleUrl,
     accountReservationUrl,
     accountSettingsUrl,
@@ -299,8 +299,8 @@ class AccountApi {
         return await response.json(); // May throw SyntaxError
     }
 
-    async verifyPhone(phoneNumber) {
-        const url = accountPhoneUrl(config.base_url);
+    async verifyPhoneNumber(phoneNumber) {
+        const url = accountPhoneVerifyUrl(config.base_url);
         console.log(`[AccountApi] Sending phone verification ${url}`);
         await fetchOrThrow(url, {
             method: "PUT",
@@ -311,11 +311,11 @@ class AccountApi {
         });
     }
 
-    async checkVerifyPhone(phoneNumber, code) {
+    async addPhoneNumber(phoneNumber, code) {
         const url = accountPhoneUrl(config.base_url);
-        console.log(`[AccountApi] Checking phone verification code ${url}`);
+        console.log(`[AccountApi] Adding phone number with verification code ${url}`);
         await fetchOrThrow(url, {
-            method: "POST",
+            method: "PUT",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
                 number: phoneNumber,

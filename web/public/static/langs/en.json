@@ -130,7 +130,7 @@
   "publish_dialog_email_placeholder": "Address to forward the notification to, e.g. phil@example.com",
   "publish_dialog_email_reset": "Remove email forward",
   "publish_dialog_call_label": "Phone call",
-  "publish_dialog_call_placeholder": "Phone number to call with the message, e.g. +12223334444",
+  "publish_dialog_call_placeholder": "Phone number to call with the message, e.g. +12223334444, or 'yes'",
   "publish_dialog_call_reset": "Remove phone call",
   "publish_dialog_attach_label": "Attachment URL",
   "publish_dialog_attach_placeholder": "Attach file by URL, e.g. https://f-droid.org/F-Droid.apk",

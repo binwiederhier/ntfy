@@ -41,34 +41,34 @@ func newEvent() *Event {
 
 // Fatal logs the event as FATAL, and exits the program with exit code 1
 func (e *Event) Fatal(message string, v ...any) {
-	e.Field(fieldExitCode, 1).maybeLog(FatalLevel, message, v...)
+	e.Field(fieldExitCode, 1).Log(FatalLevel, message, v...)
 	fmt.Fprintf(os.Stderr, message+"\n", v...) // Always output error to stderr
 	os.Exit(1)
 }
 
 // Error logs the event with log level error
-func (e *Event) Error(message string, v ...any) {
-	e.maybeLog(ErrorLevel, message, v...)
+func (e *Event) Error(message string, v ...any) *Event {
+	return e.Log(ErrorLevel, message, v...)
 }
 
 // Warn logs the event with log level warn
-func (e *Event) Warn(message string, v ...any) {
-	e.maybeLog(WarnLevel, message, v...)
+func (e *Event) Warn(message string, v ...any) *Event {
+	return e.Log(WarnLevel, message, v...)
 }
 
 // Info logs the event with log level info
-func (e *Event) Info(message string, v ...any) {
-	e.maybeLog(InfoLevel, message, v...)
+func (e *Event) Info(message string, v ...any) *Event {
+	return e.Log(InfoLevel, message, v...)
 }
 
 // Debug logs the event with log level debug
-func (e *Event) Debug(message string, v ...any) {
-	e.maybeLog(DebugLevel, message, v...)
+func (e *Event) Debug(message string, v ...any) *Event {
+	return e.Log(DebugLevel, message, v...)
 }
 
 // Trace logs the event with log level trace
-func (e *Event) Trace(message string, v ...any) {
-	e.maybeLog(TraceLevel, message, v...)
+func (e *Event) Trace(message string, v ...any) *Event {
+	return e.Log(TraceLevel, message, v...)
 }
 
 // Tag adds a "tag" field to the log event
@@ -108,6 +108,14 @@ func (e *Event) Field(key string, value any) *Event {
 	return e
 }
 
+// FieldIf adds a custom field and value to the log event if the given level is loggable
+func (e *Event) FieldIf(key string, value any, level Level) *Event {
+	if e.Loggable(level) {
+		return e.Field(key, value)
+	}
+	return e
+}
+
 // Fields adds a map of fields to the log event
 func (e *Event) Fields(fields Context) *Event {
 	if e.fields == nil {
@@ -138,7 +146,7 @@ func (e *Event) With(contexters ...Contexter) *Event {
 // to determine if they match. This is super complicated, but required for efficiency.
 func (e *Event) Render(l Level, message string, v ...any) string {
 	appliedContexters := e.maybeApplyContexters()
-	if !e.shouldLog(l) {
+	if !e.Loggable(l) {
 		return ""
 	}
 	e.Message = fmt.Sprintf(message, v...)
@@ -153,11 +161,12 @@ func (e *Event) Render(l Level, message string, v ...any) string {
 	return e.String()
 }
 
-// maybeLog logs the event to the defined output, or does nothing if Render returns an empty string
-func (e *Event) maybeLog(l Level, message string, v ...any) {
+// Log logs the event to the defined output, or does nothing if Render returns an empty string
+func (e *Event) Log(l Level, message string, v ...any) *Event {
 	if m := e.Render(l, message, v...); m != "" {
 		log.Println(m)
 	}
+	return e
 }
 
 // Loggable returns true if the given log level is lower or equal to the current log level
@@ -197,10 +206,6 @@ func (e *Event) String() string {
 	}
 	sort.Strings(fields)
 	return fmt.Sprintf("%s %s (%s)", e.Level.String(), e.Message, strings.Join(fields, ", "))
-}
-
-func (e *Event) shouldLog(l Level) bool {
-	return e.globalLevelWithOverride() <= l
 }
 
 func (e *Event) globalLevelWithOverride() Level {

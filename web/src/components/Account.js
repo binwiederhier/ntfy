@@ -432,7 +432,7 @@ const AddPhoneNumberDialog = (props) => {
     const verifyPhone = async () => {
         try {
             setSending(true);
-            await accountApi.verifyPhone(phoneNumber);
+            await accountApi.verifyPhoneNumber(phoneNumber);
             setVerificationCodeSent(true);
         } catch (e) {
             console.log(`[Account] Error sending verification`, e);
@@ -449,7 +449,7 @@ const AddPhoneNumberDialog = (props) => {
     const checkVerifyPhone = async () => {
         try {
             setSending(true);
-            await accountApi.checkVerifyPhone(phoneNumber, code);
+            await accountApi.addPhoneNumber(phoneNumber, code);
             props.onClose();
         } catch (e) {
             console.log(`[Account] Error confirming verification`, e);

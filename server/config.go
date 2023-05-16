@@ -47,7 +47,6 @@ const (
 	DefaultVisitorMessageDailyLimit             = 0
 	DefaultVisitorEmailLimitBurst               = 16
 	DefaultVisitorEmailLimitReplenish           = time.Hour
-	DefaultVisitorCallDailyLimit                = 10
 	DefaultVisitorAccountCreationLimitBurst     = 3
 	DefaultVisitorAccountCreationLimitReplenish = 24 * time.Hour
 	DefaultVisitorAuthFailureLimitBurst         = 30
@@ -106,10 +105,10 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
-	TwilioMessagingBaseURL               string
 	TwilioAccount                        string
 	TwilioAuthToken                      string
 	TwilioFromNumber                     string
+	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
 	TwilioVerifyService                  string
 	MetricsEnable                        bool
@@ -190,7 +189,7 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
-		TwilioMessagingBaseURL:               "https://api.twilio.com", // Override for tests
+		TwilioCallsBaseURL:                   "https://api.twilio.com", // Override for tests
 		TwilioAccount:                        "",
 		TwilioAuthToken:                      "",
 		TwilioFromNumber:                     "",

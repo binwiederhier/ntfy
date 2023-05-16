@@ -11,37 +11,108 @@ import (
 	"testing"
 )
 
-func TestServer_Twilio_SMS(t *testing.T) {
-	var called atomic.Bool
-	twilioServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestServer_Twilio_Call_Add_Verify_Call_Delete_Success(t *testing.T) {
+	var called, verified atomic.Bool
+	var code atomic.Pointer[string]
+	twilioVerifyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Messages.json", r.URL.Path)
 		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
-		require.Equal(t, "Body=test%0A%0A--%0AThis+message+was+sent+by+9.9.9.9+via+ntfy.sh%2Fmytopic&From=%2B1234567890&To=%2B11122233344", string(body))
+		if r.URL.Path == "/v2/Services/VA1234567890/Verifications" {
+			if code.Load() != nil {
+				t.Fatal("Should be only called once")
+			}
+			require.Equal(t, "Channel=sms&To=%2B12223334444", string(body))
+			code.Store(util.String("123456"))
+		} else if r.URL.Path == "/v2/Services/VA1234567890/VerificationCheck" {
+			if verified.Load() {
+				t.Fatal("Should be only called once")
+			}
+			require.Equal(t, "Code=123456&To=%2B12223334444", string(body))
+			verified.Store(true)
+		} else {
+			t.Fatal("Unexpected path:", r.URL.Path)
+		}
+	}))
+	defer twilioVerifyServer.Close()
+	twilioCallsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if called.Load() {
+			t.Fatal("Should be only called once")
+		}
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Calls.json", r.URL.Path)
+		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
+		require.Equal(t, "From=%2B1234567890&To=%2B12223334444&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay+loop%3D%223%22%3E%0A%09%09You+have+a+notification+from+notify+on+topic+mytopic.+Message%3A%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09hi+there%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09End+message.%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09This+message+was+sent+by+user+phil.+It+will+be+repeated+up+to+three+times.%0A%09%09%3Cbreak+time%3D%223s%22%2F%3E%0A%09%3C%2FSay%3E%0A%09%3CSay%3EGoodbye.%3C%2FSay%3E%0A%3C%2FResponse%3E", string(body))
 		called.Store(true)
 	}))
-	defer twilioServer.Close()
+	defer twilioCallsServer.Close()
 
-	c := newTestConfig(t)
-	c.BaseURL = "https://ntfy.sh"
-	c.TwilioMessagingBaseURL = twilioServer.URL
+	c := newTestConfigWithAuthFile(t)
+	c.TwilioVerifyBaseURL = twilioVerifyServer.URL
+	c.TwilioCallsBaseURL = twilioCallsServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
-	c.VisitorSMSDailyLimit = 1
+	c.TwilioVerifyService = "VA1234567890"
 	s := newTestServer(t, c)
 
-	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
-		"SMS": "+11122233344",
+	// Add tier and user
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "pro",
+		MessageLimit: 10,
+		CallLimit:    1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+
+	// Send verification code for phone number
+	response := request(t, s, "PUT", "/v1/account/phone/verify", `{"number":"+12223334444"}`, map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
 	})
-	require.Equal(t, "test", toMessage(t, response.Body.String()).Message)
+	require.Equal(t, 200, response.Code)
+	waitFor(t, func() bool {
+		return *code.Load() == "123456"
+	})
+
+	// Add phone number with code
+	response = request(t, s, "PUT", "/v1/account/phone", `{"number":"+12223334444","code":"123456"}`, map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	waitFor(t, func() bool {
+		return verified.Load()
+	})
+	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(phoneNumbers))
+	require.Equal(t, "+12223334444", phoneNumbers[0])
+
+	// Do the thing
+	response = request(t, s, "POST", "/mytopic", "hi there", map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+		"x-call":        "yes",
+	})
+	require.Equal(t, "hi there", toMessage(t, response.Body.String()).Message)
 	waitFor(t, func() bool {
 		return called.Load()
 	})
+
+	// Remove the phone number
+	response = request(t, s, "DELETE", "/v1/account/phone", `{"number":"+12223334444"}`, map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+
+	// Verify the phone number is gone from the DB
+	phoneNumbers, err = s.userManager.PhoneNumbers(u.ID)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(phoneNumbers))
 }
 
-func TestServer_Twilio_SMS_With_User(t *testing.T) {
+func TestServer_Twilio_Call_Success(t *testing.T) {
 	var called atomic.Bool
 	twilioServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if called.Load() {
@@ -49,16 +120,15 @@ func TestServer_Twilio_SMS_With_User(t *testing.T) {
 		}
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Messages.json", r.URL.Path)
+		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Calls.json", r.URL.Path)
 		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
-		require.Equal(t, "Body=test%0A%0A--%0AThis+message+was+sent+by+phil+%289.9.9.9%29+via+ntfy.sh%2Fmytopic&From=%2B1234567890&To=%2B11122233344", string(body))
+		require.Equal(t, "From=%2B1234567890&To=%2B11122233344&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay+loop%3D%223%22%3E%0A%09%09You+have+a+notification+from+notify+on+topic+mytopic.+Message%3A%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09hi+there%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09End+message.%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09This+message+was+sent+by+user+phil.+It+will+be+repeated+up+to+three+times.%0A%09%09%3Cbreak+time%3D%223s%22%2F%3E%0A%09%3C%2FSay%3E%0A%09%3CSay%3EGoodbye.%3C%2FSay%3E%0A%3C%2FResponse%3E", string(body))
 		called.Store(true)
 	}))
 	defer twilioServer.Close()
 
 	c := newTestConfigWithAuthFile(t)
-	c.BaseURL = "https://ntfy.sh"
-	c.TwilioMessagingBaseURL = twilioServer.URL
+	c.TwilioCallsBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -68,62 +138,26 @@ func TestServer_Twilio_SMS_With_User(t *testing.T) {
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:         "pro",
 		MessageLimit: 10,
-		SMSLimit:     1,
+		CallLimit:    1,
 	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, s.userManager.AddPhoneNumber(u.ID, "+11122233344"))
 
-	// Do request with user
-	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
-		"Authorization": util.BasicAuth("phil", "phil"),
-		"SMS":           "+11122233344",
+	// Do the thing
+	response := request(t, s, "POST", "/mytopic", "hi there", map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+		"x-call":        "+11122233344",
 	})
-	require.Equal(t, "test", toMessage(t, response.Body.String()).Message)
-	waitFor(t, func() bool {
-		return called.Load()
-	})
-
-	// Second one should fail due to rate limits
-	response = request(t, s, "POST", "/mytopic", "test", map[string]string{
-		"Authorization": util.BasicAuth("phil", "phil"),
-		"SMS":           "+11122233344",
-	})
-	require.Equal(t, 42910, toHTTPError(t, response.Body.String()).Code)
-}
-
-func TestServer_Twilio_Call(t *testing.T) {
-	var called atomic.Bool
-	twilioServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		require.Nil(t, err)
-		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Calls.json", r.URL.Path)
-		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
-		require.Equal(t, "From=%2B1234567890&To=%2B11122233344&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EYou+have+a+message+from+notify+on+topic+mytopic.+Message%3A%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3Ethis+message+has%26%23xA%3Ba+new+line+and+%26lt%3Bbrackets%26gt%3B%21%26%23xA%3Band+%26%2334%3Bquotes+and+other+%26%2339%3Bquotes%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EEnd+message.%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EThis+message+was+sent+by+9.9.9.9+via+127.0.0.1%3A12345%2Fmytopic%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%3C%2FResponse%3E", string(body))
-		called.Store(true)
-	}))
-	defer twilioServer.Close()
-
-	c := newTestConfig(t)
-	c.TwilioMessagingBaseURL = twilioServer.URL
-	c.TwilioAccount = "AC1234567890"
-	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
-	c.VisitorCallDailyLimit = 1
-	s := newTestServer(t, c)
-
-	body := `this message has
-a new line and <brackets>!
-and "quotes and other 'quotes`
-	response := request(t, s, "POST", "/mytopic", body, map[string]string{
-		"x-call": "+11122233344",
-	})
-	require.Equal(t, "this message has\na new line and <brackets>!\nand \"quotes and other 'quotes", toMessage(t, response.Body.String()).Message)
+	require.Equal(t, "hi there", toMessage(t, response.Body.String()).Message)
 	waitFor(t, func() bool {
 		return called.Load()
 	})
 }
 
-func TestServer_Twilio_Call_With_User(t *testing.T) {
+func TestServer_Twilio_Call_Success_With_Yes(t *testing.T) {
 	var called atomic.Bool
 	twilioServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if called.Load() {
@@ -133,13 +167,44 @@ func TestServer_Twilio_Call_With_User(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Calls.json", r.URL.Path)
 		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
-		require.Equal(t, "From=%2B1234567890&To=%2B11122233344&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EYou+have+a+message+from+notify+on+topic+mytopic.+Message%3A%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3Ehi+there%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EEnd+message.%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay%3EThis+message+was+sent+by+phil+%289.9.9.9%29+via+127.0.0.1%3A12345%2Fmytopic%3C%2FSay%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%3C%2FResponse%3E", string(body))
+		require.Equal(t, "From=%2B1234567890&To=%2B11122233344&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay+loop%3D%223%22%3E%0A%09%09You+have+a+notification+from+notify+on+topic+mytopic.+Message%3A%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09hi+there%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09End+message.%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09This+message+was+sent+by+user+phil.+It+will+be+repeated+up+to+three+times.%0A%09%09%3Cbreak+time%3D%223s%22%2F%3E%0A%09%3C%2FSay%3E%0A%09%3CSay%3EGoodbye.%3C%2FSay%3E%0A%3C%2FResponse%3E", string(body))
 		called.Store(true)
 	}))
 	defer twilioServer.Close()
 
 	c := newTestConfigWithAuthFile(t)
-	c.TwilioMessagingBaseURL = twilioServer.URL
+	c.TwilioCallsBaseURL = twilioServer.URL
+	c.TwilioAccount = "AC1234567890"
+	c.TwilioAuthToken = "AAEAA1234567890"
+	c.TwilioFromNumber = "+1234567890"
+	s := newTestServer(t, c)
+
+	// Add tier and user
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "pro",
+		MessageLimit: 10,
+		CallLimit:    1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, s.userManager.AddPhoneNumber(u.ID, "+11122233344"))
+
+	// Do the thing
+	response := request(t, s, "POST", "/mytopic", "hi there", map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+		"x-call":        "yes", // <<<------
+	})
+	require.Equal(t, "hi there", toMessage(t, response.Body.String()).Message)
+	waitFor(t, func() bool {
+		return called.Load()
+	})
+}
+
+func TestServer_Twilio_Call_UnverifiedNumber(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.TwilioCallsBaseURL = "http://dummy.invalid"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -155,19 +220,16 @@ func TestServer_Twilio_Call_With_User(t *testing.T) {
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Do the thing
-	response := request(t, s, "POST", "/mytopic", "hi there", map[string]string{
+	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
 		"authorization": util.BasicAuth("phil", "phil"),
 		"x-call":        "+11122233344",
 	})
-	require.Equal(t, "hi there", toMessage(t, response.Body.String()).Message)
-	waitFor(t, func() bool {
-		return called.Load()
-	})
+	require.Equal(t, 40034, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 	c := newTestConfig(t)
-	c.TwilioMessagingBaseURL = "https://127.0.0.1"
+	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
@@ -176,29 +238,21 @@ func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
 		"x-call": "+invalid",
 	})
-	require.Equal(t, 40031, toHTTPError(t, response.Body.String()).Code)
+	require.Equal(t, 40033, toHTTPError(t, response.Body.String()).Code)
 }
 
-func TestServer_Twilio_SMS_InvalidNumber(t *testing.T) {
+func TestServer_Twilio_Call_Anonymous(t *testing.T) {
 	c := newTestConfig(t)
-	c.TwilioMessagingBaseURL = "https://127.0.0.1"
+	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
-		"x-sms": "+invalid",
+		"x-call": "+123123",
 	})
-	require.Equal(t, 40031, toHTTPError(t, response.Body.String()).Code)
-}
-
-func TestServer_Twilio_SMS_Unconfigured(t *testing.T) {
-	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
-		"x-sms": "+1234",
-	})
-	require.Equal(t, 40030, toHTTPError(t, response.Body.String()).Code)
+	require.Equal(t, 40035, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_Twilio_Call_Unconfigured(t *testing.T) {
@@ -206,5 +260,5 @@ func TestServer_Twilio_Call_Unconfigured(t *testing.T) {
 	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
 		"x-call": "+1234",
 	})
-	require.Equal(t, 40030, toHTTPError(t, response.Body.String()).Code)
+	require.Equal(t, 40032, toHTTPError(t, response.Body.String()).Code)
 }

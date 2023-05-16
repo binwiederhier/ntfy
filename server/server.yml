@@ -144,7 +144,7 @@
 # smtp-server-domain:
 # smtp-server-addr-prefix:
 
-# If enabled, ntfy can send SMS text messages and do voice calls via Twilio, and the "X-SMS" and "X-Call" headers.
+# If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.
 #
 # twilio-account:
 # twilio-auth-token:
@@ -225,16 +225,10 @@
 # visitor-request-limit-exempt-hosts: ""
 
 # Rate limiting: Hard daily limit of messages per visitor and day. The limit is reset
-# every day at midnight UTC. If the limit is not set (or set to zero), the request limit (see above)
-# governs the upper limit. SMS and calls are only supported if the twilio-settings are properly configured.
+# every day at midnight UTC. If the limit is not set (or set to zero), the request
+# limit (see above) governs the upper limit.
 #
 # visitor-message-daily-limit: 0
-
-# Rate limiting: Daily limit of SMS and calls per visitor and day. The limit is reset every day
-# at midnight UTC. SMS and calls are only supported if the twilio-settings are properly configured.
-#
-# visitor-sms-daily-limit: 10
-# visitor-call-daily-limit: 10
 
 # Rate limiting: Allowed emails per visitor:
 # - visitor-email-limit-burst is the initial bucket of emails each visitor has

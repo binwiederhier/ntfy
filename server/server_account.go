@@ -521,7 +521,7 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 	return nil
 }
 
-func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
@@ -545,13 +545,13 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	}
 	// Actually add the unverified number, and send verification
 	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Sending phone number verification")
-	if err := s.verifyPhone(v, r, req.Number); err != nil {
+	if err := s.verifyPhoneNumber(v, r, req.Number); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
@@ -560,7 +560,7 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 	if !phoneNumberRegex.MatchString(req.Number) {
 		return errHTTPBadRequestPhoneNumberInvalid
 	}
-	if err := s.checkVerifyPhone(v, r, req.Number, req.Code); err != nil {
+	if err := s.verifyPhoneNumberCheck(v, r, req.Number, req.Code); err != nil {
 		return err
 	}
 	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Adding phone number as verified")

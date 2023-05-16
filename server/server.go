@@ -91,6 +91,7 @@ var (
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
 	apiAccountPhonePath                                  = "/v1/account/phone"
+	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -463,12 +464,12 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhoneVerifyPath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberVerify)))(w, r, v)
 	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhonePath {
-		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberAdd))(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPhonePath {
-		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberVerify))(w, r, v)
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
-		return s.ensureUser(s.withAccountSync(s.handleAccountPhoneNumberDelete))(w, r, v)
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
@@ -910,7 +911,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		return false, false, "", "", false, errHTTPBadRequestEmailDisabled
 	}
 	call = readParam(r, "x-call", "call")
-	if call != "" && s.config.TwilioAccount == "" {
+	if call != "" && s.config.TwilioAccount == "" && s.userManager == nil {
 		return false, false, "", "", false, errHTTPBadRequestPhoneCallsDisabled
 	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
 		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid

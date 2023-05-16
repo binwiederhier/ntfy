@@ -326,7 +326,6 @@ type apiAccountLimits struct {
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
-	SMS                      int64  `json:"sms"`
 	Calls                    int64  `json:"calls"`
 	Reservations             int64  `json:"reservations"`
 	AttachmentTotalSize      int64  `json:"attachment_total_size"`
@@ -340,8 +339,6 @@ type apiAccountStats struct {
 	MessagesRemaining            int64 `json:"messages_remaining"`
 	Emails                       int64 `json:"emails"`
 	EmailsRemaining              int64 `json:"emails_remaining"`
-	SMS                          int64 `json:"sms"`
-	SMSRemaining                 int64 `json:"sms_remaining"`
 	Calls                        int64 `json:"calls"`
 	CallsRemaining               int64 `json:"calls_remaining"`
 	Reservations                 int64 `json:"reservations"`

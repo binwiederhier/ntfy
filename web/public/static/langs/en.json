@@ -256,7 +256,7 @@
   "account_upgrade_dialog_tier_features_emails_other": "{{emails}} daily emails",
   "account_upgrade_dialog_tier_features_calls_one": "{{calls}} daily phone calls",
   "account_upgrade_dialog_tier_features_calls_other": "{{calls}} daily phone calls",
-  "account_upgrade_dialog_tier_features_no_calls": "No daily phone calls",
+  "account_upgrade_dialog_tier_features_no_calls": "No phone calls",
   "account_upgrade_dialog_tier_features_attachment_file_size": "{{filesize}} per file",
   "account_upgrade_dialog_tier_features_attachment_total_size": "{{totalsize}} total storage",
   "account_upgrade_dialog_tier_price_per_month": "month",

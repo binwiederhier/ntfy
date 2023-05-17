@@ -256,5 +256,8 @@
     "account_basics_tier_admin_suffix_no_tier": "(nessun livello)",
     "account_basics_tier_basic": "Base",
     "account_basics_tier_free": "Gratuito",
-    "account_usage_emails_title": "Email inviate"
+    "account_usage_emails_title": "Email inviate",
+    "account_usage_cannot_create_portal_session": "Impossibile aprire il portale di pagamento",
+    "account_delete_title": "Elimina account",
+    "account_basics_username_description": "Hey, sei tu ❤"
 }

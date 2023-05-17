@@ -571,22 +571,24 @@ const Stats = () => {
                         value={account.role === Role.USER ? normalize(account.stats.messages, account.limits.messages) : 100}
                     />
                 </Pref>
-                <Pref title={
-                    <>
-                        {t("account_usage_emails_title")}
-                        <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
-                    </>
-                }>
-                    <div>
-                        <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails.toLocaleString()}</Typography>
-                        <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.emails.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
-                    </div>
-                    <LinearProgress
-                        variant="determinate"
-                        value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100}
-                    />
-                </Pref>
-                {(account.role === Role.ADMIN || account.limits.calls > 0) &&
+                {config.enable_emails &&
+                    <Pref title={
+                        <>
+                            {t("account_usage_emails_title")}
+                            <Tooltip title={t("account_usage_limits_reset_daily")}><span><InfoIcon/></span></Tooltip>
+                        </>
+                    }>
+                        <div>
+                            <Typography variant="body2" sx={{float: "left"}}>{account.stats.emails.toLocaleString()}</Typography>
+                            <Typography variant="body2" sx={{float: "right"}}>{account.role === Role.USER ? t("account_usage_of_limit", { limit: account.limits.emails.toLocaleString() }) : t("account_usage_unlimited")}</Typography>
+                        </div>
+                        <LinearProgress
+                            variant="determinate"
+                            value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100}
+                        />
+                    </Pref>
+                }
+                {config.enable_calls && (account.role === Role.ADMIN || account.limits.calls > 0) &&
                     <Pref title={
                         <>
                             {t("account_usage_calls_title")}

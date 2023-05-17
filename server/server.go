@@ -550,6 +550,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
 		EnableCalls:        s.config.TwilioAccount != "",
+		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
 		BillingContact:     s.config.BillingContact,
 		DisallowedTopics:   s.config.DisallowedTopics,
@@ -911,7 +912,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		return false, false, "", "", false, errHTTPBadRequestEmailDisabled
 	}
 	call = readParam(r, "x-call", "call")
-	if call != "" && s.config.TwilioAccount == "" && s.userManager == nil {
+	if call != "" && (s.config.TwilioAccount == "" || s.userManager == nil) {
 		return false, false, "", "", false, errHTTPBadRequestPhoneCallsDisabled
 	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
 		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid

@@ -108,17 +108,19 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				CancelAt:     u.Billing.StripeSubscriptionCancelAt.Unix(),
 			}
 		}
-		reservations, err := s.userManager.Reservations(u.Name)
-		if err != nil {
-			return err
-		}
-		if len(reservations) > 0 {
-			response.Reservations = make([]*apiAccountReservation, 0)
-			for _, r := range reservations {
-				response.Reservations = append(response.Reservations, &apiAccountReservation{
-					Topic:    r.Topic,
-					Everyone: r.Everyone.String(),
-				})
+		if s.config.EnableReservations {
+			reservations, err := s.userManager.Reservations(u.Name)
+			if err != nil {
+				return err
+			}
+			if len(reservations) > 0 {
+				response.Reservations = make([]*apiAccountReservation, 0)
+				for _, r := range reservations {
+					response.Reservations = append(response.Reservations, &apiAccountReservation{
+						Topic:    r.Topic,
+						Everyone: r.Everyone.String(),
+					})
+				}
 			}
 		}
 		tokens, err := s.userManager.Tokens(u.ID)
@@ -141,12 +143,14 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				})
 			}
 		}
-		phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
-		if err != nil {
-			return err
-		}
-		if len(phoneNumbers) > 0 {
-			response.PhoneNumbers = phoneNumbers
+		if s.config.TwilioAccount != "" {
+			phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+			if err != nil {
+				return err
+			}
+			if len(phoneNumbers) > 0 {
+				response.PhoneNumbers = phoneNumbers
+			}
 		}
 	} else {
 		response.Username = user.Everyone

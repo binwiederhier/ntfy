@@ -1194,7 +1194,7 @@ func TestServer_PublishDelayedEmail_Fail(t *testing.T) {
 }
 
 func TestServer_PublishDelayedCall_Fail(t *testing.T) {
-	c := newTestConfig(t)
+	c := newTestConfigWithAuthFile(t)
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
 	c.TwilioFromNumber = "+1234567890"

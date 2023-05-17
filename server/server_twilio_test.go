@@ -228,7 +228,7 @@ func TestServer_Twilio_Call_UnverifiedNumber(t *testing.T) {
 }
 
 func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
-	c := newTestConfig(t)
+	c := newTestConfigWithAuthFile(t)
 	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
@@ -242,7 +242,7 @@ func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 }
 
 func TestServer_Twilio_Call_Anonymous(t *testing.T) {
-	c := newTestConfig(t)
+	c := newTestConfigWithAuthFile(t)
 	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"

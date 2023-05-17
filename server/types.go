@@ -394,6 +394,7 @@ type apiConfigResponse struct {
 	EnableSignup       bool     `json:"enable_signup"`
 	EnablePayments     bool     `json:"enable_payments"`
 	EnableCalls        bool     `json:"enable_calls"`
+	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
 	BillingContact     string   `json:"billing_contact"`
 	DisallowedTopics   []string `json:"disallowed_topics"`

@@ -6,12 +6,13 @@
 // During web development, you may change values here for rapid testing.
 
 var config = {
-    base_url: "http://127.0.0.1:2586",// FIXME window.location.origin, // Change to test against a different server
+    base_url: window.location.origin, // Change to test against a different server
     app_root: "/app",
     enable_login: true,
     enable_signup: true,
     enable_payments: true,
     enable_reservations: true,
+    enable_emails: true,
     enable_calls: true,
     billing_contact: "",
     disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"]

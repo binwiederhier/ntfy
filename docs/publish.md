@@ -2709,7 +2709,7 @@ You may also simply pass `yes` as a value to pick the first of your verified pho
 On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) plans.
 
 <figure markdown>
-  ![e-mail publishing](static/img/web-phone-verify.png)
+  ![phone number verification](static/img/web-phone-verify.png)
   <figcaption>Phone number verification in the <a href="https://ntfy.sh/account">web app</a></figcaption>
 </figure>
 

@@ -1,14 +1,16 @@
 import {
     accountBillingPortalUrl,
     accountBillingSubscriptionUrl,
-    accountPasswordUrl, accountPhoneUrl, accountPhoneVerifyUrl,
+    accountPasswordUrl,
+    accountPhoneUrl,
+    accountPhoneVerifyUrl,
     accountReservationSingleUrl,
     accountReservationUrl,
     accountSettingsUrl,
-    accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
-    accountUrl, maybeWithBearerAuth,
+    accountUrl,
+    maybeWithBearerAuth,
     tiersUrl,
     withBasicAuth,
     withBearerAuth
@@ -18,7 +20,7 @@ import subscriptionManager from "./SubscriptionManager";
 import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
-import {fetchOrThrow, throwAppError, UnauthorizedError} from "./errors";
+import {fetchOrThrow, UnauthorizedError} from "./errors";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes

@@ -1,13 +1,17 @@
 import * as React from 'react';
 import {useContext, useState} from 'react';
 import {
-    Alert, ButtonGroup,
+    Alert,
     CardActions,
-    CardContent, Chip,
-    FormControl, FormControlLabel, InputLabel,
+    CardContent,
+    Chip,
+    FormControl,
+    FormControlLabel,
     LinearProgress,
     Link,
-    Portal, Radio, RadioGroup,
+    Portal,
+    Radio,
+    RadioGroup,
     Select,
     Snackbar,
     Stack,
@@ -47,14 +51,12 @@ import {AccountContext} from "./App";
 import DialogFooter from "./DialogFooter";
 import {Paragraph} from "./styles";
 import CloseIcon from "@mui/icons-material/Close";
-import {Check, ContentCopy, DeleteForever, Public} from "@mui/icons-material";
+import {ContentCopy, Public} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import DialogContentText from "@mui/material/DialogContentText";
 import {IncorrectPasswordError, UnauthorizedError} from "../app/errors";
 import {ProChip} from "./SubscriptionPopup";
 import AddIcon from "@mui/icons-material/Add";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 
 const Account = () => {
     if (!session.exists()) {
@@ -427,6 +429,7 @@ const AddPhoneNumberDialog = (props) => {
     const handleCancel = () => {
         if (verificationCodeSent) {
             setVerificationCodeSent(false);
+            setCode("");
         } else {
             props.onClose();
         }

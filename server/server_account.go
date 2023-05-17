@@ -581,7 +581,7 @@ func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.R
 		return errHTTPBadRequestPhoneNumberInvalid
 	}
 	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Deleting phone number")
-	if err := s.userManager.DeletePhoneNumber(u.ID, req.Number); err != nil {
+	if err := s.userManager.RemovePhoneNumber(u.ID, req.Number); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

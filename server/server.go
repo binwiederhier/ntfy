@@ -937,6 +937,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		if email != "" {
 			return false, false, "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
 		}
+		if call != "" {
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
+		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
 			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse

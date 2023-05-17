@@ -856,8 +856,8 @@ billing-contact: "phil@example.com"
 ```
 
 ## Phone calls
-ntfy supports phone calls via [Twilio](https://www.twilio.com/) as a phone call provider. If phone calls are enabled,
-users can verify and add a phone number, and then receive phone calls when publish a message with the `X-Call` header.
+ntfy supports phone calls via [Twilio](https://www.twilio.com/) as a call provider. If phone calls are enabled,
+users can verify and add a phone number, and then receive phone calls when publishing a message using the `X-Call` header.
 See [publishing page](publish.md#phone-calls) for more details.
 
 To enable Twilio integration, sign up with [Twilio](https://www.twilio.com/), purchase a phone number (Toll free numbers

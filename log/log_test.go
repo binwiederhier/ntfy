@@ -198,6 +198,30 @@ func TestLog_LevelOverride_ManyOnSameField(t *testing.T) {
 	require.Equal(t, "", File())
 }
 
+func TestLog_FieldIf(t *testing.T) {
+	t.Cleanup(resetState)
+
+	var out bytes.Buffer
+	SetOutput(&out)
+	SetLevel(DebugLevel)
+	SetFormat(JSONFormat)
+
+	Time(time.Unix(11, 0).UTC()).
+		FieldIf("trace_field", "manager", TraceLevel). // This is not logged
+		Field("tag", "manager").
+		Debug("trace_field is not logged")
+	SetLevel(TraceLevel)
+	Time(time.Unix(12, 0).UTC()).
+		FieldIf("trace_field", "manager", TraceLevel). // Now it is logged
+		Field("tag", "manager").
+		Debug("trace_field is logged")
+
+	expected := `{"time":"1970-01-01T00:00:11Z","level":"DEBUG","message":"trace_field is not logged","tag":"manager"}
+{"time":"1970-01-01T00:00:12Z","level":"DEBUG","message":"trace_field is logged","tag":"manager","trace_field":"manager"}
+`
+	require.Equal(t, expected, out.String())
+}
+
 func TestLog_UsingStdLogger_JSON(t *testing.T) {
 	t.Cleanup(resetState)
 

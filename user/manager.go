@@ -117,7 +117,6 @@ const (
 			PRIMARY KEY (user_id, phone_number),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
-		CREATE UNIQUE INDEX idx_user_phone_number ON user_phone (phone_number);
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
 			version INT NOT NULL
@@ -420,7 +419,6 @@ const (
 			PRIMARY KEY (user_id, phone_number),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
-		CREATE UNIQUE INDEX idx_user_phone_number ON user_phone (phone_number);
 	`
 )
 
@@ -694,8 +692,8 @@ func (a *Manager) AddPhoneNumber(userID string, phoneNumber string) error {
 	return nil
 }
 
-// DeletePhoneNumber deletes a phone number from the user with the given user ID
-func (a *Manager) DeletePhoneNumber(userID string, phoneNumber string) error {
+// RemovePhoneNumber deletes a phone number from the user with the given user ID
+func (a *Manager) RemovePhoneNumber(userID string, phoneNumber string) error {
 	_, err := a.db.Exec(deletePhoneNumberQuery, userID, phoneNumber)
 	return err
 }

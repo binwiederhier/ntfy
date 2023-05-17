@@ -318,7 +318,7 @@ type apiAccountPhoneNumberVerifyRequest struct {
 
 type apiAccountPhoneNumberAddRequest struct {
 	Number string `json:"number"`
-	Code   string `json:"code,omitempty"`
+	Code   string `json:"code"` // Only set when adding a phone number
 }
 
 type apiAccountTier struct {

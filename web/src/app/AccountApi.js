@@ -2,13 +2,15 @@ import {
     accountBillingPortalUrl,
     accountBillingSubscriptionUrl,
     accountPasswordUrl,
+    accountPhoneUrl,
+    accountPhoneVerifyUrl,
     accountReservationSingleUrl,
     accountReservationUrl,
     accountSettingsUrl,
-    accountSubscriptionSingleUrl,
     accountSubscriptionUrl,
     accountTokenUrl,
-    accountUrl, maybeWithBearerAuth,
+    accountUrl,
+    maybeWithBearerAuth,
     tiersUrl,
     withBasicAuth,
     withBearerAuth
@@ -18,7 +20,7 @@ import subscriptionManager from "./SubscriptionManager";
 import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
-import {fetchOrThrow, throwAppError, UnauthorizedError} from "./errors";
+import {fetchOrThrow, UnauthorizedError} from "./errors";
 
 const delayMillis = 45000; // 45 seconds
 const intervalMillis = 900000; // 15 minutes
@@ -297,6 +299,44 @@ class AccountApi {
             headers: withBearerAuth({}, session.token())
         });
         return await response.json(); // May throw SyntaxError
+    }
+
+    async verifyPhoneNumber(phoneNumber, channel) {
+        const url = accountPhoneVerifyUrl(config.base_url);
+        console.log(`[AccountApi] Sending phone verification ${url}`);
+        await fetchOrThrow(url, {
+            method: "PUT",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber,
+                channel: channel
+            })
+        });
+    }
+
+    async addPhoneNumber(phoneNumber, code) {
+        const url = accountPhoneUrl(config.base_url);
+        console.log(`[AccountApi] Adding phone number with verification code ${url}`);
+        await fetchOrThrow(url, {
+            method: "PUT",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber,
+                code: code
+            })
+        });
+    }
+
+    async deletePhoneNumber(phoneNumber, code) {
+        const url = accountPhoneUrl(config.base_url);
+        console.log(`[AccountApi] Deleting phone number ${url}`);
+        await fetchOrThrow(url, {
+            method: "DELETE",
+            headers: withBearerAuth({}, session.token()),
+            body: JSON.stringify({
+                number: phoneNumber
+            })
+        });
     }
 
     async sync() {

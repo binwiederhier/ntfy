@@ -893,6 +893,44 @@ func TestManager_Tier_Change_And_Reset(t *testing.T) {
 	require.Nil(t, a.ResetTier("phil"))
 }
 
+func TestUser_PhoneNumberAddListRemove(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, a.AddPhoneNumber(phil.ID, "+1234567890"))
+
+	phoneNumbers, err := a.PhoneNumbers(phil.ID)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(phoneNumbers))
+	require.Equal(t, "+1234567890", phoneNumbers[0])
+
+	require.Nil(t, a.RemovePhoneNumber(phil.ID, "+1234567890"))
+	phoneNumbers, err = a.PhoneNumbers(phil.ID)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(phoneNumbers))
+
+	// Paranoia check: We do NOT want to keep phone numbers in there
+	rows, err := a.db.Query(`SELECT * FROM user_phone`)
+	require.Nil(t, err)
+	require.False(t, rows.Next())
+	require.Nil(t, rows.Close())
+}
+
+func TestUser_PhoneNumberAdd_Multiple_Users_Same_Number(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	ben, err := a.User("ben")
+	require.Nil(t, err)
+	require.Nil(t, a.AddPhoneNumber(phil.ID, "+1234567890"))
+	require.Nil(t, a.AddPhoneNumber(ben.ID, "+1234567890"))
+}
+
 func TestSqliteCache_Migration_From1(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "user.db")
 	db, err := sql.Open("sqlite3", filename)

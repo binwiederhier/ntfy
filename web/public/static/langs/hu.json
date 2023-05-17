@@ -84,7 +84,7 @@
     "subscribe_dialog_login_description": "Ez a téma jelszóval védett. Jelentkezz be a feliratkozáshoz.",
     "subscribe_dialog_login_username_label": "Felhasználónév, pl: jozsi",
     "subscribe_dialog_login_password_label": "Jelszó",
-    "subscribe_dialog_login_button_back": "Vissza",
+    "common_back": "Vissza",
     "subscribe_dialog_login_button_login": "Belépés",
     "subscribe_dialog_error_user_anonymous": "névtelen",
     "subscribe_dialog_error_user_not_authorized": "A(z) {{username}} felhasználónak nincs hozzáférése",

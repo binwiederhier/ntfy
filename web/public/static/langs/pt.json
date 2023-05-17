@@ -144,7 +144,7 @@
     "subscribe_dialog_login_description": "Esse tópico é protegido por palavra-passe. Por favor insira um nome de utilizador e palavra-passe para subscrever.",
     "subscribe_dialog_login_username_label": "Nome, por exemplo: \"filipe\"",
     "subscribe_dialog_login_password_label": "Palavra-passe",
-    "subscribe_dialog_login_button_back": "Voltar",
+    "common_back": "Voltar",
     "subscribe_dialog_login_button_login": "Autenticar",
     "subscribe_dialog_error_user_anonymous": "anónimo",
     "prefs_notifications_title": "Notificações",

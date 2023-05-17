@@ -151,6 +151,8 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 	require.Equal(t, int64(1004), account.Stats.MessagesRemaining)
 	require.Equal(t, int64(0), account.Stats.Emails)
 	require.Equal(t, int64(24), account.Stats.EmailsRemaining)
+	require.Equal(t, int64(0), account.Stats.Calls)
+	require.Equal(t, int64(0), account.Stats.CallsRemaining)
 
 	rr = request(t, s, "POST", "/mytopic", "", nil)
 	require.Equal(t, 200, rr.Code)
@@ -498,6 +500,8 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true
+	conf.EnableReservations = true
+	conf.TwilioAccount = "dummy"
 	s := newTestServer(t, conf)
 
 	// Create user
@@ -510,6 +514,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 		MessageLimit:             123,
 		MessageExpiryDuration:    86400 * time.Second,
 		EmailLimit:               32,
+		CallLimit:                10,
 		ReservationLimit:         2,
 		AttachmentFileSizeLimit:  1231231,
 		AttachmentTotalSizeLimit: 123123,
@@ -551,6 +556,7 @@ func TestAccount_Reservation_AddRemoveUserWithTierSuccess(t *testing.T) {
 	require.Equal(t, int64(123), account.Limits.Messages)
 	require.Equal(t, int64(86400), account.Limits.MessagesExpiryDuration)
 	require.Equal(t, int64(32), account.Limits.Emails)
+	require.Equal(t, int64(10), account.Limits.Calls)
 	require.Equal(t, int64(2), account.Limits.Reservations)
 	require.Equal(t, int64(1231231), account.Limits.AttachmentFileSize)
 	require.Equal(t, int64(123123), account.Limits.AttachmentTotalSize)

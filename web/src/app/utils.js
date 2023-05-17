@@ -27,6 +27,8 @@ export const accountReservationUrl = (baseUrl) => `${baseUrl}/v1/account/reserva
 export const accountReservationSingleUrl = (baseUrl, topic) => `${baseUrl}/v1/account/reservation/${topic}`;
 export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/billing/subscription`;
 export const accountBillingPortalUrl = (baseUrl) => `${baseUrl}/v1/account/billing/portal`;
+export const accountPhoneUrl = (baseUrl) => `${baseUrl}/v1/account/phone`;
+export const accountPhoneVerifyUrl = (baseUrl) => `${baseUrl}/v1/account/phone/verify`;
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
@@ -206,10 +208,12 @@ export const formatBytes = (bytes, decimals = 2) => {
 }
 
 export const formatNumber = (n) => {
-    if (n % 1000 === 0) {
+    if (n === 0) {
+        return n;
+    } else if (n % 1000 === 0) {
         return `${n/1000}k`;
     }
-    return n;
+    return n.toLocaleString();
 }
 
 export const formatPrice = (n) => {

@@ -90,6 +90,8 @@ var (
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
+	apiAccountPhonePath                                  = "/v1/account/phone"
+	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -100,6 +102,7 @@ var (
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
+	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
 
 	//go:embed site
 	webFs       embed.FS
@@ -461,6 +464,12 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhoneVerifyPath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberVerify)))(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
@@ -540,6 +549,8 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
+		EnableCalls:        s.config.TwilioAccount != "",
+		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
 		BillingContact:     s.config.BillingContact,
 		DisallowedTopics:   s.config.DisallowedTopics,
@@ -683,7 +694,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, e := s.parsePublishParams(r, m)
+	cache, firebase, email, call, unifiedpush, e := s.parsePublishParams(r, m)
 	if e != nil {
 		return nil, e.With(t)
 	}
@@ -697,6 +708,14 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
+	} else if call != "" {
+		var httpErr *errHTTP
+		call, httpErr = s.convertPhoneNumber(v.User(), call)
+		if httpErr != nil {
+			return nil, httpErr.With(t)
+		} else if !vrate.CallAllowed() {
+			return nil, errHTTPTooManyRequestsLimitCalls.With(t)
+		}
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
@@ -721,6 +740,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
 			"message_email":       email,
+			"message_call":        call,
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
@@ -736,6 +756,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		}
 		if s.smtpSender != nil && email != "" {
 			go s.sendEmail(v, m, email)
+		}
+		if s.config.TwilioAccount != "" && call != "" {
+			go s.callPhone(v, r, m, call)
 		}
 		if s.config.UpstreamBaseURL != "" {
 			go s.forwardPollRequest(v, m)
@@ -846,7 +869,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err *errHTTP) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, call string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = maybeDecodeHeader(readParam(r, "x-title", "title", "t"))
@@ -862,7 +885,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if attach != "" {
 		if !urlRegex.MatchString(attach) {
-			return false, false, "", false, errHTTPBadRequestAttachmentURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
 		if m.Attachment.Name == "" {
@@ -880,13 +903,19 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if icon != "" {
 		if !urlRegex.MatchString(icon) {
-			return false, false, "", false, errHTTPBadRequestIconURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestIconURLInvalid
 		}
 		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if s.smtpSender == nil && email != "" {
-		return false, false, "", false, errHTTPBadRequestEmailDisabled
+		return false, false, "", "", false, errHTTPBadRequestEmailDisabled
+	}
+	call = readParam(r, "x-call", "call")
+	if call != "" && (s.config.TwilioAccount == "" || s.userManager == nil) {
+		return false, false, "", "", false, errHTTPBadRequestPhoneCallsDisabled
+	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
+		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
@@ -895,7 +924,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	var e error
 	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if e != nil {
-		return false, false, "", false, errHTTPBadRequestPriorityInvalid
+		return false, false, "", "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	for i, t := range m.Tags {
@@ -904,18 +933,21 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, "", false, errHTTPBadRequestDelayNoCache
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCache
 		}
 		if email != "" {
-			return false, false, "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+			return false, false, "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+		}
+		if call != "" {
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, "", false, errHTTPBadRequestDelayCannotParse
+			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooSmall
+			return false, false, "", "", false, errHTTPBadRequestDelayTooSmall
 		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooLarge
+			return false, false, "", "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
 	}
@@ -923,7 +955,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -937,7 +969,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		cache = false
 		email = ""
 	}
-	return cache, firebase, email, unifiedpush, nil
+	return cache, firebase, email, call, unifiedpush, nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.

@@ -1190,7 +1190,20 @@ func TestServer_PublishDelayedEmail_Fail(t *testing.T) {
 		"E-Mail": "test@example.com",
 		"Delay":  "20 min",
 	})
-	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40003, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_PublishDelayedCall_Fail(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.TwilioAccount = "AC1234567890"
+	c.TwilioAuthToken = "AAEAA1234567890"
+	c.TwilioFromNumber = "+1234567890"
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", "fail", map[string]string{
+		"Call":  "yes",
+		"Delay": "20 min",
+	})
+	require.Equal(t, 40037, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {

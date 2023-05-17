@@ -18,6 +18,14 @@ func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
 	if value == "" {
 		return defaultValue
 	}
+	return toBool(value)
+}
+
+func isBoolValue(value string) bool {
+	return value == "1" || value == "yes" || value == "true" || value == "0" || value == "no" || value == "false"
+}
+
+func toBool(value string) bool {
 	return value == "1" || value == "yes" || value == "true"
 }
 

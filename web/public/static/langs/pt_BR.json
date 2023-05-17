@@ -93,7 +93,7 @@
     "prefs_notifications_min_priority_low_and_higher": "Baixa prioridade e acima",
     "prefs_notifications_min_priority_default_and_higher": "Prioridade padrão e acima",
     "subscribe_dialog_login_password_label": "Senha",
-    "subscribe_dialog_login_button_back": "Voltar",
+    "common_back": "Voltar",
     "prefs_notifications_min_priority_high_and_higher": "Alta prioridade e acima",
     "prefs_notifications_min_priority_max_only": "Apenas prioridade máxima",
     "prefs_notifications_delete_after_title": "Apagar notificações",

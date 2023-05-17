@@ -311,6 +311,16 @@ type apiAccountTokenResponse struct {
 	Expires    int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
+type apiAccountPhoneNumberVerifyRequest struct {
+	Number  string `json:"number"`
+	Channel string `json:"channel"`
+}
+
+type apiAccountPhoneNumberAddRequest struct {
+	Number string `json:"number"`
+	Code   string `json:"code"` // Only set when adding a phone number
+}
+
 type apiAccountTier struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
@@ -321,6 +331,7 @@ type apiAccountLimits struct {
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
+	Calls                    int64  `json:"calls"`
 	Reservations             int64  `json:"reservations"`
 	AttachmentTotalSize      int64  `json:"attachment_total_size"`
 	AttachmentFileSize       int64  `json:"attachment_file_size"`
@@ -333,6 +344,8 @@ type apiAccountStats struct {
 	MessagesRemaining            int64 `json:"messages_remaining"`
 	Emails                       int64 `json:"emails"`
 	EmailsRemaining              int64 `json:"emails_remaining"`
+	Calls                        int64 `json:"calls"`
+	CallsRemaining               int64 `json:"calls_remaining"`
 	Reservations                 int64 `json:"reservations"`
 	ReservationsRemaining        int64 `json:"reservations_remaining"`
 	AttachmentTotalSize          int64 `json:"attachment_total_size"`
@@ -362,6 +375,7 @@ type apiAccountResponse struct {
 	Subscriptions []*user.Subscription       `json:"subscriptions,omitempty"`
 	Reservations  []*apiAccountReservation   `json:"reservations,omitempty"`
 	Tokens        []*apiAccountTokenResponse `json:"tokens,omitempty"`
+	PhoneNumbers  []string                   `json:"phone_numbers,omitempty"`
 	Tier          *apiAccountTier            `json:"tier,omitempty"`
 	Limits        *apiAccountLimits          `json:"limits,omitempty"`
 	Stats         *apiAccountStats           `json:"stats,omitempty"`
@@ -379,6 +393,8 @@ type apiConfigResponse struct {
 	EnableLogin        bool     `json:"enable_login"`
 	EnableSignup       bool     `json:"enable_signup"`
 	EnablePayments     bool     `json:"enable_payments"`
+	EnableCalls        bool     `json:"enable_calls"`
+	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
 	BillingContact     string   `json:"billing_contact"`
 	DisallowedTopics   []string `json:"disallowed_topics"`

@@ -178,7 +178,7 @@
     "prefs_notifications_sound_play": "Riproduci il suono selezionato",
     "prefs_notifications_min_priority_title": "Priorità minima",
     "subscribe_dialog_login_description": "Questo argomento è protetto da password. Per favore inserisci username e password per iscriverti.",
-    "subscribe_dialog_login_button_back": "Indietro",
+    "common_back": "Indietro",
     "subscribe_dialog_error_user_not_authorized": "Utente {{username}} non autorizzato",
     "prefs_notifications_title": "Notifiche",
     "prefs_notifications_delete_after_title": "Elimina le notifiche",

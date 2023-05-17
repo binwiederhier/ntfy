@@ -56,6 +56,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			Messages:                 limits.MessageLimit,
 			MessagesExpiryDuration:   int64(limits.MessageExpiryDuration.Seconds()),
 			Emails:                   limits.EmailLimit,
+			Calls:                    limits.CallLimit,
 			Reservations:             limits.ReservationsLimit,
 			AttachmentTotalSize:      limits.AttachmentTotalSizeLimit,
 			AttachmentFileSize:       limits.AttachmentFileSizeLimit,
@@ -67,6 +68,8 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			MessagesRemaining:            stats.MessagesRemaining,
 			Emails:                       stats.Emails,
 			EmailsRemaining:              stats.EmailsRemaining,
+			Calls:                        stats.Calls,
+			CallsRemaining:               stats.CallsRemaining,
 			Reservations:                 stats.Reservations,
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
@@ -105,17 +108,19 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				CancelAt:     u.Billing.StripeSubscriptionCancelAt.Unix(),
 			}
 		}
-		reservations, err := s.userManager.Reservations(u.Name)
-		if err != nil {
-			return err
-		}
-		if len(reservations) > 0 {
-			response.Reservations = make([]*apiAccountReservation, 0)
-			for _, r := range reservations {
-				response.Reservations = append(response.Reservations, &apiAccountReservation{
-					Topic:    r.Topic,
-					Everyone: r.Everyone.String(),
-				})
+		if s.config.EnableReservations {
+			reservations, err := s.userManager.Reservations(u.Name)
+			if err != nil {
+				return err
+			}
+			if len(reservations) > 0 {
+				response.Reservations = make([]*apiAccountReservation, 0)
+				for _, r := range reservations {
+					response.Reservations = append(response.Reservations, &apiAccountReservation{
+						Topic:    r.Topic,
+						Everyone: r.Everyone.String(),
+					})
+				}
 			}
 		}
 		tokens, err := s.userManager.Tokens(u.ID)
@@ -136,6 +141,15 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 					LastOrigin: lastOrigin,
 					Expires:    t.Expires.Unix(),
 				})
+			}
+		}
+		if s.config.TwilioAccount != "" {
+			phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+			if err != nil {
+				return err
+			}
+			if len(phoneNumbers) > 0 {
+				response.PhoneNumbers = phoneNumbers
 			}
 		}
 	} else {
@@ -509,6 +523,72 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 	}
 	go s.pruneMessages()
 	return nil
+}
+
+func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberVerifyRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	} else if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	} else if req.Channel != "sms" && req.Channel != "call" {
+		return errHTTPBadRequestPhoneNumberVerifyChannelInvalid
+	}
+	// Check user is allowed to add phone numbers
+	if u == nil || (u.IsUser() && u.Tier == nil) {
+		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier.CallLimit == 0 {
+		return errHTTPUnauthorized
+	}
+	// Check if phone number exists
+	phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+	if err != nil {
+		return err
+	} else if util.Contains(phoneNumbers, req.Number) {
+		return errHTTPConflictPhoneNumberExists
+	}
+	// Actually add the unverified number, and send verification
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Sending phone number verification")
+	if err := s.verifyPhoneNumber(v, r, req.Number, req.Channel); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	if err := s.verifyPhoneNumberCheck(v, r, req.Number, req.Code); err != nil {
+		return err
+	}
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Adding phone number as verified")
+	if err := s.userManager.AddPhoneNumber(u.ID, req.Number); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !phoneNumberRegex.MatchString(req.Number) {
+		return errHTTPBadRequestPhoneNumberInvalid
+	}
+	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Deleting phone number")
+	if err := s.userManager.RemovePhoneNumber(u.ID, req.Number); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
 }
 
 // publishSyncEventAsync kicks of a Go routine to publish a sync message to the user's sync topic

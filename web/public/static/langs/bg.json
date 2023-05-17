@@ -104,7 +104,7 @@
     "subscribe_dialog_subscribe_topic_placeholder": "Име на темата, напр. phils_alerts",
     "subscribe_dialog_subscribe_use_another_label": "Използване на друг сървър",
     "subscribe_dialog_login_username_label": "Потребител, напр. phil",
-    "subscribe_dialog_login_button_back": "Назад",
+    "common_back": "Назад",
     "subscribe_dialog_subscribe_button_cancel": "Отказ",
     "subscribe_dialog_login_description": "Темата е защитена. За да се абонирате въведете потребител и парола.",
     "subscribe_dialog_subscribe_button_subscribe": "Абониране",

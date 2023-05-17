@@ -910,6 +910,12 @@ func TestUser_PhoneNumberAddListRemove(t *testing.T) {
 	phoneNumbers, err = a.PhoneNumbers(phil.ID)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(phoneNumbers))
+
+	// Paranoia check: We do NOT want to keep phone numbers in there
+	rows, err := a.db.Query(`SELECT * FROM user_phone`)
+	require.Nil(t, err)
+	require.False(t, rows.Next())
+	require.Nil(t, rows.Close())
 }
 
 func TestUser_PhoneNumberAdd_Multiple_Users_Same_Number(t *testing.T) {

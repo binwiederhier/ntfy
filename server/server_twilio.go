@@ -58,6 +58,8 @@ func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, *
 	return "", errHTTPBadRequestPhoneNumberNotVerified
 }
 
+// callPhone calls the Twilio API to make a phone call to the given phone number, using the given message.
+// Failures will be logged, but not returned to the caller.
 func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	u, sender := v.User(), m.Sender.String()
 	if u != nil {

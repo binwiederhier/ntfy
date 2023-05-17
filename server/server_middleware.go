@@ -87,7 +87,7 @@ func (s *Server) ensureAdmin(next handleFunc) handleFunc {
 
 func (s *Server) ensureCallsEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if s.config.TwilioAccount == "" {
+		if s.config.TwilioAccount == "" || s.userManager == nil {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)

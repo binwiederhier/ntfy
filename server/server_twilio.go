@@ -18,13 +18,14 @@ const (
 <Response>
 	<Pause length="1"/>
 	<Say loop="3">
-		You have a notification from notify on topic %s. Message:
+		You have a message from notify on topic %s. Message:
 		<break time="1s"/>
 		%s
 		<break time="1s"/>
-		End message.
+		End of message.
 		<break time="1s"/>
-		This message was sent by user %s. It will be repeated up to three times.
+		This message was sent by user %s. It will be repeated three times.
+		To unsubscribe from calls like this, remove your phone number in the notify web app.
 		<break time="3s"/>
 	</Say>
 	<Say>Goodbye.</Say>
@@ -97,11 +98,11 @@ func (s *Server) callPhoneInternal(data url.Values) (string, error) {
 	return string(response), nil
 }
 
-func (s *Server) verifyPhoneNumber(v *visitor, r *http.Request, phoneNumber string) error {
-	ev := logvr(v, r).Tag(tagTwilio).Field("twilio_to", phoneNumber).Debug("Sending phone verification")
+func (s *Server) verifyPhoneNumber(v *visitor, r *http.Request, phoneNumber, channel string) error {
+	ev := logvr(v, r).Tag(tagTwilio).Field("twilio_to", phoneNumber).Field("twilio_channel", channel).Debug("Sending phone verification")
 	data := url.Values{}
 	data.Set("To", phoneNumber)
-	data.Set("Channel", "sms")
+	data.Set("Channel", channel)
 	requestURL := fmt.Sprintf("%s/v2/Services/%s/Verifications", s.config.TwilioVerifyBaseURL, s.config.TwilioVerifyService)
 	req, err := http.NewRequest(http.MethodPost, requestURL, strings.NewReader(data.Encode()))
 	if err != nil {

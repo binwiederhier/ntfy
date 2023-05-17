@@ -311,9 +311,14 @@ type apiAccountTokenResponse struct {
 	Expires    int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
-type apiAccountPhoneNumberRequest struct {
+type apiAccountPhoneNumberVerifyRequest struct {
+	Number  string `json:"number"`
+	Channel string `json:"channel"`
+}
+
+type apiAccountPhoneNumberAddRequest struct {
 	Number string `json:"number"`
-	Code   string `json:"code,omitempty"` // Only supplied in "verify" call
+	Code   string `json:"code,omitempty"`
 }
 
 type apiAccountTier struct {

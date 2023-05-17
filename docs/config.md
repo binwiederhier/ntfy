@@ -868,8 +868,8 @@ are the easiest), and then configure the following options:
 * `twilio-from-number` is the outgoing phone number you purchased, e.g. +18775132586 
 * `twilio-verify-service` is the Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586
 
-After you have configured phone calls, create a [tier](#tiers) with a call limit, and then assign it to a user.
-Users may then use the `X-Call` header to receive a phone call when publishing a message.
+After you have configured phone calls, create a [tier](#tiers) with a call limit (e.g. `ntfy tier create --call-limit=10 ...`),
+and then assign it to a user. Users may then use the `X-Call` header to receive a phone call when publishing a message.
 
 ## Rate limiting
 !!! info

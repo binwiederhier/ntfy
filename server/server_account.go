@@ -523,12 +523,13 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 
 func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberVerifyRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
-	}
-	if !phoneNumberRegex.MatchString(req.Number) {
+	} else if !phoneNumberRegex.MatchString(req.Number) {
 		return errHTTPBadRequestPhoneNumberInvalid
+	} else if req.Channel != "sms" && req.Channel != "call" {
+		return errHTTPBadRequestPhoneNumberVerifyChannelInvalid
 	}
 	// Check user is allowed to add phone numbers
 	if u == nil || (u.IsUser() && u.Tier == nil) {
@@ -545,7 +546,7 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 	}
 	// Actually add the unverified number, and send verification
 	logvr(v, r).Tag(tagAccount).Field("phone_number", req.Number).Debug("Sending phone number verification")
-	if err := s.verifyPhoneNumber(v, r, req.Number); err != nil {
+	if err := s.verifyPhoneNumber(v, r, req.Number, req.Channel); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -553,7 +554,7 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 
 func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -572,7 +573,7 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}

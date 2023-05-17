@@ -1,13 +1,13 @@
 import * as React from 'react';
 import {useContext, useState} from 'react';
 import {
-    Alert,
+    Alert, ButtonGroup,
     CardActions,
     CardContent, Chip,
-    FormControl,
+    FormControl, FormControlLabel, InputLabel,
     LinearProgress,
     Link,
-    Portal,
+    Portal, Radio, RadioGroup,
     Select,
     Snackbar,
     Stack,
@@ -47,12 +47,14 @@ import {AccountContext} from "./App";
 import DialogFooter from "./DialogFooter";
 import {Paragraph} from "./styles";
 import CloseIcon from "@mui/icons-material/Close";
-import {ContentCopy, Public} from "@mui/icons-material";
+import {Check, ContentCopy, DeleteForever, Public} from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import DialogContentText from "@mui/material/DialogContentText";
 import {IncorrectPasswordError, UnauthorizedError} from "../app/errors";
 import {ProChip} from "./SubscriptionPopup";
 import AddIcon from "@mui/icons-material/Add";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 
 const Account = () => {
     if (!session.exists()) {
@@ -408,6 +410,7 @@ const AddPhoneNumberDialog = (props) => {
     const { t } = useTranslation();
     const [error, setError] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
+    const [channel, setChannel] = useState("sms");
     const [code, setCode] = useState("");
     const [sending, setSending] = useState(false);
     const [verificationCodeSent, setVerificationCodeSent] = useState(false);
@@ -432,7 +435,7 @@ const AddPhoneNumberDialog = (props) => {
     const verifyPhone = async () => {
         try {
             setSending(true);
-            await accountApi.verifyPhoneNumber(phoneNumber);
+            await accountApi.verifyPhoneNumber(phoneNumber, channel);
             setVerificationCodeSent(true);
         } catch (e) {
             console.log(`[Account] Error sending verification`, e);
@@ -471,18 +474,26 @@ const AddPhoneNumberDialog = (props) => {
                     {t("account_basics_phone_numbers_dialog_description")}
                 </DialogContentText>
                 {!verificationCodeSent &&
-                    <TextField
-                        margin="dense"
-                        label={t("account_basics_phone_numbers_dialog_number_label")}
-                        aria-label={t("account_basics_phone_numbers_dialog_number_label")}
-                        placeholder={t("account_basics_phone_numbers_dialog_number_placeholder")}
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={ev => setPhoneNumber(ev.target.value)}
-                        fullWidth
-                        inputProps={{ inputMode: 'tel', pattern: '\+[0-9]*' }}
-                        variant="standard"
-                    />
+                    <div style={{display: "flex"}}>
+                        <TextField
+                            margin="dense"
+                            label={t("account_basics_phone_numbers_dialog_number_label")}
+                            aria-label={t("account_basics_phone_numbers_dialog_number_label")}
+                            placeholder={t("account_basics_phone_numbers_dialog_number_placeholder")}
+                            type="tel"
+                            value={phoneNumber}
+                            onChange={ev => setPhoneNumber(ev.target.value)}
+                            inputProps={{ inputMode: 'tel', pattern: '\+[0-9]*' }}
+                            variant="standard"
+                            sx={{ flexGrow: 1 }}
+                        />
+                        <FormControl sx={{ flexWrap: "nowrap" }}>
+                            <RadioGroup row sx={{ flexGrow: 1, marginTop: "8px", marginLeft: "5px" }}>
+                                <FormControlLabel value="sms" control={<Radio checked={channel === "sms"} onChange={(e) => setChannel(e.target.value)} />} label={t("account_basics_phone_numbers_dialog_channel_sms")} />
+                                <FormControlLabel value="call" control={<Radio checked={channel === "call"} onChange={(e) => setChannel(e.target.value)} />} label={t("account_basics_phone_numbers_dialog_channel_call")} sx={{ marginRight: 0 }} />
+                            </RadioGroup>
+                        </FormControl>
+                    </div>
                 }
                 {verificationCodeSent &&
                     <TextField
@@ -502,7 +513,9 @@ const AddPhoneNumberDialog = (props) => {
             <DialogFooter status={error}>
                 <Button onClick={handleCancel}>{verificationCodeSent ? t("common_back") : t("common_cancel")}</Button>
                 <Button onClick={handleDialogSubmit} disabled={sending || !/^\+\d+$/.test(phoneNumber)}>
-                    {verificationCodeSent ?t("account_basics_phone_numbers_dialog_check_verification_button")  : t("account_basics_phone_numbers_dialog_send_verification_button")}
+                    {!verificationCodeSent && channel === "sms" && t("account_basics_phone_numbers_dialog_verify_button_sms")}
+                    {!verificationCodeSent && channel === "call" && t("account_basics_phone_numbers_dialog_verify_button_call")}
+                    {verificationCodeSent && t("account_basics_phone_numbers_dialog_check_verification_button")}
                 </Button>
             </DialogFooter>
         </Dialog>

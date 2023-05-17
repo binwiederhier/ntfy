@@ -299,14 +299,15 @@ class AccountApi {
         return await response.json(); // May throw SyntaxError
     }
 
-    async verifyPhoneNumber(phoneNumber) {
+    async verifyPhoneNumber(phoneNumber, channel) {
         const url = accountPhoneVerifyUrl(config.base_url);
         console.log(`[AccountApi] Sending phone verification ${url}`);
         await fetchOrThrow(url, {
             method: "PUT",
             headers: withBearerAuth({}, session.token()),
             body: JSON.stringify({
-                number: phoneNumber
+                number: phoneNumber,
+                channel: channel
             })
         });
     }

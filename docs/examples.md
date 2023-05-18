@@ -16,7 +16,7 @@ I started adding notifications pretty much all of my scripts. Typically, I just 
 directly to the command I'm running. The following example will either send <i>Laptop backup succeeded</i>
 or ⚠️ <i>Laptop backup failed</i> directly to my phone:
 
-```
+``` bash
 rsync -a root@laptop /backups/laptop \
   && zfs snapshot ... \
   && curl -H prio:low -d "Laptop backup succeeded" ntfy.sh/backups \
@@ -26,7 +26,7 @@ rsync -a root@laptop /backups/laptop \
 Here's one for the history books. I desperately want the `github.com/ntfy` organization, but all my tickets with
 GitHub have been hopeless. In case it ever becomes available, I want to know immediately.
 
-``` cron
+```
 # Check github/ntfy user
 */6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
 ```
@@ -155,8 +155,13 @@ shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUp
 ```
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd
-It's possible to use custom scripts for all the *arr services, plus SABnzbd. Notifications for downloads, warnings, grabs etc.
-Some simple bash scripts to achieve this are kindly provided in [nickexyz's repository](https://github.com/nickexyz/ntfy-shellscripts). 
+
+<!-- Sonarr v4 is in beta as of May 2023, should be updated to remove v3 reference when stable -->
+
+Radarr, Prowlarr, and Sonarr v4 support ntfy natively under Settings > Connect.
+
+Sonarr v3, Readarr, and SABnzbd support custom scripts for downloads, warnings, grabs, etc.
+Some simple bash scripts to achieve this are kindly provided in [nickexyz's ntfy-shellscripts repository](https://github.com/nickexyz/ntfy-shellscripts).
 
 ## Node-RED
 You can use the HTTP request node to send messages with [Node-RED](https://nodered.org), some examples:

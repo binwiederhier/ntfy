@@ -136,22 +136,23 @@ You can send a message during a workflow run with curl. Here is an example sendi
 ```
 
 ## Watchtower (shoutrrr)
-You can use [shoutrrr](https://github.com/containrrr/shoutrrr) generic webhook support to send 
+You can use [shoutrrr](https://containrrr.dev/shoutrrr/latest/services/ntfy/) to send 
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
 
 Example docker-compose.yml:
+
 ``` yaml
 services:
   watchtower:
     image: containrrr/watchtower
     environment:
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
-      - WATCHTOWER_NOTIFICATION_URL=generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
+      - WATCHTOWER_NOTIFICATION_URL=ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
 ```
 
 Or, if you only want to send notifications using shoutrrr:
 ```
-shoutrrr send -u "generic+https://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
+shoutrrr send -u "ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
 ```
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd

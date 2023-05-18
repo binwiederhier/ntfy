@@ -87,8 +87,9 @@ func (s *Server) callPhoneInternal(data url.Values) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
+	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
@@ -110,8 +111,9 @@ func (s *Server) verifyPhoneNumber(v *visitor, r *http.Request, phoneNumber, cha
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
+	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -135,8 +137,9 @@ func (s *Server) verifyPhoneNumberCheck(v *visitor, r *http.Request, phoneNumber
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
+	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

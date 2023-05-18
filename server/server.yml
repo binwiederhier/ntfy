@@ -208,7 +208,12 @@
 # the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
 # This is to prevent the upstream server and Firebase/APNS from being able to read the message.
 #
+# - upstream-base-url is the base URL of the upstream server. Should be "https://ntfy.sh".
+# - upstream-access-token is the token used to authenticate with the upstream server. This is only required
+#   if you exceed the upstream rate limits, or the uptream server requires authentication.
+#
 # upstream-base-url:
+# upstream-access-token:
 
 # Rate limiting: Total number of topics before the server rejects new topics.
 #

@@ -2,6 +2,32 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy server v2.5.0
+Released May 18, 2023
+
+This release brings a number of new features, including support for text-to-speech style [phone calls](publish.md#phone-calls), 
+an admin API to manage users and ACL (currently in beta, and hence undocumented), and support for authorized access to 
+upstream servers via the `upstream-access-token` config option.
+
+❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app) (20% off
+if you use promo code `MYTOPIC`). ntfy will always remain open source.
+
+**Features:**
+
+* Support for text-to-speech style [phone calls](publish.md#phone-calls) using the `X-Call` header (no ticket)
+* Admin API to manage users and ACL, `v1/users` + `v1/users/access` (intentionally undocumented as of now, [#722](https://github.com/binwiederhier/ntfy/issues/722), thanks to [@CreativeWarlock](https://github.com/CreativeWarlock) for sponsoring this ticket)
+* Added `upstream-access-token` config option to allow authorized access to upstream servers (no ticket)
+
+**Bug fixes + maintenance:**
+
+* Removed old ntfy website from ntfy entirely (no ticket)
+* Make emoji lookup for emails more efficient ([#725](https://github.com/binwiederhier/ntfy/pull/725), thanks to [@adamantike](https://github.com/adamantike))
+* Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
+* Support for `quoted-printable` in incoming emails ([#719](https://github.com/binwiederhier/ntfy/pull/719), thanks to [@Aerion](https://github.com/Aerion))
+* Attachments with filenames that are downloaded using a browser will now download with the proper filename ([#726](https://github.com/binwiederhier/ntfy/issues/726), thanks to [@un99known99](https://github.com/un99known99) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
+* Fix web app i18n issue in account preferences ([#730](https://github.com/binwiederhier/ntfy/issues/730), thanks to [@codebude](https://github.com/codebude) for reporting)
+
 ### ntfy server v2.4.0
 Released Apr 26, 2023
 
@@ -1177,22 +1203,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.5.0 (UNRELEASED)
-
-**Features:**
-
-* Support for text-to-speech style [phone calls](publish.md#phone-calls) using the `X-Call` header (no ticket)
-* Admin API to manage users and ACL, `v1/users` + `v1/users/access` ([#722](https://github.com/binwiederhier/ntfy/issues/722), thanks to [@CreativeWarlock](https://github.com/CreativeWarlock) for sponsoring this ticket)
-
-**Bug fixes + maintenance:**
-
-* Removed old ntfy website from ntfy entirely (no ticket)
-* Make emoji lookup for emails more efficient ([#725](https://github.com/binwiederhier/ntfy/pull/725), thanks to [@adamantike](https://github.com/adamantike))
-* Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
-* Support for `quoted-printable` in incoming emails ([#719](https://github.com/binwiederhier/ntfy/pull/719), thanks to [@Aerion](https://github.com/Aerion))
-* Attachments with filenames that are downloaded using a browser will now download with the proper filename ([#726](https://github.com/binwiederhier/ntfy/issues/726), thanks to [@un99known99](https://github.com/un99known99) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
-* Fix web app i18n issue in account preferences ([#730](https://github.com/binwiederhier/ntfy/issues/730), thanks to [@codebude](https://github.com/codebude) for reporting)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

@@ -855,7 +855,11 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	}
+	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
 	req.Header.Set("X-Poll-ID", m.ID)
+	if s.config.UpstreamAccessToken != "" {
+		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
+	}
 	var httpClient = &http.Client{
 		Timeout: time.Second * 10,
 	}

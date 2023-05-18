@@ -98,6 +98,7 @@ type Config struct {
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
+	UpstreamAccessToken                  string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string
@@ -182,6 +183,7 @@ func NewConfig() *Config {
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
 		FirebaseQuotaExceededPenaltyDuration: DefaultFirebaseQuotaExceededPenaltyDuration,
 		UpstreamBaseURL:                      "",
+		UpstreamAccessToken:                  "",
 		SMTPSenderAddr:                       "",
 		SMTPSenderUser:                       "",
 		SMTPSenderPass:                       "",

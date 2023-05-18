@@ -18,6 +18,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2491,6 +2492,66 @@ func TestServer_PublishWithUTF8MimeHeader(t *testing.T) {
 	require.Equal(t, "ntfy 很棒", m.Tags[1])
 }
 
+func TestServer_UpstreamBaseURL_Success(t *testing.T) {
+	var pollID atomic.Pointer[string]
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/87c9cddf7b0105f5fe849bf084c6e600be0fde99be3223335199b4965bd7b735", r.URL.Path)
+		require.Equal(t, "", string(body))
+		require.NotEmpty(t, r.Header.Get("X-Poll-ID"))
+		pollID.Store(util.String(r.Header.Get("X-Poll-ID")))
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	s := newTestServer(t, c)
+
+	// Send message, and wait for upstream server to receive it
+	response := request(t, s, "PUT", "/mytopic", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+	waitFor(t, func() bool {
+		pID := pollID.Load()
+		return pID != nil && *pID == m.ID
+	})
+}
+
+func TestServer_UpstreamBaseURL_With_Access_Token_Success(t *testing.T) {
+	var pollID atomic.Pointer[string]
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/a1c72bcb4daf5af54d13ef86aea8f76c11e8b88320d55f1811d5d7b173bcc1df", r.URL.Path)
+		require.Equal(t, "Bearer tk_1234567890", r.Header.Get("Authorization"))
+		require.Equal(t, "", string(body))
+		require.NotEmpty(t, r.Header.Get("X-Poll-ID"))
+		pollID.Store(util.String(r.Header.Get("X-Poll-ID")))
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	c.UpstreamAccessToken = "tk_1234567890"
+	s := newTestServer(t, c)
+
+	// Send message, and wait for upstream server to receive it
+	response := request(t, s, "PUT", "/mytopic1", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+	waitFor(t, func() bool {
+		pID := pollID.Load()
+		return pID != nil && *pID == m.ID
+	})
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
@@ -2592,7 +2653,7 @@ func waitForWithMaxWait(t *testing.T, maxWait time.Duration, f func() bool) {
 		if f() {
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("Function f did not succeed after %v: %v", maxWait, string(debug.Stack()))
 }

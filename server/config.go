@@ -108,7 +108,7 @@ type Config struct {
 	SMTPServerAddrPrefix                 string
 	TwilioAccount                        string
 	TwilioAuthToken                      string
-	TwilioFromNumber                     string
+	TwilioPhoneNumber                    string
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
 	TwilioVerifyService                  string
@@ -194,7 +194,7 @@ func NewConfig() *Config {
 		TwilioCallsBaseURL:                   "https://api.twilio.com", // Override for tests
 		TwilioAccount:                        "",
 		TwilioAuthToken:                      "",
-		TwilioFromNumber:                     "",
+		TwilioPhoneNumber:                    "",
 		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
 		TwilioVerifyService:                  "",
 		MessageLimit:                         DefaultMessageLengthLimit,

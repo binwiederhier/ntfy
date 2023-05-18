@@ -53,7 +53,7 @@ func TestServer_Twilio_Call_Add_Verify_Call_Delete_Success(t *testing.T) {
 	c.TwilioCallsBaseURL = twilioCallsServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	c.TwilioVerifyService = "VA1234567890"
 	s := newTestServer(t, c)
 
@@ -131,7 +131,7 @@ func TestServer_Twilio_Call_Success(t *testing.T) {
 	c.TwilioCallsBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	// Add tier and user
@@ -176,7 +176,7 @@ func TestServer_Twilio_Call_Success_With_Yes(t *testing.T) {
 	c.TwilioCallsBaseURL = twilioServer.URL
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	// Add tier and user
@@ -207,7 +207,7 @@ func TestServer_Twilio_Call_UnverifiedNumber(t *testing.T) {
 	c.TwilioCallsBaseURL = "http://dummy.invalid"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	// Add tier and user
@@ -232,7 +232,7 @@ func TestServer_Twilio_Call_InvalidNumber(t *testing.T) {
 	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
@@ -246,7 +246,7 @@ func TestServer_Twilio_Call_Anonymous(t *testing.T) {
 	c.TwilioCallsBaseURL = "https://127.0.0.1"
 	c.TwilioAccount = "AC1234567890"
 	c.TwilioAuthToken = "AAEAA1234567890"
-	c.TwilioFromNumber = "+1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
 	s := newTestServer(t, c)
 
 	response := request(t, s, "POST", "/mytopic", "test", map[string]string{

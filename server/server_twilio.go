@@ -67,7 +67,7 @@ func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	}
 	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(sender))
 	data := url.Values{}
-	data.Set("From", s.config.TwilioFromNumber)
+	data.Set("From", s.config.TwilioPhoneNumber)
 	data.Set("To", to)
 	data.Set("Twiml", body)
 	ev := logvrm(v, r, m).Tag(tagTwilio).Field("twilio_to", to).FieldIf("twilio_body", body, log.TraceLevel).Debug("Sending Twilio request")

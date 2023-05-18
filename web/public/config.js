@@ -6,11 +6,11 @@
 // During web development, you may change values here for rapid testing.
 
 var config = {
-    base_url: window.location.origin, // Change to test against a different server
+    base_url: "http://127.0.0.1:2586", //window.location.origin, // Change to test against a different server
     app_root: "/app",
     enable_login: true,
     enable_signup: true,
-    enable_payments: true,
+    enable_payments: false,
     enable_reservations: true,
     enable_emails: true,
     enable_calls: true,

@@ -1,7 +1,17 @@
 import * as React from 'react';
-import {useEffect, useRef, useState} from 'react';
+import {useContext, useEffect, useRef, useState} from 'react';
 import theme from "./theme";
-import {Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, useMediaQuery} from "@mui/material";
+import {
+    Checkbox,
+    Chip,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    Link,
+    Select,
+    Tooltip,
+    useMediaQuery
+} from "@mui/material";
 import TextField from "@mui/material/TextField";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
@@ -29,9 +39,11 @@ import session from "../app/Session";
 import routes from "./routes";
 import accountApi from "../app/AccountApi";
 import {UnauthorizedError} from "../app/errors";
+import {AccountContext} from "./App";
 
 const PublishDialog = (props) => {
     const { t } = useTranslation();
+    const { account } = useContext(AccountContext);
     const [baseUrl, setBaseUrl] = useState("");
     const [topic, setTopic] = useState("");
     const [message, setMessage] = useState("");
@@ -416,20 +428,29 @@ const PublishDialog = (props) => {
                             setCall("");
                             setShowCall(false);
                         }}>
-                            <TextField
-                                margin="dense"
-                                label={t("publish_dialog_call_label")}
-                                placeholder={t("publish_dialog_call_placeholder")}
-                                value={call}
-                                onChange={ev => setCall(ev.target.value)}
-                                disabled={disabled}
-                                type="tel"
-                                variant="standard"
+                            <FormControl
                                 fullWidth
-                                inputProps={{
-                                    "aria-label": t("publish_dialog_call_label")
-                                }}
-                            />
+                                variant="standard"
+                                margin="dense"
+                            >
+                                <InputLabel/>
+                                <Select
+                                    label={t("publish_dialog_call_label")}
+                                    margin="dense"
+                                    value={call}
+                                    onChange={(ev) => setCall(ev.target.value)}
+                                    disabled={disabled}
+                                    inputProps={{
+                                        "aria-label": t("publish_dialog_call_label")
+                                    }}
+                                >
+                                    {account?.phone_numbers?.map((phoneNumber, i) =>
+                                        <MenuItem key={`phoneNumberMenuItem${i}`} value={phoneNumber} aria-label={phoneNumber}>
+                                            {t("publish_dialog_call_item", { number: phoneNumber })}
+                                        </MenuItem>
+                                    )}
+                                </Select>
+                            </FormControl>
                         </ClosableRow>
                     }
                     {showAttachUrl &&
@@ -536,11 +557,12 @@ const PublishDialog = (props) => {
                     <div>
                         {!showClickUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_click_label")} aria-label={t("publish_dialog_chip_click_label")} onClick={() => setShowClickUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showEmail && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_email_label")} aria-label={t("publish_dialog_chip_email_label")} onClick={() => setShowEmail(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
-                        {!showCall && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_call_label")} aria-label={t("publish_dialog_chip_call_label")} onClick={() => setShowCall(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {account?.phone_numbers?.length > 0 && !showCall && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_call_label")} aria-label={t("publish_dialog_chip_call_label")} onClick={() => { setShowCall(true); setCall(account.phone_numbers[0]); }} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showAttachUrl && !showAttachFile && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_url_label")} aria-label={t("publish_dialog_chip_attach_url_label")} onClick={() => setShowAttachUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showAttachFile && !showAttachUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_attach_file_label")} aria-label={t("publish_dialog_chip_attach_file_label")} onClick={() => handleAttachFileClick()} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showDelay && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_delay_label")} aria-label={t("publish_dialog_chip_delay_label")} onClick={() => setShowDelay(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
                         {!showTopicUrl && <Chip clickable disabled={disabled} label={t("publish_dialog_chip_topic_label")} aria-label={t("publish_dialog_chip_topic_label")} onClick={() => setShowTopicUrl(true)} sx={{marginRight: 1, marginBottom: 1}}/>}
+                        {account && !account?.phone_numbers && <Tooltip title={t("publish_dialog_chip_call_no_verified_numbers_tooltip")}><span><Chip clickable disabled label={t("publish_dialog_chip_call_label")} aria-label={t("publish_dialog_chip_call_label")} sx={{marginRight: 1, marginBottom: 1}}/></span></Tooltip>}
                     </div>
                     <Typography variant="body1" sx={{marginTop: 1, marginBottom: 1}}>
                         <Trans

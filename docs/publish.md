@@ -2903,6 +2903,7 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "PowerShell 5 and earlier"
+    ``` powershell
     # With PowerShell 5 or earlier, we need to create the base64 username:password string ourselves
     $CredentialString = "$($Credential.Username):$($Credential.GetNetworkCredential().Password)"
     $EncodedCredential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($CredentialString))

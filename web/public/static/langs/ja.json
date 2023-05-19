@@ -355,5 +355,6 @@
     "account_upgrade_dialog_billing_contact_website": "支払いに関する質問は、<Link>ウェブサイト</Link>を参照して下さい。",
     "account_upgrade_dialog_tier_features_messages_one": "毎日 {{messages}} メッセージ",
     "account_upgrade_dialog_tier_features_reservations_one": "予約済みトピック {{reservations}} 件",
-    "account_upgrade_dialog_tier_features_emails_one": "毎日メール {{emails}} 件"
+    "account_upgrade_dialog_tier_features_emails_one": "毎日メール {{emails}} 件",
+    "publish_dialog_call_label": "電話"
 }

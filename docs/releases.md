@@ -1214,6 +1214,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * UnifiedPush subscriptions now include the `Rate-Topics` header to facilitate subscriber-based billing ([#652](https://github.com/binwiederhier/ntfy/issues/652), thanks to [@wunter8](https://github.com/wunter8))
 * Subscriptions without icons no longer appear to use another subscription's icon ([#634](https://github.com/binwiederhier/ntfy/issues/634), thanks to [@topcaser](https://github.com/topcaser) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+* Bumped all dependencies to the latest versions (no ticket)
 
 **Additional languages:**
 

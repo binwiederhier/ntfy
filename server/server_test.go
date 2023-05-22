@@ -2478,18 +2478,25 @@ func TestServer_PublishWithUTF8MimeHeader(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
 	response := request(t, s, "POST", "/mytopic", "some attachment", map[string]string{
-		"X-Filename": "some attachment.txt",
+		"X-Filename": "some =?UTF-8?q?=C3=A4?=ttachment.txt",
 		"X-Message":  "=?UTF-8?B?8J+HqfCfh6o=?=",
 		"X-Title":    "=?UTF-8?B?bnRmeSDlvojmo5I=?=, no really I mean it! =?UTF-8?Q?This is q=C3=BC=C3=B6ted-print=C3=A4ble.?=",
 		"X-Tags":     "=?UTF-8?B?8J+HqfCfh6o=?=, =?UTF-8?B?bnRmeSDlvojmo5I=?=",
+		"X-Click":    "=?uTf-8?b?aHR0cHM6Ly/wn5KpLmxh?=",
+		"X-Actions":  "http, \"=?utf-8?q?Mettre =C3=A0 jour?=\", \"https://my.tld/webhook/netbird-update\"; =?utf-8?b?aHR0cCwg6L+Z5piv5LiA5Liq5qCH562+LCBodHRwczovL/CfkqkubGE=?=",
 	})
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
 	require.Equal(t, "🇩🇪", m.Message)
 	require.Equal(t, "ntfy 很棒, no really I mean it! This is qüöted-printäble.", m.Title)
-	require.Equal(t, "some attachment.txt", m.Attachment.Name)
+	require.Equal(t, "some ättachment.txt", m.Attachment.Name)
 	require.Equal(t, "🇩🇪", m.Tags[0])
 	require.Equal(t, "ntfy 很棒", m.Tags[1])
+	require.Equal(t, "https://💩.la", m.Click)
+	require.Equal(t, "Mettre à jour", m.Actions[0].Label)
+	require.Equal(t, "http", m.Actions[1].Action)
+	require.Equal(t, "这是一个标签", m.Actions[1].Label)
+	require.Equal(t, "https://💩.la", m.Actions[1].URL)
 }
 
 func TestServer_UpstreamBaseURL_Success(t *testing.T) {

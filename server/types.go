@@ -101,6 +101,7 @@ type publishMessage struct {
 	Attach   string   `json:"attach"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
+	Call     string   `json:"call"`
 	Delay    string   `json:"delay"`
 }
 

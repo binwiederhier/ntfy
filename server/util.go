@@ -50,7 +50,7 @@ func readParam(r *http.Request, names ...string) string {
 
 func readHeaderParam(r *http.Request, names ...string) string {
 	for _, name := range names {
-		value := r.Header.Get(name)
+		value := maybeDecodeHeader(r.Header.Get(name))
 		if value != "" {
 			return strings.TrimSpace(value)
 		}

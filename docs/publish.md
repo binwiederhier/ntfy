@@ -393,8 +393,8 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 
 !!! info
     ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the `X-Title` or `X-Message`
-    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including the title)
+    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
     or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 ## Message priority
@@ -619,7 +619,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 
 !!! info
     ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the individual tags
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the tags header or individual tags
     as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
     or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
@@ -1004,9 +1004,11 @@ all the supported fields:
 | `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
 | `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
 | `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
 | `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
+| `call`     | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
 
 ## Action buttons
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -1139,7 +1141,13 @@ As an example, here's how you can create the above notification using this forma
         ]
     ]));
     ```
- 
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including actions) 
+    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+
 #### Using a JSON array
 Alternatively, the same actions can be defined as **JSON array**, if the notification is defined as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
@@ -3465,7 +3473,7 @@ table in their canonical form.
 
 !!! info
     ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the `X-Title` or `X-Message`
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any
     header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
     or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 

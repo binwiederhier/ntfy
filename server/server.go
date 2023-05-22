@@ -876,7 +876,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, call string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
-	m.Title = maybeDecodeHeader(readParam(r, "x-title", "title", "t"))
+	m.Title = readParam(r, "x-title", "title", "t")
 	m.Click = readParam(r, "x-click", "click")
 	icon := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
@@ -923,7 +923,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
-		m.Message = maybeDecodeHeader(messageStr)
+		m.Message = messageStr
 	}
 	var e error
 	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
@@ -931,9 +931,6 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		return false, false, "", "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
-	for i, t := range m.Tags {
-		m.Tags[i] = maybeDecodeHeader(t)
-	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
@@ -1746,6 +1743,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Delay != "" {
 			r.Header.Set("X-Delay", m.Delay)
+		}
+		if m.Call != "" {
+			r.Header.Set("X-Call", m.Call)
 		}
 		return next(w, r, v)
 	}

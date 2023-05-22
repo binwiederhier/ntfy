@@ -28,7 +28,7 @@ if you use promo code `MYTOPIC`). ntfy will always remain open source.
 * Attachments with filenames that are downloaded using a browser will now download with the proper filename ([#726](https://github.com/binwiederhier/ntfy/issues/726), thanks to [@un99known99](https://github.com/un99known99) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
 * Fix web app i18n issue in account preferences ([#730](https://github.com/binwiederhier/ntfy/issues/730), thanks to [@codebude](https://github.com/codebude) for reporting)
 
-### ntfy server v2.4.0
+## ntfy server v2.4.0
 Released Apr 26, 2023
 
 This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds suport to encode the `X-Title`,
@@ -57,7 +57,7 @@ will always remain open source.
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/Shjosan/))
 
-### ntfy server v2.3.1 
+## ntfy server v2.3.1 
 Released March 30, 2023
 
 This release disables server-initiated polling of iOS devices entirely, thereby eliminating the thundering herd problem
@@ -1219,3 +1219,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
+
+### ntfy server v2.6.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
+

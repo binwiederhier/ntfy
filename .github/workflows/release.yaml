@@ -8,29 +8,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
         name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: '1.19.x'
       -
         name: Install node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
-      -
-        name: Checkout code
-        uses: actions/checkout@v2
-      -
-        name: Cache Go and npm modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/go/bin
-            ~/.npm
-            web/node_modules
-          key: ${{ runner.os }}-ntfy-${{ hashFiles('go.sum', 'web/package.lock') }}
-          restore-keys: ${{ runner.os }}-ntfy-
+          cache: 'npm'
+          cache-dependency-path: './web/package-lock.json'
       -
         name: Docker login
         uses: docker/login-action@v2

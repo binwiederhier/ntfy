@@ -1,0 +1,31 @@
+{
+  "extends": ["airbnb", "prettier"],
+  "env": {
+    "browser": true
+  },
+  "globals": {
+    "config": "readonly"
+  },
+  "parserOptions": {
+    "ecmaVersion": 2023
+  },
+  "rules": {
+    "no-console": "off",
+    "class-methods-use-this": "off",
+    "func-style": ["error", "expression"],
+    "no-restricted-syntax": ["error", "ForInStatement", "LabeledStatement", "WithStatement"],
+    "no-await-in-loop": "error",
+    "import/no-cycle": "warn",
+    "react/prop-types": "off",
+    "react/destructuring-assignment": "off",
+    "react/jsx-no-useless-fragment": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/function-component-definition": [
+      "error",
+      {
+        "namedComponents": "arrow-function",
+        "unnamedComponents": "arrow-function"
+      }
+    ]
+  }
+}

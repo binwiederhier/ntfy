@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
+    "start": "DISABLE_ESLINT_PLUGIN=true react-scripts start",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "test": "DISABLE_ESLINT_PLUGIN=true react-scripts test",
+    "eject": "DISABLE_ESLINT_PLUGIN=true react-scripts eject",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "lint": "eslint --report-unused-disable-directives --ext .js,.jsx ./src/"
   },
   "dependencies": {
     "@mui/icons-material": "^5.4.2",
@@ -29,6 +30,13 @@
     "stacktrace-js": "^2.0.2"
   },
   "devDependencies": {
+    "eslint": "^8.41.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^2.8.8",
     "react-scripts": "^5.0.0"
   },

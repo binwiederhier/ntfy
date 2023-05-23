@@ -145,6 +145,9 @@ web-format:
 web-format-check:
 	cd web && npm run format:check
 
+web-lint:
+	cd web && npm run lint
+
 # Main server/client build
 
 cli: cli-deps
@@ -233,7 +236,7 @@ cli-build-results:
 
 # Test/check targets
 
-check: test web-format-check fmt-check vet lint staticcheck
+check: test web-format-check fmt-check vet web-lint lint staticcheck
 
 test: .PHONY
 	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')

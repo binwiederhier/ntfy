@@ -30,7 +30,7 @@ jobs:
         run: |
           cd build/ntfy-docs.github.io
           git config user.name "GitHub Actions Bot"
-          git config user.email "<>"          
+          git config user.email "<actions@github.com>"          
           git add docs/
           git commit -m "Updated docs"
           git push origin main

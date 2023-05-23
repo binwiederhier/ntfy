@@ -1,30 +1,30 @@
 class Session {
-    store(username, token) {
-        localStorage.setItem("user", username);
-        localStorage.setItem("token", token);
-    }
+  store(username, token) {
+    localStorage.setItem("user", username);
+    localStorage.setItem("token", token);
+  }
 
-    reset() {
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
-    }
+  reset() {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+  }
 
-    resetAndRedirect(url) {
-        this.reset();
-        window.location.href = url;
-    }
+  resetAndRedirect(url) {
+    this.reset();
+    window.location.href = url;
+  }
 
-    exists() {
-        return this.username() && this.token();
-    }
+  exists() {
+    return this.username() && this.token();
+  }
 
-    username() {
-        return localStorage.getItem("user");
-    }
+  username() {
+    return localStorage.getItem("user");
+  }
 
-    token() {
-        return localStorage.getItem("token");
-    }
+  token() {
+    return localStorage.getItem("token");
+  }
 }
 
 const session = new Session();

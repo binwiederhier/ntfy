@@ -1,10 +1,11 @@
 /* web app styling overrides */
 
-a, a:visited {
-    color: #338574;
+a,
+a:visited {
+  color: #338574;
 }
 
 a:hover {
-    text-decoration: none;
-    color: #317f6f;
+  text-decoration: none;
+  color: #317f6f;
 }

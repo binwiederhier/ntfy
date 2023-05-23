@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import Dexie from "dexie";
 import session from "./Session";
 
 // Uses Dexie.js
@@ -8,14 +8,14 @@ import session from "./Session";
 // - As per docs, we only declare the indexable columns, not all columns
 
 // The IndexedDB database name is based on the logged-in user
-const dbName = (session.username()) ? `ntfy-${session.username()}` : "ntfy";
+const dbName = session.username() ? `ntfy-${session.username()}` : "ntfy";
 const db = new Dexie(dbName);
 
 db.version(1).stores({
-    subscriptions: '&id,baseUrl',
-    notifications: '&id,subscriptionId,time,new,[subscriptionId+new]', // compound key for query performance
-    users: '&baseUrl,username',
-    prefs: '&key'
+  subscriptions: "&id,baseUrl",
+  notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
+  users: "&baseUrl,username",
+  prefs: "&key",
 });
 
 export default db;

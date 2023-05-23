@@ -3238,6 +3238,12 @@ The following command will generate the appropriate value for you on *nix system
 echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='
 ```
 
+For access tokens, you can use this instead:
+
+```
+echo -n "Bearer faketoken" | base64 | tr -d '='
+```
+
 ## Advanced features
 
 ### Message caching

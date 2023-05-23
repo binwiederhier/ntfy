@@ -868,7 +868,11 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	} else if response.StatusCode != http.StatusOK {
-		logvm(v, m).Err(err).Warn("Unable to publish poll request, unexpected HTTP status: %d", response.StatusCode)
+		if response.StatusCode == http.StatusTooManyRequests {
+			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s; you may solve this by sending fewer daily messages, or by configuring upstream-access-token (assuming you have an account with higher rate limits) ", s.config.UpstreamBaseURL, response.Status)
+		} else {
+			logvm(v, m).Err(err).Warn("Unable to publish poll request to %s, the upstream server %s responded with HTTP %s", s.config.UpstreamBaseURL, response.Status)
+		}
 		return
 	}
 }

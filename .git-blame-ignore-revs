@@ -1,0 +1,5 @@
+# .git-blame-ignore-revs
+# https://docs.github.com/en/repositories/working-with-files/using-files/viewing-a-file#ignore-commits-in-the-blame-view
+
+# Run prettier (https://github.com/binwiederhier/ntfy/pull/746)
+6f6a2d1f693070bf72e89d86748080e4825c9164

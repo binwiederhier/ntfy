@@ -7,9 +7,7 @@ class SubscriptionManager {
     const subscriptions = await db.subscriptions.toArray();
     await Promise.all(
       subscriptions.map(async (s) => {
-        s.new = await db.notifications
-          .where({ subscriptionId: s.id, new: 1 })
-          .count();
+        s.new = await db.notifications.where({ subscriptionId: s.id, new: 1 }).count();
       })
     );
     return subscriptions;
@@ -38,20 +36,14 @@ class SubscriptionManager {
   }
 
   async syncFromRemote(remoteSubscriptions, remoteReservations) {
-    console.log(
-      `[SubscriptionManager] Syncing subscriptions from remote`,
-      remoteSubscriptions
-    );
+    console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
     // Add remote subscriptions
     let remoteIds = []; // = topicUrl(baseUrl, topic)
     for (let i = 0; i < remoteSubscriptions.length; i++) {
       const remote = remoteSubscriptions[i];
       const local = await this.add(remote.base_url, remote.topic, false);
-      const reservation =
-        remoteReservations?.find(
-          (r) => remote.base_url === config.base_url && remote.topic === r.topic
-        ) || null;
+      const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
       await this.update(local.id, {
         displayName: remote.display_name, // May be undefined
         reservation: reservation, // May be null!
@@ -122,9 +114,7 @@ class SubscriptionManager {
 
   /** Adds/replaces notifications, will not throw if they exist */
   async addNotifications(subscriptionId, notifications) {
-    const notificationsWithSubscriptionId = notifications.map(
-      (notification) => ({ ...notification, subscriptionId })
-    );
+    const notificationsWithSubscriptionId = notifications.map((notification) => ({ ...notification, subscriptionId }));
     const lastNotificationId = notifications.at(-1).id;
     await db.notifications.bulkPut(notificationsWithSubscriptionId);
     await db.subscriptions.update(subscriptionId, {
@@ -158,9 +148,7 @@ class SubscriptionManager {
   }
 
   async markNotificationsRead(subscriptionId) {
-    await db.notifications
-      .where({ subscriptionId: subscriptionId, new: 1 })
-      .modify({ new: 0 });
+    await db.notifications.where({ subscriptionId: subscriptionId, new: 1 }).modify({ new: 0 });
   }
 
   async setMutedUntil(subscriptionId, mutedUntil) {

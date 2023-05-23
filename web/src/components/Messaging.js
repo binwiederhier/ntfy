@@ -29,14 +29,7 @@ const Messaging = (props) => {
 
   return (
     <>
-      {subscription && (
-        <MessageBar
-          subscription={subscription}
-          message={message}
-          onMessageChange={setMessage}
-          onOpenDialogClick={handleOpenDialogClick}
-        />
-      )}
+      {subscription && <MessageBar subscription={subscription} message={message} onMessageChange={setMessage} onOpenDialogClick={handleOpenDialogClick} />}
       <PublishDialog
         key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
         openMode={dialogOpenMode}
@@ -44,14 +37,8 @@ const Messaging = (props) => {
         topic={subscription?.topic ?? ""}
         message={message}
         onClose={handleDialogClose}
-        onDragEnter={() =>
-          props.onDialogOpenModeChange((prev) =>
-            prev ? prev : PublishDialog.OPEN_MODE_DRAG
-          )
-        } // Only update if not already open
-        onResetOpenMode={() =>
-          props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)
-        }
+        onDragEnter={() => props.onDialogOpenModeChange((prev) => (prev ? prev : PublishDialog.OPEN_MODE_DRAG))} // Only update if not already open
+        onResetOpenMode={() => props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)}
       />
     </>
   );
@@ -63,11 +50,7 @@ const MessageBar = (props) => {
   const [snackOpen, setSnackOpen] = useState(false);
   const handleSendClick = async () => {
     try {
-      await api.publish(
-        subscription.baseUrl,
-        subscription.topic,
-        props.message
-      );
+      await api.publish(subscription.baseUrl, subscription.topic, props.message);
     } catch (e) {
       console.log(`[MessageBar] Error publishing message`, e);
       setSnackOpen(true);
@@ -84,19 +67,10 @@ const MessageBar = (props) => {
         right: 0,
         padding: 2,
         width: { xs: "100%", sm: `calc(100% - ${Navigation.width}px)` },
-        backgroundColor: (theme) =>
-          theme.palette.mode === "light"
-            ? theme.palette.grey[100]
-            : theme.palette.grey[900],
+        backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
       }}
     >
-      <IconButton
-        color="inherit"
-        size="large"
-        edge="start"
-        onClick={props.onOpenDialogClick}
-        aria-label={t("message_bar_show_dialog")}
-      >
+      <IconButton color="inherit" size="large" edge="start" onClick={props.onOpenDialogClick} aria-label={t("message_bar_show_dialog")}>
         <KeyboardArrowUpIcon />
       </IconButton>
       <TextField
@@ -117,22 +91,11 @@ const MessageBar = (props) => {
           }
         }}
       />
-      <IconButton
-        color="inherit"
-        size="large"
-        edge="end"
-        onClick={handleSendClick}
-        aria-label={t("message_bar_publish")}
-      >
+      <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick} aria-label={t("message_bar_publish")}>
         <SendIcon />
       </IconButton>
       <Portal>
-        <Snackbar
-          open={snackOpen}
-          autoHideDuration={3000}
-          onClose={() => setSnackOpen(false)}
-          message={t("message_bar_error_publishing")}
-        />
+        <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)} message={t("message_bar_error_publishing")} />
       </Portal>
     </Paper>
   );

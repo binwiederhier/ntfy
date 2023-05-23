@@ -1,12 +1,4 @@
-import {
-  fetchLinesIterator,
-  maybeWithAuth,
-  topicShortUrl,
-  topicUrl,
-  topicUrlAuth,
-  topicUrlJsonPoll,
-  topicUrlJsonPollWithSince,
-} from "./utils";
+import { fetchLinesIterator, maybeWithAuth, topicShortUrl, topicUrl, topicUrlAuth, topicUrlJsonPoll, topicUrlJsonPollWithSince } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
 
@@ -14,9 +6,7 @@ class Api {
   async poll(baseUrl, topic, since) {
     const user = await userManager.get(baseUrl);
     const shortUrl = topicShortUrl(baseUrl, topic);
-    const url = since
-      ? topicUrlJsonPollWithSince(baseUrl, topic, since)
-      : topicUrlJsonPoll(baseUrl, topic);
+    const url = since ? topicUrlJsonPollWithSince(baseUrl, topic, since) : topicUrlJsonPoll(baseUrl, topic);
     const messages = [];
     const headers = maybeWithAuth({}, user);
     console.log(`[Api] Polling ${url}`);
@@ -73,17 +63,11 @@ class Api {
       xhr.upload.addEventListener("progress", onProgress);
       xhr.addEventListener("readystatechange", () => {
         if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status <= 299) {
-          console.log(
-            `[Api] Publish successful (HTTP ${xhr.status})`,
-            xhr.response
-          );
+          console.log(`[Api] Publish successful (HTTP ${xhr.status})`, xhr.response);
           resolve(xhr.response);
         } else if (xhr.readyState === 4) {
           // Firefox bug; see description above!
-          console.log(
-            `[Api] Publish failed (HTTP ${xhr.status})`,
-            xhr.responseText
-          );
+          console.log(`[Api] Publish failed (HTTP ${xhr.status})`, xhr.responseText);
           let errorText;
           try {
             const error = JSON.parse(xhr.responseText);

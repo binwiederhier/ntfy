@@ -17,8 +17,7 @@ import { useTranslation } from "react-i18next";
 // This is a hack, but on Ubuntu 18.04, with Chrome 99, only Emoji <= 11 are supported.
 
 const emojisByCategory = {};
-const isDesktopChrome =
-  /Chrome/.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent);
+const isDesktopChrome = /Chrome/.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent);
 const maxSupportedVersionForDesktopChrome = 11;
 rawEmojis.forEach((emoji) => {
   if (!emojisByCategory[emoji.category]) {
@@ -26,12 +25,9 @@ rawEmojis.forEach((emoji) => {
   }
   try {
     const unicodeVersion = parseFloat(emoji.unicode_version);
-    const supportedEmoji =
-      unicodeVersion <= maxSupportedVersionForDesktopChrome || !isDesktopChrome;
+    const supportedEmoji = unicodeVersion <= maxSupportedVersionForDesktopChrome || !isDesktopChrome;
     if (supportedEmoji) {
-      const searchBase = `${emoji.description.toLowerCase()} ${emoji.aliases.join(
-        " "
-      )} ${emoji.tags.join(" ")}`;
+      const searchBase = `${emoji.description.toLowerCase()} ${emoji.aliases.join(" ")} ${emoji.tags.join(" ")}`;
       const emojiWithSearchBase = { ...emoji, searchBase: searchBase };
       emojisByCategory[emoji.category].push(emojiWithSearchBase);
     }
@@ -53,13 +49,7 @@ const EmojiPicker = (props) => {
   };
 
   return (
-    <Popper
-      open={open}
-      anchorEl={props.anchorEl}
-      placement="bottom-start"
-      sx={{ zIndex: 10005 }}
-      transition
-    >
+    <Popper open={open} anchorEl={props.anchorEl} placement="bottom-start" sx={{ zIndex: 10005 }} transition>
       {({ TransitionProps }) => (
         <ClickAwayListener onClickAway={props.onClose}>
           <Fade {...TransitionProps} timeout={350}>
@@ -92,16 +82,8 @@ const EmojiPicker = (props) => {
                 }}
                 InputProps={{
                   endAdornment: (
-                    <InputAdornment
-                      position="end"
-                      sx={{ display: search ? "" : "none" }}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={handleSearchClear}
-                        edge="end"
-                        aria-label={t("emoji_picker_search_clear")}
-                      >
+                    <InputAdornment position="end" sx={{ display: search ? "" : "none" }}>
+                      <IconButton size="small" onClick={handleSearchClear} edge="end" aria-label={t("emoji_picker_search_clear")}>
                         <Close />
                       </IconButton>
                     </InputAdornment>
@@ -117,13 +99,7 @@ const EmojiPicker = (props) => {
                 }}
               >
                 {Object.keys(emojisByCategory).map((category) => (
-                  <Category
-                    key={category}
-                    title={category}
-                    emojis={emojisByCategory[category]}
-                    search={searchFields}
-                    onPick={props.onEmojiPick}
-                  />
+                  <Category key={category} title={category} emojis={emojisByCategory[category]} search={searchFields} onPick={props.onEmojiPick} />
                 ))}
               </Box>
             </Box>
@@ -144,12 +120,7 @@ const Category = (props) => {
         </Typography>
       )}
       {props.emojis.map((emoji) => (
-        <Emoji
-          key={emoji.aliases[0]}
-          emoji={emoji}
-          search={props.search}
-          onClick={() => props.onPick(emoji.aliases[0])}
-        />
+        <Emoji key={emoji.aliases[0]} emoji={emoji} search={props.search} onClick={() => props.onPick(emoji.aliases[0])} />
       ))}
     </>
   );
@@ -160,12 +131,7 @@ const Emoji = (props) => {
   const matches = emojiMatches(emoji, props.search);
   const title = `${emoji.description} (${emoji.aliases[0]})`;
   return (
-    <EmojiDiv
-      onClick={props.onClick}
-      title={title}
-      aria-label={title}
-      style={{ display: matches ? "" : "none" }}
-    >
+    <EmojiDiv onClick={props.onClick} title={title} aria-label={title} style={{ display: matches ? "" : "none" }}>
       {props.emoji.emoji}
     </EmojiDiv>
   );

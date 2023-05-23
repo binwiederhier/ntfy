@@ -10,37 +10,23 @@ import config from "./config";
 import { Base64 } from "js-base64";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
-export const topicUrlWs = (baseUrl, topic) =>
-  `${topicUrl(baseUrl, topic)}/ws`
-    .replaceAll("https://", "wss://")
-    .replaceAll("http://", "ws://");
-export const topicUrlJson = (baseUrl, topic) =>
-  `${topicUrl(baseUrl, topic)}/json`;
-export const topicUrlJsonPoll = (baseUrl, topic) =>
-  `${topicUrlJson(baseUrl, topic)}?poll=1`;
-export const topicUrlJsonPollWithSince = (baseUrl, topic, since) =>
-  `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
-export const topicUrlAuth = (baseUrl, topic) =>
-  `${topicUrl(baseUrl, topic)}/auth`;
-export const topicShortUrl = (baseUrl, topic) =>
-  shortUrl(topicUrl(baseUrl, topic));
+export const topicUrlWs = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/ws`.replaceAll("https://", "wss://").replaceAll("http://", "ws://");
+export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/json`;
+export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
+export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
+export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
+export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
 export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
 export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
 export const accountSettingsUrl = (baseUrl) => `${baseUrl}/v1/account/settings`;
-export const accountSubscriptionUrl = (baseUrl) =>
-  `${baseUrl}/v1/account/subscription`;
-export const accountReservationUrl = (baseUrl) =>
-  `${baseUrl}/v1/account/reservation`;
-export const accountReservationSingleUrl = (baseUrl, topic) =>
-  `${baseUrl}/v1/account/reservation/${topic}`;
-export const accountBillingSubscriptionUrl = (baseUrl) =>
-  `${baseUrl}/v1/account/billing/subscription`;
-export const accountBillingPortalUrl = (baseUrl) =>
-  `${baseUrl}/v1/account/billing/portal`;
+export const accountSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/subscription`;
+export const accountReservationUrl = (baseUrl) => `${baseUrl}/v1/account/reservation`;
+export const accountReservationSingleUrl = (baseUrl, topic) => `${baseUrl}/v1/account/reservation/${topic}`;
+export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account/billing/subscription`;
+export const accountBillingPortalUrl = (baseUrl) => `${baseUrl}/v1/account/billing/portal`;
 export const accountPhoneUrl = (baseUrl) => `${baseUrl}/v1/account/phone`;
-export const accountPhoneVerifyUrl = (baseUrl) =>
-  `${baseUrl}/v1/account/phone/verify`;
+export const accountPhoneVerifyUrl = (baseUrl) => `${baseUrl}/v1/account/phone/verify`;
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
@@ -208,9 +194,7 @@ export const formatShortDateTime = (timestamp) => {
 };
 
 export const formatShortDate = (timestamp) => {
-  return new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(
-    new Date(timestamp * 1000)
-  );
+  return new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(new Date(timestamp * 1000));
 };
 
 export const formatBytes = (bytes, decimals = 2) => {
@@ -312,8 +296,7 @@ export async function* fetchLinesIterator(fileURL, headers) {
 }
 
 export const randomAlphanumericString = (len) => {
-  const alphabet =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let id = "";
   for (let i = 0; i < len; i++) {
     id += alphabet[(Math.random() * alphabet.length) | 0];

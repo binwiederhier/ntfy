@@ -1,17 +1,7 @@
 import * as React from "react";
 import { useContext, useEffect, useRef, useState } from "react";
 import theme from "./theme";
-import {
-  Checkbox,
-  Chip,
-  FormControl,
-  FormControlLabel,
-  InputLabel,
-  Link,
-  Select,
-  Tooltip,
-  useMediaQuery,
-} from "@mui/material";
+import { Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, Tooltip, useMediaQuery } from "@mui/material";
 import TextField from "@mui/material/TextField";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
@@ -27,14 +17,7 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import { Close } from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import {
-  formatBytes,
-  maybeWithAuth,
-  topicShortUrl,
-  topicUrl,
-  validTopic,
-  validUrl,
-} from "../app/utils";
+import { formatBytes, maybeWithAuth, topicShortUrl, topicUrl, validTopic, validUrl } from "../app/utils";
 import Box from "@mui/material/Box";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
@@ -152,10 +135,7 @@ const PublishDialog = (props) => {
       url.searchParams.append("delay", delay.trim());
     }
     if (attachFile && message.trim()) {
-      url.searchParams.append(
-        "message",
-        message.replaceAll("\n", "\\n").trim()
-      );
+      url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());
     }
     const body = attachFile ? attachFile : message;
     try {
@@ -184,11 +164,7 @@ const PublishDialog = (props) => {
         setActiveRequest(null);
       }
     } catch (e) {
-      setStatus(
-        <Typography sx={{ color: "error.main", maxWidth: "400px" }}>
-          {e}
-        </Typography>
-      );
+      setStatus(<Typography sx={{ color: "error.main", maxWidth: "400px" }}>{e}</Typography>);
       setActiveRequest(null);
     }
   };
@@ -198,8 +174,7 @@ const PublishDialog = (props) => {
       const account = await accountApi.get();
       const fileSizeLimit = account.limits.attachment_file_size ?? 0;
       const remainingBytes = account.stats.attachment_total_size_remaining;
-      const fileSizeLimitReached =
-        fileSizeLimit > 0 && file.size > fileSizeLimit;
+      const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
       const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
       if (fileSizeLimitReached && quotaReached) {
         return setAttachFileError(
@@ -282,18 +257,8 @@ const PublishDialog = (props) => {
 
   return (
     <>
-      {dropZone && (
-        <DropArea
-          onDrop={handleAttachFileDrop}
-          onDragLeave={handleAttachFileDragLeave}
-        />
-      )}
-      <Dialog
-        maxWidth="md"
-        open={open}
-        onClose={props.onCancel}
-        fullScreen={fullScreen}
-      >
+      {dropZone && <DropArea onDrop={handleAttachFileDrop} onDragLeave={handleAttachFileDragLeave} />}
+      <Dialog maxWidth="md" open={open} onClose={props.onCancel} fullScreen={fullScreen}>
         <DialogTitle>
           {baseUrl && topic
             ? t("publish_dialog_title_topic", {
@@ -377,16 +342,8 @@ const PublishDialog = (props) => {
             }}
           />
           <div style={{ display: "flex" }}>
-            <EmojiPicker
-              anchorEl={emojiPickerAnchorEl}
-              onEmojiPick={handleEmojiPick}
-              onClose={handleEmojiClose}
-            />
-            <DialogIconButton
-              disabled={disabled}
-              onClick={handleEmojiClick}
-              aria-label={t("publish_dialog_emoji_picker_show")}
-            >
+            <EmojiPicker anchorEl={emojiPickerAnchorEl} onEmojiPick={handleEmojiPick} onClose={handleEmojiClose} />
+            <DialogIconButton disabled={disabled} onClick={handleEmojiClick} aria-label={t("publish_dialog_emoji_picker_show")}>
               <InsertEmoticonIcon />
             </DialogIconButton>
             <TextField
@@ -403,11 +360,7 @@ const PublishDialog = (props) => {
                 "aria-label": t("publish_dialog_tags_label"),
               }}
             />
-            <FormControl
-              variant="standard"
-              margin="dense"
-              sx={{ minWidth: 170, maxWidth: 300, flexGrow: 1 }}
-            >
+            <FormControl variant="standard" margin="dense" sx={{ minWidth: 170, maxWidth: 300, flexGrow: 1 }}>
               <InputLabel />
               <Select
                 label={t("publish_dialog_priority_label")}
@@ -514,11 +467,7 @@ const PublishDialog = (props) => {
                   }}
                 >
                   {account?.phone_numbers?.map((phoneNumber, i) => (
-                    <MenuItem
-                      key={`phoneNumberMenuItem${i}`}
-                      value={phoneNumber}
-                      aria-label={phoneNumber}
-                    >
+                    <MenuItem key={`phoneNumberMenuItem${i}`} value={phoneNumber} aria-label={phoneNumber}>
                       {t("publish_dialog_call_item", { number: phoneNumber })}
                     </MenuItem>
                   ))}
@@ -584,13 +533,7 @@ const PublishDialog = (props) => {
               />
             </ClosableRow>
           )}
-          <input
-            type="file"
-            ref={attachFileInput}
-            onChange={handleAttachFileChanged}
-            style={{ display: "none" }}
-            aria-hidden={true}
-          />
+          <input type="file" ref={attachFileInput} onChange={handleAttachFileChanged} style={{ display: "none" }} aria-hidden={true} />
           {showAttachFile && (
             <AttachmentBox
               file={attachFile}
@@ -712,11 +655,7 @@ const PublishDialog = (props) => {
               />
             )}
             {account && !account?.phone_numbers && (
-              <Tooltip
-                title={t(
-                  "publish_dialog_chip_call_no_verified_numbers_tooltip"
-                )}
-              >
+              <Tooltip title={t("publish_dialog_chip_call_no_verified_numbers_tooltip")}>
                 <span>
                   <Chip
                     clickable
@@ -733,23 +672,13 @@ const PublishDialog = (props) => {
             <Trans
               i18nKey="publish_dialog_details_examples_description"
               components={{
-                docsLink: (
-                  <Link
-                    href="https://ntfy.sh/docs"
-                    target="_blank"
-                    rel="noopener"
-                  />
-                ),
+                docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
               }}
             />
           </Typography>
         </DialogContent>
         <DialogFooter status={status}>
-          {activeRequest && (
-            <Button onClick={() => activeRequest.abort()}>
-              {t("publish_dialog_button_cancel_sending")}
-            </Button>
-          )}
+          {activeRequest && <Button onClick={() => activeRequest.abort()}>{t("publish_dialog_button_cancel_sending")}</Button>}
           {!activeRequest && (
             <>
               <FormControlLabel
@@ -761,16 +690,12 @@ const PublishDialog = (props) => {
                     checked={publishAnother}
                     onChange={(ev) => setPublishAnother(ev.target.checked)}
                     inputProps={{
-                      "aria-label": t(
-                        "publish_dialog_checkbox_publish_another"
-                      ),
+                      "aria-label": t("publish_dialog_checkbox_publish_another"),
                     }}
                   />
                 }
               />
-              <Button onClick={props.onClose}>
-                {t("publish_dialog_button_cancel")}
-              </Button>
+              <Button onClick={props.onClose}>{t("publish_dialog_button_cancel")}</Button>
               <Button onClick={handleSubmit} disabled={!sendButtonEnabled}>
                 {t("publish_dialog_button_send")}
               </Button>
@@ -796,12 +721,7 @@ const ClosableRow = (props) => {
     <Row>
       {props.children}
       {closable && (
-        <DialogIconButton
-          disabled={props.disabled}
-          onClick={props.onClose}
-          sx={{ marginLeft: "6px" }}
-          aria-label={props.closeLabel}
-        >
+        <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{ marginLeft: "6px" }} aria-label={props.closeLabel}>
           <Close />
         </DialogIconButton>
       )}
@@ -856,23 +776,14 @@ const AttachmentBox = (props) => {
           <Typography variant="body2" sx={{ color: "text.primary" }}>
             {formatBytes(file.size)}
             {props.error && (
-              <Typography
-                component="span"
-                sx={{ color: "error.main" }}
-                aria-live="polite"
-              >
+              <Typography component="span" sx={{ color: "error.main" }} aria-live="polite">
                 {" "}
                 ({props.error})
               </Typography>
             )}
           </Typography>
         </Box>
-        <DialogIconButton
-          disabled={props.disabled}
-          onClick={props.onClose}
-          sx={{ marginLeft: "6px" }}
-          aria-label={t("publish_dialog_attached_file_remove")}
-        >
+        <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{ marginLeft: "6px" }} aria-label={t("publish_dialog_attached_file_remove")}>
           <Close />
         </DialogIconButton>
       </Box>
@@ -888,22 +799,14 @@ const ExpandingTextField = (props) => {
     if (!boundingRect) {
       return props.minWidth;
     }
-    return boundingRect.width >= props.minWidth
-      ? Math.round(boundingRect.width)
-      : props.minWidth;
+    return boundingRect.width >= props.minWidth ? Math.round(boundingRect.width) : props.minWidth;
   };
   useEffect(() => {
     setTextWidth(determineTextWidth() + 5);
   }, [props.value]);
   return (
     <>
-      <Typography
-        ref={invisibleFieldRef}
-        component="span"
-        variant={props.variant}
-        aria-hidden={true}
-        sx={{ position: "absolute", left: "-200%" }}
-      >
+      <Typography ref={invisibleFieldRef} component="span" variant={props.variant} aria-hidden={true} sx={{ position: "absolute", left: "-200%" }}>
         {props.value}
       </Typography>
       <TextField
@@ -983,9 +886,7 @@ const DropBox = () => {
           alignItems: "center",
         }}
       >
-        <Typography variant="h5">
-          {t("publish_dialog_drop_file_here")}
-        </Typography>
+        <Typography variant="h5">{t("publish_dialog_drop_file_here")}</Typography>
       </Box>
     </Box>
   );

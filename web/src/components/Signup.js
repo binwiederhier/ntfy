@@ -31,9 +31,7 @@ const Signup = () => {
     try {
       await accountApi.create(user.username, user.password);
       const token = await accountApi.login(user);
-      console.log(
-        `[Signup] User signup for user ${user.username} successful, token is ${token}`
-      );
+      console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
       session.store(user.username, token);
       window.location.href = routes.app;
     } catch (e) {
@@ -51,9 +49,7 @@ const Signup = () => {
   if (!config.enable_signup) {
     return (
       <AvatarBox>
-        <Typography sx={{ typography: "h6" }}>
-          {t("signup_disabled")}
-        </Typography>
+        <Typography sx={{ typography: "h6" }}>{t("signup_disabled")}</Typography>
       </AvatarBox>
     );
   }
@@ -61,12 +57,7 @@ const Signup = () => {
   return (
     <AvatarBox>
       <Typography sx={{ typography: "h6" }}>{t("signup_title")}</Typography>
-      <Box
-        component="form"
-        onSubmit={handleSubmit}
-        noValidate
-        sx={{ mt: 1, maxWidth: 400 }}
-      >
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, maxWidth: 400 }}>
         <TextField
           margin="dense"
           required
@@ -130,13 +121,7 @@ const Signup = () => {
             ),
           }}
         />
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          disabled={username === "" || password === "" || password !== confirm}
-          sx={{ mt: 2, mb: 2 }}
-        >
+        <Button type="submit" fullWidth variant="contained" disabled={username === "" || password === "" || password !== confirm} sx={{ mt: 2, mb: 2 }}>
           {t("signup_form_button_submit")}
         </Button>
         {error && (

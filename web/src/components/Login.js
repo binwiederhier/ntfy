@@ -28,9 +28,7 @@ const Login = () => {
     const user = { username, password };
     try {
       const token = await accountApi.login(user);
-      console.log(
-        `[Login] User auth for user ${user.username} successful, token is ${token}`
-      );
+      console.log(`[Login] User auth for user ${user.username} successful, token is ${token}`);
       session.store(user.username, token);
       window.location.href = routes.app;
     } catch (e) {
@@ -52,12 +50,7 @@ const Login = () => {
   return (
     <AvatarBox>
       <Typography sx={{ typography: "h6" }}>{t("login_title")}</Typography>
-      <Box
-        component="form"
-        onSubmit={handleSubmit}
-        noValidate
-        sx={{ mt: 1, maxWidth: 400 }}
-      >
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, maxWidth: 400 }}>
         <TextField
           margin="dense"
           required
@@ -95,13 +88,7 @@ const Login = () => {
             ),
           }}
         />
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          disabled={username === "" || password === ""}
-          sx={{ mt: 2, mb: 2 }}
-        >
+        <Button type="submit" fullWidth variant="contained" disabled={username === "" || password === ""} sx={{ mt: 2, mb: 2 }}>
           {t("login_form_button_submit")}
         </Button>
         {error && (

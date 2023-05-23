@@ -16,11 +16,7 @@ const AvatarBox = (props) => {
         height: "100vh",
       }}
     >
-      <Avatar
-        sx={{ m: 2, width: 64, height: 64, borderRadius: 3 }}
-        src={logo}
-        variant="rounded"
-      />
+      <Avatar sx={{ m: 2, width: 64, height: 64, borderRadius: 3 }} src={logo} variant="rounded" />
       {props.children}
     </Box>
   );

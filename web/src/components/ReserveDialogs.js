@@ -28,16 +28,13 @@ export const ReserveAddDialog = (props) => {
   const [everyone, setEveryone] = useState(Permission.DENY_ALL);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const allowTopicEdit = !props.topic;
-  const alreadyReserved =
-    props.reservations.filter((r) => r.topic === topic).length > 0;
+  const alreadyReserved = props.reservations.filter((r) => r.topic === topic).length > 0;
   const submitButtonEnabled = validTopic(topic) && !alreadyReserved;
 
   const handleSubmit = async () => {
     try {
       await accountApi.upsertReservation(topic, everyone);
-      console.debug(
-        `[ReserveAddDialog] Added reservation for topic ${topic}: ${everyone}`
-      );
+      console.debug(`[ReserveAddDialog] Added reservation for topic ${topic}: ${everyone}`);
     } catch (e) {
       console.log(`[ReserveAddDialog] Error adding topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
@@ -54,18 +51,10 @@ export const ReserveAddDialog = (props) => {
   };
 
   return (
-    <Dialog
-      open={props.open}
-      onClose={props.onClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={fullScreen}
-    >
+    <Dialog open={props.open} onClose={props.onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>{t("prefs_reservations_dialog_title_add")}</DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          {t("prefs_reservations_dialog_description")}
-        </DialogContentText>
+        <DialogContentText>{t("prefs_reservations_dialog_description")}</DialogContentText>
         {allowTopicEdit && (
           <TextField
             autoFocus
@@ -80,11 +69,7 @@ export const ReserveAddDialog = (props) => {
             variant="standard"
           />
         )}
-        <ReserveTopicSelect
-          value={everyone}
-          onChange={setEveryone}
-          sx={{ mt: 1 }}
-        />
+        <ReserveTopicSelect value={everyone} onChange={setEveryone} sx={{ mt: 1 }} />
       </DialogContent>
       <DialogFooter status={error}>
         <Button onClick={props.onClose}>{t("common_cancel")}</Button>
@@ -99,17 +84,13 @@ export const ReserveAddDialog = (props) => {
 export const ReserveEditDialog = (props) => {
   const { t } = useTranslation();
   const [error, setError] = useState("");
-  const [everyone, setEveryone] = useState(
-    props.reservation?.everyone || Permission.DENY_ALL
-  );
+  const [everyone, setEveryone] = useState(props.reservation?.everyone || Permission.DENY_ALL);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleSubmit = async () => {
     try {
       await accountApi.upsertReservation(props.reservation.topic, everyone);
-      console.debug(
-        `[ReserveEditDialog] Updated reservation for topic ${t}: ${everyone}`
-      );
+      console.debug(`[ReserveEditDialog] Updated reservation for topic ${t}: ${everyone}`);
     } catch (e) {
       console.log(`[ReserveEditDialog] Error updating topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
@@ -123,23 +104,11 @@ export const ReserveEditDialog = (props) => {
   };
 
   return (
-    <Dialog
-      open={props.open}
-      onClose={props.onClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={fullScreen}
-    >
+    <Dialog open={props.open} onClose={props.onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>{t("prefs_reservations_dialog_title_edit")}</DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          {t("prefs_reservations_dialog_description")}
-        </DialogContentText>
-        <ReserveTopicSelect
-          value={everyone}
-          onChange={setEveryone}
-          sx={{ mt: 1 }}
-        />
+        <DialogContentText>{t("prefs_reservations_dialog_description")}</DialogContentText>
+        <ReserveTopicSelect value={everyone} onChange={setEveryone} sx={{ mt: 1 }} />
       </DialogContent>
       <DialogFooter status={error}>
         <Button onClick={props.onClose}>{t("common_cancel")}</Button>
@@ -158,9 +127,7 @@ export const ReserveDeleteDialog = (props) => {
   const handleSubmit = async () => {
     try {
       await accountApi.deleteReservation(props.topic, deleteMessages);
-      console.debug(
-        `[ReserveDeleteDialog] Deleted reservation for topic ${props.topic}`
-      );
+      console.debug(`[ReserveDeleteDialog] Deleted reservation for topic ${props.topic}`);
     } catch (e) {
       console.log(`[ReserveDeleteDialog] Error deleting topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
@@ -174,18 +141,10 @@ export const ReserveDeleteDialog = (props) => {
   };
 
   return (
-    <Dialog
-      open={props.open}
-      onClose={props.onClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={fullScreen}
-    >
+    <Dialog open={props.open} onClose={props.onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>{t("prefs_reservations_dialog_title_delete")}</DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          {t("reservation_delete_dialog_description")}
-        </DialogContentText>
+        <DialogContentText>{t("reservation_delete_dialog_description")}</DialogContentText>
         <FormControl fullWidth variant="standard">
           <Select
             value={deleteMessages}
@@ -203,17 +162,13 @@ export const ReserveDeleteDialog = (props) => {
               <ListItemIcon>
                 <Check />
               </ListItemIcon>
-              <ListItemText
-                primary={t("reservation_delete_dialog_action_keep_title")}
-              />
+              <ListItemText primary={t("reservation_delete_dialog_action_keep_title")} />
             </MenuItem>
             <MenuItem value={true}>
               <ListItemIcon>
                 <DeleteForever />
               </ListItemIcon>
-              <ListItemText
-                primary={t("reservation_delete_dialog_action_delete_title")}
-              />
+              <ListItemText primary={t("reservation_delete_dialog_action_delete_title")} />
             </MenuItem>
           </Select>
         </FormControl>

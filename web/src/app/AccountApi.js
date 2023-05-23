@@ -56,9 +56,7 @@ class AccountApi {
 
   async logout() {
     const url = accountTokenUrl(config.base_url);
-    console.log(
-      `[AccountApi] Logging out from ${url} using token ${session.token()}`
-    );
+    console.log(`[AccountApi] Logging out from ${url} using token ${session.token()}`);
     await fetchOrThrow(url, {
       method: "DELETE",
       headers: withBearerAuth({}, session.token()),
@@ -227,9 +225,7 @@ class AccountApi {
 
   async upsertReservation(topic, everyone) {
     const url = accountReservationUrl(config.base_url);
-    console.log(
-      `[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`
-    );
+    console.log(`[AccountApi] Upserting user access to topic ${topic}, everyone=${everyone}`);
     await fetchOrThrow(url, {
       method: "POST",
       headers: withBearerAuth({}, session.token()),
@@ -264,16 +260,12 @@ class AccountApi {
   }
 
   async createBillingSubscription(tier, interval) {
-    console.log(
-      `[AccountApi] Creating billing subscription with ${tier} and interval ${interval}`
-    );
+    console.log(`[AccountApi] Creating billing subscription with ${tier} and interval ${interval}`);
     return await this.upsertBillingSubscription("POST", tier, interval);
   }
 
   async updateBillingSubscription(tier, interval) {
-    console.log(
-      `[AccountApi] Updating billing subscription with ${tier} and interval ${interval}`
-    );
+    console.log(`[AccountApi] Updating billing subscription with ${tier} and interval ${interval}`);
     return await this.upsertBillingSubscription("PUT", tier, interval);
   }
 
@@ -324,9 +316,7 @@ class AccountApi {
 
   async addPhoneNumber(phoneNumber, code) {
     const url = accountPhoneUrl(config.base_url);
-    console.log(
-      `[AccountApi] Adding phone number with verification code ${url}`
-    );
+    console.log(`[AccountApi] Adding phone number with verification code ${url}`);
     await fetchOrThrow(url, {
       method: "PUT",
       headers: withBearerAuth({}, session.token()),
@@ -371,10 +361,7 @@ class AccountApi {
         }
       }
       if (account.subscriptions) {
-        await subscriptionManager.syncFromRemote(
-          account.subscriptions,
-          account.reservations
-        );
+        await subscriptionManager.syncFromRemote(account.subscriptions, account.reservations);
       }
       return account;
     } catch (e) {

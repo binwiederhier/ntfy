@@ -20,15 +20,12 @@ class Pruner {
 
   async prune() {
     const deleteAfterSeconds = await prefs.deleteAfter();
-    const pruneThresholdTimestamp =
-      Math.round(Date.now() / 1000) - deleteAfterSeconds;
+    const pruneThresholdTimestamp = Math.round(Date.now() / 1000) - deleteAfterSeconds;
     if (deleteAfterSeconds === 0) {
       console.log(`[Pruner] Pruning is disabled. Skipping.`);
       return;
     }
-    console.log(
-      `[Pruner] Pruning notifications older than ${deleteAfterSeconds}s (timestamp ${pruneThresholdTimestamp})`
-    );
+    console.log(`[Pruner] Pruning notifications older than ${deleteAfterSeconds}s (timestamp ${pruneThresholdTimestamp})`);
     try {
       await subscriptionManager.pruneNotifications(pruneThresholdTimestamp);
     } catch (e) {

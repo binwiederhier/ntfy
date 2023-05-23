@@ -51,8 +51,7 @@ const ActionBar = (props) => {
       <Toolbar
         sx={{
           pr: "24px",
-          background:
-            "linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%)",
+          background: "linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%)",
         }}
       >
         <IconButton
@@ -77,12 +76,7 @@ const ActionBar = (props) => {
         <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
           {title}
         </Typography>
-        {props.selected && (
-          <SettingsIcons
-            subscription={props.selected}
-            onUnsubscribe={props.onUnsubscribe}
-          />
-        )}
+        {props.selected && <SettingsIcons subscription={props.selected} onUnsubscribe={props.onUnsubscribe} />}
         <ProfileIcon />
       </Toolbar>
     </AppBar>
@@ -101,34 +95,13 @@ const SettingsIcons = (props) => {
 
   return (
     <>
-      <IconButton
-        color="inherit"
-        size="large"
-        edge="end"
-        onClick={handleToggleMute}
-        aria-label={t("action_bar_toggle_mute")}
-      >
-        {subscription.mutedUntil ? (
-          <NotificationsOffIcon />
-        ) : (
-          <NotificationsIcon />
-        )}
+      <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} aria-label={t("action_bar_toggle_mute")}>
+        {subscription.mutedUntil ? <NotificationsOffIcon /> : <NotificationsIcon />}
       </IconButton>
-      <IconButton
-        color="inherit"
-        size="large"
-        edge="end"
-        onClick={(ev) => setAnchorEl(ev.currentTarget)}
-        aria-label={t("action_bar_toggle_action_menu")}
-      >
+      <IconButton color="inherit" size="large" edge="end" onClick={(ev) => setAnchorEl(ev.currentTarget)} aria-label={t("action_bar_toggle_action_menu")}>
         <MoreVertIcon />
       </IconButton>
-      <SubscriptionPopup
-        subscription={subscription}
-        anchor={anchorEl}
-        placement="right"
-        onClose={() => setAnchorEl(null)}
-      />
+      <SubscriptionPopup subscription={subscription} anchor={anchorEl} placement="right" onClose={() => setAnchorEl(null)} />
     </>
   );
 };
@@ -159,43 +132,21 @@ const ProfileIcon = () => {
   return (
     <>
       {session.exists() && (
-        <IconButton
-          color="inherit"
-          size="large"
-          edge="end"
-          onClick={handleClick}
-          aria-label={t("action_bar_profile_title")}
-        >
+        <IconButton color="inherit" size="large" edge="end" onClick={handleClick} aria-label={t("action_bar_profile_title")}>
           <AccountCircleIcon />
         </IconButton>
       )}
       {!session.exists() && config.enable_login && (
-        <Button
-          color="inherit"
-          variant="text"
-          onClick={() => navigate(routes.login)}
-          sx={{ m: 1 }}
-          aria-label={t("action_bar_sign_in")}
-        >
+        <Button color="inherit" variant="text" onClick={() => navigate(routes.login)} sx={{ m: 1 }} aria-label={t("action_bar_sign_in")}>
           {t("action_bar_sign_in")}
         </Button>
       )}
       {!session.exists() && config.enable_signup && (
-        <Button
-          color="inherit"
-          variant="outlined"
-          onClick={() => navigate(routes.signup)}
-          aria-label={t("action_bar_sign_up")}
-        >
+        <Button color="inherit" variant="outlined" onClick={() => navigate(routes.signup)} aria-label={t("action_bar_sign_up")}>
           {t("action_bar_sign_up")}
         </Button>
       )}
-      <PopupMenu
-        horizontal="right"
-        anchorEl={anchorEl}
-        open={open}
-        onClose={handleClose}
-      >
+      <PopupMenu horizontal="right" anchorEl={anchorEl} open={open} onClose={handleClose}>
         <MenuItem onClick={() => navigate(routes.account)}>
           <ListItemIcon>
             <Person />

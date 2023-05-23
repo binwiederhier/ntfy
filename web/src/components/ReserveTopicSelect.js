@@ -4,12 +4,7 @@ import { useTranslation } from "react-i18next";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import {
-  PermissionDenyAll,
-  PermissionRead,
-  PermissionReadWrite,
-  PermissionWrite,
-} from "./ReserveIcons";
+import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { Permission } from "../app/AccountApi";
 
 const ReserveTopicSelect = (props) => {
@@ -34,33 +29,25 @@ const ReserveTopicSelect = (props) => {
           <ListItemIcon>
             <PermissionDenyAll />
           </ListItemIcon>
-          <ListItemText
-            primary={t("prefs_reservations_table_everyone_deny_all")}
-          />
+          <ListItemText primary={t("prefs_reservations_table_everyone_deny_all")} />
         </MenuItem>
         <MenuItem value={Permission.READ_ONLY}>
           <ListItemIcon>
             <PermissionRead />
           </ListItemIcon>
-          <ListItemText
-            primary={t("prefs_reservations_table_everyone_read_only")}
-          />
+          <ListItemText primary={t("prefs_reservations_table_everyone_read_only")} />
         </MenuItem>
         <MenuItem value={Permission.WRITE_ONLY}>
           <ListItemIcon>
             <PermissionWrite />
           </ListItemIcon>
-          <ListItemText
-            primary={t("prefs_reservations_table_everyone_write_only")}
-          />
+          <ListItemText primary={t("prefs_reservations_table_everyone_write_only")} />
         </MenuItem>
         <MenuItem value={Permission.READ_WRITE}>
           <ListItemIcon>
             <PermissionReadWrite />
           </ListItemIcon>
-          <ListItemText
-            primary={t("prefs_reservations_table_everyone_read_write")}
-          />
+          <ListItemText primary={t("prefs_reservations_table_everyone_read_write")} />
         </MenuItem>
       </Select>
     </FormControl>

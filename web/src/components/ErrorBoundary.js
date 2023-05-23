@@ -22,9 +22,7 @@ class ErrorBoundaryImpl extends React.Component {
     // - https://github.com/dexie/Dexie.js/issues/312
     // - https://bugzilla.mozilla.org/show_bug.cgi?id=781982
     const isUnsupportedIndexedDB =
-      error?.name === "InvalidStateError" ||
-      (error?.name === "DatabaseClosedError" &&
-        error?.message?.indexOf("InvalidStateError") !== -1);
+      error?.name === "InvalidStateError" || (error?.name === "DatabaseClosedError" && error?.message?.indexOf("InvalidStateError") !== -1);
 
     if (isUnsupportedIndexedDB) {
       this.handleUnsupportedIndexedDB();
@@ -48,14 +46,7 @@ class ErrorBoundaryImpl extends React.Component {
     // Fetch additional info and a better stack trace
     StackTrace.fromError(error).then((stack) => {
       console.error("[ErrorBoundary] Stacktrace fetched", stack);
-      const niceStack =
-        `${error.toString()}\n` +
-        stack
-          .map(
-            (el) =>
-              `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`
-          )
-          .join("\n");
+      const niceStack = `${error.toString()}\n` + stack.map((el) => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`).join("\n");
       this.setState({ niceStack });
     });
   }
@@ -96,9 +87,7 @@ class ErrorBoundaryImpl extends React.Component {
           <Trans
             i18nKey="error_boundary_unsupported_indexeddb_description"
             components={{
-              githubLink: (
-                <Link href="https://github.com/binwiederhier/ntfy/issues/208" />
-              ),
+              githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues/208" />,
               discordLink: <Link href="https://discord.gg/cT7ECsZj9w" />,
               matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org" />,
             }}
@@ -117,9 +106,7 @@ class ErrorBoundaryImpl extends React.Component {
           <Trans
             i18nKey="error_boundary_description"
             components={{
-              githubLink: (
-                <Link href="https://github.com/binwiederhier/ntfy/issues" />
-              ),
+              githubLink: <Link href="https://github.com/binwiederhier/ntfy/issues" />,
               discordLink: <Link href="https://discord.gg/cT7ECsZj9w" />,
               matrixLink: <Link href="https://matrix.to/#/#ntfy:matrix.org" />,
             }}
@@ -135,11 +122,7 @@ class ErrorBoundaryImpl extends React.Component {
           <pre>{this.state.niceStack}</pre>
         ) : (
           <>
-            <CircularProgress
-              size="20px"
-              sx={{ verticalAlign: "text-bottom" }}
-            />{" "}
-            {t("error_boundary_gathering_info")}
+            <CircularProgress size="20px" sx={{ verticalAlign: "text-bottom" }} /> {t("error_boundary_gathering_info")}
           </>
         )}
         <pre>{this.state.originalStack}</pre>

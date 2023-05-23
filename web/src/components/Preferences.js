@@ -44,17 +44,8 @@ import { Pref, PrefGroup } from "./Pref";
 import { Info } from "@mui/icons-material";
 import { AccountContext } from "./App";
 import { useOutletContext } from "react-router-dom";
-import {
-  PermissionDenyAll,
-  PermissionRead,
-  PermissionReadWrite,
-  PermissionWrite,
-} from "./ReserveIcons";
-import {
-  ReserveAddDialog,
-  ReserveDeleteDialog,
-  ReserveEditDialog,
-} from "./ReserveDialogs";
+import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
+import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
 import subscriptionManager from "../app/SubscriptionManager";
 import { subscribeTopic } from "./SubscribeDialog";
@@ -112,21 +103,11 @@ const Sound = () => {
     });
   }
   return (
-    <Pref
-      labelId={labelId}
-      title={t("prefs_notifications_sound_title")}
-      description={description}
-    >
+    <Pref labelId={labelId} title={t("prefs_notifications_sound_title")} description={description}>
       <div style={{ display: "flex", width: "100%" }}>
         <FormControl fullWidth variant="standard" sx={{ margin: 1 }}>
-          <Select
-            value={sound}
-            onChange={handleChange}
-            aria-labelledby={labelId}
-          >
-            <MenuItem value={"none"}>
-              {t("prefs_notifications_sound_no_sound")}
-            </MenuItem>
+          <Select value={sound} onChange={handleChange} aria-labelledby={labelId}>
+            <MenuItem value={"none"}>{t("prefs_notifications_sound_no_sound")}</MenuItem>
             {Object.entries(sounds).map((s) => (
               <MenuItem key={s[0]} value={s[0]}>
                 {s[1].label}
@@ -134,11 +115,7 @@ const Sound = () => {
             ))}
           </Select>
         </FormControl>
-        <IconButton
-          onClick={() => playSound(sound)}
-          disabled={sound === "none"}
-          aria-label={t("prefs_notifications_sound_play")}
-        >
+        <IconButton onClick={() => playSound(sound)} disabled={sound === "none"} aria-label={t("prefs_notifications_sound_play")}>
           <PlayArrowIcon />
         </IconButton>
       </div>
@@ -174,41 +151,20 @@ const MinPriority = () => {
   } else if (minPriority === 5) {
     description = t("prefs_notifications_min_priority_description_max");
   } else {
-    description = t(
-      "prefs_notifications_min_priority_description_x_or_higher",
-      {
-        number: minPriority,
-        name: priorities[minPriority],
-      }
-    );
+    description = t("prefs_notifications_min_priority_description_x_or_higher", {
+      number: minPriority,
+      name: priorities[minPriority],
+    });
   }
   return (
-    <Pref
-      labelId={labelId}
-      title={t("prefs_notifications_min_priority_title")}
-      description={description}
-    >
+    <Pref labelId={labelId} title={t("prefs_notifications_min_priority_title")} description={description}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select
-          value={minPriority}
-          onChange={handleChange}
-          aria-labelledby={labelId}
-        >
-          <MenuItem value={1}>
-            {t("prefs_notifications_min_priority_any")}
-          </MenuItem>
-          <MenuItem value={2}>
-            {t("prefs_notifications_min_priority_low_and_higher")}
-          </MenuItem>
-          <MenuItem value={3}>
-            {t("prefs_notifications_min_priority_default_and_higher")}
-          </MenuItem>
-          <MenuItem value={4}>
-            {t("prefs_notifications_min_priority_high_and_higher")}
-          </MenuItem>
-          <MenuItem value={5}>
-            {t("prefs_notifications_min_priority_max_only")}
-          </MenuItem>
+        <Select value={minPriority} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value={1}>{t("prefs_notifications_min_priority_any")}</MenuItem>
+          <MenuItem value={2}>{t("prefs_notifications_min_priority_low_and_higher")}</MenuItem>
+          <MenuItem value={3}>{t("prefs_notifications_min_priority_default_and_higher")}</MenuItem>
+          <MenuItem value={4}>{t("prefs_notifications_min_priority_high_and_higher")}</MenuItem>
+          <MenuItem value={5}>{t("prefs_notifications_min_priority_max_only")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>
@@ -246,32 +202,14 @@ const DeleteAfter = () => {
     }
   })();
   return (
-    <Pref
-      labelId={labelId}
-      title={t("prefs_notifications_delete_after_title")}
-      description={description}
-    >
+    <Pref labelId={labelId} title={t("prefs_notifications_delete_after_title")} description={description}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select
-          value={deleteAfter}
-          onChange={handleChange}
-          aria-labelledby={labelId}
-        >
-          <MenuItem value={0}>
-            {t("prefs_notifications_delete_after_never")}
-          </MenuItem>
-          <MenuItem value={10800}>
-            {t("prefs_notifications_delete_after_three_hours")}
-          </MenuItem>
-          <MenuItem value={86400}>
-            {t("prefs_notifications_delete_after_one_day")}
-          </MenuItem>
-          <MenuItem value={604800}>
-            {t("prefs_notifications_delete_after_one_week")}
-          </MenuItem>
-          <MenuItem value={2592000}>
-            {t("prefs_notifications_delete_after_one_month")}
-          </MenuItem>
+        <Select value={deleteAfter} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value={0}>{t("prefs_notifications_delete_after_never")}</MenuItem>
+          <MenuItem value={10800}>{t("prefs_notifications_delete_after_three_hours")}</MenuItem>
+          <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
+          <MenuItem value={604800}>{t("prefs_notifications_delete_after_one_week")}</MenuItem>
+          <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>
@@ -294,9 +232,7 @@ const Users = () => {
     setDialogOpen(false);
     try {
       await userManager.save(user);
-      console.debug(
-        `[Preferences] User ${user.username} for ${user.baseUrl} added`
-      );
+      console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} added`);
     } catch (e) {
       console.log(`[Preferences] Error adding user.`, e);
     }
@@ -309,22 +245,13 @@ const Users = () => {
         </Typography>
         <Paragraph>
           {t("prefs_users_description")}
-          {session.exists() && (
-            <>{" " + t("prefs_users_description_no_sync")}</>
-          )}
+          {session.exists() && <>{" " + t("prefs_users_description_no_sync")}</>}
         </Paragraph>
         {users?.length > 0 && <UserTable users={users} />}
       </CardContent>
       <CardActions>
         <Button onClick={handleAddClick}>{t("prefs_users_add_button")}</Button>
-        <UserDialog
-          key={`userAddDialog${dialogKey}`}
-          open={dialogOpen}
-          user={null}
-          users={users}
-          onCancel={handleDialogCancel}
-          onSubmit={handleDialogSubmit}
-        />
+        <UserDialog key={`userAddDialog${dialogKey}`} open={dialogOpen} user={null} users={users} onCancel={handleDialogCancel} onSubmit={handleDialogSubmit} />
       </CardActions>
     </Card>
   );
@@ -350,9 +277,7 @@ const UserTable = (props) => {
     setDialogOpen(false);
     try {
       await userManager.save(user);
-      console.debug(
-        `[Preferences] User ${user.username} for ${user.baseUrl} updated`
-      );
+      console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} updated`);
     } catch (e) {
       console.log(`[Preferences] Error updating user.`, e);
     }
@@ -361,9 +286,7 @@ const UserTable = (props) => {
   const handleDeleteClick = async (user) => {
     try {
       await userManager.delete(user.baseUrl);
-      console.debug(
-        `[Preferences] User ${user.username} for ${user.baseUrl} deleted`
-      );
+      console.debug(`[Preferences] User ${user.username} for ${user.baseUrl} deleted`);
     } catch (e) {
       console.error(`[Preferences] Error deleting user for ${user.baseUrl}`, e);
     }
@@ -373,43 +296,25 @@ const UserTable = (props) => {
     <Table size="small" aria-label={t("prefs_users_table")}>
       <TableHead>
         <TableRow>
-          <TableCell sx={{ paddingLeft: 0 }}>
-            {t("prefs_users_table_user_header")}
-          </TableCell>
+          <TableCell sx={{ paddingLeft: 0 }}>{t("prefs_users_table_user_header")}</TableCell>
           <TableCell>{t("prefs_users_table_base_url_header")}</TableCell>
           <TableCell />
         </TableRow>
       </TableHead>
       <TableBody>
         {props.users?.map((user) => (
-          <TableRow
-            key={user.baseUrl}
-            sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-          >
-            <TableCell
-              component="th"
-              scope="row"
-              sx={{ paddingLeft: 0 }}
-              aria-label={t("prefs_users_table_user_header")}
-            >
+          <TableRow key={user.baseUrl} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+            <TableCell component="th" scope="row" sx={{ paddingLeft: 0 }} aria-label={t("prefs_users_table_user_header")}>
               {user.username}
             </TableCell>
-            <TableCell aria-label={t("prefs_users_table_base_url_header")}>
-              {user.baseUrl}
-            </TableCell>
+            <TableCell aria-label={t("prefs_users_table_base_url_header")}>{user.baseUrl}</TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {(!session.exists() || user.baseUrl !== config.base_url) && (
                 <>
-                  <IconButton
-                    onClick={() => handleEditClick(user)}
-                    aria-label={t("prefs_users_edit_button")}
-                  >
+                  <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
                     <EditIcon />
                   </IconButton>
-                  <IconButton
-                    onClick={() => handleDeleteClick(user)}
-                    aria-label={t("prefs_users_delete_button")}
-                  >
+                  <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
                     <CloseIcon />
                   </IconButton>
                 </>
@@ -454,15 +359,8 @@ const UserDialog = (props) => {
       return username.length > 0 && password.length > 0;
     }
     const baseUrlValid = validUrl(baseUrl);
-    const baseUrlExists = props.users
-      ?.map((user) => user.baseUrl)
-      .includes(baseUrl);
-    return (
-      baseUrlValid &&
-      !baseUrlExists &&
-      username.length > 0 &&
-      password.length > 0
-    );
+    const baseUrlExists = props.users?.map((user) => user.baseUrl).includes(baseUrl);
+    return baseUrlValid && !baseUrlExists && username.length > 0 && password.length > 0;
   })();
   const handleSubmit = async () => {
     props.onSubmit({
@@ -480,11 +378,7 @@ const UserDialog = (props) => {
   }, [editMode, props.user]);
   return (
     <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-      <DialogTitle>
-        {editMode
-          ? t("prefs_users_dialog_title_edit")
-          : t("prefs_users_dialog_title_add")}
-      </DialogTitle>
+      <DialogTitle>{editMode ? t("prefs_users_dialog_title_edit") : t("prefs_users_dialog_title_add")}</DialogTitle>
       <DialogContent>
         {!editMode && (
           <TextField
@@ -555,26 +449,7 @@ const Language = () => {
 
   // Country flags are displayed using emoji. Emoji rendering is handled by platform fonts.
   // Windows in particular does not yet play nicely with flag emoji so for now, hide flags on Windows.
-  const randomFlags = shuffle([
-    "🇬🇧",
-    "🇺🇸",
-    "🇪🇸",
-    "🇫🇷",
-    "🇧🇬",
-    "🇨🇿",
-    "🇩🇪",
-    "🇵🇱",
-    "🇺🇦",
-    "🇨🇳",
-    "🇮🇹",
-    "🇭🇺",
-    "🇧🇷",
-    "🇳🇱",
-    "🇮🇩",
-    "🇯🇵",
-    "🇷🇺",
-    "🇹🇷",
-  ]).slice(0, 3);
+  const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
   const showFlags = !navigator.userAgent.includes("Windows");
   let title = t("prefs_appearance_language_title");
   if (showFlags) {
@@ -635,8 +510,7 @@ const Reservations = () => {
     return <></>;
   }
   const reservations = account.reservations || [];
-  const limitReached =
-    account.role === Role.USER && account.stats.reservations_remaining === 0;
+  const limitReached = account.role === Role.USER && account.stats.reservations_remaining === 0;
 
   const handleAddClick = () => {
     setDialogKey((prev) => prev + 1);
@@ -650,23 +524,14 @@ const Reservations = () => {
           {t("prefs_reservations_title")}
         </Typography>
         <Paragraph>{t("prefs_reservations_description")}</Paragraph>
-        {reservations.length > 0 && (
-          <ReservationsTable reservations={reservations} />
-        )}
-        {limitReached && (
-          <Alert severity="info">{t("prefs_reservations_limit_reached")}</Alert>
-        )}
+        {reservations.length > 0 && <ReservationsTable reservations={reservations} />}
+        {limitReached && <Alert severity="info">{t("prefs_reservations_limit_reached")}</Alert>}
       </CardContent>
       <CardActions>
         <Button onClick={handleAddClick} disabled={limitReached}>
           {t("prefs_reservations_add_button")}
         </Button>
-        <ReserveAddDialog
-          key={`reservationAddDialog${dialogKey}`}
-          open={dialogOpen}
-          reservations={reservations}
-          onClose={() => setDialogOpen(false)}
-        />
+        <ReserveAddDialog key={`reservationAddDialog${dialogKey}`} open={dialogOpen} reservations={reservations} onClose={() => setDialogOpen(false)} />
       </CardActions>
     </Card>
   );
@@ -680,14 +545,7 @@ const ReservationsTable = (props) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { subscriptions } = useOutletContext();
   const localSubscriptions =
-    subscriptions?.length > 0
-      ? Object.assign(
-          {},
-          ...subscriptions
-            .filter((s) => s.baseUrl === config.base_url)
-            .map((s) => ({ [s.topic]: s }))
-        )
-      : {};
+    subscriptions?.length > 0 ? Object.assign({}, ...subscriptions.filter((s) => s.baseUrl === config.base_url).map((s) => ({ [s.topic]: s }))) : {};
 
   const handleEditClick = (reservation) => {
     setDialogKey((prev) => prev + 1);
@@ -709,70 +567,46 @@ const ReservationsTable = (props) => {
     <Table size="small" aria-label={t("prefs_reservations_table")}>
       <TableHead>
         <TableRow>
-          <TableCell sx={{ paddingLeft: 0 }}>
-            {t("prefs_reservations_table_topic_header")}
-          </TableCell>
+          <TableCell sx={{ paddingLeft: 0 }}>{t("prefs_reservations_table_topic_header")}</TableCell>
           <TableCell>{t("prefs_reservations_table_access_header")}</TableCell>
           <TableCell />
         </TableRow>
       </TableHead>
       <TableBody>
         {props.reservations.map((reservation) => (
-          <TableRow
-            key={reservation.topic}
-            sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-          >
-            <TableCell
-              component="th"
-              scope="row"
-              sx={{ paddingLeft: 0 }}
-              aria-label={t("prefs_reservations_table_topic_header")}
-            >
+          <TableRow key={reservation.topic} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+            <TableCell component="th" scope="row" sx={{ paddingLeft: 0 }} aria-label={t("prefs_reservations_table_topic_header")}>
               {reservation.topic}
             </TableCell>
             <TableCell aria-label={t("prefs_reservations_table_access_header")}>
               {reservation.everyone === Permission.READ_WRITE && (
                 <>
-                  <PermissionReadWrite
-                    size="small"
-                    sx={{ verticalAlign: "bottom", mr: 1.5 }}
-                  />
+                  <PermissionReadWrite size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }} />
                   {t("prefs_reservations_table_everyone_read_write")}
                 </>
               )}
               {reservation.everyone === Permission.READ_ONLY && (
                 <>
-                  <PermissionRead
-                    size="small"
-                    sx={{ verticalAlign: "bottom", mr: 1.5 }}
-                  />
+                  <PermissionRead size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }} />
                   {t("prefs_reservations_table_everyone_read_only")}
                 </>
               )}
               {reservation.everyone === Permission.WRITE_ONLY && (
                 <>
-                  <PermissionWrite
-                    size="small"
-                    sx={{ verticalAlign: "bottom", mr: 1.5 }}
-                  />
+                  <PermissionWrite size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }} />
                   {t("prefs_reservations_table_everyone_write_only")}
                 </>
               )}
               {reservation.everyone === Permission.DENY_ALL && (
                 <>
-                  <PermissionDenyAll
-                    size="small"
-                    sx={{ verticalAlign: "bottom", mr: 1.5 }}
-                  />
+                  <PermissionDenyAll size="small" sx={{ verticalAlign: "bottom", mr: 1.5 }} />
                   {t("prefs_reservations_table_everyone_deny_all")}
                 </>
               )}
             </TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {!localSubscriptions[reservation.topic] && (
-                <Tooltip
-                  title={t("prefs_reservations_table_click_to_subscribe")}
-                >
+                <Tooltip title={t("prefs_reservations_table_click_to_subscribe")}>
                   <Chip
                     icon={<Info />}
                     onClick={() => handleSubscribeClick(reservation)}
@@ -782,16 +616,10 @@ const ReservationsTable = (props) => {
                   />
                 </Tooltip>
               )}
-              <IconButton
-                onClick={() => handleEditClick(reservation)}
-                aria-label={t("prefs_reservations_edit_button")}
-              >
+              <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
                 <EditIcon />
               </IconButton>
-              <IconButton
-                onClick={() => handleDeleteClick(reservation)}
-                aria-label={t("prefs_reservations_delete_button")}
-              >
+              <IconButton onClick={() => handleDeleteClick(reservation)} aria-label={t("prefs_reservations_delete_button")}>
                 <CloseIcon />
               </IconButton>
             </TableCell>

@@ -49,12 +49,8 @@ class ConnectionManager {
         return { ...s, user, connectionId };
       })
     );
-    const targetIds = subscriptionsWithUsersAndConnectionId.map(
-      (s) => s.connectionId
-    );
-    const deletedIds = Array.from(this.connections.keys()).filter(
-      (id) => !targetIds.includes(id)
-    );
+    const targetIds = subscriptionsWithUsersAndConnectionId.map((s) => s.connectionId);
+    const deletedIds = Array.from(this.connections.keys()).filter((id) => !targetIds.includes(id));
 
     // Create and add new connections
     subscriptionsWithUsersAndConnectionId.forEach((subscription) => {
@@ -73,15 +69,12 @@ class ConnectionManager {
           topic,
           user,
           since,
-          (subscriptionId, notification) =>
-            this.notificationReceived(subscriptionId, notification),
+          (subscriptionId, notification) => this.notificationReceived(subscriptionId, notification),
           (subscriptionId, state) => this.stateChanged(subscriptionId, state)
         );
         this.connections.set(connectionId, connection);
         console.log(
-          `[ConnectionManager] Starting new connection ${connectionId} (subscription ${subscriptionId} with user ${
-            user ? user.username : "anonymous"
-          })`
+          `[ConnectionManager] Starting new connection ${connectionId} (subscription ${subscriptionId} with user ${user ? user.username : "anonymous"})`
         );
         connection.start();
       }
@@ -101,10 +94,7 @@ class ConnectionManager {
       try {
         this.stateListener(subscriptionId, state);
       } catch (e) {
-        console.error(
-          `[ConnectionManager] Error updating state of ${subscriptionId} to ${state}`,
-          e
-        );
+        console.error(`[ConnectionManager] Error updating state of ${subscriptionId} to ${state}`, e);
       }
     }
   }
@@ -114,23 +104,14 @@ class ConnectionManager {
       try {
         this.messageListener(subscriptionId, notification);
       } catch (e) {
-        console.error(
-          `[ConnectionManager] Error handling notification for ${subscriptionId}`,
-          e
-        );
+        console.error(`[ConnectionManager] Error handling notification for ${subscriptionId}`, e);
       }
     }
   }
 }
 
 const makeConnectionId = async (subscription, user) => {
-  return user
-    ? hashCode(
-        `${subscription.id}|${user.username}|${user.password ?? ""}|${
-          user.token ?? ""
-        }`
-      )
-    : hashCode(`${subscription.id}`);
+  return user ? hashCode(`${subscription.id}|${user.username}|${user.password ?? ""}|${user.token ?? ""}`) : hashCode(`${subscription.id}`);
 };
 
 const connectionManager = new ConnectionManager();

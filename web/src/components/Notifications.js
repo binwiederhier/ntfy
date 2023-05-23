@@ -1,16 +1,5 @@
 import Container from "@mui/material/Container";
-import {
-  ButtonBase,
-  CardActions,
-  CardContent,
-  CircularProgress,
-  Fade,
-  Link,
-  Modal,
-  Snackbar,
-  Stack,
-  Tooltip,
-} from "@mui/material";
+import { ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Modal, Snackbar, Stack, Tooltip } from "@mui/material";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
@@ -29,11 +18,7 @@ import {
 import IconButton from "@mui/material/IconButton";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
-import {
-  LightboxBackdrop,
-  Paragraph,
-  VerticallyCenteredContainer,
-} from "./styles";
+import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import { useLiveQuery } from "dexie-react-hooks";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -68,10 +53,7 @@ export const SingleSubscription = () => {
 
 const AllSubscriptionsList = (props) => {
   const subscriptions = props.subscriptions;
-  const notifications = useLiveQuery(
-    () => subscriptionManager.getAllNotifications(),
-    []
-  );
+  const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
   } else if (subscriptions.length === 0) {
@@ -79,33 +61,18 @@ const AllSubscriptionsList = (props) => {
   } else if (notifications.length === 0) {
     return <NoNotificationsWithoutSubscription subscriptions={subscriptions} />;
   }
-  return (
-    <NotificationList
-      key="all"
-      notifications={notifications}
-      messageBar={false}
-    />
-  );
+  return <NotificationList key="all" notifications={notifications} messageBar={false} />;
 };
 
 const SingleSubscriptionList = (props) => {
   const subscription = props.subscription;
-  const notifications = useLiveQuery(
-    () => subscriptionManager.getNotifications(subscription.id),
-    [subscription]
-  );
+  const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
   } else if (notifications.length === 0) {
     return <NoNotifications subscription={subscription} />;
   }
-  return (
-    <NotificationList
-      id={subscription.id}
-      notifications={notifications}
-      messageBar={true}
-    />
-  );
+  return <NotificationList id={subscription.id} notifications={notifications} messageBar={true} />;
 };
 
 const NotificationList = (props) => {
@@ -146,18 +113,9 @@ const NotificationList = (props) => {
       >
         <Stack spacing={3}>
           {notifications.slice(0, count).map((notification) => (
-            <NotificationItem
-              key={notification.id}
-              notification={notification}
-              onShowSnack={() => setSnackOpen(true)}
-            />
+            <NotificationItem key={notification.id} notification={notification} onShowSnack={() => setSnackOpen(true)} />
           ))}
-          <Snackbar
-            open={snackOpen}
-            autoHideDuration={3000}
-            onClose={() => setSnackOpen(false)}
-            message={t("notifications_copied_to_clipboard")}
-          />
+          <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)} message={t("notifications_copied_to_clipboard")} />
         </Stack>
       </Container>
     </InfiniteScroll>
@@ -176,45 +134,29 @@ const NotificationItem = (props) => {
     await subscriptionManager.deleteNotification(notification.id);
   };
   const handleMarkRead = async () => {
-    console.log(
-      `[Notifications] Marking notification ${notification.id} as read`
-    );
+    console.log(`[Notifications] Marking notification ${notification.id} as read`);
     await subscriptionManager.markNotificationRead(notification.id);
   };
   const handleCopy = (s) => {
     navigator.clipboard.writeText(s);
     props.onShowSnack();
   };
-  const expired =
-    attachment && attachment.expires && attachment.expires < Date.now() / 1000;
+  const expired = attachment && attachment.expires && attachment.expires < Date.now() / 1000;
   const hasAttachmentActions = attachment && !expired;
   const hasClickAction = notification.click;
-  const hasUserActions =
-    notification.actions && notification.actions.length > 0;
+  const hasUserActions = notification.actions && notification.actions.length > 0;
   const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
   return (
-    <Card
-      sx={{ minWidth: 275, padding: 1 }}
-      role="listitem"
-      aria-label={t("notifications_list_item")}
-    >
+    <Card sx={{ minWidth: 275, padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
       <CardContent>
         <Tooltip title={t("notifications_delete")} enterDelay={500}>
-          <IconButton
-            onClick={handleDelete}
-            sx={{ float: "right", marginRight: -1, marginTop: -1 }}
-            aria-label={t("notifications_delete")}
-          >
+          <IconButton onClick={handleDelete} sx={{ float: "right", marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
             <CloseIcon />
           </IconButton>
         </Tooltip>
         {notification.new === 1 && (
           <Tooltip title={t("notifications_mark_read")} enterDelay={500}>
-            <IconButton
-              onClick={handleMarkRead}
-              sx={{ float: "right", marginRight: -0.5, marginTop: -1 }}
-              aria-label={t("notifications_mark_read")}
-            >
+            <IconButton onClick={handleMarkRead} sx={{ float: "right", marginRight: -0.5, marginTop: -1 }} aria-label={t("notifications_mark_read")}>
               <CheckIcon />
             </IconButton>
           </Tooltip>
@@ -247,9 +189,7 @@ const NotificationItem = (props) => {
           </Typography>
         )}
         <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
-          {autolink(
-            maybeAppendActionErrors(formatMessage(notification), notification)
-          )}
+          {autolink(maybeAppendActionErrors(formatMessage(notification), notification))}
         </Typography>
         {attachment && <Attachment attachment={attachment} />}
         {tags && (
@@ -263,36 +203,28 @@ const NotificationItem = (props) => {
           {hasAttachmentActions && (
             <>
               <Tooltip title={t("notifications_attachment_copy_url_title")}>
-                <Button onClick={() => handleCopy(attachment.url)}>
-                  {t("notifications_attachment_copy_url_button")}
-                </Button>
+                <Button onClick={() => handleCopy(attachment.url)}>{t("notifications_attachment_copy_url_button")}</Button>
               </Tooltip>
               <Tooltip
                 title={t("notifications_attachment_open_title", {
                   url: attachment.url,
                 })}
               >
-                <Button onClick={() => openUrl(attachment.url)}>
-                  {t("notifications_attachment_open_button")}
-                </Button>
+                <Button onClick={() => openUrl(attachment.url)}>{t("notifications_attachment_open_button")}</Button>
               </Tooltip>
             </>
           )}
           {hasClickAction && (
             <>
               <Tooltip title={t("notifications_click_copy_url_title")}>
-                <Button onClick={() => handleCopy(notification.click)}>
-                  {t("notifications_click_copy_url_button")}
-                </Button>
+                <Button onClick={() => handleCopy(notification.click)}>{t("notifications_click_copy_url_button")}</Button>
               </Tooltip>
               <Tooltip
                 title={t("notifications_actions_open_url_title", {
                   url: notification.click,
                 })}
               >
-                <Button onClick={() => openUrl(notification.click)}>
-                  {t("notifications_click_open_button")}
-                </Button>
+                <Button onClick={() => openUrl(notification.click)}>{t("notifications_click_open_button")}</Button>
               </Tooltip>
             </>
           )}
@@ -311,18 +243,10 @@ const NotificationItem = (props) => {
  * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
  */
 const autolink = (s) => {
-  const parts = s.split(
-    /(\bhttps?:\/\/[\-A-Z0-9+\u0026\u2019@#\/%?=()~_|!:,.;]*[\-A-Z0-9+\u0026@#\/%=~()_|]\b)/gi
-  );
+  const parts = s.split(/(\bhttps?:\/\/[\-A-Z0-9+\u0026\u2019@#\/%?=()~_|!:,.;]*[\-A-Z0-9+\u0026@#\/%=~()_|]\b)/gi);
   for (let i = 1; i < parts.length; i += 2) {
     parts[i] = (
-      <Link
-        key={i}
-        href={parts[i]}
-        underline="hover"
-        target="_blank"
-        rel="noreferrer,noopener"
-      >
+      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
         {shortUrl(parts[i])}
       </Link>
     );
@@ -342,8 +266,7 @@ const Attachment = (props) => {
   const attachment = props.attachment;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
-  const displayableImage =
-    !expired && attachment.type && attachment.type.startsWith("image/");
+  const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
 
   // Unexpired image
   if (displayableImage) {
@@ -386,10 +309,7 @@ const Attachment = (props) => {
         }}
       >
         <AttachmentIcon type={attachment.type} />
-        <Typography
-          variant="body2"
-          sx={{ marginLeft: 1, textAlign: "left", color: "text.primary" }}
-        >
+        <Typography variant="body2" sx={{ marginLeft: 1, textAlign: "left", color: "text.primary" }}>
           <b>{attachment.name}</b>
           {maybeInfoText}
         </Typography>
@@ -420,10 +340,7 @@ const Attachment = (props) => {
         }}
       >
         <AttachmentIcon type={attachment.type} />
-        <Typography
-          variant="body2"
-          sx={{ marginLeft: 1, textAlign: "left", color: "text.primary" }}
-        >
+        <Typography variant="body2" sx={{ marginLeft: 1, textAlign: "left", color: "text.primary" }}>
           <b>{attachment.name}</b>
           {maybeInfoText}
         </Typography>
@@ -453,11 +370,7 @@ const Image = (props) => {
           cursor: "pointer",
         }}
       />
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        BackdropComponent={LightboxBackdrop}
-      >
+      <Modal open={open} onClose={() => setOpen(false)} BackdropComponent={LightboxBackdrop}>
         <Fade in={open}>
           <Box
             component="img"
@@ -484,11 +397,7 @@ const UserActions = (props) => {
   return (
     <>
       {props.notification.actions.map((action) => (
-        <UserAction
-          key={action.id}
-          notification={props.notification}
-          action={action}
-        />
+        <UserAction key={action.id} notification={props.notification} action={action} />
       ))}
     </>
   );
@@ -502,10 +411,7 @@ const UserAction = (props) => {
     return (
       <Tooltip title={t("notifications_actions_not_supported")}>
         <span>
-          <Button
-            disabled
-            aria-label={t("notifications_actions_not_supported")}
-          >
+          <Button disabled aria-label={t("notifications_actions_not_supported")}>
             {action.label}
           </Button>
         </span>
@@ -513,9 +419,7 @@ const UserAction = (props) => {
     );
   } else if (action.action === "view") {
     return (
-      <Tooltip
-        title={t("notifications_actions_open_url_title", { url: action.url })}
-      >
+      <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
         <Button
           onClick={() => openUrl(action.url)}
           aria-label={t("notifications_actions_open_url_title", {
@@ -528,8 +432,7 @@ const UserAction = (props) => {
     );
   } else if (action.action === "http") {
     const method = action.method ?? "POST";
-    const label =
-      action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
+    const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
     return (
       <Tooltip
         title={t("notifications_actions_http_request_title", {
@@ -568,21 +471,11 @@ const performHttpAction = async (notification, action) => {
     if (success) {
       updateActionStatus(notification, action, ACTION_PROGRESS_SUCCESS, null);
     } else {
-      updateActionStatus(
-        notification,
-        action,
-        ACTION_PROGRESS_FAILED,
-        `${action.label}: Unexpected response HTTP ${response.status}`
-      );
+      updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: Unexpected response HTTP ${response.status}`);
     }
   } catch (e) {
     console.log(`[Notifications] HTTP action failed`, e);
-    updateActionStatus(
-      notification,
-      action,
-      ACTION_PROGRESS_FAILED,
-      `${action.label}: ${e} Check developer console for details.`
-    );
+    updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: ${e} Check developer console for details.`);
   }
 };
 
@@ -608,19 +501,11 @@ const ACTION_LABEL_SUFFIX = {
 
 const NoNotifications = (props) => {
   const { t } = useTranslation();
-  const shortUrl = topicShortUrl(
-    props.subscription.baseUrl,
-    props.subscription.topic
-  );
+  const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-        <img
-          src={logoOutline}
-          height="64"
-          width="64"
-          alt={t("action_bar_logo_alt")}
-        />
+        <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")} />
         <br />
         {t("notifications_none_for_topic_title")}
       </Typography>
@@ -643,12 +528,7 @@ const NoNotificationsWithoutSubscription = (props) => {
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-        <img
-          src={logoOutline}
-          height="64"
-          width="64"
-          alt={t("action_bar_logo_alt")}
-        />
+        <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")} />
         <br />
         {t("notifications_none_for_any_title")}
       </Typography>
@@ -669,12 +549,7 @@ const NoSubscriptions = () => {
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
-        <img
-          src={logoOutline}
-          height="64"
-          width="64"
-          alt={t("action_bar_logo_alt")}
-        />
+        <img src={logoOutline} height="64" width="64" alt={t("action_bar_logo_alt")} />
         <br />
         {t("notifications_no_subscriptions_title")}
       </Typography>
@@ -695,12 +570,8 @@ const ForMoreDetails = () => {
     <Trans
       i18nKey="notifications_more_details"
       components={{
-        websiteLink: (
-          <Link href="https://ntfy.sh" target="_blank" rel="noopener" />
-        ),
-        docsLink: (
-          <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />
-        ),
+        websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener" />,
+        docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
       }}
     />
   );
@@ -710,12 +581,7 @@ const Loading = () => {
   const { t } = useTranslation();
   return (
     <VerticallyCenteredContainer>
-      <Typography
-        variant="h5"
-        color="text.secondary"
-        align="center"
-        sx={{ paddingBottom: 1 }}
-      >
+      <Typography variant="h5" color="text.secondary" align="center" sx={{ paddingBottom: 1 }}>
         <CircularProgress disableShrink sx={{ marginBottom: 1 }} />
         <br />
         {t("notifications_loading")}

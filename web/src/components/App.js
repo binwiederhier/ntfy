@@ -1,11 +1,5 @@
 import * as React from "react";
-import {
-  createContext,
-  Suspense,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import { createContext, Suspense, useContext, useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -19,21 +13,11 @@ import Preferences from "./Preferences";
 import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import {
-  BrowserRouter,
-  Outlet,
-  Route,
-  Routes,
-  useParams,
-} from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { expandUrl } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import {
-  useAccountListener,
-  useBackgroundProcesses,
-  useConnectionListeners,
-} from "./hooks";
+import { useAccountListener, useBackgroundProcesses, useConnectionListeners } from "./hooks";
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
@@ -60,14 +44,8 @@ const App = () => {
                   <Route path={routes.app} element={<AllSubscriptions />} />
                   <Route path={routes.account} element={<Account />} />
                   <Route path={routes.settings} element={<Preferences />} />
-                  <Route
-                    path={routes.subscription}
-                    element={<SingleSubscription />}
-                  />
-                  <Route
-                    path={routes.subscriptionExternal}
-                    element={<SingleSubscription />}
-                  />
+                  <Route path={routes.subscription} element={<SingleSubscription />} />
+                  <Route path={routes.subscriptionExternal} element={<SingleSubscription />} />
                 </Route>
               </Routes>
             </ErrorBoundary>
@@ -82,22 +60,15 @@ const Layout = () => {
   const params = useParams();
   const { account, setAccount } = useContext(AccountContext);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [notificationsGranted, setNotificationsGranted] = useState(
-    notifier.granted()
-  );
+  const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
   const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
-  const subscriptionsWithoutInternal = subscriptions?.filter(
-    (s) => !s.internal
-  );
-  const newNotificationsCount =
-    subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
+  const subscriptionsWithoutInternal = subscriptions?.filter((s) => !s.internal);
+  const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
   const [selected] = (subscriptionsWithoutInternal || []).filter((s) => {
     return (
-      (params.baseUrl &&
-        expandUrl(params.baseUrl).includes(s.baseUrl) &&
-        params.topic === s.topic) ||
+      (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic) ||
       (config.base_url === s.baseUrl && params.topic === s.topic)
     );
   });
@@ -109,10 +80,7 @@ const Layout = () => {
 
   return (
     <Box sx={{ display: "flex" }}>
-      <ActionBar
-        selected={selected}
-        onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-      />
+      <ActionBar selected={selected} onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)} />
       <Navigation
         subscriptions={subscriptionsWithoutInternal}
         selectedSubscription={selected}
@@ -120,9 +88,7 @@ const Layout = () => {
         mobileDrawerOpen={mobileDrawerOpen}
         onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
         onNotificationGranted={setNotificationsGranted}
-        onPublishMessageClick={() =>
-          setSendDialogOpenMode(PublishDialog.OPEN_MODE_DEFAULT)
-        }
+        onPublishMessageClick={() => setSendDialogOpenMode(PublishDialog.OPEN_MODE_DEFAULT)}
       />
       <Main>
         <Toolbar />
@@ -133,11 +99,7 @@ const Layout = () => {
           }}
         />
       </Main>
-      <Messaging
-        selected={selected}
-        dialogOpenMode={sendDialogOpenMode}
-        onDialogOpenModeChange={setSendDialogOpenMode}
-      />
+      <Messaging selected={selected} dialogOpenMode={sendDialogOpenMode} onDialogOpenModeChange={setSendDialogOpenMode} />
     </Box>
   );
 };
@@ -155,10 +117,7 @@ const Main = (props) => {
         width: { sm: `calc(100% - ${Navigation.width}px)` },
         height: "100vh",
         overflow: "auto",
-        backgroundColor: (theme) =>
-          theme.palette.mode === "light"
-            ? theme.palette.grey[100]
-            : theme.palette.grey[900],
+        backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
       }}
     >
       {props.children}
@@ -171,10 +130,7 @@ const Loader = () => (
     open={true}
     sx={{
       zIndex: 100000,
-      backgroundColor: (theme) =>
-        theme.palette.mode === "light"
-          ? theme.palette.grey[100]
-          : theme.palette.grey[900],
+      backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
     }}
   >
     <CircularProgress color="success" disableShrink />
@@ -182,8 +138,7 @@ const Loader = () => (
 );
 
 const updateTitle = (newNotificationsCount) => {
-  document.title =
-    newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
+  document.title = newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
 };
 
 export default App;

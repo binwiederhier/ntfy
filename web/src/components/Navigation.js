@@ -12,16 +12,7 @@ import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
 import SubscribeDialog from "./SubscribeDialog";
-import {
-  Alert,
-  AlertTitle,
-  Badge,
-  CircularProgress,
-  Link,
-  ListSubheader,
-  Portal,
-  Tooltip,
-} from "@mui/material";
+import { Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Portal, Tooltip } from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { openUrl, topicDisplayName, topicUrl } from "../app/utils";
@@ -29,12 +20,7 @@ import routes from "./routes";
 import { ConnectionState } from "../app/Connection";
 import { useLocation, useNavigate } from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import {
-  ChatBubble,
-  MoreVert,
-  NotificationsOffOutlined,
-  Send,
-} from "@mui/icons-material";
+import { ChatBubble, MoreVert, NotificationsOffOutlined, Send } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
@@ -45,12 +31,7 @@ import accountApi, { Permission, Role } from "../app/AccountApi";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
-import {
-  PermissionDenyAll,
-  PermissionRead,
-  PermissionReadWrite,
-  PermissionWrite,
-} from "./ReserveIcons";
+import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import IconButton from "@mui/material/IconButton";
 import { SubscriptionPopup } from "./SubscriptionPopup";
 
@@ -59,11 +40,7 @@ const navWidth = 280;
 const Navigation = (props) => {
   const navigationList = <NavList {...props} />;
   return (
-    <Box
-      component="nav"
-      role="navigation"
-      sx={{ width: { sm: Navigation.width }, flexShrink: { sm: 0 } }}
-    >
+    <Box component="nav" role="navigation" sx={{ width: { sm: Navigation.width }, flexShrink: { sm: 0 } }}>
       {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
       <Drawer
         variant="temporary"
@@ -109,19 +86,14 @@ const NavList = (props) => {
   };
 
   const handleSubscribeSubmit = (subscription) => {
-    console.log(
-      `[Navigation] New subscription: ${subscription.id}`,
-      subscription
-    );
+    console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
     handleSubscribeReset();
     navigate(routes.forSubscription(subscription));
     handleRequestNotificationPermission();
   };
 
   const handleRequestNotificationPermission = () => {
-    notifier.maybeRequestPermission((granted) =>
-      props.onNotificationGranted(granted)
-    );
+    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
   };
 
   const handleAccountClick = () => {
@@ -134,39 +106,19 @@ const NavList = (props) => {
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
   const showSubscriptionsList = props.subscriptions?.length > 0;
   const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
-  const showNotificationContextNotSupportedBox =
-    notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
-  const showNotificationGrantBox =
-    notifier.supported() &&
-    props.subscriptions?.length > 0 &&
-    !props.notificationsGranted;
-  const navListPadding =
-    showNotificationGrantBox ||
-    showNotificationBrowserNotSupportedBox ||
-    showNotificationContextNotSupportedBox
-      ? "0"
-      : "";
+  const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
+  const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
+  const navListPadding = showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox ? "0" : "";
 
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       <List component="nav" sx={{ paddingTop: navListPadding }}>
-        {showNotificationBrowserNotSupportedBox && (
-          <NotificationBrowserNotSupportedAlert />
-        )}
-        {showNotificationContextNotSupportedBox && (
-          <NotificationContextNotSupportedAlert />
-        )}
-        {showNotificationGrantBox && (
-          <NotificationGrantAlert
-            onRequestPermissionClick={handleRequestNotificationPermission}
-          />
-        )}
+        {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
+        {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
+        {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission} />}
         {!showSubscriptionsList && (
-          <ListItemButton
-            onClick={() => navigate(routes.app)}
-            selected={location.pathname === config.app_root}
-          >
+          <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
               <ChatBubble />
             </ListItemIcon>
@@ -176,37 +128,25 @@ const NavList = (props) => {
         {showSubscriptionsList && (
           <>
             <ListSubheader>{t("nav_topics_title")}</ListSubheader>
-            <ListItemButton
-              onClick={() => navigate(routes.app)}
-              selected={location.pathname === config.app_root}
-            >
+            <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
               <ListItemIcon>
                 <ChatBubble />
               </ListItemIcon>
               <ListItemText primary={t("nav_button_all_notifications")} />
             </ListItemButton>
-            <SubscriptionList
-              subscriptions={props.subscriptions}
-              selectedSubscription={props.selectedSubscription}
-            />
+            <SubscriptionList subscriptions={props.subscriptions} selectedSubscription={props.selectedSubscription} />
             <Divider sx={{ my: 1 }} />
           </>
         )}
         {session.exists() && (
-          <ListItemButton
-            onClick={handleAccountClick}
-            selected={location.pathname === routes.account}
-          >
+          <ListItemButton onClick={handleAccountClick} selected={location.pathname === routes.account}>
             <ListItemIcon>
               <Person />
             </ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
           </ListItemButton>
         )}
-        <ListItemButton
-          onClick={() => navigate(routes.settings)}
-          selected={location.pathname === routes.settings}
-        >
+        <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
           <ListItemIcon>
             <SettingsIcon />
           </ListItemIcon>
@@ -260,8 +200,7 @@ const UpgradeBanner = () => {
         width: `${Navigation.width - 1}px`,
         bottom: 0,
         mt: "auto",
-        background:
-          "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
+        background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
       }}
     >
       <Divider />
@@ -277,8 +216,7 @@ const UpgradeBanner = () => {
             style: {
               fontWeight: 500,
               fontSize: "1.1rem",
-              background:
-                "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
+              background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             },
@@ -290,11 +228,7 @@ const UpgradeBanner = () => {
           }}
         />
       </ListItemButton>
-      <UpgradeDialog
-        key={`upgradeDialog${dialogKey}`}
-        open={dialogOpen}
-        onCancel={() => setDialogOpen(false)}
-      />
+      <UpgradeDialog key={`upgradeDialog${dialogKey}`} open={dialogOpen} onCancel={() => setDialogOpen(false)} />
     </Box>
   );
 };
@@ -303,9 +237,7 @@ const SubscriptionList = (props) => {
   const sortedSubscriptions = props.subscriptions
     .filter((s) => !s.internal)
     .sort((a, b) => {
-      return topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic)
-        ? -1
-        : 1;
+      return topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic) ? -1 : 1;
     });
   return (
     <>
@@ -313,10 +245,7 @@ const SubscriptionList = (props) => {
         <SubscriptionItem
           key={subscription.id}
           subscription={subscription}
-          selected={
-            props.selectedSubscription &&
-            props.selectedSubscription.id === subscription.id
-          }
+          selected={props.selectedSubscription && props.selectedSubscription.id === subscription.id}
         />
       ))}
     </>
@@ -331,19 +260,12 @@ const SubscriptionItem = (props) => {
   const subscription = props.subscription;
   const iconBadge = subscription.new <= 99 ? subscription.new : "99+";
   const displayName = topicDisplayName(subscription);
-  const ariaLabel =
-    subscription.state === ConnectionState.Connecting
-      ? `${displayName} (${t("nav_button_connecting")})`
-      : displayName;
+  const ariaLabel = subscription.state === ConnectionState.Connecting ? `${displayName} (${t("nav_button_connecting")})` : displayName;
   const icon =
     subscription.state === ConnectionState.Connecting ? (
       <CircularProgress size="24px" />
     ) : (
-      <Badge
-        badgeContent={iconBadge}
-        invisible={subscription.new === 0}
-        color="primary"
-      >
+      <Badge badgeContent={iconBadge} invisible={subscription.new === 0} color="primary">
         <ChatBubbleOutlineIcon />
       </Badge>
     );
@@ -355,12 +277,7 @@ const SubscriptionItem = (props) => {
 
   return (
     <>
-      <ListItemButton
-        onClick={handleClick}
-        selected={props.selected}
-        aria-label={ariaLabel}
-        aria-live="polite"
-      >
+      <ListItemButton onClick={handleClick} selected={props.selected} aria-label={ariaLabel} aria-live="polite">
         <ListItemIcon>{icon}</ListItemIcon>
         <ListItemText
           primary={displayName}
@@ -371,9 +288,7 @@ const SubscriptionItem = (props) => {
         {subscription.reservation?.everyone && (
           <ListItemIcon edge="end" sx={{ minWidth: "26px" }}>
             {subscription.reservation?.everyone === Permission.READ_WRITE && (
-              <Tooltip
-                title={t("prefs_reservations_table_everyone_read_write")}
-              >
+              <Tooltip title={t("prefs_reservations_table_everyone_read_write")}>
                 <PermissionReadWrite size="small" />
               </Tooltip>
             )}
@@ -383,9 +298,7 @@ const SubscriptionItem = (props) => {
               </Tooltip>
             )}
             {subscription.reservation?.everyone === Permission.WRITE_ONLY && (
-              <Tooltip
-                title={t("prefs_reservations_table_everyone_write_only")}
-              >
+              <Tooltip title={t("prefs_reservations_table_everyone_write_only")}>
                 <PermissionWrite size="small" />
               </Tooltip>
             )}
@@ -397,11 +310,7 @@ const SubscriptionItem = (props) => {
           </ListItemIcon>
         )}
         {subscription.mutedUntil > 0 && (
-          <ListItemIcon
-            edge="end"
-            sx={{ minWidth: "26px" }}
-            aria-label={t("nav_button_muted")}
-          >
+          <ListItemIcon edge="end" sx={{ minWidth: "26px" }} aria-label={t("nav_button_muted")}>
             <Tooltip title={t("nav_button_muted")}>
               <NotificationsOffOutlined />
             </Tooltip>
@@ -421,11 +330,7 @@ const SubscriptionItem = (props) => {
         </ListItemIcon>
       </ListItemButton>
       <Portal>
-        <SubscriptionPopup
-          subscription={subscription}
-          anchor={menuAnchorEl}
-          onClose={() => setMenuAnchorEl(null)}
-        />
+        <SubscriptionPopup subscription={subscription} anchor={menuAnchorEl} onClose={() => setMenuAnchorEl(null)} />
       </Portal>
     </>
   );
@@ -438,12 +343,7 @@ const NotificationGrantAlert = (props) => {
       <Alert severity="warning" sx={{ paddingTop: 2 }}>
         <AlertTitle>{t("alert_grant_title")}</AlertTitle>
         <Typography gutterBottom>{t("alert_grant_description")}</Typography>
-        <Button
-          sx={{ float: "right" }}
-          color="inherit"
-          size="small"
-          onClick={props.onRequestPermissionClick}
-        >
+        <Button sx={{ float: "right" }} color="inherit" size="small" onClick={props.onRequestPermissionClick}>
           {t("alert_grant_button")}
         </Button>
       </Alert>
@@ -458,9 +358,7 @@ const NotificationBrowserNotSupportedAlert = () => {
     <>
       <Alert severity="warning" sx={{ paddingTop: 2 }}>
         <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
-        <Typography gutterBottom>
-          {t("alert_not_supported_description")}
-        </Typography>
+        <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
       </Alert>
       <Divider />
     </>
@@ -477,13 +375,7 @@ const NotificationContextNotSupportedAlert = () => {
           <Trans
             i18nKey="alert_not_supported_context_description"
             components={{
-              mdnLink: (
-                <Link
-                  href="https://developer.mozilla.org/en-US/docs/Web/API/notification"
-                  target="_blank"
-                  rel="noopener"
-                />
-              ),
+              mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener" />,
             }}
           />
         </Typography>

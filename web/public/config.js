@@ -15,15 +15,5 @@ var config = {
   enable_emails: true,
   enable_calls: true,
   billing_contact: "",
-  disallowed_topics: [
-    "docs",
-    "static",
-    "file",
-    "app",
-    "account",
-    "settings",
-    "signup",
-    "login",
-    "v1",
-  ],
+  disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"],
 };

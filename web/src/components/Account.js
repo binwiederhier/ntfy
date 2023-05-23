@@ -38,18 +38,8 @@ import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
 import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import {
-  formatBytes,
-  formatShortDate,
-  formatShortDateTime,
-  openUrl,
-} from "../app/utils";
-import accountApi, {
-  LimitBasis,
-  Role,
-  SubscriptionInterval,
-  SubscriptionStatus,
-} from "../app/AccountApi";
+import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
+import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { Pref, PrefGroup } from "./Pref";
 import db from "../app/db";
@@ -108,11 +98,7 @@ const Username = () => {
   const labelId = "prefUsername";
 
   return (
-    <Pref
-      labelId={labelId}
-      title={t("account_basics_username_title")}
-      description={t("account_basics_username_description")}
-    >
+    <Pref labelId={labelId} title={t("account_basics_username_title")} description={t("account_basics_username_description")}>
       <div aria-labelledby={labelId}>
         {session.username()}
         {account?.role === Role.ADMIN ? (
@@ -146,30 +132,16 @@ const ChangePassword = () => {
   };
 
   return (
-    <Pref
-      labelId={labelId}
-      title={t("account_basics_password_title")}
-      description={t("account_basics_password_description")}
-    >
+    <Pref labelId={labelId} title={t("account_basics_password_title")} description={t("account_basics_password_description")}>
       <div aria-labelledby={labelId}>
-        <Typography
-          color="gray"
-          sx={{ float: "left", fontSize: "0.7rem", lineHeight: "3.5" }}
-        >
+        <Typography color="gray" sx={{ float: "left", fontSize: "0.7rem", lineHeight: "3.5" }}>
           ⬤⬤⬤⬤⬤⬤⬤⬤⬤⬤
         </Typography>
-        <IconButton
-          onClick={handleDialogOpen}
-          aria-label={t("account_basics_password_description")}
-        >
+        <IconButton onClick={handleDialogOpen} aria-label={t("account_basics_password_description")}>
           <EditIcon />
         </IconButton>
       </div>
-      <ChangePasswordDialog
-        key={`changePasswordDialog${dialogKey}`}
-        open={dialogOpen}
-        onClose={handleDialogClose}
-      />
+      <ChangePasswordDialog key={`changePasswordDialog${dialogKey}`} open={dialogOpen} onClose={handleDialogClose} />
     </Pref>
   );
 };
@@ -190,9 +162,7 @@ const ChangePasswordDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error changing password`, e);
       if (e instanceof IncorrectPasswordError) {
-        setError(
-          t("account_basics_password_dialog_current_password_incorrect")
-        );
+        setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
         session.resetAndRedirect(routes.login);
       } else {
@@ -209,9 +179,7 @@ const ChangePasswordDialog = (props) => {
           margin="dense"
           id="current-password"
           label={t("account_basics_password_dialog_current_password_label")}
-          aria-label={t(
-            "account_basics_password_dialog_current_password_label"
-          )}
+          aria-label={t("account_basics_password_dialog_current_password_label")}
           type="password"
           value={currentPassword}
           onChange={(ev) => setCurrentPassword(ev.target.value)}
@@ -233,9 +201,7 @@ const ChangePasswordDialog = (props) => {
           margin="dense"
           id="confirm"
           label={t("account_basics_password_dialog_confirm_password_label")}
-          aria-label={t(
-            "account_basics_password_dialog_confirm_password_label"
-          )}
+          aria-label={t("account_basics_password_dialog_confirm_password_label")}
           type="password"
           value={confirmPassword}
           onChange={(ev) => setConfirmPassword(ev.target.value)}
@@ -245,14 +211,7 @@ const ChangePasswordDialog = (props) => {
       </DialogContent>
       <DialogFooter status={error}>
         <Button onClick={props.onClose}>{t("common_cancel")}</Button>
-        <Button
-          onClick={handleDialogSubmit}
-          disabled={
-            newPassword.length === 0 ||
-            currentPassword.length === 0 ||
-            newPassword !== confirmPassword
-          }
-        >
+        <Button onClick={handleDialogSubmit} disabled={newPassword.length === 0 || currentPassword.length === 0 || newPassword !== confirmPassword}>
           {t("account_basics_password_dialog_button_submit")}
         </Button>
       </DialogFooter>
@@ -299,9 +258,7 @@ const AccountType = () => {
       : t("account_basics_tier_admin_suffix_no_tier");
     accountType = `${t("account_basics_tier_admin")} ${tierSuffix}`;
   } else if (!account.tier) {
-    accountType = config.enable_payments
-      ? t("account_basics_tier_free")
-      : t("account_basics_tier_basic");
+    accountType = config.enable_payments ? t("account_basics_tier_free") : t("account_basics_tier_basic");
   } else {
     accountType = account.tier.name;
     if (account.billing?.interval === SubscriptionInterval.MONTH) {
@@ -313,10 +270,7 @@ const AccountType = () => {
 
   return (
     <Pref
-      alignTop={
-        account.billing?.status === SubscriptionStatus.PAST_DUE ||
-        account.billing?.cancel_at > 0
-      }
+      alignTop={account.billing?.status === SubscriptionStatus.PAST_DUE || account.billing?.cancel_at > 0}
       title={t("account_basics_tier_title")}
       description={t("account_basics_tier_description")}
     >
@@ -333,49 +287,23 @@ const AccountType = () => {
             </span>
           </Tooltip>
         )}
-        {config.enable_payments &&
-          account.role === Role.USER &&
-          !account.billing?.subscription && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<CelebrationIcon sx={{ color: "#55b86e" }} />}
-              onClick={handleUpgradeClick}
-              sx={{ ml: 1 }}
-            >
-              {t("account_basics_tier_upgrade_button")}
-            </Button>
-          )}
-        {config.enable_payments &&
-          account.role === Role.USER &&
-          account.billing?.subscription && (
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleUpgradeClick}
-              sx={{ ml: 1 }}
-            >
-              {t("account_basics_tier_change_button")}
-            </Button>
-          )}
-        {config.enable_payments &&
-          account.role === Role.USER &&
-          account.billing?.customer && (
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleManageBilling}
-              sx={{ ml: 1 }}
-            >
-              {t("account_basics_tier_manage_billing_button")}
-            </Button>
-          )}
+        {config.enable_payments && account.role === Role.USER && !account.billing?.subscription && (
+          <Button variant="outlined" size="small" startIcon={<CelebrationIcon sx={{ color: "#55b86e" }} />} onClick={handleUpgradeClick} sx={{ ml: 1 }}>
+            {t("account_basics_tier_upgrade_button")}
+          </Button>
+        )}
+        {config.enable_payments && account.role === Role.USER && account.billing?.subscription && (
+          <Button variant="outlined" size="small" onClick={handleUpgradeClick} sx={{ ml: 1 }}>
+            {t("account_basics_tier_change_button")}
+          </Button>
+        )}
+        {config.enable_payments && account.role === Role.USER && account.billing?.customer && (
+          <Button variant="outlined" size="small" onClick={handleManageBilling} sx={{ ml: 1 }}>
+            {t("account_basics_tier_manage_billing_button")}
+          </Button>
+        )}
         {config.enable_payments && (
-          <UpgradeDialog
-            key={`upgradeDialogFromAccount${upgradeDialogKey}`}
-            open={upgradeDialogOpen}
-            onCancel={() => setUpgradeDialogOpen(false)}
-          />
+          <UpgradeDialog key={`upgradeDialogFromAccount${upgradeDialogKey}`} open={upgradeDialogOpen} onCancel={() => setUpgradeDialogOpen(false)} />
         )}
       </div>
       {account.billing?.status === SubscriptionStatus.PAST_DUE && (
@@ -456,11 +384,7 @@ const PhoneNumbers = () => {
   }
 
   return (
-    <Pref
-      labelId={labelId}
-      title={t("account_basics_phone_numbers_title")}
-      description={t("account_basics_phone_numbers_description")}
-    >
+    <Pref labelId={labelId} title={t("account_basics_phone_numbers_title")} description={t("account_basics_phone_numbers_description")}>
       <div aria-labelledby={labelId}>
         {account?.phone_numbers?.map((phoneNumber) => (
           <Chip
@@ -474,18 +398,12 @@ const PhoneNumbers = () => {
             onDelete={() => handleDelete(phoneNumber)}
           />
         ))}
-        {!account?.phone_numbers && (
-          <em>{t("account_basics_phone_numbers_no_phone_numbers_yet")}</em>
-        )}
+        {!account?.phone_numbers && <em>{t("account_basics_phone_numbers_no_phone_numbers_yet")}</em>}
         <IconButton onClick={handleDialogOpen}>
           <AddIcon />
         </IconButton>
       </div>
-      <AddPhoneNumberDialog
-        key={`addPhoneNumberDialog${dialogKey}`}
-        open={dialogOpen}
-        onClose={handleDialogClose}
-      />
+      <AddPhoneNumberDialog key={`addPhoneNumberDialog${dialogKey}`} open={dialogOpen} onClose={handleDialogClose} />
       <Portal>
         <Snackbar
           open={snackOpen}
@@ -561,22 +479,16 @@ const AddPhoneNumberDialog = (props) => {
 
   return (
     <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
-      <DialogTitle>
-        {t("account_basics_phone_numbers_dialog_title")}
-      </DialogTitle>
+      <DialogTitle>{t("account_basics_phone_numbers_dialog_title")}</DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          {t("account_basics_phone_numbers_dialog_description")}
-        </DialogContentText>
+        <DialogContentText>{t("account_basics_phone_numbers_dialog_description")}</DialogContentText>
         {!verificationCodeSent && (
           <div style={{ display: "flex" }}>
             <TextField
               margin="dense"
               label={t("account_basics_phone_numbers_dialog_number_label")}
               aria-label={t("account_basics_phone_numbers_dialog_number_label")}
-              placeholder={t(
-                "account_basics_phone_numbers_dialog_number_placeholder"
-              )}
+              placeholder={t("account_basics_phone_numbers_dialog_number_placeholder")}
               type="tel"
               value={phoneNumber}
               onChange={(ev) => setPhoneNumber(ev.target.value)}
@@ -585,28 +497,15 @@ const AddPhoneNumberDialog = (props) => {
               sx={{ flexGrow: 1 }}
             />
             <FormControl sx={{ flexWrap: "nowrap" }}>
-              <RadioGroup
-                row
-                sx={{ flexGrow: 1, marginTop: "8px", marginLeft: "5px" }}
-              >
+              <RadioGroup row sx={{ flexGrow: 1, marginTop: "8px", marginLeft: "5px" }}>
                 <FormControlLabel
                   value="sms"
-                  control={
-                    <Radio
-                      checked={channel === "sms"}
-                      onChange={(e) => setChannel(e.target.value)}
-                    />
-                  }
+                  control={<Radio checked={channel === "sms"} onChange={(e) => setChannel(e.target.value)} />}
                   label={t("account_basics_phone_numbers_dialog_channel_sms")}
                 />
                 <FormControlLabel
                   value="call"
-                  control={
-                    <Radio
-                      checked={channel === "call"}
-                      onChange={(e) => setChannel(e.target.value)}
-                    />
-                  }
+                  control={<Radio checked={channel === "call"} onChange={(e) => setChannel(e.target.value)} />}
                   label={t("account_basics_phone_numbers_dialog_channel_call")}
                   sx={{ marginRight: 0 }}
                 />
@@ -619,9 +518,7 @@ const AddPhoneNumberDialog = (props) => {
             margin="dense"
             label={t("account_basics_phone_numbers_dialog_code_label")}
             aria-label={t("account_basics_phone_numbers_dialog_code_label")}
-            placeholder={t(
-              "account_basics_phone_numbers_dialog_code_placeholder"
-            )}
+            placeholder={t("account_basics_phone_numbers_dialog_code_placeholder")}
             type="text"
             value={code}
             onChange={(ev) => setCode(ev.target.value)}
@@ -632,21 +529,11 @@ const AddPhoneNumberDialog = (props) => {
         )}
       </DialogContent>
       <DialogFooter status={error}>
-        <Button onClick={handleCancel}>
-          {verificationCodeSent ? t("common_back") : t("common_cancel")}
-        </Button>
-        <Button
-          onClick={handleDialogSubmit}
-          disabled={sending || !/^\+\d+$/.test(phoneNumber)}
-        >
-          {!verificationCodeSent &&
-            channel === "sms" &&
-            t("account_basics_phone_numbers_dialog_verify_button_sms")}
-          {!verificationCodeSent &&
-            channel === "call" &&
-            t("account_basics_phone_numbers_dialog_verify_button_call")}
-          {verificationCodeSent &&
-            t("account_basics_phone_numbers_dialog_check_verification_button")}
+        <Button onClick={handleCancel}>{verificationCodeSent ? t("common_back") : t("common_cancel")}</Button>
+        <Button onClick={handleDialogSubmit} disabled={sending || !/^\+\d+$/.test(phoneNumber)}>
+          {!verificationCodeSent && channel === "sms" && t("account_basics_phone_numbers_dialog_verify_button_sms")}
+          {!verificationCodeSent && channel === "call" && t("account_basics_phone_numbers_dialog_verify_button_call")}
+          {verificationCodeSent && t("account_basics_phone_numbers_dialog_check_verification_button")}
         </Button>
       </DialogFooter>
     </Dialog>
@@ -687,14 +574,7 @@ const Stats = () => {
             </div>
             <LinearProgress
               variant="determinate"
-              value={
-                account.role === Role.USER && account.limits.reservations > 0
-                  ? normalize(
-                      account.stats.reservations,
-                      account.limits.reservations
-                    )
-                  : 100
-              }
+              value={account.role === Role.USER && account.limits.reservations > 0 ? normalize(account.stats.reservations, account.limits.reservations) : 100}
             />
           </Pref>
         )}
@@ -722,14 +602,7 @@ const Stats = () => {
                 : t("account_usage_unlimited")}
             </Typography>
           </div>
-          <LinearProgress
-            variant="determinate"
-            value={
-              account.role === Role.USER
-                ? normalize(account.stats.messages, account.limits.messages)
-                : 100
-            }
-          />
+          <LinearProgress variant="determinate" value={account.role === Role.USER ? normalize(account.stats.messages, account.limits.messages) : 100} />
         </Pref>
         {config.enable_emails && (
           <Pref
@@ -756,64 +629,49 @@ const Stats = () => {
                   : t("account_usage_unlimited")}
               </Typography>
             </div>
+            <LinearProgress variant="determinate" value={account.role === Role.USER ? normalize(account.stats.emails, account.limits.emails) : 100} />
+          </Pref>
+        )}
+        {config.enable_calls && (account.role === Role.ADMIN || account.limits.calls > 0) && (
+          <Pref
+            title={
+              <>
+                {t("account_usage_calls_title")}
+                <Tooltip title={t("account_usage_limits_reset_daily")}>
+                  <span>
+                    <InfoIcon />
+                  </span>
+                </Tooltip>
+              </>
+            }
+          >
+            <div>
+              <Typography variant="body2" sx={{ float: "left" }}>
+                {account.stats.calls.toLocaleString()}
+              </Typography>
+              <Typography variant="body2" sx={{ float: "right" }}>
+                {account.role === Role.USER
+                  ? t("account_usage_of_limit", {
+                      limit: account.limits.calls.toLocaleString(),
+                    })
+                  : t("account_usage_unlimited")}
+              </Typography>
+            </div>
             <LinearProgress
               variant="determinate"
-              value={
-                account.role === Role.USER
-                  ? normalize(account.stats.emails, account.limits.emails)
-                  : 100
-              }
+              value={account.role === Role.USER && account.limits.calls > 0 ? normalize(account.stats.calls, account.limits.calls) : 100}
             />
           </Pref>
         )}
-        {config.enable_calls &&
-          (account.role === Role.ADMIN || account.limits.calls > 0) && (
-            <Pref
-              title={
-                <>
-                  {t("account_usage_calls_title")}
-                  <Tooltip title={t("account_usage_limits_reset_daily")}>
-                    <span>
-                      <InfoIcon />
-                    </span>
-                  </Tooltip>
-                </>
-              }
-            >
-              <div>
-                <Typography variant="body2" sx={{ float: "left" }}>
-                  {account.stats.calls.toLocaleString()}
-                </Typography>
-                <Typography variant="body2" sx={{ float: "right" }}>
-                  {account.role === Role.USER
-                    ? t("account_usage_of_limit", {
-                        limit: account.limits.calls.toLocaleString(),
-                      })
-                    : t("account_usage_unlimited")}
-                </Typography>
-              </div>
-              <LinearProgress
-                variant="determinate"
-                value={
-                  account.role === Role.USER && account.limits.calls > 0
-                    ? normalize(account.stats.calls, account.limits.calls)
-                    : 100
-                }
-              />
-            </Pref>
-          )}
         <Pref
           alignTop
           title={t("account_usage_attachment_storage_title")}
           description={t("account_usage_attachment_storage_description", {
             filesize: formatBytes(account.limits.attachment_file_size),
-            expiry: humanizeDuration(
-              account.limits.attachment_expiry_duration * 1000,
-              {
-                language: i18n.resolvedLanguage,
-                fallbacks: ["en"],
-              }
-            ),
+            expiry: humanizeDuration(account.limits.attachment_expiry_duration * 1000, {
+              language: i18n.resolvedLanguage,
+              fallbacks: ["en"],
+            }),
           })}
         >
           <div>
@@ -830,49 +688,36 @@ const Stats = () => {
           </div>
           <LinearProgress
             variant="determinate"
-            value={
-              account.role === Role.USER
-                ? normalize(
-                    account.stats.attachment_total_size,
-                    account.limits.attachment_total_size
-                  )
-                : 100
-            }
+            value={account.role === Role.USER ? normalize(account.stats.attachment_total_size, account.limits.attachment_total_size) : 100}
           />
         </Pref>
-        {config.enable_reservations &&
-          account.role === Role.USER &&
-          account.limits.reservations === 0 && (
-            <Pref
-              title={
-                <>
-                  {t("account_usage_reservations_title")}
-                  {config.enable_payments && <ProChip />}
-                </>
-              }
-            >
-              <em>{t("account_usage_reservations_none")}</em>
-            </Pref>
-          )}
-        {config.enable_calls &&
-          account.role === Role.USER &&
-          account.limits.calls === 0 && (
-            <Pref
-              title={
-                <>
-                  {t("account_usage_calls_title")}
-                  {config.enable_payments && <ProChip />}
-                </>
-              }
-            >
-              <em>{t("account_usage_calls_none")}</em>
-            </Pref>
-          )}
+        {config.enable_reservations && account.role === Role.USER && account.limits.reservations === 0 && (
+          <Pref
+            title={
+              <>
+                {t("account_usage_reservations_title")}
+                {config.enable_payments && <ProChip />}
+              </>
+            }
+          >
+            <em>{t("account_usage_reservations_none")}</em>
+          </Pref>
+        )}
+        {config.enable_calls && account.role === Role.USER && account.limits.calls === 0 && (
+          <Pref
+            title={
+              <>
+                {t("account_usage_calls_title")}
+                {config.enable_payments && <ProChip />}
+              </>
+            }
+          >
+            <em>{t("account_usage_calls_none")}</em>
+          </Pref>
+        )}
       </PrefGroup>
       {account.role === Role.USER && account.limits.basis === LimitBasis.IP && (
-        <Typography variant="body1">
-          {t("account_usage_basis_ip_description")}
-        </Typography>
+        <Typography variant="body1">{t("account_usage_basis_ip_description")}</Typography>
       )}
     </Card>
   );
@@ -928,15 +773,9 @@ const Tokens = () => {
         {tokens?.length > 0 && <TokensTable tokens={tokens} />}
       </CardContent>
       <CardActions>
-        <Button onClick={handleCreateClick}>
-          {t("account_tokens_table_create_token_button")}
-        </Button>
+        <Button onClick={handleCreateClick}>{t("account_tokens_table_create_token_button")}</Button>
       </CardActions>
-      <TokenDialog
-        key={`tokenDialogCreate${dialogKey}`}
-        open={dialogOpen}
-        onClose={handleDialogClose}
-      />
+      <TokenDialog key={`tokenDialogCreate${dialogKey}`} open={dialogOpen} onClose={handleDialogClose} />
     </Card>
   );
 };
@@ -984,9 +823,7 @@ const TokensTable = (props) => {
     <Table size="small" aria-label={t("account_tokens_title")}>
       <TableHead>
         <TableRow>
-          <TableCell sx={{ paddingLeft: 0 }}>
-            {t("account_tokens_table_token_header")}
-          </TableCell>
+          <TableCell sx={{ paddingLeft: 0 }}>{t("account_tokens_table_token_header")}</TableCell>
           <TableCell>{t("account_tokens_table_label_header")}</TableCell>
           <TableCell>{t("account_tokens_table_expires_header")}</TableCell>
           <TableCell>{t("account_tokens_table_last_access_header")}</TableCell>
@@ -995,25 +832,12 @@ const TokensTable = (props) => {
       </TableHead>
       <TableBody>
         {tokens.map((token) => (
-          <TableRow
-            key={token.token}
-            sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-          >
-            <TableCell
-              component="th"
-              scope="row"
-              sx={{ paddingLeft: 0, whiteSpace: "nowrap" }}
-              aria-label={t("account_tokens_table_token_header")}
-            >
+          <TableRow key={token.token} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+            <TableCell component="th" scope="row" sx={{ paddingLeft: 0, whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_token_header")}>
               <span>
-                <span style={{ fontFamily: "Monospace", fontSize: "0.9rem" }}>
-                  {token.token.slice(0, 12)}
-                </span>
+                <span style={{ fontFamily: "Monospace", fontSize: "0.9rem" }}>{token.token.slice(0, 12)}</span>
                 ...
-                <Tooltip
-                  title={t("common_copy_to_clipboard")}
-                  placement="right"
-                >
+                <Tooltip title={t("common_copy_to_clipboard")} placement="right">
                   <IconButton onClick={() => handleCopy(token.token)}>
                     <ContentCopy />
                   </IconButton>
@@ -1021,25 +845,13 @@ const TokensTable = (props) => {
               </span>
             </TableCell>
             <TableCell aria-label={t("account_tokens_table_label_header")}>
-              {token.token === session.token() && (
-                <em>{t("account_tokens_table_current_session")}</em>
-              )}
+              {token.token === session.token() && <em>{t("account_tokens_table_current_session")}</em>}
               {token.token !== session.token() && (token.label || "-")}
             </TableCell>
-            <TableCell
-              sx={{ whiteSpace: "nowrap" }}
-              aria-label={t("account_tokens_table_expires_header")}
-            >
-              {token.expires ? (
-                formatShortDateTime(token.expires)
-              ) : (
-                <em>{t("account_tokens_table_never_expires")}</em>
-              )}
+            <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_expires_header")}>
+              {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
             </TableCell>
-            <TableCell
-              sx={{ whiteSpace: "nowrap" }}
-              aria-label={t("account_tokens_table_last_access_header")}
-            >
+            <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_last_access_header")}>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <span>{formatShortDateTime(token.last_access)}</span>
                 <Tooltip
@@ -1047,13 +859,7 @@ const TokensTable = (props) => {
                     ip: token.last_origin,
                   })}
                 >
-                  <IconButton
-                    onClick={() =>
-                      openUrl(
-                        `https://whatismyipaddress.com/ip/${token.last_origin}`
-                      )
-                    }
-                  >
+                  <IconButton onClick={() => openUrl(`https://whatismyipaddress.com/ip/${token.last_origin}`)}>
                     <Public />
                   </IconButton>
                 </Tooltip>
@@ -1062,24 +868,16 @@ const TokensTable = (props) => {
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {token.token !== session.token() && (
                 <>
-                  <IconButton
-                    onClick={() => handleEditClick(token)}
-                    aria-label={t("account_tokens_dialog_title_edit")}
-                  >
+                  <IconButton onClick={() => handleEditClick(token)} aria-label={t("account_tokens_dialog_title_edit")}>
                     <EditIcon />
                   </IconButton>
-                  <IconButton
-                    onClick={() => handleDeleteClick(token)}
-                    aria-label={t("account_tokens_dialog_title_delete")}
-                  >
+                  <IconButton onClick={() => handleDeleteClick(token)} aria-label={t("account_tokens_dialog_title_delete")}>
                     <CloseIcon />
                   </IconButton>
                 </>
               )}
               {token.token === session.token() && (
-                <Tooltip
-                  title={t("account_tokens_table_cannot_delete_or_edit")}
-                >
+                <Tooltip title={t("account_tokens_table_cannot_delete_or_edit")}>
                   <span>
                     <IconButton disabled>
                       <EditIcon />
@@ -1095,24 +893,10 @@ const TokensTable = (props) => {
         ))}
       </TableBody>
       <Portal>
-        <Snackbar
-          open={snackOpen}
-          autoHideDuration={3000}
-          onClose={() => setSnackOpen(false)}
-          message={t("account_tokens_table_copied_to_clipboard")}
-        />
+        <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)} message={t("account_tokens_table_copied_to_clipboard")} />
       </Portal>
-      <TokenDialog
-        key={`tokenDialogEdit${upsertDialogKey}`}
-        open={upsertDialogOpen}
-        token={selectedToken}
-        onClose={handleDialogClose}
-      />
-      <TokenDeleteDialog
-        open={deleteDialogOpen}
-        token={selectedToken}
-        onClose={handleDialogClose}
-      />
+      <TokenDialog key={`tokenDialogEdit${upsertDialogKey}`} open={upsertDialogOpen} token={selectedToken} onClose={handleDialogClose} />
+      <TokenDeleteDialog open={deleteDialogOpen} token={selectedToken} onClose={handleDialogClose} />
     </Table>
   );
 };
@@ -1144,18 +928,8 @@ const TokenDialog = (props) => {
   };
 
   return (
-    <Dialog
-      open={props.open}
-      onClose={props.onClose}
-      maxWidth="sm"
-      fullWidth
-      fullScreen={fullScreen}
-    >
-      <DialogTitle>
-        {editMode
-          ? t("account_tokens_dialog_title_edit")
-          : t("account_tokens_dialog_title_create")}
-      </DialogTitle>
+    <Dialog open={props.open} onClose={props.onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
+      <DialogTitle>{editMode ? t("account_tokens_dialog_title_edit") : t("account_tokens_dialog_title_create")}</DialogTitle>
       <DialogContent>
         <TextField
           margin="dense"
@@ -1169,52 +943,22 @@ const TokenDialog = (props) => {
           variant="standard"
         />
         <FormControl fullWidth variant="standard" sx={{ mt: 1 }}>
-          <Select
-            value={expires}
-            onChange={(ev) => setExpires(ev.target.value)}
-            aria-label={t("account_tokens_dialog_expires_label")}
-          >
-            {editMode && (
-              <MenuItem value={-1}>
-                {t("account_tokens_dialog_expires_unchanged")}
-              </MenuItem>
-            )}
-            <MenuItem value={0}>
-              {t("account_tokens_dialog_expires_never")}
-            </MenuItem>
-            <MenuItem value={21600}>
-              {t("account_tokens_dialog_expires_x_hours", { hours: 6 })}
-            </MenuItem>
-            <MenuItem value={43200}>
-              {t("account_tokens_dialog_expires_x_hours", { hours: 12 })}
-            </MenuItem>
-            <MenuItem value={259200}>
-              {t("account_tokens_dialog_expires_x_days", { days: 3 })}
-            </MenuItem>
-            <MenuItem value={604800}>
-              {t("account_tokens_dialog_expires_x_days", { days: 7 })}
-            </MenuItem>
-            <MenuItem value={2592000}>
-              {t("account_tokens_dialog_expires_x_days", { days: 30 })}
-            </MenuItem>
-            <MenuItem value={7776000}>
-              {t("account_tokens_dialog_expires_x_days", { days: 90 })}
-            </MenuItem>
-            <MenuItem value={15552000}>
-              {t("account_tokens_dialog_expires_x_days", { days: 180 })}
-            </MenuItem>
+          <Select value={expires} onChange={(ev) => setExpires(ev.target.value)} aria-label={t("account_tokens_dialog_expires_label")}>
+            {editMode && <MenuItem value={-1}>{t("account_tokens_dialog_expires_unchanged")}</MenuItem>}
+            <MenuItem value={0}>{t("account_tokens_dialog_expires_never")}</MenuItem>
+            <MenuItem value={21600}>{t("account_tokens_dialog_expires_x_hours", { hours: 6 })}</MenuItem>
+            <MenuItem value={43200}>{t("account_tokens_dialog_expires_x_hours", { hours: 12 })}</MenuItem>
+            <MenuItem value={259200}>{t("account_tokens_dialog_expires_x_days", { days: 3 })}</MenuItem>
+            <MenuItem value={604800}>{t("account_tokens_dialog_expires_x_days", { days: 7 })}</MenuItem>
+            <MenuItem value={2592000}>{t("account_tokens_dialog_expires_x_days", { days: 30 })}</MenuItem>
+            <MenuItem value={7776000}>{t("account_tokens_dialog_expires_x_days", { days: 90 })}</MenuItem>
+            <MenuItem value={15552000}>{t("account_tokens_dialog_expires_x_days", { days: 180 })}</MenuItem>
           </Select>
         </FormControl>
       </DialogContent>
       <DialogFooter status={error}>
-        <Button onClick={props.onClose}>
-          {t("account_tokens_dialog_button_cancel")}
-        </Button>
-        <Button onClick={handleSubmit}>
-          {editMode
-            ? t("account_tokens_dialog_button_update")
-            : t("account_tokens_dialog_button_create")}
-        </Button>
+        <Button onClick={props.onClose}>{t("account_tokens_dialog_button_cancel")}</Button>
+        <Button onClick={handleSubmit}>{editMode ? t("account_tokens_dialog_button_update") : t("account_tokens_dialog_button_create")}</Button>
       </DialogFooter>
     </Dialog>
   );
@@ -1285,26 +1029,13 @@ const DeleteAccount = () => {
   };
 
   return (
-    <Pref
-      title={t("account_delete_title")}
-      description={t("account_delete_description")}
-    >
+    <Pref title={t("account_delete_title")} description={t("account_delete_description")}>
       <div>
-        <Button
-          fullWidth={false}
-          variant="outlined"
-          color="error"
-          startIcon={<DeleteOutlineIcon />}
-          onClick={handleDialogOpen}
-        >
+        <Button fullWidth={false} variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={handleDialogOpen}>
           {t("account_delete_title")}
         </Button>
       </div>
-      <DeleteAccountDialog
-        key={`deleteAccountDialog${dialogKey}`}
-        open={dialogOpen}
-        onClose={handleDialogClose}
-      />
+      <DeleteAccountDialog key={`deleteAccountDialog${dialogKey}`} open={dialogOpen} onClose={handleDialogClose} />
     </Pref>
   );
 };
@@ -1325,9 +1056,7 @@ const DeleteAccountDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error deleting account`, e);
       if (e instanceof IncorrectPasswordError) {
-        setError(
-          t("account_basics_password_dialog_current_password_incorrect")
-        );
+        setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
         session.resetAndRedirect(routes.login);
       } else {
@@ -1340,9 +1069,7 @@ const DeleteAccountDialog = (props) => {
     <Dialog open={props.open} onClose={props.onClose} fullScreen={fullScreen}>
       <DialogTitle>{t("account_delete_title")}</DialogTitle>
       <DialogContent>
-        <Typography variant="body1">
-          {t("account_delete_dialog_description")}
-        </Typography>
+        <Typography variant="body1">{t("account_delete_dialog_description")}</Typography>
         <TextField
           margin="dense"
           id="account-delete-confirm"
@@ -1361,14 +1088,8 @@ const DeleteAccountDialog = (props) => {
         )}
       </DialogContent>
       <DialogFooter status={error}>
-        <Button onClick={props.onClose}>
-          {t("account_delete_dialog_button_cancel")}
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          color="error"
-          disabled={password.length === 0}
-        >
+        <Button onClick={props.onClose}>{t("account_delete_dialog_button_cancel")}</Button>
+        <Button onClick={handleSubmit} color="error" disabled={password.length === 0}>
           {t("account_delete_dialog_button_submit")}
         </Button>
       </DialogFooter>

@@ -32,41 +32,25 @@ export const useConnectionListeners = (account, subscriptions, users) => {
       };
 
       const handleInternalMessage = async (message) => {
-        console.log(
-          `[ConnectionListener] Received message on sync topic`,
-          message.message
-        );
+        console.log(`[ConnectionListener] Received message on sync topic`, message.message);
         try {
           const data = JSON.parse(message.message);
           if (data.event === "sync") {
             console.log(`[ConnectionListener] Triggering account sync`);
             await accountApi.sync();
           } else {
-            console.log(
-              `[ConnectionListener] Unknown message type. Doing nothing.`
-            );
+            console.log(`[ConnectionListener] Unknown message type. Doing nothing.`);
           }
         } catch (e) {
-          console.log(
-            `[ConnectionListener] Error parsing sync topic message`,
-            e
-          );
+          console.log(`[ConnectionListener] Error parsing sync topic message`, e);
         }
       };
 
       const handleNotification = async (subscriptionId, notification) => {
-        const added = await subscriptionManager.addNotification(
-          subscriptionId,
-          notification
-        );
+        const added = await subscriptionManager.addNotification(subscriptionId, notification);
         if (added) {
-          const defaultClickAction = (subscription) =>
-            navigate(routes.forSubscription(subscription));
-          await notifier.notify(
-            subscriptionId,
-            notification,
-            defaultClickAction
-          );
+          const defaultClickAction = (subscription) => navigate(routes.forSubscription(subscription));
+          await notifier.notify(subscriptionId, notification, defaultClickAction);
         }
       };
       connectionManager.registerStateListener(subscriptionManager.updateState);
@@ -109,20 +93,12 @@ export const useAutoSubscribe = (subscriptions, selected) => {
       return;
     }
     setHasRun(true);
-    const eligible =
-      params.topic && !selected && !disallowedTopic(params.topic);
+    const eligible = params.topic && !selected && !disallowedTopic(params.topic);
     if (eligible) {
-      const baseUrl = params.baseUrl
-        ? expandSecureUrl(params.baseUrl)
-        : config.base_url;
-      console.log(
-        `[Hooks] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`
-      );
+      const baseUrl = params.baseUrl ? expandSecureUrl(params.baseUrl) : config.base_url;
+      console.log(`[Hooks] Auto-subscribing to ${topicUrl(baseUrl, params.topic)}`);
       (async () => {
-        const subscription = await subscriptionManager.add(
-          baseUrl,
-          params.topic
-        );
+        const subscription = await subscriptionManager.add(baseUrl, params.topic);
         if (session.exists()) {
           try {
             await accountApi.addSubscription(baseUrl, params.topic);

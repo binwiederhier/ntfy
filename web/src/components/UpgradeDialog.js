@@ -3,16 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
-import {
-  Alert,
-  CardActionArea,
-  CardContent,
-  Chip,
-  Link,
-  ListItem,
-  Switch,
-  useMediaQuery,
-} from "@mui/material";
+import { Alert, CardActionArea, CardContent, Chip, Link, ListItem, Switch, useMediaQuery } from "@mui/material";
 import theme from "./theme";
 import Button from "@mui/material/Button";
 import accountApi, { SubscriptionInterval } from "../app/AccountApi";
@@ -21,12 +12,7 @@ import routes from "./routes";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { AccountContext } from "./App";
-import {
-  formatBytes,
-  formatNumber,
-  formatPrice,
-  formatShortDate,
-} from "../app/utils";
+import { formatBytes, formatNumber, formatPrice, formatShortDate } from "../app/utils";
 import { Trans, useTranslation } from "react-i18next";
 import List from "@mui/material/List";
 import { Check, Close } from "@mui/icons-material";
@@ -43,9 +29,7 @@ const UpgradeDialog = (props) => {
   const { account } = useContext(AccountContext); // May be undefined!
   const [error, setError] = useState("");
   const [tiers, setTiers] = useState(null);
-  const [interval, setInterval] = useState(
-    account?.billing?.interval || SubscriptionInterval.YEAR
-  );
+  const [interval, setInterval] = useState(account?.billing?.interval || SubscriptionInterval.YEAR);
   const [newTierCode, setNewTierCode] = useState(account?.tier?.code); // May be undefined
   const [loading, setLoading] = useState(false);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -61,9 +45,7 @@ const UpgradeDialog = (props) => {
     return <></>;
   }
 
-  const tiersMap = Object.assign(
-    ...tiers.map((tier) => ({ [tier.code]: tier }))
-  );
+  const tiersMap = Object.assign(...tiers.map((tier) => ({ [tier.code]: tier })));
   const newTier = tiersMap[newTierCode]; // May be undefined
   const currentTier = account?.tier; // May be undefined
   const currentInterval = account?.billing?.interval; // May be undefined
@@ -75,10 +57,7 @@ const UpgradeDialog = (props) => {
     submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
     submitAction = Action.REDIRECT_SIGNUP;
     banner = null;
-  } else if (
-    currentTierCode === newTierCode &&
-    (currentInterval === undefined || currentInterval === interval)
-  ) {
+  } else if (currentTierCode === newTierCode && (currentInterval === undefined || currentInterval === interval)) {
     submitButtonLabel = t("account_upgrade_dialog_button_update_subscription");
     submitAction = null;
     banner = currentTierCode ? Banner.PRORATION_INFO : null;
@@ -99,10 +78,7 @@ const UpgradeDialog = (props) => {
   // Exceptional conditions
   if (loading) {
     submitAction = null;
-  } else if (
-    newTier?.code &&
-    account?.reservations?.length > newTier?.limits?.reservations
-  ) {
+  } else if (newTier?.code && account?.reservations?.length > newTier?.limits?.reservations) {
     submitAction = null;
     banner = Banner.RESERVATIONS_WARNING;
   }
@@ -115,10 +91,7 @@ const UpgradeDialog = (props) => {
     try {
       setLoading(true);
       if (submitAction === Action.CREATE_SUBSCRIPTION) {
-        const response = await accountApi.createBillingSubscription(
-          newTierCode,
-          interval
-        );
+        const response = await accountApi.createBillingSubscription(newTierCode, interval);
         window.location.href = response.redirect_url;
       } else if (submitAction === Action.UPDATE_SUBSCRIPTION) {
         await accountApi.updateBillingSubscription(newTierCode, interval);
@@ -142,16 +115,12 @@ const UpgradeDialog = (props) => {
   let discount = 0,
     upto = false;
   if (newTier?.prices) {
-    discount = Math.round(
-      ((newTier.prices.month * 12) / newTier.prices.year - 1) * 100
-    );
+    discount = Math.round(((newTier.prices.month * 12) / newTier.prices.year - 1) * 100);
   } else {
     let n = 0;
     for (const t of tiers) {
       if (t.prices) {
-        const tierDiscount = Math.round(
-          ((t.prices.month * 12) / t.prices.year - 1) * 100
-        );
+        const tierDiscount = Math.round(((t.prices.month * 12) / t.prices.year - 1) * 100);
         if (tierDiscount > discount) {
           discount = tierDiscount;
           n++;
@@ -162,12 +131,7 @@ const UpgradeDialog = (props) => {
   }
 
   return (
-    <Dialog
-      open={props.open}
-      onClose={props.onCancel}
-      maxWidth="lg"
-      fullScreen={fullScreen}
-    >
+    <Dialog open={props.open} onClose={props.onCancel} maxWidth="lg" fullScreen={fullScreen}>
       <DialogTitle>
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div style={{ flexGrow: 1 }}>{t("account_upgrade_dialog_title")}</div>
@@ -184,13 +148,7 @@ const UpgradeDialog = (props) => {
             </Typography>
             <Switch
               checked={interval === SubscriptionInterval.YEAR}
-              onChange={(ev) =>
-                setInterval(
-                  ev.target.checked
-                    ? SubscriptionInterval.YEAR
-                    : SubscriptionInterval.MONTH
-                )
-              }
+              onChange={(ev) => setInterval(ev.target.checked ? SubscriptionInterval.YEAR : SubscriptionInterval.MONTH)}
             />
             <Typography component="span" variant="subtitle1">
               {t("account_upgrade_dialog_interval_yearly")}
@@ -199,20 +157,12 @@ const UpgradeDialog = (props) => {
               <Chip
                 label={
                   upto
-                    ? t(
-                        "account_upgrade_dialog_interval_yearly_discount_save_up_to",
-                        { discount: discount }
-                      )
-                    : t(
-                        "account_upgrade_dialog_interval_yearly_discount_save",
-                        { discount: discount }
-                      )
+                    ? t("account_upgrade_dialog_interval_yearly_discount_save_up_to", { discount: discount })
+                    : t("account_upgrade_dialog_interval_yearly_discount_save", { discount: discount })
                 }
                 color="primary"
                 size="small"
-                variant={
-                  interval === SubscriptionInterval.YEAR ? "filled" : "outlined"
-                }
+                variant={interval === SubscriptionInterval.YEAR ? "filled" : "outlined"}
                 sx={{ marginLeft: "5px" }}
               />
             )}
@@ -258,9 +208,7 @@ const UpgradeDialog = (props) => {
           <Alert severity="warning" sx={{ fontSize: "1rem" }}>
             <Trans
               i18nKey="account_upgrade_dialog_reservations_warning"
-              count={
-                account?.reservations.length - newTier?.limits.reservations
-              }
+              count={account?.reservations.length - newTier?.limits.reservations}
               components={{
                 Link: <NavLink to={routes.settings} />,
               }}
@@ -309,9 +257,7 @@ const UpgradeDialog = (props) => {
           {error}
         </DialogContentText>
         <DialogActions sx={{ paddingRight: 2 }}>
-          <Button onClick={props.onCancel}>
-            {t("account_upgrade_dialog_button_cancel")}
-          </Button>
+          <Button onClick={props.onCancel}>{t("account_upgrade_dialog_button_cancel")}</Button>
           <Button onClick={handleSubmit} disabled={!submitAction}>
             {submitButtonLabel}
           </Button>
@@ -382,16 +328,10 @@ const TierCard = (props) => {
               {tier.name || t("account_basics_tier_free")}
             </Typography>
             <div>
-              <Typography
-                component="span"
-                variant="h4"
-                sx={{ fontWeight: 500, marginRight: "3px" }}
-              >
+              <Typography component="span" variant="h4" sx={{ fontWeight: 500, marginRight: "3px" }}>
                 {formatPrice(monthlyPrice)}
               </Typography>
-              {monthlyPrice > 0 && (
-                <>/ {t("account_upgrade_dialog_tier_price_per_month")}</>
-              )}
+              {monthlyPrice > 0 && <>/ {t("account_upgrade_dialog_tier_price_per_month")}</>}
             </div>
             <List dense>
               {tier.limits.reservations > 0 && (
@@ -423,21 +363,10 @@ const TierCard = (props) => {
                 </Feature>
               )}
               <Feature>
-                {t(
-                  "account_upgrade_dialog_tier_features_attachment_file_size",
-                  { filesize: formatBytes(tier.limits.attachment_file_size, 0) }
-                )}
+                {t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}
               </Feature>
-              {tier.limits.reservations === 0 && (
-                <NoFeature>
-                  {t("account_upgrade_dialog_tier_features_no_reservations")}
-                </NoFeature>
-              )}
-              {tier.limits.calls === 0 && (
-                <NoFeature>
-                  {t("account_upgrade_dialog_tier_features_no_calls")}
-                </NoFeature>
-              )}
+              {tier.limits.reservations === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_reservations")}</NoFeature>}
+              {tier.limits.calls === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_calls")}</NoFeature>}
             </List>
             {tier.prices && props.interval === SubscriptionInterval.MONTH && (
               <Typography variant="body2" color="gray">
@@ -476,10 +405,7 @@ const FeatureItem = (props) => {
         {props.feature && <Check fontSize="small" sx={{ color: "#338574" }} />}
         {!props.feature && <Close fontSize="small" sx={{ color: "gray" }} />}
       </ListItemIcon>
-      <ListItemText
-        sx={{ mt: "2px", mb: "2px" }}
-        primary={<Typography variant="body1">{props.children}</Typography>}
-      />
+      <ListItemText sx={{ mt: "2px", mb: "2px" }} primary={<Typography variant="body1">{props.children}</Typography>} />
     </ListItem>
   );
 };

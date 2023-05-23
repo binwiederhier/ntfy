@@ -34,18 +34,12 @@ class Poller {
     console.log(`[Poller] Polling ${subscription.id}`);
 
     const since = subscription.last;
-    const notifications = await api.poll(
-      subscription.baseUrl,
-      subscription.topic,
-      since
-    );
+    const notifications = await api.poll(subscription.baseUrl, subscription.topic, since);
     if (!notifications || notifications.length === 0) {
       console.log(`[Poller] No new notifications found for ${subscription.id}`);
       return;
     }
-    console.log(
-      `[Poller] Adding ${notifications.length} notification(s) for ${subscription.id}`
-    );
+    console.log(`[Poller] Adding ${notifications.length} notification(s) for ${subscription.id}`);
     await subscriptionManager.addNotifications(subscription.id, notifications);
   }
 

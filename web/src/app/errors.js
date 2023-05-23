@@ -15,12 +15,7 @@ export const throwAppError = async (response) => {
   }
   const error = await maybeToJson(response);
   if (error?.code) {
-    console.log(
-      `[Error] HTTP ${response.status}, ntfy error ${error.code}: ${
-        error.error || ""
-      }`,
-      response
-    );
+    console.log(`[Error] HTTP ${response.status}, ntfy error ${error.code}: ${error.error || ""}`, response);
     if (error.code === UserExistsError.CODE) {
       throw new UserExistsError();
     } else if (error.code === TopicReservedError.CODE) {

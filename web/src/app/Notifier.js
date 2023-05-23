@@ -1,11 +1,4 @@
-import {
-  formatMessage,
-  formatTitleWithDefault,
-  openUrl,
-  playSound,
-  topicDisplayName,
-  topicShortUrl,
-} from "./utils";
+import { formatMessage, formatTitleWithDefault, openUrl, playSound, topicDisplayName, topicShortUrl } from "./utils";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
 import logo from "../img/ntfy.png";
@@ -30,9 +23,7 @@ class Notifier {
     const title = formatTitleWithDefault(notification, displayName);
 
     // Show notification
-    console.log(
-      `[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`
-    );
+    console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
     const n = new Notification(title, {
       body: message,
       icon: logo,
@@ -96,11 +87,7 @@ class Notifier {
    * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification
    */
   contextSupported() {
-    return (
-      location.protocol === "https:" ||
-      location.hostname.match("^127.") ||
-      location.hostname === "localhost"
-    );
+    return location.protocol === "https:" || location.hostname.match("^127.") || location.hostname === "localhost";
   }
 }
 

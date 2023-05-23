@@ -35,6 +35,8 @@ help:
 	@echo "  make web                        - Build the web app"
 	@echo "  make web-deps                   - Install web app dependencies (npm install the universe)"
 	@echo "  make web-build                  - Actually build the web app"
+	@echo "  make web-format                 - Run prettier on the web app
+	@echo "  make web-format-check           - Run prettier on the web app, but don't change anything
 	@echo
 	@echo "Build documentation:"
 	@echo "  make docs                       - Build the documentation"
@@ -137,6 +139,11 @@ web-deps:
 web-deps-update:
 	cd web && npm update
 
+web-format:
+	cd web && npm run format
+
+web-format-check:
+	cd web && npm run format:check
 
 # Main server/client build
 
@@ -226,7 +233,7 @@ cli-build-results:
 
 # Test/check targets
 
-check: test fmt-check vet lint staticcheck
+check: test web-format-check fmt-check vet lint staticcheck
 
 test: .PHONY
 	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')

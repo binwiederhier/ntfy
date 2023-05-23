@@ -6,7 +6,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "dependencies": {
     "@mui/icons-material": "^5.4.2",
@@ -27,6 +29,7 @@
     "stacktrace-js": "^2.0.2"
   },
   "devDependencies": {
+    "prettier": "^2.8.8",
     "react-scripts": "^5.0.0"
   },
   "browserslist": {

@@ -5,6 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
         name: Install Go
         uses: actions/setup-go@v4
         with:
@@ -16,9 +19,6 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
       -
         name: Install dependencies
         run: make build-deps-ubuntu

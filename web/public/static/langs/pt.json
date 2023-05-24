@@ -214,5 +214,17 @@
     "login_link_signup": "Registar",
     "action_bar_reservation_add": "Reservar tópico",
     "action_bar_sign_up": "Registar",
-    "nav_button_account": "Conta"
+    "nav_button_account": "Conta",
+    "common_copy_to_clipboard": "Copiar",
+    "nav_upgrade_banner_label": "Atualizar para ntfy Pro",
+    "alert_not_supported_context_description": "Notificações são suportadas apenas sobre HTTPS. Essa é uma limitação da <mdnLink>API de Notificações</mdnLink>.",
+    "display_name_dialog_title": "Alterar nome mostrado",
+    "display_name_dialog_description": "Configura um nome alternativo ao tópico que é mostrado na lista de assinaturas. Isto ajuda a identificar tópicos com nomes complicados mais facilmente.",
+    "display_name_dialog_placeholder": "Nome exibido",
+    "reserve_dialog_checkbox_label": "Reservar tópico e configurar acesso",
+    "publish_dialog_call_label": "Chamada telefônica",
+    "publish_dialog_call_placeholder": "Número de telefone para ligar com a mensagem, ex: +12223334444, ou 'Sim'",
+    "publish_dialog_call_reset": "Remover chamada telefônica",
+    "publish_dialog_chip_call_label": "Chamada telefônica",
+    "subscribe_dialog_subscribe_button_generate_topic_name": "Gerar nome"
 }

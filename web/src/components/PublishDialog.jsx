@@ -824,8 +824,11 @@ const ExpandingTextField = (props) => {
         variant="standard"
         sx={{ width: `${textWidth}px`, borderBottom: "none" }}
         InputProps={{
-          style: { fontSize: theme.typography[props.variant].fontSize, paddingBottom: 0, paddingTop: 0 },
-          "aria-label": props.placeholder,
+          style: { fontSize: theme.typography[props.variant].fontSize },
+          inputProps: {
+            style: { paddingBottom: 0, paddingTop: 0 },
+            "aria-label": props.placeholder,
+          },
         }}
         disabled={props.disabled}
       />

@@ -1,6 +1,13 @@
+/* eslint-disable max-classes-per-file */
 import { basicAuth, bearerAuth, encodeBase64Url, topicShortUrl, topicUrlWs } from "./utils";
 
 const retryBackoffSeconds = [5, 10, 20, 30, 60, 120];
+
+export class ConnectionState {
+  static Connected = "connected";
+
+  static Connecting = "connecting";
+}
 
 /**
  * A connection contains a single WebSocket connection for one topic. It handles its connection
@@ -63,7 +70,7 @@ class Connection {
         this.ws = null;
       } else {
         const retrySeconds = retryBackoffSeconds[Math.min(this.retryCount, retryBackoffSeconds.length - 1)];
-        this.retryCount++;
+        this.retryCount += 1;
         console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Connection died, retrying in ${retrySeconds} seconds`);
         this.retryTimeout = setTimeout(() => this.start(), retrySeconds * 1000);
         this.onStateChanged(this.subscriptionId, ConnectionState.Connecting);
@@ -106,12 +113,6 @@ class Connection {
     }
     return encodeBase64Url(bearerAuth(this.user.token));
   }
-}
-
-export class ConnectionState {
-  static Connected = "connected";
-
-  static Connecting = "connecting";
 }
 
 export default Connection;

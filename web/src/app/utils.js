@@ -9,6 +9,10 @@ import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
 
+export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
+export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
+export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
+export const expandSecureUrl = (url) => `https://${url}`;
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) =>
   `${topicUrl(baseUrl, topic)}/ws`.replaceAll("https://", "wss://").replaceAll("http://", "ws://");
@@ -28,12 +32,10 @@ export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account
 export const accountBillingPortalUrl = (baseUrl) => `${baseUrl}/v1/account/billing/portal`;
 export const accountPhoneUrl = (baseUrl) => `${baseUrl}/v1/account/phone`;
 export const accountPhoneVerifyUrl = (baseUrl) => `${baseUrl}/v1/account/phone/verify`;
-export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
-export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
-export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
-export const expandSecureUrl = (url) => `https://${url}`;
 
 export const validUrl = (url) => url.match(/^https?:\/\/.+/);
+
+export const disallowedTopic = (topic) => config.disallowed_topics.includes(topic);
 
 export const validTopic = (topic) => {
   if (disallowedTopic(topic)) {
@@ -41,8 +43,6 @@ export const validTopic = (topic) => {
   }
   return topic.match(/^([-_a-zA-Z0-9]{1,64})$/); // Regex must match Go & Android app!
 };
-
-export const disallowedTopic = (topic) => config.disallowed_topics.includes(topic);
 
 export const topicDisplayName = (subscription) => {
   if (subscription.displayName) {
@@ -67,19 +67,19 @@ const toEmojis = (tags) => {
   return tags.filter((tag) => tag in emojis).map((tag) => emojis[tag]);
 };
 
-export const formatTitleWithDefault = (m, fallback) => {
-  if (m.title) {
-    return formatTitle(m);
-  }
-  return fallback;
-};
-
 export const formatTitle = (m) => {
   const emojiList = toEmojis(m.tags);
   if (emojiList.length > 0) {
     return `${emojiList.join(" ")} ${m.title}`;
   }
   return m.title;
+};
+
+export const formatTitleWithDefault = (m, fallback) => {
+  if (m.title) {
+    return formatTitle(m);
+  }
+  return fallback;
 };
 
 export const formatMessage = (m) => {
@@ -98,6 +98,25 @@ export const unmatchedTags = (tags) => {
   return tags.filter((tag) => !(tag in emojis));
 };
 
+export const encodeBase64 = (s) => Base64.encode(s);
+
+export const encodeBase64Url = (s) => Base64.encodeURI(s);
+
+export const bearerAuth = (token) => `Bearer ${token}`;
+
+export const basicAuth = (username, password) => `Basic ${encodeBase64(`${username}:${password}`)}`;
+
+export const withBearerAuth = (headers, token) => ({ ...headers, Authorization: bearerAuth(token) });
+
+export const maybeWithBearerAuth = (headers, token) => {
+  if (token) {
+    return withBearerAuth(headers, token);
+  }
+  return headers;
+};
+
+export const withBasicAuth = (headers, username, password) => ({ ...headers, Authorization: basicAuth(username, password) });
+
 export const maybeWithAuth = (headers, user) => {
   if (user && user.password) {
     return withBasicAuth(headers, user.username, user.password);
@@ -107,31 +126,6 @@ export const maybeWithAuth = (headers, user) => {
   }
   return headers;
 };
-
-export const maybeWithBearerAuth = (headers, token) => {
-  if (token) {
-    return withBearerAuth(headers, token);
-  }
-  return headers;
-};
-
-export const withBasicAuth = (headers, username, password) => {
-  headers.Authorization = basicAuth(username, password);
-  return headers;
-};
-
-export const basicAuth = (username, password) => `Basic ${encodeBase64(`${username}:${password}`)}`;
-
-export const withBearerAuth = (headers, token) => {
-  headers.Authorization = bearerAuth(token);
-  return headers;
-};
-
-export const bearerAuth = (token) => `Bearer ${token}`;
-
-export const encodeBase64 = (s) => Base64.encode(s);
-
-export const encodeBase64Url = (s) => Base64.encodeURI(s);
 
 export const maybeAppendActionErrors = (message, notification) => {
   const actionErrors = (notification.actions ?? [])
@@ -147,10 +141,12 @@ export const maybeAppendActionErrors = (message, notification) => {
 export const shuffle = (arr) => {
   let j;
   let x;
-  for (let index = arr.length - 1; index > 0; index--) {
+  for (let index = arr.length - 1; index > 0; index -= 1) {
     j = Math.floor(Math.random() * (index + 1));
     x = arr[index];
+    // eslint-disable-next-line no-param-reassign
     arr[index] = arr[j];
+    // eslint-disable-next-line no-param-reassign
     arr[j] = x;
   }
   return arr;
@@ -165,9 +161,11 @@ export const splitNoEmpty = (s, delimiter) =>
 /** Non-cryptographic hash function, see https://stackoverflow.com/a/8831937/1440785 */
 export const hashCode = async (s) => {
   let hash = 0;
-  for (let i = 0; i < s.length; i++) {
+  for (let i = 0; i < s.length; i += 1) {
     const char = s.charCodeAt(i);
+    // eslint-disable-next-line no-bitwise
     hash = (hash << 5) - hash + char;
+    // eslint-disable-next-line no-bitwise
     hash &= hash; // Convert to 32bit integer
   }
   return hash;
@@ -248,6 +246,7 @@ export const playSound = async (id) => {
 };
 
 // From: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+// eslint-disable-next-line func-style
 export async function* fetchLinesIterator(fileURL, headers) {
   const utf8Decoder = new TextDecoder("utf-8");
   const response = await fetch(fileURL, {
@@ -267,9 +266,12 @@ export async function* fetchLinesIterator(fileURL, headers) {
         break;
       }
       const remainder = chunk.substr(startIndex);
+      // eslint-disable-next-line no-await-in-loop
       ({ value: chunk, done: readerDone } = await reader.read());
       chunk = remainder + (chunk ? utf8Decoder.decode(chunk) : "");
-      startIndex = re.lastIndex = 0;
+      startIndex = 0;
+      re.lastIndex = 0;
+      // eslint-disable-next-line no-continue
       continue;
     }
     yield chunk.substring(startIndex, result.index);
@@ -283,7 +285,8 @@ export async function* fetchLinesIterator(fileURL, headers) {
 export const randomAlphanumericString = (len) => {
   const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let id = "";
-  for (let i = 0; i < len; i++) {
+  for (let i = 0; i < len; i += 1) {
+    // eslint-disable-next-line no-bitwise
     id += alphabet[(Math.random() * alphabet.length) | 0];
   }
   return id;

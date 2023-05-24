@@ -22,15 +22,6 @@ export const useConnectionListeners = (account, subscriptions, users) => {
   // Register listeners for incoming messages, and connection state changes
   useEffect(
     () => {
-      const handleMessage = async (subscriptionId, message) => {
-        const subscription = await subscriptionManager.get(subscriptionId);
-        if (subscription.internal) {
-          await handleInternalMessage(message);
-        } else {
-          await handleNotification(subscriptionId, message);
-        }
-      };
-
       const handleInternalMessage = async (message) => {
         console.log(`[ConnectionListener] Received message on sync topic`, message.message);
         try {
@@ -53,8 +44,19 @@ export const useConnectionListeners = (account, subscriptions, users) => {
           await notifier.notify(subscriptionId, notification, defaultClickAction);
         }
       };
+
+      const handleMessage = async (subscriptionId, message) => {
+        const subscription = await subscriptionManager.get(subscriptionId);
+        if (subscription.internal) {
+          await handleInternalMessage(message);
+        } else {
+          await handleNotification(subscriptionId, message);
+        }
+      };
+
       connectionManager.registerStateListener(subscriptionManager.updateState);
       connectionManager.registerMessageListener(handleMessage);
+
       return () => {
         connectionManager.resetStateListener();
         connectionManager.resetMessageListener();

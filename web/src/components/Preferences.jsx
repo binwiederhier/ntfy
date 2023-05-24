@@ -47,8 +47,21 @@ import prefs from "../app/Prefs";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
-import subscriptionManager from "../app/SubscriptionManager";
 import { subscribeTopic } from "./SubscribeDialog";
+
+const maybeUpdateAccountSettings = async (payload) => {
+  if (!session.exists()) {
+    return;
+  }
+  try {
+    await accountApi.updateSettings(payload);
+  } catch (e) {
+    console.log(`[Preferences] Error updating account settings`, e);
+    if (e instanceof UnauthorizedError) {
+      session.resetAndRedirect(routes.login);
+    }
+  }
+};
 
 const Preferences = () => (
   <Container maxWidth="md" sx={{ marginTop: 3, marginBottom: 3 }}>
@@ -181,10 +194,12 @@ const DeleteAfter = () => {
       },
     });
   };
+
   if (deleteAfter === null || deleteAfter === undefined) {
     // !deleteAfter will not work with "0"
     return null; // While loading
   }
+
   const description = (() => {
     switch (deleteAfter) {
       case 0:
@@ -197,8 +212,11 @@ const DeleteAfter = () => {
         return t("prefs_notifications_delete_after_one_week_description");
       case 2592000:
         return t("prefs_notifications_delete_after_one_month_description");
+      default:
+        return "";
     }
   })();
+
   return (
     <Pref labelId={labelId} title={t("prefs_notifications_delete_after_title")} description={description}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
@@ -672,20 +690,6 @@ const ReservationsTable = (props) => {
       />
     </Table>
   );
-};
-
-const maybeUpdateAccountSettings = async (payload) => {
-  if (!session.exists()) {
-    return;
-  }
-  try {
-    await accountApi.updateSettings(payload);
-  } catch (e) {
-    console.log(`[Preferences] Error updating account settings`, e);
-    if (e instanceof UnauthorizedError) {
-      session.resetAndRedirect(routes.login);
-    }
-  }
 };
 
 export default Preferences;

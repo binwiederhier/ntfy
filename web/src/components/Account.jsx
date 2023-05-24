@@ -439,23 +439,6 @@ const AddPhoneNumberDialog = (props) => {
   const [verificationCodeSent, setVerificationCodeSent] = useState(false);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const handleDialogSubmit = async () => {
-    if (!verificationCodeSent) {
-      await verifyPhone();
-    } else {
-      await checkVerifyPhone();
-    }
-  };
-
-  const handleCancel = () => {
-    if (verificationCodeSent) {
-      setVerificationCodeSent(false);
-      setCode("");
-    } else {
-      props.onClose();
-    }
-  };
-
   const verifyPhone = async () => {
     try {
       setSending(true);
@@ -487,6 +470,23 @@ const AddPhoneNumberDialog = (props) => {
       }
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDialogSubmit = async () => {
+    if (!verificationCodeSent) {
+      await verifyPhone();
+    } else {
+      await checkVerifyPhone();
+    }
+  };
+
+  const handleCancel = () => {
+    if (verificationCodeSent) {
+      setVerificationCodeSent(false);
+      setCode("");
+    } else {
+      props.onClose();
     }
   };
 
@@ -771,10 +771,6 @@ const Tokens = () => {
     setDialogOpen(false);
   };
 
-  const handleDialogSubmit = async (user) => {
-    setDialogOpen(false);
-    //
-  };
   return (
     <Card sx={{ padding: 1 }} aria-label={t("prefs_users_title")}>
       <CardContent sx={{ paddingBottom: 1 }}>
@@ -998,7 +994,6 @@ const TokenDialog = (props) => {
 
 const TokenDeleteDialog = (props) => {
   const { t } = useTranslation();
-  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     try {
@@ -1008,8 +1003,6 @@ const TokenDeleteDialog = (props) => {
       console.log(`[Account] Error deleting token`, e);
       if (e instanceof UnauthorizedError) {
         session.resetAndRedirect(routes.login);
-      } else {
-        setError(e.message);
       }
     }
   };

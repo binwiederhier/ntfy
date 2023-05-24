@@ -24,6 +24,33 @@ import session from "../app/Session";
 import accountApi, { SubscriptionInterval } from "../app/AccountApi";
 import theme from "./theme";
 
+const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
+
+const NoFeature = (props) => <FeatureItem feature={false}>{props.children}</FeatureItem>;
+
+const FeatureItem = (props) => (
+  <ListItem disableGutters sx={{ m: 0, p: 0 }}>
+    <ListItemIcon sx={{ minWidth: "24px" }}>
+      {props.feature && <Check fontSize="small" sx={{ color: "#338574" }} />}
+      {!props.feature && <Close fontSize="small" sx={{ color: "gray" }} />}
+    </ListItemIcon>
+    <ListItemText sx={{ mt: "2px", mb: "2px" }} primary={<Typography variant="body1">{props.children}</Typography>} />
+  </ListItem>
+);
+
+const Action = {
+  REDIRECT_SIGNUP: 1,
+  CREATE_SUBSCRIPTION: 2,
+  UPDATE_SUBSCRIPTION: 3,
+  CANCEL_SUBSCRIPTION: 4,
+};
+
+const Banner = {
+  CANCEL_WARNING: 1,
+  PRORATION_INFO: 2,
+  RESERVATIONS_WARNING: 3,
+};
+
 const UpgradeDialog = (props) => {
   const { t } = useTranslation();
   const { account } = useContext(AccountContext); // May be undefined!
@@ -120,12 +147,12 @@ const UpgradeDialog = (props) => {
     discount = Math.round(((newTier.prices.month * 12) / newTier.prices.year - 1) * 100);
   } else {
     let n = 0;
-    for (const t of tiers) {
-      if (t.prices) {
-        const tierDiscount = Math.round(((t.prices.month * 12) / t.prices.year - 1) * 100);
+    for (const tier of tiers) {
+      if (tier.prices) {
+        const tierDiscount = Math.round(((tier.prices.month * 12) / tier.prices.year - 1) * 100);
         if (tierDiscount > discount) {
           discount = tierDiscount;
-          n++;
+          n += 1;
         }
       }
     }
@@ -210,7 +237,7 @@ const UpgradeDialog = (props) => {
           <Alert severity="warning" sx={{ fontSize: "1rem" }}>
             <Trans
               i18nKey="account_upgrade_dialog_reservations_warning"
-              count={account?.reservations.length - newTier?.limits.reservations}
+              count={(account?.reservations.length ?? 0) - (newTier?.limits.reservations ?? 0)}
               components={{
                 Link: <NavLink to={routes.settings} />,
               }}
@@ -394,33 +421,6 @@ const TierCard = (props) => {
       </Card>
     </Box>
   );
-};
-
-const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
-
-const NoFeature = (props) => <FeatureItem feature={false}>{props.children}</FeatureItem>;
-
-const FeatureItem = (props) => (
-  <ListItem disableGutters sx={{ m: 0, p: 0 }}>
-    <ListItemIcon sx={{ minWidth: "24px" }}>
-      {props.feature && <Check fontSize="small" sx={{ color: "#338574" }} />}
-      {!props.feature && <Close fontSize="small" sx={{ color: "gray" }} />}
-    </ListItemIcon>
-    <ListItemText sx={{ mt: "2px", mb: "2px" }} primary={<Typography variant="body1">{props.children}</Typography>} />
-  </ListItem>
-);
-
-const Action = {
-  REDIRECT_SIGNUP: 1,
-  CREATE_SUBSCRIPTION: 2,
-  UPDATE_SUBSCRIPTION: 3,
-  CANCEL_SUBSCRIPTION: 4,
-};
-
-const Banner = {
-  CANCEL_WARNING: 1,
-  PRORATION_INFO: 2,
-  RESERVATIONS_WARNING: 3,
 };
 
 export default UpgradeDialog;

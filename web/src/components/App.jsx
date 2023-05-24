@@ -1,5 +1,5 @@
 import * as React from "react";
-import { createContext, Suspense, useContext, useEffect, useState } from "react";
+import { createContext, Suspense, useContext, useEffect, useState, useMemo } from "react";
 import Box from "@mui/material/Box";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -30,11 +30,14 @@ export const AccountContext = createContext(null);
 
 const App = () => {
   const [account, setAccount] = useState(null);
+
+  const contextValue = useMemo(() => ({ account, setAccount }), [account, setAccount]);
+
   return (
     <Suspense fallback={<Loader />}>
       <BrowserRouter>
         <ThemeProvider theme={theme}>
-          <AccountContext.Provider value={{ account, setAccount }}>
+          <AccountContext.Provider value={contextValue}>
             <CssBaseline />
             <ErrorBoundary>
               <Routes>
@@ -54,6 +57,10 @@ const App = () => {
       </BrowserRouter>
     </Suspense>
   );
+};
+
+const updateTitle = (newNotificationsCount) => {
+  document.title = newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
 };
 
 const Layout = () => {
@@ -115,7 +122,7 @@ const Main = (props) => (
       width: { sm: `calc(100% - ${Navigation.width}px)` },
       height: "100vh",
       overflow: "auto",
-      backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
+      backgroundColor: ({ palette }) => (palette.mode === "light" ? palette.grey[100] : palette.grey[900]),
     }}
   >
     {props.children}
@@ -127,15 +134,11 @@ const Loader = () => (
     open
     sx={{
       zIndex: 100000,
-      backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
+      backgroundColor: ({ palette }) => (palette.mode === "light" ? palette.grey[100] : palette.grey[900]),
     }}
   >
     <CircularProgress color="success" disableShrink />
   </Backdrop>
 );
-
-const updateTitle = (newNotificationsCount) => {
-  document.title = newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
-};
 
 export default App;

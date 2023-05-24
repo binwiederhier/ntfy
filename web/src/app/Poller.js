@@ -23,6 +23,8 @@ class Poller {
     const subscriptions = await subscriptionManager.all();
     for (const s of subscriptions) {
       try {
+        // TODO(eslint): Switch to Promise.all
+        // eslint-disable-next-line no-await-in-loop
         await this.poll(s);
       } catch (e) {
         console.log(`[Poller] Error polling ${s.id}`, e);

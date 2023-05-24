@@ -261,12 +261,12 @@ class AccountApi {
 
   async createBillingSubscription(tier, interval) {
     console.log(`[AccountApi] Creating billing subscription with ${tier} and interval ${interval}`);
-    return await this.upsertBillingSubscription("POST", tier, interval);
+    return this.upsertBillingSubscription("POST", tier, interval);
   }
 
   async updateBillingSubscription(tier, interval) {
     console.log(`[AccountApi] Updating billing subscription with ${tier} and interval ${interval}`);
-    return await this.upsertBillingSubscription("PUT", tier, interval);
+    return this.upsertBillingSubscription("PUT", tier, interval);
   }
 
   async upsertBillingSubscription(method, tier, interval) {
@@ -279,7 +279,7 @@ class AccountApi {
         interval,
       }),
     });
-    return await response.json(); // May throw SyntaxError
+    return response.json(); // May throw SyntaxError
   }
 
   async deleteBillingSubscription() {
@@ -298,7 +298,7 @@ class AccountApi {
       method: "POST",
       headers: withBearerAuth({}, session.token()),
     });
-    return await response.json(); // May throw SyntaxError
+    return response.json(); // May throw SyntaxError
   }
 
   async verifyPhoneNumber(phoneNumber, channel) {
@@ -327,7 +327,7 @@ class AccountApi {
     });
   }
 
-  async deletePhoneNumber(phoneNumber, code) {
+  async deletePhoneNumber(phoneNumber) {
     const url = accountPhoneUrl(config.base_url);
     console.log(`[AccountApi] Deleting phone number ${url}`);
     await fetchOrThrow(url, {
@@ -369,6 +369,7 @@ class AccountApi {
       if (e instanceof UnauthorizedError) {
         session.resetAndRedirect(routes.login);
       }
+      return undefined;
     }
   }
 

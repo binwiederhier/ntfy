@@ -34,6 +34,13 @@ import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
 import { useAutoSubscribe } from "./hooks";
 
+const priorityFiles = {
+  1: priority1,
+  2: priority2,
+  4: priority4,
+  5: priority5,
+};
+
 export const AllSubscriptions = () => {
   const { subscriptions } = useOutletContext();
   if (!subscriptions) {
@@ -129,6 +136,25 @@ const NotificationList = (props) => {
       </Container>
     </InfiniteScroll>
   );
+};
+
+/**
+ * Replace links with <Link/> components; this is a combination of the genius function
+ * in [1] and the regex in [2].
+ *
+ * [1] https://github.com/facebook/react/issues/3386#issuecomment-78605760
+ * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
+ */
+const autolink = (s) => {
+  const parts = s.split(/(\bhttps?:\/\/[-A-Z0-9+\u0026\u2019@#/%?=()~_|!:,.;]*[-A-Z0-9+\u0026@#/%=~()_|]\b)/gi);
+  for (let i = 1; i < parts.length; i += 2) {
+    parts[i] = (
+      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
+        {shortUrl(parts[i])}
+      </Link>
+    );
+  }
+  return <>{parts}</>;
 };
 
 const NotificationItem = (props) => {
@@ -246,32 +272,6 @@ const NotificationItem = (props) => {
       )}
     </Card>
   );
-};
-
-/**
- * Replace links with <Link/> components; this is a combination of the genius function
- * in [1] and the regex in [2].
- *
- * [1] https://github.com/facebook/react/issues/3386#issuecomment-78605760
- * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
- */
-const autolink = (s) => {
-  const parts = s.split(/(\bhttps?:\/\/[\-A-Z0-9+\u0026\u2019@#\/%?=()~_|!:,.;]*[\-A-Z0-9+\u0026@#\/%=~()_|]\b)/gi);
-  for (let i = 1; i < parts.length; i += 2) {
-    parts[i] = (
-      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
-        {shortUrl(parts[i])}
-      </Link>
-    );
-  }
-  return <>{parts}</>;
-};
-
-const priorityFiles = {
-  1: priority1,
-  2: priority2,
-  4: priority4,
-  5: priority5,
 };
 
 const Attachment = (props) => {
@@ -414,6 +414,52 @@ const UserActions = (props) => (
   </>
 );
 
+const ACTION_PROGRESS_ONGOING = 1;
+const ACTION_PROGRESS_SUCCESS = 2;
+const ACTION_PROGRESS_FAILED = 3;
+
+const ACTION_LABEL_SUFFIX = {
+  [ACTION_PROGRESS_ONGOING]: " …",
+  [ACTION_PROGRESS_SUCCESS]: " ✔",
+  [ACTION_PROGRESS_FAILED]: " ❌",
+};
+
+const updateActionStatus = (notification, action, progress, error) => {
+  // TODO(eslint): Fix by spreading? Does the code depend on the change, though?
+  // eslint-disable-next-line no-param-reassign
+  notification.actions = notification.actions.map((a) => {
+    if (a.id !== action.id) {
+      return a;
+    }
+    return { ...a, progress, error };
+  });
+  subscriptionManager.updateNotification(notification);
+};
+
+const performHttpAction = async (notification, action) => {
+  console.log(`[Notifications] Performing HTTP user action`, action);
+  try {
+    updateActionStatus(notification, action, ACTION_PROGRESS_ONGOING, null);
+    const response = await fetch(action.url, {
+      method: action.method ?? "POST",
+      headers: action.headers ?? {},
+      // This must not null-coalesce to a non nullish value. Otherwise, the fetch API
+      // will reject it for "having a body"
+      body: action.body,
+    });
+    console.log(`[Notifications] HTTP user action response`, response);
+    const success = response.status >= 200 && response.status <= 299;
+    if (success) {
+      updateActionStatus(notification, action, ACTION_PROGRESS_SUCCESS, null);
+    } else {
+      updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: Unexpected response HTTP ${response.status}`);
+    }
+  } catch (e) {
+    console.log(`[Notifications] HTTP action failed`, e);
+    updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: ${e} Check developer console for details.`);
+  }
+};
+
 const UserAction = (props) => {
   const { t } = useTranslation();
   const { notification } = props;
@@ -468,53 +514,9 @@ const UserAction = (props) => {
   return null; // Others
 };
 
-const performHttpAction = async (notification, action) => {
-  console.log(`[Notifications] Performing HTTP user action`, action);
-  try {
-    updateActionStatus(notification, action, ACTION_PROGRESS_ONGOING, null);
-    const response = await fetch(action.url, {
-      method: action.method ?? "POST",
-      headers: action.headers ?? {},
-      // This must not null-coalesce to a non nullish value. Otherwise, the fetch API
-      // will reject it for "having a body"
-      body: action.body,
-    });
-    console.log(`[Notifications] HTTP user action response`, response);
-    const success = response.status >= 200 && response.status <= 299;
-    if (success) {
-      updateActionStatus(notification, action, ACTION_PROGRESS_SUCCESS, null);
-    } else {
-      updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: Unexpected response HTTP ${response.status}`);
-    }
-  } catch (e) {
-    console.log(`[Notifications] HTTP action failed`, e);
-    updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: ${e} Check developer console for details.`);
-  }
-};
-
-const updateActionStatus = (notification, action, progress, error) => {
-  notification.actions = notification.actions.map((a) => {
-    if (a.id !== action.id) {
-      return a;
-    }
-    return { ...a, progress, error };
-  });
-  subscriptionManager.updateNotification(notification);
-};
-
-const ACTION_PROGRESS_ONGOING = 1;
-const ACTION_PROGRESS_SUCCESS = 2;
-const ACTION_PROGRESS_FAILED = 3;
-
-const ACTION_LABEL_SUFFIX = {
-  [ACTION_PROGRESS_ONGOING]: " …",
-  [ACTION_PROGRESS_SUCCESS]: " ✔",
-  [ACTION_PROGRESS_FAILED]: " ❌",
-};
-
 const NoNotifications = (props) => {
   const { t } = useTranslation();
-  const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
+  const topicShortUrlResolved = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -525,7 +527,10 @@ const NoNotifications = (props) => {
       <Paragraph>{t("notifications_none_for_topic_description")}</Paragraph>
       <Paragraph>
         {t("notifications_example")}:<br />
-        <tt>$ curl -d "Hi" {shortUrl}</tt>
+        <tt>
+          {'$ curl -d "Hi" '}
+          {topicShortUrlResolved}
+        </tt>
       </Paragraph>
       <Paragraph>
         <ForMoreDetails />
@@ -537,7 +542,7 @@ const NoNotifications = (props) => {
 const NoNotificationsWithoutSubscription = (props) => {
   const { t } = useTranslation();
   const subscription = props.subscriptions[0];
-  const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
+  const topicShortUrlResolved = topicShortUrl(subscription.baseUrl, subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -548,7 +553,10 @@ const NoNotificationsWithoutSubscription = (props) => {
       <Paragraph>{t("notifications_none_for_any_description")}</Paragraph>
       <Paragraph>
         {t("notifications_example")}:<br />
-        <tt>$ curl -d "Hi" {shortUrl}</tt>
+        <tt>
+          {'$ curl -d "Hi" '}
+          {topicShortUrlResolved}
+        </tt>
       </Paragraph>
       <Paragraph>
         <ForMoreDetails />

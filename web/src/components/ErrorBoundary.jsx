@@ -69,16 +69,6 @@ class ErrorBoundaryImpl extends React.Component {
     navigator.clipboard.writeText(stack);
   }
 
-  render() {
-    if (this.state.error) {
-      if (this.state.unsupportedIndexedDB) {
-        return this.renderUnsupportedIndexedDB();
-      }
-      return this.renderError();
-    }
-    return this.props.children;
-  }
-
   renderUnsupportedIndexedDB() {
     const { t } = this.props;
     return (
@@ -129,6 +119,16 @@ class ErrorBoundaryImpl extends React.Component {
         <pre>{this.state.originalStack}</pre>
       </div>
     );
+  }
+
+  render() {
+    if (this.state.error) {
+      if (this.state.unsupportedIndexedDB) {
+        return this.renderUnsupportedIndexedDB();
+      }
+      return this.renderError();
+    }
+    return this.props.children;
   }
 }
 

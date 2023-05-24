@@ -25,6 +25,21 @@ import { ReserveLimitChip } from "./SubscriptionPopup";
 
 const publicBaseUrl = "https://ntfy.sh";
 
+export const subscribeTopic = async (baseUrl, topic) => {
+  const subscription = await subscriptionManager.add(baseUrl, topic);
+  if (session.exists()) {
+    try {
+      await accountApi.addSubscription(baseUrl, topic);
+    } catch (e) {
+      console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
+      if (e instanceof UnauthorizedError) {
+        session.resetAndRedirect(routes.login);
+      }
+    }
+  }
+  return subscription;
+};
+
 const SubscribeDialog = (props) => {
   const [baseUrl, setBaseUrl] = useState("");
   const [topic, setTopic] = useState("");
@@ -294,21 +309,6 @@ const LoginPage = (props) => {
       </DialogFooter>
     </>
   );
-};
-
-export const subscribeTopic = async (baseUrl, topic) => {
-  const subscription = await subscriptionManager.add(baseUrl, topic);
-  if (session.exists()) {
-    try {
-      await accountApi.addSubscription(baseUrl, topic);
-    } catch (e) {
-      console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
-      if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
-      }
-    }
-  }
-  return subscription;
 };
 
 export default SubscribeDialog;

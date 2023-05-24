@@ -171,34 +171,33 @@ const PublishDialog = (props) => {
 
   const checkAttachmentLimits = async (file) => {
     try {
-      const account = await accountApi.get();
-      const fileSizeLimit = account.limits.attachment_file_size ?? 0;
-      const remainingBytes = account.stats.attachment_total_size_remaining;
+      const apiAccount = await accountApi.get();
+      const fileSizeLimit = apiAccount.limits.attachment_file_size ?? 0;
+      const remainingBytes = apiAccount.stats.attachment_total_size_remaining;
       const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
       const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
       if (fileSizeLimitReached && quotaReached) {
-        return setAttachFileError(
+        setAttachFileError(
           t("publish_dialog_attachment_limits_file_and_quota_reached", {
             fileSizeLimit: formatBytes(fileSizeLimit),
             remainingBytes: formatBytes(remainingBytes),
           })
         );
-      }
-      if (fileSizeLimitReached) {
-        return setAttachFileError(
+      } else if (fileSizeLimitReached) {
+        setAttachFileError(
           t("publish_dialog_attachment_limits_file_reached", {
             fileSizeLimit: formatBytes(fileSizeLimit),
           })
         );
-      }
-      if (quotaReached) {
-        return setAttachFileError(
+      } else if (quotaReached) {
+        setAttachFileError(
           t("publish_dialog_attachment_limits_quota_reached", {
             remainingBytes: formatBytes(remainingBytes),
           })
         );
+      } else {
+        setAttachFileError("");
       }
-      setAttachFileError("");
     } catch (e) {
       console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
       if (e instanceof UnauthorizedError) {
@@ -213,6 +212,13 @@ const PublishDialog = (props) => {
     attachFileInput.current.click();
   };
 
+  const updateAttachFile = async (file) => {
+    setAttachFile(file);
+    setFilename(file.name);
+    props.onResetOpenMode();
+    await checkAttachmentLimits(file);
+  };
+
   const handleAttachFileChanged = async (ev) => {
     await updateAttachFile(ev.target.files[0]);
   };
@@ -221,13 +227,6 @@ const PublishDialog = (props) => {
     ev.preventDefault();
     setDropZone(false);
     await updateAttachFile(ev.dataTransfer.files[0]);
-  };
-
-  const updateAttachFile = async (file) => {
-    setAttachFile(file);
-    setFilename(file.name);
-    props.onResetOpenMode();
-    await checkAttachmentLimits(file);
   };
 
   const handleAttachFileDragLeave = () => {
@@ -242,7 +241,7 @@ const PublishDialog = (props) => {
   };
 
   const handleEmojiPick = (emoji) => {
-    setTags((tags) => (tags.trim() ? `${tags.trim()}, ${emoji}` : emoji));
+    setTags((prevTags) => (prevTags.trim() ? `${prevTags.trim()}, ${emoji}` : emoji));
   };
 
   const handleEmojiClose = () => {
@@ -374,23 +373,23 @@ const PublishDialog = (props) => {
                   "aria-label": t("publish_dialog_priority_label"),
                 }}
               >
-                {[5, 4, 3, 2, 1].map((priority) => (
+                {[5, 4, 3, 2, 1].map((priorityMenuItem) => (
                   <MenuItem
-                    key={`priorityMenuItem${priority}`}
-                    value={priority}
+                    key={`priorityMenuItem${priorityMenuItem}`}
+                    value={priorityMenuItem}
                     aria-label={t("notifications_priority_x", {
-                      priority,
+                      priority: priorityMenuItem,
                     })}
                   >
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <img
-                        src={priorities[priority].file}
+                        src={priorities[priorityMenuItem].file}
                         style={{ marginRight: "8px" }}
                         alt={t("notifications_priority_x", {
-                          priority,
+                          priority: priorityMenuItem,
                         })}
                       />
-                      <div>{priorities[priority].label}</div>
+                      <div>{priorities[priorityMenuItem].label}</div>
                     </div>
                   </MenuItem>
                 ))}
@@ -469,6 +468,8 @@ const PublishDialog = (props) => {
                   }}
                 >
                   {account?.phone_numbers?.map((phoneNumber, i) => (
+                    // TODO(eslint): Possibly just use the phone number as a key?
+                    // eslint-disable-next-line react/no-array-index-key
                     <MenuItem key={`phoneNumberMenuItem${i}`} value={phoneNumber} aria-label={phoneNumber}>
                       {t("publish_dialog_call_item", { number: phoneNumber })}
                     </MenuItem>
@@ -716,7 +717,7 @@ const Row = (props) => (
 );
 
 const ClosableRow = (props) => {
-  const closable = props.hasOwnProperty("closable") ? props.closable : true;
+  const closable = props.closable !== undefined ? props.closable : true;
   return (
     <Row>
       {props.children}
@@ -823,10 +824,7 @@ const ExpandingTextField = (props) => {
         variant="standard"
         sx={{ width: `${textWidth}px`, borderBottom: "none" }}
         InputProps={{
-          style: { fontSize: theme.typography[props.variant].fontSize },
-        }}
-        inputProps={{
-          style: { paddingBottom: 0, paddingTop: 0 },
+          style: { fontSize: theme.typography[props.variant].fontSize, paddingBottom: 0, paddingTop: 0 },
           "aria-label": props.placeholder,
         }}
         disabled={props.disabled}
@@ -840,6 +838,7 @@ const DropArea = (props) => {
     // This is where we could disallow certain files to be dragged in.
     // For now we allow all files.
 
+    // eslint-disable-next-line no-param-reassign
     ev.dataTransfer.dropEffect = "copy";
     ev.preventDefault();
   };

@@ -85,15 +85,15 @@ const NavList = (props) => {
     setSubscribeDialogKey((prev) => prev + 1);
   };
 
+  const handleRequestNotificationPermission = () => {
+    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
+  };
+
   const handleSubscribeSubmit = (subscription) => {
     console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
     handleSubscribeReset();
     navigate(routes.forSubscription(subscription));
     handleRequestNotificationPermission();
-  };
-
-  const handleRequestNotificationPermission = () => {
-    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
   };
 
   const handleAccountClick = () => {

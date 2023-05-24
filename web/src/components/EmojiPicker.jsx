@@ -79,8 +79,6 @@ const EmojiPicker = (props) => {
                 inputProps={{
                   role: "searchbox",
                   "aria-label": t("emoji_picker_search_placeholder"),
-                }}
-                InputProps={{
                   endAdornment: (
                     <InputAdornment position="end" sx={{ display: search ? "" : "none" }}>
                       <IconButton size="small" onClick={handleSearchClear} edge="end" aria-label={t("emoji_picker_search_clear")}>
@@ -132,6 +130,18 @@ const Category = (props) => {
   );
 };
 
+const emojiMatches = (emoji, words) => {
+  if (words.length === 0) {
+    return true;
+  }
+  for (const word of words) {
+    if (emoji.searchBase.indexOf(word) === -1) {
+      return false;
+    }
+  }
+  return true;
+};
+
 const Emoji = (props) => {
   const { emoji } = props;
   const matches = emojiMatches(emoji, props.search);
@@ -157,17 +167,5 @@ const EmojiDiv = styled("div")({
     opacity: 1,
   },
 });
-
-const emojiMatches = (emoji, words) => {
-  if (words.length === 0) {
-    return true;
-  }
-  for (const word of words) {
-    if (emoji.searchBase.indexOf(word) === -1) {
-      return false;
-    }
-  }
-  return true;
-};
 
 export default EmojiPicker;

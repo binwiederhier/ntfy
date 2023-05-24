@@ -7,6 +7,7 @@ class SubscriptionManager {
     const subscriptions = await db.subscriptions.toArray();
     await Promise.all(
       subscriptions.map(async (s) => {
+        // eslint-disable-next-line no-param-reassign
         s.new = await db.notifications.where({ subscriptionId: s.id, new: 1 }).count();
       })
     );
@@ -14,7 +15,7 @@ class SubscriptionManager {
   }
 
   async get(subscriptionId) {
-    return await db.subscriptions.get(subscriptionId);
+    return db.subscriptions.get(subscriptionId);
   }
 
   async add(baseUrl, topic, internal) {
@@ -40,10 +41,14 @@ class SubscriptionManager {
 
     // Add remote subscriptions
     const remoteIds = []; // = topicUrl(baseUrl, topic)
-    for (let i = 0; i < remoteSubscriptions.length; i++) {
+    for (let i = 0; i < remoteSubscriptions.length; i += 1) {
       const remote = remoteSubscriptions[i];
+      // TODO(eslint): Switch to Promise.all
+      // eslint-disable-next-line no-await-in-loop
       const local = await this.add(remote.base_url, remote.topic, false);
       const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
+      // TODO(eslint): Switch to Promise.all
+      // eslint-disable-next-line no-await-in-loop
       await this.update(local.id, {
         displayName: remote.display_name, // May be undefined
         reservation, // May be null!
@@ -53,10 +58,12 @@ class SubscriptionManager {
 
     // Remove local subscriptions that do not exist remotely
     const localSubscriptions = await db.subscriptions.toArray();
-    for (let i = 0; i < localSubscriptions.length; i++) {
+    for (let i = 0; i < localSubscriptions.length; i += 1) {
       const local = localSubscriptions[i];
       const remoteExists = remoteIds.includes(local.id);
       if (!local.internal && !remoteExists) {
+        // TODO(eslint): Switch to Promise.all
+        // eslint-disable-next-line no-await-in-loop
         await this.remove(local.id);
       }
     }
@@ -101,6 +108,7 @@ class SubscriptionManager {
       return false;
     }
     try {
+      // eslint-disable-next-line no-param-reassign
       notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
       await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
       await db.subscriptions.update(subscriptionId, {

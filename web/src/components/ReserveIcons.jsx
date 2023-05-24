@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Lock, Public } from "@mui/icons-material";
-import Box from "@mui/material/Box";
+import { Box } from "@mui/material";
 
 export const PermissionReadWrite = React.forwardRef((props, ref) => <PermissionInternal icon={Public} ref={ref} {...props} />);
 

@@ -1,7 +1,5 @@
 import * as React from "react";
-import Box from "@mui/material/Box";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogActions from "@mui/material/DialogActions";
+import { Box, DialogContentText, DialogActions } from "@mui/material";
 
 const DialogFooter = (props) => (
   <Box

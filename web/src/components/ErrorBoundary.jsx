@@ -1,7 +1,6 @@
 import * as React from "react";
 import StackTrace from "stacktrace-js";
-import { CircularProgress, Link } from "@mui/material";
-import Button from "@mui/material/Button";
+import { CircularProgress, Link, Button } from "@mui/material";
 import { Trans, withTranslation } from "react-i18next";
 
 class ErrorBoundaryImpl extends React.Component {

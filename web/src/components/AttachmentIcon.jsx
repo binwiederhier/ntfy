@@ -1,5 +1,5 @@
 import * as React from "react";
-import Box from "@mui/material/Box";
+import { Box } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import fileDocument from "../img/file-document.svg";
 import fileImage from "../img/file-image.svg";

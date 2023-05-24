@@ -1,17 +1,27 @@
 import * as React from "react";
 import { useContext, useEffect, useRef, useState } from "react";
-import { Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, Tooltip, useMediaQuery } from "@mui/material";
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
-import IconButton from "@mui/material/IconButton";
+import {
+  Checkbox,
+  Chip,
+  FormControl,
+  FormControlLabel,
+  InputLabel,
+  Link,
+  Select,
+  Tooltip,
+  useMediaQuery,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Button,
+  Typography,
+  IconButton,
+  MenuItem,
+  Box,
+} from "@mui/material";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import { Close } from "@mui/icons-material";
-import MenuItem from "@mui/material/MenuItem";
-import Box from "@mui/material/Box";
 import { Trans, useTranslation } from "react-i18next";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";

@@ -1,21 +1,30 @@
 import * as React from "react";
 import { useContext, useEffect, useState } from "react";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import { Alert, CardActionArea, CardContent, Chip, Link, ListItem, Switch, useMediaQuery } from "@mui/material";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import Typography from "@mui/material/Typography";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Alert,
+  CardActionArea,
+  CardContent,
+  Chip,
+  Link,
+  ListItem,
+  Switch,
+  useMediaQuery,
+  Button,
+  Card,
+  Typography,
+  List,
+  ListItemIcon,
+  ListItemText,
+  Box,
+  DialogContentText,
+  DialogActions,
+} from "@mui/material";
 import { Trans, useTranslation } from "react-i18next";
-import List from "@mui/material/List";
 import { Check, Close } from "@mui/icons-material";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import Box from "@mui/material/Box";
 import { NavLink } from "react-router-dom";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogActions from "@mui/material/DialogActions";
 import { UnauthorizedError } from "../app/errors";
 import { formatBytes, formatNumber, formatPrice, formatShortDate } from "../app/utils";
 import { AccountContext } from "./App";

@@ -15,22 +15,22 @@ import {
   TableRow,
   Tooltip,
   useMediaQuery,
+  Typography,
+  IconButton,
+  Container,
+  TextField,
+  MenuItem,
+  Card,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
-import Typography from "@mui/material/Typography";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
-import IconButton from "@mui/material/IconButton";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import Container from "@mui/material/Container";
-import TextField from "@mui/material/TextField";
-import MenuItem from "@mui/material/MenuItem";
-import Card from "@mui/material/Card";
-import Button from "@mui/material/Button";
 import { useLiveQuery } from "dexie-react-hooks";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
 import { useTranslation } from "react-i18next";
 import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";

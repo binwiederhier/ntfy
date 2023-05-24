@@ -1,14 +1,9 @@
 import * as React from "react";
 import { useState } from "react";
-import Typography from "@mui/material/Typography";
+import { Typography, TextField, Button, Box, IconButton, InputAdornment } from "@mui/material";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Box from "@mui/material/Box";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import IconButton from "@mui/material/IconButton";
-import { InputAdornment } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import accountApi from "../app/AccountApi";
 import AvatarBox from "./AvatarBox";

@@ -1,16 +1,21 @@
 import * as React from "react";
 import { useState } from "react";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import { Alert, FormControl, Select, useMediaQuery } from "@mui/material";
+import {
+  Button,
+  TextField,
+  Dialog,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Alert,
+  FormControl,
+  Select,
+  useMediaQuery,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
 import { useTranslation } from "react-i18next";
-import MenuItem from "@mui/material/MenuItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 import { Check, DeleteForever } from "@mui/icons-material";
 import theme from "./theme";
 import { validTopic } from "../app/utils";

@@ -1,26 +1,35 @@
-import Drawer from "@mui/material/Drawer";
+import {
+  Drawer,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Divider,
+  List,
+  Alert,
+  AlertTitle,
+  Badge,
+  CircularProgress,
+  Link,
+  ListSubheader,
+  Portal,
+  Tooltip,
+  Button,
+  Typography,
+  Box,
+  IconButton,
+} from "@mui/material";
 import * as React from "react";
 import { useContext, useState } from "react";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import Person from "@mui/icons-material/Person";
-import ListItemText from "@mui/material/ListItemText";
-import Toolbar from "@mui/material/Toolbar";
-import Divider from "@mui/material/Divider";
-import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
-import { Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Portal, Tooltip } from "@mui/material";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatBubble, MoreVert, NotificationsOffOutlined, Send } from "@mui/icons-material";
-import Box from "@mui/material/Box";
 import ArticleIcon from "@mui/icons-material/Article";
 import { Trans, useTranslation } from "react-i18next";
 import CelebrationIcon from "@mui/icons-material/Celebration";
-import IconButton from "@mui/material/IconButton";
 import SubscribeDialog from "./SubscribeDialog";
 import { openUrl, topicDisplayName, topicUrl } from "../app/utils";
 import routes from "./routes";

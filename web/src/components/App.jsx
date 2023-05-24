@@ -1,12 +1,9 @@
 import * as React from "react";
 import { createContext, Suspense, useContext, useEffect, useState, useMemo } from "react";
-import Box from "@mui/material/Box";
+import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
-import Toolbar from "@mui/material/Toolbar";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
-import { Backdrop, CircularProgress } from "@mui/material";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
 import theme from "./theme";
 import Navigation from "./Navigation";

@@ -1,12 +1,7 @@
 import * as React from "react";
 import { useRef, useState } from "react";
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import TextField from "@mui/material/TextField";
-import { ClickAwayListener, Fade, InputAdornment, styled } from "@mui/material";
-import IconButton from "@mui/material/IconButton";
+import { Typography, Box, TextField, ClickAwayListener, Fade, InputAdornment, styled, IconButton, Popper } from "@mui/material";
 import { Close } from "@mui/icons-material";
-import Popper from "@mui/material/Popper";
 import { useTranslation } from "react-i18next";
 import { splitNoEmpty } from "../app/utils";
 import { rawEmojis } from "../app/emojis";

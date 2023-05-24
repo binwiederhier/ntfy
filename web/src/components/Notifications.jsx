@@ -1,15 +1,26 @@
-import Container from "@mui/material/Container";
-import { ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Modal, Snackbar, Stack, Tooltip } from "@mui/material";
-import Card from "@mui/material/Card";
-import Typography from "@mui/material/Typography";
+import {
+  Container,
+  ButtonBase,
+  CardActions,
+  CardContent,
+  CircularProgress,
+  Fade,
+  Link,
+  Modal,
+  Snackbar,
+  Stack,
+  Tooltip,
+  Card,
+  Typography,
+  IconButton,
+  Box,
+  Button,
+} from "@mui/material";
 import * as React from "react";
 import { useEffect, useState } from "react";
-import IconButton from "@mui/material/IconButton";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import { useLiveQuery } from "dexie-react-hooks";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Trans, useTranslation } from "react-i18next";
 import { useOutletContext } from "react-router-dom";

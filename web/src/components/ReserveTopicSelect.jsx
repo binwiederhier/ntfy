@@ -1,9 +1,6 @@
 import * as React from "react";
-import { FormControl, Select } from "@mui/material";
+import { FormControl, Select, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import MenuItem from "@mui/material/MenuItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { Permission } from "../app/AccountApi";
 

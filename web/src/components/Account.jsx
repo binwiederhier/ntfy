@@ -21,28 +21,28 @@ import {
   TableHead,
   TableRow,
   useMediaQuery,
+  Tooltip,
+  Typography,
+  Container,
+  Card,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  IconButton,
+  MenuItem,
+  DialogContentText,
 } from "@mui/material";
-import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 import EditIcon from "@mui/icons-material/Edit";
-import Container from "@mui/material/Container";
-import Card from "@mui/material/Card";
-import Button from "@mui/material/Button";
 import { Trans, useTranslation } from "react-i18next";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import TextField from "@mui/material/TextField";
-import IconButton from "@mui/material/IconButton";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import CloseIcon from "@mui/icons-material/Close";
 import { ContentCopy, Public } from "@mui/icons-material";
-import MenuItem from "@mui/material/MenuItem";
-import DialogContentText from "@mui/material/DialogContentText";
 import AddIcon from "@mui/icons-material/Add";
 import routes from "./routes";
 import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";

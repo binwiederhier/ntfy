@@ -1,12 +1,18 @@
 import * as React from "react";
 import { useContext, useState } from "react";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import { Autocomplete, Checkbox, FormControlLabel, FormGroup, useMediaQuery } from "@mui/material";
+import {
+  Button,
+  TextField,
+  Dialog,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Autocomplete,
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
+  useMediaQuery,
+} from "@mui/material";
 import { useTranslation } from "react-i18next";
 import theme from "./theme";
 import api from "../app/Api";

@@ -1,16 +1,22 @@
 import * as React from "react";
 import { useContext, useState } from "react";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import Dialog from "@mui/material/Dialog";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import { Chip, InputAdornment, Portal, Snackbar, useMediaQuery } from "@mui/material";
+import {
+  Button,
+  TextField,
+  Dialog,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Chip,
+  InputAdornment,
+  Portal,
+  Snackbar,
+  useMediaQuery,
+  MenuItem,
+  IconButton,
+} from "@mui/material";
 import { useTranslation } from "react-i18next";
-import MenuItem from "@mui/material/MenuItem";
 import { useNavigate } from "react-router-dom";
-import IconButton from "@mui/material/IconButton";
 import { Clear } from "@mui/icons-material";
 import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";

@@ -467,10 +467,8 @@ const PublishDialog = (props) => {
                     "aria-label": t("publish_dialog_call_label"),
                   }}
                 >
-                  {account?.phone_numbers?.map((phoneNumber, i) => (
-                    // TODO(eslint): Possibly just use the phone number as a key?
-                    // eslint-disable-next-line react/no-array-index-key
-                    <MenuItem key={`phoneNumberMenuItem${i}`} value={phoneNumber} aria-label={phoneNumber}>
+                  {account?.phone_numbers?.map((phoneNumber) => (
+                    <MenuItem key={phoneNumber} value={phoneNumber} aria-label={phoneNumber}>
                       {t("publish_dialog_call_item", { number: phoneNumber })}
                     </MenuItem>
                   ))}

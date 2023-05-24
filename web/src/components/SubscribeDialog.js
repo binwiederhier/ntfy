@@ -68,7 +68,9 @@ const SubscribePage = (props) => {
   const baseUrl = anotherServerVisible ? props.baseUrl : config.base_url;
   const topic = props.topic;
   const existingTopicUrls = props.subscriptions.map((s) => topicUrl(s.baseUrl, s.topic));
-  const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map((s) => s.baseUrl)])).filter((s) => s !== config.base_url);
+  const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map((s) => s.baseUrl)])).filter(
+    (s) => s !== config.base_url
+  );
   const showReserveTopicCheckbox = config.enable_reservations && !anotherServerVisible && (config.enable_payments || account);
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
@@ -212,7 +214,12 @@ const SubscribePage = (props) => {
                 inputValue={props.baseUrl}
                 onInputChange={updateBaseUrl}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder={config.base_url} variant="standard" aria-label={t("subscribe_dialog_subscribe_base_url_label")} />
+                  <TextField
+                    {...params}
+                    placeholder={config.base_url}
+                    variant="standard"
+                    aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                  />
                 )}
               />
             )}

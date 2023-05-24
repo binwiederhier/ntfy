@@ -99,7 +99,13 @@ const EmojiPicker = (props) => {
                 }}
               >
                 {Object.keys(emojisByCategory).map((category) => (
-                  <Category key={category} title={category} emojis={emojisByCategory[category]} search={searchFields} onPick={props.onEmojiPick} />
+                  <Category
+                    key={category}
+                    title={category}
+                    emojis={emojisByCategory[category]}
+                    search={searchFields}
+                    onPick={props.onEmojiPick}
+                  />
                 ))}
               </Box>
             </Box>

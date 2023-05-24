@@ -363,7 +363,9 @@ const TierCard = (props) => {
                 </Feature>
               )}
               <Feature>
-                {t("account_upgrade_dialog_tier_features_attachment_file_size", { filesize: formatBytes(tier.limits.attachment_file_size, 0) })}
+                {t("account_upgrade_dialog_tier_features_attachment_file_size", {
+                  filesize: formatBytes(tier.limits.attachment_file_size, 0),
+                })}
               </Feature>
               {tier.limits.reservations === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_reservations")}</NoFeature>}
               {tier.limits.calls === 0 && <NoFeature>{t("account_upgrade_dialog_tier_features_no_calls")}</NoFeature>}

@@ -115,7 +115,12 @@ const NotificationList = (props) => {
           {notifications.slice(0, count).map((notification) => (
             <NotificationItem key={notification.id} notification={notification} onShowSnack={() => setSnackOpen(true)} />
           ))}
-          <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)} message={t("notifications_copied_to_clipboard")} />
+          <Snackbar
+            open={snackOpen}
+            autoHideDuration={3000}
+            onClose={() => setSnackOpen(false)}
+            message={t("notifications_copied_to_clipboard")}
+          />
         </Stack>
       </Container>
     </InfiniteScroll>
@@ -156,7 +161,11 @@ const NotificationItem = (props) => {
         </Tooltip>
         {notification.new === 1 && (
           <Tooltip title={t("notifications_mark_read")} enterDelay={500}>
-            <IconButton onClick={handleMarkRead} sx={{ float: "right", marginRight: -0.5, marginTop: -1 }} aria-label={t("notifications_mark_read")}>
+            <IconButton
+              onClick={handleMarkRead}
+              sx={{ float: "right", marginRight: -0.5, marginTop: -1 }}
+              aria-label={t("notifications_mark_read")}
+            >
               <CheckIcon />
             </IconButton>
           </Tooltip>

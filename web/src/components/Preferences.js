@@ -251,7 +251,14 @@ const Users = () => {
       </CardContent>
       <CardActions>
         <Button onClick={handleAddClick}>{t("prefs_users_add_button")}</Button>
-        <UserDialog key={`userAddDialog${dialogKey}`} open={dialogOpen} user={null} users={users} onCancel={handleDialogCancel} onSubmit={handleDialogSubmit} />
+        <UserDialog
+          key={`userAddDialog${dialogKey}`}
+          open={dialogOpen}
+          user={null}
+          users={users}
+          onCancel={handleDialogCancel}
+          onSubmit={handleDialogSubmit}
+        />
       </CardActions>
     </Card>
   );
@@ -449,7 +456,26 @@ const Language = () => {
 
   // Country flags are displayed using emoji. Emoji rendering is handled by platform fonts.
   // Windows in particular does not yet play nicely with flag emoji so for now, hide flags on Windows.
-  const randomFlags = shuffle(["🇬🇧", "🇺🇸", "🇪🇸", "🇫🇷", "🇧🇬", "🇨🇿", "🇩🇪", "🇵🇱", "🇺🇦", "🇨🇳", "🇮🇹", "🇭🇺", "🇧🇷", "🇳🇱", "🇮🇩", "🇯🇵", "🇷🇺", "🇹🇷"]).slice(0, 3);
+  const randomFlags = shuffle([
+    "🇬🇧",
+    "🇺🇸",
+    "🇪🇸",
+    "🇫🇷",
+    "🇧🇬",
+    "🇨🇿",
+    "🇩🇪",
+    "🇵🇱",
+    "🇺🇦",
+    "🇨🇳",
+    "🇮🇹",
+    "🇭🇺",
+    "🇧🇷",
+    "🇳🇱",
+    "🇮🇩",
+    "🇯🇵",
+    "🇷🇺",
+    "🇹🇷",
+  ]).slice(0, 3);
   const showFlags = !navigator.userAgent.includes("Windows");
   let title = t("prefs_appearance_language_title");
   if (showFlags) {
@@ -531,7 +557,12 @@ const Reservations = () => {
         <Button onClick={handleAddClick} disabled={limitReached}>
           {t("prefs_reservations_add_button")}
         </Button>
-        <ReserveAddDialog key={`reservationAddDialog${dialogKey}`} open={dialogOpen} reservations={reservations} onClose={() => setDialogOpen(false)} />
+        <ReserveAddDialog
+          key={`reservationAddDialog${dialogKey}`}
+          open={dialogOpen}
+          reservations={reservations}
+          onClose={() => setDialogOpen(false)}
+        />
       </CardActions>
     </Card>
   );
@@ -545,7 +576,9 @@ const ReservationsTable = (props) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { subscriptions } = useOutletContext();
   const localSubscriptions =
-    subscriptions?.length > 0 ? Object.assign({}, ...subscriptions.filter((s) => s.baseUrl === config.base_url).map((s) => ({ [s.topic]: s }))) : {};
+    subscriptions?.length > 0
+      ? Object.assign({}, ...subscriptions.filter((s) => s.baseUrl === config.base_url).map((s) => ({ [s.topic]: s })))
+      : {};
 
   const handleEditClick = (reservation) => {
     setDialogKey((prev) => prev + 1);

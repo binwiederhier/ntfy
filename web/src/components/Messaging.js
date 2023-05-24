@@ -29,7 +29,9 @@ const Messaging = (props) => {
 
   return (
     <>
-      {subscription && <MessageBar subscription={subscription} message={message} onMessageChange={setMessage} onOpenDialogClick={handleOpenDialogClick} />}
+      {subscription && (
+        <MessageBar subscription={subscription} message={message} onMessageChange={setMessage} onOpenDialogClick={handleOpenDialogClick} />
+      )}
       <PublishDialog
         key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
         openMode={dialogOpenMode}
@@ -95,7 +97,12 @@ const MessageBar = (props) => {
         <SendIcon />
       </IconButton>
       <Portal>
-        <Snackbar open={snackOpen} autoHideDuration={3000} onClose={() => setSnackOpen(false)} message={t("message_bar_error_publishing")} />
+        <Snackbar
+          open={snackOpen}
+          autoHideDuration={3000}
+          onClose={() => setSnackOpen(false)}
+          message={t("message_bar_error_publishing")}
+        />
       </Portal>
     </Paper>
   );

@@ -121,7 +121,13 @@ const Signup = () => {
             ),
           }}
         />
-        <Button type="submit" fullWidth variant="contained" disabled={username === "" || password === "" || password !== confirm} sx={{ mt: 2, mb: 2 }}>
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          disabled={username === "" || password === "" || password !== confirm}
+          sx={{ mt: 2, mb: 2 }}
+        >
           {t("signup_form_button_submit")}
         </Button>
         {error && (

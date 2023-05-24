@@ -108,7 +108,8 @@ const NavList = (props) => {
   const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
   const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
-  const navListPadding = showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox ? "0" : "";
+  const navListPadding =
+    showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox ? "0" : "";
 
   return (
     <>

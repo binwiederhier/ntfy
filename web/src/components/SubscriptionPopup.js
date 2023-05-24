@@ -40,7 +40,10 @@ export const SubscriptionPopup = (props) => {
 
   const showReservationAdd = config.enable_reservations && !subscription?.reservation && account?.stats.reservations_remaining > 0;
   const showReservationAddDisabled =
-    !showReservationAdd && config.enable_reservations && !subscription?.reservation && (config.enable_payments || account?.stats.reservations_remaining === 0);
+    !showReservationAdd &&
+    config.enable_reservations &&
+    !subscription?.reservation &&
+    (config.enable_payments || account?.stats.reservations_remaining === 0);
   const showReservationEdit = config.enable_reservations && !!subscription?.reservation;
   const showReservationDelete = config.enable_reservations && !!subscription?.reservation;
 
@@ -161,10 +164,20 @@ export const SubscriptionPopup = (props) => {
         <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
       </PopupMenu>
       <Portal>
-        <Snackbar open={showPublishError} autoHideDuration={3000} onClose={() => setShowPublishError(false)} message={t("message_bar_error_publishing")} />
+        <Snackbar
+          open={showPublishError}
+          autoHideDuration={3000}
+          onClose={() => setShowPublishError(false)}
+          message={t("message_bar_error_publishing")}
+        />
         <DisplayNameDialog open={displayNameDialogOpen} subscription={subscription} onClose={() => setDisplayNameDialogOpen(false)} />
         {showReservationAdd && (
-          <ReserveAddDialog open={reserveAddDialogOpen} topic={subscription.topic} reservations={reservations} onClose={() => setReserveAddDialogOpen(false)} />
+          <ReserveAddDialog
+            open={reserveAddDialogOpen}
+            topic={subscription.topic}
+            reservations={reservations}
+            onClose={() => setReserveAddDialogOpen(false)}
+          />
         )}
         {showReservationEdit && (
           <ReserveEditDialog
@@ -175,7 +188,11 @@ export const SubscriptionPopup = (props) => {
           />
         )}
         {showReservationDelete && (
-          <ReserveDeleteDialog open={reserveDeleteDialogOpen} topic={subscription.topic} onClose={() => setReserveDeleteDialogOpen(false)} />
+          <ReserveDeleteDialog
+            open={reserveDeleteDialogOpen}
+            topic={subscription.topic}
+            onClose={() => setReserveDeleteDialogOpen(false)}
+          />
         )}
       </Portal>
     </>

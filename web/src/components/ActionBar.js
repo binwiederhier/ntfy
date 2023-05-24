@@ -98,7 +98,13 @@ const SettingsIcons = (props) => {
       <IconButton color="inherit" size="large" edge="end" onClick={handleToggleMute} aria-label={t("action_bar_toggle_mute")}>
         {subscription.mutedUntil ? <NotificationsOffIcon /> : <NotificationsIcon />}
       </IconButton>
-      <IconButton color="inherit" size="large" edge="end" onClick={(ev) => setAnchorEl(ev.currentTarget)} aria-label={t("action_bar_toggle_action_menu")}>
+      <IconButton
+        color="inherit"
+        size="large"
+        edge="end"
+        onClick={(ev) => setAnchorEl(ev.currentTarget)}
+        aria-label={t("action_bar_toggle_action_menu")}
+      >
         <MoreVertIcon />
       </IconButton>
       <SubscriptionPopup subscription={subscription} anchor={anchorEl} placement="right" onClose={() => setAnchorEl(null)} />

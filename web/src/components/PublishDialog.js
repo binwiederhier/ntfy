@@ -783,7 +783,12 @@ const AttachmentBox = (props) => {
             )}
           </Typography>
         </Box>
-        <DialogIconButton disabled={props.disabled} onClick={props.onClose} sx={{ marginLeft: "6px" }} aria-label={t("publish_dialog_attached_file_remove")}>
+        <DialogIconButton
+          disabled={props.disabled}
+          onClick={props.onClose}
+          sx={{ marginLeft: "6px" }}
+          aria-label={t("publish_dialog_attached_file_remove")}
+        >
           <Close />
         </DialogIconButton>
       </Box>
@@ -806,7 +811,13 @@ const ExpandingTextField = (props) => {
   }, [props.value]);
   return (
     <>
-      <Typography ref={invisibleFieldRef} component="span" variant={props.variant} aria-hidden={true} sx={{ position: "absolute", left: "-200%" }}>
+      <Typography
+        ref={invisibleFieldRef}
+        component="span"
+        variant={props.variant}
+        aria-hidden={true}
+        sx={{ position: "absolute", left: "-200%" }}
+      >
         {props.value}
       </Typography>
       <TextField

@@ -1,4 +1,12 @@
-import { fetchLinesIterator, maybeWithAuth, topicShortUrl, topicUrl, topicUrlAuth, topicUrlJsonPoll, topicUrlJsonPollWithSince } from "./utils";
+import {
+  fetchLinesIterator,
+  maybeWithAuth,
+  topicShortUrl,
+  topicUrl,
+  topicUrlAuth,
+  topicUrlJsonPoll,
+  topicUrlJsonPollWithSince,
+} from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
 

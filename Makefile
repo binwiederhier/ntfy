@@ -129,8 +129,7 @@ web-build:
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \
 		&& rm \
-			../server/site/config.js \
-			../server/site/asset-manifest.json
+			../server/site/config.js
 
 web-deps:
 	cd web && npm install

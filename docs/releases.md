@@ -1226,3 +1226,4 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
 * Improved GitHub Actions flow ([#745](https://github.com/binwiederhier/ntfy/pull/745), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))

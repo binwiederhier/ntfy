@@ -118,10 +118,10 @@ export const maybeWithBearerAuth = (headers, token) => {
 export const withBasicAuth = (headers, username, password) => ({ ...headers, Authorization: basicAuth(username, password) });
 
 export const maybeWithAuth = (headers, user) => {
-  if (user && user.password) {
+  if (user?.password) {
     return withBasicAuth(headers, user.username, user.password);
   }
-  if (user && user.token) {
+  if (user?.token) {
     return withBearerAuth(headers, user.token);
   }
   return headers;

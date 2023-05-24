@@ -127,17 +127,7 @@ const Category = (props) => {
   );
 };
 
-const emojiMatches = (emoji, words) => {
-  if (words.length === 0) {
-    return true;
-  }
-  for (const word of words) {
-    if (emoji.searchBase.indexOf(word) === -1) {
-      return false;
-    }
-  }
-  return true;
-};
+const emojiMatches = (emoji, words) => words.length === 0 || words.some((word) => emoji.searchBase.includes(word));
 
 const Emoji = (props) => {
   const { emoji } = props;

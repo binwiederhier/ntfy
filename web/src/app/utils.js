@@ -139,17 +139,14 @@ export const maybeAppendActionErrors = (message, notification) => {
 };
 
 export const shuffle = (arr) => {
-  let j;
-  let x;
-  for (let index = arr.length - 1; index > 0; index -= 1) {
-    j = Math.floor(Math.random() * (index + 1));
-    x = arr[index];
-    // eslint-disable-next-line no-param-reassign
-    arr[index] = arr[j];
-    // eslint-disable-next-line no-param-reassign
-    arr[j] = x;
+  const returnArr = [...arr];
+
+  for (let index = returnArr.length - 1; index > 0; index -= 1) {
+    const j = Math.floor(Math.random() * (index + 1));
+    [returnArr[index], returnArr[j]] = [returnArr[j], returnArr[index]];
   }
-  return arr;
+
+  return returnArr;
 };
 
 export const splitNoEmpty = (s, delimiter) =>

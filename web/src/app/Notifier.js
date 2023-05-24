@@ -1,22 +1,18 @@
-import { formatMessage, formatTitleWithDefault, openUrl, playSound, topicDisplayName, topicShortUrl } from "./utils";
+import { formatMessage, formatTitleWithDefault, openUrl, playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
 import prefs from "./Prefs";
-import subscriptionManager from "./SubscriptionManager";
 import logo from "../img/ntfy.png";
+import api from "./Api";
 
 /**
  * The notifier is responsible for displaying desktop notifications. Note that not all modern browsers
  * support this; most importantly, all iOS browsers do not support window.Notification.
  */
 class Notifier {
-  async notify(subscriptionId, notification, onClickFallback) {
+  async notify(subscription, notification, onClickFallback) {
     if (!this.supported()) {
       return;
     }
-    const subscription = await subscriptionManager.get(subscriptionId);
-    const shouldNotify = await this.shouldNotify(subscription, notification);
-    if (!shouldNotify) {
-      return;
-    }
+
     const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
     const displayName = topicDisplayName(subscription);
     const message = formatMessage(notification);
@@ -26,6 +22,7 @@ class Notifier {
     console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
     const n = new Notification(title, {
       body: message,
+      tag: subscription.id,
       icon: logo,
     });
     if (notification.click) {
@@ -33,45 +30,88 @@ class Notifier {
     } else {
       n.onclick = () => onClickFallback(subscription);
     }
+  }
 
+  async playSound() {
     // Play sound
     const sound = await prefs.sound();
     if (sound && sound !== "none") {
       try {
         await playSound(sound);
       } catch (e) {
-        console.log(`[Notifier, ${shortUrl}] Error playing audio`, e);
+        console.log(`[Notifier] Error playing audio`, e);
       }
     }
+  }
+
+  async unsubscribeWebPush(subscription) {
+    try {
+      await api.unsubscribeWebPush(subscription);
+    } catch (e) {
+      console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);
+    }
+  }
+
+  async subscribeWebPush(baseUrl, topic) {
+    if (!this.supported() || !this.pushSupported()) {
+      return {};
+    }
+
+    // only subscribe to web push for the current server. this is a limitation of the web push API,
+    // which only allows a single server per service worker origin.
+    if (baseUrl !== config.base_url) {
+      return {};
+    }
+
+    const registration = await navigator.serviceWorker.getRegistration();
+
+    if (!registration) {
+      console.log("[Notifier.subscribeWebPush] Web push supported but no service worker registration found, skipping");
+      return {};
+    }
+
+    try {
+      const webPushConfig = await api.getWebPushConfig(baseUrl);
+
+      if (!webPushConfig) {
+        console.log("[Notifier.subscribeWebPush] Web push not configured on server");
+      }
+
+      const browserSubscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(webPushConfig.public_key),
+      });
+
+      await api.subscribeWebPush(baseUrl, topic, browserSubscription);
+
+      console.log("[Notifier.subscribeWebPush] Successfully subscribed to web push");
+
+      return browserSubscription;
+    } catch (e) {
+      console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);
+    }
+
+    return {};
   }
 
   granted() {
     return this.supported() && Notification.permission === "granted";
   }
 
-  maybeRequestPermission(cb) {
-    if (!this.supported()) {
-      cb(false);
-      return;
-    }
-    if (!this.granted()) {
-      Notification.requestPermission().then((permission) => {
-        const granted = permission === "granted";
-        cb(granted);
-      });
-    }
+  denied() {
+    return this.supported() && Notification.permission === "denied";
   }
 
-  async shouldNotify(subscription, notification) {
-    if (subscription.mutedUntil === 1) {
+  async maybeRequestPermission() {
+    if (!this.supported()) {
       return false;
     }
-    const priority = notification.priority ? notification.priority : 3;
-    const minPriority = await prefs.minPriority();
-    if (priority < minPriority) {
-      return false;
-    }
-    return true;
+
+    return new Promise((resolve) => {
+      Notification.requestPermission((permission) => {
+        resolve(permission === "granted");
+      });
+    });
   }
 
   supported() {
@@ -82,12 +122,20 @@ class Notifier {
     return "Notification" in window;
   }
 
+  pushSupported() {
+    return "serviceWorker" in navigator && "PushManager" in window;
+  }
+
   /**
    * Returns true if this is a HTTPS site, or served over localhost. Otherwise the Notification API
    * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification
    */
   contextSupported() {
     return window.location.protocol === "https:" || window.location.hostname.match("^127.") || window.location.hostname === "localhost";
+  }
+
+  iosSupportedButInstallRequired() {
+    return "standalone" in window.navigator && window.navigator.standalone === false;
   }
 }
 

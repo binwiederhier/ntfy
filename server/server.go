@@ -9,13 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
 	"io"
 	"net"
 	"net/http"
@@ -32,32 +25,43 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
+
+	"github.com/SherClockHolmes/webpush-go"
 )
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config            *Config
-	httpServer        *http.Server
-	httpsServer       *http.Server
-	httpMetricsServer *http.Server
-	httpProfileServer *http.Server
-	unixListener      net.Listener
-	smtpServer        *smtp.Server
-	smtpServerBackend *smtpBackend
-	smtpSender        mailer
-	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	firebaseClient    *firebaseClient
-	messages          int64                               // Total number of messages (persisted if messageCache enabled)
-	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
-	userManager       *user.Manager                       // Might be nil!
-	messageCache      *messageCache                       // Database that stores the messages
-	fileCache         *fileCache                          // File system based cache that stores attachments
-	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
-	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
-	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
-	closeChan         chan bool
-	mu                sync.RWMutex
+	config                   *Config
+	httpServer               *http.Server
+	httpsServer              *http.Server
+	httpMetricsServer        *http.Server
+	httpProfileServer        *http.Server
+	unixListener             net.Listener
+	smtpServer               *smtp.Server
+	smtpServerBackend        *smtpBackend
+	smtpSender               mailer
+	topics                   map[string]*topic
+	visitors                 map[string]*visitor // ip:<ip> or user:<user>
+	firebaseClient           *firebaseClient
+	messages                 int64                               // Total number of messages (persisted if messageCache enabled)
+	messagesHistory          []int64                             // Last n values of the messages counter, used to determine rate
+	userManager              *user.Manager                       // Might be nil!
+	messageCache             *messageCache                       // Database that stores the messages
+	webPushSubscriptionStore *webPushSubscriptionStore           // Database that stores web push subscriptions
+	fileCache                *fileCache                          // File system based cache that stores attachments
+	stripe                   stripeAPI                           // Stripe API, can be replaced with a mock
+	priceCache               *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
+	metricsHandler           http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	closeChan                chan bool
+	mu                       sync.RWMutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -65,17 +69,21 @@ type handleFunc func(http.ResponseWriter, *http.Request, *visitor) error
 
 var (
 	// If changed, don't forget to update Android App and auth_sqlite.go
-	topicRegex             = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)               // No /!
-	topicPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)              // Regex must match JS & Android app!
-	externalTopicPathRegex = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`) // Extended topic path, for web-app, e.g. /example.com/mytopic
-	jsonPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
-	ssePathRegex           = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
-	rawPathRegex           = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
-	wsPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
-	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
-	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
+	topicRegex                  = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)               // No /!
+	topicPathRegex              = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}$`)              // Regex must match JS & Android app!
+	externalTopicPathRegex      = regexp.MustCompile(`^/[^/]+\.[^/]+/[-_A-Za-z0-9]{1,64}$`) // Extended topic path, for web-app, e.g. /example.com/mytopic
+	jsonPathRegex               = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/json$`)
+	ssePathRegex                = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/sse$`)
+	rawPathRegex                = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
+	wsPathRegex                 = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
+	authPathRegex               = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
+	webPushPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/web-push$`)
+	webPushUnsubscribePathRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/web-push/unsubscribe$`)
+	publishPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
 	webConfigPath                                        = "/config.js"
+	webManifestPath                                      = "/manifest.webmanifest"
+	webServiceWorkerPath                                 = "/sw.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
@@ -98,6 +106,7 @@ var (
 	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
 	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
 	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
+	apiWebPushConfig                                     = "/v1/web-push-config"
 	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -151,6 +160,10 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	webPushSubscriptionStore, err := createWebPushSubscriptionStore(conf)
+	if err != nil {
+		return nil, err
+	}
 	topics, err := messageCache.Topics()
 	if err != nil {
 		return nil, err
@@ -188,17 +201,18 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s := &Server{
-		config:          conf,
-		messageCache:    messageCache,
-		fileCache:       fileCache,
-		firebaseClient:  firebaseClient,
-		smtpSender:      mailer,
-		topics:          topics,
-		userManager:     userManager,
-		messages:        messages,
-		messagesHistory: []int64{messages},
-		visitors:        make(map[string]*visitor),
-		stripe:          stripe,
+		config:                   conf,
+		messageCache:             messageCache,
+		webPushSubscriptionStore: webPushSubscriptionStore,
+		fileCache:                fileCache,
+		firebaseClient:           firebaseClient,
+		smtpSender:               mailer,
+		topics:                   topics,
+		userManager:              userManager,
+		messages:                 messages,
+		messagesHistory:          []int64{messages},
+		visitors:                 make(map[string]*visitor),
+		stripe:                   stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	return s, nil
@@ -211,6 +225,14 @@ func createMessageCache(conf *Config) (*messageCache, error) {
 		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
 	}
 	return newMemCache()
+}
+
+func createWebPushSubscriptionStore(conf *Config) (*webPushSubscriptionStore, error) {
+	if !conf.WebPushEnabled {
+		return nil, nil
+	}
+
+	return newWebPushSubscriptionStore(conf.WebPushSubscriptionsFile)
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
@@ -342,6 +364,9 @@ func (s *Server) closeDatabases() {
 		s.userManager.Close()
 	}
 	s.messageCache.Close()
+	if s.webPushSubscriptionStore != nil {
+		s.webPushSubscriptionStore.Close()
+	}
 }
 
 // handle is the main entry point for all HTTP requests
@@ -416,6 +441,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
+		return s.ensureWebEnabled(s.handleWebManifest)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webServiceWorkerPath {
+		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
 	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
@@ -474,6 +503,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiWebPushConfig {
+		return s.ensureWebPushEnabled(s.handleAPIWebPushConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
@@ -504,6 +535,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.authorizeTopicRead(s.handleSubscribeWS))(w, r, v)
 	} else if r.Method == http.MethodGet && authPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authorizeTopicRead(s.handleTopicAuth))(w, r, v)
+	} else if r.Method == http.MethodPost && webPushPathRegex.MatchString(r.URL.Path) {
+		return s.limitRequestsWithTopic(s.authorizeTopicRead(s.ensureWebPushEnabled(s.handleTopicWebPushSubscribe)))(w, r, v)
+	} else if r.Method == http.MethodPost && webPushUnsubscribePathRegex.MatchString(r.URL.Path) {
+		return s.limitRequestsWithTopic(s.authorizeTopicRead(s.ensureWebPushEnabled(s.handleTopicWebPushUnsubscribe)))(w, r, v)
 	} else if r.Method == http.MethodGet && (topicPathRegex.MatchString(r.URL.Path) || externalTopicPathRegex.MatchString(r.URL.Path)) {
 		return s.ensureWebEnabled(s.handleTopic)(w, r, v)
 	}
@@ -535,6 +570,63 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+func (s *Server) handleAPIWebPushConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	response := &apiWebPushConfigResponse{
+		PublicKey: s.config.WebPushPublicKey,
+	}
+
+	return s.writeJSON(w, response)
+}
+
+func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	var username string
+	u := v.User()
+	if u != nil {
+		username = u.Name
+	}
+
+	var sub webPushSubscribePayload
+	err := json.NewDecoder(r.Body).Decode(&sub)
+
+	if err != nil || sub.BrowserSubscription.Endpoint == "" || sub.BrowserSubscription.Keys.P256dh == "" || sub.BrowserSubscription.Keys.Auth == "" {
+		return errHTTPBadRequestWebPushSubscriptionInvalid
+	}
+
+	topic, err := fromContext[*topic](r, contextTopic)
+	if err != nil {
+		return err
+	}
+
+	err = s.webPushSubscriptionStore.AddSubscription(topic.ID, username, sub)
+	if err != nil {
+		return err
+	}
+
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleTopicWebPushUnsubscribe(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	var payload webPushUnsubscribePayload
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+
+	if err != nil {
+		return errHTTPBadRequestWebPushSubscriptionInvalid
+	}
+
+	topic, err := fromContext[*topic](r, contextTopic)
+	if err != nil {
+		return err
+	}
+
+	err = s.webPushSubscriptionStore.RemoveSubscription(topic.ID, payload.Endpoint)
+	if err != nil {
+		return err
+	}
+
+	return s.writeJSON(w, newSuccessResponse())
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	response := &apiHealthResponse{
 		Healthy: true,
@@ -562,6 +654,11 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "text/javascript")
 	_, err = io.WriteString(w, fmt.Sprintf("// Generated server configuration\nvar config = %s;\n", string(b)))
 	return err
+}
+
+func (s *Server) handleWebManifest(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	w.Header().Set("Content-Type", "application/manifest+json")
+	return s.handleStatic(w, r, v)
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -763,6 +860,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
 			go s.forwardPollRequest(v, m)
 		}
+		if s.config.WebPushEnabled {
+			go s.publishToWebPushEndpoints(v, m)
+		}
 	} else {
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
 	}
@@ -874,6 +974,95 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s", s.config.UpstreamBaseURL, response.Status)
 		}
 		return
+	}
+}
+
+func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
+	subscriptions, err := s.webPushSubscriptionStore.GetSubscriptionsForTopic(m.Topic)
+
+	if err != nil {
+		logvm(v, m).Err(err).Warn("Unable to publish web push messages")
+		return
+	}
+
+	failedCount := 0
+	totalCount := len(subscriptions)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(totalCount)
+
+	ctx := log.Context{"topic": m.Topic, "message_id": m.ID, "total_count": totalCount}
+
+	// Importing the emojis in the service worker would add unnecessary complexity,
+	// simply do it here for web push notifications instead
+	var titleWithDefault string
+	var formattedTitle string
+
+	emojis, _, err := toEmojis(m.Tags)
+	if err != nil {
+		logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
+		return
+	}
+
+	if m.Title == "" {
+		titleWithDefault = m.Topic
+	} else {
+		titleWithDefault = m.Title
+	}
+
+	if len(emojis) > 0 {
+		formattedTitle = fmt.Sprintf("%s %s", strings.Join(emojis[:], " "), titleWithDefault)
+	} else {
+		formattedTitle = titleWithDefault
+	}
+
+	for i, xi := range subscriptions {
+		go func(i int, sub webPushSubscription) {
+			defer wg.Done()
+			ctx := log.Context{"endpoint": sub.BrowserSubscription.Endpoint, "username": sub.Username, "topic": m.Topic, "message_id": m.ID}
+
+			payload := &webPushPayload{
+				SubscriptionID: fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic),
+				Message:        *m,
+				FormattedTitle: formattedTitle,
+			}
+			jsonPayload, err := json.Marshal(payload)
+
+			if err != nil {
+				failedCount++
+				logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
+				return
+			}
+
+			_, err = webpush.SendNotification(jsonPayload, &sub.BrowserSubscription, &webpush.Options{
+				Subscriber:      s.config.WebPushEmailAddress,
+				VAPIDPublicKey:  s.config.WebPushPublicKey,
+				VAPIDPrivateKey: s.config.WebPushPrivateKey,
+				// deliverability on iOS isn't great with lower urgency values,
+				// and thus we can't really map lower ntfy priorities to lower urgency values
+				Urgency: webpush.UrgencyHigh,
+			})
+
+			if err != nil {
+				failedCount++
+				logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
+
+				// probably need to handle different codes differently,
+				// but for now just expire the subscription on any error
+				err = s.webPushSubscriptionStore.ExpireWebPushEndpoint(sub.BrowserSubscription.Endpoint)
+				if err != nil {
+					logvm(v, m).Err(err).Fields(ctx).Warn("Unable to expire subscription")
+				}
+			}
+		}(i, xi)
+	}
+
+	ctx = log.Context{"topic": m.Topic, "message_id": m.ID, "failed_count": failedCount, "total_count": totalCount}
+
+	if failedCount > 0 {
+		logvm(v, m).Fields(ctx).Warn("Unable to publish web push messages to %d of %d endpoints", failedCount, totalCount)
+	} else {
+		logvm(v, m).Fields(ctx).Debug("Published %d web push messages successfully", totalCount)
 	}
 }
 
@@ -1691,6 +1880,9 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	}
 	if s.config.UpstreamBaseURL != "" {
 		go s.forwardPollRequest(v, m)
+	}
+	if s.config.WebPushEnabled {
+		go s.publishToWebPushEndpoints(v, m)
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err

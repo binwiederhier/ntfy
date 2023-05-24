@@ -1,8 +1,6 @@
 package server
 
 import (
-	_ "embed" // required by go:embed
-	"encoding/json"
 	"fmt"
 	"mime"
 	"net"
@@ -129,26 +127,4 @@ This message was sent by {ip} at {time} via {topicURL}`
 	body = strings.ReplaceAll(body, "{time}", time.Unix(m.Time, 0).UTC().Format(time.RFC1123))
 	body = strings.ReplaceAll(body, "{ip}", senderIP)
 	return body, nil
-}
-
-var (
-	//go:embed "mailer_emoji_map.json"
-	emojisJSON string
-)
-
-func toEmojis(tags []string) (emojisOut []string, tagsOut []string, err error) {
-	var emojiMap map[string]string
-	if err = json.Unmarshal([]byte(emojisJSON), &emojiMap); err != nil {
-		return nil, nil, err
-	}
-	tagsOut = make([]string, 0)
-	emojisOut = make([]string, 0)
-	for _, t := range tags {
-		if emoji, ok := emojiMap[t]; ok {
-			emojisOut = append(emojisOut, emoji)
-		} else {
-			tagsOut = append(tagsOut, t)
-		}
-	}
-	return
 }

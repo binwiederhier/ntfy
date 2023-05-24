@@ -1,10 +1,11 @@
 package server
 
 import (
-	"heckel.io/ntfy/user"
 	"io/fs"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/user"
 )
 
 // Defines default config settings (excluding limits, see below)
@@ -146,6 +147,11 @@ type Config struct {
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
+	WebPushEnabled                       bool
+	WebPushPrivateKey                    string
+	WebPushPublicKey                     string
+	WebPushSubscriptionsFile             string
+	WebPushEmailAddress                  string
 }
 
 // NewConfig instantiates a default new server config
@@ -227,5 +233,8 @@ func NewConfig() *Config {
 		EnableReservations:                   false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
+		WebPushPrivateKey:                    "",
+		WebPushPublicKey:                     "",
+		WebPushSubscriptionsFile:             "",
 	}
 }

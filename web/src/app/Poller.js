@@ -18,6 +18,10 @@ class Poller {
     setTimeout(() => this.pollAll(), delayMillis);
   }
 
+  stopWorker() {
+    clearTimeout(this.timer);
+  }
+
   async pollAll() {
     console.log(`[Poller] Polling all subscriptions`);
     const subscriptions = await subscriptionManager.all();
@@ -47,14 +51,13 @@ class Poller {
   }
 
   pollInBackground(subscription) {
-    const fn = async () => {
+    (async () => {
       try {
         await this.poll(subscription);
       } catch (e) {
         console.error(`[App] Error polling subscription ${subscription.id}`, e);
       }
-    };
-    setTimeout(() => fn(), 0);
+    })();
   }
 }
 

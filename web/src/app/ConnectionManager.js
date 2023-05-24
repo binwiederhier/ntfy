@@ -1,7 +1,8 @@
 import Connection from "./Connection";
+import { NotificationType } from "./SubscriptionManager";
 import { hashCode } from "./utils";
 
-const makeConnectionId = async (subscription, user) =>
+const makeConnectionId = (subscription, user) =>
   user ? hashCode(`${subscription.id}|${user.username}|${user.password ?? ""}|${user.token ?? ""}`) : hashCode(`${subscription.id}`);
 
 /**
@@ -45,13 +46,19 @@ class ConnectionManager {
       return;
     }
     console.log(`[ConnectionManager] Refreshing connections`);
-    const subscriptionsWithUsersAndConnectionId = await Promise.all(
-      subscriptions.map(async (s) => {
+    const subscriptionsWithUsersAndConnectionId = subscriptions
+      .map((s) => {
         const [user] = users.filter((u) => u.baseUrl === s.baseUrl);
-        const connectionId = await makeConnectionId(s, user);
+        const connectionId = makeConnectionId(s, user);
         return { ...s, user, connectionId };
       })
-    );
+      // we want to create a ws for both sound-only and active browser notifications,
+      // only background notifications don't need this as they come over web push.
+      // however, if background notifications are muted, we again need the ws while
+      // the page is active
+      .filter((s) => s.notificationType !== NotificationType.BACKGROUND && s.mutedUntil !== 1);
+
+    console.log();
     const targetIds = subscriptionsWithUsersAndConnectionId.map((s) => s.connectionId);
     const deletedIds = Array.from(this.connections.keys()).filter((id) => !targetIds.includes(id));
 

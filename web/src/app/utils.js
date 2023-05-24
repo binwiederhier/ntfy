@@ -20,7 +20,10 @@ export const topicUrlJson = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/jso
 export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, topic)}?poll=1`;
 export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
+export const topicUrlWebPushSubscribe = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/web-push`;
+export const topicUrlWebPushUnsubscribe = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/web-push/unsubscribe`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
+export const webPushConfigUrl = (baseUrl) => `${baseUrl}/v1/web-push-config`;
 export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
 export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
@@ -156,7 +159,7 @@ export const splitNoEmpty = (s, delimiter) =>
     .filter((x) => x !== "");
 
 /** Non-cryptographic hash function, see https://stackoverflow.com/a/8831937/1440785 */
-export const hashCode = async (s) => {
+export const hashCode = (s) => {
   let hash = 0;
   for (let i = 0; i < s.length; i += 1) {
     const char = s.charCodeAt(i);
@@ -287,4 +290,17 @@ export const randomAlphanumericString = (len) => {
     id += alphabet[(Math.random() * alphabet.length) | 0];
   }
   return id;
+};
+
+export const urlB64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 };

@@ -382,6 +382,10 @@ class AccountApi {
     setTimeout(() => this.runWorker(), delayMillis);
   }
 
+  stopWorker() {
+    clearTimeout(this.timer);
+  }
+
   async runWorker() {
     if (!session.token()) {
       return;

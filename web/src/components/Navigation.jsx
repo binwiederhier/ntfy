@@ -14,7 +14,6 @@ import {
   ListSubheader,
   Portal,
   Tooltip,
-  Button,
   Typography,
   Box,
   IconButton,
@@ -94,15 +93,10 @@ const NavList = (props) => {
     setSubscribeDialogKey((prev) => prev + 1);
   };
 
-  const handleRequestNotificationPermission = () => {
-    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
-  };
-
   const handleSubscribeSubmit = (subscription) => {
     console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
     handleSubscribeReset();
     navigate(routes.forSubscription(subscription));
-    handleRequestNotificationPermission();
   };
 
   const handleAccountClick = () => {
@@ -114,19 +108,27 @@ const NavList = (props) => {
   const isPaid = account?.billing?.subscription;
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
   const showSubscriptionsList = props.subscriptions?.length > 0;
-  const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
+  const showNotificationPermissionDenied = notifier.denied();
+  const showNotificationIOSInstallRequired = notifier.iosSupportedButInstallRequired();
+  const showNotificationBrowserNotSupportedBox = !showNotificationIOSInstallRequired && !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
-  const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
+
   const navListPadding =
-    showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox ? "0" : "";
+    showNotificationPermissionDenied ||
+    showNotificationIOSInstallRequired ||
+    showNotificationBrowserNotSupportedBox ||
+    showNotificationContextNotSupportedBox
+      ? "0"
+      : "";
 
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       <List component="nav" sx={{ paddingTop: navListPadding }}>
+        {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
         {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
-        {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission} />}
+        {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
         {!showSubscriptionsList && (
           <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
@@ -344,16 +346,26 @@ const SubscriptionItem = (props) => {
   );
 };
 
-const NotificationGrantAlert = (props) => {
+const NotificationPermissionDeniedAlert = () => {
   const { t } = useTranslation();
   return (
     <>
       <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_grant_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_grant_description")}</Typography>
-        <Button sx={{ float: "right" }} color="inherit" size="small" onClick={props.onRequestPermissionClick}>
-          {t("alert_grant_button")}
-        </Button>
+        <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
+        <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
+      </Alert>
+      <Divider />
+    </>
+  );
+};
+
+const NotificationIOSInstallRequiredAlert = () => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Alert severity="warning" sx={{ paddingTop: 2 }}>
+        <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
+        <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
       </Alert>
       <Divider />
     </>

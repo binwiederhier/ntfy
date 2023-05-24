@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	_ "embed" // required by go:embed
+	"encoding/json"
 	"fmt"
 	"heckel.io/ntfy/util"
 	"io"
@@ -132,4 +134,26 @@ func maybeDecodeHeader(header string) string {
 		return header
 	}
 	return decoded
+}
+
+var (
+	//go:embed "mailer_emoji_map.json"
+	emojisJSON string
+)
+
+func toEmojis(tags []string) (emojisOut []string, tagsOut []string, err error) {
+	var emojiMap map[string]string
+	if err = json.Unmarshal([]byte(emojisJSON), &emojiMap); err != nil {
+		return nil, nil, err
+	}
+	tagsOut = make([]string, 0)
+	emojisOut = make([]string, 0)
+	for _, t := range tags {
+		if emoji, ok := emojiMap[t]; ok {
+			emojisOut = append(emojisOut, emoji)
+		} else {
+			tagsOut = append(tagsOut, t)
+		}
+	}
+	return
 }

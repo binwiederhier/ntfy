@@ -48,7 +48,7 @@ import routes from "./routes";
 import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
 import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
-import db from "../app/db";
+import getDb from "../app/getDb";
 import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import DialogFooter from "./DialogFooter";
@@ -57,6 +57,7 @@ import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
 import theme from "./theme";
 import session from "../app/Session";
+import subscriptionManager from "../app/SubscriptionManager";
 
 const Account = () => {
   if (!session.exists()) {
@@ -1077,8 +1078,10 @@ const DeleteAccountDialog = (props) => {
 
   const handleSubmit = async () => {
     try {
+      await subscriptionManager.unsubscribeAllWebPush();
+
       await accountApi.delete(password);
-      await db.delete();
+      await getDb().delete();
       console.debug(`[Account] Account deleted`);
       session.resetAndRedirect(routes.app);
     } catch (e) {

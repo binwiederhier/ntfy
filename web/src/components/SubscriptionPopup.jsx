@@ -14,12 +14,26 @@ import {
   useMediaQuery,
   MenuItem,
   IconButton,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Clear } from "@mui/icons-material";
+import {
+  Check,
+  Clear,
+  ClearAll,
+  Edit,
+  EnhancedEncryption,
+  Lock,
+  LockOpen,
+  NotificationsOff,
+  RemoveCircle,
+  Send,
+} from "@mui/icons-material";
 import theme from "./theme";
-import subscriptionManager from "../app/SubscriptionManager";
+import subscriptionManager, { NotificationType } from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import accountApi, { Role } from "../app/AccountApi";
 import session from "../app/Session";
@@ -30,6 +44,7 @@ import api from "../app/Api";
 import { AccountContext } from "./App";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
+import notifier from "../app/Notifier";
 
 export const SubscriptionPopup = (props) => {
   const { t } = useTranslation();
@@ -70,8 +85,7 @@ export const SubscriptionPopup = (props) => {
   };
 
   const handleSendTestMessage = async () => {
-    const { baseUrl } = props.subscription;
-    const { topic } = props.subscription;
+    const { baseUrl, topic } = props.subscription;
     const tags = shuffle([
       "grinning",
       "octopus",
@@ -133,7 +147,7 @@ export const SubscriptionPopup = (props) => {
 
   const handleUnsubscribe = async () => {
     console.log(`[SubscriptionPopup] Unsubscribing from ${props.subscription.id}`, props.subscription);
-    await subscriptionManager.remove(props.subscription.id);
+    await subscriptionManager.remove(props.subscription);
     if (session.exists() && !subscription.internal) {
       try {
         await accountApi.deleteSubscription(props.subscription.baseUrl, props.subscription.topic);
@@ -155,19 +169,72 @@ export const SubscriptionPopup = (props) => {
   return (
     <>
       <PopupMenu horizontal={placement} anchorEl={props.anchor} open={!!props.anchor} onClose={props.onClose}>
-        <MenuItem onClick={handleChangeDisplayName}>{t("action_bar_change_display_name")}</MenuItem>
-        {showReservationAdd && <MenuItem onClick={handleReserveAdd}>{t("action_bar_reservation_add")}</MenuItem>}
+        <NotificationToggle subscription={subscription} />
+        <Divider />
+        <MenuItem onClick={handleChangeDisplayName}>
+          <ListItemIcon>
+            <Edit fontSize="small" />
+          </ListItemIcon>
+
+          {t("action_bar_change_display_name")}
+        </MenuItem>
+        {showReservationAdd && (
+          <MenuItem onClick={handleReserveAdd}>
+            <ListItemIcon>
+              <Lock fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_reservation_add")}
+          </MenuItem>
+        )}
         {showReservationAddDisabled && (
           <MenuItem sx={{ cursor: "default" }}>
+            <ListItemIcon>
+              <Lock fontSize="small" color="disabled" />
+            </ListItemIcon>
+
             <span style={{ opacity: 0.3 }}>{t("action_bar_reservation_add")}</span>
             <ReserveLimitChip />
           </MenuItem>
         )}
-        {showReservationEdit && <MenuItem onClick={handleReserveEdit}>{t("action_bar_reservation_edit")}</MenuItem>}
-        {showReservationDelete && <MenuItem onClick={handleReserveDelete}>{t("action_bar_reservation_delete")}</MenuItem>}
-        <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
-        <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
-        <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
+        {showReservationEdit && (
+          <MenuItem onClick={handleReserveEdit}>
+            <ListItemIcon>
+              <EnhancedEncryption fontSize="small" />
+            </ListItemIcon>
+
+            {t("action_bar_reservation_edit")}
+          </MenuItem>
+        )}
+        {showReservationDelete && (
+          <MenuItem onClick={handleReserveDelete}>
+            <ListItemIcon>
+              <LockOpen fontSize="small" />
+            </ListItemIcon>
+
+            {t("action_bar_reservation_delete")}
+          </MenuItem>
+        )}
+        <MenuItem onClick={handleSendTestMessage}>
+          <ListItemIcon>
+            <Send fontSize="small" />
+          </ListItemIcon>
+
+          {t("action_bar_send_test_notification")}
+        </MenuItem>
+        <MenuItem onClick={handleClearAll}>
+          <ListItemIcon>
+            <ClearAll fontSize="small" />
+          </ListItemIcon>
+
+          {t("action_bar_clear_notifications")}
+        </MenuItem>
+        <MenuItem onClick={handleUnsubscribe}>
+          <ListItemIcon>
+            <RemoveCircle fontSize="small" />
+          </ListItemIcon>
+
+          {t("action_bar_unsubscribe")}
+        </MenuItem>
       </PopupMenu>
       <Portal>
         <Snackbar
@@ -264,6 +331,83 @@ const DisplayNameDialog = (props) => {
         <Button onClick={handleSave}>{t("common_save")}</Button>
       </DialogFooter>
     </Dialog>
+  );
+};
+
+const getNotificationType = (subscription) => {
+  if (subscription.mutedUntil === 1) {
+    return "muted";
+  }
+
+  return subscription.notificationType ?? NotificationType.BROWSER;
+};
+
+const checkedItem = (
+  <ListItemIcon>
+    <Check />
+  </ListItemIcon>
+);
+
+const NotificationToggle = ({ subscription }) => {
+  const { t } = useTranslation();
+  const type = getNotificationType(subscription);
+
+  const handleChange = async (newType) => {
+    try {
+      if (newType !== NotificationType.SOUND && !(await notifier.maybeRequestPermission())) {
+        return;
+      }
+
+      await subscriptionManager.setNotificationType(subscription, newType);
+    } catch (e) {
+      console.error("[NotificationToggle] Error setting notification type", e);
+    }
+  };
+
+  const unmute = async () => {
+    await subscriptionManager.setMutedUntil(subscription.id, 0);
+  };
+
+  if (type === "muted") {
+    return (
+      <MenuItem onClick={unmute}>
+        <ListItemIcon>
+          <NotificationsOff />
+        </ListItemIcon>
+        {t("notification_toggle_unmute")}
+      </MenuItem>
+    );
+  }
+
+  return (
+    <>
+      <MenuItem>
+        {type === NotificationType.SOUND && checkedItem}
+        <ListItemText inset={type !== NotificationType.SOUND} onClick={() => handleChange(NotificationType.SOUND)}>
+          {t("notification_toggle_sound")}
+        </ListItemText>
+      </MenuItem>
+      {!notifier.denied() && !notifier.iosSupportedButInstallRequired() && (
+        <>
+          {notifier.supported() && (
+            <MenuItem>
+              {type === NotificationType.BROWSER && checkedItem}
+              <ListItemText inset={type !== NotificationType.BROWSER} onClick={() => handleChange(NotificationType.BROWSER)}>
+                {t("notification_toggle_browser")}
+              </ListItemText>
+            </MenuItem>
+          )}
+          {notifier.pushSupported() && (
+            <MenuItem>
+              {type === NotificationType.BACKGROUND && checkedItem}
+              <ListItemText inset={type !== NotificationType.BACKGROUND} onClick={() => handleChange(NotificationType.BACKGROUND)}>
+                {t("notification_toggle_background")}
+              </ListItemText>
+            </MenuItem>
+          )}
+        </>
+      )}
+    </>
   );
 };
 

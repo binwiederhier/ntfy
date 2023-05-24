@@ -8,17 +8,20 @@ import {
   DialogContentText,
   DialogTitle,
   Autocomplete,
-  Checkbox,
   FormControlLabel,
   FormGroup,
   useMediaQuery,
+  Switch,
+  Stack,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { Warning } from "@mui/icons-material";
+import { useLiveQuery } from "dexie-react-hooks";
 import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
 import userManager from "../app/UserManager";
-import subscriptionManager from "../app/SubscriptionManager";
+import subscriptionManager, { NotificationType } from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import session from "../app/Session";
@@ -28,11 +31,13 @@ import ReserveTopicSelect from "./ReserveTopicSelect";
 import { AccountContext } from "./App";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 import { ReserveLimitChip } from "./SubscriptionPopup";
+import notifier from "../app/Notifier";
+import prefs from "../app/Prefs";
 
 const publicBaseUrl = "https://ntfy.sh";
 
-export const subscribeTopic = async (baseUrl, topic) => {
-  const subscription = await subscriptionManager.add(baseUrl, topic);
+export const subscribeTopic = async (baseUrl, topic, opts) => {
+  const subscription = await subscriptionManager.add(baseUrl, topic, opts);
   if (session.exists()) {
     try {
       await accountApi.addSubscription(baseUrl, topic);
@@ -52,13 +57,28 @@ const SubscribeDialog = (props) => {
   const [showLoginPage, setShowLoginPage] = useState(false);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const handleSuccess = async () => {
+  const webPushDefaultEnabled = useLiveQuery(async () => prefs.webPushDefaultEnabled());
+
+  const handleSuccess = async (notificationType) => {
     console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
     const actualBaseUrl = baseUrl || config.base_url;
-    const subscription = await subscribeTopic(actualBaseUrl, topic);
+    const subscription = await subscribeTopic(actualBaseUrl, topic, {
+      notificationType,
+    });
     poller.pollInBackground(subscription); // Dangle!
+
+    // if the user hasn't changed the default web push setting yet, set it to enabled
+    if (notificationType === "background" && webPushDefaultEnabled === "initial") {
+      await prefs.setWebPushDefaultEnabled(true);
+    }
+
     props.onSuccess(subscription);
   };
+
+  // wait for liveQuery load
+  if (webPushDefaultEnabled === undefined) {
+    return <></>;
+  }
 
   return (
     <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
@@ -72,11 +92,28 @@ const SubscribeDialog = (props) => {
           onCancel={props.onCancel}
           onNeedsLogin={() => setShowLoginPage(true)}
           onSuccess={handleSuccess}
+          webPushDefaultEnabled={webPushDefaultEnabled}
         />
       )}
       {showLoginPage && <LoginPage baseUrl={baseUrl} topic={topic} onBack={() => setShowLoginPage(false)} onSuccess={handleSuccess} />}
     </Dialog>
   );
+};
+
+const browserNotificationsSupported = notifier.supported();
+const pushNotificationsSupported = notifier.pushSupported();
+const iosInstallRequired = notifier.iosSupportedButInstallRequired();
+
+const getNotificationTypeFromToggles = (browserNotificationsEnabled, backgroundNotificationsEnabled) => {
+  if (backgroundNotificationsEnabled) {
+    return NotificationType.BACKGROUND;
+  }
+
+  if (browserNotificationsEnabled) {
+    return NotificationType.BROWSER;
+  }
+
+  return NotificationType.SOUND;
 };
 
 const SubscribePage = (props) => {
@@ -95,6 +132,30 @@ const SubscribePage = (props) => {
   const showReserveTopicCheckbox = config.enable_reservations && !anotherServerVisible && (config.enable_payments || account);
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
+
+  // load initial value, but update it in `handleBrowserNotificationsChanged`
+  // if we interact with the API and therefore possibly change it (from default -> denied)
+  const [notificationsExplicitlyDenied, setNotificationsExplicitlyDenied] = useState(notifier.denied());
+  // default to on if notifications are already granted
+  const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(notifier.granted());
+  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(props.webPushDefaultEnabled === "enabled");
+
+  const handleBrowserNotificationsChanged = async (e) => {
+    if (e.target.checked && (await notifier.maybeRequestPermission())) {
+      setBrowserNotificationsEnabled(true);
+      if (props.webPushDefaultEnabled === "enabled") {
+        setBackgroundNotificationsEnabled(true);
+      }
+    } else {
+      setNotificationsExplicitlyDenied(notifier.denied());
+      setBrowserNotificationsEnabled(false);
+      setBackgroundNotificationsEnabled(false);
+    }
+  };
+
+  const handleBackgroundNotificationsChanged = (e) => {
+    setBackgroundNotificationsEnabled(e.target.checked);
+  };
 
   const handleSubscribe = async () => {
     const user = await userManager.get(baseUrl); // May be undefined
@@ -133,12 +194,15 @@ const SubscribePage = (props) => {
     }
 
     console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
-    props.onSuccess();
+    props.onSuccess(getNotificationTypeFromToggles(browserNotificationsEnabled, backgroundNotificationsEnabled));
   };
 
   const handleUseAnotherChanged = (e) => {
     props.setBaseUrl("");
     setAnotherServerVisible(e.target.checked);
+    if (e.target.checked) {
+      setBackgroundNotificationsEnabled(false);
+    }
   };
 
   const subscribeButtonEnabled = (() => {
@@ -193,8 +257,7 @@ const SubscribePage = (props) => {
             <FormControlLabel
               variant="standard"
               control={
-                <Checkbox
-                  fullWidth
+                <Switch
                   disabled={!reserveTopicEnabled}
                   checked={reserveTopicVisible}
                   onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
@@ -217,8 +280,9 @@ const SubscribePage = (props) => {
           <FormGroup>
             <FormControlLabel
               control={
-                <Checkbox
+                <Switch
                   onChange={handleUseAnotherChanged}
+                  checked={anotherServerVisible}
                   inputProps={{
                     "aria-label": t("subscribe_dialog_subscribe_use_another_label"),
                   }}
@@ -240,6 +304,43 @@ const SubscribePage = (props) => {
                     aria-label={t("subscribe_dialog_subscribe_base_url_label")}
                   />
                 )}
+              />
+            )}
+          </FormGroup>
+        )}
+        {browserNotificationsSupported && (
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Switch
+                  onChange={handleBrowserNotificationsChanged}
+                  checked={browserNotificationsEnabled}
+                  disabled={notificationsExplicitlyDenied}
+                  inputProps={{
+                    "aria-label": t("subscribe_dialog_subscribe_enable_browser_notifications_label"),
+                  }}
+                />
+              }
+              label={
+                <Stack direction="row" gap={1} alignItems="center">
+                  {t("subscribe_dialog_subscribe_enable_browser_notifications_label")}
+                  {notificationsExplicitlyDenied && <Warning />}
+                </Stack>
+              }
+            />
+            {pushNotificationsSupported && !anotherServerVisible && browserNotificationsEnabled && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    onChange={handleBackgroundNotificationsChanged}
+                    checked={backgroundNotificationsEnabled}
+                    disabled={iosInstallRequired}
+                    inputProps={{
+                      "aria-label": t("subscribe_dialog_subscribe_enable_background_notifications_label"),
+                    }}
+                  />
+                }
+                label={t("subscribe_dialog_subscribe_enable_background_notifications_label")}
               />
             )}
           </FormGroup>

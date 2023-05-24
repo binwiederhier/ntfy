@@ -2,7 +2,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import subscriptionManager from "../app/SubscriptionManager";
 import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
-import notifier from "../app/Notifier";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
@@ -10,6 +9,7 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
+import webPushWorker from "../app/WebPushWorker";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -41,7 +41,7 @@ export const useConnectionListeners = (account, subscriptions, users) => {
         const added = await subscriptionManager.addNotification(subscriptionId, notification);
         if (added) {
           const defaultClickAction = (subscription) => navigate(routes.forSubscription(subscription));
-          await notifier.notify(subscriptionId, notification, defaultClickAction);
+          await subscriptionManager.notify(subscriptionId, notification, defaultClickAction);
         }
       };
 
@@ -61,7 +61,7 @@ export const useConnectionListeners = (account, subscriptions, users) => {
         }
       };
 
-      connectionManager.registerStateListener(subscriptionManager.updateState);
+      connectionManager.registerStateListener((id, state) => subscriptionManager.updateState(id, state));
       connectionManager.registerMessageListener(handleMessage);
 
       return () => {
@@ -79,7 +79,7 @@ export const useConnectionListeners = (account, subscriptions, users) => {
     if (!account || !account.sync_topic) {
       return;
     }
-    subscriptionManager.add(config.base_url, account.sync_topic, true); // Dangle!
+    subscriptionManager.add(config.base_url, account.sync_topic, { internal: true }); // Dangle!
   }, [account]);
 
   // When subscriptions or users change, refresh the connections
@@ -129,11 +129,30 @@ export const useAutoSubscribe = (subscriptions, selected) => {
  * and Poller.js, because side effect imports are not a thing in JS, and "Optimize imports" cleans
  * up "unused" imports. See https://github.com/binwiederhier/ntfy/issues/186.
  */
+
+const stopWorkers = () => {
+  poller.stopWorker();
+  pruner.stopWorker();
+  accountApi.stopWorker();
+};
+
+const startWorkers = () => {
+  poller.startWorker();
+  pruner.startWorker();
+  accountApi.startWorker();
+};
+
 export const useBackgroundProcesses = () => {
   useEffect(() => {
-    poller.startWorker();
-    pruner.startWorker();
-    accountApi.startWorker();
+    console.log("[useBackgroundProcesses] mounting");
+    startWorkers();
+    webPushWorker.startWorker();
+
+    return () => {
+      console.log("[useBackgroundProcesses] unloading");
+      stopWorkers();
+      webPushWorker.stopWorker();
+    };
   }, []);
 };
 

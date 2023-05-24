@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/util"
 )
 
@@ -401,6 +402,10 @@ type apiConfigResponse struct {
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
+type apiWebPushConfigResponse struct {
+	PublicKey string `json:"public_key"`
+}
+
 type apiAccountBillingPrices struct {
 	Month int64 `json:"month"`
 	Year  int64 `json:"year"`
@@ -461,4 +466,23 @@ type apiStripeSubscriptionUpdatedEvent struct {
 type apiStripeSubscriptionDeletedEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
+}
+
+type webPushPayload struct {
+	SubscriptionID string  `json:"subscription_id"`
+	Message        message `json:"message"`
+	FormattedTitle string  `json:"formatted_title"`
+}
+
+type webPushSubscription struct {
+	BrowserSubscription webpush.Subscription
+	Username            string
+}
+
+type webPushSubscribePayload struct {
+	BrowserSubscription webpush.Subscription `json:"browser_subscription"`
+}
+
+type webPushUnsubscribePayload struct {
+	Endpoint string `json:"endpoint"`
 }

@@ -1,12 +1,22 @@
+import sessionReplica from "./SessionReplica";
+
 class Session {
+  constructor(replica) {
+    this.replica = replica;
+  }
+
   store(username, token) {
     localStorage.setItem("user", username);
     localStorage.setItem("token", token);
+
+    this.replica.store(username, token);
   }
 
   reset() {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+
+    this.replica.reset();
   }
 
   resetAndRedirect(url) {
@@ -27,5 +37,5 @@ class Session {
   }
 }
 
-const session = new Session();
+const session = new Session(sessionReplica);
 export default session;

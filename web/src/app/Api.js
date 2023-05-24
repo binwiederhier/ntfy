@@ -6,6 +6,9 @@ import {
   topicUrlAuth,
   topicUrlJsonPoll,
   topicUrlJsonPollWithSince,
+  topicUrlWebPushSubscribe,
+  topicUrlWebPushUnsubscribe,
+  webPushConfigUrl,
 } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
@@ -111,6 +114,62 @@ class Api {
       // See server/server.go
       return false;
     }
+    throw new Error(`Unexpected server response ${response.status}`);
+  }
+
+  /**
+   * @returns {Promise<{ public_key: string } | undefined>}
+   */
+  async getWebPushConfig(baseUrl) {
+    const response = await fetch(webPushConfigUrl(baseUrl));
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    if (response.status === 404) {
+      // web push is not enabled
+      return undefined;
+    }
+
+    throw new Error(`Unexpected server response ${response.status}`);
+  }
+
+  async subscribeWebPush(baseUrl, topic, browserSubscription) {
+    const user = await userManager.get(baseUrl);
+
+    const url = topicUrlWebPushSubscribe(baseUrl, topic);
+    console.log(`[Api] Sending Web Push Subscription ${url}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: maybeWithAuth({}, user),
+      body: JSON.stringify({ browser_subscription: browserSubscription }),
+    });
+
+    if (response.ok) {
+      return true;
+    }
+
+    throw new Error(`Unexpected server response ${response.status}`);
+  }
+
+  async unsubscribeWebPush(subscription) {
+    const user = await userManager.get(subscription.baseUrl);
+
+    const url = topicUrlWebPushUnsubscribe(subscription.baseUrl, subscription.topic);
+    console.log(`[Api] Unsubscribing Web Push Subscription ${url}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: maybeWithAuth({}, user),
+      body: JSON.stringify({ endpoint: subscription.webPushEndpoint }),
+    });
+
+    if (response.ok) {
+      return true;
+    }
+
     throw new Error(`Unexpected server response ${response.status}`);
   }
 }

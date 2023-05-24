@@ -105,9 +105,12 @@ class SubscriptionManager {
       return false;
     }
     try {
-      // eslint-disable-next-line no-param-reassign
-      notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-      await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
+      await db.notifications.add({
+        ...notification,
+        subscriptionId,
+        // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+        new: 1,
+      }); // FIXME consider put() for double tab
       await db.subscriptions.update(subscriptionId, {
         last: notification.id,
       });

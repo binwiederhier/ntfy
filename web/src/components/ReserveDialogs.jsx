@@ -7,18 +7,18 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { Alert, FormControl, Select, useMediaQuery } from "@mui/material";
-import theme from "./theme";
-import { validTopic } from "../app/utils";
-import DialogFooter from "./DialogFooter";
 import { useTranslation } from "react-i18next";
-import session from "../app/Session";
-import routes from "./routes";
-import accountApi, { Permission } from "../app/AccountApi";
-import ReserveTopicSelect from "./ReserveTopicSelect";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import { Check, DeleteForever } from "@mui/icons-material";
+import theme from "./theme";
+import { validTopic } from "../app/utils";
+import DialogFooter from "./DialogFooter";
+import session from "../app/Session";
+import routes from "./routes";
+import accountApi, { Permission } from "../app/AccountApi";
+import ReserveTopicSelect from "./ReserveTopicSelect";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 
 export const ReserveAddDialog = (props) => {
@@ -164,7 +164,7 @@ export const ReserveDeleteDialog = (props) => {
               </ListItemIcon>
               <ListItemText primary={t("reservation_delete_dialog_action_keep_title")} />
             </MenuItem>
-            <MenuItem value={true}>
+            <MenuItem value>
               <ListItemIcon>
                 <DeleteForever />
               </ListItemIcon>

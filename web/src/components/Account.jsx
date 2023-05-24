@@ -29,34 +29,34 @@ import Container from "@mui/material/Container";
 import Card from "@mui/material/Card";
 import Button from "@mui/material/Button";
 import { Trans, useTranslation } from "react-i18next";
-import session from "../app/Session";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import theme from "./theme";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import TextField from "@mui/material/TextField";
-import routes from "./routes";
 import IconButton from "@mui/material/IconButton";
-import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
-import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Pref, PrefGroup } from "./Pref";
-import db from "../app/db";
 import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
-import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
-import { AccountContext } from "./App";
-import DialogFooter from "./DialogFooter";
-import { Paragraph } from "./styles";
 import CloseIcon from "@mui/icons-material/Close";
 import { ContentCopy, Public } from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
 import DialogContentText from "@mui/material/DialogContentText";
+import AddIcon from "@mui/icons-material/Add";
+import routes from "./routes";
+import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
+import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
+import { Pref, PrefGroup } from "./Pref";
+import db from "../app/db";
+import UpgradeDialog from "./UpgradeDialog";
+import { AccountContext } from "./App";
+import DialogFooter from "./DialogFooter";
+import { Paragraph } from "./styles";
 import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
-import AddIcon from "@mui/icons-material/Add";
+import theme from "./theme";
+import session from "../app/Session";
 
 const Account = () => {
   if (!session.exists()) {
@@ -561,9 +561,7 @@ const Stats = () => {
     return <></>;
   }
 
-  const normalize = (value, max) => {
-    return Math.min((value / max) * 100, 100);
-  };
+  const normalize = (value, max) => Math.min((value / max) * 100, 100);
 
   return (
     <Card sx={{ p: 3 }} aria-label={t("account_usage_title")}>
@@ -746,18 +744,16 @@ const Stats = () => {
   );
 };
 
-const InfoIcon = () => {
-  return (
-    <InfoOutlinedIcon
-      sx={{
-        verticalAlign: "middle",
-        width: "18px",
-        marginLeft: "4px",
-        color: "gray",
-      }}
-    />
-  );
-};
+const InfoIcon = () => (
+  <InfoOutlinedIcon
+    sx={{
+      verticalAlign: "middle",
+      width: "18px",
+      marginLeft: "4px",
+      color: "gray",
+    }}
+  />
+);
 
 const Tokens = () => {
   const { t } = useTranslation();
@@ -814,7 +810,8 @@ const TokensTable = (props) => {
   const tokens = (props.tokens || []).sort((a, b) => {
     if (a.token === session.token()) {
       return -1;
-    } else if (b.token === session.token()) {
+    }
+    if (b.token === session.token()) {
       return 1;
     }
     return a.token.localeCompare(b.token);

@@ -4,15 +4,9 @@ import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import { Alert, CardActionArea, CardContent, Chip, Link, ListItem, Switch, useMediaQuery } from "@mui/material";
-import theme from "./theme";
 import Button from "@mui/material/Button";
-import accountApi, { SubscriptionInterval } from "../app/AccountApi";
-import session from "../app/Session";
-import routes from "./routes";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
-import { AccountContext } from "./App";
-import { formatBytes, formatNumber, formatPrice, formatShortDate } from "../app/utils";
 import { Trans, useTranslation } from "react-i18next";
 import List from "@mui/material/List";
 import { Check, Close } from "@mui/icons-material";
@@ -20,9 +14,15 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Box from "@mui/material/Box";
 import { NavLink } from "react-router-dom";
-import { UnauthorizedError } from "../app/errors";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
+import { UnauthorizedError } from "../app/errors";
+import { formatBytes, formatNumber, formatPrice, formatShortDate } from "../app/utils";
+import { AccountContext } from "./App";
+import routes from "./routes";
+import session from "../app/Session";
+import accountApi, { SubscriptionInterval } from "../app/AccountApi";
+import theme from "./theme";
 
 const UpgradeDialog = (props) => {
   const { t } = useTranslation();
@@ -52,7 +52,9 @@ const UpgradeDialog = (props) => {
   const currentTierCode = currentTier?.code; // May be undefined
 
   // Figure out buttons, labels and the submit action
-  let submitAction, submitButtonLabel, banner;
+  let submitAction;
+  let submitButtonLabel;
+  let banner;
   if (!account) {
     submitButtonLabel = t("account_upgrade_dialog_button_redirect_signup");
     submitAction = Action.REDIRECT_SIGNUP;
@@ -112,8 +114,8 @@ const UpgradeDialog = (props) => {
   };
 
   // Figure out discount
-  let discount = 0,
-    upto = false;
+  let discount = 0;
+  let upto = false;
   if (newTier?.prices) {
     discount = Math.round(((newTier.prices.month * 12) / newTier.prices.year - 1) * 100);
   } else {
@@ -157,8 +159,8 @@ const UpgradeDialog = (props) => {
               <Chip
                 label={
                   upto
-                    ? t("account_upgrade_dialog_interval_yearly_discount_save_up_to", { discount: discount })
-                    : t("account_upgrade_dialog_interval_yearly_discount_save", { discount: discount })
+                    ? t("account_upgrade_dialog_interval_yearly_discount_save_up_to", { discount })
+                    : t("account_upgrade_dialog_interval_yearly_discount_save", { discount })
                 }
                 color="primary"
                 size="small"
@@ -269,9 +271,11 @@ const UpgradeDialog = (props) => {
 
 const TierCard = (props) => {
   const { t } = useTranslation();
-  const tier = props.tier;
+  const { tier } = props;
 
-  let cardStyle, labelStyle, labelText;
+  let cardStyle;
+  let labelStyle;
+  let labelText;
   if (props.selected) {
     cardStyle = { background: "#eee", border: "3px solid #338574" };
     labelStyle = { background: "#338574", color: "white" };
@@ -392,25 +396,19 @@ const TierCard = (props) => {
   );
 };
 
-const Feature = (props) => {
-  return <FeatureItem feature={true}>{props.children}</FeatureItem>;
-};
+const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
 
-const NoFeature = (props) => {
-  return <FeatureItem feature={false}>{props.children}</FeatureItem>;
-};
+const NoFeature = (props) => <FeatureItem feature={false}>{props.children}</FeatureItem>;
 
-const FeatureItem = (props) => {
-  return (
-    <ListItem disableGutters sx={{ m: 0, p: 0 }}>
-      <ListItemIcon sx={{ minWidth: "24px" }}>
-        {props.feature && <Check fontSize="small" sx={{ color: "#338574" }} />}
-        {!props.feature && <Close fontSize="small" sx={{ color: "gray" }} />}
-      </ListItemIcon>
-      <ListItemText sx={{ mt: "2px", mb: "2px" }} primary={<Typography variant="body1">{props.children}</Typography>} />
-    </ListItem>
-  );
-};
+const FeatureItem = (props) => (
+  <ListItem disableGutters sx={{ m: 0, p: 0 }}>
+    <ListItemIcon sx={{ minWidth: "24px" }}>
+      {props.feature && <Check fontSize="small" sx={{ color: "#338574" }} />}
+      {!props.feature && <Close fontSize="small" sx={{ color: "gray" }} />}
+    </ListItemIcon>
+    <ListItemText sx={{ mt: "2px", mb: "2px" }} primary={<Typography variant="body1">{props.children}</Typography>} />
+  </ListItem>
+);
 
 const Action = {
   REDIRECT_SIGNUP: 1,

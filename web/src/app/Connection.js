@@ -77,7 +77,7 @@ class Connection {
   close() {
     console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Closing connection`);
     const socket = this.ws;
-    const retryTimeout = this.retryTimeout;
+    const { retryTimeout } = this;
     if (socket !== null) {
       socket.close();
     }
@@ -110,6 +110,7 @@ class Connection {
 
 export class ConnectionState {
   static Connected = "connected";
+
   static Connecting = "connecting";
 }
 

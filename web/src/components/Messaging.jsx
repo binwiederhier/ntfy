@@ -1,21 +1,21 @@
 import * as React from "react";
 import { useState } from "react";
-import Navigation from "./Navigation";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import SendIcon from "@mui/icons-material/Send";
-import api from "../app/Api";
-import PublishDialog from "./PublishDialog";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { Portal, Snackbar } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import PublishDialog from "./PublishDialog";
+import api from "../app/Api";
+import Navigation from "./Navigation";
 
 const Messaging = (props) => {
   const [message, setMessage] = useState("");
   const [dialogKey, setDialogKey] = useState(0);
 
-  const dialogOpenMode = props.dialogOpenMode;
+  const { dialogOpenMode } = props;
   const subscription = props.selected;
 
   const handleOpenDialogClick = () => {
@@ -39,7 +39,7 @@ const Messaging = (props) => {
         topic={subscription?.topic ?? ""}
         message={message}
         onClose={handleDialogClose}
-        onDragEnter={() => props.onDialogOpenModeChange((prev) => (prev ? prev : PublishDialog.OPEN_MODE_DRAG))} // Only update if not already open
+        onDragEnter={() => props.onDialogOpenModeChange((prev) => prev || PublishDialog.OPEN_MODE_DRAG)} // Only update if not already open
         onResetOpenMode={() => props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)}
       />
     </>
@@ -48,7 +48,7 @@ const Messaging = (props) => {
 
 const MessageBar = (props) => {
   const { t } = useTranslation();
-  const subscription = props.subscription;
+  const { subscription } = props;
   const [snackOpen, setSnackOpen] = useState(false);
   const handleSendClick = async () => {
     try {

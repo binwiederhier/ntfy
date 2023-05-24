@@ -7,6 +7,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { Autocomplete, Checkbox, FormControlLabel, FormGroup, useMediaQuery } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
@@ -14,7 +15,6 @@ import userManager from "../app/UserManager";
 import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
-import { useTranslation } from "react-i18next";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, { Permission, Role } from "../app/AccountApi";
@@ -33,7 +33,7 @@ const SubscribeDialog = (props) => {
 
   const handleSuccess = async () => {
     console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
-    const actualBaseUrl = baseUrl ? baseUrl : config.base_url;
+    const actualBaseUrl = baseUrl || config.base_url;
     const subscription = await subscribeTopic(actualBaseUrl, topic);
     poller.pollInBackground(subscription); // Dangle!
     props.onSuccess(subscription);
@@ -66,7 +66,7 @@ const SubscribePage = (props) => {
   const [anotherServerVisible, setAnotherServerVisible] = useState(false);
   const [everyone, setEveryone] = useState(Permission.DENY_ALL);
   const baseUrl = anotherServerVisible ? props.baseUrl : config.base_url;
-  const topic = props.topic;
+  const { topic } = props;
   const existingTopicUrls = props.subscriptions.map((s) => topicUrl(s.baseUrl, s.topic));
   const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map((s) => s.baseUrl)])).filter(
     (s) => s !== config.base_url
@@ -86,14 +86,13 @@ const SubscribePage = (props) => {
       if (user) {
         setError(
           t("subscribe_dialog_error_user_not_authorized", {
-            username: username,
+            username,
           })
         );
         return;
-      } else {
-        props.onNeedsLogin();
-        return;
       }
+      props.onNeedsLogin();
+      return;
     }
 
     // Reserve topic (if requested)
@@ -125,10 +124,9 @@ const SubscribePage = (props) => {
     if (anotherServerVisible) {
       const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(baseUrl, topic));
       return validTopic(topic) && validUrl(baseUrl) && !isExistingTopicUrl;
-    } else {
-      const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.base_url, topic));
-      return validTopic(topic) && !isExistingTopicUrl;
     }
+    const isExistingTopicUrl = existingTopicUrls.includes(topicUrl(config.base_url, topic));
+    return validTopic(topic) && !isExistingTopicUrl;
   })();
 
   const updateBaseUrl = (ev, newVal) => {
@@ -242,14 +240,14 @@ const LoginPage = (props) => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const baseUrl = props.baseUrl ? props.baseUrl : config.base_url;
-  const topic = props.topic;
+  const { topic } = props;
 
   const handleLogin = async () => {
     const user = { baseUrl, username, password };
     const success = await api.topicAuth(baseUrl, topic, user);
     if (!success) {
       console.log(`[SubscribeDialog] Login to ${topicUrl(baseUrl, topic)} failed for user ${username}`);
-      setError(t("subscribe_dialog_error_user_not_authorized", { username: username }));
+      setError(t("subscribe_dialog_error_user_not_authorized", { username }));
       return;
     }
     console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);

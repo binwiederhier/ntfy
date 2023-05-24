@@ -1,13 +1,7 @@
 import * as React from "react";
 import { useContext, useEffect, useRef, useState } from "react";
-import theme from "./theme";
 import { Checkbox, Chip, FormControl, FormControlLabel, InputLabel, Link, Select, Tooltip, useMediaQuery } from "@mui/material";
 import TextField from "@mui/material/TextField";
-import priority1 from "../img/priority-1.svg";
-import priority2 from "../img/priority-2.svg";
-import priority3 from "../img/priority-3.svg";
-import priority4 from "../img/priority-4.svg";
-import priority5 from "../img/priority-5.svg";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -17,14 +11,20 @@ import IconButton from "@mui/material/IconButton";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import { Close } from "@mui/icons-material";
 import MenuItem from "@mui/material/MenuItem";
-import { formatBytes, maybeWithAuth, topicShortUrl, topicUrl, validTopic, validUrl } from "../app/utils";
 import Box from "@mui/material/Box";
+import { Trans, useTranslation } from "react-i18next";
+import priority1 from "../img/priority-1.svg";
+import priority2 from "../img/priority-2.svg";
+import priority3 from "../img/priority-3.svg";
+import priority4 from "../img/priority-4.svg";
+import priority5 from "../img/priority-5.svg";
+import { formatBytes, maybeWithAuth, topicShortUrl, topicUrl, validTopic, validUrl } from "../app/utils";
 import AttachmentIcon from "./AttachmentIcon";
 import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
-import { Trans, useTranslation } from "react-i18next";
+import theme from "./theme";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi from "../app/AccountApi";
@@ -137,7 +137,7 @@ const PublishDialog = (props) => {
     if (attachFile && message.trim()) {
       url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());
     }
-    const body = attachFile ? attachFile : message;
+    const body = attachFile || message;
     try {
       const user = await userManager.get(baseUrl);
       const headers = maybeWithAuth({}, user);
@@ -183,13 +183,15 @@ const PublishDialog = (props) => {
             remainingBytes: formatBytes(remainingBytes),
           })
         );
-      } else if (fileSizeLimitReached) {
+      }
+      if (fileSizeLimitReached) {
         return setAttachFileError(
           t("publish_dialog_attachment_limits_file_reached", {
             fileSizeLimit: formatBytes(fileSizeLimit),
           })
         );
-      } else if (quotaReached) {
+      }
+      if (quotaReached) {
         return setAttachFileError(
           t("publish_dialog_attachment_limits_quota_reached", {
             remainingBytes: formatBytes(remainingBytes),
@@ -377,7 +379,7 @@ const PublishDialog = (props) => {
                     key={`priorityMenuItem${priority}`}
                     value={priority}
                     aria-label={t("notifications_priority_x", {
-                      priority: priority,
+                      priority,
                     })}
                   >
                     <div style={{ display: "flex", alignItems: "center" }}>
@@ -385,7 +387,7 @@ const PublishDialog = (props) => {
                         src={priorities[priority].file}
                         style={{ marginRight: "8px" }}
                         alt={t("notifications_priority_x", {
-                          priority: priority,
+                          priority,
                         })}
                       />
                       <div>{priorities[priority].label}</div>
@@ -533,7 +535,7 @@ const PublishDialog = (props) => {
               />
             </ClosableRow>
           )}
-          <input type="file" ref={attachFileInput} onChange={handleAttachFileChanged} style={{ display: "none" }} aria-hidden={true} />
+          <input type="file" ref={attachFileInput} onChange={handleAttachFileChanged} style={{ display: "none" }} aria-hidden />
           {showAttachFile && (
             <AttachmentBox
               file={attachFile}
@@ -707,13 +709,11 @@ const PublishDialog = (props) => {
   );
 };
 
-const Row = (props) => {
-  return (
-    <div style={{ display: "flex" }} role="row">
-      {props.children}
-    </div>
-  );
-};
+const Row = (props) => (
+  <div style={{ display: "flex" }} role="row">
+    {props.children}
+  </div>
+);
 
 const ClosableRow = (props) => {
   const closable = props.hasOwnProperty("closable") ? props.closable : true;
@@ -748,7 +748,7 @@ const DialogIconButton = (props) => {
 
 const AttachmentBox = (props) => {
   const { t } = useTranslation();
-  const file = props.file;
+  const { file } = props;
   return (
     <>
       <Typography variant="body1" sx={{ marginTop: 2 }}>
@@ -811,13 +811,7 @@ const ExpandingTextField = (props) => {
   }, [props.value]);
   return (
     <>
-      <Typography
-        ref={invisibleFieldRef}
-        component="span"
-        variant={props.variant}
-        aria-hidden={true}
-        sx={{ position: "absolute", left: "-200%" }}
-      >
+      <Typography ref={invisibleFieldRef} component="span" variant={props.variant} aria-hidden sx={{ position: "absolute", left: "-200%" }}>
         {props.value}
       </Typography>
       <TextField

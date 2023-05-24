@@ -61,7 +61,7 @@ export const useConnectionListeners = (account, subscriptions, users) => {
       };
     },
     // We have to disable dep checking for "navigate". This is fine, it never changes.
-    // eslint-disable-next-line
+
     []
   );
 

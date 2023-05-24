@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import {
   accountBillingPortalUrl,
   accountBillingSubscriptionUrl,
@@ -17,7 +18,6 @@ import {
 } from "./utils";
 import session from "./Session";
 import subscriptionManager from "./SubscriptionManager";
-import i18n from "i18next";
 import prefs from "./Prefs";
 import routes from "../components/routes";
 import { fetchOrThrow, UnauthorizedError } from "./errors";
@@ -66,13 +66,13 @@ class AccountApi {
   async create(username, password) {
     const url = accountUrl(config.base_url);
     const body = JSON.stringify({
-      username: username,
-      password: password,
+      username,
+      password,
     });
     console.log(`[AccountApi] Creating user account ${url}`);
     await fetchOrThrow(url, {
       method: "POST",
-      body: body,
+      body,
     });
   }
 
@@ -97,7 +97,7 @@ class AccountApi {
       method: "DELETE",
       headers: withBearerAuth({}, session.token()),
       body: JSON.stringify({
-        password: password,
+        password,
       }),
     });
   }
@@ -118,7 +118,7 @@ class AccountApi {
   async createToken(label, expires) {
     const url = accountTokenUrl(config.base_url);
     const body = {
-      label: label,
+      label,
       expires: expires > 0 ? Math.floor(Date.now() / 1000) + expires : 0,
     };
     console.log(`[AccountApi] Creating user access token ${url}`);
@@ -132,8 +132,8 @@ class AccountApi {
   async updateToken(token, label, expires) {
     const url = accountTokenUrl(config.base_url);
     const body = {
-      token: token,
-      label: label,
+      token,
+      label,
     };
     if (expires > 0) {
       body.expires = Math.floor(Date.now() / 1000) + expires;
@@ -171,7 +171,7 @@ class AccountApi {
     await fetchOrThrow(url, {
       method: "PATCH",
       headers: withBearerAuth({}, session.token()),
-      body: body,
+      body,
     });
   }
 
@@ -179,13 +179,13 @@ class AccountApi {
     const url = accountSubscriptionUrl(config.base_url);
     const body = JSON.stringify({
       base_url: baseUrl,
-      topic: topic,
+      topic,
     });
     console.log(`[AccountApi] Adding user subscription ${url}: ${body}`);
     const response = await fetchOrThrow(url, {
       method: "POST",
       headers: withBearerAuth({}, session.token()),
-      body: body,
+      body,
     });
     const subscription = await response.json(); // May throw SyntaxError
     console.log(`[AccountApi] Subscription`, subscription);
@@ -196,14 +196,14 @@ class AccountApi {
     const url = accountSubscriptionUrl(config.base_url);
     const body = JSON.stringify({
       base_url: baseUrl,
-      topic: topic,
+      topic,
       ...payload,
     });
     console.log(`[AccountApi] Updating user subscription ${url}: ${body}`);
     const response = await fetchOrThrow(url, {
       method: "PATCH",
       headers: withBearerAuth({}, session.token()),
-      body: body,
+      body,
     });
     const subscription = await response.json(); // May throw SyntaxError
     console.log(`[AccountApi] Subscription`, subscription);
@@ -230,8 +230,8 @@ class AccountApi {
       method: "POST",
       headers: withBearerAuth({}, session.token()),
       body: JSON.stringify({
-        topic: topic,
-        everyone: everyone,
+        topic,
+        everyone,
       }),
     });
   }
@@ -272,11 +272,11 @@ class AccountApi {
   async upsertBillingSubscription(method, tier, interval) {
     const url = accountBillingSubscriptionUrl(config.base_url);
     const response = await fetchOrThrow(url, {
-      method: method,
+      method,
       headers: withBearerAuth({}, session.token()),
       body: JSON.stringify({
-        tier: tier,
-        interval: interval,
+        tier,
+        interval,
       }),
     });
     return await response.json(); // May throw SyntaxError
@@ -309,7 +309,7 @@ class AccountApi {
       headers: withBearerAuth({}, session.token()),
       body: JSON.stringify({
         number: phoneNumber,
-        channel: channel,
+        channel,
       }),
     });
   }
@@ -322,7 +322,7 @@ class AccountApi {
       headers: withBearerAuth({}, session.token()),
       body: JSON.stringify({
         number: phoneNumber,
-        code: code,
+        code,
       }),
     });
   }

@@ -7,20 +7,20 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { Chip, InputAdornment, Portal, Snackbar, useMediaQuery } from "@mui/material";
-import theme from "./theme";
-import subscriptionManager from "../app/SubscriptionManager";
-import DialogFooter from "./DialogFooter";
 import { useTranslation } from "react-i18next";
-import accountApi, { Role } from "../app/AccountApi";
-import session from "../app/Session";
-import routes from "./routes";
 import MenuItem from "@mui/material/MenuItem";
-import PopupMenu from "./PopupMenu";
-import { formatShortDateTime, shuffle } from "../app/utils";
-import api from "../app/Api";
 import { useNavigate } from "react-router-dom";
 import IconButton from "@mui/material/IconButton";
 import { Clear } from "@mui/icons-material";
+import theme from "./theme";
+import subscriptionManager from "../app/SubscriptionManager";
+import DialogFooter from "./DialogFooter";
+import accountApi, { Role } from "../app/AccountApi";
+import session from "../app/Session";
+import routes from "./routes";
+import PopupMenu from "./PopupMenu";
+import { formatShortDateTime, shuffle } from "../app/utils";
+import api from "../app/Api";
 import { AccountContext } from "./App";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
@@ -34,7 +34,7 @@ export const SubscriptionPopup = (props) => {
   const [reserveEditDialogOpen, setReserveEditDialogOpen] = useState(false);
   const [reserveDeleteDialogOpen, setReserveDeleteDialogOpen] = useState(false);
   const [showPublishError, setShowPublishError] = useState(false);
-  const subscription = props.subscription;
+  const { subscription } = props;
   const placement = props.placement ?? "left";
   const reservations = account?.reservations || [];
 
@@ -64,8 +64,8 @@ export const SubscriptionPopup = (props) => {
   };
 
   const handleSendTestMessage = async () => {
-    const baseUrl = props.subscription.baseUrl;
-    const topic = props.subscription.topic;
+    const { baseUrl } = props.subscription;
+    const { topic } = props.subscription;
     const tags = shuffle([
       "grinning",
       "octopus",
@@ -110,9 +110,9 @@ export const SubscriptionPopup = (props) => {
     ])[0];
     try {
       await api.publish(baseUrl, topic, message, {
-        title: title,
-        priority: priority,
-        tags: tags,
+        title,
+        priority,
+        tags,
       });
     } catch (e) {
       console.log(`[SubscriptionPopup] Error publishing message`, e);
@@ -201,7 +201,7 @@ export const SubscriptionPopup = (props) => {
 
 const DisplayNameDialog = (props) => {
   const { t } = useTranslation();
-  const subscription = props.subscription;
+  const { subscription } = props;
   const [error, setError] = useState("");
   const [displayName, setDisplayName] = useState(subscription.displayName ?? "");
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -265,9 +265,11 @@ export const ReserveLimitChip = () => {
   const { account } = useContext(AccountContext);
   if (account?.role === Role.ADMIN || account?.stats.reservations_remaining > 0) {
     return <></>;
-  } else if (config.enable_payments) {
+  }
+  if (config.enable_payments) {
     return account?.limits.reservations > 0 ? <LimitReachedChip /> : <ProChip />;
-  } else if (account) {
+  }
+  if (account) {
     return <LimitReachedChip />;
   }
   return <></>;
@@ -294,7 +296,7 @@ export const ProChip = () => {
   const { t } = useTranslation();
   return (
     <Chip
-      label={"ntfy Pro"}
+      label="ntfy Pro"
       variant="outlined"
       color="primary"
       sx={{

@@ -1,3 +1,4 @@
+import { Base64 } from "js-base64";
 import { rawEmojis } from "./emojis";
 import beep from "../sounds/beep.mp3";
 import juntos from "../sounds/juntos.mp3";
@@ -7,7 +8,6 @@ import dadum from "../sounds/dadum.mp3";
 import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
-import { Base64 } from "js-base64";
 
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) =>
@@ -33,9 +33,7 @@ export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
 
-export const validUrl = (url) => {
-  return url.match(/^https?:\/\/.+/);
-};
+export const validUrl = (url) => url.match(/^https?:\/\/.+/);
 
 export const validTopic = (topic) => {
   if (disallowedTopic(topic)) {
@@ -44,14 +42,13 @@ export const validTopic = (topic) => {
   return topic.match(/^([-_a-zA-Z0-9]{1,64})$/); // Regex must match Go & Android app!
 };
 
-export const disallowedTopic = (topic) => {
-  return config.disallowed_topics.includes(topic);
-};
+export const disallowedTopic = (topic) => config.disallowed_topics.includes(topic);
 
 export const topicDisplayName = (subscription) => {
   if (subscription.displayName) {
     return subscription.displayName;
-  } else if (subscription.baseUrl === config.base_url) {
+  }
+  if (subscription.baseUrl === config.base_url) {
     return subscription.topic;
   }
   return topicShortUrl(subscription.baseUrl, subscription.topic);
@@ -67,7 +64,7 @@ rawEmojis.forEach((emoji) => {
 
 const toEmojis = (tags) => {
   if (!tags) return [];
-  else return tags.filter((tag) => tag in emojis).map((tag) => emojis[tag]);
+  return tags.filter((tag) => tag in emojis).map((tag) => emojis[tag]);
 };
 
 export const formatTitleWithDefault = (m, fallback) => {
@@ -81,33 +78,31 @@ export const formatTitle = (m) => {
   const emojiList = toEmojis(m.tags);
   if (emojiList.length > 0) {
     return `${emojiList.join(" ")} ${m.title}`;
-  } else {
-    return m.title;
   }
+  return m.title;
 };
 
 export const formatMessage = (m) => {
   if (m.title) {
     return m.message;
-  } else {
-    const emojiList = toEmojis(m.tags);
-    if (emojiList.length > 0) {
-      return `${emojiList.join(" ")} ${m.message}`;
-    } else {
-      return m.message;
-    }
   }
+  const emojiList = toEmojis(m.tags);
+  if (emojiList.length > 0) {
+    return `${emojiList.join(" ")} ${m.message}`;
+  }
+  return m.message;
 };
 
 export const unmatchedTags = (tags) => {
   if (!tags) return [];
-  else return tags.filter((tag) => !(tag in emojis));
+  return tags.filter((tag) => !(tag in emojis));
 };
 
 export const maybeWithAuth = (headers, user) => {
   if (user && user.password) {
     return withBasicAuth(headers, user.username, user.password);
-  } else if (user && user.token) {
+  }
+  if (user && user.token) {
     return withBearerAuth(headers, user.token);
   }
   return headers;
@@ -121,30 +116,22 @@ export const maybeWithBearerAuth = (headers, token) => {
 };
 
 export const withBasicAuth = (headers, username, password) => {
-  headers["Authorization"] = basicAuth(username, password);
+  headers.Authorization = basicAuth(username, password);
   return headers;
 };
 
-export const basicAuth = (username, password) => {
-  return `Basic ${encodeBase64(`${username}:${password}`)}`;
-};
+export const basicAuth = (username, password) => `Basic ${encodeBase64(`${username}:${password}`)}`;
 
 export const withBearerAuth = (headers, token) => {
-  headers["Authorization"] = bearerAuth(token);
+  headers.Authorization = bearerAuth(token);
   return headers;
 };
 
-export const bearerAuth = (token) => {
-  return `Bearer ${token}`;
-};
+export const bearerAuth = (token) => `Bearer ${token}`;
 
-export const encodeBase64 = (s) => {
-  return Base64.encode(s);
-};
+export const encodeBase64 = (s) => Base64.encode(s);
 
-export const encodeBase64Url = (s) => {
-  return Base64.encodeURI(s);
-};
+export const encodeBase64Url = (s) => Base64.encodeURI(s);
 
 export const maybeAppendActionErrors = (message, notification) => {
   const actionErrors = (notification.actions ?? [])
@@ -153,13 +140,13 @@ export const maybeAppendActionErrors = (message, notification) => {
     .join("\n");
   if (actionErrors.length === 0) {
     return message;
-  } else {
-    return `${message}\n\n${actionErrors}`;
   }
+  return `${message}\n\n${actionErrors}`;
 };
 
 export const shuffle = (arr) => {
-  let j, x;
+  let j;
+  let x;
   for (let index = arr.length - 1; index > 0; index--) {
     j = Math.floor(Math.random() * (index + 1));
     x = arr[index];
@@ -169,12 +156,11 @@ export const shuffle = (arr) => {
   return arr;
 };
 
-export const splitNoEmpty = (s, delimiter) => {
-  return s
+export const splitNoEmpty = (s, delimiter) =>
+  s
     .split(delimiter)
     .map((x) => x.trim())
     .filter((x) => x !== "");
-};
 
 /** Non-cryptographic hash function, see https://stackoverflow.com/a/8831937/1440785 */
 export const hashCode = async (s) => {
@@ -182,21 +168,18 @@ export const hashCode = async (s) => {
   for (let i = 0; i < s.length; i++) {
     const char = s.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash &= hash; // Convert to 32bit integer
   }
   return hash;
 };
 
-export const formatShortDateTime = (timestamp) => {
-  return new Intl.DateTimeFormat("default", {
+export const formatShortDateTime = (timestamp) =>
+  new Intl.DateTimeFormat("default", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(timestamp * 1000));
-};
 
-export const formatShortDate = (timestamp) => {
-  return new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(new Date(timestamp * 1000));
-};
+export const formatShortDate = (timestamp) => new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(new Date(timestamp * 1000));
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 bytes";
@@ -204,13 +187,14 @@ export const formatBytes = (bytes, decimals = 2) => {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ["bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+  return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
 };
 
 export const formatNumber = (n) => {
   if (n === 0) {
     return n;
-  } else if (n % 1000 === 0) {
+  }
+  if (n % 1000 === 0) {
     return `${n / 1000}k`;
   }
   return n.toLocaleString();
@@ -267,7 +251,7 @@ export const playSound = async (id) => {
 export async function* fetchLinesIterator(fileURL, headers) {
   const utf8Decoder = new TextDecoder("utf-8");
   const response = await fetch(fileURL, {
-    headers: headers,
+    headers,
   });
   const reader = response.body.getReader();
   let { value: chunk, done: readerDone } = await reader.read();
@@ -277,12 +261,12 @@ export async function* fetchLinesIterator(fileURL, headers) {
   let startIndex = 0;
 
   for (;;) {
-    let result = re.exec(chunk);
+    const result = re.exec(chunk);
     if (!result) {
       if (readerDone) {
         break;
       }
-      let remainder = chunk.substr(startIndex);
+      const remainder = chunk.substr(startIndex);
       ({ value: chunk, done: readerDone } = await reader.read());
       chunk = remainder + (chunk ? utf8Decoder.decode(chunk) : "");
       startIndex = re.lastIndex = 0;

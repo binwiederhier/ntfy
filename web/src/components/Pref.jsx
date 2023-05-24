@@ -1,8 +1,6 @@
 import * as React from "react";
 
-export const PrefGroup = (props) => {
-  return <div role="table">{props.children}</div>;
-};
+export const PrefGroup = (props) => <div role="table">{props.children}</div>;
 
 export const Pref = (props) => {
   const justifyContent = props.alignTop ? "normal" : "center";
@@ -24,7 +22,7 @@ export const Pref = (props) => {
           flex: "1 0 40%",
           display: "flex",
           flexDirection: "column",
-          justifyContent: justifyContent,
+          justifyContent,
           paddingRight: "30px",
         }}
       >
@@ -44,7 +42,7 @@ export const Pref = (props) => {
           flex: "1 0 calc(60% - 50px)",
           display: "flex",
           flexDirection: "column",
-          justifyContent: justifyContent,
+          justifyContent,
         }}
       >
         {props.children}

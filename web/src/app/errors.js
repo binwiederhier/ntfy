@@ -48,6 +48,7 @@ export class UnauthorizedError extends Error {
 
 export class UserExistsError extends Error {
   static CODE = 40901; // errHTTPConflictUserExists
+
   constructor() {
     super("Username already exists");
   }
@@ -55,6 +56,7 @@ export class UserExistsError extends Error {
 
 export class TopicReservedError extends Error {
   static CODE = 40902; // errHTTPConflictTopicReserved
+
   constructor() {
     super("Topic already reserved");
   }
@@ -62,6 +64,7 @@ export class TopicReservedError extends Error {
 
 export class AccountCreateLimitReachedError extends Error {
   static CODE = 42906; // errHTTPTooManyRequestsLimitAccountCreation
+
   constructor() {
     super("Account creation limit reached");
   }
@@ -69,6 +72,7 @@ export class AccountCreateLimitReachedError extends Error {
 
 export class IncorrectPasswordError extends Error {
   static CODE = 40026; // errHTTPBadRequestIncorrectPasswordConfirmation
+
   constructor() {
     super("Password incorrect");
   }

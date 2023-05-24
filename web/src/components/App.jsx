@@ -4,16 +4,17 @@ import Box from "@mui/material/Box";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import Toolbar from "@mui/material/Toolbar";
+import { useLiveQuery } from "dexie-react-hooks";
+import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { Backdrop, CircularProgress } from "@mui/material";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
 import theme from "./theme";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
 import Preferences from "./Preferences";
-import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { expandUrl } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
@@ -21,7 +22,6 @@ import { useAccountListener, useBackgroundProcesses, useConnectionListeners } fr
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import "./i18n"; // Translations!
-import { Backdrop, CircularProgress } from "@mui/material";
 import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
@@ -66,12 +66,11 @@ const Layout = () => {
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
   const subscriptionsWithoutInternal = subscriptions?.filter((s) => !s.internal);
   const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
-  const [selected] = (subscriptionsWithoutInternal || []).filter((s) => {
-    return (
+  const [selected] = (subscriptionsWithoutInternal || []).filter(
+    (s) =>
       (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic) ||
       (config.base_url === s.baseUrl && params.topic === s.topic)
-    );
-  });
+  );
 
   useConnectionListeners(account, subscriptions, users);
   useAccountListener(setAccount);
@@ -95,7 +94,7 @@ const Layout = () => {
         <Outlet
           context={{
             subscriptions: subscriptionsWithoutInternal,
-            selected: selected,
+            selected,
           }}
         />
       </Main>
@@ -104,30 +103,28 @@ const Layout = () => {
   );
 };
 
-const Main = (props) => {
-  return (
-    <Box
-      id="main"
-      component="main"
-      sx={{
-        display: "flex",
-        flexGrow: 1,
-        flexDirection: "column",
-        padding: 3,
-        width: { sm: `calc(100% - ${Navigation.width}px)` },
-        height: "100vh",
-        overflow: "auto",
-        backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
-      }}
-    >
-      {props.children}
-    </Box>
-  );
-};
+const Main = (props) => (
+  <Box
+    id="main"
+    component="main"
+    sx={{
+      display: "flex",
+      flexGrow: 1,
+      flexDirection: "column",
+      padding: 3,
+      width: { sm: `calc(100% - ${Navigation.width}px)` },
+      height: "100vh",
+      overflow: "auto",
+      backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),
+    }}
+  >
+    {props.children}
+  </Box>
+);
 
 const Loader = () => (
   <Backdrop
-    open={true}
+    open
     sx={{
       zIndex: 100000,
       backgroundColor: (theme) => (theme.palette.mode === "light" ? theme.palette.grey[100] : theme.palette.grey[900]),

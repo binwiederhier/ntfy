@@ -1,16 +1,17 @@
 import * as React from "react";
 import Box from "@mui/material/Box";
+import { useTranslation } from "react-i18next";
 import fileDocument from "../img/file-document.svg";
 import fileImage from "../img/file-image.svg";
 import fileVideo from "../img/file-video.svg";
 import fileAudio from "../img/file-audio.svg";
 import fileApp from "../img/file-app.svg";
-import { useTranslation } from "react-i18next";
 
 const AttachmentIcon = (props) => {
   const { t } = useTranslation();
-  const type = props.type;
-  let imageFile, imageLabel;
+  const { type } = props;
+  let imageFile;
+  let imageLabel;
   if (!type) {
     imageFile = fileDocument;
     imageLabel = t("notifications_attachment_file_image");

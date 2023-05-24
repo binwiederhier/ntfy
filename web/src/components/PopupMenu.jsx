@@ -37,8 +37,8 @@ const PopupMenu = (props) => {
           },
         },
       }}
-      transformOrigin={{ horizontal: horizontal, vertical: "top" }}
-      anchorOrigin={{ horizontal: horizontal, vertical: "bottom" }}
+      transformOrigin={{ horizontal, vertical: "top" }}
+      anchorOrigin={{ horizontal, vertical: "bottom" }}
     >
       {props.children}
     </Menu>

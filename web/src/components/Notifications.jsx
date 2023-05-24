@@ -4,6 +4,15 @@ import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import * as React from "react";
 import { useEffect, useState } from "react";
+import IconButton from "@mui/material/IconButton";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import { useLiveQuery } from "dexie-react-hooks";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { Trans, useTranslation } from "react-i18next";
+import { useOutletContext } from "react-router-dom";
 import {
   formatBytes,
   formatMessage,
@@ -15,23 +24,14 @@ import {
   topicShortUrl,
   unmatchedTags,
 } from "../app/utils";
-import IconButton from "@mui/material/IconButton";
-import CheckIcon from "@mui/icons-material/Check";
-import CloseIcon from "@mui/icons-material/Close";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
-import { useLiveQuery } from "dexie-react-hooks";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
-import InfiniteScroll from "react-infinite-scroll-component";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
-import { Trans, useTranslation } from "react-i18next";
-import { useOutletContext } from "react-router-dom";
 import { useAutoSubscribe } from "./hooks";
 
 export const AllSubscriptions = () => {
@@ -52,46 +52,50 @@ export const SingleSubscription = () => {
 };
 
 const AllSubscriptionsList = (props) => {
-  const subscriptions = props.subscriptions;
+  const { subscriptions } = props;
   const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
-  } else if (subscriptions.length === 0) {
+  }
+  if (subscriptions.length === 0) {
     return <NoSubscriptions />;
-  } else if (notifications.length === 0) {
+  }
+  if (notifications.length === 0) {
     return <NoNotificationsWithoutSubscription subscriptions={subscriptions} />;
   }
   return <NotificationList key="all" notifications={notifications} messageBar={false} />;
 };
 
 const SingleSubscriptionList = (props) => {
-  const subscription = props.subscription;
+  const { subscription } = props;
   const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
-  } else if (notifications.length === 0) {
+  }
+  if (notifications.length === 0) {
     return <NoNotifications subscription={subscription} />;
   }
-  return <NotificationList id={subscription.id} notifications={notifications} messageBar={true} />;
+  return <NotificationList id={subscription.id} notifications={notifications} messageBar />;
 };
 
 const NotificationList = (props) => {
   const { t } = useTranslation();
   const pageSize = 20;
-  const notifications = props.notifications;
+  const { notifications } = props;
   const [snackOpen, setSnackOpen] = useState(false);
   const [maxCount, setMaxCount] = useState(pageSize);
   const count = Math.min(notifications.length, maxCount);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       setMaxCount(pageSize);
       const main = document.getElementById("main");
       if (main) {
         main.scrollTo(0, 0);
       }
-    };
-  }, [props.id]);
+    },
+    [props.id]
+  );
 
   return (
     <InfiniteScroll
@@ -129,8 +133,8 @@ const NotificationList = (props) => {
 
 const NotificationItem = (props) => {
   const { t } = useTranslation();
-  const notification = props.notification;
-  const attachment = notification.attachment;
+  const { notification } = props;
+  const { attachment } = notification;
   const date = formatShortDateTime(notification.time);
   const otherTags = unmatchedTags(notification.tags);
   const tags = otherTags.length > 0 ? otherTags.join(", ") : null;
@@ -272,7 +276,7 @@ const priorityFiles = {
 
 const Attachment = (props) => {
   const { t } = useTranslation();
-  const attachment = props.attachment;
+  const { attachment } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
   const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
@@ -402,20 +406,18 @@ const Image = (props) => {
   );
 };
 
-const UserActions = (props) => {
-  return (
-    <>
-      {props.notification.actions.map((action) => (
-        <UserAction key={action.id} notification={props.notification} action={action} />
-      ))}
-    </>
-  );
-};
+const UserActions = (props) => (
+  <>
+    {props.notification.actions.map((action) => (
+      <UserAction key={action.id} notification={props.notification} action={action} />
+    ))}
+  </>
+);
 
 const UserAction = (props) => {
   const { t } = useTranslation();
-  const notification = props.notification;
-  const action = props.action;
+  const { notification } = props;
+  const { action } = props;
   if (action.action === "broadcast") {
     return (
       <Tooltip title={t("notifications_actions_not_supported")}>
@@ -426,7 +428,8 @@ const UserAction = (props) => {
         </span>
       </Tooltip>
     );
-  } else if (action.action === "view") {
+  }
+  if (action.action === "view") {
     return (
       <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
         <Button
@@ -439,20 +442,21 @@ const UserAction = (props) => {
         </Button>
       </Tooltip>
     );
-  } else if (action.action === "http") {
+  }
+  if (action.action === "http") {
     const method = action.method ?? "POST";
     const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
     return (
       <Tooltip
         title={t("notifications_actions_http_request_title", {
-          method: method,
+          method,
           url: action.url,
         })}
       >
         <Button
           onClick={() => performHttpAction(notification, action)}
           aria-label={t("notifications_actions_http_request_title", {
-            method: method,
+            method,
             url: action.url,
           })}
         >
@@ -493,7 +497,7 @@ const updateActionStatus = (notification, action, progress, error) => {
     if (a.id !== action.id) {
       return a;
     }
-    return { ...a, progress: progress, error: error };
+    return { ...a, progress, error };
   });
   subscriptionManager.updateNotification(notification);
 };
@@ -574,17 +578,15 @@ const NoSubscriptions = () => {
   );
 };
 
-const ForMoreDetails = () => {
-  return (
-    <Trans
-      i18nKey="notifications_more_details"
-      components={{
-        websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener" />,
-        docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
-      }}
-    />
-  );
-};
+const ForMoreDetails = () => (
+  <Trans
+    i18nKey="notifications_more_details"
+    components={{
+      websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener" />,
+      docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
+    }}
+  />
+);
 
 const Loading = () => {
   const { t } = useTranslation();

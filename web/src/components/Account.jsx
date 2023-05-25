@@ -994,6 +994,7 @@ const TokenDialog = (props) => {
 
 const TokenDeleteDialog = (props) => {
   const { t } = useTranslation();
+  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     try {
@@ -1003,6 +1004,8 @@ const TokenDeleteDialog = (props) => {
       console.log(`[Account] Error deleting token`, e);
       if (e instanceof UnauthorizedError) {
         session.resetAndRedirect(routes.login);
+      } else {
+        setError(e.message);
       }
     }
   };
@@ -1015,7 +1018,7 @@ const TokenDeleteDialog = (props) => {
           <Trans i18nKey="account_tokens_delete_dialog_description" />
         </DialogContentText>
       </DialogContent>
-      <DialogFooter status>
+      <DialogFooter status={error}>
         <Button onClick={props.onClose}>{t("common_cancel")}</Button>
         <Button onClick={handleSubmit} color="error">
           {t("account_tokens_delete_dialog_submit_button")}

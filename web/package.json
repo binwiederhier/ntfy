@@ -11,6 +11,8 @@
     "lint": "eslint --report-unused-disable-directives --ext .js,.jsx ./src/"
   },
   "dependencies": {
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "latest",
     "dexie": "^3.2.1",

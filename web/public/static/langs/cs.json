@@ -355,5 +355,15 @@
     "account_upgrade_dialog_billing_contact_website": "Otázky týkající se fakturace naleznete na našich <Link>webových stránkách</Link>.",
     "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} rezervované téma",
     "account_upgrade_dialog_tier_features_messages_one": "{{messages}} denní zpráva",
-    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} denní e-mail"
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} denní e-mail",
+    "publish_dialog_call_label": "Telefonát",
+    "publish_dialog_call_reset": "Odstranit telefonát",
+    "publish_dialog_chip_call_label": "Telefonát",
+    "account_basics_phone_numbers_title": "Telefonní čísla",
+    "account_basics_phone_numbers_dialog_description": "Pro oznámení prostřednictvím tel. hovoru, musíte přidat a ověřit alespoň jedno telefonní číslo. Ověření lze provést pomocí SMS nebo telefonátu.",
+    "account_basics_phone_numbers_description": "K oznámení telefonátem",
+    "account_basics_phone_numbers_no_phone_numbers_yet": "Zatím žádná telefonní čísla",
+    "account_basics_phone_numbers_copied_to_clipboard": "Telefonní číslo zkopírováno do schránky",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "Žádná ověřená telefonní čísla",
+    "publish_dialog_call_item": "Vytočit číslo {{number}}"
 }

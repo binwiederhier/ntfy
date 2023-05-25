@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(() => ({
   build: {
     outDir: "build",
-    assetsDir: "static/media"
+    assetsDir: "static/media",
   },
   server: {
     port: 3000,

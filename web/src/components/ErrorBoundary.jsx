@@ -45,9 +45,7 @@ class ErrorBoundaryImpl extends React.Component {
     // Fetch additional info and a better stack trace
     StackTrace.fromError(error).then((stack) => {
       console.error("[ErrorBoundary] Stacktrace fetched", stack);
-      const stackString = stack
-          .map((el) => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`)
-          .join("\n");
+      const stackString = stack.map((el) => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`).join("\n");
       const niceStack = `${error.toString()}\n${stackString}`;
       this.setState({ niceStack });
     });

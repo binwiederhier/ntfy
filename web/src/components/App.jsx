@@ -30,14 +30,13 @@ export const AccountContext = createContext(null);
 
 const App = () => {
   const [account, setAccount] = useState(null);
-
-  const contextValue = useMemo(() => ({ account, setAccount }), [account, setAccount]);
+  const accountMemo = useMemo(() => ({ account, setAccount }), [account, setAccount]);
 
   return (
     <Suspense fallback={<Loader />}>
       <BrowserRouter>
         <ThemeProvider theme={theme}>
-          <AccountContext.Provider value={contextValue}>
+          <AccountContext.Provider value={accountMemo}>
             <CssBaseline />
             <ErrorBoundary>
               <Routes>

@@ -247,6 +247,8 @@ const DisplayNameDialog = (props) => {
           inputProps={{
             maxLength: 64,
             "aria-label": t("display_name_dialog_placeholder"),
+          }}
+          InputProps={{
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton onClick={() => setDisplayName("")} edge="end">

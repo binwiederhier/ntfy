@@ -383,23 +383,23 @@ const PublishDialog = (props) => {
                   "aria-label": t("publish_dialog_priority_label"),
                 }}
               >
-                {[5, 4, 3, 2, 1].map((priorityMenuItem) => (
+                {[5, 4, 3, 2, 1].map((p) => (
                   <MenuItem
-                    key={`priorityMenuItem${priorityMenuItem}`}
-                    value={priorityMenuItem}
+                    key={`priorityMenuItem${p}`}
+                    value={p}
                     aria-label={t("notifications_priority_x", {
-                      priority: priorityMenuItem,
+                      priority: p,
                     })}
                   >
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <img
-                        src={priorities[priorityMenuItem].file}
+                        src={priorities[p].file}
                         style={{ marginRight: "8px" }}
                         alt={t("notifications_priority_x", {
-                          priority: priorityMenuItem,
+                          priority: p,
                         })}
                       />
-                      <div>{priorities[priorityMenuItem].label}</div>
+                      <div>{priorities[p].label}</div>
                     </div>
                   </MenuItem>
                 ))}
@@ -477,10 +477,8 @@ const PublishDialog = (props) => {
                     "aria-label": t("publish_dialog_call_label"),
                   }}
                 >
-                  {account?.phone_numbers?.map((phoneNumber, i) => (
-                    // TODO(eslint): Possibly just use the phone number as a key?
-                    // eslint-disable-next-line react/no-array-index-key
-                    <MenuItem key={`phoneNumberMenuItem${i}`} value={phoneNumber} aria-label={phoneNumber}>
+                  {account?.phone_numbers?.map((phoneNumber) => (
+                    <MenuItem key={phoneNumber} value={phoneNumber} aria-label={phoneNumber}>
                       {t("publish_dialog_call_item", { number: phoneNumber })}
                     </MenuItem>
                   ))}
@@ -834,7 +832,10 @@ const ExpandingTextField = (props) => {
         variant="standard"
         sx={{ width: `${textWidth}px`, borderBottom: "none" }}
         InputProps={{
-          style: { fontSize: theme.typography[props.variant].fontSize, paddingBottom: 0, paddingTop: 0 },
+          style: { fontSize: theme.typography[props.variant].fontSize },
+        }}
+        inputProps={{
+          style: { paddingBottom: 0, paddingTop: 0 },
           "aria-label": props.placeholder,
         }}
         disabled={props.disabled}

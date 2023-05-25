@@ -74,6 +74,8 @@ const EmojiPicker = (props) => {
                 inputProps={{
                   role: "searchbox",
                   "aria-label": t("emoji_picker_search_placeholder"),
+                }}
+                InputProps={{
                   endAdornment: (
                     <InputAdornment position="end" sx={{ display: search ? "" : "none" }}>
                       <IconButton size="small" onClick={handleSearchClear} edge="end" aria-label={t("emoji_picker_search_clear")}>

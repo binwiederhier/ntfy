@@ -20,6 +20,12 @@
     "react/destructuring-assignment": "off",
     "react/jsx-no-useless-fragment": "off",
     "react/jsx-props-no-spreading": "off",
+    "react/jsx-no-duplicate-props": [
+      "error",
+      {
+        "ignoreCase": false // For <TextField>'s [iI]nputProps
+      }
+    ],
     "react/function-component-definition": [
       "error",
       {

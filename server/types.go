@@ -24,23 +24,24 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID         string      `json:"id"`                // Random message ID
-	Time       int64       `json:"time"`              // Unix time in seconds
-	Expires    int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
-	Event      string      `json:"event"`             // One of the above
-	Topic      string      `json:"topic"`
-	Title      string      `json:"title,omitempty"`
-	Message    string      `json:"message,omitempty"`
-	Priority   int         `json:"priority,omitempty"`
-	Tags       []string    `json:"tags,omitempty"`
-	Click      string      `json:"click,omitempty"`
-	Icon       string      `json:"icon,omitempty"`
-	Actions    []*action   `json:"actions,omitempty"`
-	Attachment *attachment `json:"attachment,omitempty"`
-	PollID     string      `json:"poll_id,omitempty"`
-	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
-	Sender     netip.Addr  `json:"-"`                  // IP address of uploader, used for rate limiting
-	User       string      `json:"-"`                  // Username of the uploader, used to associated attachments
+	ID          string      `json:"id"`                // Random message ID
+	Time        int64       `json:"time"`              // Unix time in seconds
+	Expires     int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
+	Event       string      `json:"event"`             // One of the above
+	Topic       string      `json:"topic"`
+	Title       string      `json:"title,omitempty"`
+	Message     string      `json:"message,omitempty"`
+	Priority    int         `json:"priority,omitempty"`
+	Tags        []string    `json:"tags,omitempty"`
+	Click       string      `json:"click,omitempty"`
+	Icon        string      `json:"icon,omitempty"`
+	Actions     []*action   `json:"actions,omitempty"`
+	Attachment  *attachment `json:"attachment,omitempty"`
+	PollID      string      `json:"poll_id,omitempty"`
+	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
+	Encoding    string      `json:"encoding,omitempty"`     // empty for raw UTF-8, or "base64" for encoded bytes
+	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
+	User        string      `json:"-"`                      // Username of the uploader, used to associated attachments
 }
 
 func (m *message) Context() log.Context {

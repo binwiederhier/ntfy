@@ -963,6 +963,10 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
+	contentType, markdown := readParam(r, "content-type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
+	if markdown || strings.ToLower(contentType) == "text/markdown" {
+		m.ContentType = "text/markdown"
+	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {
 		firebase = false

@@ -144,17 +144,18 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 		}
 		if allowForward {
 			data = map[string]string{
-				"id":       m.ID,
-				"time":     fmt.Sprintf("%d", m.Time),
-				"event":    m.Event,
-				"topic":    m.Topic,
-				"priority": fmt.Sprintf("%d", m.Priority),
-				"tags":     strings.Join(m.Tags, ","),
-				"click":    m.Click,
-				"icon":     m.Icon,
-				"title":    m.Title,
-				"message":  m.Message,
-				"encoding": m.Encoding,
+				"id":           m.ID,
+				"time":         fmt.Sprintf("%d", m.Time),
+				"event":        m.Event,
+				"topic":        m.Topic,
+				"priority":     fmt.Sprintf("%d", m.Priority),
+				"tags":         strings.Join(m.Tags, ","),
+				"click":        m.Click,
+				"icon":         m.Icon,
+				"title":        m.Title,
+				"message":      m.Message,
+				"content_type": m.ContentType,
+				"encoding":     m.Encoding,
 			}
 			if len(m.Actions) > 0 {
 				actions, err := json.Marshal(m.Actions)

@@ -61,9 +61,7 @@ class ConnectionManager {
       const { connectionId } = subscription;
       const added = !this.connections.get(connectionId);
       if (added) {
-        const { baseUrl } = subscription;
-        const { topic } = subscription;
-        const { user } = subscription;
+        const { baseUrl, topic, user } = subscription;
         const since = subscription.last;
         const connection = new Connection(
           connectionId,

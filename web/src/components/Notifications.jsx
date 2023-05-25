@@ -436,15 +436,10 @@ const ACTION_LABEL_SUFFIX = {
 };
 
 const updateActionStatus = (notification, action, progress, error) => {
-  // TODO(eslint): Fix by spreading? Does the code depend on the change, though?
-  // eslint-disable-next-line no-param-reassign
-  notification.actions = notification.actions.map((a) => {
-    if (a.id !== action.id) {
-      return a;
-    }
-    return { ...a, progress, error };
+  subscriptionManager.updateNotification({
+    ...notification,
+    actions: notification.actions.map((a) => (a.id === action.id ? { ...a, progress, error } : a)),
   });
-  subscriptionManager.updateNotification(notification);
 };
 
 const performHttpAction = async (notification, action) => {

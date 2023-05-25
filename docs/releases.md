@@ -1231,3 +1231,4 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Improved GitHub Actions flow ([#745](https://github.com/binwiederhier/ntfy/pull/745), thanks to [@nimbleghost](https://github.com/nimbleghost))
 * Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))
 * Web: Add eslint with eslint-config-airbnb ([#748](https://github.com/binwiederhier/ntfy/pull/748), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Switch to Vite ([#749](https://github.com/binwiederhier/ntfy/pull/749), thanks to [@nimbleghost](https://github.com/nimbleghost))

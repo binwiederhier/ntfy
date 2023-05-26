@@ -85,13 +85,13 @@ update: web-deps-update cli-deps-update docs-deps-update
 # Ubuntu-specific
 
 build-deps-ubuntu:
-	sudo apt update
-	sudo apt install -y \
+	sudo apt-get update
+	sudo apt-get install -y \
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
 		jq
-	which pip3 || sudo apt install -y python3-pip
+	which pip3 || sudo apt-get install -y python3-pip
 
 # Documentation
 

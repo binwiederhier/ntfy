@@ -31,12 +31,16 @@ help:
 	@echo "  make cli-darwin-server          - Build client & server (no GoReleaser, current arch, macOS)"
 	@echo "  make cli-client                 - Build client only (no GoReleaser, current arch, Linux/macOS/Windows)"
 	@echo
+	@echo "Build dev Docker:"
+	@echo "  make docker-dev                 - Build client & server for current architecture using Docker only"
+	@echo
 	@echo "Build web app:"
 	@echo "  make web                        - Build the web app"
 	@echo "  make web-deps                   - Install web app dependencies (npm install the universe)"
 	@echo "  make web-build                  - Actually build the web app"
-	@echo "  make web-format                 - Run prettier on the web app
-	@echo "  make web-format-check           - Run prettier on the web app, but don't change anything
+	@echo "  make web-lint                   - Run eslint on the web app"
+	@echo "  make web-format                 - Run prettier on the web app"
+	@echo "  make web-format-check           - Run prettier on the web app, but don't change anything"
 	@echo
 	@echo "Build documentation:"
 	@echo "  make docs                       - Build the documentation"
@@ -81,6 +85,15 @@ build: web docs cli
 
 update: web-deps-update cli-deps-update docs-deps-update
 	docker pull alpine
+
+docker-dev:
+	docker build \
+		--file ./Dockerfile-build \
+		--tag binwiederhier/ntfy:$(VERSION) \
+		--tag binwiederhier/ntfy:dev \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		./
 
 # Ubuntu-specific
 

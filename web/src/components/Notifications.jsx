@@ -1,9 +1,29 @@
-import Container from "@mui/material/Container";
-import { ButtonBase, CardActions, CardContent, CircularProgress, Fade, Link, Modal, Snackbar, Stack, Tooltip } from "@mui/material";
-import Card from "@mui/material/Card";
-import Typography from "@mui/material/Typography";
+import {
+  Container,
+  ButtonBase,
+  CardActions,
+  CardContent,
+  CircularProgress,
+  Fade,
+  Link,
+  Modal,
+  Snackbar,
+  Stack,
+  Tooltip,
+  Card,
+  Typography,
+  IconButton,
+  Box,
+  Button,
+} from "@mui/material";
 import * as React from "react";
 import { useEffect, useState } from "react";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import { useLiveQuery } from "dexie-react-hooks";
+import InfiniteScroll from "react-infinite-scroll-component";
+import { Trans, useTranslation } from "react-i18next";
+import { useOutletContext } from "react-router-dom";
 import {
   formatBytes,
   formatMessage,
@@ -15,24 +35,22 @@ import {
   topicShortUrl,
   unmatchedTags,
 } from "../app/utils";
-import IconButton from "@mui/material/IconButton";
-import CheckIcon from "@mui/icons-material/Check";
-import CloseIcon from "@mui/icons-material/Close";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
-import { useLiveQuery } from "dexie-react-hooks";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import subscriptionManager from "../app/SubscriptionManager";
-import InfiniteScroll from "react-infinite-scroll-component";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
 import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
-import { Trans, useTranslation } from "react-i18next";
-import { useOutletContext } from "react-router-dom";
 import { useAutoSubscribe } from "./hooks";
+
+const priorityFiles = {
+  1: priority1,
+  2: priority2,
+  4: priority4,
+  5: priority5,
+};
 
 export const AllSubscriptions = () => {
   const { subscriptions } = useOutletContext();
@@ -52,46 +70,50 @@ export const SingleSubscription = () => {
 };
 
 const AllSubscriptionsList = (props) => {
-  const subscriptions = props.subscriptions;
+  const { subscriptions } = props;
   const notifications = useLiveQuery(() => subscriptionManager.getAllNotifications(), []);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
-  } else if (subscriptions.length === 0) {
+  }
+  if (subscriptions.length === 0) {
     return <NoSubscriptions />;
-  } else if (notifications.length === 0) {
+  }
+  if (notifications.length === 0) {
     return <NoNotificationsWithoutSubscription subscriptions={subscriptions} />;
   }
   return <NotificationList key="all" notifications={notifications} messageBar={false} />;
 };
 
 const SingleSubscriptionList = (props) => {
-  const subscription = props.subscription;
+  const { subscription } = props;
   const notifications = useLiveQuery(() => subscriptionManager.getNotifications(subscription.id), [subscription]);
   if (notifications === null || notifications === undefined) {
     return <Loading />;
-  } else if (notifications.length === 0) {
+  }
+  if (notifications.length === 0) {
     return <NoNotifications subscription={subscription} />;
   }
-  return <NotificationList id={subscription.id} notifications={notifications} messageBar={true} />;
+  return <NotificationList id={subscription.id} notifications={notifications} messageBar />;
 };
 
 const NotificationList = (props) => {
   const { t } = useTranslation();
   const pageSize = 20;
-  const notifications = props.notifications;
+  const { notifications } = props;
   const [snackOpen, setSnackOpen] = useState(false);
   const [maxCount, setMaxCount] = useState(pageSize);
   const count = Math.min(notifications.length, maxCount);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       setMaxCount(pageSize);
       const main = document.getElementById("main");
       if (main) {
         main.scrollTo(0, 0);
       }
-    };
-  }, [props.id]);
+    },
+    [props.id]
+  );
 
   return (
     <InfiniteScroll
@@ -127,10 +149,29 @@ const NotificationList = (props) => {
   );
 };
 
+/**
+ * Replace links with <Link/> components; this is a combination of the genius function
+ * in [1] and the regex in [2].
+ *
+ * [1] https://github.com/facebook/react/issues/3386#issuecomment-78605760
+ * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
+ */
+const autolink = (s) => {
+  const parts = s.split(/(\bhttps?:\/\/[-A-Z0-9+\u0026\u2019@#/%?=()~_|!:,.;]*[-A-Z0-9+\u0026@#/%=~()_|]\b)/gi);
+  for (let i = 1; i < parts.length; i += 2) {
+    parts[i] = (
+      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
+        {shortUrl(parts[i])}
+      </Link>
+    );
+  }
+  return <>{parts}</>;
+};
+
 const NotificationItem = (props) => {
   const { t } = useTranslation();
-  const notification = props.notification;
-  const attachment = notification.attachment;
+  const { notification } = props;
+  const { attachment } = notification;
   const date = formatShortDateTime(notification.time);
   const otherTags = unmatchedTags(notification.tags);
   const tags = otherTags.length > 0 ? otherTags.join(", ") : null;
@@ -244,35 +285,9 @@ const NotificationItem = (props) => {
   );
 };
 
-/**
- * Replace links with <Link/> components; this is a combination of the genius function
- * in [1] and the regex in [2].
- *
- * [1] https://github.com/facebook/react/issues/3386#issuecomment-78605760
- * [2] https://github.com/bryanwoods/autolink-js/blob/master/autolink.js#L9
- */
-const autolink = (s) => {
-  const parts = s.split(/(\bhttps?:\/\/[\-A-Z0-9+\u0026\u2019@#\/%?=()~_|!:,.;]*[\-A-Z0-9+\u0026@#\/%=~()_|]\b)/gi);
-  for (let i = 1; i < parts.length; i += 2) {
-    parts[i] = (
-      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
-        {shortUrl(parts[i])}
-      </Link>
-    );
-  }
-  return <>{parts}</>;
-};
-
-const priorityFiles = {
-  1: priority1,
-  2: priority2,
-  4: priority4,
-  5: priority5,
-};
-
 const Attachment = (props) => {
   const { t } = useTranslation();
-  const attachment = props.attachment;
+  const { attachment } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
   const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
@@ -402,66 +417,29 @@ const Image = (props) => {
   );
 };
 
-const UserActions = (props) => {
-  return (
-    <>
-      {props.notification.actions.map((action) => (
-        <UserAction key={action.id} notification={props.notification} action={action} />
-      ))}
-    </>
-  );
+const UserActions = (props) => (
+  <>
+    {props.notification.actions.map((action) => (
+      <UserAction key={action.id} notification={props.notification} action={action} />
+    ))}
+  </>
+);
+
+const ACTION_PROGRESS_ONGOING = 1;
+const ACTION_PROGRESS_SUCCESS = 2;
+const ACTION_PROGRESS_FAILED = 3;
+
+const ACTION_LABEL_SUFFIX = {
+  [ACTION_PROGRESS_ONGOING]: " …",
+  [ACTION_PROGRESS_SUCCESS]: " ✔",
+  [ACTION_PROGRESS_FAILED]: " ❌",
 };
 
-const UserAction = (props) => {
-  const { t } = useTranslation();
-  const notification = props.notification;
-  const action = props.action;
-  if (action.action === "broadcast") {
-    return (
-      <Tooltip title={t("notifications_actions_not_supported")}>
-        <span>
-          <Button disabled aria-label={t("notifications_actions_not_supported")}>
-            {action.label}
-          </Button>
-        </span>
-      </Tooltip>
-    );
-  } else if (action.action === "view") {
-    return (
-      <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
-        <Button
-          onClick={() => openUrl(action.url)}
-          aria-label={t("notifications_actions_open_url_title", {
-            url: action.url,
-          })}
-        >
-          {action.label}
-        </Button>
-      </Tooltip>
-    );
-  } else if (action.action === "http") {
-    const method = action.method ?? "POST";
-    const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
-    return (
-      <Tooltip
-        title={t("notifications_actions_http_request_title", {
-          method: method,
-          url: action.url,
-        })}
-      >
-        <Button
-          onClick={() => performHttpAction(notification, action)}
-          aria-label={t("notifications_actions_http_request_title", {
-            method: method,
-            url: action.url,
-          })}
-        >
-          {label}
-        </Button>
-      </Tooltip>
-    );
-  }
-  return null; // Others
+const updateActionStatus = (notification, action, progress, error) => {
+  subscriptionManager.updateNotification({
+    ...notification,
+    actions: notification.actions.map((a) => (a.id === action.id ? { ...a, progress, error } : a)),
+  });
 };
 
 const performHttpAction = async (notification, action) => {
@@ -488,29 +466,63 @@ const performHttpAction = async (notification, action) => {
   }
 };
 
-const updateActionStatus = (notification, action, progress, error) => {
-  notification.actions = notification.actions.map((a) => {
-    if (a.id !== action.id) {
-      return a;
-    }
-    return { ...a, progress: progress, error: error };
-  });
-  subscriptionManager.updateNotification(notification);
-};
-
-const ACTION_PROGRESS_ONGOING = 1;
-const ACTION_PROGRESS_SUCCESS = 2;
-const ACTION_PROGRESS_FAILED = 3;
-
-const ACTION_LABEL_SUFFIX = {
-  [ACTION_PROGRESS_ONGOING]: " …",
-  [ACTION_PROGRESS_SUCCESS]: " ✔",
-  [ACTION_PROGRESS_FAILED]: " ❌",
+const UserAction = (props) => {
+  const { t } = useTranslation();
+  const { notification } = props;
+  const { action } = props;
+  if (action.action === "broadcast") {
+    return (
+      <Tooltip title={t("notifications_actions_not_supported")}>
+        <span>
+          <Button disabled aria-label={t("notifications_actions_not_supported")}>
+            {action.label}
+          </Button>
+        </span>
+      </Tooltip>
+    );
+  }
+  if (action.action === "view") {
+    return (
+      <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
+        <Button
+          onClick={() => openUrl(action.url)}
+          aria-label={t("notifications_actions_open_url_title", {
+            url: action.url,
+          })}
+        >
+          {action.label}
+        </Button>
+      </Tooltip>
+    );
+  }
+  if (action.action === "http") {
+    const method = action.method ?? "POST";
+    const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
+    return (
+      <Tooltip
+        title={t("notifications_actions_http_request_title", {
+          method,
+          url: action.url,
+        })}
+      >
+        <Button
+          onClick={() => performHttpAction(notification, action)}
+          aria-label={t("notifications_actions_http_request_title", {
+            method,
+            url: action.url,
+          })}
+        >
+          {label}
+        </Button>
+      </Tooltip>
+    );
+  }
+  return null; // Others
 };
 
 const NoNotifications = (props) => {
   const { t } = useTranslation();
-  const shortUrl = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
+  const topicShortUrlResolved = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -521,7 +533,10 @@ const NoNotifications = (props) => {
       <Paragraph>{t("notifications_none_for_topic_description")}</Paragraph>
       <Paragraph>
         {t("notifications_example")}:<br />
-        <tt>$ curl -d "Hi" {shortUrl}</tt>
+        <tt>
+          {'$ curl -d "Hi" '}
+          {topicShortUrlResolved}
+        </tt>
       </Paragraph>
       <Paragraph>
         <ForMoreDetails />
@@ -533,7 +548,7 @@ const NoNotifications = (props) => {
 const NoNotificationsWithoutSubscription = (props) => {
   const { t } = useTranslation();
   const subscription = props.subscriptions[0];
-  const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
+  const topicShortUrlResolved = topicShortUrl(subscription.baseUrl, subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -544,7 +559,10 @@ const NoNotificationsWithoutSubscription = (props) => {
       <Paragraph>{t("notifications_none_for_any_description")}</Paragraph>
       <Paragraph>
         {t("notifications_example")}:<br />
-        <tt>$ curl -d "Hi" {shortUrl}</tt>
+        <tt>
+          {'$ curl -d "Hi" '}
+          {topicShortUrlResolved}
+        </tt>
       </Paragraph>
       <Paragraph>
         <ForMoreDetails />
@@ -574,17 +592,15 @@ const NoSubscriptions = () => {
   );
 };
 
-const ForMoreDetails = () => {
-  return (
-    <Trans
-      i18nKey="notifications_more_details"
-      components={{
-        websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener" />,
-        docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
-      }}
-    />
-  );
-};
+const ForMoreDetails = () => (
+  <Trans
+    i18nKey="notifications_more_details"
+    components={{
+      websiteLink: <Link href="https://ntfy.sh" target="_blank" rel="noopener" />,
+      docsLink: <Link href="https://ntfy.sh/docs" target="_blank" rel="noopener" />,
+    }}
+  />
+);
 
 const Loading = () => {
   const { t } = useTranslation();

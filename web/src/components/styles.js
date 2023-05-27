@@ -1,7 +1,5 @@
-import Typography from "@mui/material/Typography";
+import { Typography, Container, Backdrop, styled } from "@mui/material";
 import theme from "./theme";
-import Container from "@mui/material/Container";
-import { Backdrop, styled } from "@mui/material";
 
 export const Paragraph = styled(Typography)({
   paddingTop: 8,

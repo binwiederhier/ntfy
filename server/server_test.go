@@ -219,7 +219,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 	rr = request(t, s, "GET", "/mytopic", "", nil)
 	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow"/>`)
+	require.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow" />`)
 
 	rr = request(t, s, "GET", "/docs", "", nil)
 	require.Equal(t, 301, rr.Code)

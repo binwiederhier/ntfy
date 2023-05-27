@@ -29,7 +29,7 @@ class Notifier {
       icon: logo,
     });
     if (notification.click) {
-      n.onclick = (e) => openUrl(notification.click);
+      n.onclick = () => openUrl(notification.click);
     } else {
       n.onclick = () => onClickFallback(subscription);
     }
@@ -87,7 +87,7 @@ class Notifier {
    * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification
    */
   contextSupported() {
-    return location.protocol === "https:" || location.hostname.match("^127.") || location.hostname === "localhost";
+    return window.location.protocol === "https:" || window.location.hostname.match("^127.") || window.location.hostname === "localhost";
   }
 }
 

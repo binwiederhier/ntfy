@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="#317f6f" />
 
     <!-- Favicon, see favicon.io -->
-    <link rel="icon" type="image/png" href="%PUBLIC_URL%/static/images/favicon.ico" />
+    <link rel="icon" type="image/png" href="/static/images/favicon.ico" />
 
     <!-- Previews in Google, Slack, WhatsApp, etc. -->
     <meta property="og:type" content="website" />
@@ -26,15 +26,15 @@
       property="og:description"
       content="ntfy lets you send push notifications via scripts from any computer or phone. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy."
     />
-    <meta property="og:image" content="%PUBLIC_URL%/static/images/ntfy.png" />
+    <meta property="og:image" content="/static/images/ntfy.png" />
     <meta property="og:url" content="https://ntfy.sh" />
 
     <!-- Never index -->
     <meta name="robots" content="noindex, nofollow" />
 
     <!-- Style overrides & fonts -->
-    <link rel="stylesheet" href="%PUBLIC_URL%/static/css/app.css" type="text/css" />
-    <link rel="stylesheet" href="%PUBLIC_URL%/static/css/fonts.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/app.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
   </head>
   <body>
     <noscript>
@@ -43,6 +43,7 @@
       subscribe.
     </noscript>
     <div id="root"></div>
-    <script src="%PUBLIC_URL%/config.js"></script>
+    <script src="/config.js"></script>
+    <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

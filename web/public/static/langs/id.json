@@ -379,5 +379,7 @@
     "account_basics_phone_numbers_dialog_channel_sms": "SMS",
     "account_upgrade_dialog_tier_features_calls_one": "{{calls}} panggilan telepon harian",
     "account_upgrade_dialog_tier_features_no_calls": "Tidak ada panggilan telepon",
-    "account_basics_phone_numbers_dialog_code_label": "Kode verifikasi"
+    "account_basics_phone_numbers_dialog_code_label": "Kode verifikasi",
+    "publish_dialog_call_item": "Panggil nomor telepon {{number}}",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "Tidak ada nomor telepon terverifikasi"
 }

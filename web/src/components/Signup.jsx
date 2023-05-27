@@ -1,19 +1,14 @@
 import * as React from "react";
 import { useState } from "react";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Box from "@mui/material/Box";
-import routes from "./routes";
-import session from "../app/Session";
-import Typography from "@mui/material/Typography";
+import { TextField, Button, Box, Typography, InputAdornment, IconButton } from "@mui/material";
 import { NavLink } from "react-router-dom";
-import AvatarBox from "./AvatarBox";
 import { useTranslation } from "react-i18next";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import accountApi from "../app/AccountApi";
-import { InputAdornment } from "@mui/material";
-import IconButton from "@mui/material/IconButton";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
+import accountApi from "../app/AccountApi";
+import AvatarBox from "./AvatarBox";
+import session from "../app/Session";
+import routes from "./routes";
 import { AccountCreateLimitReachedError, UserExistsError } from "../app/errors";
 
 const Signup = () => {

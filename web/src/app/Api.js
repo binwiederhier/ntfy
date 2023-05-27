@@ -18,7 +18,7 @@ class Api {
     const messages = [];
     const headers = maybeWithAuth({}, user);
     console.log(`[Api] Polling ${url}`);
-    for await (let line of fetchLinesIterator(url, headers)) {
+    for await (const line of fetchLinesIterator(url, headers)) {
       const message = JSON.parse(line);
       if (message.id) {
         console.log(`[Api, ${shortUrl}] Received message ${line}`);
@@ -33,8 +33,8 @@ class Api {
     console.log(`[Api] Publishing message to ${topicUrl(baseUrl, topic)}`);
     const headers = {};
     const body = {
-      topic: topic,
-      message: message,
+      topic,
+      message,
       ...options,
     };
     await fetchOrThrow(baseUrl, {
@@ -60,7 +60,7 @@ class Api {
   publishXHR(url, body, headers, onProgress) {
     console.log(`[Api] Publishing message to ${url}`);
     const xhr = new XMLHttpRequest();
-    const send = new Promise(function (resolve, reject) {
+    const send = new Promise((resolve, reject) => {
       xhr.open("PUT", url);
       if (body.type) {
         xhr.overrideMimeType(body.type);
@@ -106,7 +106,8 @@ class Api {
     });
     if (response.status >= 200 && response.status <= 299) {
       return true;
-    } else if (response.status === 401 || response.status === 403) {
+    }
+    if (response.status === 401 || response.status === 403) {
       // See server/server.go
       return false;
     }

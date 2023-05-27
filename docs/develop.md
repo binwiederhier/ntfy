@@ -163,6 +163,15 @@ $ make release-snapshot
 
 During development, you may want to be more picky and build only certain things. Here are a few examples.
 
+### Build a Docker image only for Linux
+
+This is useful to test the final build with web app, docs, and server without any dependencies locally
+
+``` shell
+$ make docker-dev
+$ docker run --rm -p 80:80 binwiederhier/ntfy:dev serve
+```
+
 ### Build the ntfy binary
 To build only the `ntfy` binary **without the web app or documentation**, use the `make cli-...` targets:
 

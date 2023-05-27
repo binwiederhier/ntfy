@@ -1,38 +1,47 @@
-import Drawer from "@mui/material/Drawer";
+import {
+  Drawer,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Divider,
+  List,
+  Alert,
+  AlertTitle,
+  Badge,
+  CircularProgress,
+  Link,
+  ListSubheader,
+  Portal,
+  Tooltip,
+  Button,
+  Typography,
+  Box,
+  IconButton,
+} from "@mui/material";
 import * as React from "react";
 import { useContext, useState } from "react";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import Person from "@mui/icons-material/Person";
-import ListItemText from "@mui/material/ListItemText";
-import Toolbar from "@mui/material/Toolbar";
-import Divider from "@mui/material/Divider";
-import List from "@mui/material/List";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddIcon from "@mui/icons-material/Add";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ChatBubble, MoreVert, NotificationsOffOutlined, Send } from "@mui/icons-material";
+import ArticleIcon from "@mui/icons-material/Article";
+import { Trans, useTranslation } from "react-i18next";
+import CelebrationIcon from "@mui/icons-material/Celebration";
 import SubscribeDialog from "./SubscribeDialog";
-import { Alert, AlertTitle, Badge, CircularProgress, Link, ListSubheader, Portal, Tooltip } from "@mui/material";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
 import { openUrl, topicDisplayName, topicUrl } from "../app/utils";
 import routes from "./routes";
 import { ConnectionState } from "../app/Connection";
-import { useLocation, useNavigate } from "react-router-dom";
 import subscriptionManager from "../app/SubscriptionManager";
-import { ChatBubble, MoreVert, NotificationsOffOutlined, Send } from "@mui/icons-material";
-import Box from "@mui/material/Box";
 import notifier from "../app/Notifier";
 import config from "../app/config";
-import ArticleIcon from "@mui/icons-material/Article";
-import { Trans, useTranslation } from "react-i18next";
 import session from "../app/Session";
 import accountApi, { Permission, Role } from "../app/AccountApi";
-import CelebrationIcon from "@mui/icons-material/Celebration";
 import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
-import IconButton from "@mui/material/IconButton";
 import { SubscriptionPopup } from "./SubscriptionPopup";
 
 const navWidth = 280;
@@ -85,15 +94,15 @@ const NavList = (props) => {
     setSubscribeDialogKey((prev) => prev + 1);
   };
 
+  const handleRequestNotificationPermission = () => {
+    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
+  };
+
   const handleSubscribeSubmit = (subscription) => {
     console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
     handleSubscribeReset();
     navigate(routes.forSubscription(subscription));
     handleRequestNotificationPermission();
-  };
-
-  const handleRequestNotificationPermission = () => {
-    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
   };
 
   const handleAccountClick = () => {
@@ -237,9 +246,7 @@ const UpgradeBanner = () => {
 const SubscriptionList = (props) => {
   const sortedSubscriptions = props.subscriptions
     .filter((s) => !s.internal)
-    .sort((a, b) => {
-      return topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic) ? -1 : 1;
-    });
+    .sort((a, b) => (topicUrl(a.baseUrl, a.topic) < topicUrl(b.baseUrl, b.topic) ? -1 : 1));
   return (
     <>
       {sortedSubscriptions.map((subscription) => (
@@ -258,7 +265,7 @@ const SubscriptionItem = (props) => {
   const navigate = useNavigate();
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-  const subscription = props.subscription;
+  const { subscription } = props;
   const iconBadge = subscription.new <= 99 ? subscription.new : "99+";
   const displayName = topicDisplayName(subscription);
   const ariaLabel = subscription.state === ConnectionState.Connecting ? `${displayName} (${t("nav_button_connecting")})` : displayName;

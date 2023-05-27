@@ -21,42 +21,42 @@ import {
   TableHead,
   TableRow,
   useMediaQuery,
+  Tooltip,
+  Typography,
+  Container,
+  Card,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  IconButton,
+  MenuItem,
+  DialogContentText,
 } from "@mui/material";
-import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 import EditIcon from "@mui/icons-material/Edit";
-import Container from "@mui/material/Container";
-import Card from "@mui/material/Card";
-import Button from "@mui/material/Button";
 import { Trans, useTranslation } from "react-i18next";
-import session from "../app/Session";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import theme from "./theme";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import TextField from "@mui/material/TextField";
-import routes from "./routes";
-import IconButton from "@mui/material/IconButton";
-import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
-import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Pref, PrefGroup } from "./Pref";
-import db from "../app/db";
 import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
-import UpgradeDialog from "./UpgradeDialog";
 import CelebrationIcon from "@mui/icons-material/Celebration";
+import CloseIcon from "@mui/icons-material/Close";
+import { ContentCopy, Public } from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
+import routes from "./routes";
+import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
+import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
+import { Pref, PrefGroup } from "./Pref";
+import db from "../app/db";
+import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import DialogFooter from "./DialogFooter";
 import { Paragraph } from "./styles";
-import CloseIcon from "@mui/icons-material/Close";
-import { ContentCopy, Public } from "@mui/icons-material";
-import MenuItem from "@mui/material/MenuItem";
-import DialogContentText from "@mui/material/DialogContentText";
 import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
-import AddIcon from "@mui/icons-material/Add";
+import theme from "./theme";
+import session from "../app/Session";
 
 const Account = () => {
   if (!session.exists()) {
@@ -439,23 +439,6 @@ const AddPhoneNumberDialog = (props) => {
   const [verificationCodeSent, setVerificationCodeSent] = useState(false);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const handleDialogSubmit = async () => {
-    if (!verificationCodeSent) {
-      await verifyPhone();
-    } else {
-      await checkVerifyPhone();
-    }
-  };
-
-  const handleCancel = () => {
-    if (verificationCodeSent) {
-      setVerificationCodeSent(false);
-      setCode("");
-    } else {
-      props.onClose();
-    }
-  };
-
   const verifyPhone = async () => {
     try {
       setSending(true);
@@ -487,6 +470,23 @@ const AddPhoneNumberDialog = (props) => {
       }
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDialogSubmit = async () => {
+    if (!verificationCodeSent) {
+      await verifyPhone();
+    } else {
+      await checkVerifyPhone();
+    }
+  };
+
+  const handleCancel = () => {
+    if (verificationCodeSent) {
+      setVerificationCodeSent(false);
+      setCode("");
+    } else {
+      props.onClose();
     }
   };
 
@@ -561,9 +561,7 @@ const Stats = () => {
     return <></>;
   }
 
-  const normalize = (value, max) => {
-    return Math.min((value / max) * 100, 100);
-  };
+  const normalize = (value, max) => Math.min((value / max) * 100, 100);
 
   return (
     <Card sx={{ p: 3 }} aria-label={t("account_usage_title")}>
@@ -746,18 +744,16 @@ const Stats = () => {
   );
 };
 
-const InfoIcon = () => {
-  return (
-    <InfoOutlinedIcon
-      sx={{
-        verticalAlign: "middle",
-        width: "18px",
-        marginLeft: "4px",
-        color: "gray",
-      }}
-    />
-  );
-};
+const InfoIcon = () => (
+  <InfoOutlinedIcon
+    sx={{
+      verticalAlign: "middle",
+      width: "18px",
+      marginLeft: "4px",
+      color: "gray",
+    }}
+  />
+);
 
 const Tokens = () => {
   const { t } = useTranslation();
@@ -775,10 +771,6 @@ const Tokens = () => {
     setDialogOpen(false);
   };
 
-  const handleDialogSubmit = async (user) => {
-    setDialogOpen(false);
-    //
-  };
   return (
     <Card sx={{ padding: 1 }} aria-label={t("prefs_users_title")}>
       <CardContent sx={{ paddingBottom: 1 }}>
@@ -814,7 +806,8 @@ const TokensTable = (props) => {
   const tokens = (props.tokens || []).sort((a, b) => {
     if (a.token === session.token()) {
       return -1;
-    } else if (b.token === session.token()) {
+    }
+    if (b.token === session.token()) {
       return 1;
     }
     return a.token.localeCompare(b.token);
@@ -1025,7 +1018,7 @@ const TokenDeleteDialog = (props) => {
           <Trans i18nKey="account_tokens_delete_dialog_description" />
         </DialogContentText>
       </DialogContent>
-      <DialogFooter status>
+      <DialogFooter status={error}>
         <Button onClick={props.onClose}>{t("common_cancel")}</Button>
         <Button onClick={handleSubmit} color="error">
           {t("account_tokens_delete_dialog_submit_button")}

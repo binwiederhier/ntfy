@@ -1,22 +1,14 @@
 import * as React from "react";
 import { Lock, Public } from "@mui/icons-material";
-import Box from "@mui/material/Box";
+import { Box } from "@mui/material";
 
-export const PermissionReadWrite = React.forwardRef((props, ref) => {
-  return <PermissionInternal icon={Public} ref={ref} {...props} />;
-});
+export const PermissionReadWrite = React.forwardRef((props, ref) => <PermissionInternal icon={Public} ref={ref} {...props} />);
 
-export const PermissionDenyAll = React.forwardRef((props, ref) => {
-  return <PermissionInternal icon={Lock} ref={ref} {...props} />;
-});
+export const PermissionDenyAll = React.forwardRef((props, ref) => <PermissionInternal icon={Lock} ref={ref} {...props} />);
 
-export const PermissionRead = React.forwardRef((props, ref) => {
-  return <PermissionInternal icon={Public} text="R" ref={ref} {...props} />;
-});
+export const PermissionRead = React.forwardRef((props, ref) => <PermissionInternal icon={Public} text="R" ref={ref} {...props} />);
 
-export const PermissionWrite = React.forwardRef((props, ref) => {
-  return <PermissionInternal icon={Public} text="W" ref={ref} {...props} />;
-});
+export const PermissionWrite = React.forwardRef((props, ref) => <PermissionInternal icon={Public} text="W" ref={ref} {...props} />);
 
 const PermissionInternal = React.forwardRef((props, ref) => {
   const size = props.size ?? "medium";

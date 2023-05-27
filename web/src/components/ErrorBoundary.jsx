@@ -1,7 +1,6 @@
 import * as React from "react";
 import StackTrace from "stacktrace-js";
-import { CircularProgress, Link } from "@mui/material";
-import Button from "@mui/material/Button";
+import { CircularProgress, Link, Button } from "@mui/material";
 import { Trans, withTranslation } from "react-i18next";
 
 class ErrorBoundaryImpl extends React.Component {
@@ -46,9 +45,8 @@ class ErrorBoundaryImpl extends React.Component {
     // Fetch additional info and a better stack trace
     StackTrace.fromError(error).then((stack) => {
       console.error("[ErrorBoundary] Stacktrace fetched", stack);
-      const niceStack =
-        `${error.toString()}\n` +
-        stack.map((el) => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`).join("\n");
+      const stackString = stack.map((el) => `  at ${el.functionName} (${el.fileName}:${el.columnNumber}:${el.lineNumber})`).join("\n");
+      const niceStack = `${error.toString()}\n${stackString}`;
       this.setState({ niceStack });
     });
   }
@@ -67,17 +65,6 @@ class ErrorBoundaryImpl extends React.Component {
     }
     stack += `${this.state.originalStack}\n`;
     navigator.clipboard.writeText(stack);
-  }
-
-  render() {
-    if (this.state.error) {
-      if (this.state.unsupportedIndexedDB) {
-        return this.renderUnsupportedIndexedDB();
-      } else {
-        return this.renderError();
-      }
-    }
-    return this.props.children;
   }
 
   renderUnsupportedIndexedDB() {
@@ -130,6 +117,16 @@ class ErrorBoundaryImpl extends React.Component {
         <pre>{this.state.originalStack}</pre>
       </div>
     );
+  }
+
+  render() {
+    if (this.state.error) {
+      if (this.state.unsupportedIndexedDB) {
+        return this.renderUnsupportedIndexedDB();
+      }
+      return this.renderError();
+    }
+    return this.props.children;
   }
 }
 

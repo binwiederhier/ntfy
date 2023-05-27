@@ -5,16 +5,16 @@ class SubscriptionManager {
   /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
   async all() {
     const subscriptions = await db.subscriptions.toArray();
-    await Promise.all(
-      subscriptions.map(async (s) => {
-        s.new = await db.notifications.where({ subscriptionId: s.id, new: 1 }).count();
-      })
+    return Promise.all(
+      subscriptions.map(async (s) => ({
+        ...s,
+        new: await db.notifications.where({ subscriptionId: s.id, new: 1 }).count(),
+      }))
     );
-    return subscriptions;
   }
 
   async get(subscriptionId) {
-    return await db.subscriptions.get(subscriptionId);
+    return db.subscriptions.get(subscriptionId);
   }
 
   async add(baseUrl, topic, internal) {
@@ -25,8 +25,8 @@ class SubscriptionManager {
     }
     const subscription = {
       id: topicUrl(baseUrl, topic),
-      baseUrl: baseUrl,
-      topic: topic,
+      baseUrl,
+      topic,
       mutedUntil: 0,
       last: null,
       internal: internal || false,
@@ -39,36 +39,40 @@ class SubscriptionManager {
     console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
     // Add remote subscriptions
-    let remoteIds = []; // = topicUrl(baseUrl, topic)
-    for (let i = 0; i < remoteSubscriptions.length; i++) {
-      const remote = remoteSubscriptions[i];
-      const local = await this.add(remote.base_url, remote.topic, false);
-      const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
-      await this.update(local.id, {
-        displayName: remote.display_name, // May be undefined
-        reservation: reservation, // May be null!
-      });
-      remoteIds.push(local.id);
-    }
+    const remoteIds = await Promise.all(
+      remoteSubscriptions.map(async (remote) => {
+        const local = await this.add(remote.base_url, remote.topic, false);
+        const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
+
+        await this.update(local.id, {
+          displayName: remote.display_name, // May be undefined
+          reservation, // May be null!
+        });
+
+        return local.id;
+      })
+    );
 
     // Remove local subscriptions that do not exist remotely
     const localSubscriptions = await db.subscriptions.toArray();
-    for (let i = 0; i < localSubscriptions.length; i++) {
-      const local = localSubscriptions[i];
-      const remoteExists = remoteIds.includes(local.id);
-      if (!local.internal && !remoteExists) {
-        await this.remove(local.id);
-      }
-    }
+
+    await Promise.all(
+      localSubscriptions.map(async (local) => {
+        const remoteExists = remoteIds.includes(local.id);
+        if (!local.internal && !remoteExists) {
+          await this.remove(local.id);
+        }
+      })
+    );
   }
 
   async updateState(subscriptionId, state) {
-    db.subscriptions.update(subscriptionId, { state: state });
+    db.subscriptions.update(subscriptionId, { state });
   }
 
   async remove(subscriptionId) {
     await db.subscriptions.delete(subscriptionId);
-    await db.notifications.where({ subscriptionId: subscriptionId }).delete();
+    await db.notifications.where({ subscriptionId }).delete();
   }
 
   async first() {
@@ -101,8 +105,12 @@ class SubscriptionManager {
       return false;
     }
     try {
-      notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-      await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
+      await db.notifications.add({
+        ...notification,
+        subscriptionId,
+        // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+        new: 1,
+      }); // FIXME consider put() for double tab
       await db.subscriptions.update(subscriptionId, {
         last: notification.id,
       });
@@ -140,7 +148,7 @@ class SubscriptionManager {
   }
 
   async deleteNotifications(subscriptionId) {
-    await db.notifications.where({ subscriptionId: subscriptionId }).delete();
+    await db.notifications.where({ subscriptionId }).delete();
   }
 
   async markNotificationRead(notificationId) {
@@ -148,24 +156,24 @@ class SubscriptionManager {
   }
 
   async markNotificationsRead(subscriptionId) {
-    await db.notifications.where({ subscriptionId: subscriptionId, new: 1 }).modify({ new: 0 });
+    await db.notifications.where({ subscriptionId, new: 1 }).modify({ new: 0 });
   }
 
   async setMutedUntil(subscriptionId, mutedUntil) {
     await db.subscriptions.update(subscriptionId, {
-      mutedUntil: mutedUntil,
+      mutedUntil,
     });
   }
 
   async setDisplayName(subscriptionId, displayName) {
     await db.subscriptions.update(subscriptionId, {
-      displayName: displayName,
+      displayName,
     });
   }
 
   async setReservation(subscriptionId, reservation) {
     await db.subscriptions.update(subscriptionId, {
-      reservation: reservation,
+      reservation,
     });
   }
 

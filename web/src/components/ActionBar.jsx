@@ -1,29 +1,21 @@
-import AppBar from "@mui/material/AppBar";
-import Navigation from "./Navigation";
-import Toolbar from "@mui/material/Toolbar";
-import IconButton from "@mui/material/IconButton";
+import { AppBar, Toolbar, IconButton, Typography, Box, MenuItem, Button, Divider, ListItemIcon } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import Typography from "@mui/material/Typography";
 import * as React from "react";
 import { useState } from "react";
-import Box from "@mui/material/Box";
-import { topicDisplayName } from "../app/utils";
-import db from "../app/db";
 import { useLocation, useNavigate } from "react-router-dom";
-import MenuItem from "@mui/material/MenuItem";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import NotificationsOffIcon from "@mui/icons-material/NotificationsOff";
-import routes from "./routes";
-import subscriptionManager from "../app/SubscriptionManager";
-import logo from "../img/ntfy.svg";
 import { useTranslation } from "react-i18next";
-import session from "../app/Session";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import Button from "@mui/material/Button";
-import Divider from "@mui/material/Divider";
 import { Logout, Person, Settings } from "@mui/icons-material";
-import ListItemIcon from "@mui/material/ListItemIcon";
+import session from "../app/Session";
+import logo from "../img/ntfy.svg";
+import subscriptionManager from "../app/SubscriptionManager";
+import routes from "./routes";
+import db from "../app/db";
+import { topicDisplayName } from "../app/utils";
+import Navigation from "./Navigation";
 import accountApi from "../app/AccountApi";
 import PopupMenu from "./PopupMenu";
 import { SubscriptionPopup } from "./SubscriptionPopup";
@@ -86,7 +78,7 @@ const ActionBar = (props) => {
 const SettingsIcons = (props) => {
   const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
-  const subscription = props.subscription;
+  const { subscription } = props;
 
   const handleToggleMute = async () => {
     const mutedUntil = subscription.mutedUntil ? 0 : 1; // Make this a timestamp in the future

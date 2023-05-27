@@ -1,12 +1,51 @@
+/* eslint-disable max-classes-per-file */
 // This is a subset of, and the counterpart to errors.go
 
-export const fetchOrThrow = async (url, options) => {
-  const response = await fetch(url, options);
-  if (response.status !== 200) {
-    await throwAppError(response);
+const maybeToJson = async (response) => {
+  try {
+    return await response.json();
+  } catch (e) {
+    return null;
   }
-  return response; // Promise!
 };
+
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Unauthorized");
+  }
+}
+
+export class UserExistsError extends Error {
+  static CODE = 40901; // errHTTPConflictUserExists
+
+  constructor() {
+    super("Username already exists");
+  }
+}
+
+export class TopicReservedError extends Error {
+  static CODE = 40902; // errHTTPConflictTopicReserved
+
+  constructor() {
+    super("Topic already reserved");
+  }
+}
+
+export class AccountCreateLimitReachedError extends Error {
+  static CODE = 42906; // errHTTPTooManyRequestsLimitAccountCreation
+
+  constructor() {
+    super("Account creation limit reached");
+  }
+}
+
+export class IncorrectPasswordError extends Error {
+  static CODE = 40026; // errHTTPBadRequestIncorrectPasswordConfirmation
+
+  constructor() {
+    super("Password incorrect");
+  }
+}
 
 export const throwAppError = async (response) => {
   if (response.status === 401 || response.status === 403) {
@@ -32,44 +71,10 @@ export const throwAppError = async (response) => {
   throw new Error(`Unexpected response ${response.status}`);
 };
 
-const maybeToJson = async (response) => {
-  try {
-    return await response.json();
-  } catch (e) {
-    return null;
+export const fetchOrThrow = async (url, options) => {
+  const response = await fetch(url, options);
+  if (response.status !== 200) {
+    await throwAppError(response);
   }
+  return response; // Promise!
 };
-
-export class UnauthorizedError extends Error {
-  constructor() {
-    super("Unauthorized");
-  }
-}
-
-export class UserExistsError extends Error {
-  static CODE = 40901; // errHTTPConflictUserExists
-  constructor() {
-    super("Username already exists");
-  }
-}
-
-export class TopicReservedError extends Error {
-  static CODE = 40902; // errHTTPConflictTopicReserved
-  constructor() {
-    super("Topic already reserved");
-  }
-}
-
-export class AccountCreateLimitReachedError extends Error {
-  static CODE = 42906; // errHTTPTooManyRequestsLimitAccountCreation
-  constructor() {
-    super("Account creation limit reached");
-  }
-}
-
-export class IncorrectPasswordError extends Error {
-  static CODE = 40026; // errHTTPBadRequestIncorrectPasswordConfirmation
-  constructor() {
-    super("Password incorrect");
-  }
-}

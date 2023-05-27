@@ -1,4 +1,4 @@
-const config = window.config;
+const { config } = window;
 
 // The backend returns an empty base_url for the config struct,
 // so the frontend (hey, that's us!) can use the current location.

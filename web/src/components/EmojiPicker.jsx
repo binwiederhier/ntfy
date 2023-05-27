@@ -1,15 +1,10 @@
 import * as React from "react";
 import { useRef, useState } from "react";
-import Typography from "@mui/material/Typography";
-import { rawEmojis } from "../app/emojis";
-import Box from "@mui/material/Box";
-import TextField from "@mui/material/TextField";
-import { ClickAwayListener, Fade, InputAdornment, styled } from "@mui/material";
-import IconButton from "@mui/material/IconButton";
+import { Typography, Box, TextField, ClickAwayListener, Fade, InputAdornment, styled, IconButton, Popper } from "@mui/material";
 import { Close } from "@mui/icons-material";
-import Popper from "@mui/material/Popper";
-import { splitNoEmpty } from "../app/utils";
 import { useTranslation } from "react-i18next";
+import { splitNoEmpty } from "../app/utils";
+import { rawEmojis } from "../app/emojis";
 
 // Create emoji list by category and create a search base (string with all search words)
 //
@@ -28,7 +23,7 @@ rawEmojis.forEach((emoji) => {
     const supportedEmoji = unicodeVersion <= maxSupportedVersionForDesktopChrome || !isDesktopChrome;
     if (supportedEmoji) {
       const searchBase = `${emoji.description.toLowerCase()} ${emoji.aliases.join(" ")} ${emoji.tags.join(" ")}`;
-      const emojiWithSearchBase = { ...emoji, searchBase: searchBase };
+      const emojiWithSearchBase = { ...emoji, searchBase };
       emojisByCategory[emoji.category].push(emojiWithSearchBase);
     }
   } catch (e) {
@@ -132,8 +127,10 @@ const Category = (props) => {
   );
 };
 
+const emojiMatches = (emoji, words) => words.length === 0 || words.some((word) => emoji.searchBase.includes(word));
+
 const Emoji = (props) => {
-  const emoji = props.emoji;
+  const { emoji } = props;
   const matches = emojiMatches(emoji, props.search);
   const title = `${emoji.description} (${emoji.aliases[0]})`;
   return (
@@ -157,17 +154,5 @@ const EmojiDiv = styled("div")({
     opacity: 1,
   },
 });
-
-const emojiMatches = (emoji, words) => {
-  if (words.length === 0) {
-    return true;
-  }
-  for (const word of words) {
-    if (emoji.searchBase.indexOf(word) === -1) {
-      return false;
-    }
-  }
-  return true;
-};
 
 export default EmojiPicker;

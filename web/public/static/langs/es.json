@@ -379,5 +379,7 @@
     "account_basics_phone_numbers_copied_to_clipboard": "Número de teléfono copiado al portapapeles",
     "account_basics_phone_numbers_dialog_check_verification_button": "Confirmar código",
     "account_basics_phone_numbers_dialog_title": "Agregar número de teléfono",
-    "account_basics_phone_numbers_dialog_code_placeholder": "p.ej. 123456"
+    "account_basics_phone_numbers_dialog_code_placeholder": "p.ej. 123456",
+    "publish_dialog_call_item": "Llamar al número de teléfono {{number}}",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "No hay números de teléfono verificados"
 }

@@ -178,3 +178,4 @@ Third party libraries and resources:
 * [Regex for auto-linking](https://github.com/bryanwoods/autolink-js) (MIT) is used to highlight links (the library is not used)
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)
 * [Linked tabs in mkdocs](https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#linked-tabs)
+* [webpush-go](https://github.com/SherClockHolmes/webpush-go) (MIT) is used to send web push notifications

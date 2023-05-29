@@ -789,6 +789,55 @@ Note that the self-hosted server literally sends the message `New message` for e
 may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
 it'll show `New message` as a popup.
 
+## Web Push notifications
+[Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) ([RFC8030](https://datatracker.ietf.org/doc/html/rfc8030))
+is supported, but needs a little configuration to enable it. Since there is no central server (other than the browser's push endpoint),
+you have to configure your own [VAPID](https://datatracker.ietf.org/doc/html/draft-thomson-webpush-vapid) keys. These identify the publisher,
+and are used to encrypt the messages before sending them to the push endpoint.
+
+Limitations:
+
+- Like foreground browser notifications, background push notifications require the web app to be served over HTTPS. A _valid_
+  certificate is required, as service workers will not run on origins with untrusted certificates.
+
+- Web Push is only supported for the same server. You cannot use subscribe to web push on a topic on another server. This
+  is due to a limitation of the Push API, which doesn't allow multiple push servers for the same origin.
+
+To configure VAPID keys, first generate them:
+
+```sh
+$ ntfy web-push generate-keys
+Keys generated.
+
+VAPID Public Key:
+AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+
+VAPID Private Key:
+AA2BB1234567890abcdefzxcvbnm1234567890
+```
+
+Then copy the generated values into your `server.yml` or use the corresponding environment variables or command line arguments:
+
+```yaml
+web-push-enabled: true
+web-push-public-key: AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+web-push-private-key: AA2BB1234567890abcdefzxcvbnm1234567890
+web-push-subscriptions-file: /var/cache/ntfy/subscriptions.db
+web-push-email-address: sysadmin@example.com
+
+# don't forget to set the required base-url for web push notifications
+base-url: https://ntfy.example.com
+```
+
+The `web-push-subscriptions-file` is used to store the push subscriptions. Subscriptions do not ever expire automatically, unless the push
+gateway returns an error (e.g. 410 Gone when a user has unsubscribed).
+
+The web app refreshes subscriptions on start and regularly on an interval, but this file should be persisted across restarts. If the subscription
+file is deleted or lost, any web apps that aren't open will not receive new web push notifications until you open then.
+
+Changing your public/private keypair is NOT recommended. Browsers only allow one server identity (public key) per origin, and
+if you change them the clients will not be able to subscribe via web push until the user manually clears the notification permission.
+
 ## Tiers
 ntfy supports associating users to pre-defined tiers. Tiers can be used to grant users higher limits, such as 
 daily message limits, attachment size, or make it possible for users to reserve topics. If [payments are enabled](#payments),

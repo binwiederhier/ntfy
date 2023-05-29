@@ -7,35 +7,37 @@ enable them for the first time, you will be prompted to allow notifications on y
 
 - **Sound only**
 
-  If you don't enable browser notifications, a sound will play when a new notification comes in, and the tab title
-  will show the number of new notifications.
+    If you don't enable browser notifications, a sound will play when a new notification comes in, and the tab title
+    will show the number of new notifications.
 
 - **Browser Notifications**
 
-  This requires an active ntfy tab to be open to receive notifications. These are typically instantaneous, and will
-  appear as a system notification. If you don't see these, check that your browser is allowed to show notifications
-  (for example in System Settings on macOS).
+    This requires an active ntfy tab to be open to receive notifications. These are typically instantaneous, and will
+    appear as a system notification. If you don't see these, check that your browser is allowed to show notifications
+    (for example in System Settings on macOS).
 
-  If you don't want to enable background notifications, pinning the ntfy tab on your browser is a good solution to leave
-  it running.
+    If you don't want to enable background notifications, pinning the ntfy tab on your browser is a good solution to leave
+    it running.
 
 - **Background Notifications**
 
-  This uses the [Web Push API](https://caniuse.com/push-api). You don't need an active ntfy tab open, but in some
-  cases you may need to keep your browser open.
+    This uses the [Web Push API](https://caniuse.com/push-api). You don't need an active ntfy tab open, but in some
+    cases you may need to keep your browser open.
 
+    Background notifications are only supported on the same server hosting the web app. You cannot use another server,
+    but can instead subscribe on the other server itself.
 
-  | Browser | Platform | Browser Running | Browser Not Running | Notes                                                   |
-  | ------- | -------- | --------------- | ------------------- | ------------------------------------------------------- |
-  | Chrome  | Desktop  | ✅              | ❌                  |                                                         |
-  | Firefox | Desktop  | ✅              | ❌                  |                                                         |
-  | Edge    | Desktop  | ✅              | ❌                  |                                                         |
-  | Opera   | Desktop  | ✅              | ❌                  |                                                         |
-  | Safari  | Desktop  | ✅              | ✅                  | requires Safari 16.1, macOS 13 Ventura                  |
-  | Chrome  | Android  | ✅              | ✅                  |                                                         |
-  | Safari  | iOS      | ⚠️               | ⚠️                   | requires iOS 16.4, only when app is added to homescreen |
-  
-  (Browsers below 1% usage not shown, look at the Push API link for more info)
+    | Browser | Platform | Browser Running | Browser Not Running | Restrictions                                            |
+    | ------- | -------- | --------------- | ------------------- | ------------------------------------------------------- |
+    | Chrome  | Desktop  | ✅              | ❌                  |                                                         |
+    | Firefox | Desktop  | ✅              | ❌                  |                                                         |
+    | Edge    | Desktop  | ✅              | ❌                  |                                                         |
+    | Opera   | Desktop  | ✅              | ❌                  |                                                         |
+    | Safari  | Desktop  | ✅              | ✅                  | requires Safari 16.1, macOS 13 Ventura                  |
+    | Chrome  | Android  | ✅              | ✅                  |                                                         |
+    | Safari  | iOS      | ⚠️               | ⚠️                   | requires iOS 16.4, only when app is added to homescreen |
+
+    (Browsers below 1% usage not shown, look at the [Push API](https://caniuse.com/push-api) for more info)
 
 To learn how to send messages, check out the [publishing page](../publish.md).
 

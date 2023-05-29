@@ -77,7 +77,7 @@ var (
 	rawPathRegex                = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/raw$`)
 	wsPathRegex                 = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
 	authPathRegex               = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
-	webPushPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/web-push$`)
+	webPushSubscribePathRegex   = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/web-push/subscribe$`)
 	webPushUnsubscribePathRegex = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/web-push/unsubscribe$`)
 	publishPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
@@ -535,7 +535,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.authorizeTopicRead(s.handleSubscribeWS))(w, r, v)
 	} else if r.Method == http.MethodGet && authPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequests(s.authorizeTopicRead(s.handleTopicAuth))(w, r, v)
-	} else if r.Method == http.MethodPost && webPushPathRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodPost && webPushSubscribePathRegex.MatchString(r.URL.Path) {
 		return s.limitRequestsWithTopic(s.authorizeTopicRead(s.ensureWebPushEnabled(s.handleTopicWebPushSubscribe)))(w, r, v)
 	} else if r.Method == http.MethodPost && webPushUnsubscribePathRegex.MatchString(r.URL.Path) {
 		return s.limitRequestsWithTopic(s.authorizeTopicRead(s.ensureWebPushEnabled(s.handleTopicWebPushUnsubscribe)))(w, r, v)
@@ -985,7 +985,6 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 		return
 	}
 
-	failedCount := 0
 	totalCount := len(subscriptions)
 
 	wg := &sync.WaitGroup{}
@@ -1029,12 +1028,11 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 			jsonPayload, err := json.Marshal(payload)
 
 			if err != nil {
-				failedCount++
 				logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
 				return
 			}
 
-			_, err = webpush.SendNotification(jsonPayload, &sub.BrowserSubscription, &webpush.Options{
+			resp, err := webpush.SendNotification(jsonPayload, &sub.BrowserSubscription, &webpush.Options{
 				Subscriber:      s.config.WebPushEmailAddress,
 				VAPIDPublicKey:  s.config.WebPushPublicKey,
 				VAPIDPrivateKey: s.config.WebPushPrivateKey,
@@ -1044,25 +1042,28 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 			})
 
 			if err != nil {
-				failedCount++
 				logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
 
-				// probably need to handle different codes differently,
-				// but for now just expire the subscription on any error
 				err = s.webPushSubscriptionStore.ExpireWebPushEndpoint(sub.BrowserSubscription.Endpoint)
 				if err != nil {
 					logvm(v, m).Err(err).Fields(ctx).Warn("Unable to expire subscription")
 				}
+
+				return
+			}
+
+			// May want to handle at least 429 differently, but for now treat all errors the same
+			if !(200 <= resp.StatusCode && resp.StatusCode <= 299) {
+				logvm(v, m).Fields(ctx).Field("response", resp).Debug("Unable to publish web push message")
+
+				err = s.webPushSubscriptionStore.ExpireWebPushEndpoint(sub.BrowserSubscription.Endpoint)
+				if err != nil {
+					logvm(v, m).Err(err).Fields(ctx).Warn("Unable to expire subscription")
+				}
+
+				return
 			}
 		}(i, xi)
-	}
-
-	ctx = log.Context{"topic": m.Topic, "message_id": m.ID, "failed_count": failedCount, "total_count": totalCount}
-
-	if failedCount > 0 {
-		logvm(v, m).Fields(ctx).Warn("Unable to publish web push messages to %d of %d endpoints", failedCount, totalCount)
-	} else {
-		logvm(v, m).Fields(ctx).Debug("Published %d web push messages successfully", totalCount)
 	}
 }
 

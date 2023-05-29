@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -2604,11 +2605,32 @@ func newTestConfig(t *testing.T) *Config {
 	return conf
 }
 
-func newTestConfigWithAuthFile(t *testing.T) *Config {
-	conf := newTestConfig(t)
+func configureAuth(t *testing.T, conf *Config) *Config {
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	conf.AuthBcryptCost = bcrypt.MinCost // This speeds up tests a lot
+	return conf
+}
+
+func newTestConfigWithAuthFile(t *testing.T) *Config {
+	conf := newTestConfig(t)
+	conf = configureAuth(t, conf)
+	return conf
+}
+
+func newTestConfigWithWebPush(t *testing.T) *Config {
+	conf := newTestConfig(t)
+
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf.WebPushEnabled = true
+	conf.WebPushSubscriptionsFile = filepath.Join(t.TempDir(), "subscriptions.db")
+	conf.WebPushEmailAddress = "testing@example.com"
+	conf.WebPushPrivateKey = privateKey
+	conf.WebPushPublicKey = publicKey
 	return conf
 }
 

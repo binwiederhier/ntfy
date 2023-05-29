@@ -194,7 +194,7 @@ func execServe(c *cli.Context) error {
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if webPushEnabled && (webPushPrivateKey == "" || webPushPublicKey == "" || webPushSubscriptionsFile == "" || webPushEmailAddress == "" || baseURL == "") {
-		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-subscriptions-file, web-push-email-address, and base-url should be set. run 'ntfy web-push-keys' to generate keys")
+		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-subscriptions-file, web-push-email-address, and base-url should be set. run 'ntfy web-push generate-keys' to generate keys")
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {

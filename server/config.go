@@ -233,8 +233,10 @@ func NewConfig() *Config {
 		EnableReservations:                   false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
+		WebPushEnabled:                       false,
 		WebPushPrivateKey:                    "",
 		WebPushPublicKey:                     "",
 		WebPushSubscriptionsFile:             "",
+		WebPushEmailAddress:                  "",
 	}
 }

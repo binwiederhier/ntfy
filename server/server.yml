@@ -40,7 +40,7 @@
 
 # Enable web push
 #
-# Run ntfy web-push-keys to generate the keys
+# Run ntfy web-push generate-keys to generate the keys
 #
 # web-push-enabled: true
 # web-push-public-key: ""

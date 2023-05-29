@@ -247,7 +247,7 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 
 #### With the dev servers
 
-1. Get web push keys `go run main.go web-push-keys`
+1. Get web push keys `go run main.go web-push generate-keys`
 
 2. Run the server with web push enabled
 

@@ -1,29 +1,35 @@
 # Publishing
-Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](install.md). Topics are created on the fly by 
-subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
+
+Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](install.md). Topics are created on the fly by
+subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick
 something that's not easily guessable.
 
 Here's an example showing how to publish a simple message using a POST request:
 
 === "Command line (curl)"
+
     ```
     curl -d "Backup successful 😀" ntfy.sh/mytopic
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish mytopic "Backup successful 😀"
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
 
     Backup successful 😀
     ```
+
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mytopic', {
       method: 'POST', // PUT works too
       body: 'Backup successful 😀'
@@ -31,13 +37,15 @@ Here's an example showing how to publish a simple message using a POST request:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     http.Post("https://ntfy.sh/mytopic", "text/plain",
         strings.NewReader("Backup successful 😀"))
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mytopic"
@@ -47,13 +55,15 @@ Here's an example showing how to publish a simple message using a POST request:
     ```
 
 === "Python"
-    ``` python
-    requests.post("https://ntfy.sh/mytopic", 
+
+    ```python
+    requests.post("https://ntfy.sh/mytopic",
         data="Backup successful 😀".encode(encoding='utf-8'))
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -70,10 +80,11 @@ If you have the [Android app](subscribe/phone.md) installed on your phone, this 
   <figcaption>Android notification</figcaption>
 </figure>
 
-There are more features related to publishing messages: You can set a [notification priority](#message-priority), 
+There are more features related to publishing messages: You can set a [notification priority](#message-priority),
 a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an example that uses some of them at together:
 
 === "Command line (curl)"
+
     ```
     curl \
       -H "Title: Unauthorized access detected" \
@@ -84,6 +95,7 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --title "Unauthorized access detected" \
@@ -94,18 +106,20 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /phil_alerts HTTP/1.1
     Host: ntfy.sh
     Title: Unauthorized access detected
     Priority: urgent
     Tags: warning,skull
-    
+
     Remote access to phils-laptop detected. Act right away.
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/phil_alerts', {
         method: 'POST', // PUT works too
         body: 'Remote access to phils-laptop detected. Act right away.',
@@ -118,17 +132,19 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 === "Go"
-    ``` go
-	req, _ := http.NewRequest("POST", "https://ntfy.sh/phil_alerts",
-		strings.NewReader("Remote access to phils-laptop detected. Act right away."))
-	req.Header.Set("Title", "Unauthorized access detected")
-	req.Header.Set("Priority", "urgent")
-	req.Header.Set("Tags", "warning,skull")
-	http.DefaultClient.Do(req)
+
+    ```go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/phil_alerts",
+    	strings.NewReader("Remote access to phils-laptop detected. Act right away."))
+    req.Header.Set("Title", "Unauthorized access detected")
+    req.Header.Set("Priority", "urgent")
+    req.Header.Set("Tags", "warning,skull")
+    http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/phil_alerts"
@@ -138,12 +154,13 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
         Tags = "warning,skull"
       }
       Body = "Remote access to phils-laptop detected. Act right away."
-    }             
+    }
     Invoke-RestMethod @Request
     ```
-    
+
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/phil_alerts",
         data="Remote access to phils-laptop detected. Act right away.",
         headers={
@@ -154,7 +171,8 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/phil_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -177,6 +195,7 @@ You can also do multi-line messages. Here's an example using a [click action](#c
 an [external image attachment](#attach-file-from-a-url) and [email publishing](#e-mail-publishing):
 
 === "Command line (curl)"
+
     ```
     curl \
       -H "Click: https://home.nest.com/" \
@@ -184,74 +203,79 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
       -H "Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
       -H "Email: phil@example.com" \
       -d "There's someone at the door. 🐶
-   
-    Please check if it's a good boy or a hooman. 
+
+    Please check if it's a good boy or a hooman.
     Doggies have been known to ring the doorbell." \
       ntfy.sh/mydoorbell
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
-	    --click="https://home.nest.com/" \
+        --click="https://home.nest.com/" \
         --attach="https://nest.com/view/yAxkasd.jpg" \
         --actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true" \
         --email="phil@example.com" \
         mydoorbell \
         "There's someone at the door. 🐶
-   
-    Please check if it's a good boy or a hooman. 
+
+    Please check if it's a good boy or a hooman.
     Doggies have been known to ring the doorbell."
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mydoorbell HTTP/1.1
     Host: ntfy.sh
     Click: https://home.nest.com/
     Attach: https://nest.com/view/yAxkasd.jpg
     Actions: http, Open door, https://api.nest.com/open/yAxkasd, clear=true
     Email: phil@example.com
-    
+
     There's someone at the door. 🐶
-   
-    Please check if it's a good boy or a hooman. 
+
+    Please check if it's a good boy or a hooman.
     Doggies have been known to ring the doorbell.
     ```
-    
+
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mydoorbell', {
         method: 'POST', // PUT works too
         headers: {
             'Click': 'https://home.nest.com/',
             'Attach': 'https://nest.com/view/yAxkasd.jpg',
-	        'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
-	        'Email': 'phil@example.com'
+            'Actions': 'http, Open door, https://api.nest.com/open/yAxkasd, clear=true',
+            'Email': 'phil@example.com'
         },
         body: `There's someone at the door. 🐶
-       
-    Please check if it's a good boy or a hooman. 
+
+    Please check if it's a good boy or a hooman.
     Doggies have been known to ring the doorbell.`,
     })
     ```
 
 === "Go"
-    ``` go
-	req, _ := http.NewRequest("POST", "https://ntfy.sh/mydoorbell",
-		strings.NewReader(`There's someone at the door. 🐶
-   
-    Please check if it's a good boy or a hooman. 
+
+    ```go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mydoorbell",
+    	strings.NewReader(`There's someone at the door. 🐶
+
+    Please check if it's a good boy or a hooman.
     Doggies have been known to ring the doorbell.`))
-	req.Header.Set("Click", "https://home.nest.com/")
-	req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
-	req.Header.Set("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
-	req.Header.Set("Email", "phil@example.com")
-	http.DefaultClient.Do(req)
+    req.Header.Set("Click", "https://home.nest.com/")
+    req.Header.Set("Attach", "https://nest.com/view/yAxkasd.jpg")
+    req.Header.Set("Actions", "http, Open door, https://api.nest.com/open/yAxkasd, clear=true")
+    req.Header.Set("Email", "phil@example.com")
+    http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mydoorbell"
@@ -270,7 +294,8 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/mydoorbell",
         data="""There's someone at the door. 🐶
 
@@ -285,7 +310,8 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mydoorbell', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -296,7 +322,7 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
                 "Actions": "http, Open door, https://api.nest.com/open/yAxkasd, clear=true\r\n" .
                 "Email": "phil@example.com\r\n",
             'content' => 'There\'s someone at the door. 🐶
-   
+
     Please check if it\'s a good boy or a hooman.
     Doggies have been known to ring the doorbell.'
         ]
@@ -309,12 +335,14 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
 </figure>
 
 ## Message title
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`). To override the title, 
+The notification title is typically set to the topic short URL (e.g. `ntfy.sh/mytopic`). To override the title,
 you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 
 === "Command line (curl)"
+
     ```
     curl -H "X-Title: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
     curl -H "Title: Dogs are better than cats" -d "Oh my ..." ntfy.sh/controversial
@@ -322,6 +350,7 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         -t "Dogs are better than cats" \
@@ -329,16 +358,18 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /controversial HTTP/1.1
     Host: ntfy.sh
     Title: Dogs are better than cats
-    
+
     Oh my ...
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/controversial', {
         method: 'POST',
         body: 'Oh my ...',
@@ -347,14 +378,16 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/controversial", strings.NewReader("Oh my ..."))
     req.Header.Set("Title", "Dogs are better than cats")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/controversial"
@@ -367,14 +400,16 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/controversial",
         data="Oh my ...",
         headers={ "Title": "Dogs are better than cats" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/controversial', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -392,12 +427,13 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 </figure>
 
 !!! info
-    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including the title)
-    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
-    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including the title)
+as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 ## Message priority
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 All messages have a priority, which defines how urgently your phone notifies you. On Android, you can set custom
@@ -406,16 +442,17 @@ notification sounds and vibration patterns on your phone to map to these priorit
 The following priorities exist:
 
 | Priority             | Icon                                       | ID  | Name           | Description                                                                                            |
-|----------------------|--------------------------------------------|-----|----------------|--------------------------------------------------------------------------------------------------------|
+| -------------------- | ------------------------------------------ | --- | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification.                 |
 | High priority        | ![min priority](static/img/priority-4.svg) | `4` | `high`         | Long vibration burst, default notification sound with a pop-over notification.                         |
-| **Default priority** | *(none)*                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
+| **Default priority** | _(none)_                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
 | Low priority         | ![min priority](static/img/priority-2.svg) | `2` | `low`          | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
 | Min priority         | ![min priority](static/img/priority-1.svg) | `1` | `min`          | No vibration or sound. The notification will be under the fold in "Other notifications".               |
 
 You can set the priority with the header `X-Priority` (or any of its aliases: `Priority`, `prio`, or `p`).
 
 === "Command line (curl)"
+
     ```
     curl -H "X-Priority: 5" -d "An urgent message" ntfy.sh/phil_alerts
     curl -H "Priority: low" -d "Low priority message" ntfy.sh/phil_alerts
@@ -423,14 +460,16 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     ```
 
 === "ntfy CLI"
+
     ```
-    ntfy publish \ 
+    ntfy publish \
         -p 5 \
         phil_alerts An urgent message
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /phil_alerts HTTP/1.1
     Host: ntfy.sh
     Priority: 5
@@ -439,7 +478,8 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/phil_alerts', {
         method: 'POST',
         body: 'An urgent message',
@@ -448,14 +488,16 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/phil_alerts", strings.NewReader("An urgent message"))
     req.Header.Set("Priority", "5")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       URI = "https://ntfy.sh/phil_alerts"
       Headers = @{
@@ -465,16 +507,18 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
     }
     Invoke-RestMethod @Request
     ```
-    
+
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/phil_alerts",
         data="An urgent message",
         headers={ "Priority": "5" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/phil_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -492,16 +536,17 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 </figure>
 
 ## Tags & emojis 🥳 🎉
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 You can tag messages with emojis and other relevant strings:
 
-* **Emojis**: If a tag matches an [emoji short code](emojis.md), it'll be converted to an emoji and prepended 
+- **Emojis**: If a tag matches an [emoji short code](emojis.md), it'll be converted to an emoji and prepended
   to title or message.
-* **Other tags:** If a tag doesn't match, it will be listed below the notification. 
+- **Other tags:** If a tag doesn't match, it will be listed below the notification.
 
-This feature is useful for things like warnings (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. script 
-names, hostnames, etc.). Use [the emoji short code list](emojis.md) to figure out what tags can be converted to emojis. 
+This feature is useful for things like warnings (⚠️, ️🚨, or 🚩), but also to simply tag messages otherwise (e.g. script
+names, hostnames, etc.). Use [the emoji short code list](emojis.md) to figure out what tags can be converted to emojis.
 Here's an **excerpt of emojis** I've found very useful in alert messages:
 
 <table class="remove-md-box"><tr>
@@ -541,6 +586,7 @@ You can set tags with the `X-Tags` header (or any of its aliases: `Tags`, `tag`,
 them with a comma, e.g. `tag1,tag2,tag3`.
 
 === "Command line (curl)"
+
     ```
     curl -H "X-Tags: warning,mailsrv13,daily-backup" -d "Backup of mailsrv13 failed" ntfy.sh/backups
     curl -H "Tags: horse,unicorn" -d "Unicorns are just horses with unique horns" ntfy.sh/backups
@@ -548,6 +594,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --tags=warning,mailsrv13,daily-backup \
@@ -555,16 +602,18 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /backups HTTP/1.1
     Host: ntfy.sh
     Tags: warning,mailsrv13,daily-backup
-    
+
     Backup of mailsrv13 failed
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/backups', {
         method: 'POST',
         body: 'Backup of mailsrv13 failed',
@@ -573,14 +622,16 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/backups", strings.NewReader("Backup of mailsrv13 failed"))
     req.Header.Set("Tags", "warning,mailsrv13,daily-backup")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/backups"
@@ -593,14 +644,16 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/backups",
         data="Backup of mailsrv13 failed",
         headers={ "Tags": "warning,mailsrv13,daily-backup" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -618,32 +671,34 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 </figure>
 
 !!! info
-    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the tags header or individual tags
-    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
-    or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the tags header or individual tags
+as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 ## Scheduled delivery
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself 
+You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself
 reminders or even to execute commands at a later date (if your subscriber acts on messages).
 
-Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`, 
-`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`, 
-`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
-[and more](https://github.com/olebedev/when)). 
+Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`,
+`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`,
+`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`,
+[and more](https://github.com/olebedev/when)).
 
 As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can currently
-not be configured otherwise ([let me know](https://github.com/binwiederhier/ntfy/issues) if you'd like to change 
+not be configured otherwise ([let me know](https://github.com/binwiederhier/ntfy/issues) if you'd like to change
 these limits).
 
-For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours 
+For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours
 after they were delivered (or whatever the server-side cache duration is set to). For instance, if a message is scheduled
-to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Also note that naturally, 
-[turning off server-side caching](#message-caching) is not possible in combination with this feature.  
+to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Also note that naturally,
+[turning off server-side caching](#message-caching) is not possible in combination with this feature.
 
 === "Command line (curl)"
+
     ```
     curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
     curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
@@ -651,6 +706,7 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --at="tomorrow, 10am" \
@@ -658,7 +714,8 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /hello HTTP/1.1
     Host: ntfy.sh
     At: tomorrow, 10am
@@ -667,7 +724,8 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/hello', {
         method: 'POST',
         body: 'Good morning',
@@ -676,14 +734,16 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/hello", strings.NewReader("Good morning"))
     req.Header.Set("At", "tomorrow, 10am")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/hello"
@@ -694,16 +754,18 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     }
     Invoke-RestMethod @Request
     ```
-    
+
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/hello",
         data="Good morning",
         headers={ "At": "tomorrow, 10am" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -730,74 +792,85 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
 </td>
 </tr></table>
 
-## Webhooks (publish via GET) 
+## Webhooks (publish via GET)
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
+In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use
 a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
 like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
 
-To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
-any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 
-also supported as HTTP headers as URL-encoded arguments. Be sure to check the list of all 
+To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without
+any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are
+also supported as HTTP headers as URL-encoded arguments. Be sure to check the list of all
 [supported parameters and headers](#list-of-all-parameters) for details.
 
-For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhook/trigger` to send a message 
+For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhook/trigger` to send a message
 (aka trigger the webhook):
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh/mywebhook/trigger
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy trigger mywebhook
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     GET /mywebhook/trigger HTTP/1.1
     Host: ntfy.sh
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mywebhook/trigger')
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     http.Get("https://ntfy.sh/mywebhook/trigger")
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     Invoke-RestMethod "ntfy.sh/mywebhook/trigger"
-    ```    
+    ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.get("https://ntfy.sh/mywebhook/trigger")
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mywebhook/trigger');
     ```
 
-To add a custom message, simply append the `message=` URL parameter. And of course you can set the 
-[message priority](#message-priority), the [message title](#message-title), and [tags](#tags-emojis) as well. 
+To add a custom message, simply append the `message=` URL parameter. And of course you can set the
+[message priority](#message-priority), the [message title](#message-title), and [tags](#tags-emojis) as well.
 For a full list of possible parameters, check the list of [supported parameters and headers](#list-of-all-parameters).
 
 Here's an example with a custom message, tags and a priority:
 
 === "Command line (curl)"
+
     ```
     curl "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         -p 5 --tags=warning,skull \
@@ -805,54 +878,62 @@ Here's an example with a custom message, tags and a priority:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     GET /mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull HTTP/1.1
     Host: ntfy.sh
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull')
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     http.Get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     Invoke-RestMethod "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
 ## Publish as JSON
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)), 
-adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message 
+For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)),
+adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message
 as JSON in the request body.
 
 To publish as JSON, simple PUT/POST the JSON object directly to the ntfy root URL. The message format is described below
 the example.
 
 !!! info
-    To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
-    POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect). 
+To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
+POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect).
 
-Here's an example using most supported parameters. Check the table below for a complete list. The `topic` parameter 
+Here's an example using most supported parameters. Check the table below for a complete list. The `topic` parameter
 is the only required one:
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh \
       -d '{
@@ -869,7 +950,8 @@ is the only required one:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST / HTTP/1.1
     Host: ntfy.sh
 
@@ -887,7 +969,8 @@ is the only required one:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh', {
         method: 'POST',
         body: JSON.stringify({
@@ -905,11 +988,12 @@ is the only required one:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     // You should probably use json.Marshal() instead and make a proper struct,
-    // or even just use req.Header.Set() like in the other examples, but for the 
+    // or even just use req.Header.Set() like in the other examples, but for the
     // sake of the example, this is easier.
-    
+
     body := `{
         "topic": "mytopic",
         "message": "Disk space is low at 5.1 GB",
@@ -926,7 +1010,8 @@ is the only required one:
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
@@ -940,7 +1025,7 @@ is the only required one:
         Tags     = @("warning", "cd")
         Click    = "https://homecamera.lan/xasds1h2xsSsa/"
         Actions  = ConvertTo-JSON @(
-          @{ 
+          @{
             Action = "view"
             Label  = "Admin panel"
             URL    = "https://filesrv.lan/admin"
@@ -953,7 +1038,8 @@ is the only required one:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "mytopic",
@@ -970,7 +1056,8 @@ is the only required one:
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -990,41 +1077,42 @@ is the only required one:
     ]));
     ```
 
-The JSON message format closely mirrors the format of the message you can consume when you [subscribe via the API](subscribe/api.md) 
+The JSON message format closely mirrors the format of the message you can consume when you [subscribe via the API](subscribe/api.md)
 (see [JSON message format](subscribe/api.md#json-message-format) for details), but is not exactly identical. Here's an overview of
 all the supported fields:
 
 | Field      | Required | Type                             | Example                                   | Description                                                           |
-|------------|----------|----------------------------------|-------------------------------------------|-----------------------------------------------------------------------|
-| `topic`    | ✔️       | *string*                         | `topic1`                                  | Target topic name                                                     |
-| `message`  | -        | *string*                         | `Some message`                            | Message body; set to `triggered` if empty or not passed               |
-| `title`    | -        | *string*                         | `Some title`                              | Message [title](#message-title)                                       |
-| `tags`     | -        | *string array*                   | `["tag1","tag2"]`                         | List of [tags](#tags-emojis) that may or not map to emojis            |
-| `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
-| `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
-| `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
-| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
-| `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
-| `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
-| `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
-| `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
-| `call`     | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
+| ---------- | -------- | -------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| `topic`    | ✔️       | _string_                         | `topic1`                                  | Target topic name                                                     |
+| `message`  | -        | _string_                         | `Some message`                            | Message body; set to `triggered` if empty or not passed               |
+| `title`    | -        | _string_                         | `Some title`                              | Message [title](#message-title)                                       |
+| `tags`     | -        | _string array_                   | `["tag1","tag2"]`                         | List of [tags](#tags-emojis) that may or not map to emojis            |
+| `priority` | -        | _int (one of: 1, 2, 3, 4, or 5)_ | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
+| `actions`  | -        | _JSON array_                     | _(see [action buttons](#action-buttons))_ | Custom [user action buttons](#action-buttons) for notifications       |
+| `click`    | -        | _URL_                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
+| `attach`   | -        | _URL_                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `icon`     | -        | _string_                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
+| `filename` | -        | _string_                         | `file.jpg`                                | File name of the attachment                                           |
+| `delay`    | -        | _string_                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
+| `email`    | -        | _e-mail address_                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
+| `call`     | -        | _phone number or 'yes'_          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
 
 ## Action buttons
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 You can add action buttons to notifications to allow yourself to react to a notification directly. This is incredibly
-useful and has countless applications. 
+useful and has countless applications.
 
-You can control your home appliances (open/close garage door, change temperature on thermostat, ...), react to common 
+You can control your home appliances (open/close garage door, change temperature on thermostat, ...), react to common
 monitoring alerts (clear logs when disk is full, ...), and many other things. The sky is the limit.
 
 As of today, the following actions are supported:
 
-* [`view`](#open-websiteapp): Opens a website or app when the action button is tapped
-* [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
+- [`view`](#open-websiteapp): Opens a website or app when the action button is tapped
+- [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
   when the action button is tapped (only supported on Android)
-* [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
+- [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
 
 Here's an example of what that a notification with actions can look like:
 
@@ -1034,35 +1122,40 @@ Here's an example of what that a notification with actions can look like:
 </figure>
 
 ### Defining actions
+
 You can define **up to three user actions** in your notifications, using either of the following methods:
 
-* In the [`X-Actions` header](#using-a-header), using a simple comma-separated format
-* As a [JSON array](#using-a-json-array) in the `actions` key, when [publishing as JSON](#publish-as-json) 
+- In the [`X-Actions` header](#using-a-header), using a simple comma-separated format
+- As a [JSON array](#using-a-json-array) in the `actions` key, when [publishing as JSON](#publish-as-json)
 
 #### Using a header
+
 To define actions using the `X-Actions` header (or any of its aliases: `Actions`, `Action`), use the following format:
 
 === "Header format (long)"
+
     ```
     action=<action1>, label=<label1>, paramN=... [; action=<action2>, label=<label2>, ...]
     ```
 
 === "Header format (short)"
+
     ```
     <action1>, <label1>, paramN=... [; <action2>, <label2>, ...]
     ```
 
-Multiple actions are separated by a semicolon (`;`), and key/value pairs are separated by commas (`,`). Values may be 
-quoted with double quotes (`"`) or single quotes (`'`) if the value itself contains commas or semicolons. 
+Multiple actions are separated by a semicolon (`;`), and key/value pairs are separated by commas (`,`). Values may be
+quoted with double quotes (`"`) or single quotes (`'`) if the value itself contains commas or semicolons.
 
-The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and 
-`http` action. The only limitation of this format is that depending on your language/library, UTF-8 characters may not 
+The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and
+`http` action. The only limitation of this format is that depending on your language/library, UTF-8 characters may not
 work. If they don't, use the [JSON array format](#using-a-json-array) instead.
 
-As an example, here's how you can create the above notification using this format. Refer to the [`view` action](#open-websiteapp) and 
+As an example, here's how you can create the above notification using this format. Refer to the [`view` action](#open-websiteapp) and
 [`http` action](#send-http-request) section for details on the specific actions:
 
 === "Command line (curl)"
+
     ```
     body='{"temperature": 65}'
     curl \
@@ -1073,6 +1166,7 @@ As an example, here's how you can create the above notification using this forma
     ```
 
 === "ntfy CLI"
+
     ```
     body='{"temperature": 65}'
     ntfy publish \
@@ -1083,7 +1177,8 @@ As an example, here's how you can create the above notification using this forma
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
     Actions: view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{"temperature": 65}'
@@ -1092,25 +1187,28 @@ As an example, here's how you can create the above notification using this forma
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/myhome', {
         method: 'POST',
         body: 'You left the house. Turn down the A/C?',
-        headers: { 
-            'Actions': 'view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body=\'{"temperature": 65}\'' 
+        headers: {
+            'Actions': 'view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body=\'{"temperature": 65}\''
         }
     })
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("You left the house. Turn down the A/C?"))
     req.Header.Set("Actions", "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/myhome"
@@ -1123,14 +1221,16 @@ As an example, here's how you can create the above notification using this forma
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/myhome",
         data="You left the house. Turn down the A/C?",
         headers={ "Actions": "view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1143,16 +1243,18 @@ As an example, here's how you can create the above notification using this forma
     ```
 
 !!! info
-    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including actions) 
-    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
-    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including actions)
+as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 #### Using a JSON array
-Alternatively, the same actions can be defined as **JSON array**, if the notification is defined as part of the JSON body 
+
+Alternatively, the same actions can be defined as **JSON array**, if the notification is defined as part of the JSON body
 (see [publish as JSON](#publish-as-json)):
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh \
       -d '{
@@ -1176,6 +1278,7 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions '[
@@ -1197,7 +1300,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST / HTTP/1.1
     Host: ntfy.sh
 
@@ -1222,7 +1326,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh', {
         method: 'POST',
         body: JSON.stringify({
@@ -1247,10 +1352,11 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     // You should probably use json.Marshal() instead and make a proper struct,
     // but for the sake of the example, this is easier.
-    
+
     body := `{
         "topic": "myhome",
         "message": "You left the house. Turn down the A/C?",
@@ -1274,7 +1380,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
@@ -1302,7 +1409,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "myhome",
@@ -1326,7 +1434,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1356,29 +1465,31 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ]));
     ```
 
-The required/optional fields for each action depend on the type of the action itself. Please refer to 
-[`view` action](#open-websiteapp), [`broadcast` action](#send-android-broadcast), and [`http` action](#send-http-request) 
+The required/optional fields for each action depend on the type of the action itself. Please refer to
+[`view` action](#open-websiteapp), [`broadcast` action](#send-android-broadcast), and [`http` action](#send-http-request)
 for details.
 
 ### Open website/app
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 The `view` action **opens a website or app when the action button is tapped**, e.g. a browser, a Google Maps location, or
-even a deep link into Twitter or a show ntfy topic. How exactly the action is handled depends on how Android and your 
-desktop browser treat the links. Normally it'll just open a link in the browser. 
+even a deep link into Twitter or a show ntfy topic. How exactly the action is handled depends on how Android and your
+desktop browser treat the links. Normally it'll just open a link in the browser.
 
 Examples:
 
-* `http://` or `https://` will open your browser (or an app if it registered for a URL)
-* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
-* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
-* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
-* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
-* ...
+- `http://` or `https://` will open your browser (or an app if it registered for a URL)
+- `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
+- `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
+- `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+- `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
+- ...
 
 Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
+
     ```
     curl \
         -d "Somebody retweeted your tweet." \
@@ -1387,6 +1498,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" \
@@ -1395,7 +1507,8 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
     Actions: view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392
@@ -1404,25 +1517,28 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/myhome', {
         method: 'POST',
         body: 'Somebody retweeted your tweet.',
-        headers: { 
-            'Actions': 'view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392' 
+        headers: {
+            'Actions': 'view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392'
         }
     })
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Somebody retweeted your tweet."))
     req.Header.Set("Actions", "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/myhome"
@@ -1435,14 +1551,16 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/myhome",
         data="Somebody retweeted your tweet.",
         headers={ "Actions": "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1457,6 +1575,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 And the same example using [JSON publishing](#publish-as-json):
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh \
       -d '{
@@ -1473,6 +1592,7 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions '[
@@ -1487,7 +1607,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST / HTTP/1.1
     Host: ntfy.sh
 
@@ -1505,7 +1626,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh', {
         method: 'POST',
         body: JSON.stringify({
@@ -1523,10 +1645,11 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     // You should probably use json.Marshal() instead and make a proper struct,
     // but for the sake of the example, this is easier.
-    
+
     body := `{
         "topic": "myhome",
         "message": "Somebody retweeted your tweet.",
@@ -1543,7 +1666,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
@@ -1564,7 +1688,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "myhome",
@@ -1581,7 +1706,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1604,13 +1730,14 @@ And the same example using [JSON publishing](#publish-as-json):
 The `view` action supports the following fields:
 
 | Field    | Required | Type      | Default | Example               | Description                                      |
-|----------|----------|-----------|---------|-----------------------|--------------------------------------------------|
-| `action` | ✔️       | *string*  | -       | `view`                | Action type (**must be `view`**)                 |
-| `label`  | ✔️       | *string*  | -       | `Turn on light`       | Label of the action button in the notification   |
-| `url`    | ✔️       | *URL*     | -       | `https://example.com` | URL to open when action is tapped                |
-| `clear`  | -️       | *boolean* | `false` | `true`                | Clear notification after action button is tapped |
+| -------- | -------- | --------- | ------- | --------------------- | ------------------------------------------------ |
+| `action` | ✔️       | _string_  | -       | `view`                | Action type (**must be `view`**)                 |
+| `label`  | ✔️       | _string_  | -       | `Turn on light`       | Label of the action button in the notification   |
+| `url`    | ✔️       | _URL_     | -       | `https://example.com` | URL to open when action is tapped                |
+| `clear`  | -️       | _boolean_ | `false` | `true`                | Clear notification after action button is tapped |
 
 ### Send Android broadcast
+
 _Supported on:_ :material-android:
 
 The `broadcast` action **sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
@@ -1623,13 +1750,14 @@ By default, the intent action **`io.heckel.ntfy.USER_ACTION`** is broadcast, tho
 To send extras, use the `extras` parameter. Currently, **only string extras are supported**.
 
 !!! info
-    If you have no idea what this is, check out the [automation apps](subscribe/phone.md#automation-apps) section, which shows
-    how to integrate Tasker and MacroDroid **with screenshots**. The action button integration is identical, except that
-    you have to use **the intent action `io.heckel.ntfy.USER_ACTION`** instead.
+If you have no idea what this is, check out the [automation apps](subscribe/phone.md#automation-apps) section, which shows
+how to integrate Tasker and MacroDroid **with screenshots**. The action button integration is identical, except that
+you have to use **the intent action `io.heckel.ntfy.USER_ACTION`** instead.
 
 Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
+
     ```
     curl \
         -d "Your wife requested you send a picture of yourself." \
@@ -1638,6 +1766,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions="broadcast, Take picture, extras.cmd=pic, extras.camera=front" \
@@ -1646,7 +1775,8 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /wifey HTTP/1.1
     Host: ntfy.sh
     Actions: broadcast, Take picture, extras.cmd=pic, extras.camera=front
@@ -1655,25 +1785,28 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/wifey', {
         method: 'POST',
         body: 'Your wife requested you send a picture of yourself.',
-        headers: { 
-            'Actions': 'broadcast, Take picture, extras.cmd=pic, extras.camera=front' 
+        headers: {
+            'Actions': 'broadcast, Take picture, extras.cmd=pic, extras.camera=front'
         }
     })
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/wifey", strings.NewReader("Your wife requested you send a picture of yourself."))
     req.Header.Set("Actions", "broadcast, Take picture, extras.cmd=pic, extras.camera=front")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/wifey"
@@ -1686,14 +1819,16 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/wifey",
         data="Your wife requested you send a picture of yourself.",
         headers={ "Actions": "broadcast, Take picture, extras.cmd=pic, extras.camera=front" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/wifey', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1708,6 +1843,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 And the same example using [JSON publishing](#publish-as-json):
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh \
       -d '{
@@ -1727,6 +1863,7 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions '[
@@ -1744,7 +1881,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST / HTTP/1.1
     Host: ntfy.sh
 
@@ -1765,7 +1903,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh', {
         method: 'POST',
         body: JSON.stringify({
@@ -1786,10 +1925,11 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     // You should probably use json.Marshal() instead and make a proper struct,
     // but for the sake of the example, this is easier.
-    
+
     body := `{
         "topic": "wifey",
         "message": "Your wife requested you send a picture of yourself.",
@@ -1809,7 +1949,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras',
     # otherwise it will read System.Collections.Hashtable in the returned JSON
     $Request = @{
@@ -1835,7 +1976,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "wifey",
@@ -1855,7 +1997,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1880,25 +2023,27 @@ And the same example using [JSON publishing](#publish-as-json):
 The `broadcast` action supports the following fields:
 
 | Field    | Required | Type             | Default                      | Example                 | Description                                                                                                                                                                            |
-|----------|----------|------------------|------------------------------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `action` | ✔️       | *string*         | -                            | `broadcast`             | Action type (**must be `broadcast`**)                                                                                                                                                  |
-| `label`  | ✔️       | *string*         | -                            | `Turn on light`         | Label of the action button in the notification                                                                                                                                         |
-| `intent` | -️       | *string*         | `io.heckel.ntfy.USER_ACTION` | `com.example.AN_INTENT` | Android intent name, **default is `io.heckel.ntfy.USER_ACTION`**                                                                                                                       |
-| `extras` | -️       | *map of strings* | -                            | *see above*             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
-| `clear`  | -️       | *boolean*        | `false`                      | `true`                  | Clear notification after action button is tapped                                                                                                                                       |
+| -------- | -------- | ---------------- | ---------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action` | ✔️       | _string_         | -                            | `broadcast`             | Action type (**must be `broadcast`**)                                                                                                                                                  |
+| `label`  | ✔️       | _string_         | -                            | `Turn on light`         | Label of the action button in the notification                                                                                                                                         |
+| `intent` | -️       | _string_         | `io.heckel.ntfy.USER_ACTION` | `com.example.AN_INTENT` | Android intent name, **default is `io.heckel.ntfy.USER_ACTION`**                                                                                                                       |
+| `extras` | -️       | _map of strings_ | -                            | _see above_             | Android intent extras. Currently, only string extras are supported. When publishing as JSON, extras are passed as a map. When the simple format is used, use `extras.<param>=<value>`. |
+| `clear`  | -️       | _boolean_        | `false`                      | `true`                  | Clear notification after action button is tapped                                                                                                                                       |
 
 ### Send HTTP request
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 The `http` action **sends a HTTP request when the action button is tapped**. You can use this to trigger REST APIs
 for whatever systems you have, e.g. opening the garage door, or turning on/off lights.
 
 By default, this action sends a **POST request** (not GET!), though this can be changed with the `method` parameter.
-The only required parameter is `url`. Headers can be passed along using the `headers` parameter.  
+The only required parameter is `url`. Headers can be passed along using the `headers` parameter.
 
 Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
+
     ```
     curl \
         -d "Garage door has been open for 15 minutes. Close it?" \
@@ -1907,6 +2052,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" \
@@ -1915,7 +2061,8 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /myhome HTTP/1.1
     Host: ntfy.sh
     Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={"action": "close"}
@@ -1924,25 +2071,28 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/myhome', {
         method: 'POST',
         body: 'Garage door has been open for 15 minutes. Close it?',
-        headers: { 
-            'Actions': 'http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}' 
+        headers: {
+            'Actions': 'http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}'
         }
     })
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Garage door has been open for 15 minutes. Close it?"))
     req.Header.Set("Actions", "http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/myhome"
@@ -1955,14 +2105,16 @@ Here's an example using the [`X-Actions` header](#using-a-header):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/myhome",
         data="Garage door has been open for 15 minutes. Close it?",
         headers={ "Actions": "http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -1977,6 +2129,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 And the same example using [JSON publishing](#publish-as-json):
 
 === "Command line (curl)"
+
     ```
     curl ntfy.sh \
       -d '{
@@ -1998,6 +2151,7 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --actions '[
@@ -2017,7 +2171,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST / HTTP/1.1
     Host: ntfy.sh
 
@@ -2040,7 +2195,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh', {
         method: 'POST',
         body: JSON.stringify({
@@ -2063,10 +2219,11 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     // You should probably use json.Marshal() instead and make a proper struct,
     // but for the sake of the example, this is easier.
-    
+
     body := `{
         "topic": "myhome",
         "message": "Garage door has been open for 15 minutes. Close it?",
@@ -2088,8 +2245,9 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PowerShell"
-    ``` powershell
-    # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', 
+
+    ```powershell
+    # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers',
     # otherwise it will read System.Collections.Hashtable in the returned JSON
 
     $Request = @{
@@ -2117,7 +2275,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/",
         data=json.dumps({
             "topic": "myhome",
@@ -2139,7 +2298,8 @@ And the same example using [JSON publishing](#publish-as-json):
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -2167,38 +2327,40 @@ And the same example using [JSON publishing](#publish-as-json):
 The `http` action supports the following fields:
 
 | Field     | Required | Type               | Default   | Example                   | Description                                                                                                                                             |
-|-----------|----------|--------------------|-----------|---------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `action`  | ✔️       | *string*           | -         | `http`                    | Action type (**must be `http`**)                                                                                                                        |
-| `label`   | ✔️       | *string*           | -         | `Open garage door`        | Label of the action button in the notification                                                                                                          |
-| `url`     | ✔️       | *string*           | -         | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
-| `method`  | -️       | *GET/POST/PUT/...* | `POST` ⚠️ | `GET`                     | HTTP method to use for request, **default is POST** ⚠️                                                                                                  |
-| `headers` | -️       | *map of strings*   | -         | *see above*               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
-| `body`    | -️       | *string*           | *empty*   | `some body, somebody?`    | HTTP body                                                                                                                                               |
-| `clear`   | -️       | *boolean*          | `false`   | `true`                    | Clear notification after HTTP request succeeds. If the request fails, the notification is not cleared.                                                  |
+| --------- | -------- | ------------------ | --------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action`  | ✔️       | _string_           | -         | `http`                    | Action type (**must be `http`**)                                                                                                                        |
+| `label`   | ✔️       | _string_           | -         | `Open garage door`        | Label of the action button in the notification                                                                                                          |
+| `url`     | ✔️       | _string_           | -         | `https://ntfy.sh/mytopic` | URL to which the HTTP request will be sent                                                                                                              |
+| `method`  | -️       | _GET/POST/PUT/..._ | `POST` ⚠️ | `GET`                     | HTTP method to use for request, **default is POST** ⚠️                                                                                                  |
+| `headers` | -️       | _map of strings_   | -         | _see above_               | HTTP headers to pass in request. When publishing as JSON, headers are passed as a map. When the simple format is used, use `headers.<header1>=<value>`. |
+| `body`    | -️       | _string_           | _empty_   | `some body, somebody?`    | HTTP body                                                                                                                                               |
+| `clear`   | -️       | _boolean_          | `false`   | `true`                    | Clear notification after HTTP request succeeds. If the request fails, the notification is not cleared.                                                  |
 
 ## Click action
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
+You can define which URL to open when a notification is clicked. This may be useful if your notification is related
 to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
 the web browser (or the app) and open the website.
 
 To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its aliase `Click`).
 If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
-by another app, the responsible app may open. 
+by another app, the responsible app may open.
 
 Examples:
 
-* `http://` or `https://` will open your browser (or an app if it registered for a URL)
-* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
-* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
-* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
-* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
-* ...
+- `http://` or `https://` will open your browser (or an app if it registered for a URL)
+- `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
+- `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
+- `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+- `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
+- ...
 
 Here's an example that will open Reddit when the notification is clicked:
 
 === "Command line (curl)"
+
     ```
     curl \
         -d "New messages on Reddit" \
@@ -2207,6 +2369,7 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --click="https://www.reddit.com/message/messages" \
@@ -2214,16 +2377,18 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /reddit_alerts HTTP/1.1
     Host: ntfy.sh
-    Click: https://www.reddit.com/message/messages 
+    Click: https://www.reddit.com/message/messages
 
     New messages on Reddit
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/reddit_alerts', {
         method: 'POST',
         body: 'New messages on Reddit',
@@ -2232,14 +2397,16 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
     req.Header.Set("Click", "https://www.reddit.com/message/messages")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/reddit_alerts"
@@ -2250,14 +2417,16 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/reddit_alerts",
         data="New messages on Reddit",
         headers={ "Click": "https://www.reddit.com/message/messages" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -2270,30 +2439,33 @@ Here's an example that will open Reddit when the notification is clicked:
     ```
 
 ## Attachments
+
 _Supported on:_ :material-android: :material-firefox:
 
 You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
 onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
 
-There are two different ways to send attachments: 
+There are two different ways to send attachments:
 
-* sending [a local file](#attach-local-file) via PUT, e.g. from `~/Flowers/flower.jpg` or `ringtone.mp3`
-* or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk` 
+- sending [a local file](#attach-local-file) via PUT, e.g. from `~/Flowers/flower.jpg` or `ringtone.mp3`
+- or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk`
 
 ### Attach local file
-To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater 
-than the maximum message size (4,096 bytes) or consists of non UTF-8 characters, the ntfy server will automatically 
-detect the mime type and size, and send the message as an attachment file. To send smaller text-only messages or files 
-as attachments, you must pass a filename by passing the `X-Filename` header or query parameter (or any of its aliases 
-`Filename`, `File` or `f`). 
 
-By default, and how ntfy.sh is configured, the **max attachment size is 15 MB** (with 100 MB total per visitor). 
+To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater
+than the maximum message size (4,096 bytes) or consists of non UTF-8 characters, the ntfy server will automatically
+detect the mime type and size, and send the message as an attachment file. To send smaller text-only messages or files
+as attachments, you must pass a filename by passing the `X-Filename` header or query parameter (or any of its aliases
+`Filename`, `File` or `f`).
+
+By default, and how ntfy.sh is configured, the **max attachment size is 15 MB** (with 100 MB total per visitor).
 Attachments **expire after 3 hours**, which typically is plenty of time for the user to download it, or for the Android app
 to auto-download it. Please also check out the [other limits below](#limitations).
 
 Here's an example showing how to upload an image:
 
 === "Command line (curl)"
+
     ```
     curl \
         -T flower.jpg \
@@ -2302,6 +2474,7 @@ Here's an example showing how to upload an image:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --file=flower.jpg \
@@ -2309,17 +2482,19 @@ Here's an example showing how to upload an image:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     PUT /flowers HTTP/1.1
     Host: ntfy.sh
     Filename: flower.jpg
     Content-Type: 52312
-     
+
     (binary JPEG data)
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/flowers', {
         method: 'PUT',
         body: document.getElementById("file").files[0],
@@ -2328,7 +2503,8 @@ Here's an example showing how to upload an image:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     file, _ := os.Open("flower.jpg")
     req, _ := http.NewRequest("PUT", "https://ntfy.sh/flowers", file)
     req.Header.Set("Filename", "flower.jpg")
@@ -2336,21 +2512,23 @@ Here's an example showing how to upload an image:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.put("https://ntfy.sh/flowers",
         data=open("flower.jpg", 'rb'),
         headers={ "Filename": "flower.jpg" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/flowers', false, stream_context_create([
         'http' => [
             'method' => 'PUT',
             'header' =>
                 "Content-Type: application/octet-stream\r\n" . // Does not matter
                 "Filename: flower.jpg",
-            'content' => file_get_contents('flower.jpg') // Dangerous for large files 
+            'content' => file_get_contents('flower.jpg') // Dangerous for large files
         ]
     ]));
     ```
@@ -2363,20 +2541,22 @@ Here's what that looks like on Android:
 </figure>
 
 ### Attach file from a URL
+
 Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
-This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are 
+This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are
 externally hosted, the expiration or size limits from above do not apply here.
 
 To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
-to specify the attachment URL. It can be any type of file. 
+to specify the attachment URL. It can be any type of file.
 
-ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a 
+ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a
 filename `flower.jpg`). To override this filename, you may send the `X-Filename` header or query parameter (or any of its
 aliases `Filename`, `File` or `f`).
 
 Here's an example showing how to attach an APK file:
 
 === "Command line (curl)"
+
     ```
     curl \
         -X POST \
@@ -2385,6 +2565,7 @@ Here's an example showing how to attach an APK file:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --attach="https://f-droid.org/F-Droid.apk" \
@@ -2392,14 +2573,16 @@ Here's an example showing how to attach an APK file:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mydownloads HTTP/1.1
     Host: ntfy.sh
     Attach: https://f-droid.org/F-Droid.apk
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mydownloads', {
         method: 'POST',
         headers: { 'Attach': 'https://f-droid.org/F-Droid.apk' }
@@ -2407,14 +2590,16 @@ Here's an example showing how to attach an APK file:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mydownloads", file)
     req.Header.Set("Attach", "https://f-droid.org/F-Droid.apk")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mydownloads"
@@ -2424,13 +2609,15 @@ Here's an example showing how to attach an APK file:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.put("https://ntfy.sh/mydownloads",
         headers={ "Attach": "https://f-droid.org/F-Droid.apk" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mydownloads', false, stream_context_create([
         'http' => [
         'method' => 'PUT',
@@ -2447,16 +2634,18 @@ Here's an example showing how to attach an APK file:
 </figure>
 
 ## Icons
+
 _Supported on:_ :material-android:
 
 You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
 parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
-the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are 
+the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are
 cached locally in the client until the notification is deleted. **Only JPEG and PNG images are supported at this time**.
 
 Here's an example showing how to include an icon:
 
 === "Command line (curl)"
+
     ```
     curl \
         -H "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
@@ -2467,6 +2656,7 @@ Here's an example showing how to include an icon:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
@@ -2477,7 +2667,8 @@ Here's an example showing how to include an icon:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /tvshows HTTP/1.1
     Host: ntfy.sh
     Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png
@@ -2488,10 +2679,11 @@ Here's an example showing how to include an icon:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/tvshows', {
         method: 'POST',
-        headers: { 
+        headers: {
             'Icon': 'https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png',
             'Title': 'Kodi: Resuming Playback',
             'Tags': 'arrow_forward'
@@ -2501,7 +2693,8 @@ Here's an example showing how to include an icon:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/tvshows", strings.NewReader("The Wire, S01E01"))
     req.Header.Set("Icon", "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png")
     req.Header.Set("Tags", "arrow_forward")
@@ -2510,7 +2703,8 @@ Here's an example showing how to include an icon:
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/tvshows"
@@ -2525,7 +2719,8 @@ Here's an example showing how to include an icon:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/tvshows",
         data="The Wire, S01E01",
         headers={
@@ -2536,7 +2731,8 @@ Here's an example showing how to include an icon:
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/tvshows', false, stream_context_create([
         'http' => [
         'method' => 'PUT',
@@ -2558,19 +2754,21 @@ Here's an example of how it will look on Android:
 </figure>
 
 ## E-mail notifications
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that 
-you'd like to persist longer, or to blast-notify yourself on all possible channels. 
+You can forward messages to e-mail by specifying an address in the header. This can be useful for messages that
+you'd like to persist longer, or to blast-notify yourself on all possible channels.
 
 Usage is easy: Simply pass the `X-Email` header (or any of its aliases: `X-E-mail`, `Email`, `E-mail`, `Mail`, or `e`).
 Only one e-mail address is supported.
 
-Since ntfy does not provide auth (yet), the rate limiting is pretty strict (see [limitations](#limitations)). In the 
-default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of 
+Since ntfy does not provide auth (yet), the rate limiting is pretty strict (see [limitations](#limitations)). In the
+default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of
 that, your IP address appears in the e-mail body. This is to prevent abuse.
 
 === "Command line (curl)"
+
     ```
     curl \
         -H "Email: phil@example.com" \
@@ -2578,11 +2776,12 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
         -H "Priority: high" \
         -d "Unknown login from 5.31.23.83 to backups.example.com" \
         ntfy.sh/alerts
-    curl -H "Email: phil@example.com" -d "You've Got Mail" 
+    curl -H "Email: phil@example.com" -d "You've Got Mail"
     curl -d "You've Got Mail" "ntfy.sh/alerts?email=phil@example.com"
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --email=phil@example.com \
@@ -2592,7 +2791,8 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /alerts HTTP/1.1
     Host: ntfy.sh
     Email: phil@example.com
@@ -2603,11 +2803,12 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/alerts', {
         method: 'POST',
         body: "Unknown login from 5.31.23.83 to backups.example.com",
-        headers: { 
+        headers: {
             'Email': 'phil@example.com',
             'Tags': 'warning,skull,backup-host,ssh-login',
             'Priority': 'high'
@@ -2616,8 +2817,9 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
+
+    ```go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts",
         strings.NewReader("Unknown login from 5.31.23.83 to backups.example.com"))
     req.Header.Set("Email", "phil@example.com")
     req.Header.Set("Tags", "warning,skull,backup-host,ssh-login")
@@ -2626,7 +2828,8 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/alerts"
@@ -2642,10 +2845,11 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/alerts",
         data="Unknown login from 5.31.23.83 to backups.example.com",
-        headers={ 
+        headers={
             "Email": "phil@example.com",
             "Tags": "warning,skull,backup-host,ssh-login",
             "Priority": "high"
@@ -2653,7 +2857,8 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -2675,14 +2880,15 @@ Here's what that looks like in Google Mail:
 </figure>
 
 ## E-mail publishing
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 You can publish messages to a topic via e-mail, i.e. by sending an email to a specific address. For instance, you can
-publish a message to the topic `sometopic` by sending an e-mail to `ntfy-sometopic@ntfy.sh`. This is useful for e-mail 
+publish a message to the topic `sometopic` by sending an e-mail to `ntfy-sometopic@ntfy.sh`. This is useful for e-mail
 based integrations such as for statuspage.io (though these days most services also support webhooks and HTTP calls).
 
-Depending on the [server configuration](config.md#e-mail-publishing), the e-mail address format can have a prefix to 
-prevent spam on topics. For ntfy.sh, the prefix is configured to `ntfy-`, meaning that the general e-mail address 
+Depending on the [server configuration](config.md#e-mail-publishing), the e-mail address format can have a prefix to
+prevent spam on topics. For ntfy.sh, the prefix is configured to `ntfy-`, meaning that the general e-mail address
 format is:
 
 ```
@@ -2690,12 +2896,13 @@ ntfy-$topic@ntfy.sh
 ```
 
 If [access control](config.md#access-control) is enabled, and the target topic does not support anonymous writes, e-mail publishing won't work without providing an authorized access token. That will change the format of the e-mail's recipient address to
+
 ```
 ntfy-$topic+$token@ntfy.sh
 ```
 
 As of today, e-mail publishing only supports adding a [message title](#message-title) (the e-mail subject). Tags, priority,
-delay and other features are not supported (yet). Here's an example that will publish a message with the 
+delay and other features are not supported (yet). Here's an example that will publish a message with the
 title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://ntfy.sh/sometopic)):
 
 <figure markdown>
@@ -2704,16 +2911,17 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
 </figure>
 
 ## Phone calls
+
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can use ntfy to call a phone and **read the message out loud using text-to-speech**. 
-Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have 
+You can use ntfy to call a phone and **read the message out loud using text-to-speech**.
+Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have
 the ntfy app installed on their phone.
 
-**Phone numbers have to be previously verified** (via the [web app](https://ntfy.sh/account)), so this feature is 
+**Phone numbers have to be previously verified** (via the [web app](https://ntfy.sh/account)), so this feature is
 **only available to authenticated users** (no anonymous phone calls). To forward a message as a voice call, pass a phone
-number in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`. 
-You may also simply pass `yes` as a value to pick the first of your verified phone numbers. 
+number in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`.
+You may also simply pass `yes` as a value to pick the first of your verified phone numbers.
 On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) plans.
 
 <figure markdown>
@@ -2725,13 +2933,14 @@ As of today, the text-to-speed voice used will only support English. If there is
 be happy to add support for that. Please [open an issue on GitHub](https://github.com/binwiederhier/ntfy/issues).
 
 !!! info
-    You are responsible for the message content, and **you must abide by the [Twilio Acceptable Use Policy](https://www.twilio.com/en-us/legal/aup)**.
-    This particularly means that you must not use this feature to send unsolicited messages, or messages that are illegal or
-    violate the rights of others. Please read the policy for details. Failure to do so may result in your account being suspended or terminated.
+You are responsible for the message content, and **you must abide by the [Twilio Acceptable Use Policy](https://www.twilio.com/en-us/legal/aup)**.
+This particularly means that you must not use this feature to send unsolicited messages, or messages that are illegal or
+violate the rights of others. Please read the policy for details. Failure to do so may result in your account being suspended or terminated.
 
 Here's how you use it:
 
 === "Command line (curl)"
+
     ```
     curl \
         -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
@@ -2741,6 +2950,7 @@ Here's how you use it:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --token=tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
@@ -2749,7 +2959,8 @@ Here's how you use it:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /alerts HTTP/1.1
     Host: ntfy.sh
     Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
@@ -2759,11 +2970,12 @@ Here's how you use it:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/alerts', {
         method: 'POST',
         body: "Your garage seems to be on fire. You should probably check that out.",
-        headers: { 
+        headers: {
             'Authorization': 'Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2',
             'Call': '+12223334444'
         }
@@ -2771,8 +2983,9 @@ Here's how you use it:
     ```
 
 === "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
+
+    ```go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts",
         strings.NewReader("Your garage seems to be on fire. You should probably check that out."))
     req.Header.Set("Call", "+12223334444")
     req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
@@ -2780,7 +2993,8 @@ Here's how you use it:
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/alerts"
@@ -2794,17 +3008,19 @@ Here's how you use it:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/alerts",
         data="Your garage seems to be on fire. You should probably check that out.",
-        headers={ 
+        headers={
             "Authorization": "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2",
             "Call": "+12223334444"
         })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -2826,28 +3042,31 @@ Here's what a phone call from ntfy sounds like:
 
 Audio transcript:
 
-> You have a notification from ntfy on topic alerts.        
-> Message: Your garage seems to be on fire. You should probably check that out. End message.   
+> You have a notification from ntfy on topic alerts.  
+> Message: Your garage seems to be on fire. You should probably check that out. End message.  
 > This message was sent by user phil. It will be repeated up to three times.
 
 ## Authentication
+
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
-To publish/subscribe to protected topics, you can: 
+To publish/subscribe to protected topics, you can:
 
-* Use [username & password](#username-password) via Basic auth, e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
-* Use [access tokens](#bearer-auth) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
-* or use either with the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
+- Use [username & password](#username-password) via Basic auth, e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+- Use [access tokens](#bearer-auth) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
+- or use either with the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 !!! warning
-    When using Basic auth, base64 only encodes username and password. It **is not encrypting it**. For your 
-    self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing your password. 
+When using Basic auth, base64 only encodes username and password. It **is not encrypting it**. For your
+self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing your password.
 
 ### Username + password
+
 The simplest way to authenticate against a ntfy server is to use [Basic auth](https://en.wikipedia.org/wiki/Basic_access_authentication).
 Here's an example with a user `testuser` and password `fakepassword`:
 
 === "Command line (curl)"
+
     ```
     curl \
       -u testuser:fakepassword \
@@ -2856,6 +3075,7 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
       -u testuser:fakepassword \
@@ -2864,7 +3084,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mysecrets HTTP/1.1
     Host: ntfy.example.com
     Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
@@ -2873,7 +3094,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.example.com/mysecrets', {
         method: 'POST', // PUT works too
         body: 'Look ma, with auth',
@@ -2884,7 +3106,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
     strings.NewReader("Look ma, with auth"))
     req.Header.Set("Authorization", "Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk")
@@ -2892,13 +3115,14 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "PowerShell 7+"
-    ``` powershell
+
+    ```powershell
     # Get the credentials from the user
     $Credential = Get-Credential testuser
 
     # Alternatively, create a PSCredential object with the password from scratch
     $Credential = [PSCredential]::new("testuser", (ConvertTo-SecureString "password" -AsPlainText -Force))
-    
+
     # Note that the Authentication parameter requires PowerShell 7 or later
     $Request = @{
       Method = "POST"
@@ -2911,7 +3135,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "PowerShell 5 and earlier"
-    ``` powershell
+
+    ```powershell
     # With PowerShell 5 or earlier, we need to create the base64 username:password string ourselves
     $CredentialString = "$($Credential.Username):$($Credential.GetNetworkCredential().Password)"
     $EncodedCredential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($CredentialString))
@@ -2925,7 +3150,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.example.com/mysecrets",
     data="Look ma, with auth",
     headers={
@@ -2934,7 +3160,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -2946,8 +3173,8 @@ Here's an example with a user `testuser` and password `fakepassword`:
     ]));
     ```
 
-To generate the `Authorization` header, use **standard base64** to encode the colon-separated `<username>:<password>` 
-and prepend the word `Basic`, i.e. `Authorization: Basic base64(<username>:<password>)`. Here's some pseudo-code that 
+To generate the `Authorization` header, use **standard base64** to encode the colon-separated `<username>:<password>`
+and prepend the word `Basic`, i.e. `Authorization: Basic base64(<username>:<password>)`. Here's some pseudo-code that
 hopefully explains it better:
 
 ```
@@ -2956,13 +3183,14 @@ password   = "fakepassword"
 authHeader = "Basic " + base64(username + ":" + password) // -> Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk
 ```
 
-The following command will generate the appropriate value for you on *nix systems:
+The following command will generate the appropriate value for you on \*nix systems:
 
 ```
 echo "Basic $(echo -n 'testuser:fakepassword' | base64)"
 ```
 
 ### Access tokens
+
 In addition to username/password auth, ntfy also provides authentication via access tokens. Access tokens are useful
 to avoid having to configure your password across multiple publishing/subscribing applications. For instance, you may
 want to use a dedicated token to publish from your backup host, and one from your home automation system.
@@ -2970,11 +3198,12 @@ want to use a dedicated token to publish from your backup host, and one from you
 You can create access tokens using the `ntfy token` command, or in the web app in the "Account" section (when logged in).
 See [access tokens](config.md#access-tokens) for details.
 
-Once an access token is created, you can use it to authenticate against the ntfy server, e.g. when you publish or 
+Once an access token is created, you can use it to authenticate against the ntfy server, e.g. when you publish or
 subscribe to topics. Here's an example using [Bearer auth](https://swagger.io/docs/specification/authentication/bearer-authentication/),
 with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
 
 === "Command line (curl)"
+
     ```
     curl \
       -H "Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2" \
@@ -2983,6 +3212,7 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
       --token tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
@@ -2991,7 +3221,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mysecrets HTTP/1.1
     Host: ntfy.example.com
     Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
@@ -3000,7 +3231,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.example.com/mysecrets', {
         method: 'POST', // PUT works too
         body: 'Look ma, with auth',
@@ -3011,7 +3243,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
     strings.NewReader("Look ma, with auth"))
     req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
@@ -3019,7 +3252,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "PowerShell 7+"
-    ``` powershell
+
+    ```powershell
     # With PowerShell 7 or greater, we can use the Authentication and Token parameters
     $Request = @{
       Method = "POST"
@@ -3032,7 +3266,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "PowerShell 5 and earlier"
-    ``` powershell
+
+    ```powershell
     # In PowerShell 5 and below, we can only send the Bearer token as a string in the Headers
     $Request = @{
       Method = "POST"
@@ -3044,7 +3279,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.example.com/mysecrets",
     data="Look ma, with auth",
     headers={
@@ -3053,7 +3289,8 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -3065,11 +3302,12 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     ]));
     ```
 
-Alternatively, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) to send the 
-access token. When sending an empty username, the basic auth password is treated by the ntfy server as an 
+Alternatively, you can use [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) to send the
+access token. When sending an empty username, the basic auth password is treated by the ntfy server as an
 access token. This is primarily useful to make `curl` calls easier, e.g. `curl -u:tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 ...`:
 
 === "Command line (curl)"
+
     ```
     curl \
       -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
@@ -3078,6 +3316,7 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
       --token tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
@@ -3086,7 +3325,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mysecrets HTTP/1.1
     Host: ntfy.example.com
     Authorization: Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy
@@ -3095,7 +3335,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.example.com/mysecrets', {
         method: 'POST', // PUT works too
         body: 'Look ma, with auth',
@@ -3106,7 +3347,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
     strings.NewReader("Look ma, with auth"))
     req.Header.Set("Authorization", "Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy")
@@ -3114,7 +3356,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     # Note that PSCredentials *must* have a username, so we fall back to placing the authorization in the Headers as with PowerShell 5
     $Request = @{
       Method = "POST"
@@ -3128,7 +3371,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.example.com/mysecrets",
     data="Look ma, with auth",
     headers={
@@ -3137,7 +3381,8 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -3149,11 +3394,12 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
     ]));
     ```
 
-
 ### Query param
+
 Here's an example using the `auth` query parameter:
 
 === "Command line (curl)"
+
     ```
     curl \
       -d "Look ma, with auth" \
@@ -3161,6 +3407,7 @@ Here's an example using the `auth` query parameter:
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
       -u testuser:fakepassword \
@@ -3169,7 +3416,8 @@ Here's an example using the `auth` query parameter:
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw HTTP/1.1
     Host: ntfy.example.com
 
@@ -3177,7 +3425,8 @@ Here's an example using the `auth` query parameter:
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw', {
         method: 'POST', // PUT works too
         body: 'Look ma, with auth'
@@ -3185,14 +3434,16 @@ Here's an example using the `auth` query parameter:
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw",
         strings.NewReader("Look ma, with auth"))
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
@@ -3202,13 +3453,15 @@ Here's an example using the `auth` query parameter:
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw",
     data="Look ma, with auth"
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw', false, stream_context_create([
         'http' => [
             'method' => 'POST', // PUT also works
@@ -3218,8 +3471,8 @@ Here's an example using the `auth` query parameter:
     ]));
     ```
 
-To generate the value of the `auth` parameter, encode the value of the `Authorization` header (see above) using 
-**raw base64 encoding** (like base64, but strip any trailing `=`). Here's some pseudo-code that hopefully 
+To generate the value of the `auth` parameter, encode the value of the `Authorization` header (see above) using
+**raw base64 encoding** (like base64, but strip any trailing `=`). Here's some pseudo-code that hopefully
 explains it better:
 
 ```
@@ -3229,10 +3482,10 @@ authHeader = "Basic " + base64(username + ":" + password) // -> Basic dGVzdHVzZX
 authParam  = base64_raw(authHeader) // -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw (no trailing =)
 
 // If your language does not have a function to encode raw base64, simply use normal base64
-// and REMOVE TRAILING "=" characters. 
+// and REMOVE TRAILING "=" characters.
 ```
 
-The following command will generate the appropriate value for you on *nix systems:
+The following command will generate the appropriate value for you on \*nix systems:
 
 ```
 echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='
@@ -3247,27 +3500,30 @@ echo -n "Bearer faketoken" | base64 | tr -d '='
 ## Advanced features
 
 ### Message caching
+
 !!! info
-    If `Cache: no` is used, messages will only be delivered to connected subscribers, and won't be re-delivered if a 
-    client re-connects. If a subscriber has (temporary) network issues or is reconnecting momentarily, 
-    **messages might be missed**.
+If `Cache: no` is used, messages will only be delivered to connected subscribers, and won't be re-delivered if a
+client re-connects. If a subscriber has (temporary) network issues or is reconnecting momentarily,
+**messages might be missed**.
 
 By default, the ntfy server caches messages on disk for 12 hours (see [message caching](config.md#message-cache)), so
-all messages you publish are stored server-side for a little while. The reason for this is to overcome temporary 
+all messages you publish are stored server-side for a little while. The reason for this is to overcome temporary
 client-side network disruptions, but arguably this feature also may raise privacy concerns.
 
-To avoid messages being cached server-side entirely, you can set `X-Cache` header (or its alias: `Cache`) to `no`. 
+To avoid messages being cached server-side entirely, you can set `X-Cache` header (or its alias: `Cache`) to `no`.
 This will make sure that your message is not cached on the server, even if server-side caching is enabled. Messages
-are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetch-cached-messages) and 
+are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fetch-cached-messages) and
 [`poll=1`](subscribe/api.md#poll-for-messages) won't return the message anymore.
 
 === "Command line (curl)"
+
     ```
     curl -H "X-Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
     curl -H "Cache: no" -d "This message won't be stored server-side" ntfy.sh/mytopic
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --no-cache \
@@ -3275,7 +3531,8 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
     Cache: no
@@ -3284,7 +3541,8 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mytopic', {
         method: 'POST',
         body: 'This message won't be stored server-side',
@@ -3293,14 +3551,16 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be stored server-side"))
     req.Header.Set("Cache", "no")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mytopic"
@@ -3311,14 +3571,16 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/mytopic",
         data="This message won't be stored server-side",
         headers={ "Cache": "no" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -3331,13 +3593,14 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
     ```
 
 ### Disable Firebase
+
 !!! info
-    If `Firebase: no` is used and [instant delivery](subscribe/phone.md#instant-delivery) isn't enabled in the Android 
-    app (Google Play variant only), **message delivery will be significantly delayed (up to 15 minutes)**. To overcome 
-    this delay, simply enable instant delivery.
+If `Firebase: no` is used and [instant delivery](subscribe/phone.md#instant-delivery) isn't enabled in the Android
+app (Google Play variant only), **message delivery will be significantly delayed (up to 15 minutes)**. To overcome
+this delay, simply enable instant delivery.
 
 The ntfy server can be configured to use [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging)
-(see [Firebase config](config.md#firebase-fcm)) for message delivery on Android (to minimize the app's battery footprint). 
+(see [Firebase config](config.md#firebase-fcm)) for message delivery on Android (to minimize the app's battery footprint).
 The ntfy.sh server is configured this way, meaning that all messages published to ntfy.sh are also published to corresponding
 FCM topics.
 
@@ -3345,12 +3608,14 @@ If you'd like to avoid forwarding messages to Firebase, you can set the `X-Fireb
 to `no`. This will instruct the server not to forward messages to Firebase.
 
 === "Command line (curl)"
+
     ```
     curl -H "X-Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
     curl -H "Firebase: no" -d "This message won't be forwarded to FCM" ntfy.sh/mytopic
     ```
 
 === "ntfy CLI"
+
     ```
     ntfy publish \
         --no-firebase \
@@ -3358,7 +3623,8 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
 
 === "HTTP"
-    ``` http
+
+    ```http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
     Firebase: no
@@ -3367,7 +3633,8 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
 
 === "JavaScript"
-    ``` javascript
+
+    ```javascript
     fetch('https://ntfy.sh/mytopic', {
         method: 'POST',
         body: 'This message won't be forwarded to FCM',
@@ -3376,14 +3643,16 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
 
 === "Go"
-    ``` go
+
+    ```go
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("This message won't be forwarded to FCM"))
     req.Header.Set("Firebase", "no")
     http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
-    ``` powershell
+
+    ```powershell
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mytopic"
@@ -3394,14 +3663,16 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
 
 === "Python"
-    ``` python
+
+    ```python
     requests.post("https://ntfy.sh/mytopic",
         data="This message won't be forwarded to FCM",
         headers={ "Firebase": "no" })
     ```
 
 === "PHP"
-    ``` php-inline
+
+    ```php-inline
     file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
         'http' => [
             'method' => 'POST',
@@ -3414,8 +3685,9 @@ to `no`. This will instruct the server not to forward messages to Firebase.
     ```
 
 ### UnifiedPush
+
 !!! info
-    This setting is not relevant to users, only to app developers and people interested in [UnifiedPush](https://unifiedpush.org). 
+This setting is not relevant to users, only to app developers and people interested in [UnifiedPush](https://unifiedpush.org).
 
 [UnifiedPush](https://unifiedpush.org) is a standard for receiving push notifications without using the Google-owned
 [Firebase Cloud Messaging (FCM)](https://firebase.google.com/docs/cloud-messaging) service. It puts push notifications
@@ -3423,16 +3695,17 @@ in the control of the user. ntfy can act as a **UnifiedPush distributor**, forwa
 
 When publishing messages to a topic, apps using ntfy as a UnifiedPush distributor can set the `X-UnifiedPush` header or query
 parameter (or any of its aliases `unifiedpush` or `up`) to `1` to [disable Firebase](#disable-firebase). As of today, this
-option is mostly equivalent to `Firebase: no`, but was introduced to allow future flexibility. The flag additionally 
+option is mostly equivalent to `Firebase: no`, but was introduced to allow future flexibility. The flag additionally
 enables auto-detection of the message encoding. If the message is binary, it'll be encoded as base64.
 
 ### Matrix Gateway
+
 The ntfy server implements a [Matrix Push Gateway](https://spec.matrix.org/v1.2/push-gateway-api/) (in combination with
 [UnifiedPush](https://unifiedpush.org) as the [Provider Push Protocol](https://unifiedpush.org/developers/gateway/)). This makes it easier to integrate
-with self-hosted [Matrix](https://matrix.org/) servers (such as [synapse](https://github.com/matrix-org/synapse)), since 
+with self-hosted [Matrix](https://matrix.org/) servers (such as [synapse](https://github.com/matrix-org/synapse)), since
 you don't have to set up a separate push proxy (such as [common-proxies](https://github.com/UnifiedPush/common-proxies)).
 
-In short, ntfy accepts Matrix messages on the `/_matrix/push/v1/notify` endpoint (see [Push Gateway API](https://spec.matrix.org/v1.2/push-gateway-api/)), 
+In short, ntfy accepts Matrix messages on the `/_matrix/push/v1/notify` endpoint (see [Push Gateway API](https://spec.matrix.org/v1.2/push-gateway-api/)),
 and forwards them to the ntfy topic defined in the `pushkey` of the message. The message will then be forwarded to the
 ntfy Android app, and passed on to the Matrix client there.
 
@@ -3440,24 +3713,26 @@ There is a nice diagram in the [Push Gateway docs](https://spec.matrix.org/v1.2/
 ntfy server plays the role of the Push Gateway, as well as the Push Provider. UnifiedPush is the Provider Push Protocol.
 
 !!! info
-    This is not a generic Matrix Push Gateway. It only works in combination with UnifiedPush and ntfy.
+This is not a generic Matrix Push Gateway. It only works in combination with UnifiedPush and ntfy.
 
 ## Public topics
+
 Obviously all topics on ntfy.sh are public, but there are a few designated topics that are used in examples, and topics
 that you can use to try out what [authentication and access control](#authentication) looks like.
 
-| Topic                                          | User                              | Permissions                                          | Description                          |
-|------------------------------------------------|-----------------------------------|------------------------------------------------------|--------------------------------------|
-| [announcements](https://ntfy.sh/announcements) | `*` (unauthenticated)             | Read-only for everyone                               | Release announcements and such       |
-| [stats](https://ntfy.sh/stats)                 | `*` (unauthenticated)             | Read-only for everyone                               | Daily statistics about ntfy.sh usage |
+| Topic                                          | User                  | Permissions            | Description                          |
+| ---------------------------------------------- | --------------------- | ---------------------- | ------------------------------------ |
+| [announcements](https://ntfy.sh/announcements) | `*` (unauthenticated) | Read-only for everyone | Release announcements and such       |
+| [stats](https://ntfy.sh/stats)                 | `*` (unauthenticated) | Read-only for everyone | Daily statistics about ntfy.sh usage |
 
 ## Limitations
-There are a few limitations to the API to prevent abuse and to keep the server healthy. Almost all of these settings 
+
+There are a few limitations to the API to prevent abuse and to keep the server healthy. Almost all of these settings
 are configurable via the server side [rate limiting settings](config.md#rate-limiting). Most of these limits you won't run into,
 but just in case, let's list them all:
 
 | Limit                      | Description                                                                                                                                                                                                             |
-|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Message length**         | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                                                                 |
 | **Requests**               | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds.                                                |
 | **Daily messages**         | By default, the number of messages is governed by the request limits. This can be overridden. On ntfy.sh, the daily message limit is 250.                                                                               |
@@ -3470,21 +3745,22 @@ but just in case, let's list them all:
 | **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                                                               |
 
 These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
-a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
+a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above.
 
 ## List of all parameters
+
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
-when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
+when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the
 table in their canonical form.
 
 !!! info
-    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
-    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any
-    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
-    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any
+header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 | Parameter       | Aliases                                    | Description                                                                                   |
-|-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|
+| --------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | `X-Message`     | `Message`, `m`                             | Main body of the message as shown in the notification                                         |
 | `X-Title`       | `Title`, `t`                               | [Message title](#message-title)                                                               |
 | `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |

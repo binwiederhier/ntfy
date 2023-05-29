@@ -1,10 +1,9 @@
 ---
 name: ❓ Question
 about: Ask a question about ntfy
-title: ''
-labels: 'question'
-assignees: ''
-
+title: ""
+labels: "question"
+assignees: ""
 ---
 
 <!--
@@ -18,4 +17,5 @@ sooner, and there are more people there to help!
 -->
 
 :question: **Question**
+
 <!-- Go ahead and ask your question here :) -->

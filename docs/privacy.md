@@ -8,5 +8,5 @@ any outside service. All data is exclusively used to make the service function p
 I use is Firebase Cloud Messaging (FCM) service, which is required to provide instant Android notifications (see
 [FAQ](faq.md) for details). To avoid FCM altogether, download the F-Droid version.
 
-For debugging purposes, the ntfy server may temporarily log request paths, remote IP addresses or even topics 
+For debugging purposes, the ntfy server may temporarily log request paths, remote IP addresses or even topics
 or messages, though typically this is turned off.

@@ -1,0 +1,6 @@
+server/docs/
+server/site/
+server/mailer_emoji_map.json
+scripts/emoji.json
+dist/
+web/

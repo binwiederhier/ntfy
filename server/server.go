@@ -55,7 +55,7 @@ type Server struct {
 	messagesHistory          []int64                             // Last n values of the messages counter, used to determine rate
 	userManager              *user.Manager                       // Might be nil!
 	messageCache             *messageCache                       // Database that stores the messages
-	webPushSubscriptionStore *webPushSubscriptionStore           // Database that stores web push subscriptions
+	webPushSubscriptionStore *webPushStore                       // Database that stores web push subscriptions
 	fileCache                *fileCache                          // File system based cache that stores attachments
 	stripe                   stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache               *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
@@ -227,12 +227,12 @@ func createMessageCache(conf *Config) (*messageCache, error) {
 	return newMemCache()
 }
 
-func createWebPushSubscriptionStore(conf *Config) (*webPushSubscriptionStore, error) {
+func createWebPushSubscriptionStore(conf *Config) (*webPushStore, error) {
 	if !conf.WebPushEnabled {
 		return nil, nil
 	}
 
-	return newWebPushSubscriptionStore(conf.WebPushSubscriptionsFile)
+	return newWebPushStore(conf.WebPushSubscriptionsFile)
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
@@ -979,18 +979,12 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 
 func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 	subscriptions, err := s.webPushSubscriptionStore.GetSubscriptionsForTopic(m.Topic)
-
 	if err != nil {
 		logvm(v, m).Err(err).Warn("Unable to publish web push messages")
 		return
 	}
-
-	totalCount := len(subscriptions)
-
-	wg := &sync.WaitGroup{}
-	wg.Add(totalCount)
-
-	ctx := log.Context{"topic": m.Topic, "message_id": m.ID, "total_count": totalCount}
+	
+	ctx := log.Context{"topic": m.Topic, "message_id": m.ID, "total_count": len(subscriptions)}
 
 	// Importing the emojis in the service worker would add unnecessary complexity,
 	// simply do it here for web push notifications instead
@@ -1017,7 +1011,6 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 
 	for i, xi := range subscriptions {
 		go func(i int, sub webPushSubscription) {
-			defer wg.Done()
 			ctx := log.Context{"endpoint": sub.BrowserSubscription.Endpoint, "username": sub.Username, "topic": m.Topic, "message_id": m.ID}
 
 			payload := &webPushPayload{

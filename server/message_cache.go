@@ -270,7 +270,7 @@ func newSqliteCache(filename, startupQueries string, cacheDuration time.Duration
 	if err != nil {
 		return nil, err
 	}
-	if err := setupDB(db, startupQueries, cacheDuration); err != nil {
+	if err := setupMessagesDB(db, startupQueries, cacheDuration); err != nil {
 		return nil, err
 	}
 	var queue *util.BatchingQueue[*message]
@@ -749,7 +749,7 @@ func (c *messageCache) Close() error {
 	return c.db.Close()
 }
 
-func setupDB(db *sql.DB, startupQueries string, cacheDuration time.Duration) error {
+func setupMessagesDB(db *sql.DB, startupQueries string, cacheDuration time.Duration) error {
 	// Run startup queries
 	if startupQueries != "" {
 		if _, err := db.Exec(startupQueries); err != nil {

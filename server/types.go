@@ -398,12 +398,10 @@ type apiConfigResponse struct {
 	EnableCalls        bool     `json:"enable_calls"`
 	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
+	EnableWebPush      bool     `json:"enable_web_push"`
 	BillingContact     string   `json:"billing_contact"`
+	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
-}
-
-type apiWebPushConfigResponse struct {
-	PublicKey string `json:"public_key"`
 }
 
 type apiAccountBillingPrices struct {

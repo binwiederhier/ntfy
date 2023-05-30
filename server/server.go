@@ -104,7 +104,6 @@ var (
 	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
 	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
 	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
-	apiWebPushConfig                                     = "/v1/web-push-config"
 	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -496,8 +495,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiWebPushConfig {
-		return s.ensureWebPushEnabled(s.handleAPIWebPushConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
@@ -563,14 +560,6 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) handleAPIWebPushConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiWebPushConfigResponse{
-		PublicKey: s.config.WebPushPublicKey,
-	}
-
-	return s.writeJSON(w, response)
-}
-
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	response := &apiHealthResponse{
 		Healthy: true,
@@ -588,7 +577,9 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableCalls:        s.config.TwilioAccount != "",
 		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
+		EnableWebPush:      s.config.WebPushEnabled,
 		BillingContact:     s.config.BillingContact,
+		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")

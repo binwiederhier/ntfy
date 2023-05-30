@@ -14,6 +14,8 @@ var config = {
   enable_reservations: true,
   enable_emails: true,
   enable_calls: true,
+  enable_web_push: true,
   billing_contact: "",
+  web_push_public_key: "",
   disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"],
 };

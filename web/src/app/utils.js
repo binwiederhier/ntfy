@@ -23,7 +23,6 @@ export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/aut
 export const topicUrlWebPushSubscribe = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/web-push/subscribe`;
 export const topicUrlWebPushUnsubscribe = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/web-push/unsubscribe`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
-export const webPushConfigUrl = (baseUrl) => `${baseUrl}/v1/web-push-config`;
 export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
 export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;

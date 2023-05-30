@@ -8,7 +8,6 @@ import {
   topicUrlJsonPollWithSince,
   topicUrlWebPushSubscribe,
   topicUrlWebPushUnsubscribe,
-  webPushConfigUrl,
 } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
@@ -117,27 +116,8 @@ class Api {
     throw new Error(`Unexpected server response ${response.status}`);
   }
 
-  /**
-   * @returns {Promise<{ public_key: string } | undefined>}
-   */
-  async getWebPushConfig(baseUrl) {
-    const response = await fetch(webPushConfigUrl(baseUrl));
-
-    if (response.ok) {
-      return response.json();
-    }
-
-    if (response.status === 404) {
-      // web push is not enabled
-      return undefined;
-    }
-
-    throw new Error(`Unexpected server response ${response.status}`);
-  }
-
   async subscribeWebPush(baseUrl, topic, browserSubscription) {
     const user = await userManager.get(baseUrl);
-
     const url = topicUrlWebPushSubscribe(baseUrl, topic);
     console.log(`[Api] Sending Web Push Subscription ${url}`);
 
@@ -163,7 +143,9 @@ class Api {
     const response = await fetch(url, {
       method: "POST",
       headers: maybeWithAuth({}, user),
-      body: JSON.stringify({ endpoint: subscription.webPushEndpoint }),
+      body: JSON.stringify({
+        endpoint: subscription.webPushEndpoint
+      }),
     });
 
     if (response.ok) {

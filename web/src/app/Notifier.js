@@ -53,7 +53,7 @@ class Notifier {
   }
 
   async subscribeWebPush(baseUrl, topic) {
-    if (!this.supported() || !this.pushSupported()) {
+    if (!this.supported() || !this.pushSupported() || !config.enable_web_push) {
       return {};
     }
 
@@ -71,21 +71,12 @@ class Notifier {
     }
 
     try {
-      const webPushConfig = await api.getWebPushConfig(baseUrl);
-
-      if (!webPushConfig) {
-        console.log("[Notifier.subscribeWebPush] Web push not configured on server");
-      }
-
       const browserSubscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(webPushConfig.public_key),
+        applicationServerKey: urlB64ToUint8Array(config.web_push_public_key),
       });
-
       await api.subscribeWebPush(baseUrl, topic, browserSubscription);
-
       console.log("[Notifier.subscribeWebPush] Successfully subscribed to web push");
-
       return browserSubscription;
     } catch (e) {
       console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);

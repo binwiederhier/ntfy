@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,14 +25,6 @@ var (
 		}
 	}`
 )
-
-func TestServer_WebPush_GetConfig(t *testing.T) {
-	s := newTestServer(t, newTestConfigWithWebPush(t))
-
-	response := request(t, s, "GET", "/v1/web-push-config", "", nil)
-	require.Equal(t, 200, response.Code)
-	require.Equal(t, fmt.Sprintf(`{"public_key":"%s"}`, s.config.WebPushPublicKey)+"\n", response.Body.String())
-}
 
 func TestServer_WebPush_TopicSubscribe(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))

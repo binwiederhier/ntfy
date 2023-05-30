@@ -41,7 +41,7 @@ func TestServer_WebPush_TopicSubscribe(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
-	subs, err := s.webPushSubscriptionStore.GetSubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
-	subs, err := s.webPushSubscriptionStore.GetSubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestServer_WebPush_PublishExpire(t *testing.T) {
 }
 
 func addSubscription(t *testing.T, s *Server, topic string, url string) {
-	err := s.webPushSubscriptionStore.AddSubscription("test-topic", "", webPushSubscribePayload{
+	err := s.webPush.AddSubscription("test-topic", "", webPushSubscribePayload{
 		BrowserSubscription: webpush.Subscription{
 			Endpoint: url,
 			Keys: webpush.Keys{
@@ -203,7 +203,7 @@ func addSubscription(t *testing.T, s *Server, topic string, url string) {
 }
 
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {
-	subs, err := s.webPushSubscriptionStore.GetSubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}

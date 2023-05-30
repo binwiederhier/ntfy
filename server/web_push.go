@@ -12,7 +12,7 @@ const (
 		CREATE TABLE IF NOT EXISTS subscriptions (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			topic TEXT NOT NULL,
-			username TEXT,
+			user_id TEXT,
 			endpoint TEXT NOT NULL,
 			key_auth TEXT NOT NULL,
 			key_p256dh TEXT NOT NULL,
@@ -24,14 +24,14 @@ const (
 		COMMIT;
 	`
 	insertWebPushSubscriptionQuery = `
-		INSERT OR REPLACE INTO subscriptions (topic, username, endpoint, key_auth, key_p256dh)
+		INSERT OR REPLACE INTO subscriptions (topic, user_id, endpoint, key_auth, key_p256dh)
 		VALUES (?, ?, ?, ?, ?)
 	`
 	deleteWebPushSubscriptionByEndpointQuery         = `DELETE FROM subscriptions WHERE endpoint = ?`
-	deleteWebPushSubscriptionByUsernameQuery         = `DELETE FROM subscriptions WHERE username = ?`
+	deleteWebPushSubscriptionByUserIDQuery           = `DELETE FROM subscriptions WHERE user_id = ?`
 	deleteWebPushSubscriptionByTopicAndEndpointQuery = `DELETE FROM subscriptions WHERE topic = ? AND endpoint = ?`
 
-	selectWebPushSubscriptionsForTopicQuery = `SELECT endpoint, key_auth, key_p256dh, username FROM subscriptions WHERE topic = ?`
+	selectWebPushSubscriptionsForTopicQuery = `SELECT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE topic = ?`
 
 	selectWebPushSubscriptionsCountQuery = `SELECT COUNT(*) FROM subscriptions`
 )
@@ -69,11 +69,11 @@ func setupNewSubscriptionsDB(db *sql.DB) error {
 	return nil
 }
 
-func (c *webPushStore) AddSubscription(topic string, username string, subscription webPushSubscribePayload) error {
+func (c *webPushStore) AddSubscription(topic string, userID string, subscription webPushSubscribePayload) error {
 	_, err := c.db.Exec(
 		insertWebPushSubscriptionQuery,
 		topic,
-		username,
+		userID,
 		subscription.BrowserSubscription.Endpoint,
 		subscription.BrowserSubscription.Keys.Auth,
 		subscription.BrowserSubscription.Keys.P256dh,
@@ -90,7 +90,7 @@ func (c *webPushStore) RemoveSubscription(topic string, endpoint string) error {
 	return err
 }
 
-func (c *webPushStore) GetSubscriptionsForTopic(topic string) (subscriptions []webPushSubscription, err error) {
+func (c *webPushStore) SubscriptionsForTopic(topic string) (subscriptions []webPushSubscription, err error) {
 	rows, err := c.db.Query(selectWebPushSubscriptionsForTopicQuery, topic)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (c *webPushStore) GetSubscriptionsForTopic(topic string) (subscriptions []w
 	var data []webPushSubscription
 	for rows.Next() {
 		i := webPushSubscription{}
-		err = rows.Scan(&i.BrowserSubscription.Endpoint, &i.BrowserSubscription.Keys.Auth, &i.BrowserSubscription.Keys.P256dh, &i.Username)
+		err = rows.Scan(&i.BrowserSubscription.Endpoint, &i.BrowserSubscription.Keys.Auth, &i.BrowserSubscription.Keys.P256dh, &i.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +109,7 @@ func (c *webPushStore) GetSubscriptionsForTopic(topic string) (subscriptions []w
 	return data, nil
 }
 
-func (c *webPushStore) ExpireWebPushEndpoint(endpoint string) error {
+func (c *webPushStore) RemoveByEndpoint(endpoint string) error {
 	_, err := c.db.Exec(
 		deleteWebPushSubscriptionByEndpointQuery,
 		endpoint,
@@ -117,10 +117,10 @@ func (c *webPushStore) ExpireWebPushEndpoint(endpoint string) error {
 	return err
 }
 
-func (c *webPushStore) ExpireWebPushForUser(username string) error {
+func (c *webPushStore) RemoveByUserID(userID string) error {
 	_, err := c.db.Exec(
-		deleteWebPushSubscriptionByUsernameQuery,
-		username,
+		deleteWebPushSubscriptionByUserIDQuery,
+		userID,
 	)
 	return err
 }

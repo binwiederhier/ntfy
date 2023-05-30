@@ -2620,12 +2620,8 @@ func newTestConfigWithAuthFile(t *testing.T) *Config {
 
 func newTestConfigWithWebPush(t *testing.T) *Config {
 	conf := newTestConfig(t)
-
 	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	require.Nil(t, err)
 	conf.WebPushEnabled = true
 	conf.WebPushSubscriptionsFile = filepath.Join(t.TempDir(), "subscriptions.db")
 	conf.WebPushEmailAddress = "testing@example.com"
@@ -2636,9 +2632,7 @@ func newTestConfigWithWebPush(t *testing.T) *Config {
 
 func newTestServer(t *testing.T, config *Config) *Server {
 	server, err := New(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	return server
 }
 

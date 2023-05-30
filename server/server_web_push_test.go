@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestServer_WebPush_TopicSubscribe(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
-	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestServer_WebPush_TopicSubscribe(t *testing.T) {
 	require.Equal(t, subs[0].BrowserSubscription.Endpoint, "https://example.com/webpush")
 	require.Equal(t, subs[0].BrowserSubscription.Keys.P256dh, "p256dh-key")
 	require.Equal(t, subs[0].BrowserSubscription.Keys.Auth, "auth-key")
-	require.Equal(t, subs[0].Username, "")
+	require.Equal(t, subs[0].UserID, "")
 }
 
 func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
@@ -64,17 +65,13 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	response := request(t, s, "POST", "/test-topic/web-push/subscribe", webPushSubscribePayloadExample, map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
-
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
-	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
+	require.Nil(t, err)
 	require.Len(t, subs, 1)
-	require.Equal(t, subs[0].Username, "ben")
+	require.True(t, strings.HasPrefix(subs[0].UserID, "u_"))
 }
 
 func TestServer_WebPush_TopicSubscribeProtected_Denied(t *testing.T) {
@@ -203,7 +200,7 @@ func addSubscription(t *testing.T, s *Server, topic string, url string) {
 }
 
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {
-	subs, err := s.webPush.GetSubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
 	if err != nil {
 		t.Fatal(err)
 	}

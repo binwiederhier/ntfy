@@ -10,15 +10,8 @@ import (
 )
 
 func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	var username string
-	u := v.User()
-	if u != nil {
-		username = u.Name
-	}
-
 	var sub webPushSubscribePayload
 	err := json.NewDecoder(r.Body).Decode(&sub)
-
 	if err != nil || sub.BrowserSubscription.Endpoint == "" || sub.BrowserSubscription.Keys.P256dh == "" || sub.BrowserSubscription.Keys.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	}
@@ -27,12 +20,9 @@ func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-
-	err = s.webPush.AddSubscription(topic.ID, username, sub)
-	if err != nil {
+	if err = s.webPush.AddSubscription(topic.ID, v.MaybeUserID(), sub); err != nil {
 		return err
 	}
-
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -59,7 +49,7 @@ func (s *Server) handleTopicWebPushUnsubscribe(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
-	subscriptions, err := s.webPush.GetSubscriptionsForTopic(m.Topic)
+	subscriptions, err := s.webPush.SubscriptionsForTopic(m.Topic)
 	if err != nil {
 		logvm(v, m).Err(err).Warn("Unable to publish web push messages")
 		return
@@ -69,21 +59,17 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 
 	// Importing the emojis in the service worker would add unnecessary complexity,
 	// simply do it here for web push notifications instead
-	var titleWithDefault string
-	var formattedTitle string
-
+	var titleWithDefault, formattedTitle string
 	emojis, _, err := toEmojis(m.Tags)
 	if err != nil {
 		logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
 		return
 	}
-
 	if m.Title == "" {
 		titleWithDefault = m.Topic
 	} else {
 		titleWithDefault = m.Title
 	}
-
 	if len(emojis) > 0 {
 		formattedTitle = fmt.Sprintf("%s %s", strings.Join(emojis[:], " "), titleWithDefault)
 	} else {
@@ -92,7 +78,7 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 
 	for i, xi := range subscriptions {
 		go func(i int, sub webPushSubscription) {
-			ctx := log.Context{"endpoint": sub.BrowserSubscription.Endpoint, "username": sub.Username, "topic": m.Topic, "message_id": m.ID}
+			ctx := log.Context{"endpoint": sub.BrowserSubscription.Endpoint, "username": sub.UserID, "topic": m.Topic, "message_id": m.ID}
 
 			payload := &webPushPayload{
 				SubscriptionID: fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic),
@@ -110,31 +96,25 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 				Subscriber:      s.config.WebPushEmailAddress,
 				VAPIDPublicKey:  s.config.WebPushPublicKey,
 				VAPIDPrivateKey: s.config.WebPushPrivateKey,
-				// deliverability on iOS isn't great with lower urgency values,
+				// Deliverability on iOS isn't great with lower urgency values,
 				// and thus we can't really map lower ntfy priorities to lower urgency values
 				Urgency: webpush.UrgencyHigh,
 			})
 
 			if err != nil {
 				logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
-
-				err = s.webPush.ExpireWebPushEndpoint(sub.BrowserSubscription.Endpoint)
-				if err != nil {
+				if err := s.webPush.RemoveByEndpoint(sub.BrowserSubscription.Endpoint); err != nil {
 					logvm(v, m).Err(err).Fields(ctx).Warn("Unable to expire subscription")
 				}
-
 				return
 			}
 
 			// May want to handle at least 429 differently, but for now treat all errors the same
 			if !(200 <= resp.StatusCode && resp.StatusCode <= 299) {
 				logvm(v, m).Fields(ctx).Field("response", resp).Debug("Unable to publish web push message")
-
-				err = s.webPush.ExpireWebPushEndpoint(sub.BrowserSubscription.Endpoint)
-				if err != nil {
+				if err := s.webPush.RemoveByEndpoint(sub.BrowserSubscription.Endpoint); err != nil {
 					logvm(v, m).Err(err).Fields(ctx).Warn("Unable to expire subscription")
 				}
-
 				return
 			}
 		}(i, xi)

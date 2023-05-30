@@ -27,6 +27,7 @@ require github.com/pkg/errors v0.9.1 // indirect
 
 require (
 	firebase.google.com/go/v4 v4.11.0
+	github.com/SherClockHolmes/webpush-go v1.2.0
 	github.com/prometheus/client_golang v1.15.1
 	github.com/stripe/stripe-go/v74 v74.21.0
 )
@@ -39,7 +40,6 @@ require (
 	cloud.google.com/go/longrunning v0.5.0 // indirect
 	github.com/AlekSi/pointer v1.2.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
-	github.com/SherClockHolmes/webpush-go v1.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

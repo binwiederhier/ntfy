@@ -9,8 +9,7 @@ import (
 )
 
 func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	var sub webPushSubscribePayload
-	err := json.NewDecoder(r.Body).Decode(&sub)
+	sub, err := readJSONWithLimit[webPushSubscribePayload](r.Body, jsonBodyBytesLimit, false)
 	if err != nil || sub.BrowserSubscription.Endpoint == "" || sub.BrowserSubscription.Keys.P256dh == "" || sub.BrowserSubscription.Keys.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	}
@@ -19,17 +18,14 @@ func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	if err = s.webPush.AddSubscription(topic.ID, v.MaybeUserID(), sub); err != nil {
+	if err = s.webPush.AddSubscription(topic.ID, v.MaybeUserID(), *sub); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
 
 func (s *Server) handleTopicWebPushUnsubscribe(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	var payload webPushUnsubscribePayload
-
-	err := json.NewDecoder(r.Body).Decode(&payload)
-
+	payload, err := readJSONWithLimit[webPushUnsubscribePayload](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	}

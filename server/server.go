@@ -760,7 +760,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.config.TwilioAccount != "" && call != "" {
 			go s.callPhone(v, r, m, call)
 		}
-		if s.config.UpstreamBaseURL != "" {
+		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
 			go s.forwardPollRequest(v, m)
 		}
 	} else {

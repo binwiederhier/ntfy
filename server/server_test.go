@@ -2559,6 +2559,29 @@ func TestServer_UpstreamBaseURL_With_Access_Token_Success(t *testing.T) {
 	})
 }
 
+func TestServer_UpstreamBaseURL_DoNotForwardUnifiedPush(t *testing.T) {
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("UnifiedPush messages should not be forwarded")
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	s := newTestServer(t, c)
+
+	// Send UP message, this should not forward to upstream server
+	response := request(t, s, "PUT", "/mytopic?up=1", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+
+	// Forwarding is done asynchronously, so wait a bit.
+	// This ensures that the t.Fatal above is actually not triggered.
+	time.Sleep(500 * time.Millisecond)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

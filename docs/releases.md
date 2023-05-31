@@ -1225,6 +1225,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes:**
 
 * Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
+* Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
 
 **Maintenance:**
 

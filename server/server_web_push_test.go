@@ -34,9 +34,7 @@ func TestServer_WebPush_TopicSubscribe(t *testing.T) {
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
 	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	require.Len(t, subs, 1)
 	require.Equal(t, subs[0].BrowserSubscription.Endpoint, "https://example.com/webpush")
@@ -185,16 +183,12 @@ func addSubscription(t *testing.T, s *Server, topic string, url string) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 }
 
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {
 	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	require.Len(t, subs, expectedLength)
 }

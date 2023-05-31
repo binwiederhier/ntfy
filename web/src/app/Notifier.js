@@ -115,7 +115,7 @@ class Notifier {
   }
 
   pushSupported() {
-    return "serviceWorker" in navigator && "PushManager" in window;
+    return config.enable_web_push && "serviceWorker" in navigator && "PushManager" in window;
   }
 
   /**

@@ -103,6 +103,7 @@ const SubscribeDialog = (props) => {
 const browserNotificationsSupported = notifier.supported();
 const pushNotificationsSupported = notifier.pushSupported();
 const iosInstallRequired = notifier.iosSupportedButInstallRequired();
+const pushPossible = pushNotificationsSupported && iosInstallRequired;
 
 const getNotificationTypeFromToggles = (browserNotificationsEnabled, backgroundNotificationsEnabled) => {
   if (backgroundNotificationsEnabled) {
@@ -138,12 +139,14 @@ const SubscribePage = (props) => {
   const [notificationsExplicitlyDenied, setNotificationsExplicitlyDenied] = useState(notifier.denied());
   // default to on if notifications are already granted
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(notifier.granted());
-  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(props.webPushDefaultEnabled === "enabled");
+  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(
+    pushPossible && props.webPushDefaultEnabled === "enabled"
+  );
 
   const handleBrowserNotificationsChanged = async (e) => {
     if (e.target.checked && (await notifier.maybeRequestPermission())) {
       setBrowserNotificationsEnabled(true);
-      if (props.webPushDefaultEnabled === "enabled") {
+      if (pushPossible && props.webPushDefaultEnabled === "enabled") {
         setBackgroundNotificationsEnabled(true);
       }
     } else {

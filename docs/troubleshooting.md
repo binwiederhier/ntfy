@@ -1,20 +1,24 @@
 # Troubleshooting
-This page lists a few suggestions of what to do when things don't work as expected. This is not a complete list. 
+
+This page lists a few suggestions of what to do when things don't work as expected. This is not a complete list.
 If this page does not help, feel free to drop by the [Discord](https://discord.gg/cT7ECsZj9w) or [Matrix](https://matrix.to/#/#ntfy:matrix.org)
 and ask there. We're happy to help.
 
 ## ntfy server
+
 If you host your own ntfy server, and you're having issues with any component, it is always helpful to enable debugging/tracing
 in the server. You can find detailed instructions in the [Logging & Debugging](config.md#logging-debugging) section, but it ultimately
 boils down to setting `log-level: debug` or `log-level: trace` in the `server.yml` file:
 
 === "server.yml (debug)"
-    ``` yaml
+
+    ```yaml
     log-level: debug
     ```
 
 === "server.yml (trace)"
-    ``` yaml
+
+    ```yaml
     log-level: trace
     ```
 
@@ -23,6 +27,7 @@ to the `ntfy serve` command, e.g. `ntfy serve --trace`. If you're using systemd 
 the logs using `journalctl -u ntfy -f`. The logs will look something like this:
 
 === "Example logs (debug)"
+
     ```
     $ ntfy serve --debug
     2023/03/20 14:45:38 INFO Listening on :2586[http] :1025[smtp], ntfy 2.1.2, log level is DEBUG (tag=startup)
@@ -33,10 +38,11 @@ the logs using `journalctl -u ntfy -f`. The logs will look something like this:
     2023/03/20 14:45:39 DEBUG Adding message to cache (http_method=POST, http_path=/mytopic, message_body_size=2, message_event=message, message_id=EZu6i2WZjH0v, message_sender=127.0.0.1, message_time=1679337939, tag=publish, topic=mytopic, visitor_auth_limiter_limit=0.016666666666666666, visitor_auth_limiter_tokens=10, visitor_emails=0, visitor_emails_limit=12, visitor_emails_remaining=12, visitor_id=ip:127.0.0.1, visitor_ip=127.0.0.1, visitor_messages=1, visitor_messages_limit=500, visitor_messages_remaining=499, visitor_request_limiter_limit=0.2, visitor_request_limiter_tokens=59.000259165, visitor_seen=2023-03-20T14:45:39.7-04:00)
     2023/03/20 14:45:39 DEBUG HTTP request finished (http_method=POST, http_path=/mytopic, tag=http, time_taken_ms=2, visitor_auth_limiter_limit=0.016666666666666666, visitor_auth_limiter_tokens=10, visitor_emails=0, visitor_emails_limit=12, visitor_emails_remaining=12, visitor_id=ip:127.0.0.1, visitor_ip=127.0.0.1, visitor_messages=1, visitor_messages_limit=500, visitor_messages_remaining=499, visitor_request_limiter_limit=0.2, visitor_request_limiter_tokens=59.0004147334, visitor_seen=2023-03-20T14:45:39.7-04:00)
     2023/03/20 14:45:39 DEBUG Wrote 1 message(s) in 8.285712ms (tag=message_cache)
-    ...    
+    ...
     ```
 
 === "Example logs (trace)"
+
     ```
     $ ntfy serve --trace
     2023/03/20 14:40:42 INFO Listening on :2586[http] :1025[smtp], ntfy 2.1.2, log level is TRACE (tag=startup)
@@ -47,7 +53,7 @@ the logs using `journalctl -u ntfy -f`. The logs will look something like this:
     Accept: */*
     Content-Length: 2
     Content-Type: application/x-www-form-urlencoded
-    
+
     hi, tag=http, visitor_auth_limiter_limit=0.016666666666666666, visitor_auth_limiter_tokens=10, visitor_emails=0, visitor_emails_limit=12, visitor_emails_remaining=12, visitor_id=ip:127.0.0.1, visitor_ip=127.0.0.1, visitor_messages=0, visitor_messages_limit=500, visitor_messages_remaining=500, visitor_request_limiter_limit=0.2, visitor_request_limiter_tokens=60, visitor_seen=2023-03-20T14:40:59.893-04:00)
     2023/03/20 14:40:59 TRACE Received message (http_method=POST, http_path=/mytopic, message_body={
       "id": "Khaup1RVclU3",
@@ -65,8 +71,9 @@ the logs using `journalctl -u ntfy -f`. The logs will look something like this:
     ```
 
 ## Android app
+
 On Android, you can turn on logging in the settings under **Settings → Record logs**. This will store up to 1,000 log
-entries, which you can then copy or upload. 
+entries, which you can then copy or upload.
 
 <figure markdown>
   ![Recording logs on Android](static/img/android-screenshot-logs.jpg){ width=400 }
@@ -119,7 +126,8 @@ adb -s 192.168.1.137:39539 logcat --pid=$(adb -s 192.168.1.137:39539 shell pidof
 ```
 
 ## Web app
-The web app logs everything to the **developer console**, which you can open by **pressing the F12 key** on your 
+
+The web app logs everything to the **developer console**, which you can open by **pressing the F12 key** on your
 keyboard.
 
 <figure markdown>
@@ -128,4 +136,5 @@ keyboard.
 </figure>
 
 ## iOS app
+
 Sorry, there is no way to debug or get the logs from the iOS app (yet), outside of running the app in Xcode.

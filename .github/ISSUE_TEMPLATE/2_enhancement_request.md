@@ -1,10 +1,9 @@
 ---
 name: 💡 Feature/Enhancement Request
 about: Got a great idea? Let us know!
-title: ''
-labels: 'enhancement'
-assignees: ''
-
+title: ""
+labels: "enhancement"
+assignees: ""
 ---
 
 <!--
@@ -18,9 +17,10 @@ sooner, and there are more people there to help!
 -->
 
 :bulb: **Idea**
+
 <!-- Share your thoughts; try to be detailed if you can -->
 
 :computer: **Target components**
+
 <!-- Where should this feature/enhancement be added? -->
 <!-- e.g. ntfy server, Android app, iOS app, web app -->
-

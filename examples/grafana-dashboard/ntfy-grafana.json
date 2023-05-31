@@ -114,9 +114,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -175,9 +173,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -236,9 +232,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -302,9 +296,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -364,9 +356,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -426,9 +416,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
@@ -1083,9 +1071,7 @@
       "id": 41,
       "options": {
         "legend": {
-          "calcs": [
-            "mean"
-          ],
+          "calcs": ["mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -1179,9 +1165,7 @@
       "id": 16,
       "options": {
         "legend": {
-          "calcs": [
-            "mean"
-          ],
+          "calcs": ["mean"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,

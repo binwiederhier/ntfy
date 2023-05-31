@@ -55,6 +55,8 @@ help:
 	@echo "  make coverage-upload            - Upload coverage results to codecov.io"
 	@echo
 	@echo "Lint/format:"
+	@echo "  make format                     - Run prettier on config files, docs, etc excluding the web app"
+	@echo "  make format-check               - Run prettier on config files, docs, etc excluding the web app, but don't change anything"
 	@echo "  make fmt                        - Run 'go fmt'"
 	@echo "  make fmt-check                  - Run 'go fmt', but don't change anything"
 	@echo "  make vet                        - Run 'go vet'"
@@ -248,7 +250,7 @@ cli-build-results:
 
 # Test/check targets
 
-check: test web-format-check fmt-check vet web-lint lint staticcheck
+check: test format-check web-format-check fmt-check vet web-lint lint staticcheck
 
 test: .PHONY
 	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
@@ -274,6 +276,12 @@ coverage-upload:
 
 
 # Lint/formatting targets
+
+format: web-deps
+	./web/node_modules/.bin/prettier . --write
+
+format-check: web-deps
+	./web/node_modules/.bin/prettier . --check
 
 fmt:
 	gofmt -s -w .

@@ -9,3 +9,6 @@ ca5d736a7169eb6b4b0d849e061d5bf9565dcc53
 # Run eslint (https://github.com/binwiederhier/ntfy/pull/748)
 f558b4dbe9bb5b9e0e87fada1215de2558353173
 8319f1cf26113167fb29fe12edaff5db74caf35f
+
+# Run prettier on everything else (https://github.com/binwiederhier/ntfy/pull/758)
+c1ff20f5be4fc0928ab027ec60e97e5b12aa5cd9

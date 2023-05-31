@@ -47,6 +47,13 @@ export const useConnectionListeners = (account, subscriptions, users) => {
 
       const handleMessage = async (subscriptionId, message) => {
         const subscription = await subscriptionManager.get(subscriptionId);
+
+        // Race condition: sometimes the subscription is already unsubscribed from account
+        // sync before the message is handled
+        if (!subscription) {
+          return;
+        }
+
         if (subscription.internal) {
           await handleInternalMessage(message);
         } else {

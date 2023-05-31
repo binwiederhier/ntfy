@@ -1,4 +1,5 @@
-import { formatMessage, formatTitleWithDefault, openUrl, playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
+import { openUrl, playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
+import { formatMessage, formatTitleWithDefault } from "./notificationUtils";
 import prefs from "./Prefs";
 import logo from "../img/ntfy.png";
 import api from "./Api";

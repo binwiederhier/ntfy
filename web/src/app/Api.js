@@ -144,7 +144,7 @@ class Api {
       method: "POST",
       headers: maybeWithAuth({}, user),
       body: JSON.stringify({
-        endpoint: subscription.webPushEndpoint
+        endpoint: subscription.webPushEndpoint,
       }),
     });
 

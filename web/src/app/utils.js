@@ -1,5 +1,4 @@
 import { Base64 } from "js-base64";
-import { rawEmojis } from "./emojis";
 import beep from "../sounds/beep.mp3";
 import juntos from "../sounds/juntos.mp3";
 import pristine from "../sounds/pristine.mp3";
@@ -8,6 +7,7 @@ import dadum from "../sounds/dadum.mp3";
 import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
+import emojisMapped from "./emojisMapped";
 
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
@@ -56,48 +56,9 @@ export const topicDisplayName = (subscription) => {
   return topicShortUrl(subscription.baseUrl, subscription.topic);
 };
 
-// Format emojis (see emoji.js)
-const emojis = {};
-rawEmojis.forEach((emoji) => {
-  emoji.aliases.forEach((alias) => {
-    emojis[alias] = emoji.emoji;
-  });
-});
-
-const toEmojis = (tags) => {
-  if (!tags) return [];
-  return tags.filter((tag) => tag in emojis).map((tag) => emojis[tag]);
-};
-
-export const formatTitle = (m) => {
-  const emojiList = toEmojis(m.tags);
-  if (emojiList.length > 0) {
-    return `${emojiList.join(" ")} ${m.title}`;
-  }
-  return m.title;
-};
-
-export const formatTitleWithDefault = (m, fallback) => {
-  if (m.title) {
-    return formatTitle(m);
-  }
-  return fallback;
-};
-
-export const formatMessage = (m) => {
-  if (m.title) {
-    return m.message;
-  }
-  const emojiList = toEmojis(m.tags);
-  if (emojiList.length > 0) {
-    return `${emojiList.join(" ")} ${m.message}`;
-  }
-  return m.message;
-};
-
 export const unmatchedTags = (tags) => {
   if (!tags) return [];
-  return tags.filter((tag) => !(tag in emojis));
+  return tags.filter((tag) => !(tag in emojisMapped));
 };
 
 export const encodeBase64 = (s) => Base64.encode(s);

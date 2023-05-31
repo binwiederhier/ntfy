@@ -469,7 +469,6 @@ type apiStripeSubscriptionDeletedEvent struct {
 type webPushPayload struct {
 	SubscriptionID string  `json:"subscription_id"`
 	Message        message `json:"message"`
-	FormattedTitle string  `json:"formatted_title"`
 }
 
 type webPushSubscription struct {

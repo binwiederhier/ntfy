@@ -6,7 +6,6 @@ import (
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/log"
 	"net/http"
-	"strings"
 )
 
 func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -55,27 +54,6 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 		return
 	}
 
-	ctx := log.Context{"topic": m.Topic, "message_id": m.ID, "total_count": len(subscriptions)}
-
-	// Importing the emojis in the service worker would add unnecessary complexity,
-	// simply do it here for web push notifications instead
-	var titleWithDefault, formattedTitle string
-	emojis, _, err := toEmojis(m.Tags)
-	if err != nil {
-		logvm(v, m).Err(err).Fields(ctx).Debug("Unable to publish web push message")
-		return
-	}
-	if m.Title == "" {
-		titleWithDefault = m.Topic
-	} else {
-		titleWithDefault = m.Title
-	}
-	if len(emojis) > 0 {
-		formattedTitle = fmt.Sprintf("%s %s", strings.Join(emojis[:], " "), titleWithDefault)
-	} else {
-		formattedTitle = titleWithDefault
-	}
-
 	for i, xi := range subscriptions {
 		go func(i int, sub webPushSubscription) {
 			ctx := log.Context{"endpoint": sub.BrowserSubscription.Endpoint, "username": sub.UserID, "topic": m.Topic, "message_id": m.ID}
@@ -83,7 +61,6 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 			payload := &webPushPayload{
 				SubscriptionID: fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic),
 				Message:        *m,
-				FormattedTitle: formattedTitle,
 			}
 			jsonPayload, err := json.Marshal(payload)
 

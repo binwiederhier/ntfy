@@ -261,8 +261,11 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
         --web-push-subscriptions-file=/tmp/subscriptions.db
     ```
 
-3. In `web/public/config.js` set `base_url` to `http://localhost`. This is required as web push can only be used
-   with the server matching the `base_url`
+3. In `web/public/config.js`:
+
+   - Set `base_url` to `http://localhost`, This is required as web push can only be used with the server matching the `base_url`.
+
+   - Set the `web_push_public_key` correctly.
 
 4. Run `ENABLE_DEV_PWA=1 npm run start` - this enables the dev service worker
 
@@ -270,7 +273,7 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 
    - Chrome:
 
-      Open Chrome with special flags allowing insecure localhost service worker testing (regularly dismissing SSL warnings is not enough)
+      Open Chrome with special flags allowing insecure localhost service worker testing insecurely
 
       ```sh
       # for example, macOS

@@ -24,17 +24,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Trans, useTranslation } from "react-i18next";
 import { useOutletContext } from "react-router-dom";
-import {
-  formatBytes,
-  formatMessage,
-  formatShortDateTime,
-  formatTitle,
-  maybeAppendActionErrors,
-  openUrl,
-  shortUrl,
-  topicShortUrl,
-  unmatchedTags,
-} from "../app/utils";
+import { formatBytes, formatShortDateTime, maybeAppendActionErrors, openUrl, shortUrl, topicShortUrl, unmatchedTags } from "../app/utils";
+import { formatMessage, formatTitle } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
 import priority1 from "../img/priority-1.svg";

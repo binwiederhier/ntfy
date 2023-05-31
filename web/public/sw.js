@@ -4,6 +4,7 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 
 import { getDbAsync } from "../src/app/getDb";
+import { formatMessage, formatTitleWithDefault } from "../src/app/notificationUtils";
 
 // See WebPushWorker, this is to play a sound on supported browsers,
 // if the app is in the foreground
@@ -27,11 +28,11 @@ self.addEventListener("pushsubscriptionchange", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  console.log("[ServiceWorker] Received Web Push Event", { event });
   // server/types.go webPushPayload
   const data = event.data.json();
+  console.log("[ServiceWorker] Received Web Push Event", { event, data });
 
-  const { formatted_title: formattedTitle, subscription_id: subscriptionId, message } = data;
+  const { subscription_id: subscriptionId, message } = data;
   broadcastChannel.postMessage(message);
 
   event.waitUntil(
@@ -53,9 +54,9 @@ self.addEventListener("push", (event) => {
         db.subscriptions.update(subscriptionId, {
           last: message.id,
         }),
-        self.registration.showNotification(formattedTitle, {
+        self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
           tag: subscriptionId,
-          body: message.message,
+          body: formatMessage(message),
           icon: "/static/images/ntfy.png",
           data,
         }),
@@ -106,6 +107,7 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // to allow work offline
-registerRoute(new NavigationRoute(createHandlerBoundToURL("/")));
-
-registerRoute(({ url }) => url.pathname === "/config.js", new NetworkFirst());
+if (import.meta.env.MODE !== "development") {
+  registerRoute(new NavigationRoute(createHandlerBoundToURL("/")));
+  registerRoute(({ url }) => url.pathname === "/config.js", new NetworkFirst());
+}

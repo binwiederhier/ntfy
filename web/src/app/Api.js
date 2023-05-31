@@ -134,7 +134,7 @@ class Api {
     throw new Error(`Unexpected server response ${response.status}`);
   }
 
-  async unsubscribeWebPush(subscription) {
+  async unsubscribeWebPush(subscription, browserSubscription) {
     const user = await userManager.get(subscription.baseUrl);
 
     const url = topicUrlWebPushUnsubscribe(subscription.baseUrl, subscription.topic);
@@ -144,7 +144,7 @@ class Api {
       method: "POST",
       headers: maybeWithAuth({}, user),
       body: JSON.stringify({
-        endpoint: subscription.webPushEndpoint,
+        endpoint: browserSubscription.endpoint,
       }),
     });
 

@@ -68,16 +68,12 @@ class SubscriptionManager {
   async add(baseUrl, topic, opts = {}) {
     const id = topicUrl(baseUrl, topic);
 
-    const webPushFields = opts.notificationType === "background" ? await notifier.subscribeWebPush(baseUrl, topic) : {};
+    if (opts.notificationType === "background") {
+      await notifier.subscribeWebPush(baseUrl, topic);
+    }
 
     const existingSubscription = await this.get(id);
     if (existingSubscription) {
-      if (webPushFields.endpoint) {
-        await this.db.subscriptions.update(existingSubscription.id, {
-          webPushEndpoint: webPushFields.endpoint,
-        });
-      }
-
       return existingSubscription;
     }
 
@@ -88,7 +84,6 @@ class SubscriptionManager {
       mutedUntil: 0,
       last: null,
       ...opts,
-      webPushEndpoint: webPushFields.endpoint,
     };
 
     await this.db.subscriptions.put(subscription);
@@ -139,7 +134,7 @@ class SubscriptionManager {
     await this.db.subscriptions.delete(subscription.id);
     await this.db.notifications.where({ subscriptionId: subscription.id }).delete();
 
-    if (subscription.webPushEndpoint) {
+    if (subscription.notificationType === NotificationType.BACKGROUND) {
       await notifier.unsubscribeWebPush(subscription);
     }
   }
@@ -240,10 +235,7 @@ class SubscriptionManager {
       if (mutedUntil === 1) {
         await notifier.unsubscribeWebPush(subscription);
       } else {
-        const webPushFields = await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
-        await this.db.subscriptions.update(subscriptionId, {
-          webPushEndpoint: webPushFields.endpoint,
-        });
+        await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
       }
     }
   }
@@ -261,19 +253,14 @@ class SubscriptionManager {
       return;
     }
 
-    let { webPushEndpoint } = subscription;
-
     if (oldNotificationType === "background") {
       await notifier.unsubscribeWebPush(subscription);
-      webPushEndpoint = undefined;
     } else if (newNotificationType === "background") {
-      const webPushFields = await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
-      webPushEndpoint = webPushFields.webPushEndpoint;
+      await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
     }
 
     await this.db.subscriptions.update(subscription.id, {
       notificationType: newNotificationType,
-      webPushEndpoint,
     });
   }
 

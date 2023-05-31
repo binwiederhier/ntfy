@@ -47,9 +47,14 @@ class Notifier {
 
   async unsubscribeWebPush(subscription) {
     try {
-      await api.unsubscribeWebPush(subscription);
+      const pushManager = await this.pushManager();
+      const browserSubscription = await pushManager.getSubscription();
+      if (!browserSubscription) {
+        throw new Error("No browser subscription found");
+      }
+      await api.unsubscribeWebPush(subscription, browserSubscription);
     } catch (e) {
-      console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);
+      console.error("[Notifier] Error unsubscribing from web push", e);
     }
   }
 
@@ -64,26 +69,30 @@ class Notifier {
       return {};
     }
 
-    const registration = await navigator.serviceWorker.getRegistration();
-
-    if (!registration) {
-      console.log("[Notifier.subscribeWebPush] Web push supported but no service worker registration found, skipping");
-      return {};
-    }
-
     try {
-      const browserSubscription = await registration.pushManager.subscribe({
+      const pushManager = await this.pushManager();
+      const browserSubscription = await pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(config.web_push_public_key),
       });
+
       await api.subscribeWebPush(baseUrl, topic, browserSubscription);
       console.log("[Notifier.subscribeWebPush] Successfully subscribed to web push");
-      return browserSubscription;
     } catch (e) {
       console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);
     }
 
     return {};
+  }
+
+  async pushManager() {
+    const registration = await navigator.serviceWorker.getRegistration();
+
+    if (!registration) {
+      throw new Error("No service worker registration found");
+    }
+
+    return registration.pushManager;
   }
 
   granted() {

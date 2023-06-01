@@ -108,8 +108,6 @@ func execSubscribe(c *cli.Context) error {
 	// Checks
 	if user != "" && token != "" {
 		return errors.New("cannot set both --user and --token")
-	} else if !topicRegex.MatchString(topic) {
-		return fmt.Errorf("topic %s contains invalid characters", topic)
 	}
 
 	if !fromConfig {
@@ -196,7 +194,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			topicOptions = append(topicOptions, auth)
 		}
 
-		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
+		subscriptionID, err := cl.Subscribe(s.Topic, topicOptions...)
+		if err != nil {
+			return err
+		}
 		if s.Command != "" {
 			cmds[subscriptionID] = s.Command
 		} else if conf.DefaultCommand != "" {
@@ -206,7 +207,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		}
 	}
 	if topic != "" {
-		subscriptionID := cl.Subscribe(topic, options...)
+		subscriptionID, err := cl.Subscribe(topic, options...)
+		if err != nil {
+			return err
+		}
 		cmds[subscriptionID] = command
 	}
 	for m := range cl.Messages {

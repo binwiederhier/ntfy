@@ -249,10 +249,6 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 	if c.String("message") != "" {
 		message = c.String("message")
 	}
-	if !topicRegex.MatchString(topic) {
-		err = fmt.Errorf("topic %s contains invalid characters", topic)
-		return
-	}
 	return
 }
 

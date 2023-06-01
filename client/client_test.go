@@ -21,7 +21,7 @@ func TestClient_Publish_Subscribe(t *testing.T) {
 	defer test.StopServer(t, s, port)
 	c := client.New(newTestConfig(port))
 
-	subscriptionID := c.Subscribe("mytopic")
+	subscriptionID, _ := c.Subscribe("mytopic")
 	time.Sleep(time.Second)
 
 	msg, err := c.Publish("mytopic", "some message")

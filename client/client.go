@@ -97,7 +97,10 @@ func (c *Client) Publish(topic, message string, options ...PublishOption) (*Mess
 // WithNoFirebase, and the generic WithHeader.
 func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishOption) (*Message, error) {
 	topicURL := c.expandTopicURL(topic)
-	req, _ := http.NewRequest("POST", topicURL, body)
+	req, err := http.NewRequest("POST", topicURL, body)
+	if err != nil {
+		return nil, err
+	}
 	for _, option := range options {
 		if err := option(req); err != nil {
 			return nil, err

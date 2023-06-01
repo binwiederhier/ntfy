@@ -72,7 +72,7 @@ ntfy subscribe TOPIC COMMAND
     $NTFY_TITLE     $title, $t            Message title
     $NTFY_PRIORITY  $priority, $prio, $p  Message priority (1=min, 5=max)
     $NTFY_TAGS      $tags, $tag, $ta      Message tags (comma separated list)
-	$NTFY_RAW       $raw                  Raw JSON message
+    $NTFY_RAW       $raw                  Raw JSON message
 
   Examples:
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
@@ -108,6 +108,8 @@ func execSubscribe(c *cli.Context) error {
 	// Checks
 	if user != "" && token != "" {
 		return errors.New("cannot set both --user and --token")
+	} else if !topicRegex.MatchString(topic) {
+		return fmt.Errorf("topic %s contains invalid characters", topic)
 	}
 
 	if !fromConfig {

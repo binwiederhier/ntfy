@@ -29,6 +29,7 @@ var flagsDefault = []cli.Flag{
 
 var (
 	logLevelOverrideRegex = regexp.MustCompile(`(?i)^([^=\s]+)(?:\s*=\s*(\S+))?\s*->\s*(TRACE|DEBUG|INFO|WARN|ERROR)$`)
+	topicRegex            = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`) // Same as in server/server.go
 )
 
 // New creates a new CLI application

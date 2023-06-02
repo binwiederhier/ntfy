@@ -7,7 +7,7 @@
 
 var config = {
   base_url: window.location.origin, // Change to test against a different server
-  app_root: "/app",
+  app_root: "/",
   enable_login: true,
   enable_signup: true,
   enable_payments: false,

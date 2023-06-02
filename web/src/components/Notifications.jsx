@@ -287,14 +287,15 @@ const NotificationItem = (props) => {
 
 const Attachment = (props) => {
   const { t } = useTranslation();
+  const [ imageError, setImageError ] = useState(false);
   const { attachment } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
   const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
 
   // Unexpired image
-  if (displayableImage) {
-    return <Image attachment={attachment} />;
+  if (!imageError) {
+    return <Image attachment={attachment} onError={() => setImageError(true)} />;
   }
 
   // Anything else: Show box
@@ -376,14 +377,19 @@ const Attachment = (props) => {
 const Image = (props) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   return (
-    <>
+    <div style={{
+      display: loaded ? "block" : "none",
+    }}>
       <Box
         component="img"
         src={props.attachment.url}
         loading="lazy"
         alt={t("notifications_attachment_image")}
         onClick={() => setOpen(true)}
+        onLoad={() => setLoaded(true)}
+        onError={props.onError}
         sx={{
           marginTop: 2,
           borderRadius: "4px",
@@ -413,7 +419,7 @@ const Image = (props) => {
           />
         </Fade>
       </Modal>
-    </>
+    </div>
   );
 };
 

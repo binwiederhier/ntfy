@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
@@ -18,7 +19,8 @@ const (
 			endpoint TEXT NOT NULL,
 			key_auth TEXT NOT NULL,
 			key_p256dh TEXT NOT NULL,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			warning_sent BOOLEAN DEFAULT FALSE
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic ON subscriptions (topic);
 		CREATE INDEX IF NOT EXISTS idx_endpoint ON subscriptions (endpoint);
@@ -32,8 +34,12 @@ const (
 	deleteWebPushSubscriptionByEndpointQuery         = `DELETE FROM subscriptions WHERE endpoint = ?`
 	deleteWebPushSubscriptionByUserIDQuery           = `DELETE FROM subscriptions WHERE user_id = ?`
 	deleteWebPushSubscriptionByTopicAndEndpointQuery = `DELETE FROM subscriptions WHERE topic = ? AND endpoint = ?`
+	deleteWebPushSubscriptionsByAgeQuery             = `DELETE FROM subscriptions WHERE warning_sent = 1 AND updated_at <= datetime('now', ?)`
 
-	selectWebPushSubscriptionsForTopicQuery = `SELECT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE topic = ?`
+	selectWebPushSubscriptionsForTopicQuery     = `SELECT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE topic = ?`
+	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT DISTINCT endpoint, key_auth, key_p256dh FROM subscriptions WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
+
+	updateWarningSentQuery = `UPDATE subscriptions SET warning_sent = true WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
 
 	selectWebPushSubscriptionsCountQuery = `SELECT COUNT(*) FROM subscriptions`
 )
@@ -72,7 +78,6 @@ func setupNewSubscriptionsDB(db *sql.DB) error {
 }
 
 func (c *webPushStore) UpdateSubscriptions(topics []string, userID string, subscription webpush.Subscription) error {
-	fmt.Printf("AAA")
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
@@ -121,6 +126,49 @@ func (c *webPushStore) SubscriptionsForTopic(topic string) (subscriptions []webP
 	return data, nil
 }
 
+func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Duration, expiryDuration time.Duration) (subscriptions []webPushSubscription, err error) {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(deleteWebPushSubscriptionsByAgeQuery, fmt.Sprintf("-%.2f seconds", expiryDuration.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(selectWebPushSubscriptionsExpiringSoonQuery, fmt.Sprintf("-%.2f seconds", warningDuration.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var data []webPushSubscription
+	for rows.Next() {
+		i := webPushSubscription{}
+		err = rows.Scan(&i.BrowserSubscription.Endpoint, &i.BrowserSubscription.Keys.Auth, &i.BrowserSubscription.Keys.P256dh)
+		fmt.Printf("%v+", i)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, i)
+	}
+
+	// also set warning as sent
+	_, err = tx.Exec(updateWarningSentQuery, fmt.Sprintf("-%.2f seconds", warningDuration.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
 func (c *webPushStore) RemoveByEndpoint(endpoint string) error {
 	_, err := c.db.Exec(
 		deleteWebPushSubscriptionByEndpointQuery,
@@ -136,6 +184,7 @@ func (c *webPushStore) RemoveByUserID(userID string) error {
 	)
 	return err
 }
+
 func (c *webPushStore) Close() error {
 	return c.db.Close()
 }

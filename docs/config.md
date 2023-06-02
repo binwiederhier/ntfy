@@ -827,6 +827,11 @@ web-push-email-address: sysadmin@example.com
 
 # don't forget to set the required base-url for web push notifications
 base-url: https://ntfy.example.com
+
+# you can also set custom expiry and warning durations
+# the minimum is 1 day for warning, and 1 day after warning for expiry
+web-push-expiry-warning-duration: 168h
+web-push-expiry-duration: 192h
 ```
 
 The `web-push-subscriptions-file` is used to store the push subscriptions. Subscriptions do not ever expire automatically, unless the push
@@ -1339,6 +1344,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy web-push generate-keys` to generate                                                                                                                                                            |
 | `web-push-subscriptions-file`               | `NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE`              | *string*                                            | -                 | Web Push: Subscriptions file                                                                                                                                                                                                     |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
+| `web-push-expiry-warning-duration`         | `NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION`         | *duration*                                          | 1 week            | Web Push: Time before expiry warning is sent (min 1 day)                                                                                                                                                                        |
+| `web-push-expiry-duration`                 | `NTFY_WEB_PUSH_EXPIRY_DURATION`                 | *duration*                                          | 1 week + 1 day    | Web Push: Time before subscription is expired (min 1 day after warning)                                                                                                                                                         |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
@@ -1436,5 +1443,8 @@ OPTIONS:
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
    --web-push-subscriptions-file value, --web_push_subscriptions_file value                                               file used to store web push subscriptions [$NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
+   --web-push-expiry-warning-duration value, --web_push_expiry_warning_duration value                                     duration after last update to send a warning notification (default: 168h0m0s) [$NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION]
+   --web-push-expiry-duration value, --web_push_expiry_duration value                                                     duration after last update to expire subscription (default: 192h0m0s) [$NTFY_WEB_PUSH_EXPIRY_DURATION]
    --help, -h                                                                                                             show help
+
 ```

@@ -58,9 +58,7 @@ const App = () => {
 const updateTitle = (newNotificationsCount) => {
   document.title = newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
 
-  if ("setAppBadge" in window.navigator) {
-    window.navigator.setAppBadge(newNotificationsCount);
-  }
+  window.navigator.setAppBadge?.(newNotificationsCount);
 };
 
 const Layout = () => {

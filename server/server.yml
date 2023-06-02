@@ -47,6 +47,8 @@
 # web-push-private-key:
 # web-push-subscriptions-file:
 # web-push-email-address:
+# web-push-expiry-warning-duration: 168h
+# web-push-expiry-duration: 192h
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.

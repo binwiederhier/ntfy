@@ -57,7 +57,6 @@ import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
 import theme from "./theme";
 import session from "../app/Session";
-import subscriptionManager from "../app/SubscriptionManager";
 
 const Account = () => {
   if (!session.exists()) {

@@ -468,8 +468,27 @@ type apiStripeSubscriptionDeletedEvent struct {
 }
 
 type webPushPayload struct {
+	Event          string  `json:"event"`
 	SubscriptionID string  `json:"subscription_id"`
 	Message        message `json:"message"`
+}
+
+func newWebPushPayload(subscriptionID string, message message) webPushPayload {
+	return webPushPayload{
+		Event:          "message",
+		SubscriptionID: subscriptionID,
+		Message:        message,
+	}
+}
+
+type webPushControlMessagePayload struct {
+	Event string `json:"event"`
+}
+
+func newWebPushSubscriptionExpiringPayload() webPushControlMessagePayload {
+	return webPushControlMessagePayload{
+		Event: "subscription_expiring",
+	}
 }
 
 type webPushSubscription struct {

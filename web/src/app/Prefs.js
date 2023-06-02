@@ -42,4 +42,5 @@ class Prefs {
   }
 }
 
-export default new Prefs(getDb());
+const prefs = new Prefs(getDb());
+export default prefs;

@@ -10,7 +10,6 @@ import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
 import { webPushRefreshWorker, useWebPushUpdateWorker } from "../app/WebPushWorker";
-import notifier from "../app/Notifier";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection

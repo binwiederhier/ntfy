@@ -23,6 +23,12 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
 )
 
+// Defines default web push settings
+const (
+	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
+	DefaultWebPushExpiryDuration        = DefaultWebPushExpiryWarningDuration + 24*time.Hour
+)
+
 // Defines all global and per-visitor limits
 // - message size limit: the max number of bytes for a message
 // - total topic limit: max number of topics overall
@@ -152,6 +158,8 @@ type Config struct {
 	WebPushPublicKey                     string
 	WebPushSubscriptionsFile             string
 	WebPushEmailAddress                  string
+	WebPushExpiryDuration                time.Duration
+	WebPushExpiryWarningDuration         time.Duration
 }
 
 // NewConfig instantiates a default new server config
@@ -238,5 +246,7 @@ func NewConfig() *Config {
 		WebPushPublicKey:                     "",
 		WebPushSubscriptionsFile:             "",
 		WebPushEmailAddress:                  "",
+		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
+		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
 	}
 }

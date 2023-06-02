@@ -99,6 +99,8 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-private-key", Aliases: []string{"web_push_private_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PRIVATE_KEY"}, Usage: "private key used for web push notifications"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-subscriptions-file", Aliases: []string{"web_push_subscriptions_file"}, EnvVars: []string{"NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE"}, Usage: "file used to store web push subscriptions"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
+	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "web-push-expiry-warning-duration", Aliases: []string{"web_push_expiry_warning_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION"}, Value: server.DefaultWebPushExpiryWarningDuration, Usage: "duration after last update to send a warning notification"}),
+	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: server.DefaultWebPushExpiryDuration, Usage: "duration after last update to expire subscription"}),
 )
 
 var cmdServe = &cli.Command{
@@ -138,6 +140,8 @@ func execServe(c *cli.Context) error {
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushSubscriptionsFile := c.String("web-push-subscriptions-file")
+	webPushExpiryWarningDuration := c.Duration("web-push-expiry-warning-duration")
+	webPushExpiryDuration := c.Duration("web-push-expiry-duration")
 	webPushEmailAddress := c.String("web-push-email-address")
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
@@ -197,6 +201,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-subscriptions-file, web-push-email-address, and base-url should be set. run 'ntfy web-push generate-keys' to generate keys")
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
+	} else if webPushEnabled && (webPushExpiryWarningDuration < 24*time.Hour || (webPushExpiryDuration-webPushExpiryWarningDuration < 24*time.Hour)) {
+		return errors.New("web push expiry warning duration must be at least 1 day, expire duration must be at least 1 day later")
 	} else if managerInterval < 5*time.Second {
 		return errors.New("manager interval cannot be lower than five seconds")
 	} else if cacheDuration > 0 && cacheDuration < managerInterval {
@@ -364,6 +370,8 @@ func execServe(c *cli.Context) error {
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushSubscriptionsFile = webPushSubscriptionsFile
 	conf.WebPushEmailAddress = webPushEmailAddress
+	conf.WebPushExpiryDuration = webPushExpiryDuration
+	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

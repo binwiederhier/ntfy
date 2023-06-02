@@ -157,8 +157,42 @@ func TestServer_WebPush_PublishExpire(t *testing.T) {
 	requireSubscriptionCount(t, s, "test-topic-abc", 0)
 }
 
+func TestServer_WebPush_Expiry(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t))
+
+	var received atomic.Bool
+
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		w.WriteHeader(200)
+		w.Write([]byte(``))
+		received.Store(true)
+	}))
+	defer upstreamServer.Close()
+
+	addSubscription(t, s, "test-topic", upstreamServer.URL+"/push-receive")
+	requireSubscriptionCount(t, s, "test-topic", 1)
+
+	_, err := s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-7 days')")
+	require.Nil(t, err)
+
+	s.expireOrNotifyOldSubscriptions()
+	requireSubscriptionCount(t, s, "test-topic", 1)
+
+	waitFor(t, func() bool {
+		return received.Load()
+	})
+
+	_, err = s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-8 days')")
+	require.Nil(t, err)
+
+	s.expireOrNotifyOldSubscriptions()
+	requireSubscriptionCount(t, s, "test-topic", 0)
+}
+
 func payloadForTopics(t *testing.T, topics []string) string {
-	topicsJson, err := json.Marshal(topics)
+	topicsJSON, err := json.Marshal(topics)
 	require.Nil(t, err)
 
 	return fmt.Sprintf(`{
@@ -170,7 +204,7 @@ func payloadForTopics(t *testing.T, topics []string) string {
 				"auth": "auth-key"
 			}
 		}
-	}`, topicsJson)
+	}`, topicsJSON)
 }
 
 func addSubscription(t *testing.T, s *Server, topic string, url string) {

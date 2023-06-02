@@ -15,6 +15,9 @@ func (s *Server) execManager() {
 	s.pruneTokens()
 	s.pruneAttachments()
 	s.pruneMessages()
+	if s.config.WebPushEnabled {
+		s.expireOrNotifyOldSubscriptions()
+	}
 
 	// Message count per topic
 	var messagesCached int

@@ -2,15 +2,9 @@
 
 You can use the Web UI to subscribe to topics as well. Simply type in the topic name and click the *Subscribe* button.
 
-While subscribing, you have the option to enable desktop notifications, as well as background notifications. When you
-enable them for the first time, you will be prompted to allow notifications on your browser.
+While subscribing, you have the option to enable background notifications on supported browsers.
 
-- **Sound only**
-
-    If you don't enable browser notifications, a sound will play when a new notification comes in, and the tab title
-    will show the number of new notifications.
-
-- **Browser Notifications**
+- If background notifications are off:
 
     This requires an active ntfy tab to be open to receive notifications. These are typically instantaneous, and will
     appear as a system notification. If you don't see these, check that your browser is allowed to show notifications
@@ -19,13 +13,16 @@ enable them for the first time, you will be prompted to allow notifications on y
     If you don't want to enable background notifications, pinning the ntfy tab on your browser is a good solution to leave
     it running.
 
-- **Background Notifications**
+- If background notifications are on:
 
     This uses the [Web Push API](https://caniuse.com/push-api). You don't need an active ntfy tab open, but in some
     cases you may need to keep your browser open.
 
     Background notifications are only supported on the same server hosting the web app. You cannot use another server,
     but can instead subscribe on the other server itself.
+
+    If the ntfy app is not opened for more than a week, background notifications will be paused. You can resume them
+    by opening the app again, and will get a warning notification before they are paused.
 
     | Browser | Platform | Browser Running | Browser Not Running | Restrictions                                            |
     | ------- | -------- | --------------- | ------------------- | ------------------------------------------------------- |

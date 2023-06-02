@@ -14,7 +14,7 @@ const getDbBase = (username) => {
   const db = new Dexie(dbName);
 
   db.version(2).stores({
-    subscriptions: "&id,baseUrl,notificationType",
+    subscriptions: "&id,baseUrl,[webPushEnabled+mutedUntil]",
     notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
     users: "&baseUrl,username",
     prefs: "&key",

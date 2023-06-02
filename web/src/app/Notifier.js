@@ -2,7 +2,6 @@ import { openUrl, playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array
 import { formatMessage, formatTitleWithDefault } from "./notificationUtils";
 import prefs from "./Prefs";
 import logo from "../img/ntfy.png";
-import api from "./Api";
 
 /**
  * The notifier is responsible for displaying desktop notifications. Note that not all modern browsers
@@ -45,44 +44,20 @@ class Notifier {
     }
   }
 
-  async unsubscribeWebPush(subscription) {
-    try {
-      const pushManager = await this.pushManager();
-      const browserSubscription = await pushManager.getSubscription();
-      if (!browserSubscription) {
-        throw new Error("No browser subscription found");
-      }
-      await api.unsubscribeWebPush(subscription, browserSubscription);
-    } catch (e) {
-      console.error("[Notifier] Error unsubscribing from web push", e);
-    }
-  }
-
-  async subscribeWebPush(baseUrl, topic) {
-    if (!this.supported() || !this.pushSupported() || !config.enable_web_push) {
-      return {};
+  async getBrowserSubscription() {
+    if (!this.pushPossible()) {
+      throw new Error("Unsupported or denied");
     }
 
-    // only subscribe to web push for the current server. this is a limitation of the web push API,
-    // which only allows a single server per service worker origin.
-    if (baseUrl !== config.base_url) {
-      return {};
-    }
+    const pushManager = await this.pushManager();
 
-    try {
-      const pushManager = await this.pushManager();
-      const browserSubscription = await pushManager.subscribe({
+    return (
+      (await pushManager.getSubscription()) ??
+      pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(config.web_push_public_key),
-      });
-
-      await api.subscribeWebPush(baseUrl, topic, browserSubscription);
-      console.log("[Notifier.subscribeWebPush] Successfully subscribed to web push");
-    } catch (e) {
-      console.error("[Notifier.subscribeWebPush] Error subscribing to web push", e);
-    }
-
-    return {};
+      })
+    );
   }
 
   async pushManager() {
@@ -93,6 +68,10 @@ class Notifier {
     }
 
     return registration.pushManager;
+  }
+
+  notRequested() {
+    return this.supported() && Notification.permission === "default";
   }
 
   granted() {
@@ -127,6 +106,10 @@ class Notifier {
     return config.enable_web_push && "serviceWorker" in navigator && "PushManager" in window;
   }
 
+  pushPossible() {
+    return this.pushSupported() && this.contextSupported() && this.granted() && !this.iosSupportedButInstallRequired();
+  }
+
   /**
    * Returns true if this is a HTTPS site, or served over localhost. Otherwise the Notification API
    * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification
@@ -136,7 +119,7 @@ class Notifier {
   }
 
   iosSupportedButInstallRequired() {
-    return "standalone" in window.navigator && window.navigator.standalone === false;
+    return this.pushSupported() && "standalone" in window.navigator && window.navigator.standalone === false;
   }
 }
 

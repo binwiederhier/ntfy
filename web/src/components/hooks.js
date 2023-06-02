@@ -9,7 +9,8 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
-import webPushWorker from "../app/WebPushWorker";
+import { webPushRefreshWorker, useWebPushUpdateWorker } from "../app/WebPushWorker";
+import notifier from "../app/Notifier";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -134,24 +135,26 @@ const stopWorkers = () => {
   poller.stopWorker();
   pruner.stopWorker();
   accountApi.stopWorker();
+  webPushRefreshWorker.stopWorker();
 };
 
 const startWorkers = () => {
   poller.startWorker();
   pruner.startWorker();
   accountApi.startWorker();
+  webPushRefreshWorker.startWorker();
 };
 
 export const useBackgroundProcesses = () => {
+  useWebPushUpdateWorker();
+
   useEffect(() => {
     console.log("[useBackgroundProcesses] mounting");
     startWorkers();
-    webPushWorker.startWorker();
 
     return () => {
       console.log("[useBackgroundProcesses] unloading");
       stopWorkers();
-      webPushWorker.stopWorker();
     };
   }, []);
 };

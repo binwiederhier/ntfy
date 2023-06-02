@@ -33,7 +33,7 @@ import {
   Send,
 } from "@mui/icons-material";
 import theme from "./theme";
-import subscriptionManager, { NotificationType } from "../app/SubscriptionManager";
+import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import accountApi, { Role } from "../app/AccountApi";
 import session from "../app/Session";
@@ -334,14 +334,6 @@ const DisplayNameDialog = (props) => {
   );
 };
 
-const getNotificationType = (subscription) => {
-  if (subscription.mutedUntil === 1) {
-    return "muted";
-  }
-
-  return subscription.notificationType ?? NotificationType.BROWSER;
-};
-
 const checkedItem = (
   <ListItemIcon>
     <Check />
@@ -350,15 +342,10 @@ const checkedItem = (
 
 const NotificationToggle = ({ subscription }) => {
   const { t } = useTranslation();
-  const type = getNotificationType(subscription);
 
-  const handleChange = async (newType) => {
+  const handleToggleBackground = async () => {
     try {
-      if (newType !== NotificationType.SOUND && !(await notifier.maybeRequestPermission())) {
-        return;
-      }
-
-      await subscriptionManager.setNotificationType(subscription, newType);
+      await subscriptionManager.toggleBackgroundNotifications(subscription);
     } catch (e) {
       console.error("[NotificationToggle] Error setting notification type", e);
     }
@@ -368,7 +355,7 @@ const NotificationToggle = ({ subscription }) => {
     await subscriptionManager.setMutedUntil(subscription.id, 0);
   };
 
-  if (type === "muted") {
+  if (subscription.mutedUntil === 1) {
     return (
       <MenuItem onClick={unmute}>
         <ListItemIcon>
@@ -381,30 +368,14 @@ const NotificationToggle = ({ subscription }) => {
 
   return (
     <>
-      <MenuItem>
-        {type === NotificationType.SOUND && checkedItem}
-        <ListItemText inset={type !== NotificationType.SOUND} onClick={() => handleChange(NotificationType.SOUND)}>
-          {t("notification_toggle_sound")}
-        </ListItemText>
-      </MenuItem>
-      {!notifier.denied() && !notifier.iosSupportedButInstallRequired() && (
+      {notifier.pushPossible() && (
         <>
-          {notifier.supported() && (
-            <MenuItem>
-              {type === NotificationType.BROWSER && checkedItem}
-              <ListItemText inset={type !== NotificationType.BROWSER} onClick={() => handleChange(NotificationType.BROWSER)}>
-                {t("notification_toggle_browser")}
-              </ListItemText>
-            </MenuItem>
-          )}
-          {notifier.pushSupported() && (
-            <MenuItem>
-              {type === NotificationType.BACKGROUND && checkedItem}
-              <ListItemText inset={type !== NotificationType.BACKGROUND} onClick={() => handleChange(NotificationType.BACKGROUND)}>
-                {t("notification_toggle_background")}
-              </ListItemText>
-            </MenuItem>
-          )}
+          <MenuItem>
+            {subscription.webPushEnabled === 1 && checkedItem}
+            <ListItemText inset={subscription.webPushEnabled !== 1} onClick={handleToggleBackground}>
+              {t("notification_toggle_background")}
+            </ListItemText>
+          </MenuItem>
         </>
       )}
     </>

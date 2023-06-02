@@ -1078,8 +1078,6 @@ const DeleteAccountDialog = (props) => {
 
   const handleSubmit = async () => {
     try {
-      await subscriptionManager.unsubscribeAllWebPush();
-
       await accountApi.delete(password);
       await getDb().delete();
       console.debug(`[Account] Account deleted`);

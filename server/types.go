@@ -1,11 +1,12 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
 	"net/http"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/util"
@@ -476,10 +477,7 @@ type webPushSubscription struct {
 	UserID              string
 }
 
-type webPushSubscribePayload struct {
+type webPushSubscriptionPayload struct {
 	BrowserSubscription webpush.Subscription `json:"browser_subscription"`
-}
-
-type webPushUnsubscribePayload struct {
-	Endpoint string `json:"endpoint"`
+	Topics              []string             `json:"topics"`
 }

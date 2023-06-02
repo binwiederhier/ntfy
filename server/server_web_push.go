@@ -3,40 +3,36 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/log"
-	"net/http"
+	"heckel.io/ntfy/user"
 )
 
-func (s *Server) handleTopicWebPushSubscribe(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	sub, err := readJSONWithLimit[webPushSubscribePayload](r.Body, jsonBodyBytesLimit, false)
-	if err != nil || sub.BrowserSubscription.Endpoint == "" || sub.BrowserSubscription.Keys.P256dh == "" || sub.BrowserSubscription.Keys.Auth == "" {
+func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	payload, err := readJSONWithLimit[webPushSubscriptionPayload](r.Body, jsonBodyBytesLimit, false)
+	if err != nil || payload.BrowserSubscription.Endpoint == "" || payload.BrowserSubscription.Keys.P256dh == "" || payload.BrowserSubscription.Keys.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	}
 
-	topic, err := fromContext[*topic](r, contextTopic)
-	if err != nil {
-		return err
-	}
-	if err = s.webPush.AddSubscription(topic.ID, v.MaybeUserID(), *sub); err != nil {
-		return err
-	}
-	return s.writeJSON(w, newSuccessResponse())
-}
+	u := v.User()
 
-func (s *Server) handleTopicWebPushUnsubscribe(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	payload, err := readJSONWithLimit[webPushUnsubscribePayload](r.Body, jsonBodyBytesLimit, false)
-	if err != nil {
-		return errHTTPBadRequestWebPushSubscriptionInvalid
-	}
-
-	topic, err := fromContext[*topic](r, contextTopic)
+	topics, err := s.topicsFromIDs(payload.Topics...)
 	if err != nil {
 		return err
 	}
 
-	err = s.webPush.RemoveSubscription(topic.ID, payload.Endpoint)
-	if err != nil {
+	if s.userManager != nil {
+		for _, t := range topics {
+			if err := s.userManager.Authorize(u, t.ID, user.PermissionRead); err != nil {
+				logvr(v, r).With(t).Err(err).Debug("Access to topic %s not authorized", t.ID)
+				return errHTTPForbidden.With(t)
+			}
+		}
+	}
+
+	if err := s.webPush.UpdateSubscriptions(payload.Topics, v.MaybeUserID(), payload.BrowserSubscription); err != nil {
 		return err
 	}
 

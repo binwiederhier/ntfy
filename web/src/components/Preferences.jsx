@@ -86,7 +86,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {notifier.pushSupported() && <WebPushDefaultEnabled />}
+        {notifier.pushPossible() && <WebPushDefaultEnabled />}
       </PrefGroup>
     </Card>
   );

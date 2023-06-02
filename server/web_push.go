@@ -2,7 +2,9 @@ package server
 
 import (
 	"database/sql"
+	"fmt"
 
+	"github.com/SherClockHolmes/webpush-go"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
@@ -69,23 +71,33 @@ func setupNewSubscriptionsDB(db *sql.DB) error {
 	return nil
 }
 
-func (c *webPushStore) AddSubscription(topic string, userID string, subscription webPushSubscribePayload) error {
+func (c *webPushStore) UpdateSubscriptions(topics []string, userID string, subscription webpush.Subscription) error {
+	fmt.Printf("AAA")
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err = c.RemoveByEndpoint(subscription.Endpoint); err != nil {
+		return err
+	}
+	for _, topic := range topics {
+		if err := c.AddSubscription(topic, userID, subscription); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (c *webPushStore) AddSubscription(topic string, userID string, subscription webpush.Subscription) error {
 	_, err := c.db.Exec(
 		insertWebPushSubscriptionQuery,
 		topic,
 		userID,
-		subscription.BrowserSubscription.Endpoint,
-		subscription.BrowserSubscription.Keys.Auth,
-		subscription.BrowserSubscription.Keys.P256dh,
-	)
-	return err
-}
-
-func (c *webPushStore) RemoveSubscription(topic string, endpoint string) error {
-	_, err := c.db.Exec(
-		deleteWebPushSubscriptionByTopicAndEndpointQuery,
-		topic,
-		endpoint,
+		subscription.Endpoint,
+		subscription.Keys.Auth,
+		subscription.Keys.P256dh,
 	)
 	return err
 }

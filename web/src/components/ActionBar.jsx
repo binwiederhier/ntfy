@@ -120,8 +120,6 @@ const ProfileIcon = () => {
 
   const handleLogout = async () => {
     try {
-      await subscriptionManager.unsubscribeAllWebPush();
-
       await accountApi.logout();
       await getDb().delete();
     } finally {

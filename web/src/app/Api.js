@@ -6,8 +6,7 @@ import {
   topicUrlAuth,
   topicUrlJsonPoll,
   topicUrlJsonPollWithSince,
-  topicUrlWebPushSubscribe,
-  topicUrlWebPushUnsubscribe,
+  webPushSubscriptionsUrl,
 } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
@@ -116,36 +115,15 @@ class Api {
     throw new Error(`Unexpected server response ${response.status}`);
   }
 
-  async subscribeWebPush(baseUrl, topic, browserSubscription) {
-    const user = await userManager.get(baseUrl);
-    const url = topicUrlWebPushSubscribe(baseUrl, topic);
-    console.log(`[Api] Sending Web Push Subscription ${url}`);
+  async updateWebPushSubscriptions(topics, browserSubscription) {
+    const user = await userManager.get(config.base_url);
+    const url = webPushSubscriptionsUrl(config.base_url);
+    console.log(`[Api] Sending Web Push Subscriptions`, { url, topics, endpoint: browserSubscription.endpoint });
 
     const response = await fetch(url, {
-      method: "POST",
+      method: "PUT",
       headers: maybeWithAuth({}, user),
-      body: JSON.stringify({ browser_subscription: browserSubscription }),
-    });
-
-    if (response.ok) {
-      return true;
-    }
-
-    throw new Error(`Unexpected server response ${response.status}`);
-  }
-
-  async unsubscribeWebPush(subscription, browserSubscription) {
-    const user = await userManager.get(subscription.baseUrl);
-
-    const url = topicUrlWebPushUnsubscribe(subscription.baseUrl, subscription.topic);
-    console.log(`[Api] Unsubscribing Web Push Subscription ${url}`);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: maybeWithAuth({}, user),
-      body: JSON.stringify({
-        endpoint: browserSubscription.endpoint,
-      }),
+      body: JSON.stringify({ topics, browser_subscription: browserSubscription }),
     });
 
     if (response.ok) {

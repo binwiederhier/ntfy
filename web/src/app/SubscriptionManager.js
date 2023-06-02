@@ -1,19 +1,8 @@
+import api from "./Api";
 import notifier from "./Notifier";
 import prefs from "./Prefs";
 import getDb from "./getDb";
 import { topicUrl } from "./utils";
-
-/** @typedef {string} NotificationTypeEnum */
-
-/** @enum {NotificationTypeEnum} */
-export const NotificationType = {
-  /** sound-only */
-  SOUND: "sound",
-  /** browser notifications when there is an active tab, via websockets */
-  BROWSER: "browser",
-  /** web push notifications, regardless of whether the window is open */
-  BACKGROUND: "background",
-};
 
 class SubscriptionManager {
   constructor(db) {
@@ -29,6 +18,11 @@ class SubscriptionManager {
         new: await this.db.notifications.where({ subscriptionId: s.id, new: 1 }).count(),
       }))
     );
+  }
+
+  async webPushTopics() {
+    const subscriptions = await this.db.subscriptions.where({ webPushEnabled: 1, mutedUntil: 0 }).toArray();
+    return subscriptions.map(({ topic }) => topic);
   }
 
   async get(subscriptionId) {
@@ -47,14 +41,7 @@ class SubscriptionManager {
       return;
     }
 
-    await notifier.playSound();
-
-    // sound only
-    if (subscription.notificationType === "sound") {
-      return;
-    }
-
-    await notifier.notify(subscription, notification, defaultClickAction);
+    await Promise.all([notifier.playSound(), notifier.notify(subscription, notification, defaultClickAction)]);
   }
 
   /**
@@ -62,15 +49,11 @@ class SubscriptionManager {
    * @param {string} topic
    * @param {object} opts
    * @param {boolean} opts.internal
-   * @param {NotificationTypeEnum} opts.notificationType
+   * @param {boolean} opts.webPushEnabled
    * @returns
    */
   async add(baseUrl, topic, opts = {}) {
     const id = topicUrl(baseUrl, topic);
-
-    if (opts.notificationType === "background") {
-      await notifier.subscribeWebPush(baseUrl, topic);
-    }
 
     const existingSubscription = await this.get(id);
     if (existingSubscription) {
@@ -78,12 +61,13 @@ class SubscriptionManager {
     }
 
     const subscription = {
+      ...opts,
       id: topicUrl(baseUrl, topic),
       baseUrl,
       topic,
       mutedUntil: 0,
       last: null,
-      ...opts,
+      webPushEnabled: opts.webPushEnabled ? 1 : 0,
     };
 
     await this.db.subscriptions.put(subscription);
@@ -94,17 +78,16 @@ class SubscriptionManager {
   async syncFromRemote(remoteSubscriptions, remoteReservations) {
     console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
-    const notificationType = (await prefs.webPushDefaultEnabled()) === "enabled" ? "background" : "browser";
+    const webPushEnabled = (await prefs.webPushDefaultEnabled()) === "enabled";
 
     // Add remote subscriptions
     const remoteIds = await Promise.all(
       remoteSubscriptions.map(async (remote) => {
-        const local = await this.add(remote.base_url, remote.topic, {
-          notificationType,
-        });
         const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
 
-        await this.update(local.id, {
+        const local = await this.add(remote.base_url, remote.topic, {
+          // only if same-origin subscription
+          webPushEnabled: webPushEnabled && remote.base_url === config.base_url,
           displayName: remote.display_name, // May be undefined
           reservation, // May be null!
         });
@@ -126,6 +109,12 @@ class SubscriptionManager {
     );
   }
 
+  async refreshWebPushSubscriptions(presetTopics) {
+    const topics = presetTopics ?? (await this.webPushTopics());
+
+    await api.updateWebPushSubscriptions(topics, await notifier.getBrowserSubscription());
+  }
+
   async updateState(subscriptionId, state) {
     this.db.subscriptions.update(subscriptionId, { state });
   }
@@ -133,10 +122,6 @@ class SubscriptionManager {
   async remove(subscription) {
     await this.db.subscriptions.delete(subscription.id);
     await this.db.notifications.where({ subscriptionId: subscription.id }).delete();
-
-    if (subscription.notificationType === NotificationType.BACKGROUND) {
-      await notifier.unsubscribeWebPush(subscription);
-    }
   }
 
   async first() {
@@ -228,57 +213,12 @@ class SubscriptionManager {
     await this.db.subscriptions.update(subscriptionId, {
       mutedUntil,
     });
-
-    const subscription = await this.get(subscriptionId);
-
-    if (subscription.notificationType === "background") {
-      if (mutedUntil === 1) {
-        await notifier.unsubscribeWebPush(subscription);
-      } else {
-        await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
-      }
-    }
   }
 
-  /**
-   *
-   * @param {object} subscription
-   * @param {NotificationTypeEnum} newNotificationType
-   * @returns
-   */
-  async setNotificationType(subscription, newNotificationType) {
-    const oldNotificationType = subscription.notificationType ?? "browser";
-
-    if (oldNotificationType === newNotificationType) {
-      return;
-    }
-
-    if (oldNotificationType === "background") {
-      await notifier.unsubscribeWebPush(subscription);
-    } else if (newNotificationType === "background") {
-      await notifier.subscribeWebPush(subscription.baseUrl, subscription.topic);
-    }
-
+  async toggleBackgroundNotifications(subscription) {
     await this.db.subscriptions.update(subscription.id, {
-      notificationType: newNotificationType,
+      webPushEnabled: subscription.webPushEnabled === 1 ? 0 : 1,
     });
-  }
-
-  // for logout/delete, unsubscribe first to prevent receiving dangling notifications
-  async unsubscribeAllWebPush() {
-    const subscriptions = await this.db.subscriptions.where({ notificationType: "background" }).toArray();
-    await Promise.all(subscriptions.map((subscription) => notifier.unsubscribeWebPush(subscription)));
-  }
-
-  async refreshWebPushSubscriptions() {
-    const subscriptions = await this.db.subscriptions.where({ notificationType: "background" }).toArray();
-    const browserSubscription = await (await navigator.serviceWorker.getRegistration())?.pushManager?.getSubscription();
-
-    if (browserSubscription) {
-      await Promise.all(subscriptions.map((subscription) => notifier.subscribeWebPush(subscription.baseUrl, subscription.topic)));
-    } else {
-      await Promise.all(subscriptions.map((subscription) => this.setNotificationType(subscription, "sound")));
-    }
   }
 
   async setDisplayName(subscriptionId, displayName) {

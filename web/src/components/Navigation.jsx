@@ -108,27 +108,34 @@ const NavList = (props) => {
   const isPaid = account?.billing?.subscription;
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
   const showSubscriptionsList = props.subscriptions?.length > 0;
-  const showNotificationPermissionDenied = notifier.denied();
+  const [showNotificationPermissionRequired, setShowNotificationPermissionRequired] = useState(notifier.notRequested());
+  const [showNotificationPermissionDenied, setShowNotificationPermissionDenied] = useState(notifier.denied());
   const showNotificationIOSInstallRequired = notifier.iosSupportedButInstallRequired();
   const showNotificationBrowserNotSupportedBox = !showNotificationIOSInstallRequired && !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
 
-  const navListPadding =
+  const refreshPermissions = () => {
+    setShowNotificationPermissionRequired(notifier.notRequested());
+    setShowNotificationPermissionDenied(notifier.denied());
+  };
+
+  const alertVisible =
+    showNotificationPermissionRequired ||
     showNotificationPermissionDenied ||
     showNotificationIOSInstallRequired ||
     showNotificationBrowserNotSupportedBox ||
-    showNotificationContextNotSupportedBox
-      ? "0"
-      : "";
+    showNotificationContextNotSupportedBox;
 
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
-      <List component="nav" sx={{ paddingTop: navListPadding }}>
+      <List component="nav" sx={{ paddingTop: alertVisible ? "0" : "" }}>
+        {showNotificationPermissionRequired && <NotificationPermissionRequired refreshPermissions={refreshPermissions} />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
         {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
         {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
+        {alertVisible && <Divider />}
         {!showSubscriptionsList && (
           <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
@@ -346,16 +353,36 @@ const SubscriptionItem = (props) => {
   );
 };
 
+const NotificationPermissionRequired = ({ refreshPermissions }) => {
+  const { t } = useTranslation();
+  return (
+    <Alert severity="info" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_permission_required_title")}</AlertTitle>
+      <Typography gutterBottom align="left">
+        {/* component=Button is not an anchor, false positive */}
+        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+        <Link
+          component="button"
+          style={{ textAlign: "left" }}
+          onClick={async () => {
+            await notifier.maybeRequestPermission();
+            refreshPermissions();
+          }}
+        >
+          {t("alert_notification_permission_required_description")}
+        </Link>
+      </Typography>
+    </Alert>
+  );
+};
+
 const NotificationPermissionDeniedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
+    </Alert>
   );
 };
 
@@ -363,7 +390,7 @@ const NotificationIOSInstallRequiredAlert = () => {
   const { t } = useTranslation();
   return (
     <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <Alert severity="info" sx={{ paddingTop: 2 }}>
         <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
         <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
       </Alert>
@@ -375,33 +402,27 @@ const NotificationIOSInstallRequiredAlert = () => {
 const NotificationBrowserNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
+    </Alert>
   );
 };
 
 const NotificationContextNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
-        <Typography gutterBottom>
-          <Trans
-            i18nKey="alert_not_supported_context_description"
-            components={{
-              mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener" />,
-            }}
-          />
-        </Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+      <Typography gutterBottom>
+        <Trans
+          i18nKey="alert_not_supported_context_description"
+          components={{
+            mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener" />,
+          }}
+        />
+      </Typography>
+    </Alert>
   );
 };
 

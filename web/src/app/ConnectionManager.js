@@ -1,5 +1,4 @@
 import Connection from "./Connection";
-import { NotificationType } from "./SubscriptionManager";
 import { hashCode } from "./utils";
 
 const makeConnectionId = (subscription, user) =>
@@ -52,11 +51,9 @@ class ConnectionManager {
         const connectionId = makeConnectionId(s, user);
         return { ...s, user, connectionId };
       })
-      // we want to create a ws for both sound-only and active browser notifications,
-      // only background notifications don't need this as they come over web push.
-      // however, if background notifications are muted, we again need the ws while
-      // the page is active
-      .filter((s) => s.notificationType !== NotificationType.BACKGROUND && s.mutedUntil !== 1);
+      // background notifications don't need this as they come over web push.
+      // however, if they are muted, we again need the ws while the page is active
+      .filter((s) => !s.webPushEnabled && s.mutedUntil !== 1);
 
     console.log();
     const targetIds = subscriptionsWithUsersAndConnectionId.map((s) => s.connectionId);

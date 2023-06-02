@@ -12,16 +12,14 @@ import {
   FormGroup,
   useMediaQuery,
   Switch,
-  Stack,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { Warning } from "@mui/icons-material";
 import { useLiveQuery } from "dexie-react-hooks";
 import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
 import userManager from "../app/UserManager";
-import subscriptionManager, { NotificationType } from "../app/SubscriptionManager";
+import subscriptionManager from "../app/SubscriptionManager";
 import poller from "../app/Poller";
 import DialogFooter from "./DialogFooter";
 import session from "../app/Session";
@@ -59,16 +57,16 @@ const SubscribeDialog = (props) => {
 
   const webPushDefaultEnabled = useLiveQuery(async () => prefs.webPushDefaultEnabled());
 
-  const handleSuccess = async (notificationType) => {
+  const handleSuccess = async (webPushEnabled) => {
     console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
     const actualBaseUrl = baseUrl || config.base_url;
     const subscription = await subscribeTopic(actualBaseUrl, topic, {
-      notificationType,
+      webPushEnabled,
     });
     poller.pollInBackground(subscription); // Dangle!
 
     // if the user hasn't changed the default web push setting yet, set it to enabled
-    if (notificationType === "background" && webPushDefaultEnabled === "initial") {
+    if (webPushEnabled && webPushDefaultEnabled === "initial") {
       await prefs.setWebPushDefaultEnabled(true);
     }
 
@@ -100,23 +98,6 @@ const SubscribeDialog = (props) => {
   );
 };
 
-const browserNotificationsSupported = notifier.supported();
-const pushNotificationsSupported = notifier.pushSupported();
-const iosInstallRequired = notifier.iosSupportedButInstallRequired();
-const pushPossible = pushNotificationsSupported && iosInstallRequired;
-
-const getNotificationTypeFromToggles = (browserNotificationsEnabled, backgroundNotificationsEnabled) => {
-  if (backgroundNotificationsEnabled) {
-    return NotificationType.BACKGROUND;
-  }
-
-  if (browserNotificationsEnabled) {
-    return NotificationType.BROWSER;
-  }
-
-  return NotificationType.SOUND;
-};
-
 const SubscribePage = (props) => {
   const { t } = useTranslation();
   const { account } = useContext(AccountContext);
@@ -134,27 +115,7 @@ const SubscribePage = (props) => {
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
 
-  // load initial value, but update it in `handleBrowserNotificationsChanged`
-  // if we interact with the API and therefore possibly change it (from default -> denied)
-  const [notificationsExplicitlyDenied, setNotificationsExplicitlyDenied] = useState(notifier.denied());
-  // default to on if notifications are already granted
-  const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(notifier.granted());
-  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(
-    pushPossible && props.webPushDefaultEnabled === "enabled"
-  );
-
-  const handleBrowserNotificationsChanged = async (e) => {
-    if (e.target.checked && (await notifier.maybeRequestPermission())) {
-      setBrowserNotificationsEnabled(true);
-      if (pushPossible && props.webPushDefaultEnabled === "enabled") {
-        setBackgroundNotificationsEnabled(true);
-      }
-    } else {
-      setNotificationsExplicitlyDenied(notifier.denied());
-      setBrowserNotificationsEnabled(false);
-      setBackgroundNotificationsEnabled(false);
-    }
-  };
+  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(props.webPushDefaultEnabled === "enabled");
 
   const handleBackgroundNotificationsChanged = (e) => {
     setBackgroundNotificationsEnabled(e.target.checked);
@@ -197,7 +158,7 @@ const SubscribePage = (props) => {
     }
 
     console.log(`[SubscribeDialog] Successful login to ${topicUrl(baseUrl, topic)} for user ${username}`);
-    props.onSuccess(getNotificationTypeFromToggles(browserNotificationsEnabled, backgroundNotificationsEnabled));
+    props.onSuccess(backgroundNotificationsEnabled);
   };
 
   const handleUseAnotherChanged = (e) => {
@@ -311,41 +272,20 @@ const SubscribePage = (props) => {
             )}
           </FormGroup>
         )}
-        {browserNotificationsSupported && (
+        {notifier.pushPossible() && !anotherServerVisible && (
           <FormGroup>
             <FormControlLabel
               control={
                 <Switch
-                  onChange={handleBrowserNotificationsChanged}
-                  checked={browserNotificationsEnabled}
-                  disabled={notificationsExplicitlyDenied}
+                  onChange={handleBackgroundNotificationsChanged}
+                  checked={backgroundNotificationsEnabled}
                   inputProps={{
-                    "aria-label": t("subscribe_dialog_subscribe_enable_browser_notifications_label"),
+                    "aria-label": t("subscribe_dialog_subscribe_enable_background_notifications_label"),
                   }}
                 />
               }
-              label={
-                <Stack direction="row" gap={1} alignItems="center">
-                  {t("subscribe_dialog_subscribe_enable_browser_notifications_label")}
-                  {notificationsExplicitlyDenied && <Warning />}
-                </Stack>
-              }
+              label={t("subscribe_dialog_subscribe_enable_background_notifications_label")}
             />
-            {pushNotificationsSupported && !anotherServerVisible && browserNotificationsEnabled && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    onChange={handleBackgroundNotificationsChanged}
-                    checked={backgroundNotificationsEnabled}
-                    disabled={iosInstallRequired}
-                    inputProps={{
-                      "aria-label": t("subscribe_dialog_subscribe_enable_background_notifications_label"),
-                    }}
-                  />
-                }
-                label={t("subscribe_dialog_subscribe_enable_background_notifications_label")}
-              />
-            )}
           </FormGroup>
         )}
       </DialogContent>

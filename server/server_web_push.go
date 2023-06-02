@@ -4,16 +4,43 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 )
 
+// test: https://regexr.com/7eqvl
+// example urls:
+//
+//	https://android.googleapis.com/XYZ
+//	https://fcm.googleapis.com/XYZ
+//	https://updates.push.services.mozilla.com/XYZ
+//	https://updates-autopush.stage.mozaws.net/XYZ
+//	https://updates-autopush.dev.mozaws.net/XYZ
+//	https://AAA.notify.windows.com/XYZ
+//	https://AAA.push.apple.com/XYZ
+const (
+	webPushEndpointAllowRegexStr = `^https:\/\/(android\.googleapis\.com|fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|updates-autopush\.stage\.mozaws\.net|updates-autopush\.dev\.mozaws\.net|.*\.notify\.windows\.com|.*\.push\.apple\.com)\/.*$`
+	webPushTopicSubscribeLimit   = 50
+)
+
+var webPushEndpointAllowRegex = regexp.MustCompile(webPushEndpointAllowRegexStr)
+
 func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	payload, err := readJSONWithLimit[webPushSubscriptionPayload](r.Body, jsonBodyBytesLimit, false)
+
 	if err != nil || payload.BrowserSubscription.Endpoint == "" || payload.BrowserSubscription.Keys.P256dh == "" || payload.BrowserSubscription.Keys.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
+	}
+
+	if !webPushEndpointAllowRegex.MatchString(payload.BrowserSubscription.Endpoint) {
+		return errHTTPBadRequestWebPushEndpointUnknown
+	}
+
+	if len(payload.Topics) > webPushTopicSubscribeLimit {
+		return errHTTPBadRequestWebPushTopicCountTooHigh
 	}
 
 	u := v.User()

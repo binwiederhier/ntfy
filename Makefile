@@ -110,8 +110,9 @@ build-deps-ubuntu:
 
 docs: docs-deps docs-build
 
-docs-build: .PHONY
-	@if ! /bin/echo -e "import sys\nif sys.version_info < (3,8):\n exit(1)" | python3; then \
+docs-build: venv .PHONY
+	@. venv/bin/activate && \
+	if ! /bin/echo -e "import sys\nif sys.version_info < (3,8):\n exit(1)" | python3; then \
 	  if which python3.8; then \
 	  	echo "python3.8 $(shell which mkdocs) build"; \
 	    python3.8 $(shell which mkdocs) build; \
@@ -124,10 +125,15 @@ docs-build: .PHONY
 	  mkdocs build; \
 	fi
 
-docs-deps: .PHONY
+venv:
+	python3 -m venv ./venv
+
+docs-deps: venv .PHONY
+	. venv/bin/activate && \
 	pip3 install -r requirements.txt
 
-docs-deps-update: .PHONY
+docs-deps-update: venv .PHONY
+	. venv/bin/activate && \
 	pip3 install -r requirements.txt --upgrade
 
 

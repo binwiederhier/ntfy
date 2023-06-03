@@ -8,7 +8,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash
 RUN apt-get install -y \
     build-essential \
     nodejs \
-    python3-pip
+    python3-pip \
+    python3-venv
 
 WORKDIR /app
 ADD Makefile .

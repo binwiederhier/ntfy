@@ -8,6 +8,8 @@ push notifications, and an app badge with the unread notification count.
 
 To receive background notifications, either the browser or the installed web app must be open.
 
+<!-- TODO: (Q4 2023) Safari 17 / macOS 14 Sonoma supports installable PWAs too -->
+
 Web app installation is supported on Chrome and Edge on desktop, as well as Chrome on Android and Safari on iOS.
 Look at the [compatibility table](https://caniuse.com/web-app-manifest) for more info.
 

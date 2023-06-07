@@ -46,6 +46,8 @@ self.addEventListener("push", (event) => {
 
         const db = await getDbAsync();
 
+        const image = message.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? message.attachment.url : undefined;
+
         await Promise.all([
           (async () => {
             await db.notifications.add({
@@ -61,11 +63,14 @@ self.addEventListener("push", (event) => {
           db.subscriptions.update(subscriptionId, {
             last: message.id,
           }),
+          // Please update the desktop notification in Notifier.js to match any changes
           self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
             tag: subscriptionId,
             body: formatMessage(message),
-            icon: "/static/images/ntfy.png",
+            icon: image ?? "/static/images/ntfy.png",
+            image,
             data,
+            timestamp: message.time * 1_000,
           }),
         ]);
       } else {
@@ -81,6 +86,8 @@ self.addEventListener("push", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
+  console.log("[ServiceWorker] NotificationClick");
+
   event.notification.close();
 
   event.waitUntil(

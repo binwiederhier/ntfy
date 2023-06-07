@@ -17,13 +17,17 @@ class Notifier {
     const displayName = topicDisplayName(subscription);
     const message = formatMessage(notification);
     const title = formatTitleWithDefault(notification, displayName);
+    const image = notification.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? notification.attachment.url : undefined;
 
     // Show notification
     console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
+    // Please update sw.js if formatting changes
     const n = new Notification(title, {
       body: message,
       tag: subscription.id,
-      icon: logo,
+      icon: image ?? logo,
+      image,
+      timestamp: message.time * 1_000,
     });
     if (notification.click) {
       n.onclick = () => openUrl(notification.click);

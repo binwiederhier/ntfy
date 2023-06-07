@@ -78,16 +78,12 @@ class SubscriptionManager {
   async syncFromRemote(remoteSubscriptions, remoteReservations) {
     console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
-    const webPushEnabled = (await prefs.webPushDefaultEnabled()) === "enabled";
-
     // Add remote subscriptions
     const remoteIds = await Promise.all(
       remoteSubscriptions.map(async (remote) => {
         const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
 
         const local = await this.add(remote.base_url, remote.topic, {
-          // only if same-origin subscription
-          webPushEnabled: webPushEnabled && remote.base_url === config.base_url,
           displayName: remote.display_name, // May be undefined
           reservation, // May be null!
         });

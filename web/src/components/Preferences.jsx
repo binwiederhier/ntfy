@@ -48,7 +48,6 @@ import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
 import { subscribeTopic } from "./SubscribeDialog";
-import notifier from "../app/Notifier";
 
 const maybeUpdateAccountSettings = async (payload) => {
   if (!session.exists()) {
@@ -86,7 +85,6 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {notifier.pushPossible() && <WebPushDefaultEnabled />}
       </PrefGroup>
     </Card>
   );
@@ -228,36 +226,6 @@ const DeleteAfter = () => {
           <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
           <MenuItem value={604800}>{t("prefs_notifications_delete_after_one_week")}</MenuItem>
           <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
-        </Select>
-      </FormControl>
-    </Pref>
-  );
-};
-
-const WebPushDefaultEnabled = () => {
-  const { t } = useTranslation();
-  const labelId = "prefWebPushDefaultEnabled";
-  const defaultEnabled = useLiveQuery(async () => prefs.webPushDefaultEnabled());
-  const handleChange = async (ev) => {
-    await prefs.setWebPushDefaultEnabled(ev.target.value);
-  };
-
-  // while loading
-  if (defaultEnabled == null) {
-    return null;
-  }
-
-  return (
-    <Pref
-      labelId={labelId}
-      title={t("prefs_notifications_web_push_default_title")}
-      description={t("prefs_notifications_web_push_default_description")}
-    >
-      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={defaultEnabled} onChange={handleChange} aria-labelledby={labelId}>
-          {defaultEnabled === "initial" && <MenuItem value="initial">{t("prefs_notifications_web_push_default_initial")}</MenuItem>}
-          <MenuItem value="enabled">{t("prefs_notifications_web_push_default_enabled")}</MenuItem>
-          <MenuItem value="disabled">{t("prefs_notifications_web_push_default_disabled")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>

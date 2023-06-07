@@ -31,15 +31,6 @@ class Prefs {
     const deleteAfter = await this.db.prefs.get("deleteAfter");
     return deleteAfter ? Number(deleteAfter.value) : 604800; // Default is one week
   }
-
-  async webPushDefaultEnabled() {
-    const obj = await this.db.prefs.get("webPushDefaultEnabled");
-    return obj?.value ?? "initial";
-  }
-
-  async setWebPushDefaultEnabled(enabled) {
-    await this.db.prefs.put({ key: "webPushDefaultEnabled", value: enabled ? "enabled" : "disabled" });
-  }
 }
 
 const prefs = new Prefs(getDb());

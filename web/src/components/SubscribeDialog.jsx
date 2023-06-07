@@ -14,7 +14,6 @@ import {
   Switch,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { useLiveQuery } from "dexie-react-hooks";
 import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
@@ -30,7 +29,6 @@ import { AccountContext } from "./App";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 import { ReserveLimitChip } from "./SubscriptionPopup";
 import notifier from "../app/Notifier";
-import prefs from "../app/Prefs";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -55,8 +53,6 @@ const SubscribeDialog = (props) => {
   const [showLoginPage, setShowLoginPage] = useState(false);
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const webPushDefaultEnabled = useLiveQuery(async () => prefs.webPushDefaultEnabled());
-
   const handleSuccess = async (webPushEnabled) => {
     console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
     const actualBaseUrl = baseUrl || config.base_url;
@@ -64,19 +60,8 @@ const SubscribeDialog = (props) => {
       webPushEnabled,
     });
     poller.pollInBackground(subscription); // Dangle!
-
-    // if the user hasn't changed the default web push setting yet, set it to enabled
-    if (webPushEnabled && webPushDefaultEnabled === "initial") {
-      await prefs.setWebPushDefaultEnabled(true);
-    }
-
     props.onSuccess(subscription);
   };
-
-  // wait for liveQuery load
-  if (webPushDefaultEnabled === undefined) {
-    return <></>;
-  }
 
   return (
     <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
@@ -90,7 +75,6 @@ const SubscribeDialog = (props) => {
           onCancel={props.onCancel}
           onNeedsLogin={() => setShowLoginPage(true)}
           onSuccess={handleSuccess}
-          webPushDefaultEnabled={webPushDefaultEnabled}
         />
       )}
       {showLoginPage && <LoginPage baseUrl={baseUrl} topic={topic} onBack={() => setShowLoginPage(false)} onSuccess={handleSuccess} />}
@@ -115,7 +99,7 @@ const SubscribePage = (props) => {
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
 
-  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(props.webPushDefaultEnabled === "enabled");
+  const [backgroundNotificationsEnabled, setBackgroundNotificationsEnabled] = useState(false);
 
   const handleBackgroundNotificationsChanged = (e) => {
     setBackgroundNotificationsEnabled(e.target.checked);

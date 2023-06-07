@@ -169,7 +169,7 @@ export const SubscriptionPopup = (props) => {
   return (
     <>
       <PopupMenu horizontal={placement} anchorEl={props.anchor} open={!!props.anchor} onClose={props.onClose}>
-        <NotificationToggle subscription={subscription} />
+        {notifier.pushPossible() && <NotificationToggle subscription={subscription} />}
         <Divider />
         <MenuItem onClick={handleChangeDisplayName}>
           <ListItemIcon>
@@ -367,18 +367,12 @@ const NotificationToggle = ({ subscription }) => {
   }
 
   return (
-    <>
-      {notifier.pushPossible() && (
-        <>
-          <MenuItem>
-            {subscription.webPushEnabled === 1 && checkedItem}
-            <ListItemText inset={subscription.webPushEnabled !== 1} onClick={handleToggleBackground}>
-              {t("notification_toggle_background")}
-            </ListItemText>
-          </MenuItem>
-        </>
-      )}
-    </>
+    <MenuItem>
+      {subscription.webPushEnabled === 1 && checkedItem}
+      <ListItemText inset={subscription.webPushEnabled !== 1} onClick={handleToggleBackground}>
+        {t("notification_toggle_background")}
+      </ListItemText>
+    </MenuItem>
   );
 };
 

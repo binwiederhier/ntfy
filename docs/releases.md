@@ -1222,6 +1222,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.6.0 (UNRELEASED)
 
+**Features:**
+
+* The web app now supports web push, and is installable on Chrome, Edge, Android, and iOS. Look at the [web app docs](https://docs.ntfy.sh/subscribe/web/) for more information ([#751](https://github.com/binwiederhier/ntfy/pull/751), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
 **Bug fixes:**
 
 * Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)

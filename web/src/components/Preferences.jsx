@@ -242,11 +242,6 @@ const WebPushEnabled = () => {
     await prefs.setWebPushEnabled(ev.target.value);
   };
 
-  // while loading
-  if (defaultEnabled == null) {
-    return null;
-  }
-
   if (!notifier.pushPossible()) {
     return null;
   }
@@ -254,7 +249,7 @@ const WebPushEnabled = () => {
   return (
     <Pref labelId={labelId} title={t("prefs_notifications_web_push_title")} description={t("prefs_notifications_web_push_description")}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={defaultEnabled} onChange={handleChange} aria-labelledby={labelId}>
+        <Select value={defaultEnabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
           <MenuItem value>{t("prefs_notifications_web_push_enabled")}</MenuItem>
           <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
         </Select>

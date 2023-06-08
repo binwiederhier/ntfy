@@ -29,7 +29,7 @@ const (
 	tagResetter     = "resetter"
 	tagWebsocket    = "websocket"
 	tagMatrix       = "matrix"
-	tagWebPush      = "web_push"
+	tagWebPush      = "webpush"
 )
 
 var (

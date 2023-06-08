@@ -63,11 +63,11 @@ func newWebPushStore(filename string) (*webPushStore, error) {
 
 func setupSubscriptionsDB(db *sql.DB) error {
 	// If 'subscriptions' table does not exist, this must be a new database
-	rowsMC, err := db.Query(selectWebPushSubscriptionsCountQuery)
+	rows, err := db.Query(selectWebPushSubscriptionsCountQuery)
 	if err != nil {
 		return setupNewSubscriptionsDB(db)
 	}
-	return rowsMC.Close()
+	return rows.Close()
 }
 
 func setupNewSubscriptionsDB(db *sql.DB) error {
@@ -83,7 +83,6 @@ func (c *webPushStore) UpdateSubscriptions(topics []string, userID string, subsc
 		return err
 	}
 	defer tx.Rollback()
-
 	if err = c.RemoveByEndpoint(subscription.Endpoint); err != nil {
 		return err
 	}
@@ -107,26 +106,35 @@ func (c *webPushStore) AddSubscription(topic string, userID string, subscription
 	return err
 }
 
-func (c *webPushStore) SubscriptionsForTopic(topic string) (subscriptions []webPushSubscription, err error) {
+func (c *webPushStore) SubscriptionsForTopic(topic string) (subscriptions []*webPushSubscription, err error) {
 	rows, err := c.db.Query(selectWebPushSubscriptionsForTopicQuery, topic)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var data []webPushSubscription
+	var data []*webPushSubscription
 	for rows.Next() {
-		i := webPushSubscription{}
-		err = rows.Scan(&i.BrowserSubscription.Endpoint, &i.BrowserSubscription.Keys.Auth, &i.BrowserSubscription.Keys.P256dh, &i.UserID)
-		if err != nil {
+		var userID, endpoint, auth, p256dh string
+		if err = rows.Scan(&endpoint, &auth, &p256dh, &userID); err != nil {
 			return nil, err
 		}
-		data = append(data, i)
+		data = append(data, &webPushSubscription{
+			UserID: userID,
+			BrowserSubscription: webpush.Subscription{
+				Endpoint: endpoint,
+				Keys: webpush.Keys{
+					Auth:   auth,
+					P256dh: p256dh,
+				},
+			},
+		})
 	}
 	return data, nil
 }
 
 func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Duration, expiryDuration time.Duration) (subscriptions []webPushSubscription, err error) {
+	// TODO this should be two functions
 	tx, err := c.db.Begin()
 	if err != nil {
 		return nil, err

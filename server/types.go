@@ -467,15 +467,21 @@ type apiStripeSubscriptionDeletedEvent struct {
 	Customer string `json:"customer"`
 }
 
+// List of possible Web Push events
+const (
+	webPushMessageEvent  = "message"
+	webPushExpiringEvent = "subscription_expiring"
+)
+
 type webPushPayload struct {
-	Event          string  `json:"event"`
-	SubscriptionID string  `json:"subscription_id"`
-	Message        message `json:"message"`
+	Event          string   `json:"event"`
+	SubscriptionID string   `json:"subscription_id"`
+	Message        *message `json:"message"`
 }
 
-func newWebPushPayload(subscriptionID string, message message) webPushPayload {
+func newWebPushPayload(subscriptionID string, message *message) webPushPayload {
 	return webPushPayload{
-		Event:          "message",
+		Event:          webPushMessageEvent,
 		SubscriptionID: subscriptionID,
 		Message:        message,
 	}
@@ -487,7 +493,7 @@ type webPushControlMessagePayload struct {
 
 func newWebPushSubscriptionExpiringPayload() webPushControlMessagePayload {
 	return webPushControlMessagePayload{
-		Event: "subscription_expiring",
+		Event: webPushExpiringEvent,
 	}
 }
 

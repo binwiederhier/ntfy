@@ -142,6 +142,10 @@ export const SubscriptionPopup = (props) => {
     await subscriptionManager.deleteNotifications(props.subscription.id);
   };
 
+  const handleSetMutedUntil = async (mutedUntil) => {
+    await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
+  };
+
   const handleUnsubscribe = async () => {
     console.log(`[SubscriptionPopup] Unsubscribing from ${props.subscription.id}`, props.subscription);
     await subscriptionManager.remove(props.subscription);
@@ -166,8 +170,6 @@ export const SubscriptionPopup = (props) => {
   return (
     <>
       <PopupMenu horizontal={placement} anchorEl={props.anchor} open={!!props.anchor} onClose={props.onClose}>
-        <NotificationToggle subscription={subscription} />
-
         <MenuItem onClick={handleChangeDisplayName}>
           <ListItemIcon>
             <Edit fontSize="small" />
@@ -198,7 +200,6 @@ export const SubscriptionPopup = (props) => {
             <ListItemIcon>
               <EnhancedEncryption fontSize="small" />
             </ListItemIcon>
-
             {t("action_bar_reservation_edit")}
           </MenuItem>
         )}
@@ -207,7 +208,6 @@ export const SubscriptionPopup = (props) => {
             <ListItemIcon>
               <LockOpen fontSize="small" />
             </ListItemIcon>
-
             {t("action_bar_reservation_delete")}
           </MenuItem>
         )}
@@ -215,21 +215,34 @@ export const SubscriptionPopup = (props) => {
           <ListItemIcon>
             <Send fontSize="small" />
           </ListItemIcon>
-
           {t("action_bar_send_test_notification")}
         </MenuItem>
         <MenuItem onClick={handleClearAll}>
           <ListItemIcon>
             <ClearAll fontSize="small" />
           </ListItemIcon>
-
           {t("action_bar_clear_notifications")}
         </MenuItem>
+        {!!subscription.mutedUntil && (
+          <MenuItem onClick={() => handleSetMutedUntil(0)}>
+            <ListItemIcon>
+              <Notifications fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_unmute_notifications")}
+          </MenuItem>
+        )}
+        {!subscription.mutedUntil && (
+          <MenuItem onClick={() => handleSetMutedUntil(1)}>
+            <ListItemIcon>
+              <NotificationsOff fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_mute_notifications")}
+          </MenuItem>
+        )}
         <MenuItem onClick={handleUnsubscribe}>
           <ListItemIcon>
             <RemoveCircle fontSize="small" />
           </ListItemIcon>
-
           {t("action_bar_unsubscribe")}
         </MenuItem>
       </PopupMenu>
@@ -328,31 +341,6 @@ const DisplayNameDialog = (props) => {
         <Button onClick={handleSave}>{t("common_save")}</Button>
       </DialogFooter>
     </Dialog>
-  );
-};
-
-const NotificationToggle = ({ subscription }) => {
-  const { t } = useTranslation();
-
-  const handleToggleMute = async () => {
-    const mutedUntil = subscription.mutedUntil ? 0 : 1; // Make this a timestamp in the future
-    await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
-  };
-
-  return subscription.mutedUntil ? (
-    <MenuItem onClick={handleToggleMute}>
-      <ListItemIcon>
-        <Notifications />
-      </ListItemIcon>
-      {t("notification_toggle_unmute")}
-    </MenuItem>
-  ) : (
-    <MenuItem onClick={handleToggleMute}>
-      <ListItemIcon>
-        <NotificationsOff />
-      </ListItemIcon>
-      {t("notification_toggle_mute")}
-    </MenuItem>
   );
 };
 

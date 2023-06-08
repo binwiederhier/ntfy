@@ -791,9 +791,18 @@ it'll show `New message` as a popup.
 
 ## Web Push notifications
 [Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) ([RFC8030](https://datatracker.ietf.org/doc/html/rfc8030))
-is supported, but needs a little configuration to enable it. Since there is no central server (other than the browser's push endpoint),
-you have to configure your own [VAPID](https://datatracker.ietf.org/doc/html/draft-thomson-webpush-vapid) keys. These identify the publisher,
-and are used to encrypt the messages before sending them to the push endpoint.
+allows ntfy to receive push notifications, even when the ntfy web app (or even the browser, depending on the platform) is closed. 
+When enabled, the user can enable **background notifications** for their topics in the wep app under Settings. Once enabled by the
+user, ntfy will forward published messages to the push endpoint (browser-provided, e.g. fcm.googleapis.com), which will then
+forward it to the browser.
+
+To configure Web Push, you need to generate and configure a [VAPID](https://datatracker.ietf.org/doc/html/draft-thomson-webpush-vapid) keypair (via `ntfy webpush keys`),
+a database to keep track of the browser's subscriptions, and an admin email address (you):
+
+- `web-push-public-key` is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+- `web-push-private-key` is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
+- `web-push-subscriptions-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+- `web-push-email-address` is the admin email address send to the push provider, e.g. `sysadmin@example.com`
 
 Limitations:
 
@@ -806,32 +815,17 @@ Limitations:
 To configure VAPID keys, first generate them:
 
 ```sh
-$ ntfy web-push generate-keys
-Keys generated.
-
-VAPID Public Key:
-AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
-
-VAPID Private Key:
-AA2BB1234567890abcdefzxcvbnm1234567890
+$ ntfy webpush keys
+Web Push keys generated. 
 ```
 
 Then copy the generated values into your `server.yml` or use the corresponding environment variables or command line arguments:
 
 ```yaml
-web-push-enabled: true
 web-push-public-key: AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 web-push-private-key: AA2BB1234567890abcdefzxcvbnm1234567890
-web-push-subscriptions-file: /var/cache/ntfy/subscriptions.db
+web-push-subscriptions-file: /var/cache/ntfy/webpush.db
 web-push-email-address: sysadmin@example.com
-
-# don't forget to set the required base-url for web push notifications
-base-url: https://ntfy.example.com
-
-# you can also set custom expiry and warning durations
-# the minimum is 1 day for warning, and 1 day after warning for expiry
-web-push-expiry-warning-duration: 168h
-web-push-expiry-duration: 192h
 ```
 
 The `web-push-subscriptions-file` is used to store the push subscriptions. Subscriptions do not ever expire automatically, unless the push
@@ -840,7 +834,7 @@ gateway returns an error (e.g. 410 Gone when a user has unsubscribed).
 The web app refreshes subscriptions on start and regularly on an interval, but this file should be persisted across restarts. If the subscription
 file is deleted or lost, any web apps that aren't open will not receive new web push notifications until you open then.
 
-Changing your public/private keypair is NOT recommended. Browsers only allow one server identity (public key) per origin, and
+Changing your public/private keypair is **not recommended**. Browsers only allow one server identity (public key) per origin, and
 if you change them the clients will not be able to subscribe via web push until the user manually clears the notification permission.
 
 ## Tiers
@@ -1340,12 +1334,10 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `stripe-webhook-key`                       | `NTFY_STRIPE_WEBHOOK_KEY`                       | *string*                                            | -                 | Payments: Key required to validate the authenticity of incoming webhooks from Stripe                                                                                                                                            |
 | `billing-contact`                          | `NTFY_BILLING_CONTACT`                          | *email address* or *website*                        | -                 | Payments: Email or website displayed in Upgrade dialog as a billing contact                                                                                                                                                     |
 | `web-push-enabled`                         | `NTFY_WEB_PUSH_ENABLED`                         | *boolean* (`true` or `false`)                       | -                 | Web Push: Enable/disable (requires private and public key below).                                                                                                                                                               |
-| `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy web-push generate-keys` to generate                                                                                                                                                             |
-| `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy web-push generate-keys` to generate                                                                                                                                                            |
-| `web-push-subscriptions-file`               | `NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE`              | *string*                                            | -                 | Web Push: Subscriptions file                                                                                                                                                                                                     |
+| `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush generate-keys` to generate                                                                                                                                                              |
+| `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush generate-keys` to generate                                                                                                                                                             |
+| `web-push-subscriptions-file`              | `NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE`              | *string*                                            | -                 | Web Push: Subscriptions file                                                                                                                                                                                                    |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
-| `web-push-expiry-warning-duration`         | `NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION`         | *duration*                                          | 1 week            | Web Push: Time before expiry warning is sent (min 1 day)                                                                                                                                                                        |
-| `web-push-expiry-duration`                 | `NTFY_WEB_PUSH_EXPIRY_DURATION`                 | *duration*                                          | 1 week + 1 day    | Web Push: Time before subscription is expired (min 1 day after warning)                                                                                                                                                         |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
@@ -1443,8 +1435,6 @@ OPTIONS:
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
    --web-push-subscriptions-file value, --web_push_subscriptions_file value                                               file used to store web push subscriptions [$NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
-   --web-push-expiry-warning-duration value, --web_push_expiry_warning_duration value                                     duration after last update to send a warning notification (default: 168h0m0s) [$NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION]
-   --web-push-expiry-duration value, --web_push_expiry_duration value                                                     duration after last update to expire subscription (default: 192h0m0s) [$NTFY_WEB_PUSH_EXPIRY_DURATION]
    --help, -h                                                                                                             show help
 
 ```

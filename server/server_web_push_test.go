@@ -23,7 +23,7 @@ const (
 func TestServer_WebPush_TopicAdd(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
@@ -40,7 +40,7 @@ func TestServer_WebPush_TopicAdd(t *testing.T) {
 func TestServer_WebPush_TopicAdd_InvalidEndpoint(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{"test-topic"}, "https://ddos-target.example.com/webpush"), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, "https://ddos-target.example.com/webpush"), nil)
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, `{"code":40039,"http":400,"error":"invalid request: web push endpoint unknown"}`+"\n", response.Body.String())
 }
@@ -53,7 +53,7 @@ func TestServer_WebPush_TopicAdd_TooManyTopics(t *testing.T) {
 		topicList[i] = util.RandomString(5)
 	}
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, topicList, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, topicList, defaultEndpoint), nil)
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, `{"code":40040,"http":400,"error":"invalid request: too many web push topic subscriptions"}`+"\n", response.Body.String())
 }
@@ -64,7 +64,7 @@ func TestServer_WebPush_TopicUnsubscribe(t *testing.T) {
 	addSubscription(t, s, "test-topic", defaultEndpoint)
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{}, defaultEndpoint), nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
@@ -79,7 +79,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 200, response.Code)
@@ -96,7 +96,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Denied(t *testing.T) {
 	config.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, config)
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
 	require.Equal(t, 403, response.Code)
 
 	requireSubscriptionCount(t, s, "test-topic", 0)
@@ -109,7 +109,7 @@ func TestServer_WebPush_DeleteAccountUnsubscribe(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
-	response := request(t, s, "PUT", "/v1/account/web-push", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 

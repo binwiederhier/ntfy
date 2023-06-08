@@ -15,7 +15,7 @@ func (s *Server) execManager() {
 	s.pruneTokens()
 	s.pruneAttachments()
 	s.pruneMessages()
-	if s.config.WebPushEnabled {
+	if s.config.WebPushPublicKey != "" {
 		s.expireOrNotifyOldSubscriptions()
 	}
 

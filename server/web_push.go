@@ -31,10 +31,9 @@ const (
 		INSERT OR REPLACE INTO subscriptions (topic, user_id, endpoint, key_auth, key_p256dh)
 		VALUES (?, ?, ?, ?, ?)
 	`
-	deleteWebPushSubscriptionByEndpointQuery         = `DELETE FROM subscriptions WHERE endpoint = ?`
-	deleteWebPushSubscriptionByUserIDQuery           = `DELETE FROM subscriptions WHERE user_id = ?`
-	deleteWebPushSubscriptionByTopicAndEndpointQuery = `DELETE FROM subscriptions WHERE topic = ? AND endpoint = ?`
-	deleteWebPushSubscriptionsByAgeQuery             = `DELETE FROM subscriptions WHERE warning_sent = 1 AND updated_at <= datetime('now', ?)`
+	deleteWebPushSubscriptionByEndpointQuery = `DELETE FROM subscriptions WHERE endpoint = ?`
+	deleteWebPushSubscriptionByUserIDQuery   = `DELETE FROM subscriptions WHERE user_id = ?`
+	deleteWebPushSubscriptionsByAgeQuery     = `DELETE FROM subscriptions WHERE warning_sent = 1 AND updated_at <= datetime('now', ?)`
 
 	selectWebPushSubscriptionsForTopicQuery     = `SELECT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE topic = ?`
 	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT DISTINCT endpoint, key_auth, key_p256dh FROM subscriptions WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
@@ -169,8 +168,7 @@ func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Du
 		return nil, err
 	}
 
-	err = tx.Commit()
-	if err != nil {
+	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
 

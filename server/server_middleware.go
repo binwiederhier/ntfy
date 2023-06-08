@@ -60,7 +60,7 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 
 func (s *Server) ensureWebPushEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if !s.config.WebPushEnabled {
+		if s.config.WebPushPublicKey == "" {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)

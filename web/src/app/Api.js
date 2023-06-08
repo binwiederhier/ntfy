@@ -6,7 +6,7 @@ import {
   topicUrlAuth,
   topicUrlJsonPoll,
   topicUrlJsonPollWithSince,
-  webPushSubscriptionsUrl,
+  accountWebPushUrl,
 } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
@@ -117,7 +117,7 @@ class Api {
 
   async updateWebPushSubscriptions(topics, browserSubscription) {
     const user = await userManager.get(config.base_url);
-    const url = webPushSubscriptionsUrl(config.base_url);
+    const url = accountWebPushUrl(config.base_url);
     console.log(`[Api] Sending Web Push Subscriptions`, { url, topics, endpoint: browserSubscription.endpoint });
 
     const response = await fetch(url, {

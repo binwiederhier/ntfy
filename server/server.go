@@ -94,7 +94,7 @@ var (
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
-	apiAccountWebPushPath                                = "/v1/account/web-push"
+	apiAccountWebPushPath                                = "/v1/account/webpush"
 	apiAccountPhonePath                                  = "/v1/account/phone"
 	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
@@ -157,7 +157,7 @@ func New(conf *Config) (*Server, error) {
 		return nil, err
 	}
 	var webPush *webPushStore
-	if conf.WebPushEnabled {
+	if conf.WebPushPublicKey != "" {
 		webPush, err = newWebPushStore(conf.WebPushSubscriptionsFile)
 		if err != nil {
 			return nil, err
@@ -574,7 +574,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableCalls:        s.config.TwilioAccount != "",
 		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
-		EnableWebPush:      s.config.WebPushEnabled,
+		EnableWebPush:      s.config.WebPushPublicKey != "",
 		BillingContact:     s.config.BillingContact,
 		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
@@ -792,7 +792,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
 			go s.forwardPollRequest(v, m)
 		}
-		if s.config.WebPushEnabled {
+		if s.config.WebPushPublicKey != "" {
 			go s.publishToWebPushEndpoints(v, m)
 		}
 	} else {
@@ -1724,7 +1724,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	if s.config.UpstreamBaseURL != "" {
 		go s.forwardPollRequest(v, m)
 	}
-	if s.config.WebPushEnabled {
+	if s.config.WebPushPublicKey != "" {
 		go s.publishToWebPushEndpoints(v, m)
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {

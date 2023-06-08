@@ -52,17 +52,14 @@ class Notifier {
     if (!this.pushPossible()) {
       throw new Error("Unsupported or denied");
     }
-
     const pushManager = await this.pushManager();
-
     const existingSubscription = await pushManager.getSubscription();
-
     if (existingSubscription) {
       return existingSubscription;
     }
 
-    // create a new subscription only if web push is enabled
-    // it is possible that web push was previously enabled and then disabled again
+    // Create a new subscription only if web push is enabled. 
+    // It is possible that web push was previously enabled and then disabled again
     // in which case there would be an existingSubscription.
     // but if it was _not_ enabled previously, we reach here, and only create a new
     // subscription if it is now enabled.

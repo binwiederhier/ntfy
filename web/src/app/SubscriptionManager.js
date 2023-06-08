@@ -113,7 +113,6 @@ class SubscriptionManager {
 
   async refreshWebPushSubscriptions(presetTopics) {
     const topics = presetTopics ?? (await this.webPushTopics());
-
     const browserSubscription = await notifier.getBrowserSubscription();
 
     if (!browserSubscription) {

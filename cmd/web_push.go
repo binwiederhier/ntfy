@@ -14,7 +14,7 @@ func init() {
 }
 
 var cmdWebPush = &cli.Command{
-	Name:      "web-push",
+	Name:      "webpush",
 	Usage:     "Generate keys, in the future manage web push subscriptions",
 	UsageText: "ntfy web-push [generate-keys]",
 	Category:  categoryServer,
@@ -22,7 +22,7 @@ var cmdWebPush = &cli.Command{
 	Subcommands: []*cli.Command{
 		{
 			Action:    generateWebPushKeys,
-			Name:      "generate-keys",
+			Name:      "keys",
 			Usage:     "Generate VAPID keys to enable browser background push notifications",
 			UsageText: "ntfy web-push generate-keys",
 			Category:  categoryServer,
@@ -36,28 +36,15 @@ func generateWebPushKeys(c *cli.Context) error {
 		return err
 	}
 
-	fmt.Fprintf(c.App.ErrWriter, `Keys generated.
+	fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
 
-VAPID Public Key:
-%s
-
-VAPID Private Key:
-%s
-
----
-
-Add the following lines to your config file:
-
-web-push-enabled: true
 web-push-public-key: %s
 web-push-private-key: %s
-web-push-subscriptions-file: <filename>
+web-push-subscriptions-file: /var/cache/ntfy/webpush.db # or similar
 web-push-email-address: <email address>
 
-Look at the docs for other methods (e.g. command line flags & environment variables).
-
-You will also need to set a base-url.
-`, publicKey, privateKey, publicKey, privateKey)
+See https://ntfy.sh/docs/config/#web-push for details.
+`, publicKey, privateKey)
 
 	return nil
 }

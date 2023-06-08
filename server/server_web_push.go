@@ -76,7 +76,7 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 }
 
 // TODO this should return error
-// TODO the updated_at field is not actually updated ever
+// TODO rate limiting
 
 func (s *Server) expireOrNotifyOldSubscriptions() {
 	subscriptions, err := s.webPush.ExpireAndGetExpiringSubscriptions(s.config.WebPushExpiryWarningDuration, s.config.WebPushExpiryDuration)

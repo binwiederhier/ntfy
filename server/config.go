@@ -153,7 +153,6 @@ type Config struct {
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
-	WebPushEnabled                       bool
 	WebPushPrivateKey                    string
 	WebPushPublicKey                     string
 	WebPushSubscriptionsFile             string
@@ -241,7 +240,6 @@ func NewConfig() *Config {
 		EnableReservations:                   false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
-		WebPushEnabled:                       false,
 		WebPushPrivateKey:                    "",
 		WebPushPublicKey:                     "",
 		WebPushSubscriptionsFile:             "",

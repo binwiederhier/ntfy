@@ -21,7 +21,6 @@ export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, top
 export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
-export const webPushSubscriptionsUrl = (baseUrl) => `${baseUrl}/v1/account/web-push`;
 export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
 export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
@@ -33,6 +32,7 @@ export const accountBillingSubscriptionUrl = (baseUrl) => `${baseUrl}/v1/account
 export const accountBillingPortalUrl = (baseUrl) => `${baseUrl}/v1/account/billing/portal`;
 export const accountPhoneUrl = (baseUrl) => `${baseUrl}/v1/account/phone`;
 export const accountPhoneVerifyUrl = (baseUrl) => `${baseUrl}/v1/account/phone/verify`;
+export const accountWebPushUrl = (baseUrl) => `${baseUrl}/v1/account/webpush`;
 
 export const validUrl = (url) => url.match(/^https?:\/\/.+/);
 

@@ -114,7 +114,14 @@ class SubscriptionManager {
   async refreshWebPushSubscriptions(presetTopics) {
     const topics = presetTopics ?? (await this.webPushTopics());
 
-    await api.updateWebPushSubscriptions(topics, await notifier.getBrowserSubscription());
+    const browserSubscription = await notifier.getBrowserSubscription();
+
+    if (!browserSubscription) {
+      console.log("[SubscriptionManager] No browser subscription currently exists, so web push was never enabled. Skipping.");
+      return;
+    }
+
+    await api.updateWebPushSubscriptions(topics, browserSubscription);
   }
 
   async updateState(subscriptionId, state) {

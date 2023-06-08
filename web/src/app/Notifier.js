@@ -55,13 +55,26 @@ class Notifier {
 
     const pushManager = await this.pushManager();
 
-    return (
-      (await pushManager.getSubscription()) ??
-      pushManager.subscribe({
+    const existingSubscription = await pushManager.getSubscription();
+
+    if (existingSubscription) {
+      return existingSubscription;
+    }
+
+    // create a new subscription only if web push is enabled
+    // it is possible that web push was previously enabled and then disabled again
+    // in which case there would be an existingSubscription.
+    // but if it was _not_ enabled previously, we reach here, and only create a new
+    // subscription if it is now enabled.
+
+    if (await this.pushEnabled()) {
+      return pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(config.web_push_public_key),
-      })
-    );
+      });
+    }
+
+    return undefined;
   }
 
   async pushManager() {

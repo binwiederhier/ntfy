@@ -48,6 +48,13 @@ self.addEventListener("push", (event) => {
 
         const image = message.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? message.attachment.url : undefined;
 
+        const actions = message.actions
+          ?.filter(({ action }) => action === "view" || action === "http")
+          .map(({ label }) => ({
+            action: label,
+            title: label,
+          }));
+
         await Promise.all([
           (async () => {
             await db.notifications.add({
@@ -71,6 +78,7 @@ self.addEventListener("push", (event) => {
             image,
             data,
             timestamp: message.time * 1_000,
+            actions,
           }),
         ]);
       } else {
@@ -88,8 +96,6 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   console.log("[ServiceWorker] NotificationClick");
 
-  event.notification.close();
-
   event.waitUntil(
     (async () => {
       const clients = await self.clients.matchAll({ type: "window" });
@@ -97,29 +103,64 @@ self.addEventListener("notificationclick", (event) => {
       const rootUrl = new URL(self.location.origin);
       const rootClient = clients.find((client) => client.url === rootUrl.toString());
 
-      if (event.notification.data.event !== "message") {
+      if (event.notification.data?.event !== "message") {
         if (rootClient) {
           rootClient.focus();
         } else {
           self.clients.openWindow(rootUrl);
         }
+        event.notification.close();
       } else {
         const { message } = event.notification.data;
 
-        if (message.click) {
+        if (event.action) {
+          const action = event.notification.data.message.actions.find(({ label }) => event.action === label);
+
+          if (action.action === "view") {
+            self.clients.openWindow(action.url);
+
+            if (action.clear) {
+              event.notification.close();
+            }
+          } else if (action.action === "http") {
+            try {
+              const response = await fetch(action.url, {
+                method: action.method ?? "POST",
+                headers: action.headers ?? {},
+                body: action.body,
+              });
+
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status} ${response.statusText}`);
+              }
+
+              if (action.clear) {
+                event.notification.close();
+              }
+            } catch (e) {
+              console.error("[ServiceWorker] Error performing http action", e);
+              self.registration.showNotification(`Unsuccessful action ${action.label} (${action.action})`, {
+                body: e.message,
+              });
+            }
+          }
+        } else if (message.click) {
           self.clients.openWindow(message.click);
-          return;
-        }
 
-        const topicUrl = new URL(message.topic, self.location.origin);
-        const topicClient = clients.find((client) => client.url === topicUrl.toString());
-
-        if (topicClient) {
-          topicClient.focus();
-        } else if (rootClient) {
-          rootClient.focus();
+          event.notification.close();
         } else {
-          self.clients.openWindow(topicUrl);
+          const topicUrl = new URL(message.topic, self.location.origin);
+          const topicClient = clients.find((client) => client.url === topicUrl.toString());
+
+          if (topicClient) {
+            topicClient.focus();
+          } else if (rootClient) {
+            rootClient.focus();
+          } else {
+            self.clients.openWindow(topicUrl);
+          }
+
+          event.notification.close();
         }
       }
     })()

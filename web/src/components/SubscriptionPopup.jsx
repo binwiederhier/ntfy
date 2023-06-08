@@ -15,19 +15,17 @@ import {
   MenuItem,
   IconButton,
   ListItemIcon,
-  ListItemText,
-  Divider,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
-  Check,
   Clear,
   ClearAll,
   Edit,
   EnhancedEncryption,
   Lock,
   LockOpen,
+  Notifications,
   NotificationsOff,
   RemoveCircle,
   Send,
@@ -44,7 +42,6 @@ import api from "../app/Api";
 import { AccountContext } from "./App";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
-import notifier from "../app/Notifier";
 
 export const SubscriptionPopup = (props) => {
   const { t } = useTranslation();
@@ -169,8 +166,8 @@ export const SubscriptionPopup = (props) => {
   return (
     <>
       <PopupMenu horizontal={placement} anchorEl={props.anchor} open={!!props.anchor} onClose={props.onClose}>
-        {notifier.pushPossible() && <NotificationToggle subscription={subscription} />}
-        <Divider />
+        <NotificationToggle subscription={subscription} />
+
         <MenuItem onClick={handleChangeDisplayName}>
           <ListItemIcon>
             <Edit fontSize="small" />
@@ -334,44 +331,27 @@ const DisplayNameDialog = (props) => {
   );
 };
 
-const checkedItem = (
-  <ListItemIcon>
-    <Check />
-  </ListItemIcon>
-);
-
 const NotificationToggle = ({ subscription }) => {
   const { t } = useTranslation();
 
-  const handleToggleBackground = async () => {
-    try {
-      await subscriptionManager.toggleBackgroundNotifications(subscription);
-    } catch (e) {
-      console.error("[NotificationToggle] Error setting notification type", e);
-    }
+  const handleToggleMute = async () => {
+    const mutedUntil = subscription.mutedUntil ? 0 : 1; // Make this a timestamp in the future
+    await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
   };
 
-  const unmute = async () => {
-    await subscriptionManager.setMutedUntil(subscription.id, 0);
-  };
-
-  if (subscription.mutedUntil === 1) {
-    return (
-      <MenuItem onClick={unmute}>
-        <ListItemIcon>
-          <NotificationsOff />
-        </ListItemIcon>
-        {t("notification_toggle_unmute")}
-      </MenuItem>
-    );
-  }
-
-  return (
-    <MenuItem>
-      {subscription.webPushEnabled === 1 && checkedItem}
-      <ListItemText inset={subscription.webPushEnabled !== 1} onClick={handleToggleBackground}>
-        {t("notification_toggle_background")}
-      </ListItemText>
+  return subscription.mutedUntil ? (
+    <MenuItem onClick={handleToggleMute}>
+      <ListItemIcon>
+        <Notifications />
+      </ListItemIcon>
+      {t("notification_toggle_unmute")}
+    </MenuItem>
+  ) : (
+    <MenuItem onClick={handleToggleMute}>
+      <ListItemIcon>
+        <NotificationsOff />
+      </ListItemIcon>
+      {t("notification_toggle_mute")}
     </MenuItem>
   );
 };

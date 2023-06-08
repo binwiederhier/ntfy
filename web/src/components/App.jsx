@@ -69,6 +69,16 @@ const Layout = () => {
   const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
+  const webPushTopics = useLiveQuery(() => subscriptionManager.webPushTopics());
+
+  const websocketSubscriptions = useMemo(
+    () => (subscriptions && webPushTopics ? subscriptions.filter((s) => !webPushTopics.includes(s.topic)) : []),
+    // websocketSubscriptions should stay stable unless the list of subscription ids changes.
+    // without the memoization, the connection listener calls a refresh for no reason.
+    // this isn't a problem due to the makeConnectionId, but it triggers an
+    // unnecessary recomputation for every received message.
+    [JSON.stringify({ subscriptions: subscriptions?.map(({ id }) => id), webPushTopics })]
+  );
   const subscriptionsWithoutInternal = subscriptions?.filter((s) => !s.internal);
   const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
   const [selected] = (subscriptionsWithoutInternal || []).filter(
@@ -77,7 +87,7 @@ const Layout = () => {
       (config.base_url === s.baseUrl && params.topic === s.topic)
   );
 
-  useConnectionListeners(account, subscriptions, users);
+  useConnectionListeners(account, websocketSubscriptions, users);
   useAccountListener(setAccount);
   useBackgroundProcesses();
   useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);

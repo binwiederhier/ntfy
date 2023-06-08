@@ -45,15 +45,11 @@ class ConnectionManager {
       return;
     }
     console.log(`[ConnectionManager] Refreshing connections`);
-    const subscriptionsWithUsersAndConnectionId = subscriptions
-      .map((s) => {
-        const [user] = users.filter((u) => u.baseUrl === s.baseUrl);
-        const connectionId = makeConnectionId(s, user);
-        return { ...s, user, connectionId };
-      })
-      // background notifications don't need this as they come over web push.
-      // however, if they are muted, we again need the ws while the page is active
-      .filter((s) => !s.webPushEnabled && s.mutedUntil !== 1);
+    const subscriptionsWithUsersAndConnectionId = subscriptions.map((s) => {
+      const [user] = users.filter((u) => u.baseUrl === s.baseUrl);
+      const connectionId = makeConnectionId(s, user);
+      return { ...s, user, connectionId };
+    });
 
     console.log();
     const targetIds = subscriptionsWithUsersAndConnectionId.map((s) => s.connectionId);

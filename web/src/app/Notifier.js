@@ -114,6 +114,11 @@ class Notifier {
     return this.pushSupported() && this.contextSupported() && this.granted() && !this.iosSupportedButInstallRequired();
   }
 
+  async pushEnabled() {
+    const enabled = await prefs.webPushEnabled();
+    return this.pushPossible() && enabled;
+  }
+
   /**
    * Returns true if this is a HTTPS site, or served over localhost. Otherwise the Notification API
    * is not supported, see https://developer.mozilla.org/en-US/docs/Web/API/notification

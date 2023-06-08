@@ -21,8 +21,16 @@ class SubscriptionManager {
   }
 
   async webPushTopics() {
-    const subscriptions = await this.db.subscriptions.where({ webPushEnabled: 1, mutedUntil: 0 }).toArray();
-    return subscriptions.map(({ topic }) => topic);
+    // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
+    // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
+    if (!(await Promise.resolve(notifier.pushEnabled()))) {
+      return [];
+    }
+
+    const subscriptions = await this.db.subscriptions.where({ mutedUntil: 0, baseUrl: config.base_url }).toArray();
+
+    // internal is currently a bool, it could be a 0/1 to be indexable, but for now just filter them out here
+    return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
   }
 
   async get(subscriptionId) {
@@ -49,7 +57,6 @@ class SubscriptionManager {
    * @param {string} topic
    * @param {object} opts
    * @param {boolean} opts.internal
-   * @param {boolean} opts.webPushEnabled
    * @returns
    */
   async add(baseUrl, topic, opts = {}) {
@@ -67,7 +74,6 @@ class SubscriptionManager {
       topic,
       mutedUntil: 0,
       last: null,
-      webPushEnabled: opts.webPushEnabled ? 1 : 0,
     };
 
     await this.db.subscriptions.put(subscription);
@@ -208,12 +214,6 @@ class SubscriptionManager {
   async setMutedUntil(subscriptionId, mutedUntil) {
     await this.db.subscriptions.update(subscriptionId, {
       mutedUntil,
-    });
-  }
-
-  async toggleBackgroundNotifications(subscription) {
-    await this.db.subscriptions.update(subscription.id, {
-      webPushEnabled: subscription.webPushEnabled === 1 ? 0 : 1,
     });
   }
 

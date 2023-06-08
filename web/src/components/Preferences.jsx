@@ -48,6 +48,7 @@ import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
 import { subscribeTopic } from "./SubscribeDialog";
+import notifier from "../app/Notifier";
 
 const maybeUpdateAccountSettings = async (payload) => {
   if (!session.exists()) {
@@ -85,6 +86,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
+        <WebPushEnabled />
       </PrefGroup>
     </Card>
   );
@@ -226,6 +228,35 @@ const DeleteAfter = () => {
           <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
           <MenuItem value={604800}>{t("prefs_notifications_delete_after_one_week")}</MenuItem>
           <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
+        </Select>
+      </FormControl>
+    </Pref>
+  );
+};
+
+const WebPushEnabled = () => {
+  const { t } = useTranslation();
+  const labelId = "prefWebPushEnabled";
+  const defaultEnabled = useLiveQuery(async () => prefs.webPushEnabled());
+  const handleChange = async (ev) => {
+    await prefs.setWebPushEnabled(ev.target.value);
+  };
+
+  // while loading
+  if (defaultEnabled == null) {
+    return null;
+  }
+
+  if (!notifier.pushPossible()) {
+    return null;
+  }
+
+  return (
+    <Pref labelId={labelId} title={t("prefs_notifications_web_push_title")} description={t("prefs_notifications_web_push_description")}>
+      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+        <Select value={defaultEnabled} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value>{t("prefs_notifications_web_push_enabled")}</MenuItem>
+          <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>

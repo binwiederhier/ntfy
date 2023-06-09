@@ -116,6 +116,7 @@ func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscriptio
 		VAPIDPublicKey:  s.config.WebPushPublicKey,
 		VAPIDPrivateKey: s.config.WebPushPrivateKey,
 		Urgency:         webpush.UrgencyHigh, // iOS requires this to ensure delivery
+		TTL:             int(s.config.CacheDuration.Seconds()),
 	})
 	if err != nil {
 		log.Tag(tagWebPush).Err(err).Fields(*ctx).Debug("Unable to publish web push message, removing endpoint")

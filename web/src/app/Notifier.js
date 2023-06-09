@@ -58,7 +58,7 @@ class Notifier {
       return existingSubscription;
     }
 
-    // Create a new subscription only if web push is enabled. 
+    // Create a new subscription only if web push is enabled.
     // It is possible that web push was previously enabled and then disabled again
     // in which case there would be an existingSubscription.
     // but if it was _not_ enabled previously, we reach here, and only create a new
@@ -76,11 +76,9 @@ class Notifier {
 
   async pushManager() {
     const registration = await navigator.serviceWorker.getRegistration();
-
     if (!registration) {
       throw new Error("No service worker registration found");
     }
-
     return registration.pushManager;
   }
 

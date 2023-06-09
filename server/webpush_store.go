@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SherClockHolmes/webpush-go"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
@@ -41,7 +40,7 @@ const (
 	deleteWebPushSubscriptionsByAgeQuery     = `DELETE FROM subscriptions WHERE warning_sent = 1 AND updated_at <= datetime('now', ?)`
 
 	selectWebPushSubscriptionsForTopicQuery     = `SELECT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE topic = ?`
-	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT DISTINCT endpoint, key_auth, key_p256dh FROM subscriptions WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
+	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT DISTINCT endpoint, key_auth, key_p256dh, user_id FROM subscriptions WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
 
 	updateWarningSentQuery = `UPDATE subscriptions SET warning_sent = true WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
 )
@@ -89,65 +88,48 @@ func setupNewWebPushDB(db *sql.DB) error {
 	return nil
 }
 
-// UpdateSubscriptions updates the subscriptions for the given topics and user ID. It always first deletes all
+// UpsertSubscription adds or updates Web Push subscriptions for the given topics and user ID. It always first deletes all
 // existing entries for a given endpoint.
-func (c *webPushStore) UpdateSubscriptions(topics []string, userID string, subscription webpush.Subscription) error {
+func (c *webPushStore) UpsertSubscription(endpoint string, topics []string, userID, auth, p256dh string) error {
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(deleteWebPushSubscriptionByEndpointQuery, subscription.Endpoint); err != nil {
+	if _, err := tx.Exec(deleteWebPushSubscriptionByEndpointQuery, endpoint); err != nil {
 		return err
 	}
 	for _, topic := range topics {
-		if _, err = tx.Exec(insertWebPushSubscriptionQuery, topic, userID, subscription.Endpoint, subscription.Keys.Auth, subscription.Keys.P256dh); err != nil {
+		if _, err = tx.Exec(insertWebPushSubscriptionQuery, topic, userID, endpoint, auth, p256dh); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
 }
 
-func (c *webPushStore) AddSubscription(topic string, userID string, subscription webpush.Subscription) error {
-	_, err := c.db.Exec(
-		insertWebPushSubscriptionQuery,
-		topic,
-		userID,
-		subscription.Endpoint,
-		subscription.Keys.Auth,
-		subscription.Keys.P256dh,
-	)
-	return err
-}
-
-func (c *webPushStore) SubscriptionsForTopic(topic string) (subscriptions []*webPushSubscription, err error) {
+func (c *webPushStore) SubscriptionsForTopic(topic string) ([]*webPushSubscription, error) {
 	rows, err := c.db.Query(selectWebPushSubscriptionsForTopicQuery, topic)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	var data []*webPushSubscription
+	subscriptions := make([]*webPushSubscription, 0)
 	for rows.Next() {
-		var userID, endpoint, auth, p256dh string
+		var endpoint, auth, p256dh, userID string
 		if err = rows.Scan(&endpoint, &auth, &p256dh, &userID); err != nil {
 			return nil, err
 		}
-		data = append(data, &webPushSubscription{
-			UserID: userID,
-			BrowserSubscription: webpush.Subscription{
-				Endpoint: endpoint,
-				Keys: webpush.Keys{
-					Auth:   auth,
-					P256dh: p256dh,
-				},
-			},
+		subscriptions = append(subscriptions, &webPushSubscription{
+			Endpoint: endpoint,
+			Auth:     auth,
+			P256dh:   p256dh,
+			UserID:   userID,
 		})
 	}
-	return data, nil
+	return subscriptions, nil
 }
 
-func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Duration, expiryDuration time.Duration) (subscriptions []webPushSubscription, err error) {
+func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Duration, expiryDuration time.Duration) ([]*webPushSubscription, error) {
 	// TODO this should be two functions
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -166,15 +148,18 @@ func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Du
 	}
 	defer rows.Close()
 
-	var data []webPushSubscription
+	subscriptions := make([]*webPushSubscription, 0)
 	for rows.Next() {
-		i := webPushSubscription{}
-		err = rows.Scan(&i.BrowserSubscription.Endpoint, &i.BrowserSubscription.Keys.Auth, &i.BrowserSubscription.Keys.P256dh)
-		fmt.Printf("%v+", i)
-		if err != nil {
+		var endpoint, auth, p256dh, userID string
+		if err = rows.Scan(&endpoint, &auth, &p256dh, &userID); err != nil {
 			return nil, err
 		}
-		data = append(data, i)
+		subscriptions = append(subscriptions, &webPushSubscription{
+			Endpoint: endpoint,
+			Auth:     auth,
+			P256dh:   p256dh,
+			UserID:   userID,
+		})
 	}
 
 	// also set warning as sent
@@ -187,22 +172,16 @@ func (c *webPushStore) ExpireAndGetExpiringSubscriptions(warningDuration time.Du
 		return nil, err
 	}
 
-	return data, nil
+	return subscriptions, nil
 }
 
-func (c *webPushStore) RemoveByEndpoint(endpoint string) error {
-	_, err := c.db.Exec(
-		deleteWebPushSubscriptionByEndpointQuery,
-		endpoint,
-	)
+func (c *webPushStore) RemoveSubscriptionsByEndpoint(endpoint string) error {
+	_, err := c.db.Exec(deleteWebPushSubscriptionByEndpointQuery, endpoint)
 	return err
 }
 
-func (c *webPushStore) RemoveByUserID(userID string) error {
-	_, err := c.db.Exec(
-		deleteWebPushSubscriptionByUserIDQuery,
-		userID,
-	)
+func (c *webPushStore) RemoveSubscriptionsByUserID(userID string) error {
+	_, err := c.db.Exec(deleteWebPushSubscriptionByUserIDQuery, userID)
 	return err
 }
 

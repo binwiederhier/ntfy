@@ -29,15 +29,15 @@ const (
 var webPushEndpointAllowRegex = regexp.MustCompile(webPushEndpointAllowRegexStr)
 
 func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	payload, err := readJSONWithLimit[webPushSubscriptionPayload](r.Body, jsonBodyBytesLimit, false)
-	if err != nil || payload.BrowserSubscription.Endpoint == "" || payload.BrowserSubscription.Keys.P256dh == "" || payload.BrowserSubscription.Keys.Auth == "" {
+	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil || req.Endpoint == "" || req.P256dh == "" || req.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
-	} else if !webPushEndpointAllowRegex.MatchString(payload.BrowserSubscription.Endpoint) {
+	} else if !webPushEndpointAllowRegex.MatchString(req.Endpoint) {
 		return errHTTPBadRequestWebPushEndpointUnknown
-	} else if len(payload.Topics) > webPushTopicSubscribeLimit {
+	} else if len(req.Topics) > webPushTopicSubscribeLimit {
 		return errHTTPBadRequestWebPushTopicCountTooHigh
 	}
-	topics, err := s.topicsFromIDs(payload.Topics...)
+	topics, err := s.topicsFromIDs(req.Topics...)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 			}
 		}
 	}
-	if err := s.webPush.UpdateSubscriptions(payload.Topics, v.MaybeUserID(), payload.BrowserSubscription); err != nil {
+	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Topics, v.MaybeUserID(), req.Auth, req.P256dh); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -68,15 +68,12 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 		return
 	}
 	for _, subscription := range subscriptions {
-		ctx := log.Context{"endpoint": subscription.BrowserSubscription.Endpoint, "username": subscription.UserID, "topic": m.Topic, "message_id": m.ID}
+		ctx := log.Context{"endpoint": subscription.Endpoint, "username": subscription.UserID, "topic": m.Topic, "message_id": m.ID}
 		if err := s.sendWebPushNotification(payload, subscription, &ctx); err != nil {
 			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish web push message")
 		}
 	}
 }
-
-// TODO this should return error
-// TODO rate limiting
 
 func (s *Server) pruneOrNotifyWebPushSubscriptions() {
 	if s.config.WebPushPublicKey == "" {
@@ -103,8 +100,8 @@ func (s *Server) pruneOrNotifyWebPushSubscriptionsInternal() error {
 		return err
 	}
 	for _, subscription := range subscriptions {
-		ctx := log.Context{"endpoint": subscription.BrowserSubscription.Endpoint}
-		if err := s.sendWebPushNotification(payload, &subscription, &ctx); err != nil {
+		ctx := log.Context{"endpoint": subscription.Endpoint}
+		if err := s.sendWebPushNotification(payload, subscription, &ctx); err != nil {
 			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish expiry imminent warning")
 			return err
 		}
@@ -114,7 +111,7 @@ func (s *Server) pruneOrNotifyWebPushSubscriptionsInternal() error {
 }
 
 func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscription, ctx *log.Context) error {
-	resp, err := webpush.SendNotification(message, &sub.BrowserSubscription, &webpush.Options{
+	resp, err := webpush.SendNotification(message, sub.ToSubscription(), &webpush.Options{
 		Subscriber:      s.config.WebPushEmailAddress,
 		VAPIDPublicKey:  s.config.WebPushPublicKey,
 		VAPIDPrivateKey: s.config.WebPushPrivateKey,
@@ -122,14 +119,14 @@ func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscriptio
 	})
 	if err != nil {
 		log.Tag(tagWebPush).Err(err).Fields(*ctx).Debug("Unable to publish web push message, removing endpoint")
-		if err := s.webPush.RemoveByEndpoint(sub.BrowserSubscription.Endpoint); err != nil {
+		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
 			return err
 		}
 		return err
 	}
 	if (resp.StatusCode < 200 || resp.StatusCode > 299) && resp.StatusCode != 429 {
 		log.Tag(tagWebPush).Fields(*ctx).Field("response_code", resp.StatusCode).Debug("Unable to publish web push message, unexpected response")
-		if err := s.webPush.RemoveByEndpoint(sub.BrowserSubscription.Endpoint); err != nil {
+		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
 			return err
 		}
 		return errHTTPInternalErrorWebPushUnableToPublish.Fields(*ctx)

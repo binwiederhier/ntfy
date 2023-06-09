@@ -3,27 +3,25 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/SherClockHolmes/webpush-go"
-	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
 )
 
 const (
-	defaultEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
+	testWebPushEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
 )
 
 func TestServer_WebPush_TopicAdd(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
@@ -31,9 +29,9 @@ func TestServer_WebPush_TopicAdd(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Len(t, subs, 1)
-	require.Equal(t, subs[0].BrowserSubscription.Endpoint, defaultEndpoint)
-	require.Equal(t, subs[0].BrowserSubscription.Keys.P256dh, "p256dh-key")
-	require.Equal(t, subs[0].BrowserSubscription.Keys.Auth, "auth-key")
+	require.Equal(t, subs[0].Endpoint, testWebPushEndpoint)
+	require.Equal(t, subs[0].P256dh, "p256dh-key")
+	require.Equal(t, subs[0].Auth, "auth-key")
 	require.Equal(t, subs[0].UserID, "")
 }
 
@@ -53,7 +51,7 @@ func TestServer_WebPush_TopicAdd_TooManyTopics(t *testing.T) {
 		topicList[i] = util.RandomString(5)
 	}
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, topicList, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, topicList, testWebPushEndpoint), nil)
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, `{"code":40040,"http":400,"error":"invalid request: too many web push topic subscriptions"}`+"\n", response.Body.String())
 }
@@ -61,10 +59,10 @@ func TestServer_WebPush_TopicAdd_TooManyTopics(t *testing.T) {
 func TestServer_WebPush_TopicUnsubscribe(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
-	addSubscription(t, s, "test-topic", defaultEndpoint)
+	addSubscription(t, s, testWebPushEndpoint, "test-topic")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{}, testWebPushEndpoint), nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
 
@@ -79,7 +77,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 	require.Equal(t, 200, response.Code)
@@ -96,7 +94,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Denied(t *testing.T) {
 	config.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, config)
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), nil)
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), nil)
 	require.Equal(t, 403, response.Code)
 
 	requireSubscriptionCount(t, s, "test-topic", 0)
@@ -109,7 +107,7 @@ func TestServer_WebPush_DeleteAccountUnsubscribe(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
-	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, defaultEndpoint), map[string]string{
+	response := request(t, s, "PUT", "/v1/account/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{
 		"Authorization": util.BasicAuth("ben", "ben"),
 	})
 
@@ -129,7 +127,6 @@ func TestServer_WebPush_Publish(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
 	var received atomic.Bool
-
 	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
@@ -140,8 +137,7 @@ func TestServer_WebPush_Publish(t *testing.T) {
 	}))
 	defer pushService.Close()
 
-	addSubscription(t, s, "test-topic", pushService.URL+"/push-receive")
-
+	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic")
 	request(t, s, "PUT", "/test-topic", "web push test", nil)
 
 	waitFor(t, func() bool {
@@ -153,19 +149,15 @@ func TestServer_WebPush_Publish_RemoveOnError(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
 	var received atomic.Bool
-
 	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		// Gone
-		w.WriteHeader(410)
+		w.WriteHeader(http.StatusGone)
 		received.Store(true)
 	}))
 	defer pushService.Close()
 
-	addSubscription(t, s, "test-topic", pushService.URL+"/push-receive")
-	addSubscription(t, s, "test-topic-abc", pushService.URL+"/push-receive")
-
+	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic", "test-topic-abc")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 	requireSubscriptionCount(t, s, "test-topic-abc", 1)
 
@@ -195,7 +187,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	}))
 	defer pushService.Close()
 
-	addSubscription(t, s, "test-topic", pushService.URL+"/push-receive")
+	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
 	_, err := s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-7 days')")
@@ -225,30 +217,18 @@ func payloadForTopics(t *testing.T, topics []string, endpoint string) string {
 
 	return fmt.Sprintf(`{
 		"topics": %s,
-		"browser_subscription":{
-			"endpoint": "%s",
-			"keys": {
-				"p256dh": "p256dh-key",
-				"auth": "auth-key"
-			}
-		}
+		"endpoint": "%s",
+		"p256dh": "p256dh-key",
+		"auth": "auth-key"
 	}`, topicsJSON, endpoint)
 }
 
-func addSubscription(t *testing.T, s *Server, topic string, url string) {
-	err := s.webPush.AddSubscription(topic, "", webpush.Subscription{
-		Endpoint: url,
-		Keys: webpush.Keys{
-			// connected to a local test VAPID key, not a leak!
-			Auth:   "kSC3T8aN1JCQxxPdrFLrZg",
-			P256dh: "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE",
-		},
-	})
-	require.Nil(t, err)
+func addSubscription(t *testing.T, s *Server, endpoint string, topics ...string) {
+	require.Nil(t, s.webPush.UpsertSubscription(endpoint, topics, "", "kSC3T8aN1JCQxxPdrFLrZg", "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE")) // Test auth and p256dh
 }
 
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {
-	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
+	subs, err := s.webPush.SubscriptionsForTopic(topic)
 	require.Nil(t, err)
 	require.Len(t, subs, expectedLength)
 }

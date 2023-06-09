@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/SherClockHolmes/webpush-go"
 	"net/http"
 	"net/netip"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 
-	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/util"
 )
 
@@ -467,6 +467,13 @@ type apiStripeSubscriptionDeletedEvent struct {
 	Customer string `json:"customer"`
 }
 
+type apiWebPushUpdateSubscriptionRequest struct {
+	Endpoint string   `json:"endpoint"`
+	Auth     string   `json:"auth"`
+	P256dh   string   `json:"p256dh"`
+	Topics   []string `json:"topics"`
+}
+
 // List of possible Web Push events
 const (
 	webPushMessageEvent  = "message"
@@ -498,11 +505,18 @@ func newWebPushSubscriptionExpiringPayload() webPushControlMessagePayload {
 }
 
 type webPushSubscription struct {
-	BrowserSubscription webpush.Subscription
-	UserID              string
+	Endpoint string
+	Auth     string
+	P256dh   string
+	UserID   string
 }
 
-type webPushSubscriptionPayload struct {
-	BrowserSubscription webpush.Subscription `json:"browser_subscription"`
-	Topics              []string             `json:"topics"`
+func (w *webPushSubscription) ToSubscription() *webpush.Subscription {
+	return &webpush.Subscription{
+		Endpoint: w.Endpoint,
+		Keys: webpush.Keys{
+			Auth:   w.Auth,
+			P256dh: w.P256dh,
+		},
+	}
 }

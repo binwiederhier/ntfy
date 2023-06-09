@@ -115,22 +115,22 @@ class Api {
     throw new Error(`Unexpected server response ${response.status}`);
   }
 
-  async updateWebPushSubscriptions(topics, browserSubscription) {
+  async updateWebPushSubscriptions(topics, pushSubscription) {
     const user = await userManager.get(config.base_url);
     const url = accountWebPushUrl(config.base_url);
-    console.log(`[Api] Sending Web Push Subscriptions`, { url, topics, endpoint: browserSubscription.endpoint });
-
-    const response = await fetch(url, {
+    console.log(`[Api] Sending Web Push Subscriptions`, { url, topics, endpoint: pushSubscription.endpoint });
+    console.log(`[Api] Sending Web Push Subscriptions`, { pushSubscription });
+    const serializedSubscription = JSON.parse(JSON.stringify(pushSubscription)); // Ugh ... https://stackoverflow.com/a/40525434/1440785
+    await fetchOrThrow(url, {
       method: "PUT",
       headers: maybeWithAuth({}, user),
-      body: JSON.stringify({ topics, browser_subscription: browserSubscription }),
+      body: JSON.stringify({
+        endpoint: serializedSubscription.endpoint,
+        auth: serializedSubscription.keys.auth,
+        p256dh: serializedSubscription.keys.p256dh,
+        topics
+      }),
     });
-
-    if (response.ok) {
-      return true;
-    }
-
-    throw new Error(`Unexpected server response ${response.status}`);
   }
 }
 

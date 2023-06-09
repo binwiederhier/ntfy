@@ -48,7 +48,7 @@ import routes from "./routes";
 import { formatBytes, formatShortDate, formatShortDateTime, openUrl } from "../app/utils";
 import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
-import getDb from "../app/getDb";
+import db from "../app/db";
 import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import DialogFooter from "./DialogFooter";
@@ -1078,7 +1078,7 @@ const DeleteAccountDialog = (props) => {
   const handleSubmit = async () => {
     try {
       await accountApi.delete(password);
-      await getDb().delete();
+      await db().delete();
       console.debug(`[Account] Account deleted`);
       session.resetAndRedirect(routes.app);
     } catch (e) {

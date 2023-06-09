@@ -1,7 +1,7 @@
 import api from "./Api";
 import notifier from "./Notifier";
 import prefs from "./Prefs";
-import getDb from "./getDb";
+import db from "./db";
 import { topicUrl } from "./utils";
 
 class SubscriptionManager {
@@ -244,4 +244,4 @@ class SubscriptionManager {
   }
 }
 
-export default new SubscriptionManager(getDb());
+export default new SubscriptionManager(db());

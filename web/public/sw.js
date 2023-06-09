@@ -3,7 +3,7 @@ import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 
-import { getDbAsync } from "../src/app/getDb";
+import { dbAsync } from "../src/app/db";
 import { formatMessage, formatTitleWithDefault } from "../src/app/notificationUtils";
 
 // See WebPushWorker, this is to play a sound on supported browsers,
@@ -44,8 +44,7 @@ self.addEventListener("push", (event) => {
         const { subscription_id: subscriptionId, message } = data;
         broadcastChannel.postMessage(message);
 
-        const db = await getDbAsync();
-
+        const db = await dbAsync();
         const image = message.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? message.attachment.url : undefined;
 
         const actions = message.actions

@@ -1,24 +1,21 @@
 import Dexie from "dexie";
 
-// Store to IndexedDB as well so that the
-// service worker can access it
-// TODO: Probably make everything depend on this and not use localStorage,
-// but that's a larger refactoring effort for another PR
-
+/**
+ * Replica of the session in IndexedDB. This is used by the service
+ * worker to access the session. This is a bit of a hack.
+ */
 class SessionReplica {
   constructor() {
     const db = new Dexie("session-replica");
-
     db.version(1).stores({
-      keyValueStore: "&key",
+      kv: "&key",
     });
-
     this.db = db;
   }
 
   async store(username, token) {
     try {
-      await this.db.keyValueStore.bulkPut([
+      await this.db.kv.bulkPut([
         { key: "user", value: username },
         { key: "token", value: token },
       ]);
@@ -36,7 +33,7 @@ class SessionReplica {
   }
 
   async username() {
-    return (await this.db.keyValueStore.get({ key: "user" }))?.value;
+    return (await this.db.kv.get({ key: "user" }))?.value;
   }
 }
 

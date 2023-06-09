@@ -8,12 +8,11 @@ import sessionReplica from "./SessionReplica";
 // Notes:
 // - As per docs, we only declare the indexable columns, not all columns
 
-const getDbBase = (username) => {
-  // The IndexedDB database name is based on the logged-in user
-  const dbName = username ? `ntfy-${username}` : "ntfy";
+const createDatabase = (username) => {
+  const dbName = username ? `ntfy-${username}` : "ntfy"; // IndexedDB database is based on the logged-in user
   const db = new Dexie(dbName);
 
-  db.version(2).stores({
+  db.version(1).stores({
     subscriptions: "&id,baseUrl,[baseUrl+mutedUntil]",
     notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
     users: "&baseUrl,username",
@@ -23,12 +22,11 @@ const getDbBase = (username) => {
   return db;
 };
 
-export const getDbAsync = async () => {
+export const dbAsync = async () => {
   const username = await sessionReplica.username();
-
-  return getDbBase(username);
+  return createDatabase(username);
 };
 
-const getDb = () => getDbBase(session.username());
+export const db = () => createDatabase(session.username());
 
-export default getDb;
+export default db;

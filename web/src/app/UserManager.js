@@ -1,4 +1,4 @@
-import getDb from "./getDb";
+import db from "./db";
 import session from "./Session";
 
 class UserManager {
@@ -47,4 +47,4 @@ class UserManager {
   }
 }
 
-export default new UserManager(getDb());
+export default new UserManager(db());

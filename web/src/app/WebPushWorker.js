@@ -26,7 +26,7 @@ export const useWebPushUpdateWorker = () => {
   }, [topics, lastTopics]);
 };
 
-const intervalMillis = 5 * 60 * 1_000; // 5 minutes
+const intervalMillis = 13 * 60 * 1_000; // 13 minutes
 const updateIntervalMillis = 60 * 60 * 1_000; // 1 hour
 
 class WebPushRefreshWorker {

@@ -1,4 +1,4 @@
-import getDb from "./getDb";
+import db from "./db";
 
 class Prefs {
   constructor(db) {
@@ -42,5 +42,5 @@ class Prefs {
   }
 }
 
-const prefs = new Prefs(getDb());
+const prefs = new Prefs(db());
 export default prefs;

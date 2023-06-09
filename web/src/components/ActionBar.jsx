@@ -13,7 +13,7 @@ import session from "../app/Session";
 import logo from "../img/ntfy.svg";
 import subscriptionManager from "../app/SubscriptionManager";
 import routes from "./routes";
-import getDb from "../app/getDb";
+import db from "../app/db";
 import { topicDisplayName } from "../app/utils";
 import Navigation from "./Navigation";
 import accountApi from "../app/AccountApi";
@@ -121,7 +121,7 @@ const ProfileIcon = () => {
   const handleLogout = async () => {
     try {
       await accountApi.logout();
-      await getDb().delete();
+      await db().delete();
     } finally {
       session.resetAndRedirect(routes.app);
     }

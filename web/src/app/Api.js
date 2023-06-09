@@ -128,7 +128,7 @@ class Api {
         endpoint: serializedSubscription.endpoint,
         auth: serializedSubscription.keys.auth,
         p256dh: serializedSubscription.keys.p256dh,
-        topics
+        topics,
       }),
     });
   }

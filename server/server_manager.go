@@ -15,9 +15,7 @@ func (s *Server) execManager() {
 	s.pruneTokens()
 	s.pruneAttachments()
 	s.pruneMessages()
-	if s.config.WebPushPublicKey != "" {
-		s.expireOrNotifyOldSubscriptions()
-	}
+	s.pruneOrNotifyWebPushSubscriptions()
 
 	// Message count per topic
 	var messagesCached int

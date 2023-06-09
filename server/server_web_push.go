@@ -78,28 +78,39 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 // TODO this should return error
 // TODO rate limiting
 
-func (s *Server) expireOrNotifyOldSubscriptions() {
+func (s *Server) pruneOrNotifyWebPushSubscriptions() {
+	if s.config.WebPushPublicKey == "" {
+		return
+	}
+	go func() {
+		if err := s.pruneOrNotifyWebPushSubscriptionsInternal(); err != nil {
+			log.Tag(tagWebPush).Err(err).Warn("Unable to prune or notify web push subscriptions")
+		}
+	}()
+}
+
+func (s *Server) pruneOrNotifyWebPushSubscriptionsInternal() error {
 	subscriptions, err := s.webPush.ExpireAndGetExpiringSubscriptions(s.config.WebPushExpiryWarningDuration, s.config.WebPushExpiryDuration)
 	if err != nil {
 		log.Tag(tagWebPush).Err(err).Warn("Unable to publish expiry imminent warning")
-		return
+		return err
 	} else if len(subscriptions) == 0 {
-		return
+		return nil
 	}
 	payload, err := json.Marshal(newWebPushSubscriptionExpiringPayload())
 	if err != nil {
 		log.Tag(tagWebPush).Err(err).Warn("Unable to marshal expiring payload")
-		return
+		return err
 	}
-	go func() {
-		for _, subscription := range subscriptions {
-			ctx := log.Context{"endpoint": subscription.BrowserSubscription.Endpoint}
-			if err := s.sendWebPushNotification(payload, &subscription, &ctx); err != nil {
-				log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish expiry imminent warning")
-			}
+	for _, subscription := range subscriptions {
+		ctx := log.Context{"endpoint": subscription.BrowserSubscription.Endpoint}
+		if err := s.sendWebPushNotification(payload, &subscription, &ctx); err != nil {
+			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish expiry imminent warning")
+			return err
 		}
-	}()
+	}
 	log.Tag(tagWebPush).Debug("Expiring old subscriptions and published %d expiry imminent warnings", len(subscriptions))
+	return nil
 }
 
 func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscription, ctx *log.Context) error {

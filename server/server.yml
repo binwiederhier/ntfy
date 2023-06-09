@@ -38,15 +38,6 @@
 #
 # firebase-key-file: <filename>
 
-# Enable web push
-#
-# Run "ntfy webpush keys" to generate the keys
-#
-# web-push-public-key:
-# web-push-private-key:
-# web-push-subscriptions-file:
-# web-push-email-address:
-
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
 #
@@ -152,6 +143,25 @@
 # smtp-server-listen:
 # smtp-server-domain:
 # smtp-server-addr-prefix:
+
+# Web Push support (background notifications for browsers)
+#
+# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, the user
+# can enable background notifications. Once enabled by the user, ntfy will forward published messages to the push
+# endpoint, which will then forward it to the browser.
+#
+# You must configure all settings below to enable Web Push.
+# Run "ntfy webpush keys" to generate the keys.
+#
+# - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+# - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
+# - web-push-subscriptions-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+# - web-push-email-address is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+#
+# web-push-public-key:
+# web-push-private-key:
+# web-push-subscriptions-file:
+# web-push-email-address:
 
 # If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.
 #

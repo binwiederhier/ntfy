@@ -149,7 +149,7 @@ func TestServer_WebPush_Publish(t *testing.T) {
 	})
 }
 
-func TestServer_WebPush_PublishExpire(t *testing.T) {
+func TestServer_WebPush_Publish_RemoveOnError(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 
 	var received atomic.Bool
@@ -201,7 +201,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	_, err := s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-7 days')")
 	require.Nil(t, err)
 
-	s.expireOrNotifyOldSubscriptions()
+	s.pruneOrNotifyWebPushSubscriptions()
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
 	waitFor(t, func() bool {
@@ -211,8 +211,12 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	_, err = s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-8 days')")
 	require.Nil(t, err)
 
-	s.expireOrNotifyOldSubscriptions()
-	requireSubscriptionCount(t, s, "test-topic", 0)
+	s.pruneOrNotifyWebPushSubscriptions()
+	waitFor(t, func() bool {
+		subs, err := s.webPush.SubscriptionsForTopic("test-topic")
+		require.Nil(t, err)
+		return len(subs) == 0
+	})
 }
 
 func payloadForTopics(t *testing.T, topics []string, endpoint string) string {
@@ -246,6 +250,5 @@ func addSubscription(t *testing.T, s *Server, topic string, url string) {
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {
 	subs, err := s.webPush.SubscriptionsForTopic("test-topic")
 	require.Nil(t, err)
-
 	require.Len(t, subs, expectedLength)
 }

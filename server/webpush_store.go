@@ -22,11 +22,16 @@ const (
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			warning_sent BOOLEAN DEFAULT FALSE
 		);
+		CREATE TABLE IF NOT EXISTS schemaVersion (
+			id INT PRIMARY KEY,
+			version INT NOT NULL
+		);	
 		CREATE INDEX IF NOT EXISTS idx_topic ON subscriptions (topic);
 		CREATE INDEX IF NOT EXISTS idx_endpoint ON subscriptions (endpoint);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_endpoint ON subscriptions (topic, endpoint);
 		COMMIT;
 	`
+
 	insertWebPushSubscriptionQuery = `
 		INSERT OR REPLACE INTO subscriptions (topic, user_id, endpoint, key_auth, key_p256dh)
 		VALUES (?, ?, ?, ?, ?)
@@ -39,8 +44,13 @@ const (
 	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT DISTINCT endpoint, key_auth, key_p256dh FROM subscriptions WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
 
 	updateWarningSentQuery = `UPDATE subscriptions SET warning_sent = true WHERE warning_sent = 0 AND updated_at <= datetime('now', ?)`
+)
 
-	selectWebPushSubscriptionsCountQuery = `SELECT COUNT(*) FROM subscriptions`
+// Schema management queries
+const (
+	currentWebPushSchemaVersion     = 1
+	insertWebPushSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
+	selectWebPushSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
 )
 
 type webPushStore struct {
@@ -52,7 +62,7 @@ func newWebPushStore(filename string) (*webPushStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := setupSubscriptionsDB(db); err != nil {
+	if err := setupWebPushDB(db); err != nil {
 		return nil, err
 	}
 	return &webPushStore{
@@ -60,33 +70,38 @@ func newWebPushStore(filename string) (*webPushStore, error) {
 	}, nil
 }
 
-func setupSubscriptionsDB(db *sql.DB) error {
-	// If 'subscriptions' table does not exist, this must be a new database
-	rows, err := db.Query(selectWebPushSubscriptionsCountQuery)
+func setupWebPushDB(db *sql.DB) error {
+	// If 'schemaVersion' table does not exist, this must be a new database
+	rows, err := db.Query(selectWebPushSchemaVersionQuery)
 	if err != nil {
-		return setupNewSubscriptionsDB(db)
+		return setupNewWebPushDB(db)
 	}
 	return rows.Close()
 }
 
-func setupNewSubscriptionsDB(db *sql.DB) error {
+func setupNewWebPushDB(db *sql.DB) error {
 	if _, err := db.Exec(createWebPushSubscriptionsTableQuery); err != nil {
+		return err
+	}
+	if _, err := db.Exec(insertWebPushSchemaVersion, currentWebPushSchemaVersion); err != nil {
 		return err
 	}
 	return nil
 }
 
+// UpdateSubscriptions updates the subscriptions for the given topics and user ID. It always first deletes all
+// existing entries for a given endpoint.
 func (c *webPushStore) UpdateSubscriptions(topics []string, userID string, subscription webpush.Subscription) error {
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err = c.RemoveByEndpoint(subscription.Endpoint); err != nil {
+	if _, err := tx.Exec(deleteWebPushSubscriptionByEndpointQuery, subscription.Endpoint); err != nil {
 		return err
 	}
 	for _, topic := range topics {
-		if err := c.AddSubscription(topic, userID, subscription); err != nil {
+		if _, err = tx.Exec(insertWebPushSubscriptionQuery, topic, userID, subscription.Endpoint, subscription.Keys.Auth, subscription.Keys.P256dh); err != nil {
 			return err
 		}
 	}

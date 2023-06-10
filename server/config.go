@@ -23,10 +23,10 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
 )
 
-// Defines default web push settings
+// Defines default Web Push settings
 const (
 	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
-	DefaultWebPushExpiryDuration        = DefaultWebPushExpiryWarningDuration + 24*time.Hour
+	DefaultWebPushExpiryDuration        = 9 * 24 * time.Hour
 )
 
 // Defines all global and per-visitor limits

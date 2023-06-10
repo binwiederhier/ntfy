@@ -505,6 +505,7 @@ func newWebPushSubscriptionExpiringPayload() webPushControlMessagePayload {
 }
 
 type webPushSubscription struct {
+	ID       string
 	Endpoint string
 	Auth     string
 	P256dh   string

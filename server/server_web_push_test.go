@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const (
@@ -190,20 +191,20 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
-	_, err := s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-7 days')")
+	_, err := s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-7*24*time.Hour).Unix())
 	require.Nil(t, err)
 
-	s.pruneOrNotifyWebPushSubscriptions()
+	s.pruneAndNotifyWebPushSubscriptions()
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
 	waitFor(t, func() bool {
 		return received.Load()
 	})
 
-	_, err = s.webPush.db.Exec("UPDATE subscriptions SET updated_at = datetime('now', '-8 days')")
+	_, err = s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-9*24*time.Hour).Unix())
 	require.Nil(t, err)
 
-	s.pruneOrNotifyWebPushSubscriptions()
+	s.pruneAndNotifyWebPushSubscriptions()
 	waitFor(t, func() bool {
 		subs, err := s.webPush.SubscriptionsForTopic("test-topic")
 		require.Nil(t, err)
@@ -224,7 +225,7 @@ func payloadForTopics(t *testing.T, topics []string, endpoint string) string {
 }
 
 func addSubscription(t *testing.T, s *Server, endpoint string, topics ...string) {
-	require.Nil(t, s.webPush.UpsertSubscription(endpoint, topics, "", "kSC3T8aN1JCQxxPdrFLrZg", "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE")) // Test auth and p256dh
+	require.Nil(t, s.webPush.UpsertSubscription(endpoint, "kSC3T8aN1JCQxxPdrFLrZg", "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE", "u_123", topics)) // Test auth and p256dh
 }
 
 func requireSubscriptionCount(t *testing.T, s *Server, topic string, expectedLength int) {

@@ -50,7 +50,7 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 			}
 		}
 	}
-	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Topics, v.MaybeUserID(), req.Auth, req.P256dh); err != nil {
+	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Auth, req.P256dh, v.MaybeUserID(), req.Topics); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -75,21 +75,25 @@ func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) pruneOrNotifyWebPushSubscriptions() {
+func (s *Server) pruneAndNotifyWebPushSubscriptions() {
 	if s.config.WebPushPublicKey == "" {
 		return
 	}
 	go func() {
-		if err := s.pruneOrNotifyWebPushSubscriptionsInternal(); err != nil {
+		if err := s.pruneAndNotifyWebPushSubscriptionsInternal(); err != nil {
 			log.Tag(tagWebPush).Err(err).Warn("Unable to prune or notify web push subscriptions")
 		}
 	}()
 }
 
-func (s *Server) pruneOrNotifyWebPushSubscriptionsInternal() error {
-	subscriptions, err := s.webPush.ExpireAndGetExpiringSubscriptions(s.config.WebPushExpiryWarningDuration, s.config.WebPushExpiryDuration)
+func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
+	// Expire old subscriptions
+	if err := s.webPush.RemoveExpiredSubscriptions(s.config.WebPushExpiryDuration); err != nil {
+		return err
+	}
+	// Notify subscriptions that will expire soon
+	subscriptions, err := s.webPush.SubscriptionsExpiring(s.config.WebPushExpiryWarningDuration)
 	if err != nil {
-		log.Tag(tagWebPush).Err(err).Warn("Unable to publish expiry imminent warning")
 		return err
 	} else if len(subscriptions) == 0 {
 		return nil
@@ -99,14 +103,19 @@ func (s *Server) pruneOrNotifyWebPushSubscriptionsInternal() error {
 		log.Tag(tagWebPush).Err(err).Warn("Unable to marshal expiring payload")
 		return err
 	}
+	warningSent := make([]*webPushSubscription, 0)
 	for _, subscription := range subscriptions {
 		ctx := log.Context{"endpoint": subscription.Endpoint}
 		if err := s.sendWebPushNotification(payload, subscription, &ctx); err != nil {
 			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish expiry imminent warning")
-			return err
+			continue
 		}
+		warningSent = append(warningSent, subscription)
 	}
-	log.Tag(tagWebPush).Debug("Expiring old subscriptions and published %d expiry imminent warnings", len(subscriptions))
+	if err := s.webPush.MarkExpiryWarningSent(warningSent); err != nil {
+		return err
+	}
+	log.Tag(tagWebPush).Debug("Expired old subscriptions and published %d expiry imminent warnings", len(subscriptions))
 	return nil
 }
 

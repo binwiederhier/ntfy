@@ -15,7 +15,7 @@ func (s *Server) execManager() {
 	s.pruneTokens()
 	s.pruneAttachments()
 	s.pruneMessages()
-	s.pruneOrNotifyWebPushSubscriptions()
+	s.pruneAndNotifyWebPushSubscriptions()
 
 	// Message count per topic
 	var messagesCached int

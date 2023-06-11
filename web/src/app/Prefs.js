@@ -33,8 +33,8 @@ class Prefs {
   }
 
   async webPushEnabled() {
-    const obj = await this.db.prefs.get("webPushEnabled");
-    return obj?.value ?? false;
+    const webPushEnabled = await this.db.prefs.get("webPushEnabled");
+    return webPushEnabled?.value ?? false;
   }
 
   async setWebPushEnabled(enabled) {

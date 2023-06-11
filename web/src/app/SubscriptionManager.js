@@ -20,16 +20,15 @@ class SubscriptionManager {
     );
   }
 
+  /** List of topics for which Web Push is enabled, excludes internal topics; returns empty list if Web Push is disabled */
   async webPushTopics() {
     // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
     // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
-    if (!(await Promise.resolve(notifier.pushEnabled()))) {
+    const pushEnabled = await Promise.resolve(notifier.pushEnabled());
+    if (!pushEnabled) {
       return [];
     }
-
     const subscriptions = await this.db.subscriptions.where({ mutedUntil: 0, baseUrl: config.base_url }).toArray();
-
-    // internal is currently a bool, it could be a 0/1 to be indexable, but for now just filter them out here
     return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
   }
 
@@ -111,7 +110,7 @@ class SubscriptionManager {
     );
   }
 
-  async refreshWebPushSubscriptions(presetTopics) {
+  async updateWebPushSubscriptions(presetTopics) {
     const topics = presetTopics ?? (await this.webPushTopics());
     const browserSubscription = await notifier.getBrowserSubscription();
 

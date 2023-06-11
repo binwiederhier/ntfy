@@ -237,7 +237,7 @@ const DeleteAfter = () => {
 const WebPushEnabled = () => {
   const { t } = useTranslation();
   const labelId = "prefWebPushEnabled";
-  const defaultEnabled = useLiveQuery(async () => prefs.webPushEnabled());
+  const enabled = useLiveQuery(async () => prefs.webPushEnabled());
   const handleChange = async (ev) => {
     await prefs.setWebPushEnabled(ev.target.value);
   };
@@ -247,9 +247,9 @@ const WebPushEnabled = () => {
   }
 
   return (
-    <Pref labelId={labelId} title={t("prefs_notifications_web_push_title")} description={t("prefs_notifications_web_push_description")}>
+    <Pref labelId={labelId} title={t("prefs_notifications_web_push_title")} description={enabled ? t("prefs_notifications_web_push_enabled_description") : t("prefs_notifications_web_push_disabled_description")}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={defaultEnabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
+        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
           <MenuItem value>{t("prefs_notifications_web_push_enabled")}</MenuItem>
           <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
         </Select>

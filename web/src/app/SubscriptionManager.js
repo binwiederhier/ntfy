@@ -119,7 +119,12 @@ class SubscriptionManager {
       return;
     }
 
-    await api.updateWebPushSubscriptions(topics, browserSubscription);
+    if (topics.length > 0) {
+      await api.updateWebPush(browserSubscription, topics);
+    } else {
+      await api.deleteWebPush(browserSubscription);
+    }
+
   }
 
   async updateState(subscriptionId, state) {

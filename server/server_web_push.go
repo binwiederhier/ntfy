@@ -56,6 +56,17 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+func (s *Server) handleWebPushDelete(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil || req.Endpoint == "" {
+		return errHTTPBadRequestWebPushSubscriptionInvalid
+	}
+	if err := s.webPush.RemoveSubscriptionsByEndpoint(req.Endpoint); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
 func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 	subscriptions, err := s.webPush.SubscriptionsForTopic(m.Topic)
 	if err != nil {

@@ -141,6 +141,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/CreativeWarlock"><img src="https://github.com/CreativeWarlock.png" width="40px" /></a>
 <a href="https://github.com/darkdragon-001"><img src="https://github.com/darkdragon-001.png" width="40px" /></a>
 <a href="https://github.com/jonathan-kosgei"><img src="https://github.com/jonathan-kosgei.png" width="40px" /></a>
+<a href="https://github.com/KevinWang15"><img src="https://github.com/KevinWang15.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

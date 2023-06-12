@@ -9,7 +9,7 @@
 [![Discord](https://img.shields.io/discord/874398661709295626?label=Discord)](https://discord.gg/cT7ECsZj9w)
 [![Matrix](https://img.shields.io/matrix/ntfy:matrix.org?label=Matrix)](https://matrix.to/#/#ntfy:matrix.org)
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
-[![Reddit](https://img.shields.io/reddit/subreddit-subscribers/ntfy?color=%23317f6f&label=-%20r%2Fntfy&style=social)](https://www.reddit.com/r/ntfy/)
+[![Lemmy](https://img.shields.io/badge/Lemmy-discuss-green)](https://discuss.ntfy.sh/)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 [![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
@@ -47,7 +47,7 @@ works best for you:
 
 * [Discord server](https://discord.gg/cT7ECsZj9w) - direct chat with the community
 * [Matrix room #ntfy](https://matrix.to/#/#ntfy:matrix.org) (+ [Matrix space](https://matrix.to/#/#ntfy-space:matrix.org)) - same chat, bridged from Discord
-* [Reddit r/ntfy](https://www.reddit.com/r/ntfy/) - asynchronous forum (_new as of October 2022_)
+* [Lemmy discussion board](https://discuss.ntfy.sh/) - asynchronous forum (_new as of June 2023_)
 * [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
 * [Email](https://heckel.io/about) - reach me directly (_I usually prefer the other methods_)
 

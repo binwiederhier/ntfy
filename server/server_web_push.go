@@ -5,34 +5,44 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/user"
 )
 
-// test: https://regexr.com/7eqvl
-// example urls:
-//
-//	https://android.googleapis.com/XYZ
-//	https://fcm.googleapis.com/XYZ
-//	https://updates.push.services.mozilla.com/XYZ
-//	https://updates-autopush.stage.mozaws.net/XYZ
-//	https://updates-autopush.dev.mozaws.net/XYZ
-//	https://AAA.notify.windows.com/XYZ
-//	https://AAA.push.apple.com/XYZ
 const (
-	webPushEndpointAllowRegexStr = `^https:\/\/(android\.googleapis\.com|fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|updates-autopush\.stage\.mozaws\.net|updates-autopush\.dev\.mozaws\.net|.*\.notify\.windows\.com|.*\.push\.apple\.com)\/.*$`
-	webPushTopicSubscribeLimit   = 50
+	webPushTopicSubscribeLimit = 50
 )
 
-var webPushEndpointAllowRegex = regexp.MustCompile(webPushEndpointAllowRegexStr)
+var (
+	webPushAllowedEndpointsPatterns = []string{
+		"https://*.google.com/",
+		"https://*.googleapis.com/",
+		"https://*.mozilla.com/",
+		"https://*.mozaws.net/",
+		"https://*.windows.com/",
+		"https://*.microsoft.com/",
+		"https://*.apple.com/",
+	}
+	webPushAllowedEndpointsRegex *regexp.Regexp
+)
+
+func init() {
+	for i, pattern := range webPushAllowedEndpointsPatterns {
+		webPushAllowedEndpointsPatterns[i] = strings.ReplaceAll(strings.ReplaceAll(pattern, ".", "\\."), "*", ".+")
+	}
+	allPatterns := fmt.Sprintf("^(%s)", strings.Join(webPushAllowedEndpointsPatterns, "|"))
+	fmt.Println(allPatterns)
+	webPushAllowedEndpointsRegex = regexp.MustCompile(allPatterns)
+}
 
 func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil || req.Endpoint == "" || req.P256dh == "" || req.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
-	} else if !webPushEndpointAllowRegex.MatchString(req.Endpoint) {
+	} else if !webPushAllowedEndpointsRegex.MatchString(req.Endpoint) {
 		return errHTTPBadRequestWebPushEndpointUnknown
 	} else if len(req.Topics) > webPushTopicSubscribeLimit {
 		return errHTTPBadRequestWebPushTopicCountTooHigh

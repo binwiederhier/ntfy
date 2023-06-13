@@ -26,6 +26,6 @@ export const dbAsync = async () => {
   return createDatabase(username);
 };
 
-export const db = () => createDatabase(session.username());
+const db = () => createDatabase(session.username());
 
 export default db;

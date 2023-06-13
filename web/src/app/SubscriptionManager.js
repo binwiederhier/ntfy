@@ -5,8 +5,8 @@ import db from "./db";
 import { topicUrl } from "./utils";
 
 class SubscriptionManager {
-  constructor(db) {
-    this.db = db;
+  constructor(dbImpl) {
+    this.db = dbImpl;
   }
 
   /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
@@ -124,7 +124,6 @@ class SubscriptionManager {
     } else {
       await api.deleteWebPush(browserSubscription);
     }
-
   }
 
   async updateState(subscriptionId, state) {

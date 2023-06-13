@@ -132,7 +132,6 @@ class Api {
     });
   }
 
-
   async deleteWebPush(pushSubscription) {
     const user = await userManager.get(config.base_url);
     const url = accountWebPushUrl(config.base_url);
@@ -141,7 +140,7 @@ class Api {
       method: "DELETE",
       headers: maybeWithAuth({}, user),
       body: JSON.stringify({
-        endpoint: pushSubscription.endpoint
+        endpoint: pushSubscription.endpoint,
       }),
     });
   }

@@ -2,8 +2,8 @@ import db from "./db";
 import session from "./Session";
 
 class UserManager {
-  constructor(db) {
-    this.db = db;
+  constructor(dbImpl) {
+    this.db = dbImpl;
   }
 
   async all() {

@@ -34,7 +34,6 @@ func init() {
 		webPushAllowedEndpointsPatterns[i] = strings.ReplaceAll(strings.ReplaceAll(pattern, ".", "\\."), "*", ".+")
 	}
 	allPatterns := fmt.Sprintf("^(%s)", strings.Join(webPushAllowedEndpointsPatterns, "|"))
-	fmt.Println(allPatterns)
 	webPushAllowedEndpointsRegex = regexp.MustCompile(allPatterns)
 }
 

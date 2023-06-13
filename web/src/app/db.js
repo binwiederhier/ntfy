@@ -1,6 +1,5 @@
 import Dexie from "dexie";
 import session from "./Session";
-import sessionReplica from "./SessionReplica";
 
 // Uses Dexie.js
 // https://dexie.org/docs/API-Reference#quick-reference
@@ -23,7 +22,7 @@ const createDatabase = (username) => {
 };
 
 export const dbAsync = async () => {
-  const username = await sessionReplica.username();
+  const username = await session.usernameAsync();
   return createDatabase(username);
 };
 

@@ -164,7 +164,7 @@ const ChangePasswordDialog = (props) => {
       if (e instanceof IncorrectPasswordError) {
         setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -245,7 +245,7 @@ const AccountType = () => {
     } catch (e) {
       console.log(`[Account] Error opening billing portal`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setShowPortalError(true);
       }
@@ -371,7 +371,7 @@ const PhoneNumbers = () => {
     } catch (e) {
       console.log(`[Account] Error deleting phone number`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
     }
   };
@@ -447,7 +447,7 @@ const AddPhoneNumberDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error sending verification`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -464,7 +464,7 @@ const AddPhoneNumberDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error confirming verification`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -946,7 +946,7 @@ const TokenDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error creating token`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -1003,7 +1003,7 @@ const TokenDeleteDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error deleting token`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -1080,13 +1080,13 @@ const DeleteAccountDialog = (props) => {
       await accountApi.delete(password);
       await db().delete();
       console.debug(`[Account] Account deleted`);
-      session.resetAndRedirect(routes.app);
+      await session.resetAndRedirect(routes.app);
     } catch (e) {
       console.log(`[Account] Error deleting account`, e);
       if (e instanceof IncorrectPasswordError) {
         setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }

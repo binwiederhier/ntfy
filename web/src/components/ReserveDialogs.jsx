@@ -43,7 +43,7 @@ export const ReserveAddDialog = (props) => {
     } catch (e) {
       console.log(`[ReserveAddDialog] Error adding topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else if (e instanceof TopicReservedError) {
         setError(t("subscribe_dialog_error_topic_already_reserved"));
         return;
@@ -99,7 +99,7 @@ export const ReserveEditDialog = (props) => {
     } catch (e) {
       console.log(`[ReserveEditDialog] Error updating topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
         return;
@@ -136,7 +136,7 @@ export const ReserveDeleteDialog = (props) => {
     } catch (e) {
       console.log(`[ReserveDeleteDialog] Error deleting topic reservation.`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
         return;

@@ -140,7 +140,7 @@ const UpgradeDialog = (props) => {
     } catch (e) {
       console.log(`[UpgradeDialog] Error changing billing subscription`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }

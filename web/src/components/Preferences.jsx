@@ -59,7 +59,7 @@ const maybeUpdateAccountSettings = async (payload) => {
   } catch (e) {
     console.log(`[Preferences] Error updating account settings`, e);
     if (e instanceof UnauthorizedError) {
-      session.resetAndRedirect(routes.login);
+      await session.resetAndRedirect(routes.login);
     }
   }
 };

@@ -114,7 +114,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
           } catch (e) {
             console.log(`[Hooks] Auto-subscribing failed`, e);
             if (e instanceof UnauthorizedError) {
-              session.resetAndRedirect(routes.login);
+              await session.resetAndRedirect(routes.login);
             }
           }
         }

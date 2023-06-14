@@ -367,7 +367,7 @@ class AccountApi {
     } catch (e) {
       console.log(`[AccountApi] Error fetching account`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
       return undefined;
     }

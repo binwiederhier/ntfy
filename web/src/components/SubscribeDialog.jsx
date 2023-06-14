@@ -39,7 +39,7 @@ export const subscribeTopic = async (baseUrl, topic, opts) => {
     } catch (e) {
       console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
     }
   }
@@ -124,7 +124,7 @@ const SubscribePage = (props) => {
       } catch (e) {
         console.log(`[SubscribeDialog] Error reserving topic`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         } else if (e instanceof TopicReservedError) {
           setError(t("subscribe_dialog_error_topic_already_reserved"));
           return;

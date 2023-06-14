@@ -1,8 +1,8 @@
 import db from "./db";
 
 class Prefs {
-  constructor(db) {
-    this.db = db;
+  constructor(dbImpl) {
+    this.db = dbImpl;
   }
 
   async setSound(sound) {

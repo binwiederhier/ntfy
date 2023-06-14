@@ -123,7 +123,7 @@ const ProfileIcon = () => {
       await accountApi.logout();
       await db().delete();
     } finally {
-      session.resetAndRedirect(routes.app);
+      await session.resetAndRedirect(routes.app);
     }
   };
 

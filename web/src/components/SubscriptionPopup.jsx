@@ -155,7 +155,7 @@ export const SubscriptionPopup = (props) => {
       } catch (e) {
         console.log(`[SubscriptionPopup] Error unsubscribing`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         }
       }
     }
@@ -298,7 +298,7 @@ const DisplayNameDialog = (props) => {
       } catch (e) {
         console.log(`[SubscriptionSettingsDialog] Error updating subscription`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         } else {
           setError(e.message);
           return;

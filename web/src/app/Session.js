@@ -1,29 +1,36 @@
-import sessionReplica from "./SessionReplica";
+import Dexie from "dexie";
 
 /**
  * Manages the logged-in user's session and access token.
  * The session replica is stored in IndexedDB so that the service worker can access it.
  */
 class Session {
-  constructor(replica) {
-    this.replica = replica;
+  constructor() {
+    const db = new Dexie("session-replica");
+    db.version(1).stores({
+      kv: "&key",
+    });
+    this.db = db;
   }
 
-  store(username, token) {
+  async store(username, token) {
+    await this.db.kv.bulkPut([
+      { key: "user", value: username },
+      { key: "token", value: token },
+    ]);
     localStorage.setItem("user", username);
     localStorage.setItem("token", token);
-    this.replica.store(username, token);
   }
 
-  reset() {
+  async resetAndRedirect(url) {
+    await this.db.delete();
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    this.replica.reset();
+    window.location.href = url;
   }
 
-  resetAndRedirect(url) {
-    this.reset();
-    window.location.href = url;
+  async usernameAsync() {
+    return (await this.db.kv.get({ key: "user" }))?.value;
   }
 
   exists() {
@@ -39,5 +46,5 @@ class Session {
   }
 }
 
-const session = new Session(sessionReplica);
+const session = new Session();
 export default session;

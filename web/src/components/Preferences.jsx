@@ -59,7 +59,7 @@ const maybeUpdateAccountSettings = async (payload) => {
   } catch (e) {
     console.log(`[Preferences] Error updating account settings`, e);
     if (e instanceof UnauthorizedError) {
-      session.resetAndRedirect(routes.login);
+      await session.resetAndRedirect(routes.login);
     }
   }
 };
@@ -247,7 +247,11 @@ const WebPushEnabled = () => {
   }
 
   return (
-    <Pref labelId={labelId} title={t("prefs_notifications_web_push_title")} description={enabled ? t("prefs_notifications_web_push_enabled_description") : t("prefs_notifications_web_push_disabled_description")}>
+    <Pref
+      labelId={labelId}
+      title={t("prefs_notifications_web_push_title")}
+      description={enabled ? t("prefs_notifications_web_push_enabled_description") : t("prefs_notifications_web_push_disabled_description")}
+    >
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
         <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
           <MenuItem value>{t("prefs_notifications_web_push_enabled")}</MenuItem>

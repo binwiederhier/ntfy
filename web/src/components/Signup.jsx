@@ -27,7 +27,7 @@ const Signup = () => {
       await accountApi.create(user.username, user.password);
       const token = await accountApi.login(user);
       console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
-      session.store(user.username, token);
+      await session.store(user.username, token);
       window.location.href = routes.app;
     } catch (e) {
       console.log(`[Signup] Signup for user ${user.username} failed`, e);

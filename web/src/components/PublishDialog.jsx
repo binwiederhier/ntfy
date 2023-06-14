@@ -211,7 +211,7 @@ const PublishDialog = (props) => {
     } catch (e) {
       console.log(`[PublishDialog] Retrieving attachment limits failed`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setAttachFileError(""); // Reset error (rely on server-side checking)
       }

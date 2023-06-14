@@ -11,7 +11,7 @@ const createDatabase = (username) => {
   const dbName = username ? `ntfy-${username}` : "ntfy"; // IndexedDB database is based on the logged-in user
   const db = new Dexie(dbName);
 
-  db.version(1).stores({
+  db.version(2).stores({
     subscriptions: "&id,baseUrl,[baseUrl+mutedUntil]",
     notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
     users: "&baseUrl,username",

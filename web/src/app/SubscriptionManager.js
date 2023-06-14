@@ -20,7 +20,13 @@ class SubscriptionManager {
     );
   }
 
-  /** List of topics for which Web Push is enabled, excludes internal topics; returns empty list if Web Push is disabled */
+  /**
+   * List of topics for which Web Push is enabled. This excludes (a) internal topics, (b) topics that are muted,
+   * and (c) topics from other hosts. Returns an empty list if Web Push is disabled.
+   *
+   * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
+   * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
+   */
   async webPushTopics() {
     // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
     // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
@@ -28,8 +34,10 @@ class SubscriptionManager {
     if (!pushEnabled) {
       return [];
     }
-    const subscriptions = await this.db.subscriptions.where({ mutedUntil: 0, baseUrl: config.base_url }).toArray();
-    return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
+    const subscriptions = await this.db.subscriptions.where({ baseUrl: config.base_url, mutedUntil: 0 }).toArray();
+    return subscriptions
+      .filter(({ internal }) => !internal)
+      .map(({ topic }) => topic);
   }
 
   async get(subscriptionId) {

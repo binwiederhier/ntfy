@@ -21,11 +21,11 @@ export const useWebPushTopicListener = () => {
 
     (async () => {
       try {
-        console.log("[useWebPushUpdateWorker] Refreshing web push subscriptions");
+        console.log("[useWebPushTopicListener] Refreshing web push subscriptions", topics);
         await subscriptionManager.updateWebPushSubscriptions(topics);
         setLastTopics(topics);
       } catch (e) {
-        console.error("[useWebPushUpdateWorker] Error refreshing web push subscriptions", e);
+        console.error("[useWebPushTopicListener] Error refreshing web push subscriptions", e);
       }
     })();
   }, [topics, lastTopics]);

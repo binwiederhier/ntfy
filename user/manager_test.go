@@ -183,6 +183,19 @@ func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	require.Equal(t, ErrUserNotFound, err)
 }
 
+func TestManager_CreateToken_Only_Lower(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	// Create user, add reservations and token
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	u, err := a.User("user")
+	require.Nil(t, err)
+
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(time.Hour), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.Equal(t, token.Value, strings.ToLower(token.Value))
+}
+
 func TestManager_UserManagement(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))

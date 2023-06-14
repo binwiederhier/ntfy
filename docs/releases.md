@@ -1231,6 +1231,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
 * Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
 * Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
+* Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
 
 **Maintenance:**
 

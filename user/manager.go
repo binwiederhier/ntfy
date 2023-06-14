@@ -508,7 +508,7 @@ func (a *Manager) AuthenticateToken(token string) (*User, error) {
 // after a fixed duration unless ChangeToken is called. This function also prunes tokens for the
 // given user, if there are too many of them.
 func (a *Manager) CreateToken(userID, label string, expires time.Time, origin netip.Addr) (*Token, error) {
-	token := util.RandomStringPrefix(tokenPrefix, tokenLength)
+	token := util.RandomLowerStringPrefix(tokenPrefix, tokenLength) // Lowercase only to support "<topic>+<token>@<domain>" email addresses
 	tx, err := a.db.Begin()
 	if err != nil {
 		return nil, err

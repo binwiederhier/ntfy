@@ -35,9 +35,7 @@ class SubscriptionManager {
       return [];
     }
     const subscriptions = await this.db.subscriptions.where({ baseUrl: config.base_url, mutedUntil: 0 }).toArray();
-    return subscriptions
-      .filter(({ internal }) => !internal)
-      .map(({ topic }) => topic);
+    return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
   }
 
   async get(subscriptionId) {
@@ -46,8 +44,7 @@ class SubscriptionManager {
 
   async notify(subscriptionId, notification, defaultClickAction) {
     const subscription = await this.get(subscriptionId);
-
-    if (subscription.mutedUntil === 1) {
+    if (subscription.mutedUntil > 0) {
       return;
     }
 
@@ -120,7 +117,7 @@ class SubscriptionManager {
 
   async updateWebPushSubscriptions(presetTopics) {
     const topics = presetTopics ?? (await this.webPushTopics());
-    const browserSubscription = await notifier.getBrowserSubscription();
+    const browserSubscription = await notifier.webPushSubscription();
 
     if (!browserSubscription) {
       console.log("[SubscriptionManager] No browser subscription currently exists, so web push was never enabled. Skipping.");

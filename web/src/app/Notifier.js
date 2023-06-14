@@ -48,7 +48,7 @@ class Notifier {
     }
   }
 
-  async getBrowserSubscription() {
+  async webPushSubscription() {
     if (!this.pushPossible()) {
       throw new Error("Unsupported or denied");
     }
@@ -58,11 +58,9 @@ class Notifier {
       return existingSubscription;
     }
 
-    // Create a new subscription only if web push is enabled.
-    // It is possible that web push was previously enabled and then disabled again
-    // in which case there would be an existingSubscription.
-    // but if it was _not_ enabled previously, we reach here, and only create a new
-    // subscription if it is now enabled.
+    // Create a new subscription only if Web Push is enabled. It is possible that Web Push
+    // was previously enabled and then disabled again in which case there would be an existingSubscription.
+    // If, however, it was _not_ enabled previously, we create a new subscription if it is now enabled.
 
     if (await this.pushEnabled()) {
       return pushManager.subscribe({

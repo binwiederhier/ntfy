@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	randomStringCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randomStringCharset          = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randomStringLowerCaseCharset = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 var (
@@ -112,11 +113,20 @@ func RandomString(length int) string {
 
 // RandomStringPrefix returns a random string with a given length, with a prefix
 func RandomStringPrefix(prefix string, length int) string {
+	return randomStringPrefixWithCharset(prefix, length, randomStringCharset)
+}
+
+// RandomLowerStringPrefix returns a random lowercase-only string with a given length, with a prefix
+func RandomLowerStringPrefix(prefix string, length int) string {
+	return randomStringPrefixWithCharset(prefix, length, randomStringLowerCaseCharset)
+}
+
+func randomStringPrefixWithCharset(prefix string, length int, charset string) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!
 	defer randomMutex.Unlock()
 	b := make([]byte, length-len(prefix))
 	for i := range b {
-		b[i] = randomStringCharset[random.Intn(len(randomStringCharset))]
+		b[i] = charset[random.Intn(len(charset))]
 	}
 	return prefix + string(b)
 }

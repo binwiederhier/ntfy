@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import subscriptionManager from "../app/SubscriptionManager";
 import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
 import routes from "./routes";
@@ -15,9 +15,20 @@ import { webPush, useWebPushTopicListener } from "../app/WebPush";
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
  * state changes. Conversely, when the subscription changes, the connection is refreshed (which may lead
  * to the connection being re-established).
+ *
+ * When Web Push is enabled, we do not need to connect to our home server via WebSocket, since notifications
+ * will be delivered via Web Push. However, we still need to connect to other servers via WebSocket, or for internal
+ * topics, such as sync topics (st_...).
  */
-export const useConnectionListeners = (account, subscriptions, users) => {
+export const useConnectionListeners = (account, subscriptions, users, webPushTopics) => {
   const navigate = useNavigate();
+  const wsSubscriptions = useMemo(
+    () => (subscriptions && webPushTopics ? subscriptions.filter((s) => !webPushTopics.includes(s.topic)) : []),
+    // wsSubscriptions should stay stable unless the list of subscription IDs changes. Without the memo, the connection
+    // listener calls a refresh for no reason. This isn't a problem due to the makeConnectionId, but it triggers an
+    // unnecessary recomputation for every received message.
+    [JSON.stringify({ subscriptions: subscriptions?.map(({ id }) => id), webPushTopics })]
+  );
 
   // Register listeners for incoming messages, and connection state changes
   useEffect(
@@ -84,8 +95,8 @@ export const useConnectionListeners = (account, subscriptions, users) => {
 
   // When subscriptions or users change, refresh the connections
   useEffect(() => {
-    connectionManager.refresh(subscriptions, users); // Dangle
-  }, [subscriptions, users]);
+    connectionManager.refresh(wsSubscriptions, users); // Dangle
+  }, [wsSubscriptions, users]);
 };
 
 /**

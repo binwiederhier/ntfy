@@ -51,7 +51,6 @@ class ConnectionManager {
       return { ...s, user, connectionId };
     });
 
-    console.log();
     const targetIds = subscriptionsWithUsersAndConnectionId.map((s) => s.connectionId);
     const deletedIds = Array.from(this.connections.keys()).filter((id) => !targetIds.includes(id));
 

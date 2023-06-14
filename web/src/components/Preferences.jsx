@@ -86,7 +86,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {config.enable_web_push && <WebPushEnabled />}
+        {notifier.pushPossible() && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );
@@ -241,10 +241,6 @@ const WebPushEnabled = () => {
   const handleChange = async (ev) => {
     await prefs.setWebPushEnabled(ev.target.value);
   };
-
-  if (!notifier.pushPossible()) {
-    return null;
-  }
 
   return (
     <Pref

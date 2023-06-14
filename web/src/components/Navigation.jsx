@@ -16,7 +16,7 @@ import {
   Tooltip,
   Typography,
   Box,
-  IconButton,
+  IconButton, Button
 } from "@mui/material";
 import * as React from "react";
 import { useContext, useState } from "react";
@@ -355,23 +355,17 @@ const SubscriptionItem = (props) => {
 
 const NotificationPermissionRequired = ({ refreshPermissions }) => {
   const { t } = useTranslation();
+  const requestPermission = async () => {
+    await notifier.maybeRequestPermission();
+    refreshPermissions();
+  };
   return (
-    <Alert severity="info" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
       <AlertTitle>{t("alert_notification_permission_required_title")}</AlertTitle>
-      <Typography gutterBottom align="left">
-        {/* component=Button is not an anchor, false positive */}
-        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-        <Link
-          component="button"
-          style={{ textAlign: "left" }}
-          onClick={async () => {
-            await notifier.maybeRequestPermission();
-            refreshPermissions();
-          }}
-        >
-          {t("alert_notification_permission_required_description")}
-        </Link>
-      </Typography>
+      <Typography gutterBottom>{t("alert_notification_permission_required_description")}</Typography>
+      <Button sx={{ float: "right" }} color="inherit" size="small" onClick={requestPermission}>
+        {t("alert_notification_permission_required_button")}
+      </Button>
     </Alert>
   );
 };
@@ -389,13 +383,10 @@ const NotificationPermissionDeniedAlert = () => {
 const NotificationIOSInstallRequiredAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="info" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
+    </Alert>
   );
 };
 

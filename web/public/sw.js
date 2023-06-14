@@ -4,7 +4,8 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 
 import { dbAsync } from "../src/app/db";
-import { formatMessage, formatTitleWithDefault } from "../src/app/notificationUtils";
+
+import { getNotificationParams, icon, badge } from "../src/app/notificationUtils";
 
 import i18n from "../src/app/i18n";
 
@@ -20,14 +21,8 @@ import i18n from "../src/app/i18n";
 
 const broadcastChannel = new BroadcastChannel("web-push-broadcast");
 
-const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$/i) ?? false;
-
-const icon = "/static/images/ntfy.png";
-
-const addNotification = async (data) => {
+const addNotification = async ({ subscriptionId, message }) => {
   const db = await dbAsync();
-
-  const { subscription_id: subscriptionId, message } = data;
 
   await db.notifications.add({
     ...message,
@@ -45,27 +40,6 @@ const addNotification = async (data) => {
   self.navigator.setAppBadge?.(badgeCount);
 };
 
-const showNotification = async (data) => {
-  const { subscription_id: subscriptionId, message } = data;
-
-  // Please update the desktop notification in Notifier.js to match any changes here
-  const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
-  await self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
-    tag: subscriptionId,
-    body: formatMessage(message),
-    icon: image ?? icon,
-    image,
-    data,
-    timestamp: message.time * 1_000,
-    actions: message.actions
-      ?.filter(({ action }) => action === "view" || action === "http")
-      .map(({ label }) => ({
-        action: label,
-        title: label,
-      })),
-  });
-};
-
 /**
  * Handle a received web push notification
  * @param {object} data see server/types.go, type webPushPayload
@@ -76,21 +50,33 @@ const handlePush = async (data) => {
       body: i18n.t("web_push_subscription_expiring_body"),
       icon,
       data,
+      badge,
     });
   } else if (data.event === "message") {
+    const { subscription_id: subscriptionId, message } = data;
+
     // see: web/src/app/WebPush.js
     // the service worker cannot play a sound, so if the web app
     // is running, it receives the broadcast and plays it.
-    broadcastChannel.postMessage(data.message);
+    broadcastChannel.postMessage(message);
 
-    await addNotification(data);
-    await showNotification(data);
+    await addNotification({ subscriptionId, message });
+
+    await self.registration.showNotification(
+      ...getNotificationParams({
+        subscriptionId,
+        message,
+        defaultTitle: message.topic,
+        topicRoute: new URL(message.topic, self.location.origin).toString(),
+      })
+    );
   } else {
     // We can't ignore the push, since permission can be revoked by the browser
     await self.registration.showNotification(i18n.t("web_push_unknown_notification_title"), {
       body: i18n.t("web_push_unknown_notification_body"),
       icon,
       data,
+      badge,
     });
   }
 };
@@ -104,17 +90,23 @@ const handleClick = async (event) => {
 
   const rootUrl = new URL(self.location.origin);
   const rootClient = clients.find((client) => client.url === rootUrl.toString());
+  // perhaps open on another topic
+  const fallbackClient = clients[0];
 
-  if (event.notification.data?.event !== "message") {
-    // e.g. subscription_expiring event, simply open the web app on the root route (/)
+  if (!event.notification.data?.message) {
+    // e.g. something other than a message, e.g. a subscription_expiring event
+    // simply open the web app on the root route (/)
     if (rootClient) {
       rootClient.focus();
+    } else if (fallbackClient) {
+      fallbackClient.focus();
+      fallbackClient.navigate(rootUrl.toString());
     } else {
       self.clients.openWindow(rootUrl);
     }
     event.notification.close();
   } else {
-    const { message } = event.notification.data;
+    const { message, topicRoute } = event.notification.data;
 
     if (event.action) {
       const action = event.notification.data.message.actions.find(({ label }) => event.action === label);
@@ -134,9 +126,10 @@ const handleClick = async (event) => {
           }
         } catch (e) {
           console.error("[ServiceWorker] Error performing http action", e);
-          self.registration.showNotification(`${i18n.t('notifications_actions_failed_notification')}: ${action.label} (${action.action})`, {
+          self.registration.showNotification(`${i18n.t("notifications_actions_failed_notification")}: ${action.label} (${action.action})`, {
             body: e.message,
             icon,
+            badge,
           });
         }
       }
@@ -151,18 +144,22 @@ const handleClick = async (event) => {
     } else {
       // If no action was clicked, and the message doesn't have a click url:
       // - first try focus an open tab on the `/:topic` route
-      // - if not, an open tab on the root route (`/`)
-      // - if no ntfy window is open, open a new tab on the `/:topic` route
+      // - if not, use an open tab on the root route (`/`) and navigate to the topic
+      // - if not, use whichever tab we have open and navigate to the topic
+      // - finally, open a new tab focused on the topic
 
-      const topicUrl = new URL(message.topic, self.location.origin);
-      const topicClient = clients.find((client) => client.url === topicUrl.toString());
+      const topicClient = clients.find((client) => client.url === topicRoute);
 
       if (topicClient) {
         topicClient.focus();
       } else if (rootClient) {
         rootClient.focus();
+        rootClient.navigate(topicRoute);
+      } else if (fallbackClient) {
+        fallbackClient.focus();
+        fallbackClient.navigate(topicRoute);
       } else {
-        self.clients.openWindow(topicUrl);
+        self.clients.openWindow(topicRoute);
       }
 
       event.notification.close();

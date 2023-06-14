@@ -1,39 +1,34 @@
-import { openUrl, playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
-import { formatMessage, formatTitleWithDefault } from "./notificationUtils";
+import { playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
+import { getNotificationParams } from "./notificationUtils";
 import prefs from "./Prefs";
-import logo from "../img/ntfy.png";
+import routes from "../components/routes";
 
 /**
  * The notifier is responsible for displaying desktop notifications. Note that not all modern browsers
  * support this; most importantly, all iOS browsers do not support window.Notification.
  */
 class Notifier {
-  async notify(subscription, notification, onClickFallback) {
+  async notify(subscription, notification) {
     if (!this.supported()) {
       return;
     }
 
-    const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
-    const displayName = topicDisplayName(subscription);
-    const message = formatMessage(notification);
-    const title = formatTitleWithDefault(notification, displayName);
-    const image = notification.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? notification.attachment.url : undefined;
+    await this.playSound();
 
-    // Show notification
-    console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}: ${message}`);
-    // Please update sw.js if formatting changes
-    const n = new Notification(title, {
-      body: message,
-      tag: subscription.id,
-      icon: image ?? logo,
-      image,
-      timestamp: message.time * 1_000,
-    });
-    if (notification.click) {
-      n.onclick = () => openUrl(notification.click);
-    } else {
-      n.onclick = () => onClickFallback(subscription);
-    }
+    const shortUrl = topicShortUrl(subscription.baseUrl, subscription.topic);
+    const defaultTitle = topicDisplayName(subscription);
+
+    console.log(`[Notifier, ${shortUrl}] Displaying notification ${notification.id}`);
+
+    const registration = await this.serviceWorkerRegistration();
+    await registration.showNotification(
+      ...getNotificationParams({
+        subscriptionId: subscription.id,
+        message: notification,
+        defaultTitle,
+        topicRoute: new URL(routes.forSubscription(subscription), window.location.origin).toString(),
+      })
+    );
   }
 
   async playSound() {
@@ -73,11 +68,15 @@ class Notifier {
   }
 
   async pushManager() {
+    return (await this.serviceWorkerRegistration()).pushManager;
+  }
+
+  async serviceWorkerRegistration() {
     const registration = await navigator.serviceWorker.getRegistration();
     if (!registration) {
       throw new Error("No service worker registration found");
     }
-    return registration.pushManager;
+    return registration;
   }
 
   notRequested() {

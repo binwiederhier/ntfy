@@ -16,7 +16,7 @@ export const formatTitle = (m) => {
   return m.title;
 };
 
-export const formatTitleWithDefault = (m, fallback) => {
+const formatTitleWithDefault = (m, fallback) => {
   if (m.title) {
     return formatTitle(m);
   }
@@ -32,4 +32,39 @@ export const formatMessage = (m) => {
     return `${emojiList.join(" ")} ${m.message}`;
   }
   return m.message;
+};
+
+const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$/i) ?? false;
+
+export const icon = "/static/images/ntfy.png";
+export const badge = "/static/images/mask-icon.svg";
+
+export const getNotificationParams = ({ subscriptionId, message, defaultTitle, topicRoute }) => {
+  const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
+
+  // https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API
+  return [
+    formatTitleWithDefault(message, defaultTitle),
+    {
+      body: formatMessage(message),
+      badge,
+      icon,
+      image,
+      timestamp: message.time * 1_000,
+      tag: subscriptionId,
+      renotify: true,
+      silent: false,
+      // This is used by the notification onclick event
+      data: {
+        message,
+        topicRoute,
+      },
+      actions: message.actions
+        ?.filter(({ action }) => action === "view" || action === "http")
+        .map(({ label }) => ({
+          action: label,
+          title: label,
+        })),
+    },
+  ];
 };

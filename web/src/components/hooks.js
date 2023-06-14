@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import subscriptionManager from "../app/SubscriptionManager";
 import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
@@ -21,7 +21,6 @@ import { webPush, useWebPushTopicListener } from "../app/WebPush";
  * topics, such as sync topics (st_...).
  */
 export const useConnectionListeners = (account, subscriptions, users, webPushTopics) => {
-  const navigate = useNavigate();
   const wsSubscriptions = useMemo(
     () => (subscriptions && webPushTopics ? subscriptions.filter((s) => !webPushTopics.includes(s.topic)) : []),
     // wsSubscriptions should stay stable unless the list of subscription IDs changes. Without the memo, the connection
@@ -51,8 +50,7 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
       const handleNotification = async (subscriptionId, notification) => {
         const added = await subscriptionManager.addNotification(subscriptionId, notification);
         if (added) {
-          const defaultClickAction = (subscription) => navigate(routes.forSubscription(subscription));
-          await subscriptionManager.notify(subscriptionId, notification, defaultClickAction);
+          await subscriptionManager.notify(subscriptionId, notification);
         }
       };
 

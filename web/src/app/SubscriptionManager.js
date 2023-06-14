@@ -42,7 +42,7 @@ class SubscriptionManager {
     return this.db.subscriptions.get(subscriptionId);
   }
 
-  async notify(subscriptionId, notification, defaultClickAction) {
+  async notify(subscriptionId, notification) {
     const subscription = await this.get(subscriptionId);
     if (subscription.mutedUntil > 0) {
       return;
@@ -53,7 +53,7 @@ class SubscriptionManager {
       return;
     }
 
-    await Promise.all([notifier.playSound(), notifier.notify(subscription, notification, defaultClickAction)]);
+    await notifier.notify(subscription, notification);
   }
 
   /**

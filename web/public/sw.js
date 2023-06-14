@@ -6,9 +6,164 @@ import { NetworkFirst } from "workbox-strategies";
 import { dbAsync } from "../src/app/db";
 import { formatMessage, formatTitleWithDefault } from "../src/app/notificationUtils";
 
-// See WebPushWorker, this is to play a sound on supported browsers,
-// if the app is in the foreground
+/**
+ * General docs for service workers and PWAs:
+ * https://vite-pwa-org.netlify.app/guide/
+ * https://developer.chrome.com/docs/workbox/
+ *
+ * This file uses the (event) => event.waitUntil(<promise>) pattern.
+ * This is because the event handler itself cannot be async, but
+ * the service worker needs to stay active while the promise completes.
+ */
+
 const broadcastChannel = new BroadcastChannel("web-push-broadcast");
+
+const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$/i) ?? false;
+
+const addNotification = async (data) => {
+  const db = await dbAsync();
+
+  const { subscription_id: subscriptionId, message } = data;
+
+  await db.notifications.add({
+    ...message,
+    subscriptionId,
+    // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+    new: 1,
+  });
+
+  await db.subscriptions.update(subscriptionId, {
+    last: message.id,
+  });
+
+  const badgeCount = await db.notifications.where({ new: 1 }).count();
+  console.log("[ServiceWorker] Setting new app badge count", { badgeCount });
+  self.navigator.setAppBadge?.(badgeCount);
+};
+
+const showNotification = (data) => {
+  const { subscription_id: subscriptionId, message } = data;
+
+  // Please update the desktop notification in Notifier.js to match any changes here
+  const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
+  self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
+    tag: subscriptionId,
+    body: formatMessage(message),
+    icon: image ?? "/static/images/ntfy.png",
+    image,
+    data,
+    timestamp: message.time * 1_000,
+    actions: message.actions
+      ?.filter(({ action }) => action === "view" || action === "http")
+      .map(({ label }) => ({
+        action: label,
+        title: label,
+      })),
+  });
+};
+
+/**
+ * Handle a received web push notification
+ * @param {object} data see server/types.go, type webPushPayload
+ */
+const handlePush = async (data) => {
+  if (data.event === "subscription_expiring") {
+    await self.registration.showNotification("Notifications will be paused", {
+      body: "Open ntfy to continue receiving notifications",
+      icon: "/static/images/ntfy.png",
+      data,
+    });
+  } else if (data.event === "message") {
+    // see: web/src/app/WebPush.js
+    // the service worker cannot play a sound, so if the web app
+    // is running, it receives the broadcast and plays it.
+    broadcastChannel.postMessage(data.message);
+
+    await addNotification(data);
+    await showNotification(data);
+  } else {
+    // We can't ignore the push, since permission can be revoked by the browser
+    await self.registration.showNotification("Unknown notification received from server", {
+      body: "You may need to update ntfy by opening the web app",
+      icon: "/static/images/ntfy.png",
+      data,
+    });
+  }
+};
+
+/**
+ * Handle a user clicking on the displayed notification from `showNotification`
+ * This is also called when the user clicks on an action button
+ */
+const handleClick = async (event) => {
+  const clients = await self.clients.matchAll({ type: "window" });
+
+  const rootUrl = new URL(self.location.origin);
+  const rootClient = clients.find((client) => client.url === rootUrl.toString());
+
+  if (event.notification.data?.event !== "message") {
+    // e.g. subscription_expiring event, simply open the web app on the root route (/)
+    if (rootClient) {
+      rootClient.focus();
+    } else {
+      self.clients.openWindow(rootUrl);
+    }
+    event.notification.close();
+  } else {
+    const { message } = event.notification.data;
+
+    if (event.action) {
+      const action = event.notification.data.message.actions.find(({ label }) => event.action === label);
+
+      if (action.action === "view") {
+        self.clients.openWindow(action.url);
+      } else if (action.action === "http") {
+        try {
+          const response = await fetch(action.url, {
+            method: action.method ?? "POST",
+            headers: action.headers ?? {},
+            body: action.body,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status} ${response.statusText}`);
+          }
+        } catch (e) {
+          console.error("[ServiceWorker] Error performing http action", e);
+          self.registration.showNotification(`Unsuccessful action ${action.label} (${action.action})`, {
+            body: e.message,
+          });
+        }
+      }
+
+      if (action.clear) {
+        event.notification.close();
+      }
+    } else if (message.click) {
+      self.clients.openWindow(message.click);
+
+      event.notification.close();
+    } else {
+      // If no action was clicked, and the message doesn't have a click url:
+      // - first try focus an open tab on the `/:topic` route
+      // - if not, an open tab on the root route (`/`)
+      // - if no ntfy window is open, open a new tab on the `/:topic` route
+
+      const topicUrl = new URL(message.topic, self.location.origin);
+      const topicClient = clients.find((client) => client.url === topicUrl.toString());
+
+      if (topicClient) {
+        topicClient.focus();
+      } else if (rootClient) {
+        rootClient.focus();
+      } else {
+        self.clients.openWindow(topicUrl);
+      }
+
+      event.notification.close();
+    }
+  }
+};
 
 self.addEventListener("install", () => {
   console.log("[ServiceWorker] Installed");
@@ -28,153 +183,35 @@ self.addEventListener("pushsubscriptionchange", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  // server/types.go webPushPayload
   const data = event.data.json();
   console.log("[ServiceWorker] Received Web Push Event", { event, data });
-
-  event.waitUntil(
-    (async () => {
-      if (data.event === "subscription_expiring") {
-        await self.registration.showNotification("Notifications will be paused", {
-          body: "Open ntfy to continue receiving notifications",
-          icon: "/static/images/ntfy.png",
-          data,
-        });
-      } else if (data.event === "message") {
-        const { subscription_id: subscriptionId, message } = data;
-        broadcastChannel.postMessage(message);
-
-        const db = await dbAsync();
-        const image = message.attachment?.name.match(/\.(png|jpe?g|gif|webp)$/i) ? message.attachment.url : undefined;
-
-        const actions = message.actions
-          ?.filter(({ action }) => action === "view" || action === "http")
-          .map(({ label }) => ({
-            action: label,
-            title: label,
-          }));
-
-        await Promise.all([
-          (async () => {
-            await db.notifications.add({
-              ...message,
-              subscriptionId,
-              // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-              new: 1,
-            });
-            const badgeCount = await db.notifications.where({ new: 1 }).count();
-            console.log("[ServiceWorker] Setting new app badge count", { badgeCount });
-            self.navigator.setAppBadge?.(badgeCount);
-          })(),
-          db.subscriptions.update(subscriptionId, {
-            last: message.id,
-          }),
-          // Please update the desktop notification in Notifier.js to match any changes
-          self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
-            tag: subscriptionId,
-            body: formatMessage(message),
-            icon: image ?? "/static/images/ntfy.png",
-            image,
-            data,
-            timestamp: message.time * 1_000,
-            actions,
-          }),
-        ]);
-      } else {
-        // We can't ignore the push, since permission can be revoked by the browser
-        await self.registration.showNotification("Unknown notification received from server", {
-          body: "You may need to update ntfy by opening the web app",
-          icon: "/static/images/ntfy.png",
-          data,
-        });
-      }
-    })()
-  );
+  event.waitUntil(handlePush(data));
 });
 
 self.addEventListener("notificationclick", (event) => {
   console.log("[ServiceWorker] NotificationClick");
-
-  event.waitUntil(
-    (async () => {
-      const clients = await self.clients.matchAll({ type: "window" });
-
-      const rootUrl = new URL(self.location.origin);
-      const rootClient = clients.find((client) => client.url === rootUrl.toString());
-
-      if (event.notification.data?.event !== "message") {
-        if (rootClient) {
-          rootClient.focus();
-        } else {
-          self.clients.openWindow(rootUrl);
-        }
-        event.notification.close();
-      } else {
-        const { message } = event.notification.data;
-
-        if (event.action) {
-          const action = event.notification.data.message.actions.find(({ label }) => event.action === label);
-
-          if (action.action === "view") {
-            self.clients.openWindow(action.url);
-
-            if (action.clear) {
-              event.notification.close();
-            }
-          } else if (action.action === "http") {
-            try {
-              const response = await fetch(action.url, {
-                method: action.method ?? "POST",
-                headers: action.headers ?? {},
-                body: action.body,
-              });
-
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status} ${response.statusText}`);
-              }
-
-              if (action.clear) {
-                event.notification.close();
-              }
-            } catch (e) {
-              console.error("[ServiceWorker] Error performing http action", e);
-              self.registration.showNotification(`Unsuccessful action ${action.label} (${action.action})`, {
-                body: e.message,
-              });
-            }
-          }
-        } else if (message.click) {
-          self.clients.openWindow(message.click);
-
-          event.notification.close();
-        } else {
-          const topicUrl = new URL(message.topic, self.location.origin);
-          const topicClient = clients.find((client) => client.url === topicUrl.toString());
-
-          if (topicClient) {
-            topicClient.focus();
-          } else if (rootClient) {
-            rootClient.focus();
-          } else {
-            self.clients.openWindow(topicUrl);
-          }
-
-          event.notification.close();
-        }
-      }
-    })()
-  );
+  event.waitUntil(handleClick(event));
 });
 
-// self.__WB_MANIFEST is default injection point
-// eslint-disable-next-line no-underscore-dangle
-precacheAndRoute(self.__WB_MANIFEST);
+// see https://vite-pwa-org.netlify.app/guide/inject-manifest.html#service-worker-code
+// self.__WB_MANIFEST is the workbox injection point that injects the manifest of the
+// vite dist files and their revision ids, for example:
+// [{"revision":"aaabbbcccdddeeefff12345","url":"/index.html"},...]
+precacheAndRoute(
+  // eslint-disable-next-line no-underscore-dangle
+  self.__WB_MANIFEST
+);
 
-// clean old assets
+// delete any cached old dist files from previous service worker versions
 cleanupOutdatedCaches();
 
-// to allow work offline
 if (import.meta.env.MODE !== "development") {
+  // since the manifest only includes `/index.html`, this manually adds the root route `/`
   registerRoute(new NavigationRoute(createHandlerBoundToURL("/")));
+  // the manifest excludes config.js (see vite.config.js) since the dist-file differs from the
+  // actual config served by the go server. this adds it back with `NetworkFirst`, so that the
+  // most recent config from the go server is cached, but the app still works if the network
+  // is unavailable. this is important since there's no "refresh" button in the installed pwa
+  // to force a reload.
   registerRoute(({ url }) => url.pathname === "/config.js", new NetworkFirst());
 }

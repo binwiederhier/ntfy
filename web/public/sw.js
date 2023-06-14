@@ -20,6 +20,8 @@ const broadcastChannel = new BroadcastChannel("web-push-broadcast");
 
 const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$/i) ?? false;
 
+const icon = "/static/images/ntfy.png";
+
 const addNotification = async (data) => {
   const db = await dbAsync();
 
@@ -41,15 +43,15 @@ const addNotification = async (data) => {
   self.navigator.setAppBadge?.(badgeCount);
 };
 
-const showNotification = (data) => {
+const showNotification = async (data) => {
   const { subscription_id: subscriptionId, message } = data;
 
   // Please update the desktop notification in Notifier.js to match any changes here
   const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
-  self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
+  await self.registration.showNotification(formatTitleWithDefault(message, message.topic), {
     tag: subscriptionId,
     body: formatMessage(message),
-    icon: image ?? "/static/images/ntfy.png",
+    icon: image ?? icon,
     image,
     data,
     timestamp: message.time * 1_000,
@@ -70,7 +72,7 @@ const handlePush = async (data) => {
   if (data.event === "subscription_expiring") {
     await self.registration.showNotification("Notifications will be paused", {
       body: "Open ntfy to continue receiving notifications",
-      icon: "/static/images/ntfy.png",
+      icon,
       data,
     });
   } else if (data.event === "message") {
@@ -85,7 +87,7 @@ const handlePush = async (data) => {
     // We can't ignore the push, since permission can be revoked by the browser
     await self.registration.showNotification("Unknown notification received from server", {
       body: "You may need to update ntfy by opening the web app",
-      icon: "/static/images/ntfy.png",
+      icon,
       data,
     });
   }
@@ -132,6 +134,7 @@ const handleClick = async (event) => {
           console.error("[ServiceWorker] Error performing http action", e);
           self.registration.showNotification(`Unsuccessful action ${action.label} (${action.action})`, {
             body: e.message,
+            icon,
           });
         }
       }

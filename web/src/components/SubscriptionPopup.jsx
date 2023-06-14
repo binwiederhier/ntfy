@@ -174,7 +174,6 @@ export const SubscriptionPopup = (props) => {
           <ListItemIcon>
             <Edit fontSize="small" />
           </ListItemIcon>
-
           {t("action_bar_change_display_name")}
         </MenuItem>
         {showReservationAdd && (
@@ -190,7 +189,6 @@ export const SubscriptionPopup = (props) => {
             <ListItemIcon>
               <Lock fontSize="small" color="disabled" />
             </ListItemIcon>
-
             <span style={{ opacity: 0.3 }}>{t("action_bar_reservation_add")}</span>
             <ReserveLimitChip />
           </MenuItem>

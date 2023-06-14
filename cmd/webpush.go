@@ -16,7 +16,7 @@ func init() {
 var cmdWebPush = &cli.Command{
 	Name:      "webpush",
 	Usage:     "Generate keys, in the future manage web push subscriptions",
-	UsageText: "ntfy web-push [generate-keys]",
+	UsageText: "ntfy webpush [keys]",
 	Category:  categoryServer,
 
 	Subcommands: []*cli.Command{
@@ -24,7 +24,7 @@ var cmdWebPush = &cli.Command{
 			Action:    generateWebPushKeys,
 			Name:      "keys",
 			Usage:     "Generate VAPID keys to enable browser background push notifications",
-			UsageText: "ntfy web-push generate-keys",
+			UsageText: "ntfy webpush keys",
 			Category:  categoryServer,
 		},
 	},

@@ -86,7 +86,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        <WebPushEnabled />
+        {config.enable_web_push && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );
@@ -639,7 +639,7 @@ const ReservationsTable = (props) => {
   };
 
   const handleSubscribeClick = async (reservation) => {
-    await subscribeTopic(config.base_url, reservation.topic);
+    await subscribeTopic(config.base_url, reservation.topic, {});
   };
 
   return (

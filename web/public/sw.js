@@ -6,6 +6,8 @@ import { NetworkFirst } from "workbox-strategies";
 import { dbAsync } from "../src/app/db";
 import { formatMessage, formatTitleWithDefault } from "../src/app/notificationUtils";
 
+import i18n from "../src/app/i18n";
+
 /**
  * General docs for service workers and PWAs:
  * https://vite-pwa-org.netlify.app/guide/
@@ -70,8 +72,8 @@ const showNotification = async (data) => {
  */
 const handlePush = async (data) => {
   if (data.event === "subscription_expiring") {
-    await self.registration.showNotification("Notifications will be paused", {
-      body: "Open ntfy to continue receiving notifications",
+    await self.registration.showNotification(i18n.t("web_push_subscription_expiring_title"), {
+      body: i18n.t("web_push_subscription_expiring_body"),
       icon,
       data,
     });
@@ -85,8 +87,8 @@ const handlePush = async (data) => {
     await showNotification(data);
   } else {
     // We can't ignore the push, since permission can be revoked by the browser
-    await self.registration.showNotification("Unknown notification received from server", {
-      body: "You may need to update ntfy by opening the web app",
+    await self.registration.showNotification(i18n.t("web_push_unknown_notification_title"), {
+      body: i18n.t("web_push_unknown_notification_body"),
       icon,
       data,
     });
@@ -132,7 +134,7 @@ const handleClick = async (event) => {
           }
         } catch (e) {
           console.error("[ServiceWorker] Error performing http action", e);
-          self.registration.showNotification(`Unsuccessful action ${action.label} (${action.action})`, {
+          self.registration.showNotification(`${i18n.t('notifications_actions_failed_notification')}: ${action.label} (${action.action})`, {
             body: e.message,
             icon,
           });

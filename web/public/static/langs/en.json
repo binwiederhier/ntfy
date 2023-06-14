@@ -90,6 +90,7 @@
   "notifications_actions_open_url_title": "Go to {{url}}",
   "notifications_actions_not_supported": "Action not supported in web app",
   "notifications_actions_http_request_title": "Send HTTP {{method}} to {{url}}",
+  "notifications_actions_failed_notification": "Unsuccessful action",
   "notifications_none_for_topic_title": "You haven't received any notifications for this topic yet.",
   "notifications_none_for_topic_description": "To send notifications to this topic, simply PUT or POST to the topic URL.",
   "notifications_none_for_any_title": "You haven't received any notifications.",
@@ -391,5 +392,9 @@
   "error_boundary_stack_trace": "Stack trace",
   "error_boundary_gathering_info": "Gather more info …",
   "error_boundary_unsupported_indexeddb_title": "Private browsing not supported",
-  "error_boundary_unsupported_indexeddb_description": "The ntfy web app needs IndexedDB to function, and your browser does not support IndexedDB in private browsing mode.<br/><br/>While this is unfortunate, it also doesn't really make a lot of sense to use the ntfy web app in private browsing mode anyway, because everything is stored in the browser storage. You can read more about it <githubLink>in this GitHub issue</githubLink>, or talk to us on <discordLink>Discord</discordLink> or <matrixLink>Matrix</matrixLink>."
+  "error_boundary_unsupported_indexeddb_description": "The ntfy web app needs IndexedDB to function, and your browser does not support IndexedDB in private browsing mode.<br/><br/>While this is unfortunate, it also doesn't really make a lot of sense to use the ntfy web app in private browsing mode anyway, because everything is stored in the browser storage. You can read more about it <githubLink>in this GitHub issue</githubLink>, or talk to us on <discordLink>Discord</discordLink> or <matrixLink>Matrix</matrixLink>.",
+  "web_push_subscription_expiring_title": "Notifications will be paused",
+  "web_push_subscription_expiring_body": "Open ntfy to continue receiving notifications",
+  "web_push_unknown_notification_title": "Unknown notification received from server",
+  "web_push_unknown_notification_body": "You may need to update ntfy by opening the web app"
 }

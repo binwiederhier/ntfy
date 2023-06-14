@@ -18,10 +18,10 @@ import routes from "./routes";
 import { useAccountListener, useBackgroundProcesses, useConnectionListeners } from "./hooks";
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
-import "./i18n"; // Translations!
 import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
+import "../app/i18n"; // Translations!
 
 export const AccountContext = createContext(null);
 

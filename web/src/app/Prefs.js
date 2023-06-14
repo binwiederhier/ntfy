@@ -24,7 +24,7 @@ class Prefs {
   }
 
   async setDeleteAfter(deleteAfter) {
-    this.db.prefs.put({ key: "deleteAfter", value: deleteAfter.toString() });
+    await this.db.prefs.put({ key: "deleteAfter", value: deleteAfter.toString() });
   }
 
   async deleteAfter() {

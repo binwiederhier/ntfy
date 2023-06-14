@@ -3,13 +3,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-// please look at develop.md for how to run your browser
-// in a mode allowing insecure service worker testing
-// this turns on:
-// - the service worker in dev mode
-// - turns off automatically opening the browser
-const enableLocalPWATesting = process.env.ENABLE_DEV_PWA;
-
 export default defineConfig(() => ({
   build: {
     outDir: "build",
@@ -18,7 +11,6 @@ export default defineConfig(() => ({
   },
   server: {
     port: 3000,
-    open: !enableLocalPWATesting,
   },
   plugins: [
     react(),
@@ -27,7 +19,7 @@ export default defineConfig(() => ({
       injectRegister: "inline",
       strategies: "injectManifest",
       devOptions: {
-        enabled: enableLocalPWATesting,
+        enabled: true,
         /* when using generateSW the PWA plugin will switch to classic */
         type: "module",
         navigateFallback: "index.html",

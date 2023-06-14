@@ -267,37 +267,8 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 
    - Set the `web_push_public_key` correctly.
 
-4. Run `ENABLE_DEV_PWA=1 npm run start` - this enables the dev service worker
+4. Run `npm run start`
 
-5. Set your browser to allow testing service workers insecurely:
-
-   - Chrome:
-
-      Open Chrome with special flags allowing insecure localhost service worker testing insecurely
-
-      ```sh
-      # for example, macOS
-      /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-        --user-data-dir=/tmp/foo \
-        --unsafely-treat-insecure-origin-as-secure=http://localhost:3000,http://localhost
-      ```
-
-  - Firefox:
-  
-      See here: https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
-
-      > Note: On Firefox, for testing you can run service workers over HTTP (insecurely); simply check the Enable Service Workers over HTTP (when toolbox is open) option in the Firefox Devtools options/gear menu
-
-  - Safari, iOS:
-
-      There doesn't seem to be a good way to do this currently. The only way is to serve a valid HTTPS certificate.
-
-      This is beyond the scope of this guide, but you can try `mkcert`, a number of reverse proxies such as Traefik and Caddy,
-      or tunneling software such as [Cloudflare Tunnels][cloudflare_tunnels] or ngrok.
-
-[cloudflare_tunnels]: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/do-more-with-tunnels/trycloudflare/
-
-6. Open <http://localhost:3000/>
 #### With a built package
 
 1. Run `make web-build`

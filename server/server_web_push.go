@@ -79,18 +79,18 @@ func (s *Server) handleWebPushDelete(w http.ResponseWriter, r *http.Request, _ *
 func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
 	subscriptions, err := s.webPush.SubscriptionsForTopic(m.Topic)
 	if err != nil {
-		logvm(v, m).Err(err).Warn("Unable to publish web push messages")
+		logvm(v, m).Err(err).With(v, m).Warn("Unable to publish web push messages")
 		return
 	}
+	log.Tag(tagWebPush).With(v, m).Debug("Publishing web push message to %d subscribers", len(subscriptions))
 	payload, err := json.Marshal(newWebPushPayload(fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic), m))
 	if err != nil {
-		log.Tag(tagWebPush).Err(err).Warn("Unable to marshal expiring payload")
+		log.Tag(tagWebPush).Err(err).With(v, m).Warn("Unable to marshal expiring payload")
 		return
 	}
 	for _, subscription := range subscriptions {
-		ctx := log.Context{"endpoint": subscription.Endpoint, "username": subscription.UserID, "topic": m.Topic, "message_id": m.ID}
-		if err := s.sendWebPushNotification(payload, subscription, &ctx); err != nil {
-			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish web push message")
+		if err := s.sendWebPushNotification(subscription, payload, v, m); err != nil {
+			log.Tag(tagWebPush).Err(err).With(v, m, subscription).Warn("Unable to publish web push message")
 		}
 	}
 }
@@ -125,9 +125,8 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 	}
 	warningSent := make([]*webPushSubscription, 0)
 	for _, subscription := range subscriptions {
-		ctx := log.Context{"endpoint": subscription.Endpoint}
-		if err := s.sendWebPushNotification(payload, subscription, &ctx); err != nil {
-			log.Tag(tagWebPush).Err(err).Fields(ctx).Warn("Unable to publish expiry imminent warning")
+		if err := s.sendWebPushNotification(subscription, payload); err != nil {
+			log.Tag(tagWebPush).Err(err).With(subscription).Warn("Unable to publish expiry imminent warning")
 			continue
 		}
 		warningSent = append(warningSent, subscription)
@@ -139,7 +138,8 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 	return nil
 }
 
-func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscription, ctx *log.Context) error {
+func (s *Server) sendWebPushNotification(sub *webPushSubscription, message []byte, contexters ...log.Contexter) error {
+	log.Tag(tagWebPush).With(sub).With(contexters...).Debug("Sending web push message")
 	resp, err := webpush.SendNotification(message, sub.ToSubscription(), &webpush.Options{
 		Subscriber:      s.config.WebPushEmailAddress,
 		VAPIDPublicKey:  s.config.WebPushPublicKey,
@@ -148,18 +148,18 @@ func (s *Server) sendWebPushNotification(message []byte, sub *webPushSubscriptio
 		TTL:             int(s.config.CacheDuration.Seconds()),
 	})
 	if err != nil {
-		log.Tag(tagWebPush).Err(err).Fields(*ctx).Debug("Unable to publish web push message, removing endpoint")
+		log.Tag(tagWebPush).With(sub).With(contexters...).Err(err).Debug("Unable to publish web push message, removing endpoint")
 		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
 			return err
 		}
 		return err
 	}
 	if (resp.StatusCode < 200 || resp.StatusCode > 299) && resp.StatusCode != 429 {
-		log.Tag(tagWebPush).Fields(*ctx).Field("response_code", resp.StatusCode).Debug("Unable to publish web push message, unexpected response")
+		log.Tag(tagWebPush).With(sub).With(contexters...).Field("response_code", resp.StatusCode).Debug("Unable to publish web push message, unexpected response")
 		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
 			return err
 		}
-		return errHTTPInternalErrorWebPushUnableToPublish.Fields(*ctx)
+		return errHTTPInternalErrorWebPushUnableToPublish.With(sub).With(contexters...)
 	}
 	return nil
 }

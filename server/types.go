@@ -521,3 +521,11 @@ func (w *webPushSubscription) ToSubscription() *webpush.Subscription {
 		},
 	}
 }
+
+func (w *webPushSubscription) Context() log.Context {
+	return map[string]any{
+		"web_push_subscription_id":       w.ID,
+		"web_push_subscription_user_id":  w.UserID,
+		"web_push_subscription_endpoint": w.Endpoint,
+	}
+}

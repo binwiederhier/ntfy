@@ -5,7 +5,7 @@ import { NetworkFirst } from "workbox-strategies";
 
 import { dbAsync } from "../src/app/db";
 
-import { getNotificationParams, icon, badge } from "../src/app/notificationUtils";
+import { toNotificationParams, icon, badge } from "../src/app/notificationUtils";
 
 import i18n from "../src/app/i18n";
 
@@ -41,49 +41,69 @@ const addNotification = async ({ subscriptionId, message }) => {
 };
 
 /**
+ * Handle a received web push message and show notification.
+ *
+ * Since the service worker cannot play a sound, we send a broadcast to the web app, which (if it is running)
+ * receives the broadcast and plays a sound (see web/src/app/WebPush.js).
+ */
+const handlePushMessage = async (data) => {
+  const { subscription_id: subscriptionId, message } = data;
+
+  broadcastChannel.postMessage(message); // To potentially play sound
+
+  await addNotification({ subscriptionId, message });
+  await self.registration.showNotification(
+    ...toNotificationParams({
+      subscriptionId,
+      message,
+      defaultTitle: message.topic,
+      topicRoute: new URL(message.topic, self.location.origin).toString(),
+    })
+  );
+};
+
+/**
+ * Handle a received web push subscription expiring.
+ */
+const handlePushSubscriptionExpiring = async (data) => {
+  await self.registration.showNotification(i18n.t("web_push_subscription_expiring_title"), {
+    body: i18n.t("web_push_subscription_expiring_body"),
+    icon,
+    data,
+    badge,
+  });
+};
+
+/**
+ * Handle unknown push message. We can't ignore the push, since
+ * permission can be revoked by the browser.
+ */
+const handlePushUnknown = async (data) => {
+  await self.registration.showNotification(i18n.t("web_push_unknown_notification_title"), {
+    body: i18n.t("web_push_unknown_notification_body"),
+    icon,
+    data,
+    badge,
+  });
+};
+
+/**
  * Handle a received web push notification
  * @param {object} data see server/types.go, type webPushPayload
  */
 const handlePush = async (data) => {
-  if (data.event === "subscription_expiring") {
-    await self.registration.showNotification(i18n.t("web_push_subscription_expiring_title"), {
-      body: i18n.t("web_push_subscription_expiring_body"),
-      icon,
-      data,
-      badge,
-    });
-  } else if (data.event === "message") {
-    const { subscription_id: subscriptionId, message } = data;
-
-    // see: web/src/app/WebPush.js
-    // the service worker cannot play a sound, so if the web app
-    // is running, it receives the broadcast and plays it.
-    broadcastChannel.postMessage(message);
-
-    await addNotification({ subscriptionId, message });
-
-    await self.registration.showNotification(
-      ...getNotificationParams({
-        subscriptionId,
-        message,
-        defaultTitle: message.topic,
-        topicRoute: new URL(message.topic, self.location.origin).toString(),
-      })
-    );
+  if (data.event === "message") {
+    await handlePushMessage(data);
+  } else if (data.event === "subscription_expiring") {
+    await handlePushSubscriptionExpiring(data);
   } else {
-    // We can't ignore the push, since permission can be revoked by the browser
-    await self.registration.showNotification(i18n.t("web_push_unknown_notification_title"), {
-      body: i18n.t("web_push_unknown_notification_body"),
-      icon,
-      data,
-      badge,
-    });
+    await handlePushUnknown(data);
   }
 };
 
 /**
- * Handle a user clicking on the displayed notification from `showNotification`
- * This is also called when the user clicks on an action button
+ * Handle a user clicking on the displayed notification from `showNotification`.
+ * This is also called when the user clicks on an action button.
  */
 const handleClick = async (event) => {
   const clients = await self.clients.matchAll({ type: "window" });
@@ -195,7 +215,7 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(handleClick(event));
 });
 
-// see https://vite-pwa-org.netlify.app/guide/inject-manifest.html#service-worker-code
+// See https://vite-pwa-org.netlify.app/guide/inject-manifest.html#service-worker-code
 // self.__WB_MANIFEST is the workbox injection point that injects the manifest of the
 // vite dist files and their revision ids, for example:
 // [{"revision":"aaabbbcccdddeeefff12345","url":"/index.html"},...]
@@ -204,7 +224,7 @@ precacheAndRoute(
   self.__WB_MANIFEST
 );
 
-// delete any cached old dist files from previous service worker versions
+// Delete any cached old dist files from previous service worker versions
 cleanupOutdatedCaches();
 
 if (import.meta.env.MODE !== "development") {

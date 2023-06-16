@@ -39,7 +39,7 @@ const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$
 export const icon = "/static/images/ntfy.png";
 export const badge = "/static/images/mask-icon.svg";
 
-export const getNotificationParams = ({ subscriptionId, message, defaultTitle, topicRoute }) => {
+export const toNotificationParams = ({ subscriptionId, message, defaultTitle, topicRoute }) => {
   const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API

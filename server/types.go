@@ -474,7 +474,7 @@ type apiWebPushUpdateSubscriptionRequest struct {
 	Topics   []string `json:"topics"`
 }
 
-// List of possible Web Push events
+// List of possible Web Push events (see sw.js)
 const (
 	webPushMessageEvent  = "message"
 	webPushExpiringEvent = "subscription_expiring"
@@ -486,8 +486,8 @@ type webPushPayload struct {
 	Message        *message `json:"message"`
 }
 
-func newWebPushPayload(subscriptionID string, message *message) webPushPayload {
-	return webPushPayload{
+func newWebPushPayload(subscriptionID string, message *message) *webPushPayload {
+	return &webPushPayload{
 		Event:          webPushMessageEvent,
 		SubscriptionID: subscriptionID,
 		Message:        message,
@@ -498,8 +498,8 @@ type webPushControlMessagePayload struct {
 	Event string `json:"event"`
 }
 
-func newWebPushSubscriptionExpiringPayload() webPushControlMessagePayload {
-	return webPushControlMessagePayload{
+func newWebPushSubscriptionExpiringPayload() *webPushControlMessagePayload {
+	return &webPushControlMessagePayload{
 		Event: webPushExpiringEvent,
 	}
 }

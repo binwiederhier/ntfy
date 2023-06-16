@@ -1,5 +1,5 @@
 import { playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
-import { getNotificationParams } from "./notificationUtils";
+import { toNotificationParams } from "./notificationUtils";
 import prefs from "./Prefs";
 import routes from "../components/routes";
 
@@ -22,7 +22,7 @@ class Notifier {
 
     const registration = await this.serviceWorkerRegistration();
     await registration.showNotification(
-      ...getNotificationParams({
+      ...toNotificationParams({
         subscriptionId: subscription.id,
         message: notification,
         defaultTitle,

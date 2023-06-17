@@ -139,18 +139,18 @@ export const useAutoSubscribe = (subscriptions, selected) => {
  * up "unused" imports. See https://github.com/binwiederhier/ntfy/issues/186.
  */
 
-const stopWorkers = () => {
-  poller.stopWorker();
-  pruner.stopWorker();
-  accountApi.stopWorker();
-  webPush.stopWorker();
-};
-
 const startWorkers = () => {
   poller.startWorker();
   pruner.startWorker();
   accountApi.startWorker();
   webPush.startWorker();
+};
+
+const stopWorkers = () => {
+  poller.stopWorker();
+  pruner.stopWorker();
+  accountApi.stopWorker();
+  webPush.stopWorker();
 };
 
 export const useBackgroundProcesses = () => {

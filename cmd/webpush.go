@@ -35,8 +35,7 @@ func generateWebPushKeys(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
+	_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
 
 web-push-public-key: %s
 web-push-private-key: %s
@@ -45,6 +44,5 @@ web-push-email-address: <email address>
 
 See https://ntfy.sh/docs/config/#web-push for details.
 `, publicKey, privateKey)
-
-	return nil
+	return err
 }

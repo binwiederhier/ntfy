@@ -34,13 +34,24 @@ export const formatMessage = (m) => {
   return m.message;
 };
 
-const isImage = (filenameOrUrl) => filenameOrUrl?.match(/\.(png|jpe?g|gif|webp)$/i) ?? false;
+const imageRegex = /\.(png|jpe?g|gif|webp)$/i;
+const isImage = (attachment) => {
+  if (!attachment) return false;
+
+  // if there's a type, only take that into account
+  if (attachment.type) {
+    return attachment.type.startsWith("image/");
+  }
+
+  // otherwise, check the extension
+  return attachment.name?.match(imageRegex) || attachment.url?.match(imageRegex);
+};
 
 export const icon = "/static/images/ntfy.png";
 export const badge = "/static/images/mask-icon.svg";
 
 export const toNotificationParams = ({ subscriptionId, message, defaultTitle, topicRoute }) => {
-  const image = isImage(message.attachment?.name) ? message.attachment.url : undefined;
+  const image = isImage(message.attachment) ? message.attachment.url : undefined;
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API
   return [

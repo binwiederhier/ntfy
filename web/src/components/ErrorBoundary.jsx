@@ -101,11 +101,15 @@ class ErrorBoundaryImpl extends React.Component {
             }}
           />
         </p>
-        <p>
+        <div style={{ display: "flex", gap: 5 }}>
           <Button variant="outlined" onClick={() => this.copyStack()}>
             {t("error_boundary_button_copy_stack_trace")}
           </Button>
-        </p>
+
+          <Button variant="outlined" onClick={() => window.location.reload()}>
+            {t("error_boundary_button_reload_ntfy")}
+          </Button>
+        </div>
         <h3>{t("error_boundary_stack_trace")}</h3>
         {this.state.niceStack ? (
           <pre>{this.state.niceStack}</pre>

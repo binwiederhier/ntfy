@@ -389,6 +389,7 @@
   "error_boundary_title": "Oh no, ntfy crashed",
   "error_boundary_description": "This should obviously not happen. Very sorry about this.<br/>If you have a minute, please <githubLink>report this on GitHub</githubLink>, or let us know via <discordLink>Discord</discordLink> or <matrixLink>Matrix</matrixLink>.",
   "error_boundary_button_copy_stack_trace": "Copy stack trace",
+  "error_boundary_button_reload_ntfy": "Reload ntfy",
   "error_boundary_stack_trace": "Stack trace",
   "error_boundary_gathering_info": "Gather more info …",
   "error_boundary_unsupported_indexeddb_title": "Private browsing not supported",

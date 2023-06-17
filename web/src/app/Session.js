@@ -11,6 +11,25 @@ class Session {
       kv: "&key",
     });
     this.db = db;
+
+    // existing sessions (pre-v2.6.0) haven't called `store` with the session-replica,
+    // so attempt to sync any values from localStorage to IndexedDB
+    if (typeof localStorage !== "undefined" && this.exists()) {
+      const username = this.username();
+      const token = this.token();
+
+      this.db.kv
+        .bulkPut([
+          { key: "user", value: username },
+          { key: "token", value: token },
+        ])
+        .then(() => {
+          console.log("[Session] Synced localStorage session to IndexedDB", { username });
+        })
+        .catch((e) => {
+          console.error("[Session] Failed to sync localStorage session to IndexedDB", e);
+        });
+    }
   }
 
   async store(username, token) {

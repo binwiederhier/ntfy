@@ -170,7 +170,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if _, err := s.userManager.Authenticate(u.Name, req.Password); err != nil {
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
-	if s.webPush != nil {
+	if s.webPush != nil && u.ID != "" {
 		if err := s.webPush.RemoveSubscriptionsByUserID(u.ID); err != nil {
 			logvr(v, r).Err(err).Warn("Error removing web push subscriptions for %s", u.Name)
 		}

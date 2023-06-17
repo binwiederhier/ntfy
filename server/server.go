@@ -85,6 +85,7 @@ var (
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
 	apiStatsPath                                         = "/v1/stats"
+	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
@@ -94,7 +95,6 @@ var (
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
-	apiAccountWebPushPath                                = "/v1/account/webpush"
 	apiAccountPhonePath                                  = "/v1/account/phone"
 	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
@@ -490,9 +490,9 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
-	} else if r.Method == http.MethodPost && apiAccountWebPushPath == r.URL.Path {
+	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
-	} else if r.Method == http.MethodDelete && apiAccountWebPushPath == r.URL.Path {
+	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)

@@ -11,14 +11,15 @@ import (
 )
 
 const (
-	subscriptionIDPrefix             = "wps_"
-	subscriptionIDLength             = 10
-	subscriptionLimitPerSubscriberIP = 10
+	subscriptionIDPrefix                     = "wps_"
+	subscriptionIDLength                     = 10
+	subscriptionEndpointLimitPerSubscriberIP = 10
 )
 
 var (
 	errWebPushNoRows               = errors.New("no rows found")
 	errWebPushTooManySubscriptions = errors.New("too many subscriptions")
+	errWebPushUserIDCannotBeEmpty  = errors.New("user ID cannot be empty")
 )
 
 const (
@@ -60,6 +61,7 @@ const (
 		FROM subscription_topic st
 		JOIN subscription s ON s.id = st.subscription_id
 		WHERE st.topic = ?
+		ORDER BY endpoint
 	`
 	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT id, endpoint, key_auth, key_p256dh, user_id FROM subscription WHERE warned_at = 0 AND updated_at <= ?`
 	insertWebPushSubscriptionQuery              = `
@@ -164,7 +166,7 @@ func (c *webPushStore) UpsertSubscription(endpoint string, auth, p256dh, userID 
 			return err
 		}
 	} else {
-		if subscriptionCount >= subscriptionLimitPerSubscriberIP {
+		if subscriptionCount >= subscriptionEndpointLimitPerSubscriberIP {
 			return errWebPushTooManySubscriptions
 		}
 		subscriptionID = util.RandomStringPrefix(subscriptionIDPrefix, subscriptionIDLength)
@@ -250,6 +252,9 @@ func (c *webPushStore) RemoveSubscriptionsByEndpoint(endpoint string) error {
 
 // RemoveSubscriptionsByUserID removes all subscriptions for the given user ID
 func (c *webPushStore) RemoveSubscriptionsByUserID(userID string) error {
+	if userID == "" {
+		return errWebPushUserIDCannotBeEmpty
+	}
 	_, err := c.db.Exec(deleteWebPushSubscriptionByUserIDQuery, userID)
 	return err
 }

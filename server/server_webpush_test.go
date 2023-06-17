@@ -20,6 +20,13 @@ const (
 	testWebPushEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
 )
 
+func TestServer_WebPush_Disabled(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), nil)
+	require.Equal(t, 404, response.Code)
+}
+
 func TestServer_WebPush_TopicAdd(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t))
 

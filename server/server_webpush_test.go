@@ -78,6 +78,19 @@ func TestServer_WebPush_TopicUnsubscribe(t *testing.T) {
 	requireSubscriptionCount(t, s, "test-topic", 0)
 }
 
+func TestServer_WebPush_Delete(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t))
+
+	addSubscription(t, s, testWebPushEndpoint, "test-topic")
+	requireSubscriptionCount(t, s, "test-topic", 1)
+
+	response := request(t, s, "DELETE", "/v1/webpush", fmt.Sprintf(`{"endpoint":"%s"}`, testWebPushEndpoint), nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
+
+	requireSubscriptionCount(t, s, "test-topic", 0)
+}
+
 func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	config := configureAuth(t, newTestConfigWithWebPush(t))
 	config.AuthDefault = user.PermissionDenyAll

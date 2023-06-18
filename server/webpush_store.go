@@ -63,8 +63,12 @@ const (
 		WHERE st.topic = ?
 		ORDER BY endpoint
 	`
-	selectWebPushSubscriptionsExpiringSoonQuery = `SELECT id, endpoint, key_auth, key_p256dh, user_id FROM subscription WHERE warned_at = 0 AND updated_at <= ?`
-	insertWebPushSubscriptionQuery              = `
+	selectWebPushSubscriptionsExpiringSoonQuery = `
+		SELECT id, endpoint, key_auth, key_p256dh, user_id 
+		FROM subscription 
+		WHERE warned_at = 0 AND updated_at <= ?
+	`
+	insertWebPushSubscriptionQuery = `
 		INSERT INTO subscription (id, endpoint, key_auth, key_p256dh, user_id, subscriber_ip, updated_at, warned_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (endpoint) 

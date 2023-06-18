@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/SherClockHolmes/webpush-go"
 	"net/http"
 	"net/netip"
 	"time"
@@ -510,16 +509,6 @@ type webPushSubscription struct {
 	Auth     string
 	P256dh   string
 	UserID   string
-}
-
-func (w *webPushSubscription) ToSubscription() *webpush.Subscription {
-	return &webpush.Subscription{
-		Endpoint: w.Endpoint,
-		Keys: webpush.Keys{
-			Auth:   w.Auth,
-			P256dh: w.P256dh,
-		},
-	}
 }
 
 func (w *webPushSubscription) Context() log.Context {

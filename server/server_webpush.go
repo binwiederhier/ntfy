@@ -120,7 +120,6 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 	}
 	payload, err := json.Marshal(newWebPushSubscriptionExpiringPayload())
 	if err != nil {
-		log.Tag(tagWebPush).Err(err).Warn("Unable to marshal expiring payload")
 		return err
 	}
 	warningSent := make([]*webPushSubscription, 0)
@@ -140,7 +139,14 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 
 func (s *Server) sendWebPushNotification(sub *webPushSubscription, message []byte, contexters ...log.Contexter) error {
 	log.Tag(tagWebPush).With(sub).With(contexters...).Debug("Sending web push message")
-	resp, err := webpush.SendNotification(message, sub.ToSubscription(), &webpush.Options{
+	payload := &webpush.Subscription{
+		Endpoint: sub.Endpoint,
+		Keys: webpush.Keys{
+			Auth:   sub.Auth,
+			P256dh: sub.P256dh,
+		},
+	}
+	resp, err := webpush.SendNotification(message, payload, &webpush.Options{
 		Subscriber:      s.config.WebPushEmailAddress,
 		VAPIDPublicKey:  s.config.WebPushPublicKey,
 		VAPIDPrivateKey: s.config.WebPushPrivateKey,

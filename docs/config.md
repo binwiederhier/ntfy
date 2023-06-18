@@ -789,7 +789,7 @@ Note that the self-hosted server literally sends the message `New message` for e
 may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
 it'll show `New message` as a popup.
 
-## Web Push notifications
+## Web Push
 [Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) ([RFC8030](https://datatracker.ietf.org/doc/html/rfc8030))
 allows ntfy to receive push notifications, even when the ntfy web app (or even the browser, depending on the platform) is closed. 
 When enabled, the user can enable **background notifications** for their topics in the wep app under Settings. Once enabled by the
@@ -816,7 +816,8 @@ To configure VAPID keys, first generate them:
 
 ```sh
 $ ntfy webpush keys
-Web Push keys generated. 
+Web Push keys generated.
+...
 ```
 
 Then copy the generated values into your `server.yml` or use the corresponding environment variables or command line arguments:
@@ -828,8 +829,9 @@ web-push-subscriptions-file: /var/cache/ntfy/webpush.db
 web-push-email-address: sysadmin@example.com
 ```
 
-The `web-push-subscriptions-file` is used to store the push subscriptions. Subscriptions do not ever expire automatically, unless the push
-gateway returns an error (e.g. 410 Gone when a user has unsubscribed).
+The `web-push-subscriptions-file` is used to store the push subscriptions. Unused subscriptions will send out a warning after 7 days,
+and will automatically expire after 9 days (not configurable). If the gateway returns an error (e.g. 410 Gone when a user has unsubscribed),
+subscriptions are also removed automatically.
 
 The web app refreshes subscriptions on start and regularly on an interval, but this file should be persisted across restarts. If the subscription
 file is deleted or lost, any web apps that aren't open will not receive new web push notifications until you open then.
@@ -1333,8 +1335,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `stripe-secret-key`                        | `NTFY_STRIPE_SECRET_KEY`                        | *string*                                            | -                 | Payments: Key used for the Stripe API communication, this enables payments                                                                                                                                                      |
 | `stripe-webhook-key`                       | `NTFY_STRIPE_WEBHOOK_KEY`                       | *string*                                            | -                 | Payments: Key required to validate the authenticity of incoming webhooks from Stripe                                                                                                                                            |
 | `billing-contact`                          | `NTFY_BILLING_CONTACT`                          | *email address* or *website*                        | -                 | Payments: Email or website displayed in Upgrade dialog as a billing contact                                                                                                                                                     |
-| `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush generate-keys` to generate                                                                                                                                                              |
-| `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush generate-keys` to generate                                                                                                                                                             |
+| `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush keys` to generate                                                                                                                                                                       |
+| `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush keys` to generate                                                                                                                                                                      |
 | `web-push-subscriptions-file`              | `NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE`              | *string*                                            | -                 | Web Push: Subscriptions file                                                                                                                                                                                                    |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
 

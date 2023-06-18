@@ -146,8 +146,8 @@
 
 # Web Push support (background notifications for browsers)
 #
-# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, the user
-# can enable background notifications. Once enabled by the user, ntfy will forward published messages to the push
+# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, users
+# can enable background notifications in the web app. Once enabled, ntfy will forward published messages to the push
 # endpoint, which will then forward it to the browser.
 #
 # You must configure all settings below to enable Web Push.

@@ -431,6 +431,41 @@ func TestAccount_Delete_Not_Allowed(t *testing.T) {
 	require.Equal(t, 40026, toHTTPError(t, rr.Body.String()).Code)
 }
 
+func TestAccount_Delete_Success_WithWebPush(t *testing.T) {
+	conf := configureAuth(t, newTestConfigWithWebPush(t))
+	conf.EnableSignup = true
+	s := newTestServer(t, conf)
+
+	// Add account
+	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
+	require.Equal(t, 200, rr.Code)
+
+	// Add web push subscription
+	rr = request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"mytopic"}, testWebPushEndpoint), map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+
+	subs, err := s.webPush.SubscriptionsForTopic("mytopic")
+	require.Nil(t, err)
+	require.Len(t, subs, 1)
+	require.Equal(t, u.ID, subs[0].UserID)
+
+	// Delete account
+	rr = request(t, s, "DELETE", "/v1/account", `{"password":"mypass"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Make sure web push subscription was deleted
+	subs, err = s.webPush.SubscriptionsForTopic("mytopic")
+	require.Nil(t, err)
+	require.Len(t, subs, 0)
+}
+
 func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t)
 	conf.EnableSignup = true

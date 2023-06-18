@@ -273,7 +273,7 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 
 1. Run `make web-build`
 
-2. Follow steps 1, 2, 4 and 5 from "With the dev servers"
+2. Run the server (step 2 above)
 
 3. Open <http://localhost/>
 ### Build the docs

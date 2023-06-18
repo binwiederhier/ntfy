@@ -155,7 +155,7 @@ type Config struct {
 	Version                              string // injected by App
 	WebPushPrivateKey                    string
 	WebPushPublicKey                     string
-	WebPushSubscriptionsFile             string
+	WebPushFile                          string
 	WebPushEmailAddress                  string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
@@ -242,7 +242,7 @@ func NewConfig() *Config {
 		Version:                              "",
 		WebPushPrivateKey:                    "",
 		WebPushPublicKey:                     "",
-		WebPushSubscriptionsFile:             "",
+		WebPushFile:                          "",
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,

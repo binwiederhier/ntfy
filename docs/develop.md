@@ -258,7 +258,7 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
         --web-push-enabled \
         --web-push-public-key KEY \
         --web-push-private-key KEY \
-        --web-push-subscriptions-file=/tmp/subscriptions.db
+        --web-push-file=/tmp/webpush.db
     ```
 
 3. In `web/public/config.js`:

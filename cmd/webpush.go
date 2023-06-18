@@ -39,7 +39,7 @@ func generateWebPushKeys(c *cli.Context) error {
 
 web-push-public-key: %s
 web-push-private-key: %s
-web-push-subscriptions-file: /var/cache/ntfy/webpush.db # or similar
+web-push-file: /var/cache/ntfy/webpush.db # or similar
 web-push-email-address: <email address>
 
 See https://ntfy.sh/docs/config/#web-push for details.

@@ -96,7 +96,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "profile-listen-http", Aliases: []string{"profile_listen_http"}, EnvVars: []string{"NTFY_PROFILE_LISTEN_HTTP"}, Usage: "ip:port used to expose the profiling endpoints (implicitly enables profiling)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-public-key", Aliases: []string{"web_push_public_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PUBLIC_KEY"}, Usage: "public key used for web push notifications"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-private-key", Aliases: []string{"web_push_private_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PRIVATE_KEY"}, Usage: "private key used for web push notifications"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-subscriptions-file", Aliases: []string{"web_push_subscriptions_file"}, EnvVars: []string{"NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE"}, Usage: "file used to store web push subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
 )
 
@@ -135,7 +135,7 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
-	webPushSubscriptionsFile := c.String("web-push-subscriptions-file")
+	webPushFile := c.String("web-push-file")
 	webPushEmailAddress := c.String("web-push-email-address")
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
@@ -191,8 +191,8 @@ func execServe(c *cli.Context) error {
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
-	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || webPushSubscriptionsFile == "" || webPushEmailAddress == "" || baseURL == "") {
-		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-subscriptions-file, web-push-email-address, and base-url should be set. run 'ntfy web-push generate-keys' to generate keys")
+	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || webPushFile == "" || webPushEmailAddress == "" || baseURL == "") {
+		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-file, web-push-email-address, and base-url should be set. run 'ntfy web-push generate-keys' to generate keys")
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {
@@ -359,7 +359,7 @@ func execServe(c *cli.Context) error {
 	conf.Version = c.App.Version
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
-	conf.WebPushSubscriptionsFile = webPushSubscriptionsFile
+	conf.WebPushFile = webPushFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 
 	// Set up hot-reloading of config

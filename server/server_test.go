@@ -2622,7 +2622,7 @@ func newTestConfigWithWebPush(t *testing.T) *Config {
 	conf := newTestConfig(t)
 	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
 	require.Nil(t, err)
-	conf.WebPushSubscriptionsFile = filepath.Join(t.TempDir(), "webpush.db")
+	conf.WebPushFile = filepath.Join(t.TempDir(), "webpush.db")
 	conf.WebPushEmailAddress = "testing@example.com"
 	conf.WebPushPrivateKey = privateKey
 	conf.WebPushPublicKey = publicKey

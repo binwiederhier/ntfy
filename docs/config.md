@@ -801,7 +801,7 @@ a database to keep track of the browser's subscriptions, and an admin email addr
 
 - `web-push-public-key` is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 - `web-push-private-key` is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
-- `web-push-subscriptions-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+- `web-push-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
 - `web-push-email-address` is the admin email address send to the push provider, e.g. `sysadmin@example.com`
 
 Limitations:
@@ -825,11 +825,11 @@ Then copy the generated values into your `server.yml` or use the corresponding e
 ```yaml
 web-push-public-key: AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 web-push-private-key: AA2BB1234567890abcdefzxcvbnm1234567890
-web-push-subscriptions-file: /var/cache/ntfy/webpush.db
+web-push-file: /var/cache/ntfy/webpush.db
 web-push-email-address: sysadmin@example.com
 ```
 
-The `web-push-subscriptions-file` is used to store the push subscriptions. Unused subscriptions will send out a warning after 7 days,
+The `web-push-file` is used to store the push subscriptions. Unused subscriptions will send out a warning after 7 days,
 and will automatically expire after 9 days (not configurable). If the gateway returns an error (e.g. 410 Gone when a user has unsubscribed),
 subscriptions are also removed automatically.
 
@@ -1337,7 +1337,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `billing-contact`                          | `NTFY_BILLING_CONTACT`                          | *email address* or *website*                        | -                 | Payments: Email or website displayed in Upgrade dialog as a billing contact                                                                                                                                                     |
 | `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush keys` to generate                                                                                                                                                                       |
 | `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush keys` to generate                                                                                                                                                                      |
-| `web-push-subscriptions-file`              | `NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE`              | *string*                                            | -                 | Web Push: Subscriptions file                                                                                                                                                                                                    |
+| `web-push-file`                            | `NTFY_WEB_PUSH_FILE`                            | *string*                                            | -                 | Web Push: Database file that stores subscriptions                                                                                                                                                                               |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
@@ -1433,8 +1433,7 @@ OPTIONS:
    --profile-listen-http value, --profile_listen_http value                                                               ip:port used to expose the profiling endpoints (implicitly enables profiling) [$NTFY_PROFILE_LISTEN_HTTP]
    --web-push-public-key value, --web_push_public_key value                                                               public key used for web push notifications [$NTFY_WEB_PUSH_PUBLIC_KEY]
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
-   --web-push-subscriptions-file value, --web_push_subscriptions_file value                                               file used to store web push subscriptions [$NTFY_WEB_PUSH_SUBSCRIPTIONS_FILE]
+   --web-push-file value, --web_push_file value                                                                           file used to store web push subscriptions [$NTFY_WEB_PUSH_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
    --help, -h                                                                                                             show help
-
 ```

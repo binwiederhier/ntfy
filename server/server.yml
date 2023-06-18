@@ -155,12 +155,12 @@
 #
 # - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 # - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
-# - web-push-subscriptions-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+# - web-push-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
 # - web-push-email-address is the admin email address send to the push provider, e.g. `sysadmin@example.com`
 #
 # web-push-public-key:
 # web-push-private-key:
-# web-push-subscriptions-file:
+# web-push-file:
 # web-push-email-address:
 
 # If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.

@@ -803,6 +803,7 @@ a database to keep track of the browser's subscriptions, and an admin email addr
 - `web-push-private-key` is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
 - `web-push-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
 - `web-push-email-address` is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+- `web-push-startup-queries` is an optional list of queries to run on startup` 
 
 Limitations:
 
@@ -1339,6 +1340,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush keys` to generate                                                                                                                                                                      |
 | `web-push-file`                            | `NTFY_WEB_PUSH_FILE`                            | *string*                                            | -                 | Web Push: Database file that stores subscriptions                                                                                                                                                                               |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
+| `web-push-startup-queries`                 | `NTFY_WEB_PUSH_STARTUP_QUERIES`                 | *string*                                            | -                 | Web Push: SQL queries to run against subscription database at startup                                                                                                                                                           |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
@@ -1435,5 +1437,6 @@ OPTIONS:
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
    --web-push-file value, --web_push_file value                                                                           file used to store web push subscriptions [$NTFY_WEB_PUSH_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
+   --web-push-startup-queries value, --web_push_startup-queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]   
    --help, -h                                                                                                             show help
 ```

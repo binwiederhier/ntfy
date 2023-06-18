@@ -158,7 +158,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	var webPush *webPushStore
 	if conf.WebPushPublicKey != "" {
-		webPush, err = newWebPushStore(conf.WebPushFile)
+		webPush, err = newWebPushStore(conf.WebPushFile, conf.WebPushStartupQueries)
 		if err != nil {
 			return nil, err
 		}

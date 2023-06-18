@@ -193,7 +193,7 @@ func TestWebPushStore_RemoveExpiredSubscriptions(t *testing.T) {
 }
 
 func newTestWebPushStore(t *testing.T) *webPushStore {
-	webPush, err := newWebPushStore(filepath.Join(t.TempDir(), "webpush.db"))
+	webPush, err := newWebPushStore(filepath.Join(t.TempDir(), "webpush.db"), "")
 	require.Nil(t, err)
 	return webPush
 }

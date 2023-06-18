@@ -94,7 +94,7 @@ type webPushStore struct {
 	db *sql.DB
 }
 
-func newWebPushStore(filename string) (*webPushStore, error) {
+func newWebPushStore(filename, startupQueries string) (*webPushStore, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func newWebPushStore(filename string) (*webPushStore, error) {
 	if err := setupWebPushDB(db); err != nil {
 		return nil, err
 	}
-	if err := runWebPushStartupQueries(db); err != nil {
+	if err := runWebPushStartupQueries(db, startupQueries); err != nil {
 		return nil, err
 	}
 	return &webPushStore{
@@ -129,9 +129,14 @@ func setupNewWebPushDB(db *sql.DB) error {
 	return nil
 }
 
-func runWebPushStartupQueries(db *sql.DB) error {
-	_, err := db.Exec(builtinStartupQueries)
-	return err
+func runWebPushStartupQueries(db *sql.DB, startupQueries string) error {
+	if _, err := db.Exec(startupQueries); err != nil {
+		return err
+	}
+	if _, err := db.Exec(builtinStartupQueries); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpsertSubscription adds or updates Web Push subscriptions for the given topics and user ID. It always first deletes all

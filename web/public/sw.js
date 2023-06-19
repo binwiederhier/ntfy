@@ -245,7 +245,10 @@ if (!import.meta.env.DEV) {
         // this is so we don't respond to `/` UNLESS it's the app root itself, defined above
         /^\/.+$/,
       ],
-      denylist: [/^\/docs\/?$/],
+      // only /docs is required so it is navigable in the browser.
+      // the rest are nice-to-haves so the single-page-app doesn't try to handle them, but `fetch`
+      // and browser requests would work anyway.
+      denylist: [/^\/(docs|static|file).*$/, /^\/(app.html|manifest.webmanifest|sw.js|config.js)$/],
     })
   );
 

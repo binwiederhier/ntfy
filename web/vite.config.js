@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   build: {
     outDir: "build",
     assetsDir: "static/media",
@@ -43,22 +43,13 @@ export default defineConfig(() => ({
           }),
         ],
       },
-      manifest: {
-        name: "ntfy web",
-        short_name: "ntfy",
-        description:
-          "ntfy lets you send push notifications via scripts from any computer or phone. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy.",
+      // The actual prod manifest is served from the go server, see server.go handleWebManifest.
+      manifest: mode === "development" && {
         theme_color: "#317f6f",
-        start_url: "/",
         icons: [
           {
             src: "/static/images/pwa-192x192.png",
             sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/static/images/pwa-512x512.png",
-            sizes: "512x512",
             type: "image/png",
           },
         ],

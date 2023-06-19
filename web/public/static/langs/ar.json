@@ -44,7 +44,7 @@
     "notifications_copied_to_clipboard": "تم نسخه إلى الحافظة",
     "action_bar_toggle_mute": "كتم / إلغاء كتم الإشعارات",
     "action_bar_toggle_action_menu": "فتح/إغلاق قائمة الإجراءات",
-    "alert_grant_button": "امنح الآن",
+    "alert_notification_permission_required_button": "امنح الآن",
     "notifications_attachment_open_button": "فتح المرفق",
     "notifications_attachment_copy_url_title": "نسخ عنوان URL للمرفق إلى الحافظة",
     "notifications_click_copy_url_title": "انسخ رابط URL إلى الحافظة",

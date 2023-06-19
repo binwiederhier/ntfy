@@ -29,7 +29,7 @@
     "nav_topics_title": "購読しているトピック",
     "nav_button_subscribe": "トピックを購読",
     "alert_notification_permission_required_description": "ブラウザのデスクトップ通知を許可してください。",
-    "alert_grant_button": "許可する",
+    "alert_notification_permission_required_button": "許可する",
     "notifications_attachment_link_expires": "リンクは {{date}} に失効します",
     "notifications_click_copy_url_button": "リンクをコピー",
     "notifications_none_for_topic_description": "トピックに通知を送信するには、トピックのURLにPUTかPOSTしてください。",

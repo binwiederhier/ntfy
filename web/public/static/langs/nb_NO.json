@@ -98,7 +98,7 @@
     "priority_default": "forvalg",
     "priority_high": "høy",
     "priority_max": "maks.",
-    "alert_grant_button": "Innvilg nå",
+    "alert_notification_permission_required_button": "Innvilg nå",
     "publish_dialog_topic_label": "Emnenavn",
     "prefs_notifications_delete_after_one_day_description": "Merknader slettes automatisk etter én dag",
     "notifications_click_copy_url_button": "Kopier lenke",

@@ -48,7 +48,7 @@
     "nav_button_documentation": "Ръководство",
     "nav_button_subscribe": "Абониране за тема",
     "alert_notification_permission_required_title": "Известията са изключени",
-    "alert_grant_button": "Разрешаване",
+    "alert_notification_permission_required_button": "Разрешаване",
     "notifications_tags": "Етикети",
     "nav_button_publish_message": "Изпращане",
     "alert_not_supported_title": "Не се поддържат известия",

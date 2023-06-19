@@ -39,7 +39,7 @@
     "alert_not_supported_description": "Benachrichtigungen werden von Deinem Browser nicht unterstützt.",
     "action_bar_settings": "Einstellungen",
     "action_bar_clear_notifications": "Alle Benachrichtigungen löschen",
-    "alert_grant_button": "Jetzt erlauben",
+    "alert_notification_permission_required_button": "Jetzt erlauben",
     "notifications_none_for_topic_title": "Du hast für dieses Thema noch keine Benachrichtigungen empfangen.",
     "notifications_click_open_button": "Link öffnen",
     "notifications_more_details": "Ausführlichere Informationen findest Du auf der <websiteLink>Website</websiteLink> und in der <docsLink>Dokumentation</docsLink>.",

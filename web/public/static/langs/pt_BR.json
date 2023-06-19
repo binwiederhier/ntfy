@@ -9,7 +9,7 @@
     "nav_button_subscribe": "Inscrever no tópico",
     "alert_notification_permission_required_title": "Notificações estão desativadas",
     "alert_notification_permission_required_description": "Conceder ao navegador permissão para mostrar notificações.",
-    "alert_grant_button": "Conceder agora",
+    "alert_notification_permission_required_button": "Conceder agora",
     "alert_not_supported_title": "Notificações não são suportadas",
     "alert_not_supported_description": "Notificações não são suportadas pelo seu navagador.",
     "notifications_copied_to_clipboard": "Copiado para a área de transferência",

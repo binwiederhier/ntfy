@@ -13,7 +13,7 @@
     "nav_button_settings": "Beállítások",
     "nav_button_documentation": "Dokumentáció",
     "nav_button_publish_message": "Értesítés küldése",
-    "alert_grant_button": "Engedélyezés",
+    "alert_notification_permission_required_button": "Engedélyezés",
     "alert_not_supported_title": "Nem támogatott funkció",
     "notifications_copied_to_clipboard": "Másolva a vágólapra",
     "notifications_tags": "Címkék",

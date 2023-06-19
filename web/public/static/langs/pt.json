@@ -119,7 +119,7 @@
     "action_bar_logo_alt": "logótipo do ntfy",
     "action_bar_settings": "Configurações",
     "message_bar_show_dialog": "Mostrar caixa de publicação",
-    "alert_grant_button": "Conceder agora",
+    "alert_notification_permission_required_button": "Conceder agora",
     "publish_dialog_attachment_limits_file_reached": "excede o limite de ficheiro de {{fileSizeLimit}}",
     "publish_dialog_emoji_picker_show": "Escolher emoji",
     "publish_dialog_priority_max": "Prioridade máxima",

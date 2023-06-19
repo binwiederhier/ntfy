@@ -51,7 +51,7 @@
     "nav_button_documentation": "Документация",
     "nav_button_publish_message": "Опубликовать уведомление",
     "nav_button_subscribe": "Подписаться на тему",
-    "alert_grant_button": "Разрешить",
+    "alert_notification_permission_required_button": "Разрешить",
     "notifications_attachment_copy_url_button": "Скопировать URL-адрес",
     "notifications_attachment_open_title": "Перейти на {{url}}",
     "notifications_attachment_link_expired": "срок действия ссылки для скачивания истёк",

@@ -12,7 +12,7 @@
     "nav_button_publish_message": "Publicera notis",
     "nav_button_subscribe": "Prenumerera på kategori",
     "alert_notification_permission_required_title": "Notiser är avstängda",
-    "alert_grant_button": "Bevilja nu",
+    "alert_notification_permission_required_button": "Bevilja nu",
     "alert_not_supported_title": "Notiser stöds inte",
     "notifications_list": "Notifieringslista",
     "notifications_list_item": "Notis",

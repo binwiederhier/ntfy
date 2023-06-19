@@ -17,7 +17,7 @@
     "nav_button_connecting": "正在连接",
     "alert_notification_permission_required_title": "已禁用通知",
     "alert_notification_permission_required_description": "授予浏览器显示桌面通知的权限。",
-    "alert_grant_button": "现在授予",
+    "alert_notification_permission_required_button": "现在授予",
     "alert_not_supported_title": "不支持通知",
     "alert_not_supported_description": "您的浏览器不支持通知。",
     "notifications_list": "通知列表",

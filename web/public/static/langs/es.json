@@ -3,7 +3,7 @@
     "action_bar_send_test_notification": "Enviar notificación de prueba",
     "action_bar_clear_notifications": "Borrar todas las notificaciones",
     "nav_topics_title": "Tópicos suscritos",
-    "alert_grant_button": "Conceder ahora",
+    "alert_notification_permission_required_button": "Conceder ahora",
     "action_bar_unsubscribe": "Cancelar la suscripción",
     "message_bar_type_message": "Escriba un mensaje aquí",
     "message_bar_error_publishing": "Error al publicar la notificación",

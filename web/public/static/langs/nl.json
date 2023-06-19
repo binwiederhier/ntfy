@@ -37,7 +37,7 @@
     "nav_button_connecting": "verbinden",
     "alert_notification_permission_required_title": "Notificaties zijn uitgeschakeld",
     "alert_notification_permission_required_description": "Verleen je browser toestemming voor het weergeven van notificaties.",
-    "alert_grant_button": "Nu toestaan",
+    "alert_notification_permission_required_button": "Nu toestaan",
     "alert_not_supported_title": "Notificaties zijn niet ondersteund",
     "notifications_list": "Notificatielijst",
     "notifications_list_item": "Notificatie",

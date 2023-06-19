@@ -12,7 +12,7 @@
     "nav_button_connecting": "підключення",
     "alert_notification_permission_required_title": "Сповіщення вимкнено",
     "alert_notification_permission_required_description": "Дозвольте браузеру показувати сповіщення.",
-    "alert_grant_button": "Дозволити",
+    "alert_notification_permission_required_button": "Дозволити",
     "alert_not_supported_title": "Сповіщення не підтримуються",
     "notifications_list_item": "Сповіщення",
     "notifications_attachment_image": "Прикріплене зображення",

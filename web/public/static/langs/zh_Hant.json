@@ -5,7 +5,7 @@
     "action_bar_toggle_action_menu": "開啟/關閉操作選單",
     "message_bar_type_message": "在這輸入訊息",
     "alert_notification_permission_required_description": "允許瀏覽器權限以顯示桌面通知。",
-    "alert_grant_button": "允許",
+    "alert_notification_permission_required_button": "允許",
     "notifications_list": "通知清單",
     "notifications_list_item": "通知",
     "notifications_mark_read": "標示已讀",

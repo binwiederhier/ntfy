@@ -44,7 +44,7 @@
     "prefs_notifications_min_priority_title": "En düşük öncelik",
     "prefs_notifications_min_priority_any": "Herhangi bir öncelik",
     "publish_dialog_topic_placeholder": "Konu adı, örn. benim_uyarilarim",
-    "alert_grant_button": "Şimdi ver",
+    "alert_notification_permission_required_button": "Şimdi ver",
     "alert_not_supported_title": "Bildirimler desteklenmiyor",
     "notifications_attachment_link_expires": "bağlantının süresi {{date}} tarihinde doluyor",
     "notifications_click_copy_url_title": "Bağlantı URL'sini panoya kopyala",

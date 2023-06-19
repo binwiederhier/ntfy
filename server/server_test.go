@@ -245,6 +245,9 @@ func TestServer_WebEnabled(t *testing.T) {
 	rr = request(t, s, "GET", "/sw.js", "", nil)
 	require.Equal(t, 404, rr.Code)
 
+	rr = request(t, s, "GET", "/app.html", "", nil)
+	require.Equal(t, 404, rr.Code)
+
 	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 404, rr.Code)
 
@@ -263,6 +266,9 @@ func TestServer_WebEnabled(t *testing.T) {
 	require.Equal(t, "application/manifest+json", rr.Header().Get("Content-Type"))
 
 	rr = request(t, s2, "GET", "/sw.js", "", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/app.html", "", nil)
 	require.Equal(t, 200, rr.Code)
 }
 

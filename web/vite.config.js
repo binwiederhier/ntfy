@@ -25,15 +25,18 @@ export default defineConfig(() => ({
         navigateFallback: "index.html",
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,mp3,png,svg,json}"],
+        globPatterns: ["**/*.{js,css,html,mp3,ico,png,svg,json}"],
         globIgnores: ["config.js"],
         manifestTransforms: [
           (entries) => ({
             manifest: entries.map((entry) =>
+              // this matches the build step in the Makefile.
+              // since ntfy needs the ability to serve another page on /index.html,
+              // it's renamed and served from server.go as app.html as well.
               entry.url === "index.html"
                 ? {
                     ...entry,
-                    url: "/",
+                    url: "app.html",
                   }
                 : entry
             ),

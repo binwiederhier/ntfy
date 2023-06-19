@@ -518,3 +518,22 @@ func (w *webPushSubscription) Context() log.Context {
 		"web_push_subscription_endpoint": w.Endpoint,
 	}
 }
+
+// https://developer.mozilla.org/en-US/docs/Web/Manifest
+type webManifestResponse struct {
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	ShortName       string            `json:"short_name"`
+	Scope           string            `json:"scope"`
+	StartURL        string            `json:"start_url"`
+	Display         string            `json:"display"`
+	BackgroundColor string            `json:"background_color"`
+	ThemeColor      string            `json:"theme_color"`
+	Icons           []webManifestIcon `json:"icons"`
+}
+
+type webManifestIcon struct {
+	SRC   string `json:"src"`
+	Sizes string `json:"sizes"`
+	Type  string `json:"type"`
+}

@@ -79,6 +79,7 @@ var (
 
 	webConfigPath                                        = "/config.js"
 	webManifestPath                                      = "/manifest.webmanifest"
+	webRootHTMLPath                                      = "/app.html"
 	webServiceWorkerPath                                 = "/sw.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
@@ -434,8 +435,6 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
 		return s.ensureWebEnabled(s.handleWebManifest)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == webServiceWorkerPath {
-		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
 	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
@@ -502,7 +501,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
 		return s.handleMetrics(w, r, v)
-	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && (staticRegex.MatchString(r.URL.Path) || r.URL.Path == webServiceWorkerPath || r.URL.Path == webRootHTMLPath) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
@@ -590,9 +589,29 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	return err
 }
 
-func (s *Server) handleWebManifest(w http.ResponseWriter, r *http.Request, v *visitor) error {
+func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	response := &webManifestResponse{
+		Name:            "ntfy web",
+		Description:     "ntfy lets you send push notifications via scripts from any computer or phone. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy.",
+		ShortName:       "ntfy",
+		Scope:           "/",
+		StartURL:        s.config.WebRoot,
+		Display:         "standalone",
+		BackgroundColor: "#ffffff",
+		ThemeColor:      "#317f6f",
+		Icons: []webManifestIcon{
+			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
+			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
+		},
+	}
+
+	err := s.writeJSON(w, response)
+	if err != nil {
+		return err
+	}
+
 	w.Header().Set("Content-Type", "application/manifest+json")
-	return s.handleStatic(w, r, v)
+	return nil
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,

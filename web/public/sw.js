@@ -227,9 +227,28 @@ precacheAndRoute(
 // Delete any cached old dist files from previous service worker versions
 cleanupOutdatedCaches();
 
-if (import.meta.env.MODE !== "development") {
-  // since the manifest only includes `/index.html`, this manually adds the root route `/`
-  registerRoute(new NavigationRoute(createHandlerBoundToURL("/")));
+if (!import.meta.env.DEV) {
+  // we need the app_root setting, so we import the config.js file from the go server
+  // this does NOT include the same base_url as the web app running in a window,
+  // since we don't have access to `window` like in `src/app/config.js`
+  self.importScripts("/config.js");
+
+  // this is the fallback single-page-app route, matching vite.config.js PWA config,
+  // and is served by the go web server. It is needed for the single-page-app to work.
+  // https://developer.chrome.com/docs/workbox/modules/workbox-routing/#how-to-register-a-navigation-route
+  registerRoute(
+    new NavigationRoute(createHandlerBoundToURL("/app.html"), {
+      allowlist: [
+        // the app root itself, could be /, or not
+        new RegExp(`^${config.app_root}$`),
+        // any route starting with `/`, but not `/` itself.
+        // this is so we don't respond to `/` UNLESS it's the app root itself, defined above
+        /^\/.+$/,
+      ],
+      denylist: [/^\/docs\/?$/],
+    })
+  );
+
   // the manifest excludes config.js (see vite.config.js) since the dist-file differs from the
   // actual config served by the go server. this adds it back with `NetworkFirst`, so that the
   // most recent config from the go server is cached, but the app still works if the network

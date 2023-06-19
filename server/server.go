@@ -77,8 +77,6 @@ var (
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
-	// Note: new paths that should be viewable directly in the browser should be added to web/public/sw.js's navigation fallback denyList as well
-
 	webConfigPath                                        = "/config.js"
 	webManifestPath                                      = "/manifest.webmanifest"
 	webRootHTMLPath                                      = "/app.html"

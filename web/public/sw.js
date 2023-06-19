@@ -241,15 +241,7 @@ if (!import.meta.env.DEV) {
       allowlist: [
         // the app root itself, could be /, or not
         new RegExp(`^${config.app_root}$`),
-        // any route starting with `/`, but not `/` itself.
-        // this is so we don't respond to `/` UNLESS it's the app root itself, defined above
-        /^\/.+$/,
       ],
-      // only /docs, /file and /v1 are required so they are navigable in the browser (files for clicking on attachments,
-      // v1 for the redirect from Stripe). The rest are nice-to-haves so the single-page-app doesn't try to handle them,
-      // but `fetch` and browser requests would work anyway – they are mainly there so inspecting them is easier than
-      // calling the URLs via curl.
-      denylist: [/^\/(docs|file|v1|metrics|static|_matrix).*$/, /^\/(app.html|manifest.webmanifest|sw.js|config.js)$/],
     })
   );
 

@@ -589,29 +589,24 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	return err
 }
 
+// handleWebManifest serves the web app manifest for the progressive web app (PWA)
 func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	response := &webManifestResponse{
 		Name:            "ntfy web",
-		Description:     "ntfy lets you send push notifications via scripts from any computer or phone. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy.",
+		Description:     "ntfy lets you send push notifications via scripts from any computer or phone",
 		ShortName:       "ntfy",
 		Scope:           "/",
 		StartURL:        s.config.WebRoot,
 		Display:         "standalone",
 		BackgroundColor: "#ffffff",
 		ThemeColor:      "#317f6f",
-		Icons: []webManifestIcon{
+		Icons: []*webManifestIcon{
 			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
 			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
 		},
 	}
-
-	err := s.writeJSON(w, response)
-	if err != nil {
-		return err
-	}
-
 	w.Header().Set("Content-Type", "application/manifest+json")
-	return nil
+	return s.writeJSON(w, response)
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,

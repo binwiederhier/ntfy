@@ -521,15 +521,15 @@ func (w *webPushSubscription) Context() log.Context {
 
 // https://developer.mozilla.org/en-US/docs/Web/Manifest
 type webManifestResponse struct {
-	Name            string            `json:"name"`
-	Description     string            `json:"description"`
-	ShortName       string            `json:"short_name"`
-	Scope           string            `json:"scope"`
-	StartURL        string            `json:"start_url"`
-	Display         string            `json:"display"`
-	BackgroundColor string            `json:"background_color"`
-	ThemeColor      string            `json:"theme_color"`
-	Icons           []webManifestIcon `json:"icons"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	ShortName       string             `json:"short_name"`
+	Scope           string             `json:"scope"`
+	StartURL        string             `json:"start_url"`
+	Display         string             `json:"display"`
+	BackgroundColor string             `json:"background_color"`
+	ThemeColor      string             `json:"theme_color"`
+	Icons           []*webManifestIcon `json:"icons"`
 }
 
 type webManifestIcon struct {

@@ -23,10 +23,15 @@ If topic reservations are enabled, you can claim ownership over topics and defin
     <a href="../../static/img/web-reserve-topic-dialog.png"><img src="../../static/img/web-reserve-topic-dialog.png"/></a>
 </div>
 
-## Background notifications
+## Background Notifications
+
 While subscribing, you have the option to enable background notifications on supported browsers (see "Settings" tab).
 
-**If background notifications are off (default):** This requires an active ntfy tab to be open to receive notifications. 
+Note: If you add the web app to your homescreen (as a progressive web app, more info in the [installed web app](./installed-web-app.md)
+docs), you cannot turn these off, as notifications would not be delivered reliably otherwise. You can mute topics you don't want to receive
+notifications for.
+
+**If background notifications are off:** This requires an active ntfy tab to be open to receive notifications. 
 These are typically instantaneous, and will appear as a system notification. If you don't see these, check that your browser 
 is allowed to show notifications (for example in System Settings on macOS). If you don't want to enable background notifications, 
 **pinning the ntfy tab on your browser** is a good solution to leave it running.

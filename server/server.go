@@ -434,7 +434,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
-		return s.ensureWebEnabled(s.handleWebManifest)(w, r, v)
+		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
 	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {

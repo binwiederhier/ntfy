@@ -36,7 +36,7 @@ import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";
 import theme from "./theme";
 import userManager from "../app/UserManager";
-import { playSound, shuffle, sounds, validUrl } from "../app/utils";
+import { isLaunchedPWA, playSound, shuffle, sounds, validUrl } from "../app/utils";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, { Permission, Role } from "../app/AccountApi";
@@ -86,7 +86,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {notifier.pushPossible() && <WebPushEnabled />}
+        {!isLaunchedPWA() && notifier.pushPossible() && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );

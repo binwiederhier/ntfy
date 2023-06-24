@@ -605,8 +605,7 @@ func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *vi
 			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
 		},
 	}
-	w.Header().Set("Content-Type", "application/manifest+json")
-	return s.writeJSON(w, response)
+	return s.writeJSONWithContentType(w, response, "application/manifest+json")
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -1963,7 +1962,11 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
-	w.Header().Set("Content-Type", "application/json")
+	return s.writeJSONWithContentType(w, v, "application/json")
+}
+
+func (s *Server) writeJSONWithContentType(w http.ResponseWriter, v any, contentType string) error {
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		return err

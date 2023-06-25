@@ -7,16 +7,14 @@ launcher icon on Android), a standalone window, push notifications, and an app b
 
 Web app installation is **supported on** (see [compatibility table](https://caniuse.com/web-app-manifest) for details):
 
-- Chrome on all platforms (Windows/Linux/macOS/Android/iOS)
-- Firefox on Android natively, and on Windows/Linux (only [via an extension](https://addons.mozilla.org/en-US/firefox/addon/pwas-for-firefox/))
-- Edge on Windows
-- Safari on macOS/iOS
-
-<!-- TODO: (Q4 2023) Safari 17 / macOS 14 Sonoma supports installable PWAs too -->
+- **Chrome:** Android, Windows, Linux, macOS
+- **Safari:** iOS 16.4+, macOS 14+
+- **Firefox:** Android, as well as on Windows/Linux [via an extension](https://addons.mozilla.org/en-US/firefox/addon/pwas-for-firefox/)
+- **Edge:** Windows
 
 ## Installation
 
-### Chrome/Safari on Desktop
+### Chrome on Desktop
 To install and register the web app via Chrome, click the "install app" icon. After installation, you can find the app in your
 app drawer:
 

@@ -1,5 +1,4 @@
 import db from "./db";
-import { isLaunchedPWA } from "./utils";
 
 class Prefs {
   constructor(dbImpl) {
@@ -35,7 +34,7 @@ class Prefs {
 
   async webPushEnabled() {
     const webPushEnabled = await this.db.prefs.get("webPushEnabled");
-    return webPushEnabled?.value ?? isLaunchedPWA();
+    return webPushEnabled?.value;
   }
 
   async setWebPushEnabled(enabled) {

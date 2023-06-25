@@ -15,7 +15,7 @@ import userManager from "../app/UserManager";
 import { expandUrl } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
-import { useAccountListener, useBackgroundProcesses, useConnectionListeners } from "./hooks";
+import { useAccountListener, useBackgroundProcesses, useConnectionListeners, useWebPushTopics } from "./hooks";
 import PublishDialog from "./PublishDialog";
 import Messaging from "./Messaging";
 import Login from "./Login";
@@ -68,7 +68,7 @@ const Layout = () => {
   const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
-  const webPushTopics = useLiveQuery(() => subscriptionManager.webPushTopics());
+  const webPushTopics = useWebPushTopics();
   const subscriptionsWithoutInternal = subscriptions?.filter((s) => !s.internal);
   const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
   const [selected] = (subscriptionsWithoutInternal || []).filter(

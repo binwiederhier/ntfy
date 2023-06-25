@@ -1,7 +1,8 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
-import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
+import { disallowedTopic, expandSecureUrl, isLaunchedPWA, topicUrl } from "../app/utils";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
@@ -9,7 +10,8 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
-import { webPush, useWebPushTopicListener } from "../app/WebPush";
+import useWebPushListener from "../app/WebPush";
+import notifier from "../app/Notifier";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -133,6 +135,54 @@ export const useAutoSubscribe = (subscriptions, selected) => {
   }, [params, subscriptions, selected, hasRun]);
 };
 
+export const useWebPushTopics = () => {
+  const matchMedia = window.matchMedia("(display-mode: standalone)");
+
+  const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
+  const [pushPossible, setPushPossible] = useState(notifier.pushPossible());
+
+  useEffect(() => {
+    const handler = (evt) => {
+      console.log(`[useWebPushTopics] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
+      setIsStandalone(evt.matches);
+    };
+
+    matchMedia.addEventListener("change", handler);
+
+    return () => {
+      matchMedia.removeEventListener("change", handler);
+    };
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      const newPushPossible = notifier.pushPossible();
+      console.log(`[useWebPushTopics] Notification Permission changed`, { pushPossible: newPushPossible });
+      setPushPossible(newPushPossible);
+    };
+
+    if ("permissions" in navigator) {
+      navigator.permissions.query({ name: "notifications" }).then((permission) => {
+        permission.addEventListener("change", handler);
+
+        return () => {
+          permission.removeEventListener("change", handler);
+        };
+      });
+    }
+  });
+
+  const topics = useLiveQuery(
+    async () => subscriptionManager.webPushTopics(isStandalone, pushPossible),
+    // invalidate (reload) query when these values change
+    [isStandalone, pushPossible]
+  );
+
+  useWebPushListener(topics);
+
+  return topics;
+};
+
 /**
  * Start the poller and the pruner. This is done in a side effect as opposed to just in Pruner.js
  * and Poller.js, because side effect imports are not a thing in JS, and "Optimize imports" cleans
@@ -143,19 +193,15 @@ const startWorkers = () => {
   poller.startWorker();
   pruner.startWorker();
   accountApi.startWorker();
-  webPush.startWorker();
 };
 
 const stopWorkers = () => {
   poller.stopWorker();
   pruner.stopWorker();
   accountApi.stopWorker();
-  webPush.stopWorker();
 };
 
 export const useBackgroundProcesses = () => {
-  useWebPushTopicListener();
-
   useEffect(() => {
     console.log("[useBackgroundProcesses] mounting");
     startWorkers();

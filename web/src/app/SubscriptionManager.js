@@ -2,7 +2,7 @@ import api from "./Api";
 import notifier from "./Notifier";
 import prefs from "./Prefs";
 import db from "./db";
-import { topicUrl } from "./utils";
+import { isLaunchedPWA, topicUrl } from "./utils";
 
 class SubscriptionManager {
   constructor(dbImpl) {
@@ -27,13 +27,17 @@ class SubscriptionManager {
    * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
    * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
    */
-  async webPushTopics() {
-    // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
-    // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
-    const pushEnabled = await Promise.resolve(notifier.pushEnabled());
-    if (!pushEnabled) {
+  async webPushTopics(isStandalone = isLaunchedPWA(), pushPossible = notifier.pushPossible()) {
+    if (!pushPossible) {
       return [];
     }
+
+    // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
+    // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
+    if (!(isStandalone || (await Promise.resolve(prefs.webPushEnabled())))) {
+      return [];
+    }
+
     const subscriptions = await this.db.subscriptions.where({ baseUrl: config.base_url, mutedUntil: 0 }).toArray();
     return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
   }
@@ -117,14 +121,17 @@ class SubscriptionManager {
 
   async updateWebPushSubscriptions(presetTopics) {
     const topics = presetTopics ?? (await this.webPushTopics());
-    const browserSubscription = await notifier.webPushSubscription();
+
+    const hasWebPushTopics = topics.length > 0;
+
+    const browserSubscription = await notifier.webPushSubscription(hasWebPushTopics);
 
     if (!browserSubscription) {
       console.log("[SubscriptionManager] No browser subscription currently exists, so web push was never enabled. Skipping.");
       return;
     }
 
-    if (topics.length > 0) {
+    if (hasWebPushTopics) {
       await api.updateWebPush(browserSubscription, topics);
     } else {
       await api.deleteWebPush(browserSubscription);

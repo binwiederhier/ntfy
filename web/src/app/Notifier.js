@@ -43,7 +43,7 @@ class Notifier {
     }
   }
 
-  async webPushSubscription() {
+  async webPushSubscription(hasWebPushTopics) {
     if (!this.pushPossible()) {
       throw new Error("Unsupported or denied");
     }
@@ -53,11 +53,11 @@ class Notifier {
       return existingSubscription;
     }
 
-    // Create a new subscription only if Web Push is enabled. It is possible that Web Push
+    // Create a new subscription only if there are new topics to subscribe to. It is possible that Web Push
     // was previously enabled and then disabled again in which case there would be an existingSubscription.
     // If, however, it was _not_ enabled previously, we create a new subscription if it is now enabled.
 
-    if (await this.pushEnabled()) {
+    if (hasWebPushTopics) {
       return pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(config.web_push_public_key),
@@ -117,11 +117,6 @@ class Notifier {
 
   pushPossible() {
     return this.pushSupported() && this.contextSupported() && this.granted() && !this.iosSupportedButInstallRequired();
-  }
-
-  async pushEnabled() {
-    const enabled = await prefs.webPushEnabled();
-    return this.pushPossible() && enabled;
   }
 
   /**

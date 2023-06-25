@@ -45,9 +45,13 @@ For Firefox, select "Install" in the menu, and then click "Add" to add an icon t
 </div>
 
 ### Safari on iOS
-On iOS Safari, tap on the Share menu > "Add to Home Screen".
+On iOS Safari, tap on the Share menu, then tap "Add to Home Screen":
 
-XXXXXXx
+<div id="pwa-screenshots-safari-ios" class="screenshots">
+    <a href="../../static/img/pwa-install-safari-ios-button.jpg"><img src="../../static/img/pwa-install-safari-ios-button.jpg"/></a>
+    <a href="../../static/img/pwa-install-safari-ios-menu.jpg"><img src="../../static/img/pwa-install-safari-ios-menu.jpg"/></a>
+    <a href="../../static/img/pwa-install-safari-ios-add-icon.jpg"><img src="../../static/img/pwa-install-safari-ios-add-icon.jpg"/></a>
+</div>
 
 ## Background notifications
 Background notifications via web push are enabled by default and cannot be turned off when the app is installed, as notifications would

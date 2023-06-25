@@ -2,7 +2,7 @@ import api from "./Api";
 import notifier from "./Notifier";
 import prefs from "./Prefs";
 import db from "./db";
-import { isLaunchedPWA, topicUrl } from "./utils";
+import { topicUrl } from "./utils";
 
 class SubscriptionManager {
   constructor(dbImpl) {
@@ -27,14 +27,15 @@ class SubscriptionManager {
    * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
    * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
    */
-  async webPushTopics(isStandalone = isLaunchedPWA(), pushPossible = notifier.pushPossible()) {
+  async webPushTopics(pushPossible = notifier.pushPossible()) {
     if (!pushPossible) {
       return [];
     }
 
     // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
     // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
-    if (!(isStandalone || (await Promise.resolve(prefs.webPushEnabled())))) {
+    const enabled = await Promise.resolve(prefs.webPushEnabled());
+    if (!enabled) {
       return [];
     }
 

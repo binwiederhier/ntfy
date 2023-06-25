@@ -12,6 +12,7 @@ import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
 import useWebPushListener from "../app/WebPush";
 import notifier from "../app/Notifier";
+import prefs from "../app/Prefs";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -135,15 +136,14 @@ export const useAutoSubscribe = (subscriptions, selected) => {
   }, [params, subscriptions, selected, hasRun]);
 };
 
-export const useWebPushTopics = () => {
+export const useStandaloneAutoWebPushSubscribe = () => {
   const matchMedia = window.matchMedia("(display-mode: standalone)");
 
   const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
-  const [pushPossible, setPushPossible] = useState(notifier.pushPossible());
 
   useEffect(() => {
     const handler = (evt) => {
-      console.log(`[useWebPushTopics] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
+      console.log(`[useStandaloneAutoWebPushSubscribe] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
       setIsStandalone(evt.matches);
     };
 
@@ -153,6 +153,17 @@ export const useWebPushTopics = () => {
       matchMedia.removeEventListener("change", handler);
     };
   });
+
+  useEffect(() => {
+    if (isStandalone) {
+      console.log(`[useStandaloneAutoWebPushSubscribe] Turning on web push automatically`);
+      prefs.setWebPushEnabled(true);
+    }
+  }, [isStandalone]);
+};
+
+export const useWebPushTopics = () => {
+  const [pushPossible, setPushPossible] = useState(notifier.pushPossible());
 
   useEffect(() => {
     const handler = () => {
@@ -173,9 +184,9 @@ export const useWebPushTopics = () => {
   });
 
   const topics = useLiveQuery(
-    async () => subscriptionManager.webPushTopics(isStandalone, pushPossible),
+    async () => subscriptionManager.webPushTopics(pushPossible),
     // invalidate (reload) query when these values change
-    [isStandalone, pushPossible]
+    [pushPossible]
   );
 
   useWebPushListener(topics);
@@ -202,6 +213,8 @@ const stopWorkers = () => {
 };
 
 export const useBackgroundProcesses = () => {
+  useStandaloneAutoWebPushSubscribe();
+
   useEffect(() => {
     console.log("[useBackgroundProcesses] mounting");
     startWorkers();

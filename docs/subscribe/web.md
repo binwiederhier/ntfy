@@ -23,11 +23,10 @@ If topic reservations are enabled, you can claim ownership over topics and defin
     <a href="../../static/img/web-reserve-topic-dialog.png"><img src="../../static/img/web-reserve-topic-dialog.png"/></a>
 </div>
 
-## Background Notifications
-
+## Background notifications
 While subscribing, you have the option to enable background notifications on supported browsers (see "Settings" tab).
 
-Note: If you add the web app to your homescreen (as a progressive web app, more info in the [installed web app](./installed-web-app.md)
+Note: If you add the web app to your homescreen (as a progressive web app, more info in the [installed web app](pwa.md)
 docs), you cannot turn these off, as notifications would not be delivered reliably otherwise. You can mute topics you don't want to receive
 notifications for.
 

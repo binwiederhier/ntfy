@@ -1,14 +1,14 @@
 # Using the progressive web app (PWA)
 While ntfy doesn't have a native desktop app, it is built as a [progressive web app](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps) (PWA)
-and thus can be installed on both desktop and mobile devices.
+and thus can be **installed on both desktop and mobile devices**.
 
 This gives it its own launcher (e.g. shortcut on Windows, app on macOS, launcher shortcut on Linux, home screen icon on iOS, and
 launcher icon on Android), a standalone window, push notifications, and an app badge with the unread notification count.
 
-Web app installation is supported on (see [compatibility table](https://caniuse.com/web-app-manifest) for details):
+Web app installation is **supported on** (see [compatibility table](https://caniuse.com/web-app-manifest) for details):
 
 - Chrome on all platforms (Windows/Linux/macOS/Android/iOS)
-- Firefox on Android natively, and on Windows/Linux ([via an extension](https://addons.mozilla.org/en-US/firefox/addon/pwas-for-firefox/))
+- Firefox on Android natively, and on Windows/Linux (only [via an extension](https://addons.mozilla.org/en-US/firefox/addon/pwas-for-firefox/))
 - Edge on Windows
 - Safari on macOS/iOS
 

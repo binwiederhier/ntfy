@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "NODE_OPTIONS=\"--enable-source-maps\" vite",
+    "start": "VITE_NTFY_COMMIT=$(git rev-parse --short HEAD) NODE_OPTIONS=\"--enable-source-maps\" vite",
     "build": "vite build",
     "serve": "vite preview",
     "format": "prettier . --write",

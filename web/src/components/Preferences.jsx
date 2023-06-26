@@ -71,6 +71,7 @@ const Preferences = () => (
       <Reservations />
       <Users />
       <Appearance />
+      <VersionInfo />
     </Stack>
   </Container>
 );
@@ -490,6 +491,12 @@ const Appearance = () => {
     </Card>
   );
 };
+
+const VersionInfo = () => (
+  <Typography textAlign="center">
+    ntfy {import.meta.env.DEV ? "dev" : import.meta.env.VITE_NTFY_VERSION} ({import.meta.env.VITE_NTFY_COMMIT})
+  </Typography>
+);
 
 const Language = () => {
   const { t, i18n } = useTranslation();

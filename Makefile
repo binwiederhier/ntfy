@@ -137,7 +137,7 @@ web: web-deps web-build
 
 web-build:
 	cd web \
-		&& npm run build \
+		&& VITE_NTFY_VERSION=$(VERSION) VITE_NTFY_COMMIT=$(COMMIT) npm run build \
 		&& mv build/index.html build/app.html \
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \

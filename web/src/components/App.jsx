@@ -118,7 +118,7 @@ const Main = (props) => (
       flexDirection: "column",
       padding: 3,
       width: { sm: `calc(100% - ${Navigation.width}px)` },
-      height: "100vh",
+      height: "100dvh",
       overflow: "auto",
       backgroundColor: ({ palette }) => (palette.mode === "light" ? palette.grey[100] : palette.grey[900]),
     }}

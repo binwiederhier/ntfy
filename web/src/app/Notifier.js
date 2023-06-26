@@ -128,7 +128,8 @@ class Notifier {
   }
 
   iosSupportedButInstallRequired() {
-    return this.pushSupported() && "standalone" in window.navigator && window.navigator.standalone === false;
+    // no PushManager when not installed, but it _is_ supported.
+    return config.enable_web_push && "serviceWorker" in navigator && window.navigator.standalone === false;
   }
 }
 

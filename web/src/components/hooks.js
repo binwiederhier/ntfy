@@ -136,9 +136,12 @@ export const useAutoSubscribe = (subscriptions, selected) => {
   }, [params, subscriptions, selected, hasRun]);
 };
 
+/**
+ * Watches the "display-mode" to detect if the app is running as a standalone app (PWA),
+ * and enables "Web Push" if it is.
+ */
 export const useStandaloneAutoWebPushSubscribe = () => {
   const matchMedia = window.matchMedia("(display-mode: standalone)");
-
   const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
 
   useEffect(() => {
@@ -157,7 +160,7 @@ export const useStandaloneAutoWebPushSubscribe = () => {
   useEffect(() => {
     if (isStandalone) {
       console.log(`[useStandaloneAutoWebPushSubscribe] Turning on web push automatically`);
-      prefs.setWebPushEnabled(true);
+      prefs.setWebPushEnabled(true); // Dangle!
     }
   }, [isStandalone]);
 };

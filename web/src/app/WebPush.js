@@ -6,7 +6,7 @@ const broadcastChannel = new BroadcastChannel("web-push-broadcast");
 
 /**
  * Updates the Web Push subscriptions when the list of topics changes,
- * as well as plays a sound when a new broadcat message is received from
+ * as well as plays a sound when a new broadcast message is received from
  * the service worker, since the service worker cannot play sounds.
  */
 const useWebPushListener = (topics) => {
@@ -20,11 +20,11 @@ const useWebPushListener = (topics) => {
 
     (async () => {
       try {
-        console.log("[useWebPushTopicListener] Refreshing web push subscriptions", topics);
+        console.log("[useWebPushListener] Refreshing web push subscriptions", topics);
         await subscriptionManager.updateWebPushSubscriptions(topics);
         setLastTopics(topics);
       } catch (e) {
-        console.error("[useWebPushTopicListener] Error refreshing web push subscriptions", e);
+        console.error("[useWebPushListener] Error refreshing web push subscriptions", e);
       }
     })();
   }, [topics, lastTopics]);

@@ -10,7 +10,6 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
-import useWebPushListener from "../app/WebPush";
 import notifier from "../app/Notifier";
 import prefs from "../app/Prefs";
 
@@ -136,35 +135,51 @@ export const useAutoSubscribe = (subscriptions, selected) => {
   }, [params, subscriptions, selected, hasRun]);
 };
 
+const webPushBroadcastChannel = new BroadcastChannel("web-push-broadcast");
+
 /**
- * Watches the "display-mode" to detect if the app is running as a standalone app (PWA),
- * and enables "Web Push" if it is.
+ * Updates the Web Push subscriptions when the list of topics changes,
+ * as well as plays a sound when a new broadcast message is received from
+ * the service worker, since the service worker cannot play sounds.
  */
-export const useStandaloneAutoWebPushSubscribe = () => {
-  const matchMedia = window.matchMedia("(display-mode: standalone)");
-  const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
+const useWebPushListener = (topics) => {
+  const [lastTopics, setLastTopics] = useState();
 
   useEffect(() => {
-    const handler = (evt) => {
-      console.log(`[useStandaloneAutoWebPushSubscribe] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
-      setIsStandalone(evt.matches);
+    const topicsChanged = JSON.stringify(topics) !== JSON.stringify(lastTopics);
+    if (!notifier.pushPossible() || !topicsChanged) {
+      return;
+    }
+
+    (async () => {
+      try {
+        console.log("[useWebPushListener] Refreshing web push subscriptions", topics);
+        await subscriptionManager.updateWebPushSubscriptions(topics);
+        setLastTopics(topics);
+      } catch (e) {
+        console.error("[useWebPushListener] Error refreshing web push subscriptions", e);
+      }
+    })();
+  }, [topics, lastTopics]);
+
+  useEffect(() => {
+    const onMessage = () => {
+      notifier.playSound(); // Service Worker cannot play sound, so we do it here!
     };
 
-    matchMedia.addEventListener("change", handler);
+    webPushBroadcastChannel.addEventListener("message", onMessage);
 
     return () => {
-      matchMedia.removeEventListener("change", handler);
+      webPushBroadcastChannel.removeEventListener("message", onMessage);
     };
   });
-
-  useEffect(() => {
-    if (isStandalone) {
-      console.log(`[useStandaloneAutoWebPushSubscribe] Turning on web push automatically`);
-      prefs.setWebPushEnabled(true); // Dangle!
-    }
-  }, [isStandalone]);
 };
 
+/**
+ * Hook to return a list of Web Push enabled topics using a live query. This hook will return an empty list if
+ * permissions are not granted, or if the browser does not support Web Push. Notification permissions are acted upon
+ * automatically.
+ */
 export const useWebPushTopics = () => {
   const [pushPossible, setPushPossible] = useState(notifier.pushPossible());
 
@@ -198,6 +213,35 @@ export const useWebPushTopics = () => {
 };
 
 /**
+ * Watches the "display-mode" to detect if the app is running as a standalone app (PWA),
+ * and enables "Web Push" if it is.
+ */
+export const useStandaloneWebPushAutoSubscribe = () => {
+  const matchMedia = window.matchMedia("(display-mode: standalone)");
+  const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
+
+  useEffect(() => {
+    const handler = (evt) => {
+      console.log(`[useStandaloneAutoWebPushSubscribe] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
+      setIsStandalone(evt.matches);
+    };
+
+    matchMedia.addEventListener("change", handler);
+
+    return () => {
+      matchMedia.removeEventListener("change", handler);
+    };
+  });
+
+  useEffect(() => {
+    if (isStandalone) {
+      console.log(`[useStandaloneAutoWebPushSubscribe] Turning on web push automatically`);
+      prefs.setWebPushEnabled(true); // Dangle!
+    }
+  }, [isStandalone]);
+};
+
+/**
  * Start the poller and the pruner. This is done in a side effect as opposed to just in Pruner.js
  * and Poller.js, because side effect imports are not a thing in JS, and "Optimize imports" cleans
  * up "unused" imports. See https://github.com/binwiederhier/ntfy/issues/186.
@@ -216,7 +260,7 @@ const stopWorkers = () => {
 };
 
 export const useBackgroundProcesses = () => {
-  useStandaloneAutoWebPushSubscribe();
+  useStandaloneWebPushAutoSubscribe();
 
   useEffect(() => {
     console.log("[useBackgroundProcesses] mounting");

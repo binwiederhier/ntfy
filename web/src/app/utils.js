@@ -263,16 +263,3 @@ export const urlB64ToUint8Array = (base64String) => {
   }
   return outputArray;
 };
-
-export const isLaunchedPWA = () => {
-  if (window.matchMedia("(display-mode: standalone)").matches) {
-    return true;
-  }
-
-  // iOS
-  if (window.navigator.standalone === true) {
-    return true;
-  }
-
-  return false;
-};

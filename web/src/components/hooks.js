@@ -2,7 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
-import { disallowedTopic, expandSecureUrl, isLaunchedPWA, topicUrl } from "../app/utils";
+import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
@@ -212,17 +212,24 @@ export const useWebPushTopics = () => {
   return topics;
 };
 
-/**
+const matchMedia = window.matchMedia("(display-mode: standalone)");
+
+const isIOSStandAlone = window.navigator.standalone === true;
+
+/*
  * Watches the "display-mode" to detect if the app is running as a standalone app (PWA),
- * and enables "Web Push" if it is.
  */
-export const useStandaloneWebPushAutoSubscribe = () => {
-  const matchMedia = window.matchMedia("(display-mode: standalone)");
-  const [isStandalone, setIsStandalone] = useState(isLaunchedPWA());
+export const useIsLaunchedPWA = () => {
+  const [isStandalone, setIsStandalone] = useState(matchMedia.matches);
 
   useEffect(() => {
+    // no need to listen for events on iOS
+    if (isIOSStandAlone) {
+      return () => {};
+    }
+
     const handler = (evt) => {
-      console.log(`[useStandaloneAutoWebPushSubscribe] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
+      console.log(`[useIsLaunchedPWA] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
       setIsStandalone(evt.matches);
     };
 
@@ -231,14 +238,23 @@ export const useStandaloneWebPushAutoSubscribe = () => {
     return () => {
       matchMedia.removeEventListener("change", handler);
     };
-  });
+  }, []);
+
+  return isIOSStandAlone || isStandalone;
+};
+
+/**
+ * Watches the result of `useIsLaunchedPWA` and enables "Web Push" if it is.
+ */
+export const useStandaloneWebPushAutoSubscribe = () => {
+  const isLaunchedPWA = useIsLaunchedPWA();
 
   useEffect(() => {
-    if (isStandalone) {
-      console.log(`[useStandaloneAutoWebPushSubscribe] Turning on web push automatically`);
+    if (isLaunchedPWA) {
+      console.log(`[useStandaloneWebPushAutoSubscribe] Turning on web push automatically`);
       prefs.setWebPushEnabled(true); // Dangle!
     }
-  }, [isStandalone]);
+  }, [isLaunchedPWA]);
 };
 
 /**

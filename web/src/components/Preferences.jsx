@@ -36,7 +36,7 @@ import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";
 import theme from "./theme";
 import userManager from "../app/UserManager";
-import { isLaunchedPWA, playSound, shuffle, sounds, validUrl } from "../app/utils";
+import { playSound, shuffle, sounds, validUrl } from "../app/utils";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, { Permission, Role } from "../app/AccountApi";
@@ -49,6 +49,7 @@ import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./Rese
 import { UnauthorizedError } from "../app/errors";
 import { subscribeTopic } from "./SubscribeDialog";
 import notifier from "../app/Notifier";
+import { useIsLaunchedPWA } from "./hooks";
 
 const maybeUpdateAccountSettings = async (payload) => {
   if (!session.exists()) {
@@ -77,6 +78,9 @@ const Preferences = () => (
 
 const Notifications = () => {
   const { t } = useTranslation();
+
+  const isLaunchedPWA = useIsLaunchedPWA();
+
   return (
     <Card sx={{ p: 3 }} aria-label={t("prefs_notifications_title")}>
       <Typography variant="h5" sx={{ marginBottom: 2 }}>
@@ -86,7 +90,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {!isLaunchedPWA() && notifier.pushPossible() && <WebPushEnabled />}
+        {!isLaunchedPWA && notifier.pushPossible() && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );

@@ -1,52 +1,60 @@
+import { styled } from "@mui/material";
 import * as React from "react";
 
-export const PrefGroup = (props) => <div role="table">{props.children}</div>;
+export const PrefGroup = styled("div", { attrs: { role: "table" } })`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
 
-export const Pref = (props) => {
-  const justifyContent = props.alignTop ? "normal" : "center";
-  return (
-    <div
-      role="row"
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        marginTop: "10px",
-        marginBottom: "20px",
-      }}
-    >
-      <div
-        role="cell"
-        id={props.labelId ?? ""}
-        aria-label={props.title}
-        style={{
-          flex: "1 0 40%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent,
-          paddingRight: "30px",
-        }}
-      >
+const PrefRow = styled("div")`
+  display: flex;
+  flex-direction: row;
+
+  > :first-child {
+    flex: 1 0 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: ${(props) => (props.alignTop ? "normal" : "center")};
+  }
+
+  > :last-child {
+    flex: 1 0 calc(60% - 50px);
+    display: flex;
+    flex-direction: column;
+    justify-content: ${(props) => (props.alignTop ? "normal" : "center")};
+  }
+
+  @media (max-width: 1000px) {
+    flex-direction: column;
+    gap: 10px;
+
+    > :first-child,
+    > :last-child {
+      flex: unset;
+    }
+
+    > :last-child {
+      .MuiFormControl-root {
+        margin: 0;
+      }
+    }
+  }
+`;
+
+export const Pref = (props) => (
+  <PrefRow role="row" alignTop={props.alignTop}>
+    <div role="cell" id={props.labelId ?? ""} aria-label={props.title}>
+      <div>
+        <b>{props.title}</b>
+        {props.subtitle && <em> ({props.subtitle})</em>}
+      </div>
+      {props.description && (
         <div>
-          <b>{props.title}</b>
-          {props.subtitle && <em> ({props.subtitle})</em>}
+          <em>{props.description}</em>
         </div>
-        {props.description && (
-          <div>
-            <em>{props.description}</em>
-          </div>
-        )}
-      </div>
-      <div
-        role="cell"
-        style={{
-          flex: "1 0 calc(60% - 50px)",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent,
-        }}
-      >
-        {props.children}
-      </div>
+      )}
     </div>
-  );
-};
+    <div role="cell">{props.children}</div>
+  </PrefRow>
+);

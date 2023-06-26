@@ -785,7 +785,7 @@ const Tokens = () => {
             }}
           />
         </Paragraph>
-        {tokens?.length > 0 && <TokensTable tokens={tokens} />}
+        <div style={{ width: "100%", overflowX: "scroll" }}>{tokens?.length > 0 && <TokensTable tokens={tokens} />}</div>
       </CardContent>
       <CardActions>
         <Button onClick={handleCreateClick}>{t("account_tokens_table_create_token_button")}</Button>

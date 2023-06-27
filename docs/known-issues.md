@@ -26,3 +26,13 @@ Be sure that in your selfhosted server:
 
 * Set `upstream-base-url: "https://ntfy.sh"` (**not your own hostname!**)
 * Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to 
+
+## Firefox on Android not automatically subscribing to web push
+ntfy defaults to web-push based subscriptions when installed as a [progressive web app](./subscribe/pwa.md). Firefox
+Android has an [open bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1796434) where it reports the PWA mode incorrectly.
+This causes ntfy to not automatically subscribe to web push, and requires you to go to the ntfy Settings page to enable
+it manually.
+
+## Safari does not play sounds for web push notifications
+Safari does not support playing sounds for web push notifications, and treats them all as silent. This will be fixed with
+iOS 17 / Safari 17, which will be released later in 2023.

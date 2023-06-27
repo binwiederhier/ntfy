@@ -52,7 +52,7 @@ const Signup = () => {
   return (
     <AvatarBox>
       <Typography sx={{ typography: "h6" }}>{t("signup_title")}</Typography>
-      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, maxWidth: 400 }}>
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
         <TextField
           margin="dense"
           required

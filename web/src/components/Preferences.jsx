@@ -78,7 +78,6 @@ const Preferences = () => (
 
 const Notifications = () => {
   const { t } = useTranslation();
-
   const isLaunchedPWA = useIsLaunchedPWA();
 
   return (

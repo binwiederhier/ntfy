@@ -136,6 +136,8 @@ export const useAutoSubscribe = (subscriptions, selected) => {
 };
 
 const webPushBroadcastChannel = new BroadcastChannel("web-push-broadcast");
+const matchMedia = window.matchMedia("(display-mode: standalone)");
+const isIOSStandalone = window.navigator.standalone === true;
 
 /**
  * Updates the Web Push subscriptions when the list of topics changes,
@@ -212,35 +214,27 @@ export const useWebPushTopics = () => {
   return topics;
 };
 
-const matchMedia = window.matchMedia("(display-mode: standalone)");
-
-const isIOSStandAlone = window.navigator.standalone === true;
-
 /*
- * Watches the "display-mode" to detect if the app is running as a standalone app (PWA),
+ * Watches the "display-mode" to detect if the app is running as a standalone app (PWA).
  */
 export const useIsLaunchedPWA = () => {
   const [isStandalone, setIsStandalone] = useState(matchMedia.matches);
 
   useEffect(() => {
-    // no need to listen for events on iOS
-    if (isIOSStandAlone) {
-      return () => {};
+    if (isIOSStandalone) {
+      return () => {}; // No need to listen for events on iOS
     }
-
     const handler = (evt) => {
       console.log(`[useIsLaunchedPWA] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
       setIsStandalone(evt.matches);
     };
-
     matchMedia.addEventListener("change", handler);
-
     return () => {
       matchMedia.removeEventListener("change", handler);
     };
   }, []);
 
-  return isIOSStandAlone || isStandalone;
+  return isIOSStandalone || isStandalone;
 };
 
 /**

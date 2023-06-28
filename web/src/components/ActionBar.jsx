@@ -44,7 +44,10 @@ const ActionBar = (props) => {
       <Toolbar
         sx={{
           pr: "24px",
-          background: theme.palette.actionBarBackground,
+          background:
+            theme.palette.mode === "light"
+              ? "linear-gradient(150deg, #338574 0%, #56bda8 100%)"
+              : "linear-gradient(150deg, #203631 0%, #2a6e60 100%)",
         }}
       >
         <IconButton

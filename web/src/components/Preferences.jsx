@@ -36,7 +36,7 @@ import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";
 import theme from "./theme";
 import userManager from "../app/UserManager";
-import { playSound, shuffle, sounds, validUrl } from "../app/utils";
+import { playSound, shortUrl, shuffle, sounds, validUrl } from "../app/utils";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, { Permission, Role } from "../app/AccountApi";
@@ -253,7 +253,7 @@ const WebPushEnabled = () => {
     >
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
         <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
-          <MenuItem value>{t("prefs_notifications_web_push_enabled")}</MenuItem>
+          <MenuItem value>{t("prefs_notifications_web_push_enabled", { server: shortUrl(config.base_url) })}</MenuItem>
           <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
         </Select>
       </FormControl>

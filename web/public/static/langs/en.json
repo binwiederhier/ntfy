@@ -335,7 +335,7 @@
   "prefs_notifications_web_push_title": "Background notifications",
   "prefs_notifications_web_push_enabled_description": "Notifications are received even when web app is not running (via Web Push)",
   "prefs_notifications_web_push_disabled_description": "Notification are received when web app is running (via WebSocket)",
-  "prefs_notifications_web_push_enabled": "Enabled",
+  "prefs_notifications_web_push_enabled": "Enabled for {{server}}",
   "prefs_notifications_web_push_disabled": "Disabled",
   "prefs_users_title": "Manage users",
   "prefs_users_description": "Add/remove users for your protected topics here. Please note that username and password are stored in the browser's local storage.",

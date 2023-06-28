@@ -1,5 +1,5 @@
 # Known issues
-This is an incomplete list of known issues with the ntfy server, Android app, and iOS app. You can find a complete
+This is an incomplete list of known issues with the ntfy server, web app, Android app, and iOS app. You can find a complete
 list [on GitHub](https://github.com/binwiederhier/ntfy/labels/%F0%9F%AA%B2%20bug), but I thought it may be helpful
 to have the prominent ones here to link to.
 
@@ -27,7 +27,7 @@ Be sure that in your selfhosted server:
 * Set `upstream-base-url: "https://ntfy.sh"` (**not your own hostname!**)
 * Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to 
 
-## Firefox on Android not automatically subscribing to web push
+## Firefox on Android not automatically subscribing to web push (see [#789](https://github.com/binwiederhier/ntfy/issues/789))
 ntfy defaults to web-push based subscriptions when installed as a [progressive web app](./subscribe/pwa.md). Firefox
 Android has an [open bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1796434) where it reports the PWA mode incorrectly.
 This causes ntfy to not automatically subscribe to web push, and requires you to go to the ntfy Settings page to enable
@@ -36,3 +36,7 @@ it manually.
 ## Safari does not play sounds for web push notifications
 Safari does not support playing sounds for web push notifications, and treats them all as silent. This will be fixed with
 iOS 17 / Safari 17, which will be released later in 2023.
+
+## PWA on iOS sometimes crashes with an IndexedDB error (see [#787](https://github.com/binwiederhier/ntfy/issues/787))
+When resuming the installed PWA from the background, it sometimes crashes with an error from IndexedDB/Dexie, due to a
+[WebKit bug]( https://bugs.webkit.org/show_bug.cgi?id=197050). A reload will fix it until a permanent fix is found.

@@ -14,6 +14,7 @@ import {
   Switch,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { useLiveQuery } from "dexie-react-hooks";
 import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
@@ -28,6 +29,7 @@ import ReserveTopicSelect from "./ReserveTopicSelect";
 import { AccountContext } from "./App";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 import { ReserveLimitChip } from "./SubscriptionPopup";
+import prefs from "../app/Prefs";
 
 const publicBaseUrl = "https://ntfy.sh";
 
@@ -95,6 +97,8 @@ const SubscribePage = (props) => {
   const showReserveTopicCheckbox = config.enable_reservations && !anotherServerVisible && (config.enable_payments || account);
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
+
+  const webPushEnabled = useLiveQuery(() => prefs.webPushEnabled());
 
   const handleSubscribe = async () => {
     const user = await userManager.get(baseUrl); // May be undefined
@@ -233,12 +237,19 @@ const SubscribePage = (props) => {
                 inputValue={props.baseUrl}
                 onInputChange={updateBaseUrl}
                 renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder={config.base_url}
-                    variant="standard"
-                    aria-label={t("subscribe_dialog_subscribe_base_url_label")}
-                  />
+                  <>
+                    <TextField
+                      {...params}
+                      placeholder={config.base_url}
+                      variant="standard"
+                      aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                    />
+                    {webPushEnabled && (
+                      <div style={{ width: "100%", color: "#aaa", fontSize: "0.75rem", marginTop: "0.5rem" }}>
+                        {t("subscribe_dialog_subscribe_use_another_background_info")}
+                      </div>
+                    )}
+                  </>
                 )}
               />
             )}

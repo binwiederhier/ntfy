@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useTheme,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
@@ -34,7 +35,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";
-import theme from "./theme";
 import userManager from "../app/UserManager";
 import { playSound, shortUrl, shuffle, sounds, validUrl } from "../app/utils";
 import session from "../app/Session";
@@ -400,6 +400,7 @@ const UserTable = (props) => {
 };
 
 const UserDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [baseUrl, setBaseUrl] = useState("");
   const [username, setUsername] = useState("");

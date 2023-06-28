@@ -33,6 +33,7 @@ import {
   IconButton,
   MenuItem,
   DialogContentText,
+  useTheme,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { Trans, useTranslation } from "react-i18next";
@@ -55,7 +56,6 @@ import DialogFooter from "./DialogFooter";
 import { Paragraph } from "./styles";
 import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
-import theme from "./theme";
 import session from "../app/Session";
 
 const Account = () => {
@@ -147,6 +147,7 @@ const ChangePassword = () => {
 };
 
 const ChangePasswordDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -430,6 +431,7 @@ const PhoneNumbers = () => {
 };
 
 const AddPhoneNumberDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -928,6 +930,7 @@ const TokensTable = (props) => {
 };
 
 const TokenDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [label, setLabel] = useState(props.token?.label || "");
@@ -1069,6 +1072,7 @@ const DeleteAccount = () => {
 };
 
 const DeleteAccountDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { account } = useContext(AccountContext);
   const [error, setError] = useState("");

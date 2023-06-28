@@ -19,6 +19,7 @@ import {
   IconButton,
   MenuItem,
   Box,
+  useTheme,
 } from "@mui/material";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import { Close } from "@mui/icons-material";
@@ -34,7 +35,6 @@ import DialogFooter from "./DialogFooter";
 import api from "../app/Api";
 import userManager from "../app/UserManager";
 import EmojiPicker from "./EmojiPicker";
-import theme from "./theme";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi from "../app/AccountApi";
@@ -42,6 +42,7 @@ import { UnauthorizedError } from "../app/errors";
 import { AccountContext } from "./App";
 
 const PublishDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { account } = useContext(AccountContext);
   const [baseUrl, setBaseUrl] = useState("");
@@ -806,6 +807,7 @@ const AttachmentBox = (props) => {
 };
 
 const ExpandingTextField = (props) => {
+  const theme = useTheme();
   const invisibleFieldRef = useRef();
   const [textWidth, setTextWidth] = useState(props.minWidth);
   const determineTextWidth = () => {

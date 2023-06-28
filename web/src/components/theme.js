@@ -1,18 +1,7 @@
-import { red } from "@mui/material/colors";
-import { createTheme } from "@mui/material/styles";
+import { grey, red } from "@mui/material/colors";
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: "#338574",
-    },
-    secondary: {
-      main: "#6cead0",
-    },
-    error: {
-      main: red.A400,
-    },
-  },
+/** @type {import("@mui/material").ThemeOptions} */
+const themeOptions = {
   components: {
     MuiListItemIcon: {
       styleOverrides: {
@@ -31,6 +20,32 @@ const theme = createTheme({
       },
     },
   },
-});
+};
 
-export default theme;
+/** @type {import("@mui/material").ThemeOptions['palette']} */
+export const lightPalette = {
+  mode: "light",
+  primary: {
+    main: "#338574",
+  },
+  secondary: {
+    main: "#6cead0",
+  },
+  error: {
+    main: red.A400,
+  },
+};
+
+/** @type {import("@mui/material").ThemeOptions['palette']} */
+export const darkPalette = {
+  ...lightPalette,
+  mode: "dark",
+  background: {
+    paper: grey["800"],
+  },
+  primary: {
+    main: "#6cead0",
+  },
+};
+
+export default themeOptions;

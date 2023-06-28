@@ -14,10 +14,10 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { Check, DeleteForever } from "@mui/icons-material";
-import theme from "./theme";
 import { validTopic } from "../app/utils";
 import DialogFooter from "./DialogFooter";
 import session from "../app/Session";
@@ -27,6 +27,7 @@ import ReserveTopicSelect from "./ReserveTopicSelect";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 
 export const ReserveAddDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [topic, setTopic] = useState(props.topic || "");
@@ -87,6 +88,7 @@ export const ReserveAddDialog = (props) => {
 };
 
 export const ReserveEditDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [everyone, setEveryone] = useState(props.reservation?.everyone || Permission.DENY_ALL);
@@ -124,6 +126,7 @@ export const ReserveEditDialog = (props) => {
 };
 
 export const ReserveDeleteDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [deleteMessages, setDeleteMessages] = useState(false);

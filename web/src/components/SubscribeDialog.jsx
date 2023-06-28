@@ -12,10 +12,10 @@ import {
   FormGroup,
   useMediaQuery,
   Switch,
+  useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useLiveQuery } from "dexie-react-hooks";
-import theme from "./theme";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
 import userManager from "../app/UserManager";
@@ -49,6 +49,7 @@ export const subscribeTopic = async (baseUrl, topic, opts) => {
 };
 
 const SubscribeDialog = (props) => {
+  const theme = useTheme();
   const [baseUrl, setBaseUrl] = useState("");
   const [topic, setTopic] = useState("");
   const [showLoginPage, setShowLoginPage] = useState(false);

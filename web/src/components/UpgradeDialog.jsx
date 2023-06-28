@@ -21,6 +21,7 @@ import {
   Box,
   DialogContentText,
   DialogActions,
+  useTheme,
 } from "@mui/material";
 import { Trans, useTranslation } from "react-i18next";
 import { Check, Close } from "@mui/icons-material";
@@ -31,7 +32,6 @@ import { AccountContext } from "./App";
 import routes from "./routes";
 import session from "../app/Session";
 import accountApi, { SubscriptionInterval } from "../app/AccountApi";
-import theme from "./theme";
 
 const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
 
@@ -61,6 +61,7 @@ const Banner = {
 };
 
 const UpgradeDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { account } = useContext(AccountContext); // May be undefined!
   const [error, setError] = useState("");

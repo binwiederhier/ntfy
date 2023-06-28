@@ -1,11 +1,11 @@
 import * as React from "react";
 import { createContext, Suspense, useContext, useEffect, useState, useMemo } from "react";
-import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress } from "@mui/material";
-import { ThemeProvider } from "@mui/material/styles";
+import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress, useMediaQuery } from "@mui/material";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
-import theme from "./theme";
+import themeOptions, { darkPalette, lightPalette } from "./theme";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
@@ -28,6 +28,19 @@ export const AccountContext = createContext(null);
 const App = () => {
   const [account, setAccount] = useState(null);
   const accountMemo = useMemo(() => ({ account, setAccount }), [account, setAccount]);
+
+  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
+
+  const theme = React.useMemo(
+    () =>
+      createTheme({
+        ...themeOptions,
+        palette: {
+          ...(prefersDarkMode ? darkPalette : lightPalette),
+        },
+      }),
+    [prefersDarkMode]
+  );
 
   return (
     <Suspense fallback={<Loader />}>

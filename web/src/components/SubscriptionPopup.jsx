@@ -15,6 +15,7 @@ import {
   MenuItem,
   IconButton,
   ListItemIcon,
+  useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -30,7 +31,6 @@ import {
   RemoveCircle,
   Send,
 } from "@mui/icons-material";
-import theme from "./theme";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import accountApi, { Role } from "../app/AccountApi";
@@ -281,6 +281,7 @@ export const SubscriptionPopup = (props) => {
 };
 
 const DisplayNameDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { subscription } = props;
   const [error, setError] = useState("");

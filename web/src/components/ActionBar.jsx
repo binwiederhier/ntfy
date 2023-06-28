@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, IconButton, Typography, Box, MenuItem, Button, Divider, ListItemIcon } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Typography, Box, MenuItem, Button, Divider, ListItemIcon, useTheme } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import * as React from "react";
 import { useState } from "react";
@@ -21,6 +21,7 @@ import PopupMenu from "./PopupMenu";
 import { SubscriptionPopup } from "./SubscriptionPopup";
 
 const ActionBar = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const location = useLocation();
   let title = "ntfy";
@@ -43,7 +44,7 @@ const ActionBar = (props) => {
       <Toolbar
         sx={{
           pr: "24px",
-          background: "linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%)",
+          background: theme.palette.actionBarBackground,
         }}
       >
         <IconButton

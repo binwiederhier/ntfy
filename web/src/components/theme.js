@@ -34,7 +34,6 @@ export const lightPalette = {
   error: {
     main: "#c30000",
   },
-  actionBarBackground: "linear-gradient(150deg, #338574 0%, #56bda8 100%)",
 };
 
 /** @type {import("@mui/material").ThemeOptions['palette']} */
@@ -52,7 +51,6 @@ export const darkPalette = {
   error: {
     main: "#fe4d2e",
   },
-  actionBarBackground: "linear-gradient(150deg, #203631 0%, #2a6e60 100%)",
 };
 
 export default themeOptions;

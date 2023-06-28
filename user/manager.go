@@ -126,6 +126,7 @@ const (
 		ON CONFLICT (id) DO NOTHING;
 		COMMIT;
 	`
+
 	builtinStartupQueries = `
 		PRAGMA foreign_keys = ON;
 	`

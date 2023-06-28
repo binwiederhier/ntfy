@@ -22,19 +22,19 @@ import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
 import "../app/i18n"; // Translations!
-import prefs, { UI_MODE } from "../app/Prefs";
+import prefs, { THEME } from "../app/Prefs";
 
 export const AccountContext = createContext(null);
 
-const darkModeEnabled = (prefersDarkMode, uiModePreference) => {
-  switch (uiModePreference) {
-    case UI_MODE.DARK:
+const darkModeEnabled = (prefersDarkMode, themePreference) => {
+  switch (themePreference) {
+    case THEME.DARK:
       return true;
 
-    case UI_MODE.LIGHT:
+    case THEME.LIGHT:
       return false;
 
-    case UI_MODE.SYSTEM:
+    case THEME.SYSTEM:
     default:
       return prefersDarkMode;
   }
@@ -43,20 +43,17 @@ const darkModeEnabled = (prefersDarkMode, uiModePreference) => {
 const App = () => {
   const [account, setAccount] = useState(null);
   const accountMemo = useMemo(() => ({ account, setAccount }), [account, setAccount]);
-
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
-
-  const uiModePreference = useLiveQuery(() => prefs.uiMode());
-
+  const themePreference = useLiveQuery(() => prefs.theme());
   const theme = React.useMemo(
     () =>
       createTheme({
         ...themeOptions,
         palette: {
-          ...(darkModeEnabled(prefersDarkMode, uiModePreference) ? darkPalette : lightPalette),
+          ...(darkModeEnabled(prefersDarkMode, themePreference) ? darkPalette : lightPalette),
         },
       }),
-    [prefersDarkMode, uiModePreference]
+    [prefersDarkMode, themePreference]
   );
 
   return (

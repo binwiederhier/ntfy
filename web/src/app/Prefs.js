@@ -1,6 +1,6 @@
 import db from "./db";
 
-export const UI_MODE = {
+export const THEME = {
   DARK: "dark",
   LIGHT: "light",
   SYSTEM: "system",
@@ -47,13 +47,13 @@ class Prefs {
     await this.db.prefs.put({ key: "webPushEnabled", value: enabled });
   }
 
-  async uiMode() {
-    const uiMode = await this.db.prefs.get("uiMode");
-    return uiMode?.value ?? UI_MODE.SYSTEM;
+  async theme() {
+    const theme = await this.db.prefs.get("theme");
+    return theme?.value ?? THEME.SYSTEM;
   }
 
-  async setUIMode(mode) {
-    await this.db.prefs.put({ key: "uiMode", value: mode });
+  async setTheme(mode) {
+    await this.db.prefs.put({ key: "theme", value: mode });
   }
 }
 

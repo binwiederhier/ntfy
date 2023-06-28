@@ -7,15 +7,22 @@ Released June 28, 2023
 
 With this release, the ntfy web app now contains a **[progressive web app](https://docs.ntfy.sh/subscribe/pwa/) (PWA)
 with Web Push support**, which means you'll be able to **install the ntfy web app on your desktop or phone** similar 
-to a native app (__even on iOS!__ 🥳), and get basic push notification support (without any battery drain).
+to a native app (__even on iOS!__ 🥳). Installing the PWA gives ntfy web its own launcher, a standalone window, 
+push notifications, and an app badge with the unread notification count.
 
-Installing the PWA gives ntfy web its own launcher (e.g. shortcut on Windows, app on macOS, launcher shortcut on Linux,
-home screen icon on iOS, and launcher icon on Android), a standalone window, push notifications, and an app badge with 
-the unread notification count.
+On top of that, this release also brings **dark mode** 🧛🌙 to the web app.
+
+🙏 A huge thanks for this release goes to [@nimbleghost](https://github.com/nimbleghost), for basically implementing the 
+Web Push / PWA and dark mode feature by himself. I'm really grateful for your contributions.
+
+❤️ If you like ntfy, **please consider sponsoring us** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or buying a [paid plan via the web app](https://ntfy.sh/app) (20% off
+if you use promo code `MYTOPIC`). ntfy will always remain open source.
 
 **Features:**
 
 * The web app now supports Web Push, and is installable as a [progressive web app (PWA)](https://docs.ntfy.sh/subscribe/pwa/) on Chrome, Edge, Android, and iOS ([#751](https://github.com/binwiederhier/ntfy/pull/751), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Support for dark mode in the web app ([#206](https://github.com/binwiederhier/ntfy/issues/206), thanks to [@nimbleghost](https://github.com/nimbleghost))
 
 **Bug fixes:**
 

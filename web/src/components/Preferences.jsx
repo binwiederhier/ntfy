@@ -43,7 +43,7 @@ import accountApi, { Permission, Role } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
 import { AccountContext } from "./App";
 import { Paragraph } from "./styles";
-import prefs, { UI_MODE } from "../app/Prefs";
+import prefs, { THEME } from "../app/Prefs";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
@@ -86,7 +86,6 @@ const Notifications = () => {
         {t("prefs_notifications_title")}
       </Typography>
       <PrefGroup>
-        <UIMode />
         <Sound />
         <MinPriority />
         <DeleteAfter />
@@ -238,21 +237,21 @@ const DeleteAfter = () => {
   );
 };
 
-const UIMode = () => {
+const Theme = () => {
   const { t } = useTranslation();
-  const labelId = "prefUIMode";
-  const enabled = useLiveQuery(async () => prefs.uiMode());
+  const labelId = "prefTheme";
+  const enabled = useLiveQuery(async () => prefs.theme());
   const handleChange = async (ev) => {
-    await prefs.setUIMode(ev.target.value);
+    await prefs.setTheme(ev.target.value);
   };
 
   return (
-    <Pref labelId={labelId} title={t("prefs_ui_mode_title")}>
+    <Pref labelId={labelId} title={t("prefs_appearance_theme_title")}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
         <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
-          <MenuItem value={UI_MODE.SYSTEM}>{t("prefs_ui_mode_system")}</MenuItem>
-          <MenuItem value={UI_MODE.DARK}>{t("prefs_ui_mode_dark")}</MenuItem>
-          <MenuItem value={UI_MODE.LIGHT}>{t("prefs_ui_mode_light")}</MenuItem>
+          <MenuItem value={THEME.SYSTEM}>{t("prefs_appearance_theme_system")}</MenuItem>
+          <MenuItem value={THEME.DARK}>{t("prefs_appearance_theme_dark")}</MenuItem>
+          <MenuItem value={THEME.LIGHT}>{t("prefs_appearance_theme_light")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>
@@ -511,6 +510,7 @@ const Appearance = () => {
         {t("prefs_appearance_title")}
       </Typography>
       <PrefGroup>
+        <Theme />
         <Language />
       </PrefGroup>
     </Card>

@@ -168,12 +168,12 @@ export const useNotificationPermissionListener = (query) => {
  * the service worker, since the service worker cannot play sounds.
  */
 const useWebPushListener = (topics) => {
-  const [lastTopics, setLastTopics] = useState();
+  const [prevUpdate, setPrevUpdate] = useState();
   const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
 
   useEffect(() => {
-    const topicsChanged = JSON.stringify(topics) !== JSON.stringify(lastTopics);
-    if (!pushPossible || !topicsChanged) {
+    const nextUpdate = JSON.stringify({ topics, pushPossible });
+    if (topics === undefined || nextUpdate === prevUpdate) {
       return;
     }
 
@@ -181,12 +181,12 @@ const useWebPushListener = (topics) => {
       try {
         console.log("[useWebPushListener] Refreshing web push subscriptions", topics);
         await subscriptionManager.updateWebPushSubscriptions(topics);
-        setLastTopics(topics);
+        setPrevUpdate(nextUpdate);
       } catch (e) {
         console.error("[useWebPushListener] Error refreshing web push subscriptions", e);
       }
     })();
-  }, [topics, lastTopics]);
+  }, [topics, pushPossible, prevUpdate]);
 
   useEffect(() => {
     const onMessage = () => {

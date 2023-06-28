@@ -27,7 +27,7 @@ class SubscriptionManager {
    * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
    * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
    */
-  async webPushTopics(pushPossible = notifier.pushPossible()) {
+  async webPushTopics(pushPossible) {
     if (!pushPossible) {
       return [];
     }
@@ -120,13 +120,14 @@ class SubscriptionManager {
     );
   }
 
-  async updateWebPushSubscriptions(presetTopics) {
-    const topics = presetTopics ?? (await this.webPushTopics());
+  async updateWebPushSubscriptions(topics) {
     const hasWebPushTopics = topics.length > 0;
     const browserSubscription = await notifier.webPushSubscription(hasWebPushTopics);
 
     if (!browserSubscription) {
-      console.log("[SubscriptionManager] No browser subscription currently exists, so web push was never enabled. Skipping.");
+      console.log(
+        "[SubscriptionManager] No browser subscription currently exists, so web push was never enabled or the notification permission was removed. Skipping."
+      );
       return;
     }
 

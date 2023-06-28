@@ -44,9 +44,6 @@ class Notifier {
   }
 
   async webPushSubscription(hasWebPushTopics) {
-    if (!this.pushPossible()) {
-      throw new Error("Unsupported or denied");
-    }
     const pushManager = await this.pushManager();
     const existingSubscription = await pushManager.getSubscription();
     if (existingSubscription) {

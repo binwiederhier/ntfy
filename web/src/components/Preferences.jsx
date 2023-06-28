@@ -241,7 +241,7 @@ const DeleteAfter = () => {
 const Theme = () => {
   const { t } = useTranslation();
   const labelId = "prefTheme";
-  const enabled = useLiveQuery(async () => prefs.theme());
+  const theme = useLiveQuery(async () => prefs.theme());
   const handleChange = async (ev) => {
     await prefs.setTheme(ev.target.value);
   };
@@ -249,7 +249,7 @@ const Theme = () => {
   return (
     <Pref labelId={labelId} title={t("prefs_appearance_theme_title")}>
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
+        <Select value={theme ?? THEME.SYSTEM} onChange={handleChange} aria-labelledby={labelId}>
           <MenuItem value={THEME.SYSTEM}>{t("prefs_appearance_theme_system")}</MenuItem>
           <MenuItem value={THEME.DARK}>{t("prefs_appearance_theme_dark")}</MenuItem>
           <MenuItem value={THEME.LIGHT}>{t("prefs_appearance_theme_light")}</MenuItem>

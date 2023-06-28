@@ -11,14 +11,14 @@ const PrefRow = styled("div")`
   display: flex;
   flex-direction: row;
 
-  > :first-child {
+  > div:first-of-type {
     flex: 1 0 40%;
     display: flex;
     flex-direction: column;
     justify-content: ${(props) => (props.alignTop ? "normal" : "center")};
   }
 
-  > :last-child {
+  > div:last-of-type {
     flex: 1 0 calc(60% - 50px);
     display: flex;
     flex-direction: column;
@@ -29,12 +29,12 @@ const PrefRow = styled("div")`
     flex-direction: column;
     gap: 10px;
 
-    > :first-child,
-    > :last-child {
+    > :div:first-of-type,
+    > :div:last-of-type {
       flex: unset;
     }
 
-    > :last-child {
+    > div:last-of-type {
       .MuiFormControl-root {
         margin: 0;
       }

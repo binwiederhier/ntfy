@@ -2,6 +2,35 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.6.0
+Released June 28, 2023
+
+With this release, the ntfy web app now contains a **[progressive web app](https://docs.ntfy.sh/subscribe/pwa/) (PWA)
+with Web Push support**, which means you'll be able to **install the ntfy web app on your desktop or phone** similar 
+to a native app (__even on iOS!__ 🥳), and get basic push notification support (without any battery drain).
+
+Installing the PWA gives ntfy web its own launcher (e.g. shortcut on Windows, app on macOS, launcher shortcut on Linux,
+home screen icon on iOS, and launcher icon on Android), a standalone window, push notifications, and an app badge with 
+the unread notification count.
+
+**Features:**
+
+* The web app now supports Web Push, and is installable as a [progressive web app (PWA)](https://docs.ntfy.sh/subscribe/pwa/) on Chrome, Edge, Android, and iOS ([#751](https://github.com/binwiederhier/ntfy/pull/751), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Bug fixes:**
+
+* Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
+* Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
+* Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
+* Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
+
+**Maintenance:**
+
+* Improved GitHub Actions flow ([#745](https://github.com/binwiederhier/ntfy/pull/745), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Add eslint with eslint-config-airbnb ([#748](https://github.com/binwiederhier/ntfy/pull/748), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Switch to Vite ([#749](https://github.com/binwiederhier/ntfy/pull/749), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
 ## ntfy server v2.5.0
 Released May 18, 2023
 
@@ -1219,23 +1248,3 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
-
-### ntfy server v2.6.0 (UNRELEASED)
-
-**Features:**
-
-* The web app now supports web push, and is installable on Chrome, Edge, Android, and iOS. Look at the [web app docs](https://docs.ntfy.sh/subscribe/web/) for more information ([#751](https://github.com/binwiederhier/ntfy/pull/751), thanks to [@nimbleghost](https://github.com/nimbleghost))
-
-**Bug fixes:**
-
-* Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
-* Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
-* Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
-* Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
-
-**Maintenance:**
-
-* Improved GitHub Actions flow ([#745](https://github.com/binwiederhier/ntfy/pull/745), thanks to [@nimbleghost](https://github.com/nimbleghost))
-* Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))
-* Web: Add eslint with eslint-config-airbnb ([#748](https://github.com/binwiederhier/ntfy/pull/748), thanks to [@nimbleghost](https://github.com/nimbleghost))
-* Web: Switch to Vite ([#749](https://github.com/binwiederhier/ntfy/pull/749), thanks to [@nimbleghost](https://github.com/nimbleghost))

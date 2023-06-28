@@ -43,7 +43,7 @@ import accountApi, { Permission, Role } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
 import { AccountContext } from "./App";
 import { Paragraph } from "./styles";
-import prefs from "../app/Prefs";
+import prefs, { UI_MODE } from "../app/Prefs";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
@@ -86,6 +86,7 @@ const Notifications = () => {
         {t("prefs_notifications_title")}
       </Typography>
       <PrefGroup>
+        <UIMode />
         <Sound />
         <MinPriority />
         <DeleteAfter />
@@ -231,6 +232,27 @@ const DeleteAfter = () => {
           <MenuItem value={86400}>{t("prefs_notifications_delete_after_one_day")}</MenuItem>
           <MenuItem value={604800}>{t("prefs_notifications_delete_after_one_week")}</MenuItem>
           <MenuItem value={2592000}>{t("prefs_notifications_delete_after_one_month")}</MenuItem>
+        </Select>
+      </FormControl>
+    </Pref>
+  );
+};
+
+const UIMode = () => {
+  const { t } = useTranslation();
+  const labelId = "prefUIMode";
+  const enabled = useLiveQuery(async () => prefs.uiMode());
+  const handleChange = async (ev) => {
+    await prefs.setUIMode(ev.target.value);
+  };
+
+  return (
+    <Pref labelId={labelId} title={t("prefs_ui_mode_title")}>
+      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value={UI_MODE.SYSTEM}>{t("prefs_ui_mode_system")}</MenuItem>
+          <MenuItem value={UI_MODE.DARK}>{t("prefs_ui_mode_dark")}</MenuItem>
+          <MenuItem value={UI_MODE.LIGHT}>{t("prefs_ui_mode_light")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>

@@ -8,7 +8,6 @@ import { AllSubscriptions, SingleSubscription } from "./Notifications";
 import themeOptions, { darkPalette, lightPalette } from "./theme";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
-import notifier from "../app/Notifier";
 import Preferences from "./Preferences";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
@@ -91,7 +90,6 @@ const Layout = () => {
   const params = useParams();
   const { account, setAccount } = useContext(AccountContext);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [notificationsGranted, setNotificationsGranted] = useState(notifier.granted());
   const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
@@ -115,10 +113,8 @@ const Layout = () => {
       <Navigation
         subscriptions={subscriptionsWithoutInternal}
         selectedSubscription={selected}
-        notificationsGranted={notificationsGranted}
         mobileDrawerOpen={mobileDrawerOpen}
         onMobileDrawerToggle={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-        onNotificationGranted={setNotificationsGranted}
         onPublishMessageClick={() => setSendDialogOpenMode(PublishDialog.OPEN_MODE_DEFAULT)}
       />
       <Main>

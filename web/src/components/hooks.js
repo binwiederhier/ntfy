@@ -136,8 +136,31 @@ export const useAutoSubscribe = (subscriptions, selected) => {
 };
 
 const webPushBroadcastChannel = new BroadcastChannel("web-push-broadcast");
-const matchMedia = window.matchMedia("(display-mode: standalone)");
-const isIOSStandalone = window.navigator.standalone === true;
+
+/**
+ * Hook to return a value that's refreshed when the notification permission changes
+ */
+export const useNotificationPermissionListener = (query) => {
+  const [result, setResult] = useState(query());
+
+  useEffect(() => {
+    const handler = () => {
+      setResult(query());
+    };
+
+    if ("permissions" in navigator) {
+      navigator.permissions.query({ name: "notifications" }).then((permission) => {
+        permission.addEventListener("change", handler);
+
+        return () => {
+          permission.removeEventListener("change", handler);
+        };
+      });
+    }
+  }, []);
+
+  return result;
+};
 
 /**
  * Updates the Web Push subscriptions when the list of topics changes,
@@ -146,10 +169,11 @@ const isIOSStandalone = window.navigator.standalone === true;
  */
 const useWebPushListener = (topics) => {
   const [lastTopics, setLastTopics] = useState();
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
 
   useEffect(() => {
     const topicsChanged = JSON.stringify(topics) !== JSON.stringify(lastTopics);
-    if (!notifier.pushPossible() || !topicsChanged) {
+    if (!pushPossible || !topicsChanged) {
       return;
     }
 
@@ -183,25 +207,7 @@ const useWebPushListener = (topics) => {
  * automatically.
  */
 export const useWebPushTopics = () => {
-  const [pushPossible, setPushPossible] = useState(notifier.pushPossible());
-
-  useEffect(() => {
-    const handler = () => {
-      const newPushPossible = notifier.pushPossible();
-      console.log(`[useWebPushTopics] Notification Permission changed`, { pushPossible: newPushPossible });
-      setPushPossible(newPushPossible);
-    };
-
-    if ("permissions" in navigator) {
-      navigator.permissions.query({ name: "notifications" }).then((permission) => {
-        permission.addEventListener("change", handler);
-
-        return () => {
-          permission.removeEventListener("change", handler);
-        };
-      });
-    }
-  });
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
 
   const topics = useLiveQuery(
     async () => subscriptionManager.webPushTopics(pushPossible),
@@ -213,6 +219,9 @@ export const useWebPushTopics = () => {
 
   return topics;
 };
+
+const matchMedia = window.matchMedia("(display-mode: standalone)");
+const isIOSStandalone = window.navigator.standalone === true;
 
 /*
  * Watches the "display-mode" to detect if the app is running as a standalone app (PWA).

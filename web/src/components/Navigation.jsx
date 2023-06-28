@@ -43,6 +43,7 @@ import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { SubscriptionPopup } from "./SubscriptionPopup";
+import { useNotificationPermissionListener } from "./hooks";
 
 const navWidth = 280;
 
@@ -109,16 +110,11 @@ const NavList = (props) => {
   const isPaid = account?.billing?.subscription;
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
   const showSubscriptionsList = props.subscriptions?.length > 0;
-  const [showNotificationPermissionRequired, setShowNotificationPermissionRequired] = useState(notifier.notRequested());
-  const [showNotificationPermissionDenied, setShowNotificationPermissionDenied] = useState(notifier.denied());
+  const showNotificationPermissionRequired = useNotificationPermissionListener(() => notifier.notRequested());
+  const showNotificationPermissionDenied = useNotificationPermissionListener(() => notifier.denied());
   const showNotificationIOSInstallRequired = notifier.iosSupportedButInstallRequired();
   const showNotificationBrowserNotSupportedBox = !showNotificationIOSInstallRequired && !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
-
-  const refreshPermissions = () => {
-    setShowNotificationPermissionRequired(notifier.notRequested());
-    setShowNotificationPermissionDenied(notifier.denied());
-  };
 
   const alertVisible =
     showNotificationPermissionRequired ||
@@ -131,7 +127,7 @@ const NavList = (props) => {
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       <List component="nav" sx={{ paddingTop: alertVisible ? "0" : "" }}>
-        {showNotificationPermissionRequired && <NotificationPermissionRequired refreshPermissions={refreshPermissions} />}
+        {showNotificationPermissionRequired && <NotificationPermissionRequired />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
         {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
@@ -354,11 +350,10 @@ const SubscriptionItem = (props) => {
   );
 };
 
-const NotificationPermissionRequired = ({ refreshPermissions }) => {
+const NotificationPermissionRequired = () => {
   const { t } = useTranslation();
   const requestPermission = async () => {
     await notifier.maybeRequestPermission();
-    refreshPermissions();
   };
   return (
     <Alert severity="warning" sx={{ paddingTop: 2 }}>

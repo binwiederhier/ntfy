@@ -49,7 +49,7 @@ import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./Rese
 import { UnauthorizedError } from "../app/errors";
 import { subscribeTopic } from "./SubscribeDialog";
 import notifier from "../app/Notifier";
-import { useIsLaunchedPWA } from "./hooks";
+import { useIsLaunchedPWA, useNotificationPermissionListener } from "./hooks";
 
 const maybeUpdateAccountSettings = async (payload) => {
   if (!session.exists()) {
@@ -79,6 +79,7 @@ const Preferences = () => (
 const Notifications = () => {
   const { t } = useTranslation();
   const isLaunchedPWA = useIsLaunchedPWA();
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
 
   return (
     <Card sx={{ p: 3 }} aria-label={t("prefs_notifications_title")}>
@@ -89,7 +90,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
-        {!isLaunchedPWA && notifier.pushPossible() && <WebPushEnabled />}
+        {!isLaunchedPWA && pushPossible && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );

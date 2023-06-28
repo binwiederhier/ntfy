@@ -132,7 +132,7 @@ const NavList = (props) => {
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
-      <List component="nav" sx={{ paddingTop: alertVisible ? "0" : "" }}>
+      <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
         {showNotificationPermissionRequired && <NotificationPermissionRequired refreshPermissions={refreshPermissions} />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}

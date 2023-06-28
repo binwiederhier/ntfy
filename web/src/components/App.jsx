@@ -5,7 +5,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
-import themeOptions, { darkPalette, lightPalette } from "./theme";
+import { darkTheme, lightTheme } from "./theme";
 import Navigation from "./Navigation";
 import ActionBar from "./ActionBar";
 import notifier from "../app/Notifier";
@@ -46,13 +46,7 @@ const App = () => {
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const themePreference = useLiveQuery(() => prefs.theme());
   const theme = React.useMemo(
-    () =>
-      createTheme({
-        ...themeOptions,
-        palette: {
-          ...(darkModeEnabled(prefersDarkMode, themePreference) ? darkPalette : lightPalette),
-        },
-      }),
+    () => createTheme(darkModeEnabled(prefersDarkMode, themePreference) ? darkTheme : lightTheme),
     [prefersDarkMode, themePreference]
   );
 

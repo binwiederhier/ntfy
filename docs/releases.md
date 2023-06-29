@@ -2,7 +2,7 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-### ntfy server v2.6.0
+### ntfy server v2.6.1
 Released June 28, 2023
 
 With this release, the ntfy web app now contains a **[progressive web app](https://docs.ntfy.sh/subscribe/pwa/) (PWA)
@@ -30,6 +30,7 @@ if you use promo code `MYTOPIC`). ntfy will always remain open source.
 * Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
 * Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
 * Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
+* The .1 release fixes a few visual issues with dark mode, and other web app updates ([#791](https://github.com/binwiederhier/ntfy/pull/791), [#793](https://github.com/binwiederhier/ntfy/pull/793), [#792](https://github.com/binwiederhier/ntfy/pull/792), thanks to [@nimbleghost](https://github.com/nimbleghost)) 
 
 **Maintenance:**
 

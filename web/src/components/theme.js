@@ -55,6 +55,13 @@ export const darkTheme = {
         },
       },
     },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: "none",
+        },
+      },
+    },
   },
   palette: {
     mode: "dark",

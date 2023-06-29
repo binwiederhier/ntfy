@@ -18,6 +18,7 @@ import {
   Box,
   IconButton,
   Button,
+  useTheme,
 } from "@mui/material";
 import * as React from "react";
 import { useContext, useState } from "react";
@@ -83,6 +84,7 @@ const Navigation = (props) => {
 Navigation.width = navWidth;
 
 const NavList = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -126,7 +128,7 @@ const NavList = (props) => {
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
-      <List component="nav" sx={{ paddingTop: alertVisible ? "0" : "" }}>
+      <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
         {showNotificationPermissionRequired && <NotificationPermissionRequired />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
@@ -186,7 +188,11 @@ const NavList = (props) => {
           </ListItemIcon>
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
-        {showUpgradeBanner && <UpgradeBanner />}
+        {showUpgradeBanner && (
+          // The text background gradient didn't seem to do well with switching between light/dark mode,
+          // So adding a `key` forces React to replace the entire component when the theme changes
+          <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
+        )}
       </List>
       <SubscribeDialog
         key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
@@ -199,7 +205,7 @@ const NavList = (props) => {
   );
 };
 
-const UpgradeBanner = () => {
+const UpgradeBanner = ({ mode }) => {
   const { t } = useTranslation();
   const [dialogKey, setDialogKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -216,13 +222,16 @@ const UpgradeBanner = () => {
         width: `${Navigation.width - 1}px`,
         bottom: 0,
         mt: "auto",
-        background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
+        background:
+          mode === "light"
+            ? "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)"
+            : "linear-gradient(150deg, #203631 0%, #2a6e60 100%)",
       }}
     >
       <Divider />
       <ListItemButton onClick={handleClick} sx={{ pt: 2, pb: 2 }}>
         <ListItemIcon>
-          <CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large" />
+          <CelebrationIcon sx={{ color: mode === "light" ? "#55b86e" : "#00ff95" }} fontSize="large" />
         </ListItemIcon>
         <ListItemText
           sx={{ ml: 1 }}
@@ -232,7 +241,10 @@ const UpgradeBanner = () => {
             style: {
               fontWeight: 500,
               fontSize: "1.1rem",
-              background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
+              background:
+                mode === "light"
+                  ? "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)"
+                  : "-webkit-linear-gradient(45deg,rgb(255, 255, 255), #00ff95 80%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             },

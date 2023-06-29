@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: "index.html",
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,mp3,ico,png,svg,json}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,json}"],
         globIgnores: ["config.js"],
         manifestTransforms: [
           (entries) => ({

@@ -2,8 +2,8 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-### ntfy server v2.6.1
-Released June 28, 2023
+### ntfy server v2.6.2
+Released June 30, 2023
 
 With this release, the ntfy web app now contains a **[progressive web app](https://docs.ntfy.sh/subscribe/pwa/) (PWA)
 with Web Push support**, which means you'll be able to **install the ntfy web app on your desktop or phone** similar 
@@ -31,6 +31,7 @@ if you use promo code `MYTOPIC`). ntfy will always remain open source.
 * Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
 * Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
 * The .1 release fixes a few visual issues with dark mode, and other web app updates ([#791](https://github.com/binwiederhier/ntfy/pull/791), [#793](https://github.com/binwiederhier/ntfy/pull/793), [#792](https://github.com/binwiederhier/ntfy/pull/792), thanks to [@nimbleghost](https://github.com/nimbleghost)) 
+* The .2 release fixes issues with the service worker in Firefox and adds automatic service worker updates ([#795](https://github.com/binwiederhier/ntfy/pull/795), thanks to [@nimbleghost](https://github.com/nimbleghost))
 
 **Maintenance:**
 
@@ -38,6 +39,14 @@ if you use promo code `MYTOPIC`). ntfy will always remain open source.
 * Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))
 * Web: Add eslint with eslint-config-airbnb ([#748](https://github.com/binwiederhier/ntfy/pull/748), thanks to [@nimbleghost](https://github.com/nimbleghost))
 * Web: Switch to Vite ([#749](https://github.com/binwiederhier/ntfy/pull/749), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Changes in tarball/zip naming:**   
+Due to a [change in GoReleaser](https://goreleaser.com/deprecations/#archivesreplacements), some of the binary release 
+archives now have slightly different names. My apologies if this causes issues in the downstream projects that use ntfy:
+
+- `ntfy_v${VERSION}_windows_x86_64.zip` -> `ntfy_v${VERSION}_windows_amd64.zip`
+- `ntfy_v${VERSION}_linux_x86_64.tar.gz` -> `ntfy_v${VERSION}_linux_amd64.tar.gz`
+- `ntfy_v${VERSION}_macOS_all.tar.gz` -> `ntfy_v${VERSION}_darwin_all.tar.gz`
 
 ## ntfy server v2.5.0
 Released May 18, 2023

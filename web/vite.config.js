@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // see registerSW.js imported by index.jsx
       injectRegister: null,
       strategies: "injectManifest",
       devOptions: {

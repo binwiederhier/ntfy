@@ -58,6 +58,7 @@ export const darkTheme = {
     MuiPaper: {
       styleOverrides: {
         root: {
+          // for the sidebar on narrow (xs) screens
           backgroundImage: "none",
         },
       },

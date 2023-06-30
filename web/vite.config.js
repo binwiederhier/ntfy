@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      injectRegister: "inline",
+      // see registerSW.js imported by index.jsx
+      injectRegister: null,
       strategies: "injectManifest",
       devOptions: {
         enabled: true,
@@ -25,7 +26,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: "index.html",
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,mp3,ico,png,svg,json}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,json}"],
         globIgnores: ["config.js"],
         manifestTransforms: [
           (entries) => ({

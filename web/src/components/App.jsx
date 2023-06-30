@@ -1,7 +1,6 @@
 import * as React from "react";
 import { createContext, Suspense, useContext, useEffect, useState, useMemo } from "react";
-import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress, useMediaQuery } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress, useMediaQuery, ThemeProvider, createTheme } from "@mui/material";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
@@ -133,7 +132,7 @@ const Main = (props) => (
       display: "flex",
       flexGrow: 1,
       flexDirection: "column",
-      padding: 3,
+      padding: { xs: 0, md: 3 },
       width: { sm: `calc(100% - ${Navigation.width}px)` },
       height: "100dvh",
       overflow: "auto",

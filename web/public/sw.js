@@ -2,6 +2,7 @@
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
+import { clientsClaim } from "workbox-core";
 
 import { dbAsync } from "../src/app/db";
 
@@ -224,6 +225,8 @@ precacheAndRoute(
   self.__WB_MANIFEST
 );
 
+// Claim all open windows
+clientsClaim();
 // Delete any cached old dist files from previous service worker versions
 cleanupOutdatedCaches();
 

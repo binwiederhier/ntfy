@@ -184,7 +184,7 @@ const NotificationItem = (props) => {
   const hasUserActions = notification.actions && notification.actions.length > 0;
   const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
   return (
-    <Card sx={{ minWidth: 275, padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
+    <Card sx={{ padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
       <CardContent>
         <Tooltip title={t("notifications_delete")} enterDelay={500}>
           <IconButton onClick={handleDelete} sx={{ float: "right", marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>

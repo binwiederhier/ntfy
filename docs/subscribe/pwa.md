@@ -12,6 +12,8 @@ Web app installation is **supported on** (see [compatibility table](https://cani
 - **Firefox:** Android, as well as on Windows/Linux [via an extension](https://addons.mozilla.org/en-US/firefox/addon/pwas-for-firefox/)
 - **Edge:** Windows
 
+Note that for self-hosted servers, [Web Push](../config.md#web-push) must be configured for the PWA to work.
+
 ## Installation
 
 ### Chrome on Desktop

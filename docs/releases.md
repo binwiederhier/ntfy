@@ -5,10 +5,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ### ntfy server v2.6.2
 Released June 30, 2023
 
-With this release, the ntfy web app now contains a **[progressive web app](https://docs.ntfy.sh/subscribe/pwa/) (PWA)
+With this release, the ntfy web app now contains a **[progressive web app](subscribe/pwa.md) (PWA)
 with Web Push support**, which means you'll be able to **install the ntfy web app on your desktop or phone** similar 
 to a native app (__even on iOS!__ 🥳). Installing the PWA gives ntfy web its own launcher, a standalone window, 
-push notifications, and an app badge with the unread notification count.
+push notifications, and an app badge with the unread notification count. Note that for self-hosted servers, 
+[Web Push](config.md#web-push) must be configured.
 
 On top of that, this release also brings **dark mode** 🧛🌙 to the web app.
 

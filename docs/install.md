@@ -170,7 +170,9 @@ Manually installing the .deb file:
     ```
 
 ## Arch Linux
-ntfy can be installed using an [AUR package](https://aur.archlinux.org/packages/ntfysh-bin/). You can use an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers) like `paru`, `yay` or others to download, build and install ntfy and keep it up to date.
+ntfy can be installed using an [AUR package](https://aur.archlinux.org/packages/ntfysh-bin/). 
+You can use an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers) like `paru`, `yay` or others to download, 
+build and install ntfy and keep it up to date.
 ```
 paru -S ntfysh-bin
 ```

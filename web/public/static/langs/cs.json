@@ -365,5 +365,20 @@
     "account_basics_phone_numbers_no_phone_numbers_yet": "Zatím žádná telefonní čísla",
     "account_basics_phone_numbers_copied_to_clipboard": "Telefonní číslo zkopírováno do schránky",
     "publish_dialog_chip_call_no_verified_numbers_tooltip": "Žádná ověřená telefonní čísla",
-    "publish_dialog_call_item": "Vytočit číslo {{number}}"
+    "publish_dialog_call_item": "Vytočit číslo {{number}}",
+    "account_basics_phone_numbers_dialog_channel_sms": "SMS",
+    "account_basics_phone_numbers_dialog_title": "Přidat telefonní číslo",
+    "account_basics_phone_numbers_dialog_number_label": "Telefonní číslo",
+    "account_basics_phone_numbers_dialog_code_placeholder": "např. 123456",
+    "account_basics_phone_numbers_dialog_code_label": "Ověřovací kód",
+    "account_usage_calls_none": "S tímto účtem nelze uskutečňovat žádné telefonní hovory",
+    "account_basics_phone_numbers_dialog_check_verification_button": "Potvrdit kód",
+    "account_basics_phone_numbers_dialog_number_placeholder": "např. +1222333444",
+    "account_basics_phone_numbers_dialog_verify_button_sms": "Odeslat SMS",
+    "account_basics_phone_numbers_dialog_verify_button_call": "Zavolat mi",
+    "account_basics_phone_numbers_dialog_channel_call": "Zavolat",
+    "account_usage_calls_title": "Uskutečněné telefonáty",
+    "account_upgrade_dialog_tier_features_no_calls": "Žádné telefonní hovory",
+    "account_upgrade_dialog_tier_features_calls_one": "{{calls}} denní telefonní hovor",
+    "account_upgrade_dialog_tier_features_calls_other": "{{calls}} denních telefonních hovorů"
 }

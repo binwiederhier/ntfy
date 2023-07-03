@@ -3,6 +3,7 @@ import { createContext, Suspense, useContext, useEffect, useState, useMemo } fro
 import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress, useMediaQuery, ThemeProvider, createTheme } from "@mui/material";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
 import { darkTheme, lightTheme } from "./theme";
 import Navigation from "./Navigation";
@@ -21,6 +22,7 @@ import Signup from "./Signup";
 import Account from "./Account";
 import "../app/i18n"; // Translations!
 import prefs, { THEME } from "../app/Prefs";
+import RTLCacheProvider from "./RTLCacheProvider";
 
 export const AccountContext = createContext(null);
 
@@ -39,37 +41,47 @@ const darkModeEnabled = (prefersDarkMode, themePreference) => {
 };
 
 const App = () => {
+  const { i18n } = useTranslation();
+  const languageDir = i18n.dir();
+
   const [account, setAccount] = useState(null);
   const accountMemo = useMemo(() => ({ account, setAccount }), [account, setAccount]);
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const themePreference = useLiveQuery(() => prefs.theme());
   const theme = React.useMemo(
-    () => createTheme(darkModeEnabled(prefersDarkMode, themePreference) ? darkTheme : lightTheme),
-    [prefersDarkMode, themePreference]
+    () => createTheme({ ...(darkModeEnabled(prefersDarkMode, themePreference) ? darkTheme : lightTheme), direction: languageDir }),
+    [prefersDarkMode, themePreference, languageDir]
   );
+
+  useEffect(() => {
+    document.documentElement.setAttribute("lang", i18n.language);
+    document.dir = languageDir;
+  }, [i18n.language, languageDir]);
 
   return (
     <Suspense fallback={<Loader />}>
-      <BrowserRouter>
-        <ThemeProvider theme={theme}>
-          <AccountContext.Provider value={accountMemo}>
-            <CssBaseline />
-            <ErrorBoundary>
-              <Routes>
-                <Route path={routes.login} element={<Login />} />
-                <Route path={routes.signup} element={<Signup />} />
-                <Route element={<Layout />}>
-                  <Route path={routes.app} element={<AllSubscriptions />} />
-                  <Route path={routes.account} element={<Account />} />
-                  <Route path={routes.settings} element={<Preferences />} />
-                  <Route path={routes.subscription} element={<SingleSubscription />} />
-                  <Route path={routes.subscriptionExternal} element={<SingleSubscription />} />
-                </Route>
-              </Routes>
-            </ErrorBoundary>
-          </AccountContext.Provider>
-        </ThemeProvider>
-      </BrowserRouter>
+      <RTLCacheProvider>
+        <BrowserRouter>
+          <ThemeProvider theme={theme}>
+            <AccountContext.Provider value={accountMemo}>
+              <CssBaseline />
+              <ErrorBoundary>
+                <Routes>
+                  <Route path={routes.login} element={<Login />} />
+                  <Route path={routes.signup} element={<Signup />} />
+                  <Route element={<Layout />}>
+                    <Route path={routes.app} element={<AllSubscriptions />} />
+                    <Route path={routes.account} element={<Account />} />
+                    <Route path={routes.settings} element={<Preferences />} />
+                    <Route path={routes.subscription} element={<SingleSubscription />} />
+                    <Route path={routes.subscriptionExternal} element={<SingleSubscription />} />
+                  </Route>
+                </Routes>
+              </ErrorBoundary>
+            </AccountContext.Provider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </RTLCacheProvider>
     </Suspense>
   );
 };

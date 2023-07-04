@@ -2,7 +2,7 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-### ntfy server v2.6.2
+## ntfy server v2.6.2
 Released June 30, 2023
 
 With this release, the ntfy web app now contains a **[progressive web app](subscribe/pwa.md) (PWA)
@@ -1250,6 +1250,16 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
+
+### ntfy server v2.6.2 (UNRELEASED)
+
+**Features:**
+
+* Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Bug fixes + maintenance:**
+
+* Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to  [@nimbleghost](https://github.com/nimbleghost))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

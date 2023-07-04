@@ -62,7 +62,7 @@ const Banner = {
 
 const UpgradeDialog = (props) => {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext); // May be undefined!
   const [error, setError] = useState("");
   const [tiers, setTiers] = useState(null);
@@ -233,7 +233,7 @@ const UpgradeDialog = (props) => {
             <Trans
               i18nKey="account_upgrade_dialog_cancel_warning"
               values={{
-                date: formatShortDate(account?.billing?.paid_until || 0),
+                date: formatShortDate(account?.billing?.paid_until || 0, i18n.language),
               }}
             />
           </Alert>

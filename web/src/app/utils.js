@@ -130,13 +130,14 @@ export const hashCode = (s) => {
   return hash;
 };
 
-export const formatShortDateTime = (timestamp) =>
-  new Intl.DateTimeFormat("default", {
+export const formatShortDateTime = (timestamp, language) =>
+  new Intl.DateTimeFormat(language, {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(timestamp * 1000));
 
-export const formatShortDate = (timestamp) => new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(new Date(timestamp * 1000));
+export const formatShortDate = (timestamp, language) =>
+  new Intl.DateTimeFormat(language, { dateStyle: "short" }).format(new Date(timestamp * 1000));
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 bytes";

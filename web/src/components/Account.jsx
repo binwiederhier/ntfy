@@ -39,7 +39,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import { Trans, useTranslation } from "react-i18next";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import CloseIcon from "@mui/icons-material/Close";
@@ -224,7 +223,7 @@ const ChangePasswordDialog = (props) => {
 };
 
 const AccountType = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
   const [upgradeDialogKey, setUpgradeDialogKey] = useState(0);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
@@ -283,7 +282,7 @@ const AccountType = () => {
         {account.billing?.paid_until && !account.billing?.cancel_at && (
           <Tooltip
             title={t("account_basics_tier_paid_until", {
-              date: formatShortDate(account.billing?.paid_until),
+              date: formatShortDate(account.billing?.paid_until, i18n.language),
             })}
           >
             <span>
@@ -328,7 +327,7 @@ const AccountType = () => {
       {account.billing?.cancel_at > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>
           {t("account_basics_tier_canceled_subscription", {
-            date: formatShortDate(account.billing.cancel_at),
+            date: formatShortDate(account.billing.cancel_at, i18n.language),
           })}
         </Alert>
       )}
@@ -556,7 +555,7 @@ const AddPhoneNumberDialog = (props) => {
 };
 
 const Stats = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
 
   if (!account) {
@@ -798,7 +797,7 @@ const Tokens = () => {
 };
 
 const TokensTable = (props) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [snackOpen, setSnackOpen] = useState(false);
   const [upsertDialogKey, setUpsertDialogKey] = useState(0);
   const [upsertDialogOpen, setUpsertDialogOpen] = useState(false);
@@ -872,11 +871,11 @@ const TokensTable = (props) => {
               {token.token !== session.token() && (token.label || "-")}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_expires_header")}>
-              {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
+              {token.expires ? formatShortDateTime(token.expires, i18n.language) : <em>{t("account_tokens_table_never_expires")}</em>}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_last_access_header")}>
               <div style={{ display: "flex", alignItems: "center" }}>
-                <span>{formatShortDateTime(token.last_access)}</span>
+                <span>{formatShortDateTime(token.last_access, i18n.language)}</span>
                 <Tooltip
                   title={t("account_tokens_table_last_origin_tooltip", {
                     ip: token.last_origin,

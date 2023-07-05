@@ -47,9 +47,8 @@ works best for you:
 
 * [Discord server](https://discord.gg/cT7ECsZj9w) - direct chat with the community
 * [Matrix room #ntfy](https://matrix.to/#/#ntfy:matrix.org) (+ [Matrix space](https://matrix.to/#/#ntfy-space:matrix.org)) - same chat, bridged from Discord
-* [Lemmy discussion board](https://discuss.ntfy.sh/) - asynchronous forum (_new as of June 2023_)
+* [Lemmy discussion board](https://discuss.ntfy.sh/c/ntfy) - asynchronous forum (_new as of June 2023_)
 * [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
-* [Email](https://heckel.io/about) - reach me directly (_I usually prefer the other methods_)
 
 ## Announcements / beta testers
 For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 

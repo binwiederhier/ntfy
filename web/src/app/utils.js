@@ -89,15 +89,15 @@ export const maybeWithAuth = (headers, user) => {
   return headers;
 };
 
-export const maybeAppendActionErrors = (message, notification) => {
+export const maybeActionErrors = (notification) => {
   const actionErrors = (notification.actions ?? [])
     .map((action) => action.error)
     .filter((action) => !!action)
     .join("\n");
   if (actionErrors.length === 0) {
-    return message;
+    return undefined;
   }
-  return `${message}\n\n${actionErrors}`;
+  return actionErrors;
 };
 
 export const shuffle = (arr) => {

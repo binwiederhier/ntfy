@@ -24,7 +24,9 @@ import { useLiveQuery } from "dexie-react-hooks";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Trans, useTranslation } from "react-i18next";
 import { useOutletContext } from "react-router-dom";
-import { formatBytes, formatShortDateTime, maybeAppendActionErrors, openUrl, shortUrl, topicShortUrl, unmatchedTags } from "../app/utils";
+import { useRemark } from "react-remark";
+import styled from "@emotion/styled";
+import { formatBytes, formatShortDateTime, maybeActionErrors, openUrl, shortUrl, topicShortUrl, unmatchedTags } from "../app/utils";
 import { formatMessage, formatTitle } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
@@ -35,6 +37,7 @@ import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
 import { useAutoSubscribe } from "./hooks";
+import prefs from "../app/Prefs";
 
 const priorityFiles = {
   1: priority1,
@@ -159,6 +162,63 @@ const autolink = (s) => {
   return <>{parts}</>;
 };
 
+const MarkdownContainer = styled("div")`
+  line-height: 1;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  pre,
+  ul,
+  ol {
+    margin: 0;
+  }
+
+  p {
+    line-height: 1.2;
+  }
+
+  blockquote {
+    margin: 0;
+    padding-inline: 1rem;
+    background: ${(theme) => (theme.mode === "light" ? "#f1f1f1" : "#aeaeae")};
+  }
+
+  ul,
+  ol {
+    padding-inline: 1rem;
+  }
+`;
+
+const MarkdownContent = ({ content }) => {
+  const [reactContent, setMarkdownSource] = useRemark();
+
+  useEffect(() => {
+    setMarkdownSource(content);
+  }, [content]);
+
+  return <MarkdownContainer>{reactContent}</MarkdownContainer>;
+};
+
+const NotificationBody = ({ notification }) => {
+  const markdownAlwaysEnabled = useLiveQuery(async () => prefs.markdownAlwaysEnabled());
+
+  // TODO: check notification content-type when implemented on the server
+  const displayAsMarkdown = markdownAlwaysEnabled;
+
+  const formatted = formatMessage(notification);
+
+  if (displayAsMarkdown) {
+    return <MarkdownContent content={formatted} />;
+  }
+
+  return autolink(formatted);
+};
+
 const NotificationItem = (props) => {
   const { t, i18n } = useTranslation();
   const { notification } = props;
@@ -183,6 +243,7 @@ const NotificationItem = (props) => {
   const hasClickAction = notification.click;
   const hasUserActions = notification.actions && notification.actions.length > 0;
   const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
+
   return (
     <Card sx={{ padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
       <CardContent>
@@ -230,7 +291,8 @@ const NotificationItem = (props) => {
           </Typography>
         )}
         <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
-          {autolink(maybeAppendActionErrors(formatMessage(notification), notification))}
+          <NotificationBody notification={notification} />
+          {maybeActionErrors(notification)}
         </Typography>
         {attachment && <Attachment attachment={attachment} />}
         {tags && (

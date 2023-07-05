@@ -3,12 +3,12 @@
     "action_bar_send_test_notification": "Enviar notificación de prueba",
     "action_bar_clear_notifications": "Borrar todas las notificaciones",
     "nav_topics_title": "Tópicos suscritos",
-    "alert_grant_button": "Conceder ahora",
+    "alert_notification_permission_required_button": "Conceder ahora",
     "action_bar_unsubscribe": "Cancelar la suscripción",
     "message_bar_type_message": "Escriba un mensaje aquí",
     "message_bar_error_publishing": "Error al publicar la notificación",
-    "alert_grant_title": "Las notificaciones están deshabilitadas",
-    "alert_grant_description": "Concede a tu navegador permiso para mostrar notificaciones en el escritorio.",
+    "alert_notification_permission_required_title": "Las notificaciones están deshabilitadas",
+    "alert_notification_permission_required_description": "Concede a tu navegador permiso para mostrar notificaciones en el escritorio.",
     "nav_button_all_notifications": "Todas las notificaciones",
     "nav_button_settings": "Ajustes",
     "nav_button_subscribe": "Suscribirse al tópico",
@@ -379,5 +379,7 @@
     "account_basics_phone_numbers_copied_to_clipboard": "Número de teléfono copiado al portapapeles",
     "account_basics_phone_numbers_dialog_check_verification_button": "Confirmar código",
     "account_basics_phone_numbers_dialog_title": "Agregar número de teléfono",
-    "account_basics_phone_numbers_dialog_code_placeholder": "p.ej. 123456"
+    "account_basics_phone_numbers_dialog_code_placeholder": "p.ej. 123456",
+    "publish_dialog_call_item": "Llamar al número de teléfono {{number}}",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "No hay números de teléfono verificados"
 }

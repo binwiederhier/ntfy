@@ -1,5 +1,4 @@
 import { Base64 } from "js-base64";
-import { rawEmojis } from "./emojis";
 import beep from "../sounds/beep.mp3";
 import juntos from "../sounds/juntos.mp3";
 import pristine from "../sounds/pristine.mp3";
@@ -8,6 +7,7 @@ import dadum from "../sounds/dadum.mp3";
 import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
+import emojisMapped from "./emojisMapped";
 
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
@@ -21,6 +21,7 @@ export const topicUrlJsonPoll = (baseUrl, topic) => `${topicUrlJson(baseUrl, top
 export const topicUrlJsonPollWithSince = (baseUrl, topic, since) => `${topicUrlJson(baseUrl, topic)}?poll=1&since=${since}`;
 export const topicUrlAuth = (baseUrl, topic) => `${topicUrl(baseUrl, topic)}/auth`;
 export const topicShortUrl = (baseUrl, topic) => shortUrl(topicUrl(baseUrl, topic));
+export const webPushUrl = (baseUrl) => `${baseUrl}/v1/webpush`;
 export const accountUrl = (baseUrl) => `${baseUrl}/v1/account`;
 export const accountPasswordUrl = (baseUrl) => `${baseUrl}/v1/account/password`;
 export const accountTokenUrl = (baseUrl) => `${baseUrl}/v1/account/token`;
@@ -54,48 +55,9 @@ export const topicDisplayName = (subscription) => {
   return topicShortUrl(subscription.baseUrl, subscription.topic);
 };
 
-// Format emojis (see emoji.js)
-const emojis = {};
-rawEmojis.forEach((emoji) => {
-  emoji.aliases.forEach((alias) => {
-    emojis[alias] = emoji.emoji;
-  });
-});
-
-const toEmojis = (tags) => {
-  if (!tags) return [];
-  return tags.filter((tag) => tag in emojis).map((tag) => emojis[tag]);
-};
-
-export const formatTitle = (m) => {
-  const emojiList = toEmojis(m.tags);
-  if (emojiList.length > 0) {
-    return `${emojiList.join(" ")} ${m.title}`;
-  }
-  return m.title;
-};
-
-export const formatTitleWithDefault = (m, fallback) => {
-  if (m.title) {
-    return formatTitle(m);
-  }
-  return fallback;
-};
-
-export const formatMessage = (m) => {
-  if (m.title) {
-    return m.message;
-  }
-  const emojiList = toEmojis(m.tags);
-  if (emojiList.length > 0) {
-    return `${emojiList.join(" ")} ${m.message}`;
-  }
-  return m.message;
-};
-
 export const unmatchedTags = (tags) => {
   if (!tags) return [];
-  return tags.filter((tag) => !(tag in emojis));
+  return tags.filter((tag) => !(tag in emojisMapped));
 };
 
 export const encodeBase64 = (s) => Base64.encode(s);
@@ -156,7 +118,7 @@ export const splitNoEmpty = (s, delimiter) =>
     .filter((x) => x !== "");
 
 /** Non-cryptographic hash function, see https://stackoverflow.com/a/8831937/1440785 */
-export const hashCode = async (s) => {
+export const hashCode = (s) => {
   let hash = 0;
   for (let i = 0; i < s.length; i += 1) {
     const char = s.charCodeAt(i);
@@ -168,13 +130,14 @@ export const hashCode = async (s) => {
   return hash;
 };
 
-export const formatShortDateTime = (timestamp) =>
-  new Intl.DateTimeFormat("default", {
+export const formatShortDateTime = (timestamp, language) =>
+  new Intl.DateTimeFormat(language, {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(timestamp * 1000));
 
-export const formatShortDate = (timestamp) => new Intl.DateTimeFormat("default", { dateStyle: "short" }).format(new Date(timestamp * 1000));
+export const formatShortDate = (timestamp, language) =>
+  new Intl.DateTimeFormat(language, { dateStyle: "short" }).format(new Date(timestamp * 1000));
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 bytes";
@@ -287,4 +250,17 @@ export const randomAlphanumericString = (len) => {
     id += alphabet[(Math.random() * alphabet.length) | 0];
   }
   return id;
+};
+
+export const urlB64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 };

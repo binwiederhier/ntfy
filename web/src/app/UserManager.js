@@ -2,8 +2,12 @@ import db from "./db";
 import session from "./Session";
 
 class UserManager {
+  constructor(dbImpl) {
+    this.db = dbImpl;
+  }
+
   async all() {
-    const users = await db.users.toArray();
+    const users = await this.db.users.toArray();
     if (session.exists()) {
       users.unshift(this.localUser());
     }
@@ -14,21 +18,21 @@ class UserManager {
     if (session.exists() && baseUrl === config.base_url) {
       return this.localUser();
     }
-    return db.users.get(baseUrl);
+    return this.db.users.get(baseUrl);
   }
 
   async save(user) {
     if (session.exists() && user.baseUrl === config.base_url) {
       return;
     }
-    await db.users.put(user);
+    await this.db.users.put(user);
   }
 
   async delete(baseUrl) {
     if (session.exists() && baseUrl === config.base_url) {
       return;
     }
-    await db.users.delete(baseUrl);
+    await this.db.users.delete(baseUrl);
   }
 
   localUser() {
@@ -43,5 +47,4 @@ class UserManager {
   }
 }
 
-const userManager = new UserManager();
-export default userManager;
+export default new UserManager(db());

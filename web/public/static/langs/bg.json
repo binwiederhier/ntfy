@@ -1,6 +1,6 @@
 {
     "action_bar_clear_notifications": "Премахване на известия",
-    "alert_grant_description": "Разрешете на мрежовия четец да показва известия.",
+    "alert_notification_permission_required_description": "Разрешете на мрежовия четец да показва известия.",
     "notifications_attachment_copy_url_title": "Копиране на адреса на прикачения файл",
     "notifications_example": "Пример",
     "notifications_no_subscriptions_title": "Липсват абонаменти",
@@ -47,8 +47,8 @@
     "nav_button_settings": "Настройки",
     "nav_button_documentation": "Ръководство",
     "nav_button_subscribe": "Абониране за тема",
-    "alert_grant_title": "Известията са изключени",
-    "alert_grant_button": "Разрешаване",
+    "alert_notification_permission_required_title": "Известията са изключени",
+    "alert_notification_permission_required_button": "Разрешаване",
     "notifications_tags": "Етикети",
     "nav_button_publish_message": "Изпращане",
     "alert_not_supported_title": "Не се поддържат известия",

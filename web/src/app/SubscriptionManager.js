@@ -1,37 +1,92 @@
+import api from "./Api";
+import notifier from "./Notifier";
+import prefs from "./Prefs";
 import db from "./db";
 import { topicUrl } from "./utils";
 
 class SubscriptionManager {
+  constructor(dbImpl) {
+    this.db = dbImpl;
+  }
+
   /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
   async all() {
-    const subscriptions = await db.subscriptions.toArray();
+    const subscriptions = await this.db.subscriptions.toArray();
     return Promise.all(
       subscriptions.map(async (s) => ({
         ...s,
-        new: await db.notifications.where({ subscriptionId: s.id, new: 1 }).count(),
+        new: await this.db.notifications.where({ subscriptionId: s.id, new: 1 }).count(),
       }))
     );
   }
 
-  async get(subscriptionId) {
-    return db.subscriptions.get(subscriptionId);
+  /**
+   * List of topics for which Web Push is enabled. This excludes (a) internal topics, (b) topics that are muted,
+   * and (c) topics from other hosts. Returns an empty list if Web Push is disabled.
+   *
+   * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
+   * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
+   */
+  async webPushTopics(pushPossible) {
+    if (!pushPossible) {
+      return [];
+    }
+
+    // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
+    // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
+    const enabled = await Promise.resolve(prefs.webPushEnabled());
+    if (!enabled) {
+      return [];
+    }
+
+    const subscriptions = await this.db.subscriptions.where({ baseUrl: config.base_url, mutedUntil: 0 }).toArray();
+    return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
   }
 
-  async add(baseUrl, topic, internal) {
+  async get(subscriptionId) {
+    return this.db.subscriptions.get(subscriptionId);
+  }
+
+  async notify(subscriptionId, notification) {
+    const subscription = await this.get(subscriptionId);
+    if (subscription.mutedUntil > 0) {
+      return;
+    }
+
+    const priority = notification.priority ?? 3;
+    if (priority < (await prefs.minPriority())) {
+      return;
+    }
+
+    await notifier.notify(subscription, notification);
+  }
+
+  /**
+   * @param {string} baseUrl
+   * @param {string} topic
+   * @param {object} opts
+   * @param {boolean} opts.internal
+   * @returns
+   */
+  async add(baseUrl, topic, opts = {}) {
     const id = topicUrl(baseUrl, topic);
+
     const existingSubscription = await this.get(id);
     if (existingSubscription) {
       return existingSubscription;
     }
+
     const subscription = {
+      ...opts,
       id: topicUrl(baseUrl, topic),
       baseUrl,
       topic,
       mutedUntil: 0,
       last: null,
-      internal: internal || false,
     };
-    await db.subscriptions.put(subscription);
+
+    await this.db.subscriptions.put(subscription);
+
     return subscription;
   }
 
@@ -41,10 +96,9 @@ class SubscriptionManager {
     // Add remote subscriptions
     const remoteIds = await Promise.all(
       remoteSubscriptions.map(async (remote) => {
-        const local = await this.add(remote.base_url, remote.topic, false);
         const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
 
-        await this.update(local.id, {
+        const local = await this.add(remote.base_url, remote.topic, {
           displayName: remote.display_name, // May be undefined
           reservation, // May be null!
         });
@@ -54,29 +108,47 @@ class SubscriptionManager {
     );
 
     // Remove local subscriptions that do not exist remotely
-    const localSubscriptions = await db.subscriptions.toArray();
+    const localSubscriptions = await this.db.subscriptions.toArray();
 
     await Promise.all(
       localSubscriptions.map(async (local) => {
         const remoteExists = remoteIds.includes(local.id);
         if (!local.internal && !remoteExists) {
-          await this.remove(local.id);
+          await this.remove(local);
         }
       })
     );
   }
 
-  async updateState(subscriptionId, state) {
-    db.subscriptions.update(subscriptionId, { state });
+  async updateWebPushSubscriptions(topics) {
+    const hasWebPushTopics = topics.length > 0;
+    const browserSubscription = await notifier.webPushSubscription(hasWebPushTopics);
+
+    if (!browserSubscription) {
+      console.log(
+        "[SubscriptionManager] No browser subscription currently exists, so web push was never enabled or the notification permission was removed. Skipping."
+      );
+      return;
+    }
+
+    if (hasWebPushTopics) {
+      await api.updateWebPush(browserSubscription, topics);
+    } else {
+      await api.deleteWebPush(browserSubscription);
+    }
   }
 
-  async remove(subscriptionId) {
-    await db.subscriptions.delete(subscriptionId);
-    await db.notifications.where({ subscriptionId }).delete();
+  async updateState(subscriptionId, state) {
+    this.db.subscriptions.update(subscriptionId, { state });
+  }
+
+  async remove(subscription) {
+    await this.db.subscriptions.delete(subscription.id);
+    await this.db.notifications.where({ subscriptionId: subscription.id }).delete();
   }
 
   async first() {
-    return db.subscriptions.toCollection().first(); // May be undefined
+    return this.db.subscriptions.toCollection().first(); // May be undefined
   }
 
   async getNotifications(subscriptionId) {
@@ -84,7 +156,7 @@ class SubscriptionManager {
     // It's actually fine, because the reading and filtering is quite fast. The rendering is what's
     // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
 
-    return db.notifications
+    return this.db.notifications
       .orderBy("time") // Sort by time first
       .filter((n) => n.subscriptionId === subscriptionId)
       .reverse()
@@ -92,7 +164,7 @@ class SubscriptionManager {
   }
 
   async getAllNotifications() {
-    return db.notifications
+    return this.db.notifications
       .orderBy("time") // Efficient, see docs
       .reverse()
       .toArray();
@@ -100,18 +172,19 @@ class SubscriptionManager {
 
   /** Adds notification, or returns false if it already exists */
   async addNotification(subscriptionId, notification) {
-    const exists = await db.notifications.get(notification.id);
+    const exists = await this.db.notifications.get(notification.id);
     if (exists) {
       return false;
     }
     try {
-      await db.notifications.add({
+      // sw.js duplicates this logic, so if you change it here, change it there too
+      await this.db.notifications.add({
         ...notification,
         subscriptionId,
         // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
         new: 1,
       }); // FIXME consider put() for double tab
-      await db.subscriptions.update(subscriptionId, {
+      await this.db.subscriptions.update(subscriptionId, {
         last: notification.id,
       });
     } catch (e) {
@@ -124,19 +197,19 @@ class SubscriptionManager {
   async addNotifications(subscriptionId, notifications) {
     const notificationsWithSubscriptionId = notifications.map((notification) => ({ ...notification, subscriptionId }));
     const lastNotificationId = notifications.at(-1).id;
-    await db.notifications.bulkPut(notificationsWithSubscriptionId);
-    await db.subscriptions.update(subscriptionId, {
+    await this.db.notifications.bulkPut(notificationsWithSubscriptionId);
+    await this.db.subscriptions.update(subscriptionId, {
       last: lastNotificationId,
     });
   }
 
   async updateNotification(notification) {
-    const exists = await db.notifications.get(notification.id);
+    const exists = await this.db.notifications.get(notification.id);
     if (!exists) {
       return false;
     }
     try {
-      await db.notifications.put({ ...notification });
+      await this.db.notifications.put({ ...notification });
     } catch (e) {
       console.error(`[SubscriptionManager] Error updating notification`, e);
     }
@@ -144,47 +217,46 @@ class SubscriptionManager {
   }
 
   async deleteNotification(notificationId) {
-    await db.notifications.delete(notificationId);
+    await this.db.notifications.delete(notificationId);
   }
 
   async deleteNotifications(subscriptionId) {
-    await db.notifications.where({ subscriptionId }).delete();
+    await this.db.notifications.where({ subscriptionId }).delete();
   }
 
   async markNotificationRead(notificationId) {
-    await db.notifications.where({ id: notificationId }).modify({ new: 0 });
+    await this.db.notifications.where({ id: notificationId }).modify({ new: 0 });
   }
 
   async markNotificationsRead(subscriptionId) {
-    await db.notifications.where({ subscriptionId, new: 1 }).modify({ new: 0 });
+    await this.db.notifications.where({ subscriptionId, new: 1 }).modify({ new: 0 });
   }
 
   async setMutedUntil(subscriptionId, mutedUntil) {
-    await db.subscriptions.update(subscriptionId, {
+    await this.db.subscriptions.update(subscriptionId, {
       mutedUntil,
     });
   }
 
   async setDisplayName(subscriptionId, displayName) {
-    await db.subscriptions.update(subscriptionId, {
+    await this.db.subscriptions.update(subscriptionId, {
       displayName,
     });
   }
 
   async setReservation(subscriptionId, reservation) {
-    await db.subscriptions.update(subscriptionId, {
+    await this.db.subscriptions.update(subscriptionId, {
       reservation,
     });
   }
 
   async update(subscriptionId, params) {
-    await db.subscriptions.update(subscriptionId, params);
+    await this.db.subscriptions.update(subscriptionId, params);
   }
 
   async pruneNotifications(thresholdTimestamp) {
-    await db.notifications.where("time").below(thresholdTimestamp).delete();
+    await this.db.notifications.where("time").below(thresholdTimestamp).delete();
   }
 }
 
-const subscriptionManager = new SubscriptionManager();
-export default subscriptionManager;
+export default new SubscriptionManager(db());

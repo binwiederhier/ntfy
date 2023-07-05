@@ -8,13 +8,14 @@ import {
   DialogContentText,
   DialogTitle,
   Autocomplete,
-  Checkbox,
   FormControlLabel,
   FormGroup,
   useMediaQuery,
+  Switch,
+  useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import theme from "./theme";
+import { useLiveQuery } from "dexie-react-hooks";
 import api from "../app/Api";
 import { randomAlphanumericString, topicUrl, validTopic, validUrl } from "../app/utils";
 import userManager from "../app/UserManager";
@@ -28,18 +29,19 @@ import ReserveTopicSelect from "./ReserveTopicSelect";
 import { AccountContext } from "./App";
 import { TopicReservedError, UnauthorizedError } from "../app/errors";
 import { ReserveLimitChip } from "./SubscriptionPopup";
+import prefs from "../app/Prefs";
 
 const publicBaseUrl = "https://ntfy.sh";
 
-export const subscribeTopic = async (baseUrl, topic) => {
-  const subscription = await subscriptionManager.add(baseUrl, topic);
+export const subscribeTopic = async (baseUrl, topic, opts) => {
+  const subscription = await subscriptionManager.add(baseUrl, topic, opts);
   if (session.exists()) {
     try {
       await accountApi.addSubscription(baseUrl, topic);
     } catch (e) {
       console.log(`[SubscribeDialog] Subscribing to topic ${topic} failed`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
     }
   }
@@ -47,6 +49,7 @@ export const subscribeTopic = async (baseUrl, topic) => {
 };
 
 const SubscribeDialog = (props) => {
+  const theme = useTheme();
   const [baseUrl, setBaseUrl] = useState("");
   const [topic, setTopic] = useState("");
   const [showLoginPage, setShowLoginPage] = useState(false);
@@ -55,7 +58,7 @@ const SubscribeDialog = (props) => {
   const handleSuccess = async () => {
     console.log(`[SubscribeDialog] Subscribing to topic ${topic}`);
     const actualBaseUrl = baseUrl || config.base_url;
-    const subscription = await subscribeTopic(actualBaseUrl, topic);
+    const subscription = await subscribeTopic(actualBaseUrl, topic, {});
     poller.pollInBackground(subscription); // Dangle!
     props.onSuccess(subscription);
   };
@@ -96,6 +99,8 @@ const SubscribePage = (props) => {
   const reserveTopicEnabled =
     session.exists() && (account?.role === Role.ADMIN || (account?.role === Role.USER && (account?.stats.reservations_remaining || 0) > 0));
 
+  const webPushEnabled = useLiveQuery(() => prefs.webPushEnabled());
+
   const handleSubscribe = async () => {
     const user = await userManager.get(baseUrl); // May be undefined
     const username = user ? user.username : t("subscribe_dialog_error_user_anonymous");
@@ -124,7 +129,7 @@ const SubscribePage = (props) => {
       } catch (e) {
         console.log(`[SubscribeDialog] Error reserving topic`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         } else if (e instanceof TopicReservedError) {
           setError(t("subscribe_dialog_error_topic_already_reserved"));
           return;
@@ -193,8 +198,7 @@ const SubscribePage = (props) => {
             <FormControlLabel
               variant="standard"
               control={
-                <Checkbox
-                  fullWidth
+                <Switch
                   disabled={!reserveTopicEnabled}
                   checked={reserveTopicVisible}
                   onChange={(ev) => setReserveTopicVisible(ev.target.checked)}
@@ -217,8 +221,9 @@ const SubscribePage = (props) => {
           <FormGroup>
             <FormControlLabel
               control={
-                <Checkbox
+                <Switch
                   onChange={handleUseAnotherChanged}
+                  checked={anotherServerVisible}
                   inputProps={{
                     "aria-label": t("subscribe_dialog_subscribe_use_another_label"),
                   }}
@@ -233,12 +238,19 @@ const SubscribePage = (props) => {
                 inputValue={props.baseUrl}
                 onInputChange={updateBaseUrl}
                 renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder={config.base_url}
-                    variant="standard"
-                    aria-label={t("subscribe_dialog_subscribe_base_url_label")}
-                  />
+                  <>
+                    <TextField
+                      {...params}
+                      placeholder={config.base_url}
+                      variant="standard"
+                      aria-label={t("subscribe_dialog_subscribe_base_url_label")}
+                    />
+                    {webPushEnabled && (
+                      <div style={{ width: "100%", color: "#aaa", fontSize: "0.75rem", marginTop: "0.5rem" }}>
+                        {t("subscribe_dialog_subscribe_use_another_background_info")}
+                      </div>
+                    )}
+                  </>
                 )}
               />
             )}

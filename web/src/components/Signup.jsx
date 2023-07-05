@@ -27,7 +27,7 @@ const Signup = () => {
       await accountApi.create(user.username, user.password);
       const token = await accountApi.login(user);
       console.log(`[Signup] User signup for user ${user.username} successful, token is ${token}`);
-      session.store(user.username, token);
+      await session.store(user.username, token);
       window.location.href = routes.app;
     } catch (e) {
       console.log(`[Signup] Signup for user ${user.username} failed`, e);
@@ -52,7 +52,7 @@ const Signup = () => {
   return (
     <AvatarBox>
       <Typography sx={{ typography: "h6" }}>{t("signup_title")}</Typography>
-      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, maxWidth: 400 }}>
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
         <TextField
           margin="dense"
           required

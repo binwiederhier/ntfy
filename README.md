@@ -9,7 +9,7 @@
 [![Discord](https://img.shields.io/discord/874398661709295626?label=Discord)](https://discord.gg/cT7ECsZj9w)
 [![Matrix](https://img.shields.io/matrix/ntfy:matrix.org?label=Matrix)](https://matrix.to/#/#ntfy:matrix.org)
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
-[![Reddit](https://img.shields.io/reddit/subreddit-subscribers/ntfy?color=%23317f6f&label=-%20r%2Fntfy&style=social)](https://www.reddit.com/r/ntfy/)
+[![Lemmy](https://img.shields.io/badge/Lemmy-discuss-green)](https://discuss.ntfy.sh/c/ntfy)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 [![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
 
@@ -47,9 +47,8 @@ works best for you:
 
 * [Discord server](https://discord.gg/cT7ECsZj9w) - direct chat with the community
 * [Matrix room #ntfy](https://matrix.to/#/#ntfy:matrix.org) (+ [Matrix space](https://matrix.to/#/#ntfy-space:matrix.org)) - same chat, bridged from Discord
-* [Reddit r/ntfy](https://www.reddit.com/r/ntfy/) - asynchronous forum (_new as of October 2022_)
+* [Lemmy discussion board](https://discuss.ntfy.sh/c/ntfy) - asynchronous forum (_new as of June 2023_)
 * [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
-* [Email](https://heckel.io/about) - reach me directly (_I usually prefer the other methods_)
 
 ## Announcements / beta testers
 For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
@@ -141,6 +140,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/CreativeWarlock"><img src="https://github.com/CreativeWarlock.png" width="40px" /></a>
 <a href="https://github.com/darkdragon-001"><img src="https://github.com/darkdragon-001.png" width="40px" /></a>
 <a href="https://github.com/jonathan-kosgei"><img src="https://github.com/jonathan-kosgei.png" width="40px" /></a>
+<a href="https://github.com/KevinWang15"><img src="https://github.com/KevinWang15.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for providing their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/) to me for free,
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:
@@ -178,3 +178,4 @@ Third party libraries and resources:
 * [Regex for auto-linking](https://github.com/bryanwoods/autolink-js) (MIT) is used to highlight links (the library is not used)
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)
 * [Linked tabs in mkdocs](https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#linked-tabs)
+* [webpush-go](https://github.com/SherClockHolmes/webpush-go) (MIT) is used to send web push notifications

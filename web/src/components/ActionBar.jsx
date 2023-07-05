@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, IconButton, Typography, Box, MenuItem, Button, Divider, ListItemIcon } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Typography, Box, MenuItem, Button, Divider, ListItemIcon, useTheme } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import * as React from "react";
 import { useState } from "react";
@@ -19,10 +19,14 @@ import Navigation from "./Navigation";
 import accountApi from "../app/AccountApi";
 import PopupMenu from "./PopupMenu";
 import { SubscriptionPopup } from "./SubscriptionPopup";
+import { useIsLaunchedPWA } from "./hooks";
 
 const ActionBar = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const location = useLocation();
+  const isLaunchedPWA = useIsLaunchedPWA();
+
   let title = "ntfy";
   if (props.selected) {
     title = topicDisplayName(props.selected);
@@ -31,6 +35,22 @@ const ActionBar = (props) => {
   } else if (location.pathname === routes.account) {
     title = t("action_bar_account");
   }
+
+  const getActionBarBackground = () => {
+    if (isLaunchedPWA) {
+      return "#317f6f";
+    }
+
+    switch (theme.palette.mode) {
+      case "dark":
+        return "linear-gradient(150deg, #203631 0%, #2a6e60 100%)";
+
+      case "light":
+      default:
+        return "linear-gradient(150deg, #338574 0%, #56bda8 100%)";
+    }
+  };
+
   return (
     <AppBar
       position="fixed"
@@ -43,7 +63,7 @@ const ActionBar = (props) => {
       <Toolbar
         sx={{
           pr: "24px",
-          background: "linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%)",
+          background: getActionBarBackground(),
         }}
       >
         <IconButton
@@ -121,9 +141,9 @@ const ProfileIcon = () => {
   const handleLogout = async () => {
     try {
       await accountApi.logout();
-      await db.delete();
+      await db().delete();
     } finally {
-      session.resetAndRedirect(routes.app);
+      await session.resetAndRedirect(routes.app);
     }
   };
 

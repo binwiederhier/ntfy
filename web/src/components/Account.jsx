@@ -33,12 +33,12 @@ import {
   IconButton,
   MenuItem,
   DialogContentText,
+  useTheme,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { Trans, useTranslation } from "react-i18next";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import i18n from "i18next";
 import humanizeDuration from "humanize-duration";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import CloseIcon from "@mui/icons-material/Close";
@@ -55,7 +55,6 @@ import DialogFooter from "./DialogFooter";
 import { Paragraph } from "./styles";
 import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
-import theme from "./theme";
 import session from "../app/Session";
 
 const Account = () => {
@@ -147,6 +146,7 @@ const ChangePassword = () => {
 };
 
 const ChangePasswordDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -164,7 +164,7 @@ const ChangePasswordDialog = (props) => {
       if (e instanceof IncorrectPasswordError) {
         setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -223,7 +223,7 @@ const ChangePasswordDialog = (props) => {
 };
 
 const AccountType = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
   const [upgradeDialogKey, setUpgradeDialogKey] = useState(0);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
@@ -245,7 +245,7 @@ const AccountType = () => {
     } catch (e) {
       console.log(`[Account] Error opening billing portal`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setShowPortalError(true);
       }
@@ -282,7 +282,7 @@ const AccountType = () => {
         {account.billing?.paid_until && !account.billing?.cancel_at && (
           <Tooltip
             title={t("account_basics_tier_paid_until", {
-              date: formatShortDate(account.billing?.paid_until),
+              date: formatShortDate(account.billing?.paid_until, i18n.language),
             })}
           >
             <span>
@@ -327,7 +327,7 @@ const AccountType = () => {
       {account.billing?.cancel_at > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>
           {t("account_basics_tier_canceled_subscription", {
-            date: formatShortDate(account.billing.cancel_at),
+            date: formatShortDate(account.billing.cancel_at, i18n.language),
           })}
         </Alert>
       )}
@@ -371,7 +371,7 @@ const PhoneNumbers = () => {
     } catch (e) {
       console.log(`[Account] Error deleting phone number`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
     }
   };
@@ -430,6 +430,7 @@ const PhoneNumbers = () => {
 };
 
 const AddPhoneNumberDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -447,7 +448,7 @@ const AddPhoneNumberDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error sending verification`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -464,7 +465,7 @@ const AddPhoneNumberDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error confirming verification`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -554,7 +555,7 @@ const AddPhoneNumberDialog = (props) => {
 };
 
 const Stats = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
 
   if (!account) {
@@ -785,7 +786,7 @@ const Tokens = () => {
             }}
           />
         </Paragraph>
-        {tokens?.length > 0 && <TokensTable tokens={tokens} />}
+        <div style={{ width: "100%", overflowX: "auto" }}>{tokens?.length > 0 && <TokensTable tokens={tokens} />}</div>
       </CardContent>
       <CardActions>
         <Button onClick={handleCreateClick}>{t("account_tokens_table_create_token_button")}</Button>
@@ -796,7 +797,7 @@ const Tokens = () => {
 };
 
 const TokensTable = (props) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [snackOpen, setSnackOpen] = useState(false);
   const [upsertDialogKey, setUpsertDialogKey] = useState(0);
   const [upsertDialogOpen, setUpsertDialogOpen] = useState(false);
@@ -870,11 +871,11 @@ const TokensTable = (props) => {
               {token.token !== session.token() && (token.label || "-")}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_expires_header")}>
-              {token.expires ? formatShortDateTime(token.expires) : <em>{t("account_tokens_table_never_expires")}</em>}
+              {token.expires ? formatShortDateTime(token.expires, i18n.language) : <em>{t("account_tokens_table_never_expires")}</em>}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_last_access_header")}>
               <div style={{ display: "flex", alignItems: "center" }}>
-                <span>{formatShortDateTime(token.last_access)}</span>
+                <span>{formatShortDateTime(token.last_access, i18n.language)}</span>
                 <Tooltip
                   title={t("account_tokens_table_last_origin_tooltip", {
                     ip: token.last_origin,
@@ -928,6 +929,7 @@ const TokensTable = (props) => {
 };
 
 const TokenDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [error, setError] = useState("");
   const [label, setLabel] = useState(props.token?.label || "");
@@ -946,7 +948,7 @@ const TokenDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error creating token`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -1003,7 +1005,7 @@ const TokenDeleteDialog = (props) => {
     } catch (e) {
       console.log(`[Account] Error deleting token`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -1069,6 +1071,7 @@ const DeleteAccount = () => {
 };
 
 const DeleteAccountDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { account } = useContext(AccountContext);
   const [error, setError] = useState("");
@@ -1078,15 +1081,15 @@ const DeleteAccountDialog = (props) => {
   const handleSubmit = async () => {
     try {
       await accountApi.delete(password);
-      await db.delete();
+      await db().delete();
       console.debug(`[Account] Account deleted`);
-      session.resetAndRedirect(routes.app);
+      await session.resetAndRedirect(routes.app);
     } catch (e) {
       console.log(`[Account] Error deleting account`, e);
       if (e instanceof IncorrectPasswordError) {
         setError(t("account_basics_password_dialog_current_password_incorrect"));
       } else if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }

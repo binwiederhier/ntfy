@@ -1,8 +1,8 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
 import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
-import notifier from "../app/Notifier";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
@@ -10,14 +10,26 @@ import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
 import { UnauthorizedError } from "../app/errors";
+import notifier from "../app/Notifier";
+import prefs from "../app/Prefs";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
  * state changes. Conversely, when the subscription changes, the connection is refreshed (which may lead
  * to the connection being re-established).
+ *
+ * When Web Push is enabled, we do not need to connect to our home server via WebSocket, since notifications
+ * will be delivered via Web Push. However, we still need to connect to other servers via WebSocket, or for internal
+ * topics, such as sync topics (st_...).
  */
-export const useConnectionListeners = (account, subscriptions, users) => {
-  const navigate = useNavigate();
+export const useConnectionListeners = (account, subscriptions, users, webPushTopics) => {
+  const wsSubscriptions = useMemo(
+    () => (subscriptions && webPushTopics ? subscriptions.filter((s) => !webPushTopics.includes(s.topic)) : []),
+    // wsSubscriptions should stay stable unless the list of subscription IDs changes. Without the memo, the connection
+    // listener calls a refresh for no reason. This isn't a problem due to the makeConnectionId, but it triggers an
+    // unnecessary recomputation for every received message.
+    [JSON.stringify({ subscriptions: subscriptions?.map(({ id }) => id), webPushTopics })]
+  );
 
   // Register listeners for incoming messages, and connection state changes
   useEffect(
@@ -40,13 +52,19 @@ export const useConnectionListeners = (account, subscriptions, users) => {
       const handleNotification = async (subscriptionId, notification) => {
         const added = await subscriptionManager.addNotification(subscriptionId, notification);
         if (added) {
-          const defaultClickAction = (subscription) => navigate(routes.forSubscription(subscription));
-          await notifier.notify(subscriptionId, notification, defaultClickAction);
+          await subscriptionManager.notify(subscriptionId, notification);
         }
       };
 
       const handleMessage = async (subscriptionId, message) => {
         const subscription = await subscriptionManager.get(subscriptionId);
+
+        // Race condition: sometimes the subscription is already unsubscribed from account
+        // sync before the message is handled
+        if (!subscription) {
+          return;
+        }
+
         if (subscription.internal) {
           await handleInternalMessage(message);
         } else {
@@ -54,7 +72,7 @@ export const useConnectionListeners = (account, subscriptions, users) => {
         }
       };
 
-      connectionManager.registerStateListener(subscriptionManager.updateState);
+      connectionManager.registerStateListener((id, state) => subscriptionManager.updateState(id, state));
       connectionManager.registerMessageListener(handleMessage);
 
       return () => {
@@ -72,13 +90,13 @@ export const useConnectionListeners = (account, subscriptions, users) => {
     if (!account || !account.sync_topic) {
       return;
     }
-    subscriptionManager.add(config.base_url, account.sync_topic, true); // Dangle!
+    subscriptionManager.add(config.base_url, account.sync_topic, { internal: true }); // Dangle!
   }, [account]);
 
   // When subscriptions or users change, refresh the connections
   useEffect(() => {
-    connectionManager.refresh(subscriptions, users); // Dangle
-  }, [subscriptions, users]);
+    connectionManager.refresh(wsSubscriptions, users); // Dangle
+  }, [wsSubscriptions, users]);
 };
 
 /**
@@ -107,7 +125,7 @@ export const useAutoSubscribe = (subscriptions, selected) => {
           } catch (e) {
             console.log(`[Hooks] Auto-subscribing failed`, e);
             if (e instanceof UnauthorizedError) {
-              session.resetAndRedirect(routes.login);
+              await session.resetAndRedirect(routes.login);
             }
           }
         }
@@ -117,16 +135,160 @@ export const useAutoSubscribe = (subscriptions, selected) => {
   }, [params, subscriptions, selected, hasRun]);
 };
 
+const webPushBroadcastChannel = new BroadcastChannel("web-push-broadcast");
+
+/**
+ * Hook to return a value that's refreshed when the notification permission changes
+ */
+export const useNotificationPermissionListener = (query) => {
+  const [result, setResult] = useState(query());
+
+  useEffect(() => {
+    const handler = () => {
+      setResult(query());
+    };
+
+    if ("permissions" in navigator) {
+      navigator.permissions.query({ name: "notifications" }).then((permission) => {
+        permission.addEventListener("change", handler);
+
+        return () => {
+          permission.removeEventListener("change", handler);
+        };
+      });
+    }
+  }, []);
+
+  return result;
+};
+
+/**
+ * Updates the Web Push subscriptions when the list of topics changes,
+ * as well as plays a sound when a new broadcast message is received from
+ * the service worker, since the service worker cannot play sounds.
+ */
+const useWebPushListener = (topics) => {
+  const [prevUpdate, setPrevUpdate] = useState();
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
+
+  useEffect(() => {
+    const nextUpdate = JSON.stringify({ topics, pushPossible });
+    if (topics === undefined || nextUpdate === prevUpdate) {
+      return;
+    }
+
+    (async () => {
+      try {
+        console.log("[useWebPushListener] Refreshing web push subscriptions", topics);
+        await subscriptionManager.updateWebPushSubscriptions(topics);
+        setPrevUpdate(nextUpdate);
+      } catch (e) {
+        console.error("[useWebPushListener] Error refreshing web push subscriptions", e);
+      }
+    })();
+  }, [topics, pushPossible, prevUpdate]);
+
+  useEffect(() => {
+    const onMessage = () => {
+      notifier.playSound(); // Service Worker cannot play sound, so we do it here!
+    };
+
+    webPushBroadcastChannel.addEventListener("message", onMessage);
+
+    return () => {
+      webPushBroadcastChannel.removeEventListener("message", onMessage);
+    };
+  });
+};
+
+/**
+ * Hook to return a list of Web Push enabled topics using a live query. This hook will return an empty list if
+ * permissions are not granted, or if the browser does not support Web Push. Notification permissions are acted upon
+ * automatically.
+ */
+export const useWebPushTopics = () => {
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
+
+  const topics = useLiveQuery(
+    async () => subscriptionManager.webPushTopics(pushPossible),
+    // invalidate (reload) query when these values change
+    [pushPossible]
+  );
+
+  useWebPushListener(topics);
+
+  return topics;
+};
+
+const matchMedia = window.matchMedia("(display-mode: standalone)");
+const isIOSStandalone = window.navigator.standalone === true;
+
+/*
+ * Watches the "display-mode" to detect if the app is running as a standalone app (PWA).
+ */
+export const useIsLaunchedPWA = () => {
+  const [isStandalone, setIsStandalone] = useState(matchMedia.matches);
+
+  useEffect(() => {
+    if (isIOSStandalone) {
+      return () => {}; // No need to listen for events on iOS
+    }
+    const handler = (evt) => {
+      console.log(`[useIsLaunchedPWA] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
+      setIsStandalone(evt.matches);
+    };
+    matchMedia.addEventListener("change", handler);
+    return () => {
+      matchMedia.removeEventListener("change", handler);
+    };
+  }, []);
+
+  return isIOSStandalone || isStandalone;
+};
+
+/**
+ * Watches the result of `useIsLaunchedPWA` and enables "Web Push" if it is.
+ */
+export const useStandaloneWebPushAutoSubscribe = () => {
+  const isLaunchedPWA = useIsLaunchedPWA();
+
+  useEffect(() => {
+    if (isLaunchedPWA) {
+      console.log(`[useStandaloneWebPushAutoSubscribe] Turning on web push automatically`);
+      prefs.setWebPushEnabled(true); // Dangle!
+    }
+  }, [isLaunchedPWA]);
+};
+
 /**
  * Start the poller and the pruner. This is done in a side effect as opposed to just in Pruner.js
  * and Poller.js, because side effect imports are not a thing in JS, and "Optimize imports" cleans
  * up "unused" imports. See https://github.com/binwiederhier/ntfy/issues/186.
  */
+
+const startWorkers = () => {
+  poller.startWorker();
+  pruner.startWorker();
+  accountApi.startWorker();
+};
+
+const stopWorkers = () => {
+  poller.stopWorker();
+  pruner.stopWorker();
+  accountApi.stopWorker();
+};
+
 export const useBackgroundProcesses = () => {
+  useStandaloneWebPushAutoSubscribe();
+
   useEffect(() => {
-    poller.startWorker();
-    pruner.startWorker();
-    accountApi.startWorker();
+    console.log("[useBackgroundProcesses] mounting");
+    startWorkers();
+
+    return () => {
+      console.log("[useBackgroundProcesses] unloading");
+      stopWorkers();
+    };
   }, []);
 };
 

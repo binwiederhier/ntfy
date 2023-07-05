@@ -14,10 +14,11 @@ import {
   ListSubheader,
   Portal,
   Tooltip,
-  Button,
   Typography,
   Box,
   IconButton,
+  Button,
+  useTheme,
 } from "@mui/material";
 import * as React from "react";
 import { useContext, useState } from "react";
@@ -43,6 +44,7 @@ import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { SubscriptionPopup } from "./SubscriptionPopup";
+import { useNotificationPermissionListener } from "./hooks";
 
 const navWidth = 280;
 
@@ -59,7 +61,7 @@ const Navigation = (props) => {
         ModalProps={{ keepMounted: true }} // Better open performance on mobile.
         sx={{
           display: { xs: "block", sm: "none" },
-          "& .MuiDrawer-paper": { boxSizing: "border-box", width: navWidth },
+          "& .MuiDrawer-paper": { boxSizing: "border-box", width: navWidth, backgroundImage: "none" },
         }}
       >
         {navigationList}
@@ -82,6 +84,7 @@ const Navigation = (props) => {
 Navigation.width = navWidth;
 
 const NavList = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -94,15 +97,10 @@ const NavList = (props) => {
     setSubscribeDialogKey((prev) => prev + 1);
   };
 
-  const handleRequestNotificationPermission = () => {
-    notifier.maybeRequestPermission((granted) => props.onNotificationGranted(granted));
-  };
-
   const handleSubscribeSubmit = (subscription) => {
     console.log(`[Navigation] New subscription: ${subscription.id}`, subscription);
     handleSubscribeReset();
     navigate(routes.forSubscription(subscription));
-    handleRequestNotificationPermission();
   };
 
   const handleAccountClick = () => {
@@ -114,19 +112,29 @@ const NavList = (props) => {
   const isPaid = account?.billing?.subscription;
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
   const showSubscriptionsList = props.subscriptions?.length > 0;
-  const showNotificationBrowserNotSupportedBox = !notifier.browserSupported();
+  const showNotificationPermissionRequired = useNotificationPermissionListener(() => notifier.notRequested());
+  const showNotificationPermissionDenied = useNotificationPermissionListener(() => notifier.denied());
+  const showNotificationIOSInstallRequired = notifier.iosSupportedButInstallRequired();
+  const showNotificationBrowserNotSupportedBox = !showNotificationIOSInstallRequired && !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
-  const showNotificationGrantBox = notifier.supported() && props.subscriptions?.length > 0 && !props.notificationsGranted;
-  const navListPadding =
-    showNotificationGrantBox || showNotificationBrowserNotSupportedBox || showNotificationContextNotSupportedBox ? "0" : "";
+
+  const alertVisible =
+    showNotificationPermissionRequired ||
+    showNotificationPermissionDenied ||
+    showNotificationIOSInstallRequired ||
+    showNotificationBrowserNotSupportedBox ||
+    showNotificationContextNotSupportedBox;
 
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
-      <List component="nav" sx={{ paddingTop: navListPadding }}>
+      <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
+        {showNotificationPermissionRequired && <NotificationPermissionRequired />}
+        {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
         {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
-        {showNotificationGrantBox && <NotificationGrantAlert onRequestPermissionClick={handleRequestNotificationPermission} />}
+        {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
+        {alertVisible && <Divider />}
         {!showSubscriptionsList && (
           <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
@@ -180,7 +188,11 @@ const NavList = (props) => {
           </ListItemIcon>
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
-        {showUpgradeBanner && <UpgradeBanner />}
+        {showUpgradeBanner && (
+          // The text background gradient didn't seem to do well with switching between light/dark mode,
+          // So adding a `key` forces React to replace the entire component when the theme changes
+          <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
+        )}
       </List>
       <SubscribeDialog
         key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
@@ -193,7 +205,7 @@ const NavList = (props) => {
   );
 };
 
-const UpgradeBanner = () => {
+const UpgradeBanner = ({ mode }) => {
   const { t } = useTranslation();
   const [dialogKey, setDialogKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -210,13 +222,16 @@ const UpgradeBanner = () => {
         width: `${Navigation.width - 1}px`,
         bottom: 0,
         mt: "auto",
-        background: "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)",
+        background:
+          mode === "light"
+            ? "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)"
+            : "linear-gradient(150deg, #203631 0%, #2a6e60 100%)",
       }}
     >
       <Divider />
       <ListItemButton onClick={handleClick} sx={{ pt: 2, pb: 2 }}>
         <ListItemIcon>
-          <CelebrationIcon sx={{ color: "#55b86e" }} fontSize="large" />
+          <CelebrationIcon sx={{ color: mode === "light" ? "#55b86e" : "#00ff95" }} fontSize="large" />
         </ListItemIcon>
         <ListItemText
           sx={{ ml: 1 }}
@@ -226,7 +241,10 @@ const UpgradeBanner = () => {
             style: {
               fontWeight: 500,
               fontSize: "1.1rem",
-              background: "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)",
+              background:
+                mode === "light"
+                  ? "-webkit-linear-gradient(45deg, #09009f, #00ff95 80%)"
+                  : "-webkit-linear-gradient(45deg,rgb(255, 255, 255), #00ff95 80%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             },
@@ -344,52 +362,66 @@ const SubscriptionItem = (props) => {
   );
 };
 
-const NotificationGrantAlert = (props) => {
+const NotificationPermissionRequired = () => {
+  const { t } = useTranslation();
+  const requestPermission = async () => {
+    await notifier.maybeRequestPermission();
+  };
+  return (
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_permission_required_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_notification_permission_required_description")}</Typography>
+      <Button sx={{ float: "right" }} color="inherit" size="small" onClick={requestPermission}>
+        {t("alert_notification_permission_required_button")}
+      </Button>
+    </Alert>
+  );
+};
+
+const NotificationPermissionDeniedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_grant_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_grant_description")}</Typography>
-        <Button sx={{ float: "right" }} color="inherit" size="small" onClick={props.onRequestPermissionClick}>
-          {t("alert_grant_button")}
-        </Button>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
+    </Alert>
+  );
+};
+
+const NotificationIOSInstallRequiredAlert = () => {
+  const { t } = useTranslation();
+  return (
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
+    </Alert>
   );
 };
 
 const NotificationBrowserNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
-        <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+      <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
+    </Alert>
   );
 };
 
 const NotificationContextNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <>
-      <Alert severity="warning" sx={{ paddingTop: 2 }}>
-        <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
-        <Typography gutterBottom>
-          <Trans
-            i18nKey="alert_not_supported_context_description"
-            components={{
-              mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener" />,
-            }}
-          />
-        </Typography>
-      </Alert>
-      <Divider />
-    </>
+    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
+      <Typography gutterBottom>
+        <Trans
+          i18nKey="alert_not_supported_context_description"
+          components={{
+            mdnLink: <Link href="https://developer.mozilla.org/en-US/docs/Web/API/notification" target="_blank" rel="noopener" />,
+          }}
+        />
+      </Typography>
+    </Alert>
   );
 };
 

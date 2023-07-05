@@ -58,6 +58,15 @@ func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	}
 }
 
+func (s *Server) ensureWebPushEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.config.WebRoot == "" || s.config.WebPushPublicKey == "" {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
+}
+
 func (s *Server) ensureUserManager(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.userManager == nil {

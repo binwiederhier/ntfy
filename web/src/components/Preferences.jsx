@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useTheme,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
@@ -34,20 +35,21 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import { Info } from "@mui/icons-material";
 import { useOutletContext } from "react-router-dom";
-import theme from "./theme";
 import userManager from "../app/UserManager";
-import { playSound, shuffle, sounds, validUrl } from "../app/utils";
+import { playSound, shortUrl, shuffle, sounds, validUrl } from "../app/utils";
 import session from "../app/Session";
 import routes from "./routes";
 import accountApi, { Permission, Role } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
 import { AccountContext } from "./App";
 import { Paragraph } from "./styles";
-import prefs from "../app/Prefs";
+import prefs, { THEME } from "../app/Prefs";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
 import { subscribeTopic } from "./SubscribeDialog";
+import notifier from "../app/Notifier";
+import { useIsLaunchedPWA, useNotificationPermissionListener } from "./hooks";
 
 const maybeUpdateAccountSettings = async (payload) => {
   if (!session.exists()) {
@@ -58,7 +60,7 @@ const maybeUpdateAccountSettings = async (payload) => {
   } catch (e) {
     console.log(`[Preferences] Error updating account settings`, e);
     if (e instanceof UnauthorizedError) {
-      session.resetAndRedirect(routes.login);
+      await session.resetAndRedirect(routes.login);
     }
   }
 };
@@ -76,6 +78,9 @@ const Preferences = () => (
 
 const Notifications = () => {
   const { t } = useTranslation();
+  const isLaunchedPWA = useIsLaunchedPWA();
+  const pushPossible = useNotificationPermissionListener(() => notifier.pushPossible());
+
   return (
     <Card sx={{ p: 3 }} aria-label={t("prefs_notifications_title")}>
       <Typography variant="h5" sx={{ marginBottom: 2 }}>
@@ -85,6 +90,7 @@ const Notifications = () => {
         <Sound />
         <MinPriority />
         <DeleteAfter />
+        {!isLaunchedPWA && pushPossible && <WebPushEnabled />}
       </PrefGroup>
     </Card>
   );
@@ -232,6 +238,51 @@ const DeleteAfter = () => {
   );
 };
 
+const Theme = () => {
+  const { t } = useTranslation();
+  const labelId = "prefTheme";
+  const theme = useLiveQuery(async () => prefs.theme());
+  const handleChange = async (ev) => {
+    await prefs.setTheme(ev.target.value);
+  };
+
+  return (
+    <Pref labelId={labelId} title={t("prefs_appearance_theme_title")}>
+      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+        <Select value={theme ?? THEME.SYSTEM} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value={THEME.SYSTEM}>{t("prefs_appearance_theme_system")}</MenuItem>
+          <MenuItem value={THEME.DARK}>{t("prefs_appearance_theme_dark")}</MenuItem>
+          <MenuItem value={THEME.LIGHT}>{t("prefs_appearance_theme_light")}</MenuItem>
+        </Select>
+      </FormControl>
+    </Pref>
+  );
+};
+
+const WebPushEnabled = () => {
+  const { t } = useTranslation();
+  const labelId = "prefWebPushEnabled";
+  const enabled = useLiveQuery(async () => prefs.webPushEnabled());
+  const handleChange = async (ev) => {
+    await prefs.setWebPushEnabled(ev.target.value);
+  };
+
+  return (
+    <Pref
+      labelId={labelId}
+      title={t("prefs_notifications_web_push_title")}
+      description={enabled ? t("prefs_notifications_web_push_enabled_description") : t("prefs_notifications_web_push_disabled_description")}
+    >
+      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value>{t("prefs_notifications_web_push_enabled", { server: shortUrl(config.base_url) })}</MenuItem>
+          <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
+        </Select>
+      </FormControl>
+    </Pref>
+  );
+};
+
 const Users = () => {
   const { t } = useTranslation();
   const [dialogKey, setDialogKey] = useState(0);
@@ -371,6 +422,7 @@ const UserTable = (props) => {
 };
 
 const UserDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const [baseUrl, setBaseUrl] = useState("");
   const [username, setUsername] = useState("");
@@ -459,6 +511,7 @@ const Appearance = () => {
         {t("prefs_appearance_title")}
       </Typography>
       <PrefGroup>
+        <Theme />
         <Language />
       </PrefGroup>
     </Card>
@@ -609,7 +662,7 @@ const ReservationsTable = (props) => {
   };
 
   const handleSubscribeClick = async (reservation) => {
-    await subscribeTopic(config.base_url, reservation.topic);
+    await subscribeTopic(config.base_url, reservation.topic, {});
   };
 
   return (

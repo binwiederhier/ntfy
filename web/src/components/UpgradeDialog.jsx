@@ -21,6 +21,7 @@ import {
   Box,
   DialogContentText,
   DialogActions,
+  useTheme,
 } from "@mui/material";
 import { Trans, useTranslation } from "react-i18next";
 import { Check, Close } from "@mui/icons-material";
@@ -31,7 +32,6 @@ import { AccountContext } from "./App";
 import routes from "./routes";
 import session from "../app/Session";
 import accountApi, { SubscriptionInterval } from "../app/AccountApi";
-import theme from "./theme";
 
 const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
 
@@ -61,7 +61,8 @@ const Banner = {
 };
 
 const UpgradeDialog = (props) => {
-  const { t } = useTranslation();
+  const theme = useTheme();
+  const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext); // May be undefined!
   const [error, setError] = useState("");
   const [tiers, setTiers] = useState(null);
@@ -140,7 +141,7 @@ const UpgradeDialog = (props) => {
     } catch (e) {
       console.log(`[UpgradeDialog] Error changing billing subscription`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       } else {
         setError(e.message);
       }
@@ -232,7 +233,7 @@ const UpgradeDialog = (props) => {
             <Trans
               i18nKey="account_upgrade_dialog_cancel_warning"
               values={{
-                date: formatShortDate(account?.billing?.paid_until || 0),
+                date: formatShortDate(account?.billing?.paid_until || 0, i18n.language),
               }}
             />
           </Alert>

@@ -789,6 +789,57 @@ Note that the self-hosted server literally sends the message `New message` for e
 may be `Some other message`. This is so that if iOS cannot talk to the self-hosted server (in time, or at all), 
 it'll show `New message` as a popup.
 
+## Web Push
+[Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) ([RFC8030](https://datatracker.ietf.org/doc/html/rfc8030))
+allows ntfy to receive push notifications, even when the ntfy web app (or even the browser, depending on the platform) is closed. 
+When enabled, the user can enable **background notifications** for their topics in the wep app under Settings. Once enabled by the
+user, ntfy will forward published messages to the push endpoint (browser-provided, e.g. fcm.googleapis.com), which will then
+forward it to the browser.
+
+To configure Web Push, you need to generate and configure a [VAPID](https://datatracker.ietf.org/doc/html/draft-thomson-webpush-vapid) keypair (via `ntfy webpush keys`),
+a database to keep track of the browser's subscriptions, and an admin email address (you):
+
+- `web-push-public-key` is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+- `web-push-private-key` is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
+- `web-push-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+- `web-push-email-address` is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+- `web-push-startup-queries` is an optional list of queries to run on startup` 
+
+Limitations:
+
+- Like foreground browser notifications, background push notifications require the web app to be served over HTTPS. A _valid_
+  certificate is required, as service workers will not run on origins with untrusted certificates.
+
+- Web Push is only supported for the same server. You cannot use subscribe to web push on a topic on another server. This
+  is due to a limitation of the Push API, which doesn't allow multiple push servers for the same origin.
+
+To configure VAPID keys, first generate them:
+
+```sh
+$ ntfy webpush keys
+Web Push keys generated.
+...
+```
+
+Then copy the generated values into your `server.yml` or use the corresponding environment variables or command line arguments:
+
+```yaml
+web-push-public-key: AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+web-push-private-key: AA2BB1234567890abcdefzxcvbnm1234567890
+web-push-file: /var/cache/ntfy/webpush.db
+web-push-email-address: sysadmin@example.com
+```
+
+The `web-push-file` is used to store the push subscriptions. Unused subscriptions will send out a warning after 7 days,
+and will automatically expire after 9 days (not configurable). If the gateway returns an error (e.g. 410 Gone when a user has unsubscribed),
+subscriptions are also removed automatically.
+
+The web app refreshes subscriptions on start and regularly on an interval, but this file should be persisted across restarts. If the subscription
+file is deleted or lost, any web apps that aren't open will not receive new web push notifications until you open then.
+
+Changing your public/private keypair is **not recommended**. Browsers only allow one server identity (public key) per origin, and
+if you change them the clients will not be able to subscribe via web push until the user manually clears the notification permission.
+
 ## Tiers
 ntfy supports associating users to pre-defined tiers. Tiers can be used to grant users higher limits, such as 
 daily message limits, attachment size, or make it possible for users to reserve topics. If [payments are enabled](#payments),
@@ -1285,13 +1336,17 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `stripe-secret-key`                        | `NTFY_STRIPE_SECRET_KEY`                        | *string*                                            | -                 | Payments: Key used for the Stripe API communication, this enables payments                                                                                                                                                      |
 | `stripe-webhook-key`                       | `NTFY_STRIPE_WEBHOOK_KEY`                       | *string*                                            | -                 | Payments: Key required to validate the authenticity of incoming webhooks from Stripe                                                                                                                                            |
 | `billing-contact`                          | `NTFY_BILLING_CONTACT`                          | *email address* or *website*                        | -                 | Payments: Email or website displayed in Upgrade dialog as a billing contact                                                                                                                                                     |
+| `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush keys` to generate                                                                                                                                                                       |
+| `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush keys` to generate                                                                                                                                                                      |
+| `web-push-file`                            | `NTFY_WEB_PUSH_FILE`                            | *string*                                            | -                 | Web Push: Database file that stores subscriptions                                                                                                                                                                               |
+| `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
+| `web-push-startup-queries`                 | `NTFY_WEB_PUSH_STARTUP_QUERIES`                 | *string*                                            | -                 | Web Push: SQL queries to run against subscription database at startup                                                                                                                                                           |
 
 The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
 
 ## Command line options
 ```
-$ ntfy serve --help
 NAME:
    ntfy serve - Run the ntfy server
 
@@ -1321,8 +1376,8 @@ OPTIONS:
    --log-file value, --log_file value                                                                                     set log file, default is STDOUT [$NTFY_LOG_FILE]
    --config value, -c value                                                                                               config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
    --base-url value, --base_url value, -B value                                                                           externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
-   --listen-http value, --listen_http value, -l value                                                                     ip:port used to as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
-   --listen-https value, --listen_https value, -L value                                                                   ip:port used to as HTTPS listen address [$NTFY_LISTEN_HTTPS]
+   --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
@@ -1343,11 +1398,12 @@ OPTIONS:
    --keepalive-interval value, --keepalive_interval value, -k value                                                       interval of keepalive messages (default: 45s) [$NTFY_KEEPALIVE_INTERVAL]
    --manager-interval value, --manager_interval value, -m value                                                           interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
    --disallowed-topics value, --disallowed_topics value [ --disallowed-topics value, --disallowed_topics value ]          topics that are not allowed to be used [$NTFY_DISALLOWED_TOPICS]
-   --web-root value, --web_root value                                                                                     sets web root to landing page (home), web app (app) or disabled (disable) (default: "app") [$NTFY_WEB_ROOT]
+   --web-root value, --web_root value                                                                                     sets root of the web app (e.g. /, or /app), or disables it (disable) (default: "/") [$NTFY_WEB_ROOT]
    --enable-signup, --enable_signup                                                                                       allows users to sign up via the web app, or API (default: false) [$NTFY_ENABLE_SIGNUP]
    --enable-login, --enable_login                                                                                         allows users to log in via the web app, or API (default: false) [$NTFY_ENABLE_LOGIN]
    --enable-reservations, --enable_reservations                                                                           allows users to reserve topics (if their tier allows it) (default: false) [$NTFY_ENABLE_RESERVATIONS]
    --upstream-base-url value, --upstream_base_url value                                                                   forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers [$NTFY_UPSTREAM_BASE_URL]
+   --upstream-access-token value, --upstream_access_token value                                                           access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth [$NTFY_UPSTREAM_ACCESS_TOKEN]
    --smtp-sender-addr value, --smtp_sender_addr value                                                                     SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
    --smtp-sender-user value, --smtp_sender_user value                                                                     SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
    --smtp-sender-pass value, --smtp_sender_pass value                                                                     SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]
@@ -1355,6 +1411,10 @@ OPTIONS:
    --smtp-server-listen value, --smtp_server_listen value                                                                 SMTP server address (ip:port) for incoming emails, e.g. :25 [$NTFY_SMTP_SERVER_LISTEN]
    --smtp-server-domain value, --smtp_server_domain value                                                                 SMTP domain for incoming e-mail, e.g. ntfy.sh [$NTFY_SMTP_SERVER_DOMAIN]
    --smtp-server-addr-prefix value, --smtp_server_addr_prefix value                                                       SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-') [$NTFY_SMTP_SERVER_ADDR_PREFIX]
+   --twilio-account value, --twilio_account value                                                                         Twilio account SID, used for phone calls, e.g. AC123... [$NTFY_TWILIO_ACCOUNT]
+   --twilio-auth-token value, --twilio_auth_token value                                                                   Twilio auth token [$NTFY_TWILIO_AUTH_TOKEN]
+   --twilio-phone-number value, --twilio_phone_number value                                                               Twilio number to use for outgoing calls [$NTFY_TWILIO_PHONE_NUMBER]
+   --twilio-verify-service value, --twilio_verify_service value                                                           Twilio Verify service ID, used for phone number verification [$NTFY_TWILIO_VERIFY_SERVICE]
    --global-topic-limit value, --global_topic_limit value, -T value                                                       total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
    --visitor-subscription-limit value, --visitor_subscription_limit value                                                 number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
    --visitor-attachment-total-size-limit value, --visitor_attachment_total_size_limit value                               total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
@@ -1365,10 +1425,18 @@ OPTIONS:
    --visitor-message-daily-limit value, --visitor_message_daily_limit value                                               max messages per visitor per day, derived from request limit if unset (default: 0) [$NTFY_VISITOR_MESSAGE_DAILY_LIMIT]
    --visitor-email-limit-burst value, --visitor_email_limit_burst value                                                   initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
    --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                                           interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
+   --visitor-subscriber-rate-limiting, --visitor_subscriber_rate_limiting                                                 enables subscriber-based rate limiting (default: false) [$NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING]
    --behind-proxy, --behind_proxy, -P                                                                                     if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
    --stripe-secret-key value, --stripe_secret_key value                                                                   key used for the Stripe API communication, this enables payments [$NTFY_STRIPE_SECRET_KEY]
    --stripe-webhook-key value, --stripe_webhook_key value                                                                 key required to validate the authenticity of incoming webhooks from Stripe [$NTFY_STRIPE_WEBHOOK_KEY]
-   --billing-contact value, --billing_contact value                                                                       e-mail or website to display in upgrade dialog (only if payments are enabled) [$NTFY_BILLING_CONTACT]   
-   --help, -h                                                                                                             show help (default: false)
+   --billing-contact value, --billing_contact value                                                                       e-mail or website to display in upgrade dialog (only if payments are enabled) [$NTFY_BILLING_CONTACT]
+   --enable-metrics, --enable_metrics                                                                                     if set, Prometheus metrics are exposed via the /metrics endpoint (default: false) [$NTFY_ENABLE_METRICS]
+   --metrics-listen-http value, --metrics_listen_http value                                                               ip:port used to expose the metrics endpoint (implicitly enables metrics) [$NTFY_METRICS_LISTEN_HTTP]
+   --profile-listen-http value, --profile_listen_http value                                                               ip:port used to expose the profiling endpoints (implicitly enables profiling) [$NTFY_PROFILE_LISTEN_HTTP]
+   --web-push-public-key value, --web_push_public_key value                                                               public key used for web push notifications [$NTFY_WEB_PUSH_PUBLIC_KEY]
+   --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
+   --web-push-file value, --web_push_file value                                                                           file used to store web push subscriptions [$NTFY_WEB_PUSH_FILE]
+   --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
+   --web-push-startup-queries value, --web_push_startup-queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]   
+   --help, -h                                                                                                             show help
 ```
-

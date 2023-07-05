@@ -13,11 +13,17 @@
     <meta name="theme-color" content="#317f6f" />
     <meta name="msapplication-navbutton-color" content="#317f6f" />
     <meta name="apple-mobile-web-app-status-bar-style" content="#317f6f" />
+    <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png" sizes="180x180" />
+    <link rel="mask-icon" href="/static/images/mask-icon.svg" color="#317f6f" />
 
     <!-- Favicon, see favicon.io -->
     <link rel="icon" type="image/png" href="/static/images/favicon.ico" />
 
     <!-- Previews in Google, Slack, WhatsApp, etc. -->
+    <meta
+      name="description"
+      content="ntfy lets you send push notifications via scripts from any computer or phone. Made with ❤ by Philipp C. Heckel, Apache License 2.0, source at https://heckel.io/ntfy."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="ntfy web" />
@@ -35,6 +41,9 @@
     <!-- Style overrides & fonts -->
     <link rel="stylesheet" href="/static/css/app.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
     <noscript>

@@ -14,11 +14,23 @@ import {
   useMediaQuery,
   MenuItem,
   IconButton,
+  ListItemIcon,
+  useTheme,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Clear } from "@mui/icons-material";
-import theme from "./theme";
+import {
+  Clear,
+  ClearAll,
+  Edit,
+  EnhancedEncryption,
+  Lock,
+  LockOpen,
+  Notifications,
+  NotificationsOff,
+  RemoveCircle,
+  Send,
+} from "@mui/icons-material";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import accountApi, { Role } from "../app/AccountApi";
@@ -70,8 +82,7 @@ export const SubscriptionPopup = (props) => {
   };
 
   const handleSendTestMessage = async () => {
-    const { baseUrl } = props.subscription;
-    const { topic } = props.subscription;
+    const { baseUrl, topic } = props.subscription;
     const tags = shuffle([
       "grinning",
       "octopus",
@@ -106,10 +117,16 @@ export const SubscriptionPopup = (props) => {
     ])[0];
     const nowSeconds = Math.round(Date.now() / 1000);
     const message = shuffle([
-      `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(nowSeconds)} right now. Is that early or late?`,
+      `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(
+        nowSeconds,
+        "en-US"
+      )} right now. Is that early or late?`,
       `So I heard you like ntfy? If that's true, go to GitHub and star it, or to the Play store and rate it. Thanks! Oh yeah, this is a test notification.`,
       `It's almost like you want to hear what I have to say. I'm not even a machine. I'm just a sentence that Phil typed on a random Thursday.`,
-      `Alright then, it's ${formatShortDateTime(nowSeconds)} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
+      `Alright then, it's ${formatShortDateTime(
+        nowSeconds,
+        "en-US"
+      )} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
       `There are nine million bicycles in Beijing That's a fact; It's a thing we can't deny. I wonder if that's true ...`,
       `I'm really excited that you're trying out ntfy. Did you know that there are a few public topics, such as ntfy.sh/stats and ntfy.sh/announcements.`,
       `It's interesting to hear what people use ntfy for. I've heard people talk about using it for so many cool things. What do you use it for?`,
@@ -131,16 +148,20 @@ export const SubscriptionPopup = (props) => {
     await subscriptionManager.deleteNotifications(props.subscription.id);
   };
 
+  const handleSetMutedUntil = async (mutedUntil) => {
+    await subscriptionManager.setMutedUntil(subscription.id, mutedUntil);
+  };
+
   const handleUnsubscribe = async () => {
     console.log(`[SubscriptionPopup] Unsubscribing from ${props.subscription.id}`, props.subscription);
-    await subscriptionManager.remove(props.subscription.id);
+    await subscriptionManager.remove(props.subscription);
     if (session.exists() && !subscription.internal) {
       try {
         await accountApi.deleteSubscription(props.subscription.baseUrl, props.subscription.topic);
       } catch (e) {
         console.log(`[SubscriptionPopup] Error unsubscribing`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         }
       }
     }
@@ -155,19 +176,79 @@ export const SubscriptionPopup = (props) => {
   return (
     <>
       <PopupMenu horizontal={placement} anchorEl={props.anchor} open={!!props.anchor} onClose={props.onClose}>
-        <MenuItem onClick={handleChangeDisplayName}>{t("action_bar_change_display_name")}</MenuItem>
-        {showReservationAdd && <MenuItem onClick={handleReserveAdd}>{t("action_bar_reservation_add")}</MenuItem>}
+        <MenuItem onClick={handleChangeDisplayName}>
+          <ListItemIcon>
+            <Edit fontSize="small" />
+          </ListItemIcon>
+          {t("action_bar_change_display_name")}
+        </MenuItem>
+        {showReservationAdd && (
+          <MenuItem onClick={handleReserveAdd}>
+            <ListItemIcon>
+              <Lock fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_reservation_add")}
+          </MenuItem>
+        )}
         {showReservationAddDisabled && (
           <MenuItem sx={{ cursor: "default" }}>
+            <ListItemIcon>
+              <Lock fontSize="small" color="disabled" />
+            </ListItemIcon>
             <span style={{ opacity: 0.3 }}>{t("action_bar_reservation_add")}</span>
             <ReserveLimitChip />
           </MenuItem>
         )}
-        {showReservationEdit && <MenuItem onClick={handleReserveEdit}>{t("action_bar_reservation_edit")}</MenuItem>}
-        {showReservationDelete && <MenuItem onClick={handleReserveDelete}>{t("action_bar_reservation_delete")}</MenuItem>}
-        <MenuItem onClick={handleSendTestMessage}>{t("action_bar_send_test_notification")}</MenuItem>
-        <MenuItem onClick={handleClearAll}>{t("action_bar_clear_notifications")}</MenuItem>
-        <MenuItem onClick={handleUnsubscribe}>{t("action_bar_unsubscribe")}</MenuItem>
+        {showReservationEdit && (
+          <MenuItem onClick={handleReserveEdit}>
+            <ListItemIcon>
+              <EnhancedEncryption fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_reservation_edit")}
+          </MenuItem>
+        )}
+        {showReservationDelete && (
+          <MenuItem onClick={handleReserveDelete}>
+            <ListItemIcon>
+              <LockOpen fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_reservation_delete")}
+          </MenuItem>
+        )}
+        <MenuItem onClick={handleSendTestMessage}>
+          <ListItemIcon>
+            <Send fontSize="small" />
+          </ListItemIcon>
+          {t("action_bar_send_test_notification")}
+        </MenuItem>
+        <MenuItem onClick={handleClearAll}>
+          <ListItemIcon>
+            <ClearAll fontSize="small" />
+          </ListItemIcon>
+          {t("action_bar_clear_notifications")}
+        </MenuItem>
+        {!!subscription.mutedUntil && (
+          <MenuItem onClick={() => handleSetMutedUntil(0)}>
+            <ListItemIcon>
+              <Notifications fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_unmute_notifications")}
+          </MenuItem>
+        )}
+        {!subscription.mutedUntil && (
+          <MenuItem onClick={() => handleSetMutedUntil(1)}>
+            <ListItemIcon>
+              <NotificationsOff fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_mute_notifications")}
+          </MenuItem>
+        )}
+        <MenuItem onClick={handleUnsubscribe}>
+          <ListItemIcon>
+            <RemoveCircle fontSize="small" />
+          </ListItemIcon>
+          {t("action_bar_unsubscribe")}
+        </MenuItem>
       </PopupMenu>
       <Portal>
         <Snackbar
@@ -206,6 +287,7 @@ export const SubscriptionPopup = (props) => {
 };
 
 const DisplayNameDialog = (props) => {
+  const theme = useTheme();
   const { t } = useTranslation();
   const { subscription } = props;
   const [error, setError] = useState("");
@@ -221,7 +303,7 @@ const DisplayNameDialog = (props) => {
       } catch (e) {
         console.log(`[SubscriptionSettingsDialog] Error updating subscription`, e);
         if (e instanceof UnauthorizedError) {
-          session.resetAndRedirect(routes.login);
+          await session.resetAndRedirect(routes.login);
         } else {
           setError(e.message);
           return;

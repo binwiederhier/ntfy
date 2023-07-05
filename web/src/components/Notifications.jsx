@@ -24,17 +24,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Trans, useTranslation } from "react-i18next";
 import { useOutletContext } from "react-router-dom";
-import {
-  formatBytes,
-  formatMessage,
-  formatShortDateTime,
-  formatTitle,
-  maybeAppendActionErrors,
-  openUrl,
-  shortUrl,
-  topicShortUrl,
-  unmatchedTags,
-} from "../app/utils";
+import { formatBytes, formatShortDateTime, maybeAppendActionErrors, openUrl, shortUrl, topicShortUrl, unmatchedTags } from "../app/utils";
+import { formatMessage, formatTitle } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
 import priority1 from "../img/priority-1.svg";
@@ -169,10 +160,10 @@ const autolink = (s) => {
 };
 
 const NotificationItem = (props) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { notification } = props;
   const { attachment } = notification;
-  const date = formatShortDateTime(notification.time);
+  const date = formatShortDateTime(notification.time, i18n.language);
   const otherTags = unmatchedTags(notification.tags);
   const tags = otherTags.length > 0 ? otherTags.join(", ") : null;
   const handleDelete = async () => {
@@ -193,7 +184,7 @@ const NotificationItem = (props) => {
   const hasUserActions = notification.actions && notification.actions.length > 0;
   const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
   return (
-    <Card sx={{ minWidth: 275, padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
+    <Card sx={{ padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
       <CardContent>
         <Tooltip title={t("notifications_delete")} enterDelay={500}>
           <IconButton onClick={handleDelete} sx={{ float: "right", marginRight: -1, marginTop: -1 }} aria-label={t("notifications_delete")}>
@@ -286,7 +277,7 @@ const NotificationItem = (props) => {
 };
 
 const Attachment = (props) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { attachment } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
@@ -305,7 +296,7 @@ const Attachment = (props) => {
   if (expires) {
     infos.push(
       t("notifications_attachment_link_expires", {
-        date: formatShortDateTime(attachment.expires),
+        date: formatShortDateTime(attachment.expires, i18n.language),
       })
     );
   }

@@ -24,7 +24,7 @@ const Login = () => {
     try {
       const token = await accountApi.login(user);
       console.log(`[Login] User auth for user ${user.username} successful, token is ${token}`);
-      session.store(user.username, token);
+      await session.store(user.username, token);
       window.location.href = routes.app;
     } catch (e) {
       console.log(`[Login] User auth for user ${user.username} failed`, e);
@@ -45,7 +45,7 @@ const Login = () => {
   return (
     <AvatarBox>
       <Typography sx={{ typography: "h6" }}>{t("login_title")}</Typography>
-      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, maxWidth: 400 }}>
+      <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
         <TextField
           margin="dense"
           required

@@ -1,10 +1,11 @@
 package server
 
 import (
-	"heckel.io/ntfy/user"
 	"io/fs"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/user"
 )
 
 // Defines default config settings (excluding limits, see below)
@@ -20,6 +21,12 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+)
+
+// Defines default Web Push settings
+const (
+	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
+	DefaultWebPushExpiryDuration        = 9 * 24 * time.Hour
 )
 
 // Defines all global and per-visitor limits
@@ -146,6 +153,13 @@ type Config struct {
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
+	WebPushPrivateKey                    string
+	WebPushPublicKey                     string
+	WebPushFile                          string
+	WebPushEmailAddress                  string
+	WebPushStartupQueries                string
+	WebPushExpiryDuration                time.Duration
+	WebPushExpiryWarningDuration         time.Duration
 }
 
 // NewConfig instantiates a default new server config
@@ -227,5 +241,11 @@ func NewConfig() *Config {
 		EnableReservations:                   false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
+		WebPushPrivateKey:                    "",
+		WebPushPublicKey:                     "",
+		WebPushFile:                          "",
+		WebPushEmailAddress:                  "",
+		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
+		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
 	}
 }

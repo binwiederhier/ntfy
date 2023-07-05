@@ -15,9 +15,9 @@
     "nav_button_publish_message": "发布通知",
     "nav_button_subscribe": "订阅主题",
     "nav_button_connecting": "正在连接",
-    "alert_grant_title": "已禁用通知",
-    "alert_grant_description": "授予浏览器显示桌面通知的权限。",
-    "alert_grant_button": "现在授予",
+    "alert_notification_permission_required_title": "已禁用通知",
+    "alert_notification_permission_required_description": "授予浏览器显示桌面通知的权限。",
+    "alert_notification_permission_required_button": "现在授予",
     "alert_not_supported_title": "不支持通知",
     "alert_not_supported_description": "您的浏览器不支持通知。",
     "notifications_list": "通知列表",
@@ -352,5 +352,12 @@
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} 每年。按月计费。",
     "account_upgrade_dialog_tier_price_billed_yearly": "{{价格}} 按年计费。节省 {{save}}。",
     "account_upgrade_dialog_billing_contact_email": "有关账单问题，请直接<Link>联系我们 </Link>。",
-    "account_upgrade_dialog_billing_contact_website": "有关账单问题，请参考我们的<Link>网站 </Link>。"
+    "account_upgrade_dialog_billing_contact_website": "有关账单问题，请参考我们的<Link>网站 </Link>。",
+    "publish_dialog_call_item": "拨打电话 {{number}}",
+    "publish_dialog_call_label": "拨号",
+    "publish_dialog_chip_call_label": "拨号",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "未验证的手机号",
+    "account_basics_phone_numbers_title": "电话号码",
+    "account_basics_phone_numbers_description": "电话通知",
+    "account_basics_phone_numbers_dialog_description": "要使用来电通知功能，您需要添加并验证至少一个电话号码。可以通过短信或电话进行验证。"
 }

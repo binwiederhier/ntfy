@@ -82,6 +82,7 @@ nav:
 - "Subscribing":
   - "From your phone": subscribe/phone.md
   - "From the Web app": subscribe/web.md
+  - "From the Desktop": subscribe/pwa.md
   - "From the CLI": subscribe/cli.md
   - "Using the API": subscribe/api.md
 - "Self-hosting":

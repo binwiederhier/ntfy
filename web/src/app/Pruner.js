@@ -18,6 +18,10 @@ class Pruner {
     setTimeout(() => this.prune(), delayMillis);
   }
 
+  stopWorker() {
+    clearTimeout(this.timer);
+  }
+
   async prune() {
     const deleteAfterSeconds = await prefs.deleteAfter();
     const pruneThresholdTimestamp = Math.round(Date.now() / 1000) - deleteAfterSeconds;

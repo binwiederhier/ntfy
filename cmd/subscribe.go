@@ -72,7 +72,7 @@ ntfy subscribe TOPIC COMMAND
     $NTFY_TITLE     $title, $t            Message title
     $NTFY_PRIORITY  $priority, $prio, $p  Message priority (1=min, 5=max)
     $NTFY_TAGS      $tags, $tag, $ta      Message tags (comma separated list)
-	$NTFY_RAW       $raw                  Raw JSON message
+    $NTFY_RAW       $raw                  Raw JSON message
 
   Examples:
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
@@ -194,7 +194,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			topicOptions = append(topicOptions, auth)
 		}
 
-		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
+		subscriptionID, err := cl.Subscribe(s.Topic, topicOptions...)
+		if err != nil {
+			return err
+		}
 		if s.Command != "" {
 			cmds[subscriptionID] = s.Command
 		} else if conf.DefaultCommand != "" {
@@ -204,7 +207,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		}
 	}
 	if topic != "" {
-		subscriptionID := cl.Subscribe(topic, options...)
+		subscriptionID, err := cl.Subscribe(topic, options...)
+		if err != nil {
+			return err
+		}
 		cmds[subscriptionID] = command
 	}
 	for m := range cl.Messages {

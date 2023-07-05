@@ -9,13 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
 	"io"
 	"net"
 	"net/http"
@@ -32,6 +25,14 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
 )
 
 // Server is the main server, providing the UI and API for ntfy
@@ -52,6 +53,7 @@ type Server struct {
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *messageCache                       // Database that stores the messages
+	webPush           *webPushStore                       // Database that stores web push subscriptions
 	fileCache         *fileCache                          // File system based cache that stores attachments
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
@@ -76,11 +78,15 @@ var (
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
 	webConfigPath                                        = "/config.js"
+	webManifestPath                                      = "/manifest.webmanifest"
+	webRootHTMLPath                                      = "/app.html"
+	webServiceWorkerPath                                 = "/sw.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
 	apiStatsPath                                         = "/v1/stats"
+	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
@@ -151,6 +157,13 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	var webPush *webPushStore
+	if conf.WebPushPublicKey != "" {
+		webPush, err = newWebPushStore(conf.WebPushFile, conf.WebPushStartupQueries)
+		if err != nil {
+			return nil, err
+		}
+	}
 	topics, err := messageCache.Topics()
 	if err != nil {
 		return nil, err
@@ -190,6 +203,7 @@ func New(conf *Config) (*Server, error) {
 	s := &Server{
 		config:          conf,
 		messageCache:    messageCache,
+		webPush:         webPush,
 		fileCache:       fileCache,
 		firebaseClient:  firebaseClient,
 		smtpSender:      mailer,
@@ -342,6 +356,9 @@ func (s *Server) closeDatabases() {
 		s.userManager.Close()
 	}
 	s.messageCache.Close()
+	if s.webPush != nil {
+		s.webPush.Close()
+	}
 }
 
 // handle is the main entry point for all HTTP requests
@@ -416,6 +433,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
+		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
 	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
@@ -470,6 +489,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
+	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
+		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
+	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {
+		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
@@ -478,7 +501,7 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
 		return s.handleMetrics(w, r, v)
-	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && (staticRegex.MatchString(r.URL.Path) || r.URL.Path == webServiceWorkerPath || r.URL.Path == webRootHTMLPath) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
@@ -552,7 +575,9 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableCalls:        s.config.TwilioAccount != "",
 		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
+		EnableWebPush:      s.config.WebPushPublicKey != "",
 		BillingContact:     s.config.BillingContact,
+		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")
@@ -562,6 +587,25 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	w.Header().Set("Content-Type", "text/javascript")
 	_, err = io.WriteString(w, fmt.Sprintf("// Generated server configuration\nvar config = %s;\n", string(b)))
 	return err
+}
+
+// handleWebManifest serves the web app manifest for the progressive web app (PWA)
+func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	response := &webManifestResponse{
+		Name:            "ntfy web",
+		Description:     "ntfy lets you send push notifications via scripts from any computer or phone",
+		ShortName:       "ntfy",
+		Scope:           "/",
+		StartURL:        s.config.WebRoot,
+		Display:         "standalone",
+		BackgroundColor: "#ffffff",
+		ThemeColor:      "#317f6f",
+		Icons: []*webManifestIcon{
+			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
+			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
+		},
+	}
+	return s.writeJSONWithContentType(w, response, "application/manifest+json")
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -760,8 +804,11 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.config.TwilioAccount != "" && call != "" {
 			go s.callPhone(v, r, m, call)
 		}
-		if s.config.UpstreamBaseURL != "" {
+		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
 			go s.forwardPollRequest(v, m)
+		}
+		if s.config.WebPushPublicKey != "" {
+			go s.publishToWebPushEndpoints(v, m)
 		}
 	} else {
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
@@ -1696,6 +1743,9 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	if s.config.UpstreamBaseURL != "" {
 		go s.forwardPollRequest(v, m)
 	}
+	if s.config.WebPushPublicKey != "" {
+		go s.publishToWebPushEndpoints(v, m)
+	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err
 	}
@@ -1916,7 +1966,11 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
-	w.Header().Set("Content-Type", "application/json")
+	return s.writeJSONWithContentType(w, v, "application/json")
+}
+
+func (s *Server) writeJSONWithContentType(w http.ResponseWriter, v any, contentType string) error {
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		return err

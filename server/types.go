@@ -1,11 +1,12 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
 	"net/http"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
 
 	"heckel.io/ntfy/util"
 )
@@ -41,7 +42,7 @@ type message struct {
 	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
 	Encoding    string      `json:"encoding,omitempty"`     // empty for raw UTF-8, or "base64" for encoded bytes
 	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
-	User        string      `json:"-"`                      // Username of the uploader, used to associated attachments
+	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
 }
 
 func (m *message) Context() log.Context {
@@ -398,7 +399,9 @@ type apiConfigResponse struct {
 	EnableCalls        bool     `json:"enable_calls"`
 	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
+	EnableWebPush      bool     `json:"enable_web_push"`
 	BillingContact     string   `json:"billing_contact"`
+	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
@@ -462,4 +465,76 @@ type apiStripeSubscriptionUpdatedEvent struct {
 type apiStripeSubscriptionDeletedEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
+}
+
+type apiWebPushUpdateSubscriptionRequest struct {
+	Endpoint string   `json:"endpoint"`
+	Auth     string   `json:"auth"`
+	P256dh   string   `json:"p256dh"`
+	Topics   []string `json:"topics"`
+}
+
+// List of possible Web Push events (see sw.js)
+const (
+	webPushMessageEvent  = "message"
+	webPushExpiringEvent = "subscription_expiring"
+)
+
+type webPushPayload struct {
+	Event          string   `json:"event"`
+	SubscriptionID string   `json:"subscription_id"`
+	Message        *message `json:"message"`
+}
+
+func newWebPushPayload(subscriptionID string, message *message) *webPushPayload {
+	return &webPushPayload{
+		Event:          webPushMessageEvent,
+		SubscriptionID: subscriptionID,
+		Message:        message,
+	}
+}
+
+type webPushControlMessagePayload struct {
+	Event string `json:"event"`
+}
+
+func newWebPushSubscriptionExpiringPayload() *webPushControlMessagePayload {
+	return &webPushControlMessagePayload{
+		Event: webPushExpiringEvent,
+	}
+}
+
+type webPushSubscription struct {
+	ID       string
+	Endpoint string
+	Auth     string
+	P256dh   string
+	UserID   string
+}
+
+func (w *webPushSubscription) Context() log.Context {
+	return map[string]any{
+		"web_push_subscription_id":       w.ID,
+		"web_push_subscription_user_id":  w.UserID,
+		"web_push_subscription_endpoint": w.Endpoint,
+	}
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/Manifest
+type webManifestResponse struct {
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	ShortName       string             `json:"short_name"`
+	Scope           string             `json:"scope"`
+	StartURL        string             `json:"start_url"`
+	Display         string             `json:"display"`
+	BackgroundColor string             `json:"background_color"`
+	ThemeColor      string             `json:"theme_color"`
+	Icons           []*webManifestIcon `json:"icons"`
+}
+
+type webManifestIcon struct {
+	SRC   string `json:"src"`
+	Sizes string `json:"sizes"`
+	Type  string `json:"type"`
 }

@@ -11,6 +11,7 @@
     "lint": "eslint --report-unused-disable-directives --ext .js,.jsx ./src/"
   },
   "dependencies": {
+    "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.4.2",
@@ -28,7 +29,9 @@
     "react-infinite-scroll-component": "^6.1.0",
     "react-router-dom": "^6.2.2",
     "stacktrace-gps": "^3.0.4",
-    "stacktrace-js": "^2.0.2"
+    "stacktrace-js": "^2.0.2",
+    "stylis": "^4.3.0",
+    "stylis-plugin-rtl": "^2.1.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
@@ -40,7 +43,8 @@
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^2.8.8",
-    "vite": "^4.3.8"
+    "vite": "^4.3.9",
+    "vite-plugin-pwa": "^0.15.0"
   },
   "browserslist": {
     "production": [

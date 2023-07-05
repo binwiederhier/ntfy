@@ -6,6 +6,7 @@ import {
   topicUrlAuth,
   topicUrlJsonPoll,
   topicUrlJsonPollWithSince,
+  webPushUrl,
 } from "./utils";
 import userManager from "./UserManager";
 import { fetchOrThrow } from "./errors";
@@ -112,6 +113,36 @@ class Api {
       return false;
     }
     throw new Error(`Unexpected server response ${response.status}`);
+  }
+
+  async updateWebPush(pushSubscription, topics) {
+    const user = await userManager.get(config.base_url);
+    const url = webPushUrl(config.base_url);
+    console.log(`[Api] Updating Web Push subscription`, { url, topics, endpoint: pushSubscription.endpoint });
+    const serializedSubscription = JSON.parse(JSON.stringify(pushSubscription)); // Ugh ... https://stackoverflow.com/a/40525434/1440785
+    await fetchOrThrow(url, {
+      method: "POST",
+      headers: maybeWithAuth({}, user),
+      body: JSON.stringify({
+        endpoint: serializedSubscription.endpoint,
+        auth: serializedSubscription.keys.auth,
+        p256dh: serializedSubscription.keys.p256dh,
+        topics,
+      }),
+    });
+  }
+
+  async deleteWebPush(pushSubscription) {
+    const user = await userManager.get(config.base_url);
+    const url = webPushUrl(config.base_url);
+    console.log(`[Api] Deleting Web Push subscription`, { url, endpoint: pushSubscription.endpoint });
+    await fetchOrThrow(url, {
+      method: "DELETE",
+      headers: maybeWithAuth({}, user),
+      body: JSON.stringify({
+        endpoint: pushSubscription.endpoint,
+      }),
+    });
   }
 }
 

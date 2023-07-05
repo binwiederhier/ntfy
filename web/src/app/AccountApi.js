@@ -367,7 +367,7 @@ class AccountApi {
     } catch (e) {
       console.log(`[AccountApi] Error fetching account`, e);
       if (e instanceof UnauthorizedError) {
-        session.resetAndRedirect(routes.login);
+        await session.resetAndRedirect(routes.login);
       }
       return undefined;
     }
@@ -380,6 +380,10 @@ class AccountApi {
     console.log(`[AccountApi] Starting worker`);
     this.timer = setInterval(() => this.runWorker(), intervalMillis);
     setTimeout(() => this.runWorker(), delayMillis);
+  }
+
+  stopWorker() {
+    clearTimeout(this.timer);
   }
 
   async runWorker() {

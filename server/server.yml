@@ -144,6 +144,27 @@
 # smtp-server-domain:
 # smtp-server-addr-prefix:
 
+# Web Push support (background notifications for browsers)
+#
+# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, users
+# can enable background notifications in the web app. Once enabled, ntfy will forward published messages to the push
+# endpoint, which will then forward it to the browser.
+#
+# You must configure web-push-public/private key, web-push-file, and web-push-email-address below to enable Web Push.
+# Run "ntfy webpush keys" to generate the keys.
+#
+# - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+# - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
+# - web-push-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+# - web-push-email-address is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+# - web-push-startup-queries is an optional list of queries to run on startup`
+#
+# web-push-public-key:
+# web-push-private-key:
+# web-push-file:
+# web-push-email-address:
+# web-push-startup-queries:
+
 # If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.
 #
 # - twilio-account is the Twilio account SID, e.g. AC12345beefbeef67890beefbeef122586

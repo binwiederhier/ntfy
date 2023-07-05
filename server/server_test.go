@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -238,6 +239,12 @@ func TestServer_WebEnabled(t *testing.T) {
 	rr = request(t, s, "GET", "/config.js", "", nil)
 	require.Equal(t, 404, rr.Code)
 
+	rr = request(t, s, "GET", "/sw.js", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/app.html", "", nil)
+	require.Equal(t, 404, rr.Code)
+
 	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 404, rr.Code)
 
@@ -250,6 +257,35 @@ func TestServer_WebEnabled(t *testing.T) {
 
 	rr = request(t, s2, "GET", "/config.js", "", nil)
 	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/sw.js", "", nil)
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/app.html", "", nil)
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestServer_WebPushEnabled(t *testing.T) {
+	conf := newTestConfig(t)
+	conf.WebRoot = "" // Disable web app
+	s := newTestServer(t, conf)
+
+	rr := request(t, s, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	conf2 := newTestConfig(t)
+	s2 := newTestServer(t, conf2)
+
+	rr = request(t, s2, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	conf3 := newTestConfigWithWebPush(t)
+	s3 := newTestServer(t, conf3)
+
+	rr = request(t, s3, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "application/manifest+json", rr.Header().Get("Content-Type"))
+
 }
 
 func TestServer_PublishLargeMessage(t *testing.T) {
@@ -2559,6 +2595,29 @@ func TestServer_UpstreamBaseURL_With_Access_Token_Success(t *testing.T) {
 	})
 }
 
+func TestServer_UpstreamBaseURL_DoNotForwardUnifiedPush(t *testing.T) {
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("UnifiedPush messages should not be forwarded")
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	s := newTestServer(t, c)
+
+	// Send UP message, this should not forward to upstream server
+	response := request(t, s, "PUT", "/mytopic?up=1", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+
+	// Forwarding is done asynchronously, so wait a bit.
+	// This ensures that the t.Fatal above is actually not triggered.
+	time.Sleep(500 * time.Millisecond)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
@@ -2568,19 +2627,33 @@ func newTestConfig(t *testing.T) *Config {
 	return conf
 }
 
-func newTestConfigWithAuthFile(t *testing.T) *Config {
-	conf := newTestConfig(t)
+func configureAuth(t *testing.T, conf *Config) *Config {
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	conf.AuthBcryptCost = bcrypt.MinCost // This speeds up tests a lot
 	return conf
 }
 
+func newTestConfigWithAuthFile(t *testing.T) *Config {
+	conf := newTestConfig(t)
+	conf = configureAuth(t, conf)
+	return conf
+}
+
+func newTestConfigWithWebPush(t *testing.T) *Config {
+	conf := newTestConfig(t)
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	require.Nil(t, err)
+	conf.WebPushFile = filepath.Join(t.TempDir(), "webpush.db")
+	conf.WebPushEmailAddress = "testing@example.com"
+	conf.WebPushPrivateKey = privateKey
+	conf.WebPushPublicKey = publicKey
+	return conf
+}
+
 func newTestServer(t *testing.T, config *Config) *Server {
 	server, err := New(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	return server
 }
 

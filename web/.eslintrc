@@ -33,5 +33,6 @@
         "unnamedComponents": "arrow-function"
       }
     ]
-  }
+  },
+  "overrides": [{ "files": ["./public/sw.js"], "rules": { "no-restricted-globals": "off" } }]
 }

@@ -7,9 +7,9 @@
     "nav_button_all_notifications": "Todas notificações",
     "nav_button_settings": "Configurações",
     "nav_button_subscribe": "Inscrever no tópico",
-    "alert_grant_title": "Notificações estão desativadas",
-    "alert_grant_description": "Conceder ao navegador permissão para mostrar notificações.",
-    "alert_grant_button": "Conceder agora",
+    "alert_notification_permission_required_title": "Notificações estão desativadas",
+    "alert_notification_permission_required_description": "Conceder ao navegador permissão para mostrar notificações.",
+    "alert_notification_permission_required_button": "Conceder agora",
     "alert_not_supported_title": "Notificações não são suportadas",
     "alert_not_supported_description": "Notificações não são suportadas pelo seu navagador.",
     "notifications_copied_to_clipboard": "Copiado para a área de transferência",
@@ -188,5 +188,13 @@
     "prefs_users_edit_button": "Editar usuário",
     "prefs_users_delete_button": "Excluir usuário",
     "error_boundary_unsupported_indexeddb_title": "Navegação anônima não suportada",
-    "error_boundary_unsupported_indexeddb_description": "O ntfy web app precisa do IndexedDB para funcionar, e seu navegador não suporta IndexedDB no modo de navegação privada.<br/><br/>Embora isso seja lamentável, também não faz muito sentido usar o ntfy web app no modo de navegação privada de qualquer maneira, porque tudo é armazenado no armazenamento do navegador. Você pode ler mais sobre isso <githubLink>nesta edição do GitHub</githubLink>, ou falar conosco em <discordLink>Discord</discordLink> ou <matrixLink>Matrix</matrixLink>."
+    "error_boundary_unsupported_indexeddb_description": "O ntfy web app precisa do IndexedDB para funcionar, e seu navegador não suporta IndexedDB no modo de navegação privada.<br/><br/>Embora isso seja lamentável, também não faz muito sentido usar o ntfy web app no modo de navegação privada de qualquer maneira, porque tudo é armazenado no armazenamento do navegador. Você pode ler mais sobre isso <githubLink>nesta edição do GitHub</githubLink>, ou falar conosco em <discordLink>Discord</discordLink> ou <matrixLink>Matrix</matrixLink>.",
+    "action_bar_reservation_add": "Reserve topic",
+    "action_bar_reservation_edit": "Change reservation",
+    "signup_disabled": "Signup is disabled",
+    "signup_error_username_taken": "Username {{username}} is already taken",
+    "signup_error_creation_limit_reached": "Account creation limit reached",
+    "action_bar_reservation_delete": "N",
+    "action_bar_account": "Account",
+    "action_bar_change_display_name": "Change display name"
 }

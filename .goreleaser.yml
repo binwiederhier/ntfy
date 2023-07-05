@@ -119,8 +119,6 @@ archives:
       - server/ntfy.service
       - client/client.yml
       - client/ntfy-client.service
-    replacements:
-      amd64: x86_64
   -
     id: ntfy_windows
     builds:
@@ -131,8 +129,6 @@ archives:
       - LICENSE
       - README.md
       - client/client.yml
-    replacements:
-      amd64: x86_64
   -
     id: ntfy_darwin
     builds:
@@ -142,8 +138,6 @@ archives:
       - LICENSE
       - README.md
       - client/client.yml
-    replacements:
-      darwin: macOS
 universal_binaries:
   -
     id: ntfy_darwin_all

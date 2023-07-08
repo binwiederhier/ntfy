@@ -259,26 +259,6 @@ const Theme = () => {
   );
 };
 
-const MarkdownAlwaysEnabled = () => {
-  const { t } = useTranslation();
-  const labelId = "prefMarkdown";
-  const enabled = useLiveQuery(async () => prefs.markdownAlwaysEnabled());
-  const handleChange = async (ev) => {
-    await prefs.setMarkdownAlwaysEnabled(ev.target.value);
-  };
-
-  return (
-    <Pref labelId={labelId} title={t("prefs_appearance_markdown_always_enabled_title")}>
-      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
-          <MenuItem value>{t("prefs_appearance_markdown_always_enabled_on")}</MenuItem>
-          <MenuItem value={false}>{t("prefs_appearance_markdown_always_enabled_off")}</MenuItem>
-        </Select>
-      </FormControl>
-    </Pref>
-  );
-};
-
 const WebPushEnabled = () => {
   const { t } = useTranslation();
   const labelId = "prefWebPushEnabled";
@@ -533,7 +513,6 @@ const Appearance = () => {
       <PrefGroup>
         <Theme />
         <Language />
-        <MarkdownAlwaysEnabled />
       </PrefGroup>
     </Card>
   );

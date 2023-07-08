@@ -55,15 +55,6 @@ class Prefs {
   async setTheme(mode) {
     await this.db.prefs.put({ key: "theme", value: mode });
   }
-
-  async markdownAlwaysEnabled() {
-    const record = await this.db.prefs.get("markdownAlwaysEnabled");
-    return record?.value ?? false;
-  }
-
-  async setMarkdownAlwaysEnabled(enabled) {
-    await this.db.prefs.put({ key: "markdownAlwaysEnabled", value: enabled });
-  }
 }
 
 const prefs = new Prefs(db());

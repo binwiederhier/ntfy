@@ -192,6 +192,10 @@ const MarkdownContainer = styled("div")`
   ol {
     padding-inline: 1rem;
   }
+  
+  img {
+    max-width: 100%;
+  }
 `;
 
 const MarkdownContent = ({ content }) => {
@@ -205,17 +209,11 @@ const MarkdownContent = ({ content }) => {
 };
 
 const NotificationBody = ({ notification }) => {
-  const markdownAlwaysEnabled = useLiveQuery(async () => prefs.markdownAlwaysEnabled());
-
-  // TODO: check notification content-type when implemented on the server
-  const displayAsMarkdown = markdownAlwaysEnabled;
-
+  const displayAsMarkdown = notification.content_type === "text/markdown";
   const formatted = formatMessage(notification);
-
   if (displayAsMarkdown) {
     return <MarkdownContent content={formatted} />;
   }
-
   return autolink(formatted);
 };
 

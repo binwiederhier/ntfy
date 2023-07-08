@@ -1010,7 +1010,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
-	contentType, markdown := readParam(r, "content-type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
+	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
 	if markdown || strings.ToLower(contentType) == "text/markdown" {
 		m.ContentType = "text/markdown"
 	}
@@ -1788,6 +1788,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Icon != "" {
 			r.Header.Set("X-Icon", m.Icon)
+		}
+		if m.Markdown {
+			r.Header.Set("X-Markdown", "yes")
 		}
 		if len(m.Actions) > 0 {
 			actionsStr, err := json.Marshal(m.Actions)

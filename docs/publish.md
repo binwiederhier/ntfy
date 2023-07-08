@@ -623,6 +623,35 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
     or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
+## Markdown
+_Supported on:_ :material-firefox:
+
+You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/). 🤩
+
+By default, messages sent to ntfy are rendered as plain text. To enable Markdown, set the `X-Markdown` header (or any of 
+its aliases: `Markdown`, or `md`) to `true` (or `1` or `yes`), or set the `Content-Type` header to `text/markdown`. 
+
+Supported Markdown features:
+
+- **bold** (`**bold**`)
+- *italic* (`*italic*`)
+- [links](https://www.markdownguide.org/basic-syntax/#links) (`[links](https://www.markdownguide.org/basic-syntax/#links)`)
+- [images](https://www.markdownguide.org/basic-syntax/#images) (`![images](https://www.markdownguide.org/basic-syntax/#images)`)
+- [code blocks](https://www.markdownguide.org/basic-syntax/#code-blocks) (`` `code blocks` ``)
+- [inline code](https://www.markdownguide.org/basic-syntax/#inline-code) (`` `inline code` ``)
+- [headings](https://www.markdownguide.org/basic-syntax/#headings) (`# headings`)
+- [lists](https://www.markdownguide.org/basic-syntax/#lists) (`- lists`)
+- [blockquotes](https://www.markdownguide.org/basic-syntax/#blockquotes) (`> blockquotes`)
+- [horizontal rules](https://www.markdownguide.org/basic-syntax/#horizontal-rules) (`---`)
+
+XXXXXXXXXXXXXXXXXXXXXx
+- examples
+- supported only on Web for now
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
+
+
+
 ## Scheduled delivery
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
@@ -1004,6 +1033,7 @@ all the supported fields:
 | `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
 | `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `markdown` | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                    |
 | `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
 | `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |

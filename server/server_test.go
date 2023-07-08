@@ -1518,6 +1518,39 @@ func TestServer_PublishActions_AndPoll(t *testing.T) {
 	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
 }
 
+func TestServer_PublishMarkdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "_underline this_", map[string]string{
+		"Content-Type": "text/markdown",
+	})
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "_underline this_", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
+}
+
+func TestServer_PublishMarkdown_QueryParam(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?md=1", "_underline this_", nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "_underline this_", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
+}
+
+func TestServer_PublishMarkdown_NotMarkdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "_underline this_", map[string]string{
+		"Content-Type": "not-markdown",
+	})
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "", m.ContentType)
+}
+
 func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
@@ -1535,10 +1568,23 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "google.pdf", m.Attachment.Name)
 	require.Equal(t, "http://ntfy.sh", m.Click)
 	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+	require.Equal(t, "", m.ContentType)
 
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)
 	require.True(t, m.Time < time.Now().Unix()+31*60)
+}
+
+func TestServer_PublishAsJSON_Markdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic","message":"**This is bold**","markdown":true}`
+	response := request(t, s, "PUT", "/", body, nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "mytopic", m.Topic)
+	require.Equal(t, "**This is bold**", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
 }
 
 func TestServer_PublishAsJSON_RateLimit_MessageDailyLimit(t *testing.T) {

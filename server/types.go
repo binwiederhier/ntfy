@@ -101,6 +101,7 @@ type publishMessage struct {
 	Icon     string   `json:"icon"`
 	Actions  []action `json:"actions"`
 	Attach   string   `json:"attach"`
+	Markdown bool     `json:"markdown"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
 	Call     string   `json:"call"`

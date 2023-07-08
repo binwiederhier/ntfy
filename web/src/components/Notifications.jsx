@@ -192,7 +192,7 @@ const MarkdownContainer = styled("div")`
   ol {
     padding-inline: 1rem;
   }
-  
+
   img {
     max-width: 100%;
   }

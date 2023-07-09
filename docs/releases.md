@@ -1255,6 +1255,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Add support for [Markdown formatting](publish.md#markdown-formatting) in web app ([#310](https://github.com/binwiederhier/ntfy/issues/310), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
 * Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
 
 **Bug fixes + maintenance:**

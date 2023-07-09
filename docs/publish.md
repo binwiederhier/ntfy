@@ -653,8 +653,8 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
 === "ntfy CLI"
     ```
     ntfy publish \
-        mytopic \
         --markdown \
+        mytopic \
         "Look ma, **bold text**, *italics*, ..."
     ```
 

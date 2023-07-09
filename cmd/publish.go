@@ -96,7 +96,7 @@ func execPublish(c *cli.Context) error {
 	icon := c.String("icon")
 	actions := c.String("actions")
 	attach := c.String("attach")
-	markdown := c.Bool("attach")
+	markdown := c.Bool("markdown")
 	filename := c.String("filename")
 	file := c.String("file")
 	email := c.String("email")

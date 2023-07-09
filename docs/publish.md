@@ -627,9 +627,9 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 _Supported on:_ :material-firefox:
 
 You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/) 🤩. That means you can use 
-**bold**, *italicized*, or _underlined text_, links, images, and more. Supported Markdown features (web app only for now):
+**bold text**, *italicized text*, links, images, and more. Supported Markdown features (web app only for now):
 
-- [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italic* (`*italic*`), _underline_ (`_underline_`)
+- [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italics* (`*italics*`)
 - [Links](https://www.markdownguide.org/basic-syntax/#links) (`[some tool](https://ntfy.sh)`)
 - [Images](https://www.markdownguide.org/basic-syntax/#images) (`![some image](https://bing.com/logo.png)`)
 - [Code blocks](https://www.markdownguide.org/basic-syntax/#code-blocks) (` ```code blocks``` `) and [inline code](https://www.markdownguide.org/basic-syntax/#inline-code) (`` `inline code` ``)
@@ -645,7 +645,7 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
 === "Command line (curl)"
     ```
     curl \
-        -d "Look ma, **bold text**, *italics*, _underlined text_, ..." \
+        -d "Look ma, **bold text**, *italics*, ..." \
         -H "Markdown: yes" \
         ntfy.sh/mytopic
     ```
@@ -655,7 +655,7 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
     ntfy publish \
         mytopic \
         --markdown \
-        "Look ma, **bold text**, *italics*, _underlined text_, ..."
+        "Look ma, **bold text**, *italics*, ..."
     ```
 
 === "HTTP"
@@ -664,14 +664,14 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
     Host: ntfy.sh
     Markdown: yes
 
-    Look ma, **bold text**, *italics*, _underlined text_, ...
+    Look ma, **bold text**, *italics*, ...
     ```
 
 === "JavaScript"
     ``` javascript
     fetch('https://ntfy.sh/mytopic', {
       method: 'POST', // PUT works too
-      body: 'Look ma, **bold text**, *italics*, _underlined text_, ...',
+      body: 'Look ma, **bold text**, *italics*, ...',
       headers: { 'Markdown': 'yes' }
     })
     ```
@@ -679,11 +679,11 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
 === "Go"
     ``` go
     http.Post("https://ntfy.sh/mytopic", "text/markdown",
-        strings.NewReader("Look ma, **bold text**, *italics*, _underlined text_, ..."))
+        strings.NewReader("Look ma, **bold text**, *italics*, ..."))
 
     // or
     req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", 
-        strings.NewReader("Look ma, **bold text**, *italics*, _underlined text_, ..."))
+        strings.NewReader("Look ma, **bold text**, *italics*, ..."))
     req.Header.Set("Markdown", "yes")
     http.DefaultClient.Do(req)
     ```
@@ -693,7 +693,7 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh/mytopic"
-      Body = "Look ma, **bold text**, *italics*, _underlined text_, ..."
+      Body = "Look ma, **bold text**, *italics*, ..."
       Headers = @{
         Markdown = "yes"
       }
@@ -704,7 +704,7 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
 === "Python"
     ``` python
     requests.post("https://ntfy.sh/mytopic", 
-        data="Look ma, **bold text**, *italics*, _underlined text_, ..."
+        data="Look ma, **bold text**, *italics*, ..."
         headers={ "Markdown": "yes" }))
     ```
 
@@ -714,7 +714,7 @@ As of today, **Markdown is only supported in the web app.** Here's an example of
         'http' => [
             'method' => 'POST', // PUT also works
             'header' => 'Content-Type: text/markdown', // !
-            'content' => 'Look ma, **bold text**, *italics*, _underlined text_, ...'
+            'content' => 'Look ma, **bold text**, *italics*, ...'
         ]
     ]));
     ```

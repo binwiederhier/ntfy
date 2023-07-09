@@ -3597,6 +3597,7 @@ table in their canonical form.
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
+| `X-Markdown`    | `Markdown`, `md`                           | Enable [Markdown formatting](#markdown-formatting) in the notification body                   |
 | `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
@@ -3606,3 +3607,4 @@ table in their canonical form.
 | `X-UnifiedPush` | `UnifiedPush`, `up`                        | [UnifiedPush](#unifiedpush) publish option, only to be used by UnifiedPush apps               |
 | `X-Poll-ID`     | `Poll-ID`                                  | Internal parameter, used for [iOS push notifications](config.md#ios-instant-notifications)    |
 | `Authorization` | -                                          | If supported by the server, you can [login to access](#authentication) protected topics       |
+| `Content-Type`  | -                                          | If set to `text/markdown`, [Markdown formatting](#markdown-formatting) is enabled             |

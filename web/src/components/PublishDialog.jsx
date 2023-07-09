@@ -61,6 +61,7 @@ const PublishDialog = (props) => {
   const [call, setCall] = useState("");
   const [delay, setDelay] = useState("");
   const [publishAnother, setPublishAnother] = useState(false);
+  const [markdownEnabled, setMarkdownEnabled] = useState(false);
 
   const [showTopicUrl, setShowTopicUrl] = useState("");
   const [showClickUrl, setShowClickUrl] = useState(false);
@@ -148,6 +149,10 @@ const PublishDialog = (props) => {
     if (attachFile && message.trim()) {
       url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());
     }
+    if (markdownEnabled) {
+      url.searchParams.append("markdown", "true");
+    }
+
     const body = attachFile || message;
     try {
       const user = await userManager.get(baseUrl);
@@ -352,6 +357,20 @@ const PublishDialog = (props) => {
             inputProps={{
               "aria-label": t("publish_dialog_message_label"),
             }}
+          />
+          <FormControlLabel
+            label={t("publish_dialog_checkbox_markdown")}
+            sx={{ marginRight: 2 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={markdownEnabled}
+                onChange={(ev) => setMarkdownEnabled(ev.target.checked)}
+                inputProps={{
+                  "aria-label": t("publish_dialog_checkbox_markdown"),
+                }}
+              />
+            }
           />
           <div style={{ display: "flex" }}>
             <EmojiPicker anchorEl={emojiPickerAnchorEl} onEmojiPick={handleEmojiPick} onClose={handleEmojiClose} />

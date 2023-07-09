@@ -160,6 +160,7 @@
   "publish_dialog_button_cancel_sending": "Cancel sending",
   "publish_dialog_button_cancel": "Cancel",
   "publish_dialog_button_send": "Send",
+  "publish_dialog_checkbox_markdown": "Format as Markdown",
   "publish_dialog_checkbox_publish_another": "Publish another",
   "publish_dialog_attached_file_title": "Attached file:",
   "publish_dialog_attached_file_filename_placeholder": "Attachment filename",

@@ -1520,29 +1520,29 @@ func TestServer_PublishActions_AndPoll(t *testing.T) {
 
 func TestServer_PublishMarkdown(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic", "_underline this_", map[string]string{
+	response := request(t, s, "PUT", "/mytopic", "**make this bold**", map[string]string{
 		"Content-Type": "text/markdown",
 	})
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "_underline this_", m.Message)
+	require.Equal(t, "**make this bold**", m.Message)
 	require.Equal(t, "text/markdown", m.ContentType)
 }
 
 func TestServer_PublishMarkdown_QueryParam(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic?md=1", "_underline this_", nil)
+	response := request(t, s, "PUT", "/mytopic?md=1", "**make this bold**", nil)
 	require.Equal(t, 200, response.Code)
 
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "_underline this_", m.Message)
+	require.Equal(t, "**make this bold**", m.Message)
 	require.Equal(t, "text/markdown", m.ContentType)
 }
 
 func TestServer_PublishMarkdown_NotMarkdown(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "PUT", "/mytopic", "_underline this_", map[string]string{
+	response := request(t, s, "PUT", "/mytopic", "**make this bold**", map[string]string{
 		"Content-Type": "not-markdown",
 	})
 	require.Equal(t, 200, response.Code)

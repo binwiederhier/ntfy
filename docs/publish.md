@@ -138,7 +138,7 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
         Tags = "warning,skull"
       }
       Body = "Remote access to phils-laptop detected. Act right away."
-    }             
+    }
     Invoke-RestMethod @Request
     ```
     
@@ -623,34 +623,108 @@ them with a comma, e.g. `tag1,tag2,tag3`.
     as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
     or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
-## Markdown
+## Markdown formatting
 _Supported on:_ :material-firefox:
 
-You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/). 🤩
+You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/) 🤩. That means you can use 
+**bold**, *italicized*, or _underlined text_, links, images, and more. Supported Markdown features (web app only for now):
 
-By default, messages sent to ntfy are rendered as plain text. To enable Markdown, set the `X-Markdown` header (or any of 
-its aliases: `Markdown`, or `md`) to `true` (or `1` or `yes`), or set the `Content-Type` header to `text/markdown`. 
+- [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italic* (`*italic*`), _underline_ (`_underline_`)
+- [Links](https://www.markdownguide.org/basic-syntax/#links) (`[some tool](https://ntfy.sh)`)
+- [Images](https://www.markdownguide.org/basic-syntax/#images) (`![some image](https://bing.com/logo.png)`)
+- [Code blocks](https://www.markdownguide.org/basic-syntax/#code-blocks) (` ```code blocks``` `) and [inline code](https://www.markdownguide.org/basic-syntax/#inline-code) (`` `inline code` ``)
+- [Headings](https://www.markdownguide.org/basic-syntax/#headings) (`# headings`, `## headings`, etc.)
+- [Lists](https://www.markdownguide.org/basic-syntax/#lists) (`- lists`, `1. lists`, etc.)
+- [Blockquotes](https://www.markdownguide.org/basic-syntax/#blockquotes) (`> blockquotes`)
+- [Horizontal rules](https://www.markdownguide.org/basic-syntax/#horizontal-rules) (`---`)
 
-Supported Markdown features:
+By default, messages sent to ntfy are rendered as plain text. To enable Markdown, set the `X-Markdown` header (or any of
+its aliases: `Markdown`, or `md`) to `true` (or `1` or `yes`), or set the `Content-Type` header to `text/markdown`.
+As of today, **Markdown is only supported in the web app.** Here's an example of how to enable Markdown formatting:
 
-- **bold** (`**bold**`)
-- *italic* (`*italic*`)
-- [links](https://www.markdownguide.org/basic-syntax/#links) (`[links](https://www.markdownguide.org/basic-syntax/#links)`)
-- [images](https://www.markdownguide.org/basic-syntax/#images) (`![images](https://www.markdownguide.org/basic-syntax/#images)`)
-- [code blocks](https://www.markdownguide.org/basic-syntax/#code-blocks) (`` `code blocks` ``)
-- [inline code](https://www.markdownguide.org/basic-syntax/#inline-code) (`` `inline code` ``)
-- [headings](https://www.markdownguide.org/basic-syntax/#headings) (`# headings`)
-- [lists](https://www.markdownguide.org/basic-syntax/#lists) (`- lists`)
-- [blockquotes](https://www.markdownguide.org/basic-syntax/#blockquotes) (`> blockquotes`)
-- [horizontal rules](https://www.markdownguide.org/basic-syntax/#horizontal-rules) (`---`)
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "Look ma, **bold text**, *italics*, _underlined text_, ..." \
+        -H "Markdown: yes" \
+        ntfy.sh/mytopic
+    ```
 
-XXXXXXXXXXXXXXXXXXXXXx
-- examples
-- supported only on Web for now
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        mytopic \
+        --markdown \
+        "Look ma, **bold text**, *italics*, _underlined text_, ..."
+    ```
 
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    Markdown: yes
 
+    Look ma, **bold text**, *italics*, _underlined text_, ...
+    ```
 
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic', {
+      method: 'POST', // PUT works too
+      body: 'Look ma, **bold text**, *italics*, _underlined text_, ...',
+      headers: { 'Markdown': 'yes' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    http.Post("https://ntfy.sh/mytopic", "text/markdown",
+        strings.NewReader("Look ma, **bold text**, *italics*, _underlined text_, ..."))
+
+    // or
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", 
+        strings.NewReader("Look ma, **bold text**, *italics*, _underlined text_, ..."))
+    req.Header.Set("Markdown", "yes")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Body = "Look ma, **bold text**, *italics*, _underlined text_, ..."
+      Headers = @{
+        Markdown = "yes"
+      }
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic", 
+        data="Look ma, **bold text**, *italics*, _underlined text_, ..."
+        headers={ "Markdown": "yes" }))
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' => 'Content-Type: text/markdown', // !
+            'content' => 'Look ma, **bold text**, *italics*, _underlined text_, ...'
+        ]
+    ]));
+    ```
+
+Here's what that looks like in the web app:
+
+<figure markdown>
+  ![markdown](static/img/web-markdown.png){ width=500 }
+  <figcaption>Markdown formatting in the web app</figcaption>
+</figure>
 
 ## Scheduled delivery
 _Supported on:_ :material-android: :material-apple: :material-firefox:

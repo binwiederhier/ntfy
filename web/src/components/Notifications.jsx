@@ -15,6 +15,8 @@ import {
   IconButton,
   Box,
   Button,
+  useTheme,
+  ThemeProvider,
 } from "@mui/material";
 import * as React from "react";
 import { useEffect, useState } from "react";
@@ -37,7 +39,6 @@ import priority5 from "../img/priority-5.svg";
 import logoOutline from "../img/ntfy-outline.svg";
 import AttachmentIcon from "./AttachmentIcon";
 import { useAutoSubscribe } from "./hooks";
-import prefs from "../app/Prefs";
 
 const priorityFiles = {
   1: priority1,
@@ -174,7 +175,8 @@ const MarkdownContainer = styled("div")`
   p,
   pre,
   ul,
-  ol {
+  ol,
+  blockquote {
     margin: 0;
   }
 
@@ -182,14 +184,19 @@ const MarkdownContainer = styled("div")`
     line-height: 1.2;
   }
 
-  blockquote {
-    margin: 0;
-    padding-inline: 1rem;
-    background: ${(theme) => (theme.mode === "light" ? "#f1f1f1" : "#aeaeae")};
+  blockquote,
+  pre {
+    border-radius: 3px;
+    background: ${(props) => (props.theme.palette.mode === "light" ? "#f5f5f5" : "#333")};
+  }
+
+  pre {
+    padding: 0.9rem;
   }
 
   ul,
-  ol {
+  ol,
+  blockquote {
     padding-inline: 1rem;
   }
 

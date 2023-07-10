@@ -7,8 +7,7 @@ import { clientsClaim } from "workbox-core";
 import { dbAsync } from "../src/app/db";
 
 import { toNotificationParams, icon, badge } from "../src/app/notificationUtils";
-
-import i18n from "../src/app/i18n";
+import initI18n from "../src/app/i18n";
 
 /**
  * General docs for service workers and PWAs:
@@ -67,8 +66,10 @@ const handlePushMessage = async (data) => {
  * Handle a received web push subscription expiring.
  */
 const handlePushSubscriptionExpiring = async (data) => {
-  await self.registration.showNotification(i18n.t("web_push_subscription_expiring_title"), {
-    body: i18n.t("web_push_subscription_expiring_body"),
+  const t = await initI18n();
+
+  await self.registration.showNotification(t("web_push_subscription_expiring_title"), {
+    body: t("web_push_subscription_expiring_body"),
     icon,
     data,
     badge,
@@ -80,8 +81,10 @@ const handlePushSubscriptionExpiring = async (data) => {
  * permission can be revoked by the browser.
  */
 const handlePushUnknown = async (data) => {
-  await self.registration.showNotification(i18n.t("web_push_unknown_notification_title"), {
-    body: i18n.t("web_push_unknown_notification_body"),
+  const t = await initI18n();
+
+  await self.registration.showNotification(t("web_push_unknown_notification_title"), {
+    body: t("web_push_unknown_notification_body"),
     icon,
     data,
     badge,
@@ -107,6 +110,8 @@ const handlePush = async (data) => {
  * This is also called when the user clicks on an action button.
  */
 const handleClick = async (event) => {
+  const t = await initI18n();
+
   const clients = await self.clients.matchAll({ type: "window" });
 
   const rootUrl = new URL(self.location.origin);
@@ -147,7 +152,7 @@ const handleClick = async (event) => {
           }
         } catch (e) {
           console.error("[ServiceWorker] Error performing http action", e);
-          self.registration.showNotification(`${i18n.t("notifications_actions_failed_notification")}: ${action.label} (${action.action})`, {
+          self.registration.showNotification(`${t("notifications_actions_failed_notification")}: ${action.label} (${action.action})`, {
             body: e.message,
             icon,
             badge,

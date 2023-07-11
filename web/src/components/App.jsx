@@ -20,9 +20,11 @@ import Messaging from "./Messaging";
 import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
-import "../app/i18n"; // Translations!
+import initI18n from "../app/i18n"; // Translations!
 import prefs, { THEME } from "../app/Prefs";
 import RTLCacheProvider from "./RTLCacheProvider";
+
+initI18n();
 
 export const AccountContext = createContext(null);
 

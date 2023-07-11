@@ -1261,6 +1261,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to  [@nimbleghost](https://github.com/nimbleghost))
+* Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

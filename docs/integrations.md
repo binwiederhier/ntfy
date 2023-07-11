@@ -56,6 +56,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy](https://github.com/ffflorian/ntfy) - Send notifications over ntfy (JS)
 - [ntfy_dart](https://github.com/jr1221/ntfy_dart) - Dart wrapper around the ntfy API (Dart)
 - [gotfy](https://github.com/AnthonyHewins/gotfy) - A Go wrapper for the ntfy API (Go)
+- [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP) 
 
 ## CLIs + GUIs
 
@@ -129,6 +130,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
+- [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 9/2021
 - [Basic website monitoring using cronjobs and ntfy.sh](https://burkhardt.dev/2023/website-monitoring-cron-ntfy/) - burkhardt.dev - 6/2023 
 - [Pingdom alternative in one line of curl through ntfy.sh](https://piqoni.bearblog.dev/uptime-monitoring-in-one-line-of-curl/) - bearblog.dev - 6/2023 
 - [#OpenSourceDiscovery 78: ntfy.sh](https://opensourcedisc.substack.com/p/opensourcediscovery-78-ntfysh) - opensourcedisc.substack.com - 6/2023 
@@ -155,6 +157,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [NTFY - système de notification hyper simple et complet](https://www.youtube.com/watch?v=UieZYWVVgA4) - youtube.com - 12/2022
 - [ntfy.sh](https://paramdeo.com/til/ntfy-sh) - paramdeo.com - 11/2022
 - [Using ntfy to warn me when my computer is discharging](https://ulysseszh.github.io/programming/2022/11/28/ntfy-warn-discharge.html) - ulysseszh.github.io - 11/2022
+- [Enabling SSH Login Notifications using Ntfy](https://paramdeo.com/blog/enabling-ssh-login-notifications-using-ntfy) - paramdeo.com - 11/2022
 - [ntfy - Push Notification Service](https://dizzytech.de/posts/ntfy/) - dizzytech.de - 11/2022 
 - [Console #132](https://console.substack.com/p/console-132) ⭐ - console.substack.com - 11/2022
 - [How to make my phone buzz*](https://evbogue.com/howtomakemyphonebuzz) - evbogue.com - 11/2022

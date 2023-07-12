@@ -44,6 +44,14 @@ Here are a few working sample configs:
     attachment-cache-dir: "/var/cache/ntfy/attachments"
     ```
 
+=== "server.yml (behind proxy, with cache + attachments)"
+    ``` yaml
+    base-url: "http://ntfy.example.com"
+    listen-http: ":2586"
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
 === "server.yml (ntfy.sh config)"
     ``` yaml
     # All the things: Behind a proxy, Firebase, cache, attachments, 

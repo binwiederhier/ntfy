@@ -342,6 +342,10 @@
 #      - "field -> level" to match any value, e.g. "time_taken_ms -> debug"
 #   Warning: Using log-level-overrides has a performance penalty. Only use it for temporary debugging.
 #
+# Check your permissions:
+#   If you are running ntfy with systemd, make sure this log file is owned by the
+#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#
 # Example (good for production):
 #   log-level: info
 #   log-format: json

@@ -29,13 +29,14 @@ which pip3 1>/dev/null 2>&1; then
     exit 0
 fi
 
-# check `python3.N` from newest to oldest
-CANDIDATE_SUFFIXES=("3.11" "3.10" "3.9" "3.8")
-for SUFFIX in ${CANDIDATE_SUFFIXES[@]}; do
+# list all available `python3.N`, then use the newest that passes checks
+# compgen is bash-specific, but we asked for bash in shebang so it's fine
+MINOR_VERSION_CANDIDATES=$(compgen -c | grep -P '^python3\.[0-9]+$' | sed 's/python3\.//' | awk 'int($NF) >= 8' | sort -nr)
+for MINOR in ${MINOR_VERSION_CANDIDATES[@]}; do
     # if both `python3.N` and `pip3.N` are available, use that
-    if which "python$SUFFIX" 1>/dev/null 2>&1 && \
-    which "pip$SUFFIX" 1>/dev/null 2>&1; then
-        echo "${BIN_PREFIX}${SUFFIX}"
+    if which "python3.${MINOR}" 1>/dev/null 2>&1 && \
+    which "pip3.${MINOR}" 1>/dev/null 2>&1; then
+        echo "${BIN_PREFIX}3.${MINOR}"
         exit 0
     fi
 done

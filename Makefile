@@ -1,6 +1,10 @@
 MAKEFLAGS := --jobs=1
+
 VERSION := $(shell git describe --tag)
 COMMIT := $(shell git rev-parse --short HEAD)
+
+PY_BIN := $(shell tools/get-python-bin.sh python)
+PIP_BIN := $(shell tools/get-python-bin.sh pip)
 
 .PHONY:
 
@@ -96,16 +100,13 @@ build-deps-ubuntu:
 docs: docs-deps docs-build
 
 docs-build: .PHONY
-	PY=$$(tools/get-python-bin.sh python) && MKDOCS=$$(which mkdocs) && \
-	$$PY $$MKDOCS build
+	PY=$$(which $(PY_BIN)) && MKDOCS=$$(which mkdocs) && $$PY $$MKDOCS build
 
 docs-deps: .PHONY
-	PIP=$$(tools/get-python-bin.sh pip) && \
-	$$PIP install -r requirements.txt
+	PIP=$$(which $(PIP_BIN)) && $$PIP install -r requirements.txt
 
 docs-deps-update: .PHONY
-	PIP=$$(tools/get-python-bin.sh pip) && \
-	$$PIP install -r requirements.txt --upgrade
+	PIP=$$(which $(PIP_BIN)) && $$PIP install -r requirements.txt --upgrade
 
 # Web app
 

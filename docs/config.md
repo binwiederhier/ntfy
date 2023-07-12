@@ -658,14 +658,13 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix 
-        RewriteCond %{REQUEST_METHOD} GET
-        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+        # it to work with curl without the annoying https:// prefix (requires "a2enmod alias")
+        <If "%{REQUEST_METHOD} == 'GET'">
+            RedirectMatch permanent "^/([-_A-Za-z0-9]{0,64})$" "https://%{SERVER_NAME}/$1"
+        </If>
+
     </VirtualHost>
     
     <VirtualHost *:443>
@@ -685,9 +684,6 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
 	
     </VirtualHost>
     ```

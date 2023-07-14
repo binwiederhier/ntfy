@@ -27,7 +27,7 @@ import { useOutletContext } from "react-router-dom";
 import { useRemark } from "react-remark";
 import styled from "@emotion/styled";
 import { formatBytes, formatShortDateTime, maybeActionErrors, openUrl, shortUrl, topicShortUrl, unmatchedTags } from "../app/utils";
-import { formatMessage, formatTitle } from "../app/notificationUtils";
+import { formatMessage, formatTitle, isImage } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
 import priority1 from "../img/priority-1.svg";
@@ -346,7 +346,7 @@ const Attachment = (props) => {
   const { attachment } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
-  const displayableImage = !expired && attachment.type && attachment.type.startsWith("image/");
+  const displayableImage = !expired && isImage(attachment);
 
   // Unexpired image
   if (displayableImage) {

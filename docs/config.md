@@ -1203,7 +1203,7 @@ In Prometheus, an example scrape config would look like this:
 Here's an example Grafana dashboard built from the metrics (see [Grafana JSON on GitHub](https://raw.githubusercontent.com/binwiederhier/ntfy/main/examples/grafana-dashboard/ntfy-grafana.json)):
 
 <figure markdown style="padding-left: 50px; padding-right: 50px">
-  <a href="../../static/img/grafana-dashboard.png" target="_blank"><img src="../../static/img/grafana-dashboard.png"/></a>
+  <a href="static/img/grafana-dashboard.png" target="_blank"><img src="static/img/grafana-dashboard.png"/></a>
   <figcaption>ntfy Grafana dashboard</figcaption>
 </figure>
 

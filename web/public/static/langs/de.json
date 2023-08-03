@@ -310,7 +310,7 @@
     "prefs_reservations_delete_button": "Zugriff auf Thema zurücksetzen",
     "prefs_reservations_table": "Übersicht reservierter Themen",
     "prefs_reservations_table_topic_header": "Thema",
-    "prefs_reservations_table_everyone_deny_all": "Nur kann veröffentlichen und lesen",
+    "prefs_reservations_table_everyone_deny_all": "Nur ich kann veröffentlichen und lesen",
     "prefs_reservations_table_everyone_write_only": "Ich kann veröffentlichen und lesen, jeder kann veröffentlichen",
     "prefs_reservations_table_not_subscribed": "Nicht abonniert",
     "prefs_reservations_table_click_to_subscribe": "Klicken um zu abonnieren",

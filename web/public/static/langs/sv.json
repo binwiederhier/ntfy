@@ -277,7 +277,7 @@
     "publish_dialog_priority_low": "Låg prioritet",
     "publish_dialog_priority_default": "Standard prioritet",
     "publish_dialog_priority_high": "Hög prioritet",
-    "publish_dialog_priority_max": "Högsta prioritet",
+    "publish_dialog_priority_max": "Max. prioritet",
     "publish_dialog_base_url_label": "Service-URL",
     "publish_dialog_email_label": "E-post",
     "publish_dialog_attach_reset": "Ta bort URL för bifogade filer",

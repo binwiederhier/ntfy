@@ -330,7 +330,7 @@ default-token: tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
 
 	app, _, stdout, _ := newTestApp()
 
-	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--config=" + filename, "mytopic"}))
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--from-config", "--config=" + filename, "mytopic"}))
 
 	require.Equal(t, message, strings.TrimSpace(stdout.String()))
 }
@@ -355,7 +355,63 @@ default-password: mypass
 
 	app, _, stdout, _ := newTestApp()
 
-	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--config=" + filename, "mytopic"}))
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--from-config", "--config=" + filename, "mytopic"}))
+
+	require.Equal(t, message, strings.TrimSpace(stdout.String()))
+}
+
+func TestCLI_Subscribe_Override_Default_UserPass_With_Empty_UserPass(t *testing.T) {
+	message := `{"id":"RXIQBFaieLVr","time":124,"expires":1124,"event":"message","topic":"mytopic","message":"triggered"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic/json", r.URL.Path)
+		require.Equal(t, "", r.Header.Get("Authorization"))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(message))
+	}))
+	defer server.Close()
+
+	filename := filepath.Join(t.TempDir(), "client.yml")
+	require.Nil(t, os.WriteFile(filename, []byte(fmt.Sprintf(`
+default-host: %s
+default-user: philipp
+default-password: mypass
+subscribe:
+  - topic: mytopic
+    user: ""
+    password: ""
+`, server.URL)), 0600))
+
+	app, _, stdout, _ := newTestApp()
+
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--from-config", "--config=" + filename}))
+
+	require.Equal(t, message, strings.TrimSpace(stdout.String()))
+}
+
+func TestCLI_Subscribe_Override_Default_Token_With_Empty_Token(t *testing.T) {
+	message := `{"id":"RXIQBFaieLVr","time":124,"expires":1124,"event":"message","topic":"mytopic","message":"triggered"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic/json", r.URL.Path)
+		require.Equal(t, "", r.Header.Get("Authorization"))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(message))
+	}))
+	defer server.Close()
+
+	filename := filepath.Join(t.TempDir(), "client.yml")
+	require.Nil(t, os.WriteFile(filename, []byte(fmt.Sprintf(`
+default-host: %s
+default-token: tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
+subscribe:
+  - topic: mytopic
+    token: ""
+`, server.URL)), 0600))
+
+	app, _, stdout, _ := newTestApp()
+
+	require.Nil(t, app.Run([]string{"ntfy", "subscribe", "--poll", "--from-config", "--config=" + filename}))
 
 	require.Equal(t, message, strings.TrimSpace(stdout.String()))
 }

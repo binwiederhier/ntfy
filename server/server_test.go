@@ -1555,7 +1555,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
 		`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4,` +
-		`"icon":"https://ntfy.sh/static/img/ntfy.png", "delay":"30min"}`
+		`"icon":"https://ntfy.sh/static/img/ntfy.png", "delay":"30min", "extras": {"customField":"foo"}}`
 	response := request(t, s, "PUT", "/", body, nil)
 	require.Equal(t, 200, response.Code)
 
@@ -1569,6 +1569,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "http://ntfy.sh", m.Click)
 	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
 	require.Equal(t, "", m.ContentType)
+	require.Equal(t, map[string]string{"customField": "foo"}, m.Extras)
 
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)

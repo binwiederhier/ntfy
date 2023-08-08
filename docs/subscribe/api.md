@@ -329,6 +329,7 @@ format of the message. It's very straight forward:
 | `click`      | -        | *URL*                                             | `https://example.com`                                 | Website opened when notification is [clicked](../publish.md#click-action)                                                            |
 | `actions`    | -        | *JSON array*                                      | *see [actions buttons](../publish.md#action-buttons)* | [Action buttons](../publish.md#action-buttons) that can be displayed in the notification                                             |
 | `attachment` | -        | *JSON object*                                     | *see below*                                           | Details about an attachment (name, URL, size, ...)                                                                                   |
+| `extras`     | -        | *JSON object*                                     | `{"customField": "customValue"}`                      | Extra key:value pairs provided by the publisher                                                                                      |
 
 **Attachment** (part of the message, see [attachments](../publish.md#attachments) for details):
 
@@ -362,6 +363,9 @@ Here's an example for each message type:
             "size": 33848,
             "expires": 1643946728,
             "url": "https://ntfy.sh/file/sPs71M8A2T.png"
+        },
+        "extras": {
+            "customField": "customValue"
         },
         "title": "Unauthorized access detected",
         "message": "Movement detected in the yard. You better go check"

@@ -1285,6 +1285,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.8.0 (UNRELEASED)
 
+**Features:**
+
+* You can now send custom fields within an `extras` field in a JSON POST/PUT request ([#827](https://github.com/binwiederhier/ntfy/issues/827), thanks to [@tka85](https://github.com/tka85) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+
 **Bug fixes + maintenance:**
 
 * Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)

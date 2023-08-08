@@ -1010,6 +1010,14 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
+	extrasStr := readParam(r, "x-extras")
+	if extrasStr != "" {
+		extras := make(map[string]string)
+		if err := json.Unmarshal([]byte(extrasStr), &extras); err != nil {
+			return false, false, "", "", false, errHTTPBadRequestExtrasInvalid.Wrap(e.Error())
+		}
+		m.Extras = extras
+	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
 	if markdown || strings.ToLower(contentType) == "text/markdown" {
 		m.ContentType = "text/markdown"
@@ -1808,6 +1816,14 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)
 		}
+		if len(m.Extras) > 0 {
+			extrasStr, err := json.Marshal(m.Extras)
+			if err != nil {
+				return errHTTPBadRequestMessageJSONInvalid
+			}
+			r.Header.Set("X-Extras", string(extrasStr))
+		}
+
 		return next(w, r, v)
 	}
 }

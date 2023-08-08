@@ -1114,6 +1114,7 @@ all the supported fields:
 | `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
 | `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
 | `call`     | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
+| `extras`   | -        | *JSON object*                    | `{"customField": "customValue"}`          | Extra key:value pairs will be included in the notification            |
 
 ## Action buttons
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -2661,6 +2662,123 @@ Here's an example of how it will look on Android:
   ![file attachment](static/img/android-screenshot-icon.png){ width=500 }
   <figcaption>Custom icon from an external URL</figcaption>
 </figure>
+
+## Custom fields
+_Supported on:_ :material-android:
+
+You can send custom key:value pairs that will be included as-is in the notification. This can be helpful if you are
+using ntfy to pass messages between different computer programs or services, for example. Simply pass a stringified
+JSON object in the `X-Extras` header, or include the JSON object in the `extras` key when using [JSON publishing]
+(#publish-as-json). **The JSON object can only be 1 level deep, nesting is not supported**.
+
+Here's an example showing how to send custom fields:
+
+=== "Command line (curl) (JSON)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "extras": {"lastChecked": "20230205"}
+      }'
+    ```
+=== "Command line (curl) (Header)"
+    ```
+    curl \
+        -H "Title: Low disk space alert" \
+        -H "Tags: warning,cd" \
+        -H "X-Priority: 4" \
+        -H 'X-Extras: {"lastChecked": "20230205"}' \
+        -d "Disk space is low at 5.1 GB" \
+        ntfy.sh/mytopic
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    Title: Low disk space alert
+    Tags: warning,cd
+    X-Priority: 4
+    X-Extras: {"lastChecked": "20230205"}
+
+    Disk space is low at 5.1 GB
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic', {
+        method: 'POST',
+        headers: {
+            'Title': 'Low disk space alert',
+            'Tags': 'warning,cd'
+            'X-Priority': '4',
+            'X-Extras': {'lastChecked': '20230205'}
+        },
+        body: "Disk space is low at 5.1 GB"
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", strings.NewReader("Disk space is low at 5.1 GB"))
+    req.Header.Set("Title", "Low disk space alert")
+    req.Header.Set("Tags", "warning,cd")
+    req.Header.Set("X-Priority", "4")
+    req.Header.Set("X-Extras", `{"lastChecked": "20230205"}`)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = @{
+        Topic    = "mytopic"
+        Title    = "Low disk space alert"
+        Tags     = @("warning", "cd")
+        Priority = 4
+        Message  = "Disk space is low at 5.1 GB"
+        Extras   = ConvertTo-JSON @{
+          lastChecked = "20230205"
+        }
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic",
+        data="Disk space is low at 5.1 GB",
+        headers={
+            "Title": "Low disk space alert",
+            "Tags": "warning,cd",
+            "X-Priority": "4",
+            "X-Extras": '{"lastChecked": "20230205"}'
+        })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+        'method' => 'PUT',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Title: Low disk space alert\r\n" .
+            "Tags: warning,cd\r\n" .
+            "X-Priority: 4\r\n" .
+            "X-Extras: {\"lastChecked\": \"20230205\"}",
+        ],
+        'content' => "Disk space is low at 5.1 GB"
+    ]));
+    ```
 
 ## E-mail notifications
 _Supported on:_ :material-android: :material-apple: :material-firefox:

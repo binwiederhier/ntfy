@@ -37,7 +37,7 @@ subscribe:
 	require.Equal(t, 4, len(conf.Subscribe))
 	require.Equal(t, "no-command-with-auth", conf.Subscribe[0].Topic)
 	require.Equal(t, "", conf.Subscribe[0].Command)
-	require.Equal(t, "phil", conf.Subscribe[0].User)
+	require.Equal(t, "phil", *conf.Subscribe[0].User)
 	require.Equal(t, "mypass", *conf.Subscribe[0].Password)
 	require.Equal(t, "echo-this", conf.Subscribe[1].Topic)
 	require.Equal(t, `echo "Message received: $message"`, conf.Subscribe[1].Command)
@@ -67,7 +67,7 @@ subscribe:
 	require.Equal(t, 1, len(conf.Subscribe))
 	require.Equal(t, "no-command-with-auth", conf.Subscribe[0].Topic)
 	require.Equal(t, "", conf.Subscribe[0].Command)
-	require.Equal(t, "phil", conf.Subscribe[0].User)
+	require.Equal(t, "phil", *conf.Subscribe[0].User)
 	require.Equal(t, "", *conf.Subscribe[0].Password)
 }
 
@@ -91,7 +91,7 @@ subscribe:
 	require.Equal(t, 1, len(conf.Subscribe))
 	require.Equal(t, "no-command-with-auth", conf.Subscribe[0].Topic)
 	require.Equal(t, "", conf.Subscribe[0].Command)
-	require.Equal(t, "phil", conf.Subscribe[0].User)
+	require.Equal(t, "phil", *conf.Subscribe[0].User)
 	require.Nil(t, conf.Subscribe[0].Password)
 }
 
@@ -113,7 +113,7 @@ subscribe:
 	require.Equal(t, 1, len(conf.Subscribe))
 	require.Equal(t, "no-command-with-auth", conf.Subscribe[0].Topic)
 	require.Equal(t, "", conf.Subscribe[0].Command)
-	require.Equal(t, "phil", conf.Subscribe[0].User)
+	require.Equal(t, "phil", *conf.Subscribe[0].User)
 	require.Nil(t, conf.Subscribe[0].Password)
 }
 
@@ -134,7 +134,7 @@ subscribe:
 	require.Equal(t, "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2", conf.DefaultToken)
 	require.Equal(t, 1, len(conf.Subscribe))
 	require.Equal(t, "mytopic", conf.Subscribe[0].Topic)
-	require.Equal(t, "", conf.Subscribe[0].User)
+	require.Nil(t, conf.Subscribe[0].User)
 	require.Nil(t, conf.Subscribe[0].Password)
-	require.Equal(t, "", conf.Subscribe[0].Token)
+	require.Nil(t, conf.Subscribe[0].Token)
 }

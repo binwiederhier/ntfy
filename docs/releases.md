@@ -1262,6 +1262,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to  [@nimbleghost](https://github.com/nimbleghost))
 * Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* You can now unset the default user:pass/token in `client.yml` for an individual subscription to remove the Authorization header ([#829](https://github.com/binwiederhier/ntfy/issues/829), thanks to [@tomeon](https://github.com/tomeon) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

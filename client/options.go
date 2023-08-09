@@ -97,6 +97,11 @@ func WithBearerAuth(token string) PublishOption {
 	return WithHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 }
 
+// WithEmptyAuth clears the Authorization header
+func WithEmptyAuth() PublishOption {
+	return RemoveHeader("Authorization")
+}
+
 // WithNoCache instructs the server not to cache the message server-side
 func WithNoCache() PublishOption {
 	return WithHeader("X-Cache", "no")
@@ -183,6 +188,16 @@ func WithQueryParam(param, value string) RequestOption {
 			q := r.URL.Query()
 			q.Add(param, value)
 			r.URL.RawQuery = q.Encode()
+		}
+		return nil
+	}
+}
+
+// RemoveHeader is a generic option to remove a header from a request
+func RemoveHeader(header string) RequestOption {
+	return func(r *http.Request) error {
+		if header != "" {
+			delete(r.Header, header)
 		}
 		return nil
 	}

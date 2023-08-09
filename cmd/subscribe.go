@@ -225,12 +225,17 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 }
 
 func maybeAddAuthHeader(s client.Subscribe, conf *client.Config) client.SubscribeOption {
-	// check for subscription token then subscription user:pass
-	if s.Token != "" {
-		return client.WithBearerAuth(s.Token)
+	// if an explicit empty token or empty user:pass is given, exit without auth
+	if (s.Token != nil && *s.Token == "") || (s.User != nil && *s.User == "" && s.Password != nil && *s.Password == "") {
+		return client.WithEmptyAuth()
 	}
-	if s.User != "" && s.Password != nil {
-		return client.WithBasicAuth(s.User, *s.Password)
+
+	// check for subscription token then subscription user:pass
+	if s.Token != nil && *s.Token != "" {
+		return client.WithBearerAuth(*s.Token)
+	}
+	if s.User != nil && *s.User != "" && s.Password != nil {
+		return client.WithBasicAuth(*s.User, *s.Password)
 	}
 
 	// if no subscription token nor subscription user:pass, check for default token then default user:pass

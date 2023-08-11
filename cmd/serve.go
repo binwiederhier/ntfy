@@ -99,6 +99,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "message-limit", Aliases: []string{"message_limit"}, EnvVars: []string{"NTFY_MESSAGE_LIMIT"}, Value: server.DefaultMessageLengthLimit, Usage: "size limit for the mesasge in bytes"}),
 )
 
 var cmdServe = &cli.Command{
@@ -189,6 +190,7 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
+	mesasgeLimit := c.Int("message-limit")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -364,6 +366,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushFile = webPushFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 	conf.WebPushStartupQueries = webPushStartupQueries
+	conf.MessageLimit = mesasgeLimit
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

@@ -352,5 +352,16 @@
     "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} в год. Оплата помесячно.",
     "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} ежегодно. Сэкономьте {{save}}.",
     "account_upgrade_dialog_billing_contact_email": "По вопросам оплаты, пожалуйста <Link>свяжитесь с нами</Link>.",
-    "account_upgrade_dialog_billing_contact_website": "По вопросам оплаты, пожалуйста обратитесь к нашему <Link>сайту</Link>."
+    "account_upgrade_dialog_billing_contact_website": "По вопросам оплаты, пожалуйста обратитесь к нашему <Link>сайту</Link>.",
+    "publish_dialog_call_reset": "Удалить вызов",
+    "account_basics_phone_numbers_dialog_description": "Для использования уведомлений необходимо добавить и подтвердить хотя бы один номер телефона. Проверить можно используя SMS или звонок.",
+    "account_basics_phone_numbers_dialog_title": "Добавить номер телефона",
+    "account_basics_phone_numbers_dialog_number_placeholder": "например +1222333444",
+    "account_basics_phone_numbers_dialog_code_placeholder": "например 123456",
+    "account_basics_phone_numbers_dialog_verify_button_sms": "Отправить SMS",
+    "account_usage_calls_title": "Совершённые вызовы",
+    "account_usage_calls_none": "Невозможно совершать вызовы с этим аккаунтом",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "Нет проверенных номеров",
+    "account_basics_phone_numbers_copied_to_clipboard": "Номер телефона скопирован в буфер обмена",
+    "account_upgrade_dialog_tier_features_no_calls": "Нет вызовов"
 }

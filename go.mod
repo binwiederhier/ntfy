@@ -19,9 +19,11 @@ require (
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.11.0
 	golang.org/x/time v0.3.0
-	google.golang.org/api v0.137.0
+	google.golang.org/api v0.138.0
 	gopkg.in/yaml.v2 v2.4.0
 )
+
+replace github.com/emersion/go-smtp => github.com/emersion/go-smtp v0.17.0 // Pin version due to breaking changes, see #839
 
 require github.com/pkg/errors v0.9.1 // indirect
 

@@ -580,46 +580,80 @@ func TestManager_Token_Extend(t *testing.T) {
 }
 
 func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
+	// Tests that tokens are automatically deleted when the maximum number of tokens is reached
+
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
 
-	// Try to extend token for user without token
-	u, err := a.User("ben")
+	ben, err := a.User("ben")
 	require.Nil(t, err)
 
-	// Tokens
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+
+	// Create 2 tokens for phil
+	philTokens := make([]string, 0)
+	token, err := a.CreateToken(phil.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.NotEmpty(t, token.Value)
+	philTokens = append(philTokens, token.Value)
+
+	token, err = a.CreateToken(phil.ID, "", time.Unix(0, 0), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.NotEmpty(t, token.Value)
+	philTokens = append(philTokens, token.Value)
+
+	// Create 22 tokens for ben (only 20 allowed!)
 	baseTime := time.Now().Add(24 * time.Hour)
-	tokens := make([]string, 0)
-	for i := 0; i < 22; i++ {
-		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
+	benTokens := make([]string, 0)
+	for i := 0; i < 22; i++ { //
+		token, err := a.CreateToken(ben.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
-		tokens = append(tokens, token.Value)
+		benTokens = append(benTokens, token.Value)
 
 		// Manually modify expiry date to avoid sorting issues (this is a hack)
 		_, err = a.db.Exec(`UPDATE user_token SET expires=? WHERE token=?`, baseTime.Add(time.Duration(i)*time.Minute).Unix(), token.Value)
 		require.Nil(t, err)
 	}
 
-	_, err = a.AuthenticateToken(tokens[0])
+	// Ben: The first 2 tokens should have been wiped and should not work anymore!
+	_, err = a.AuthenticateToken(benTokens[0])
 	require.Equal(t, ErrUnauthenticated, err)
 
-	_, err = a.AuthenticateToken(tokens[1])
+	_, err = a.AuthenticateToken(benTokens[1])
 	require.Equal(t, ErrUnauthenticated, err)
 
+	// Ben: The other tokens should still work
 	for i := 2; i < 22; i++ {
-		userWithToken, err := a.AuthenticateToken(tokens[i])
-		require.Nil(t, err, "token[%d]=%s failed", i, tokens[i])
+		userWithToken, err := a.AuthenticateToken(benTokens[i])
+		require.Nil(t, err, "token[%d]=%s failed", i, benTokens[i])
 		require.Equal(t, "ben", userWithToken.Name)
-		require.Equal(t, tokens[i], userWithToken.Token)
+		require.Equal(t, benTokens[i], userWithToken.Token)
 	}
 
-	var count int
-	rows, err := a.db.Query(`SELECT COUNT(*) FROM user_token`)
+	// Phil: All tokens should still work
+	for i := 0; i < 2; i++ {
+		userWithToken, err := a.AuthenticateToken(philTokens[i])
+		require.Nil(t, err, "token[%d]=%s failed", i, philTokens[i])
+		require.Equal(t, "phil", userWithToken.Name)
+		require.Equal(t, philTokens[i], userWithToken.Token)
+	}
+
+	var benCount int
+	rows, err := a.db.Query(`SELECT COUNT(*) FROM user_token WHERE user_id=?`, ben.ID)
 	require.Nil(t, err)
 	require.True(t, rows.Next())
-	require.Nil(t, rows.Scan(&count))
-	require.Equal(t, 20, count)
+	require.Nil(t, rows.Scan(&benCount))
+	require.Equal(t, 20, benCount)
+
+	var philCount int
+	rows, err = a.db.Query(`SELECT COUNT(*) FROM user_token WHERE user_id=?`, phil.ID)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+	require.Nil(t, rows.Scan(&philCount))
+	require.Equal(t, 2, philCount)
 }
 
 func TestManager_EnqueueStats_ResetStats(t *testing.T) {

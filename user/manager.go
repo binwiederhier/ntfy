@@ -262,7 +262,8 @@ const (
 	deleteExpiredTokensQuery   = `DELETE FROM user_token WHERE expires > 0 AND expires < ?`
 	deleteExcessTokensQuery    = `
 		DELETE FROM user_token
-		WHERE (user_id, token) NOT IN (
+		WHERE user_id = ?
+		  AND (user_id, token) NOT IN (
 			SELECT user_id, token
 			FROM user_token
 			WHERE user_id = ?
@@ -534,7 +535,7 @@ func (a *Manager) CreateToken(userID, label string, expires time.Time, origin ne
 	if tokenCount >= tokenMaxCount {
 		// This pruning logic is done in two queries for efficiency. The SELECT above is a lookup
 		// on two indices, whereas the query below is a full table scan.
-		if _, err := tx.Exec(deleteExcessTokensQuery, userID, tokenMaxCount); err != nil {
+		if _, err := tx.Exec(deleteExcessTokensQuery, userID, userID, tokenMaxCount); err != nil {
 			return nil, err
 		}
 	}

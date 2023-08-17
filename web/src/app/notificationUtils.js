@@ -35,7 +35,7 @@ export const formatMessage = (m) => {
 };
 
 const imageRegex = /\.(png|jpe?g|gif|webp)$/i;
-const isImage = (attachment) => {
+export const isImage = (attachment) => {
   if (!attachment) return false;
 
   // if there's a type, only take that into account

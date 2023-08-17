@@ -5,17 +5,30 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ### ntfy server v2.7.0
 Released August 17, 2023
 
+This release ships Markdown support for the web app (not in the Android app yet), and adds support for 
+right-to-left languages (RTL) in the web app. It also fixes a few issues around date/time formatting, 
+internationalization support, a CLI auth bug.
+
+Furthermore, it fixes a security issue around access tokens getting erroneously deleted for other users
+in a specific scenario. This was a denial-of-service-type security issue, since it **effectively allowed a
+single user to deny access to all other users of a ntfy instance**. Please note that while tokens were
+erroneously deleted, **nobody but the token owner ever had access to it.** Please refer to [the ticket](https://github.com/binwiederhier/ntfy/issues/838)
+for details. **Please upgrade your ntfy instance if you run a multi-user system.**
+
 **Features:**
 
 * Add support for [Markdown formatting](publish.md#markdown-formatting) in web app ([#310](https://github.com/binwiederhier/ntfy/issues/310), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
 * Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Security:** ⚠️
+
+* Fixes issue with access tokens getting deleted ([#838](https://github.com/binwiederhier/ntfy/issues/838))
 
 **Bug fixes + maintenance:**
 
 * Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to [@nimbleghost](https://github.com/nimbleghost))
 * Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
 * You can now unset the default user:pass/token in `client.yml` for an individual subscription to remove the Authorization header ([#829](https://github.com/binwiederhier/ntfy/issues/829), thanks to [@tomeon](https://github.com/tomeon) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
-* Fixes issue with tokens getting deleted in certain cases ([#838](https://github.com/binwiederhier/ntfy/issues/838))
 
 **Documentation:**
 

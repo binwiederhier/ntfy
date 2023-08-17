@@ -44,6 +44,14 @@ Here are a few working sample configs:
     attachment-cache-dir: "/var/cache/ntfy/attachments"
     ```
 
+=== "server.yml (behind proxy, with cache + attachments)"
+    ``` yaml
+    base-url: "http://ntfy.example.com"
+    listen-http: ":2586"
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
 === "server.yml (ntfy.sh config)"
     ``` yaml
     # All the things: Behind a proxy, Firebase, cache, attachments, 
@@ -649,8 +657,8 @@ or the root domain:
     <VirtualHost *:80>
         ServerName ntfy.sh
 
-        # Proxy connections to ntfy (requires "a2enmod proxy")
-        ProxyPass / http://127.0.0.1:2586/
+        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
         ProxyPassReverse / http://127.0.0.1:2586/
 
         SetEnv proxy-nokeepalive 1
@@ -658,19 +666,13 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
-
-        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
-        RewriteCond %{HTTP:Upgrade} websocket [NC]
-        RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix 
-        RewriteCond %{REQUEST_METHOD} GET
-        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+        # it to work with curl without the annoying https:// prefix (requires "a2enmod alias")
+        <If "%{REQUEST_METHOD} == 'GET'">
+            RedirectMatch permanent "^/([-_A-Za-z0-9]{0,64})$" "https://%{SERVER_NAME}/$1"
+        </If>
+
     </VirtualHost>
     
     <VirtualHost *:443>
@@ -681,8 +683,8 @@ or the root domain:
         SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
         Include /etc/letsencrypt/options-ssl-apache.conf
 
-        # Proxy connections to ntfy (requires "a2enmod proxy")
-        ProxyPass / http://127.0.0.1:2586/
+        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
         ProxyPassReverse / http://127.0.0.1:2586/
 
         SetEnv proxy-nokeepalive 1
@@ -690,14 +692,7 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
-
-        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
-        RewriteCond %{HTTP:Upgrade} websocket [NC]
-        RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L] 
+	
     </VirtualHost>
     ```
 

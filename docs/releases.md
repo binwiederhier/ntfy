@@ -2,6 +2,25 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.7.0
+Released August 17, 2023
+
+**Features:**
+
+* Add support for [Markdown formatting](publish.md#markdown-formatting) in web app ([#310](https://github.com/binwiederhier/ntfy/issues/310), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Bug fixes + maintenance:**
+
+* Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* You can now unset the default user:pass/token in `client.yml` for an individual subscription to remove the Authorization header ([#829](https://github.com/binwiederhier/ntfy/issues/829), thanks to [@tomeon](https://github.com/tomeon) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+* Fixes issue with tokens getting deleted in certain cases ([#838](https://github.com/binwiederhier/ntfy/issues/838))
+
+**Documentation:**
+
+* Update docs for Apache config ([#819](https://github.com/binwiederhier/ntfy/pull/819), thanks to [@nisbet-hubbard](https://github.com/nisbet-hubbard))
+
 ## ntfy server v2.6.2
 Released June 30, 2023
 
@@ -1250,24 +1269,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.7.0 (UNRELEASED)
-
-**Features:**
-
-* Add support for [Markdown formatting](publish.md#markdown-formatting) in web app ([#310](https://github.com/binwiederhier/ntfy/issues/310), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
-* Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
-
-**Bug fixes + maintenance:**
-
-* Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to [@nimbleghost](https://github.com/nimbleghost))
-* Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
-* You can now unset the default user:pass/token in `client.yml` for an individual subscription to remove the Authorization header ([#829](https://github.com/binwiederhier/ntfy/issues/829), thanks to [@tomeon](https://github.com/tomeon) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
-* Fixes issue with tokens getting deleted in certain cases ([#838](https://github.com/binwiederhier/ntfy/issues/838))
-
-**Documentation:**
-
-* Update docs for Apache config ([#819](https://github.com/binwiederhier/ntfy/pull/819), thanks to [@nisbet-hubbard](https://github.com/nisbet-hubbard))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

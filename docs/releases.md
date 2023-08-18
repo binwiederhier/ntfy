@@ -2,7 +2,7 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-### ntfy server v2.7.0
+## ntfy server v2.7.0
 Released August 17, 2023
 
 This release ships Markdown support for the web app (not in the Android app yet), and adds support for 
@@ -1282,6 +1282,12 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
+
+### ntfy server v2.8.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

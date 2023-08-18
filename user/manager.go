@@ -160,7 +160,7 @@ const (
 		SELECT read, write
 		FROM user_access a
 		JOIN user u ON u.id = a.user_id
-		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic
+		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic ESCAPE '\'
 		ORDER BY u.user DESC
 	`
 
@@ -235,7 +235,7 @@ const (
 	selectOtherAccessCountQuery = `
 		SELECT COUNT(*)
 		FROM user_access
-		WHERE (topic = ? OR ? LIKE topic)
+		WHERE (topic = ? OR ? LIKE topic ESCAPE '\')
 		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM user WHERE user = ?))
 	`
 	deleteAllAccessQuery  = `DELETE FROM user_access`
@@ -312,7 +312,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion     = 4
+	currentSchemaVersion     = 5
 	insertSchemaVersion      = `INSERT INTO schemaVersion VALUES (1, ?)`
 	updateSchemaVersion      = `UPDATE schemaVersion SET version = ? WHERE id = 1`
 	selectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
@@ -422,6 +422,11 @@ const (
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
 	`
+
+	// 4 -> 5
+	migrate4To5UpdateQueries = `
+		UPDATE user_access SET topic = REPLACE(topic, '_', '\_');
+	`
 )
 
 var (
@@ -429,6 +434,7 @@ var (
 		1: migrateFrom1,
 		2: migrateFrom2,
 		3: migrateFrom3,
+		4: migrateFrom4,
 	}
 )
 
@@ -1123,7 +1129,7 @@ func (a *Manager) Reservations(username string) ([]Reservation, error) {
 			return nil, err
 		}
 		reservations = append(reservations, Reservation{
-			Topic:    topic,
+			Topic:    unescapeUnderscore(topic),
 			Owner:    NewPermission(ownerRead, ownerWrite),
 			Everyone: NewPermission(everyoneRead.Bool, everyoneWrite.Bool), // false if null
 		})
@@ -1133,7 +1139,7 @@ func (a *Manager) Reservations(username string) ([]Reservation, error) {
 
 // HasReservation returns true if the given topic access is owned by the user
 func (a *Manager) HasReservation(username, topic string) (bool, error) {
-	rows, err := a.db.Query(selectUserHasReservationQuery, username, topic)
+	rows, err := a.db.Query(selectUserHasReservationQuery, username, escapeUnderscore(topic))
 	if err != nil {
 		return false, err
 	}
@@ -1168,7 +1174,7 @@ func (a *Manager) ReservationsCount(username string) (int64, error) {
 // ReservationOwner returns user ID of the user that owns this topic, or an
 // empty string if it's not owned by anyone
 func (a *Manager) ReservationOwner(topic string) (string, error) {
-	rows, err := a.db.Query(selectUserReservationsOwnerQuery, topic)
+	rows, err := a.db.Query(selectUserReservationsOwnerQuery, escapeUnderscore(topic))
 	if err != nil {
 		return "", err
 	}
@@ -1263,7 +1269,7 @@ func (a *Manager) AllowReservation(username string, topic string) error {
 	if (!AllowedUsername(username) && username != Everyone) || !AllowedTopic(topic) {
 		return ErrInvalidArgument
 	}
-	rows, err := a.db.Query(selectOtherAccessCountQuery, topic, topic, username)
+	rows, err := a.db.Query(selectOtherAccessCountQuery, escapeUnderscore(topic), escapeUnderscore(topic), username)
 	if err != nil {
 		return err
 	}
@@ -1328,10 +1334,10 @@ func (a *Manager) AddReservation(username string, topic string, everyone Permiss
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(upsertUserAccessQuery, username, topic, true, true, username, username); err != nil {
+	if _, err := tx.Exec(upsertUserAccessQuery, username, escapeUnderscore(topic), true, true, username, username); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(upsertUserAccessQuery, Everyone, topic, everyone.IsRead(), everyone.IsWrite(), username, username); err != nil {
+	if _, err := tx.Exec(upsertUserAccessQuery, Everyone, escapeUnderscore(topic), everyone.IsRead(), everyone.IsWrite(), username, username); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1354,10 +1360,10 @@ func (a *Manager) RemoveReservations(username string, topics ...string) error {
 	}
 	defer tx.Rollback()
 	for _, topic := range topics {
-		if _, err := tx.Exec(deleteTopicAccessQuery, username, username, topic); err != nil {
+		if _, err := tx.Exec(deleteTopicAccessQuery, username, username, escapeUnderscore(topic)); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(deleteTopicAccessQuery, Everyone, Everyone, topic); err != nil {
+		if _, err := tx.Exec(deleteTopicAccessQuery, Everyone, Everyone, escapeUnderscore(topic)); err != nil {
 			return err
 		}
 	}
@@ -1484,12 +1490,24 @@ func (a *Manager) Close() error {
 	return a.db.Close()
 }
 
+// toSQLWildcard converts a wildcard string to a SQL wildcard string. It only allows '*' as wildcards,
+// and escapes '_', assuming '\' as escape character.
 func toSQLWildcard(s string) string {
-	return strings.ReplaceAll(s, "*", "%")
+	return escapeUnderscore(strings.ReplaceAll(s, "*", "%"))
 }
 
+// fromSQLWildcard converts a SQL wildcard string to a wildcard string. It converts '%' to '*',
+// and removes the '\_' escape character.
 func fromSQLWildcard(s string) string {
-	return strings.ReplaceAll(s, "%", "*")
+	return strings.ReplaceAll(unescapeUnderscore(s), "%", "*")
+}
+
+func escapeUnderscore(s string) string {
+	return strings.ReplaceAll(s, "_", "\\_")
+}
+
+func unescapeUnderscore(s string) string {
+	return strings.ReplaceAll(s, "\\_", "_")
 }
 
 func runStartupQueries(db *sql.DB, startupQueries string) error {
@@ -1622,6 +1640,22 @@ func migrateFrom3(db *sql.DB) error {
 		return err
 	}
 	if _, err := tx.Exec(updateSchemaVersion, 4); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func migrateFrom4(db *sql.DB) error {
+	log.Tag(tag).Info("Migrating user database schema: from 4 to 5")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate4To5UpdateQueries); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 5); err != nil {
 		return err
 	}
 	return tx.Commit()

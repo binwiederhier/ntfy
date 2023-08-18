@@ -125,6 +125,7 @@ var (
 	errHTTPConflictSubscriptionExists                = &errHTTP{40903, http.StatusConflict, "conflict: topic subscription already exists", "", nil}
 	errHTTPConflictPhoneNumberExists                 = &errHTTP{40904, http.StatusConflict, "conflict: phone number already exists", "", nil}
 	errHTTPGonePhoneVerificationExpired              = &errHTTP{41001, http.StatusGone, "phone number verification expired or does not exist", "", nil}
+	errHTTPGoneSubscriptionExpired                   = &errHTTP{41002, http.StatusGone, "subscription expired", "", nil}
 	errHTTPEntityTooLargeAttachment                  = &errHTTP{41301, http.StatusRequestEntityTooLarge, "attachment too large, or bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPEntityTooLargeMatrixRequest               = &errHTTP{41302, http.StatusRequestEntityTooLarge, "Matrix request is larger than the max allowed length", "", nil}
 	errHTTPEntityTooLargeJSONBody                    = &errHTTP{41303, http.StatusRequestEntityTooLarge, "JSON body too large", "", nil}

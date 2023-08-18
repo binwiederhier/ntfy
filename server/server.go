@@ -742,7 +742,14 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.Stale() {
+		// This subscription is verifiably dead, we should notify the server.
+		//
+		// This not cause the below condition (where ratevisitor is nil) to be excluded,
+		// since this will check `time.Since(t.lastAccess) > topicExpungeAfter` if ratevisitor is nil,
+		// and return on that.
+		return nil, errHTTPGoneSubscriptionExpired.With(t)
+	} else if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
 		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.

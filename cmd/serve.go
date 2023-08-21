@@ -190,7 +190,7 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
-	messasgeLimit := c.Int("message-limit")
+	messageLimit := c.Int("message-limit")
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -366,7 +366,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushFile = webPushFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 	conf.WebPushStartupQueries = webPushStartupQueries
-	conf.MessageLimit = messasgeLimit
+	conf.MessageLimit = messageLimit
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

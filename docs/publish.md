@@ -457,6 +457,7 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 === "PowerShell"
     ``` powershell
     $Request = @{
+      Method = 'POST'
       URI = "https://ntfy.sh/phil_alerts"
       Headers = @{
         Priority = "5"
@@ -1033,7 +1034,7 @@ is the only required one:
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-JSON @{
         Topic    = "mytopic"
         Title    = "Low disk space alert"
         Message  = "Disk space is low at 5.1 GB"
@@ -1042,7 +1043,7 @@ is the only required one:
         FileName = "diskspace.jpg"
         Tags     = @("warning", "cd")
         Click    = "https://homecamera.lan/xasds1h2xsSsa/"
-        Actions  = ConvertTo-JSON @(
+        Actions  = @(
           @{ 
             Action = "view"
             Label  = "Admin panel"
@@ -1919,10 +1920,10 @@ And the same example using [JSON publishing](#publish-as-json):
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-Json -Depth 3 @{
         Topic = "wifey"
         Message = "Your wife requested you send a picture of yourself."
-        Actions = ConvertTo-Json -Depth 3 @(
+        Actions = @(
           @{
             Action = "broadcast"
             Label = "Take picture"
@@ -2072,7 +2073,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
+                'Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}',
             'content' => 'Garage door has been open for 15 minutes. Close it?'
         ]
     ]));
@@ -2199,10 +2200,10 @@ And the same example using [JSON publishing](#publish-as-json):
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-Json -Depth 3 @{
         Topic   = "myhome"
         Message = "Garage door has been open for 15 minutes. Close it?"
-        Actions = ConvertTo-Json -Depth 3 @(
+        Actions = @(
           @{
             Action  = "http"
             Label   = "Close door"

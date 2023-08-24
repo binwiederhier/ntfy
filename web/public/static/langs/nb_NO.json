@@ -190,5 +190,10 @@
     "error_boundary_unsupported_indexeddb_title": "Privat surfing støttes ikke",
     "action_bar_account": "Konto",
     "action_bar_profile_settings": "Innstillinger",
-    "nav_button_account": "Konto"
+    "nav_button_account": "Konto",
+    "signup_title": "Opprett en ntfy konto",
+    "signup_form_username": "Brukernavn",
+    "signup_form_password": "Passord",
+    "signup_form_button_submit": "Meld deg på",
+    "signup_form_confirm_password": "Bekreft passord"
 }

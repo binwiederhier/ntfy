@@ -23,6 +23,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
+- [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -130,7 +131,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
-- [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 9/2021
+- [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023
+- [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 7/2023
 - [Basic website monitoring using cronjobs and ntfy.sh](https://burkhardt.dev/2023/website-monitoring-cron-ntfy/) - burkhardt.dev - 6/2023 
 - [Pingdom alternative in one line of curl through ntfy.sh](https://piqoni.bearblog.dev/uptime-monitoring-in-one-line-of-curl/) - bearblog.dev - 6/2023 
 - [#OpenSourceDiscovery 78: ntfy.sh](https://opensourcedisc.substack.com/p/opensourcediscovery-78-ntfysh) - opensourcedisc.substack.com - 6/2023 

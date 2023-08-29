@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	/*"regexp"*/
 )
 
 var mimeDecoder mime.WordDecoder
@@ -129,7 +130,25 @@ func fromContext[T any](r *http.Request, key contextKey) (T, error) {
 func maybeDecodeHeader(header string) string {
 	decoded, err := mimeDecoder.DecodeHeader(header)
 	if err != nil {
-		return header
+		return cloudflarePriorityIgnore(header)
 	}
-	return decoded
+	return cloudflarePriorityIgnore(decoded)
+}
+
+// Ignore new HTTP Priority header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
+// Cloudflare adds this to requests when forwarding to the backend (ntfy), so we just ignore it.
+// If the Priority header is set to "u=*, i" or "u=*" (by cloudflare), the header will be ignored.
+// And continue searching for another header (x-priority, prio, p) or in the Query parameters.
+func cloudflarePriorityIgnore(value string) string {
+	if strings.HasPrefix(value, "u=") {
+		return ""
+	}
+
+	// The same but with regex
+	/* pattern := `^u=\d+\s*,\s*i|u=\d+$`
+	regex := regexp.MustCompile(pattern)
+	if regex.MatchString(value) {
+		return ""
+	} */
+	return value
 }

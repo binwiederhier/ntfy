@@ -571,7 +571,8 @@ const Language = () => {
           <MenuItem value="id">Bahasa Indonesia</MenuItem>
           <MenuItem value="bg">Български</MenuItem>
           <MenuItem value="cs">Čeština</MenuItem>
-          <MenuItem value="zh_Hans">中文</MenuItem>
+          <MenuItem value="zh_Hant">繁體中文</MenuItem>
+          <MenuItem value="zh_Hans">简体中文</MenuItem>
           <MenuItem value="da">Dansk</MenuItem>
           <MenuItem value="de">Deutsch</MenuItem>
           <MenuItem value="es">Español</MenuItem>

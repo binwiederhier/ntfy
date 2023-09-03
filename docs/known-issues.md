@@ -27,6 +27,13 @@ Be sure that in your selfhosted server:
 * Set `upstream-base-url: "https://ntfy.sh"` (**not your own hostname!**)
 * Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to 
 
+## iOS app seeing "New message", but not real message content
+If you see `New message` notifications on iOS, your iPhone can likely not talk to your self-hosted server. Be sure that
+your iOS device and your ntfy server are either on the same network, or that your phone can actually reach the server.
+
+Turn on tracing/debugging on the server (via `log-level: trace` or `log-level: debug`, see [troubleshooting](troubleshooting.md)),
+and read docs on [iOS instant notifications](https://docs.ntfy.sh/config/#ios-instant-notifications).
+
 ## Firefox on Android not automatically subscribing to web push (see [#789](https://github.com/binwiederhier/ntfy/issues/789))
 ntfy defaults to web-push based subscriptions when installed as a [progressive web app](./subscribe/pwa.md). Firefox
 Android has an [open bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1796434) where it reports the PWA mode incorrectly.

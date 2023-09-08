@@ -357,3 +357,9 @@
 # log-level-overrides:
 # log-format: text
 # log-file:
+
+# Defines the size limit (in bytes) for a ntfy message.
+# NOTE: FCM has size limit at 4000 bytes. APNS has size limit at 4KB. If you increase this size limit, FCM and APNS will NOT work for large messages.
+# The default value is 4096 bytes.
+#
+# message-limit:

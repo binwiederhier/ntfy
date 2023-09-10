@@ -1010,7 +1010,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
 	}
-	extrasStr := readParam(r, "x-extras")
+	extrasStr := readParam(r, "x-extras", "extras")
 	if extrasStr != "" {
 		extras := make(map[string]string)
 		if err := json.Unmarshal([]byte(extrasStr), &extras); err != nil {

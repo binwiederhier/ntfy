@@ -267,5 +267,6 @@
     "publish_dialog_chip_call_label": "Chiamata telefonica",
     "publish_dialog_chip_call_no_verified_numbers_tooltip": "Nessun numero verificato",
     "account_basics_phone_numbers_title": "Numeri di telefono",
-    "account_basics_phone_numbers_dialog_description": "Per usare la funzionalità di notifica tramite chiamata telefonica, devi aggiungere e verificare almeno un numero di telefono. La verifica può essere fatta tramite SMS o chiamata telefonica."
+    "account_basics_phone_numbers_dialog_description": "Per usare la funzionalità di notifica tramite chiamata telefonica, devi aggiungere e verificare almeno un numero di telefono. La verifica può essere fatta tramite SMS o chiamata telefonica.",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} topic riservato"
 }

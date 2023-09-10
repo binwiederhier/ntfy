@@ -18,7 +18,7 @@ notification service. With ntfy, you can **send notifications to your phone or d
 **without having to sign up or pay any fees**. If you'd like to run your own instance of the service, you can easily do 
 so since ntfy is open source.
 
-You can access the free version of ntfy at **[ntfy.sh](https://ntfy.sh)**. There is also an [open source Android app](https://github.com/binwiederhier/ntfy-android)
+You can access the free version of ntfy at **[ntfy.sh](https://ntfy.sh)**. There is also an [open-source Android app](https://github.com/binwiederhier/ntfy-android)
 available on [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/),
 as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) available on the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
@@ -41,7 +41,7 @@ I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
 
-## Chat / forum
+## Chat/forum
 There are a few ways to get in touch with me and/or the rest of the community. Feel free to use any of these methods. Whatever
 works best for you:
 
@@ -50,13 +50,13 @@ works best for you:
 * [Lemmy discussion board](https://discuss.ntfy.sh/c/ntfy) - asynchronous forum (_new as of June 2023_)
 * [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
 
-## Announcements / beta testers
+## Announcements/beta testers
 For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
 topic. If you'd like to test the iOS app, join [TestFlight](https://testflight.apple.com/join/P1fFnAm9). For Android betas,
 join Discord/Matrix (I'll eventually make a testing channel in Google Play).
 
 ## Contributing
-I welcome any and all contributions. Just create a PR or an issue. For larger features/ideas, please reach out
+I welcome any contributions. Just create a PR or an issue. For larger features/ideas, please reach out
 on Discord/Matrix first to see if I'd accept them. To contribute code, check out the [build instructions](https://ntfy.sh/docs/develop/) 
 for the server and the Android app. Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
@@ -165,7 +165,7 @@ _Please be sure to read the complete [Code of Conduct](CODE_OF_CONDUCT.md)._
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   
 The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
-Third party libraries and resources:
+Third-party libraries and resources:
 * [github.com/urfave/cli](https://github.com/urfave/cli) (MIT) is used to drive the CLI
 * [Mixkit sounds](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) are used as notification sounds
 * [Sounds from notificationsounds.com](https://notificationsounds.com) (Creative Commons Attribution) are used as notification sounds

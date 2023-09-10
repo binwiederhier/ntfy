@@ -143,25 +143,27 @@ func testCacheTopics(t *testing.T, c *messageCache) {
 	require.Equal(t, "topic2", topics["topic2"].ID)
 }
 
-func TestSqliteCache_MessagesTagsPrioAndTitle(t *testing.T) {
-	testCacheMessagesTagsPrioAndTitle(t, newSqliteTestCache(t))
+func TestSqliteCache_MessagesTagsPrioTitleAndExtras(t *testing.T) {
+	testCacheMessagesTagsPrioTitleAndExtras(t, newSqliteTestCache(t))
 }
 
-func TestMemCache_MessagesTagsPrioAndTitle(t *testing.T) {
-	testCacheMessagesTagsPrioAndTitle(t, newMemTestCache(t))
+func TestMemCache_MessagesTagsPrioTitleAndExtras(t *testing.T) {
+	testCacheMessagesTagsPrioTitleAndExtras(t, newMemTestCache(t))
 }
 
-func testCacheMessagesTagsPrioAndTitle(t *testing.T, c *messageCache) {
+func testCacheMessagesTagsPrioTitleAndExtras(t *testing.T, c *messageCache) {
 	m := newDefaultMessage("mytopic", "some message")
 	m.Tags = []string{"tag1", "tag2"}
 	m.Priority = 5
 	m.Title = "some title"
+	m.Extras = map[string]string{"foo": "bar"}
 	require.Nil(t, c.AddMessage(m))
 
 	messages, _ := c.Messages("mytopic", sinceAllMessages, false)
 	require.Equal(t, []string{"tag1", "tag2"}, messages[0].Tags)
 	require.Equal(t, 5, messages[0].Priority)
 	require.Equal(t, "some title", messages[0].Title)
+	require.Equal(t, map[string]string{"foo": "bar"}, messages[0].Extras)
 }
 
 func TestSqliteCache_MessagesSinceID(t *testing.T) {

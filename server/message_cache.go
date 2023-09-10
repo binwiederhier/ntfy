@@ -46,6 +46,7 @@ const (
 			sender TEXT NOT NULL,
 			user TEXT NOT NULL,
 			content_type TEXT NOT NULL,
+			extras TEXT NOT NULL,
 			encoding TEXT NOT NULL,
 			published INT NOT NULL
 		);
@@ -64,43 +65,43 @@ const (
 		COMMIT;
 	`
 	insertMessageQuery = `
-		INSERT INTO messages (mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, extras, encoding, published)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	deleteMessageQuery                = `DELETE FROM messages WHERE mid = ?`
 	updateMessagesForTopicExpiryQuery = `UPDATE messages SET expires = ? WHERE topic = ?`
 	selectRowIDFromMessageID          = `SELECT id FROM messages WHERE mid = ?` // Do not include topic, see #336 and TestServer_PollSinceID_MultipleTopics
 	selectMessagesByIDQuery           = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE mid = ?
 	`
 	selectMessagesSinceTimeQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time, id
 	`
 	selectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE topic = ? AND time >= ?
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE topic = ? AND id > ? AND published = 1 
 		ORDER BY time, id
 	`
 	selectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
 	selectMessagesDueQuery = `
-		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, extras, encoding
 		FROM messages 
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id
@@ -122,7 +123,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 12
+	currentSchemaVersion          = 13
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -246,6 +247,11 @@ const (
 	migrate11To12AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN content_type TEXT NOT NULL DEFAULT('');
 	`
+
+	// 12 -> 13
+	migrate12To13AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN extras TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -262,6 +268,7 @@ var (
 		9:  migrateFrom9,
 		10: migrateFrom10,
 		11: migrateFrom11,
+		12: migrateFrom12,
 	}
 )
 
@@ -367,6 +374,14 @@ func (c *messageCache) addMessages(ms []*message) error {
 			}
 			actionsStr = string(actionsBytes)
 		}
+		var extrasStr string
+		if len(m.Extras) > 0 {
+			extrasBytes, err := json.Marshal(m.Extras)
+			if err != nil {
+				return err
+			}
+			extrasStr = string(extrasBytes)
+		}
 		var sender string
 		if m.Sender.IsValid() {
 			sender = m.Sender.String()
@@ -392,6 +407,7 @@ func (c *messageCache) addMessages(ms []*message) error {
 			sender,
 			m.User,
 			m.ContentType,
+			extrasStr,
 			m.Encoding,
 			published,
 		)
@@ -664,7 +680,7 @@ func readMessages(rows *sql.Rows) ([]*message, error) {
 func readMessage(rows *sql.Rows) (*message, error) {
 	var timestamp, expires, attachmentSize, attachmentExpires int64
 	var priority int
-	var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
+	var id, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, extrasStr, encoding string
 	err := rows.Scan(
 		&id,
 		&timestamp,
@@ -685,6 +701,7 @@ func readMessage(rows *sql.Rows) (*message, error) {
 		&sender,
 		&user,
 		&contentType,
+		&extrasStr,
 		&encoding,
 	)
 	if err != nil {
@@ -697,6 +714,12 @@ func readMessage(rows *sql.Rows) (*message, error) {
 	var actions []*action
 	if actionsStr != "" {
 		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
+			return nil, err
+		}
+	}
+	var extras map[string]string
+	if extrasStr != "" {
+		if err := json.Unmarshal([]byte(extrasStr), &extras); err != nil {
 			return nil, err
 		}
 	}
@@ -731,6 +754,7 @@ func readMessage(rows *sql.Rows) (*message, error) {
 		Sender:      senderIP, // Must parse assuming database must be correct
 		User:        user,
 		ContentType: contentType,
+		Extras:      extras,
 		Encoding:    encoding,
 	}, nil
 }
@@ -966,6 +990,22 @@ func migrateFrom11(db *sql.DB, _ time.Duration) error {
 		return err
 	}
 	if _, err := tx.Exec(updateSchemaVersion, 12); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func migrateFrom12(db *sql.DB, _ time.Duration) error {
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 12 to 13")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate12To13AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 13); err != nil {
 		return err
 	}
 	return tx.Commit()

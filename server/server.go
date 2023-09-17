@@ -631,14 +631,29 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) 
 // handleStats returns the publicly available server stats
 func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	s.mu.RLock()
+
+	var totalTopics, totalSubscriptions int64
+	for _, t := range s.topics {
+		if t.Stale() {
+			continue
+		}
+
+		totalTopics += 1
+		subscribers, _ := t.Stats()
+		totalSubscriptions += int64(subscribers)
+	}
+
 	messages, n, rate := s.messages, len(s.messagesHistory), float64(0)
 	if n > 1 {
 		rate = float64(s.messagesHistory[n-1]-s.messagesHistory[0]) / (float64(n-1) * s.config.ManagerInterval.Seconds())
 	}
+
 	s.mu.RUnlock()
 	response := &apiStatsResponse{
-		Messages:     messages,
-		MessagesRate: rate,
+		Messages:           messages,
+		MessagesRate:       rate,
+		TotalTopics:        totalTopics,
+		TotalSubscriptions: totalSubscriptions,
 	}
 	return s.writeJSON(w, response)
 }

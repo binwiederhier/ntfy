@@ -244,8 +244,10 @@ type apiHealthResponse struct {
 }
 
 type apiStatsResponse struct {
-	Messages     int64   `json:"messages"`
-	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
+	Messages           int64   `json:"messages"`
+	MessagesRate       float64 `json:"messages_rate"` // Average number of messages per second
+	TotalTopics        int64   `json:"total_topics"`
+	TotalSubscriptions int64   `json:"total_subscriptions"`
 }
 
 type apiUserAddRequest struct {

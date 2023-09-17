@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/user"
 	"io"
 	"math/rand"
 	"net/http"
@@ -21,6 +19,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
@@ -2501,7 +2502,7 @@ func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
 
 	response := request(t, s, "GET", "/v1/stats", "", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, `{"messages":5,"messages_rate":0}`+"\n", response.Body.String())
+	require.Equal(t, `{"messages":5,"messages_rate":0,"total_topics":1,"total_subscriptions":0}`+"\n", response.Body.String())
 
 	// Run manager and see message history update
 	s.execManager()
@@ -2509,7 +2510,7 @@ func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
 
 	response = request(t, s, "GET", "/v1/stats", "", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, `{"messages":5,"messages_rate":2.5}`+"\n", response.Body.String()) // 5 messages in 2 seconds = 2.5 messages per second
+	require.Equal(t, `{"messages":5,"messages_rate":2.5,"total_topics":1,"total_subscriptions":0}`+"\n", response.Body.String()) // 5 messages in 2 seconds = 2.5 messages per second
 
 	// Publish some more messages
 	for i := 0; i < 10; i++ {
@@ -2521,7 +2522,7 @@ func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
 
 	response = request(t, s, "GET", "/v1/stats", "", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, `{"messages":15,"messages_rate":2.5}`+"\n", response.Body.String()) // Rate did not update yet
+	require.Equal(t, `{"messages":15,"messages_rate":2.5,"total_topics":1,"total_subscriptions":0}`+"\n", response.Body.String()) // Rate did not update yet
 
 	// Run manager and see message history update
 	s.execManager()
@@ -2529,7 +2530,7 @@ func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
 
 	response = request(t, s, "GET", "/v1/stats", "", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, `{"messages":15,"messages_rate":3.75}`+"\n", response.Body.String()) // 15 messages in 4 seconds = 3.75 messages per second
+	require.Equal(t, `{"messages":15,"messages_rate":3.75,"total_topics":1,"total_subscriptions":0}`+"\n", response.Body.String()) // 15 messages in 4 seconds = 3.75 messages per second
 }
 
 func TestServer_MessageHistoryMaxSize(t *testing.T) {

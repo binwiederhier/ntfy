@@ -303,5 +303,6 @@
     "account_delete_dialog_button_submit": "Elimina il tuo account permanentemente",
     "account_usage_basis_ip_description": "Le statistiche di utilizzo e i limiti per questo account sono basati sul tuo indirizzo IP, quindi potrebbero essere in condivisione con altri utenti. I limiti mostrati sopra sono approssimazioni basate sui limiti esistenti.",
     "account_usage_calls_none": "Questo account non può effettuare chiamate",
-    "account_delete_dialog_billing_warning": "Eliminando il tuo account perderai immediatamente il tuo abbonamento. Non potrai più accedere alla dashboard di fatturazione."
+    "account_delete_dialog_billing_warning": "Eliminando il tuo account perderai immediatamente il tuo abbonamento. Non potrai più accedere alla dashboard di fatturazione.",
+    "account_delete_dialog_label": "Password"
 }

@@ -294,5 +294,14 @@
     "account_basics_phone_numbers_dialog_verify_button_call": "Chiamami",
     "account_basics_phone_numbers_dialog_channel_sms": "SMS",
     "account_upgrade_dialog_tier_selected_label": "Selezionato",
-    "account_upgrade_dialog_button_update_subscription": "Aggiorna iscrizione"
+    "account_upgrade_dialog_button_update_subscription": "Aggiorna iscrizione",
+    "account_usage_attachment_storage_title": "Archivio allegati",
+    "account_delete_dialog_description": "Il tuo account sarà permanentemente cancellato assieme a tutti i tuoi dati presenti sul server. Dopo la cancellazione, la tua username non sarà disponibile per 7 giorni. Se desideri davvero procedere, inserisci la tua password nella seguente casella.",
+    "account_delete_dialog_button_cancel": "Annulla",
+    "account_usage_calls_title": "Chiamate effettuate",
+    "account_delete_description": "Elimina permanentemente il tuo account",
+    "account_delete_dialog_button_submit": "Elimina il tuo account permanentemente",
+    "account_usage_basis_ip_description": "Le statistiche di utilizzo e i limiti per questo account sono basati sul tuo indirizzo IP, quindi potrebbero essere in condivisione con altri utenti. I limiti mostrati sopra sono approssimazioni basate sui limiti esistenti.",
+    "account_usage_calls_none": "Questo account non può effettuare chiamate",
+    "account_delete_dialog_billing_warning": "Eliminando il tuo account perderai immediatamente il tuo abbonamento. Non potrai più accedere alla dashboard di fatturazione."
 }

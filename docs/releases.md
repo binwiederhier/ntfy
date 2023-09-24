@@ -110,7 +110,7 @@ if you use promo code `MYTOPIC`). ntfy will always remain open source.
 ## ntfy server v2.4.0
 Released Apr 26, 2023
 
-This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds suport to encode the `X-Title`,
+This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds support to encode the `X-Title`,
 `X-Message` and `X-Tags` header as RFC 2047. It's a pretty small release, and mainly enables the release of the new ntfy.sh website.
 
 ❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
@@ -1288,6 +1288,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
+* Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

@@ -466,6 +466,31 @@ $ dig A mx1.ntfy.sh +short
 3.139.215.220
 ```
 
+### Local-only email
+If you want to send emails from an internal service on the same network as your ntfy instance, you do not need to
+worry about DNS records at all. Define a port for the SMTP server and pick an SMTP server domain (can be
+anything).
+
+=== "/etc/ntfy/server.yml"
+    ``` yaml
+    smtp-server-listen: ":25"
+    smtp-server-domain: "example.com"
+    smtp-server-addr-prefix: "ntfy-"  # optional
+    ```
+
+Then, in the email settings of your internal service, set the SMTP server address to the IP address of your
+ntfy instance. Set the port to the value you defined in `smtp-server-listen`. Leave any username and password
+fields empty. In the "From" address, pick anything (e.g., "alerts@ntfy.sh"); the value doesn't matter.
+In the "To" address, put in an email address that follows this pattern: `[topic]@[smtp-server-domain]` (or
+`[smtp-server-addr-prefix][topic]@[smtp-server-domain]` if you set `smtp-server-addr-prefix`).
+
+So if you used `example.com` as the SMTP server domain, and you want to send a message to the `email-alerts`
+topic, set the "To" address to `email-alerts@example.com`. If the topic has access restrictions, you will need
+to include an access token in the "To" address, such as `email-alerts+tk_AbC123dEf456@example.com`.
+
+If the internal service lets you use define an email "Subject", it will become the title of the notification.
+The body of the email will become the message of the notification.
+
 ## Behind a proxy (TLS, etc.)
 !!! warning
     If you are running ntfy behind a proxy, you must set the `behind-proxy` flag. Otherwise, all visitors are

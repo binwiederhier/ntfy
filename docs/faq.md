@@ -76,6 +76,18 @@ However, if you still want to disable it, you can do so with the `web-root: disa
 Think of the ntfy web app like an Android/iOS app. It is freely available and accessible to anyone, yet useless without
 a proper backend. So as long as you secure your backend with ACLs, exposing the ntfy web app to the Internet is harmless.
 
+## If topic names are public, could I not just brute force them?
+If you don't have [ACLs set up](config.md#access-control), the topic name is your password, it says so everywhere. If you
+choose a easy-to-guess/dumb topic name, people will be able to guess it. If you choose a randomly generated topic name,
+the topic is as good as a good password.
+
+As for brute forcing: It's not possible to brute force a ntfy server for very long, as you'll get quickly rate limited.
+In the default configuration, you'll be able to do 60 requests as a burst, and then 1 request per 10 seconds. Assuming you
+choose a random 10 digit topic name using only A-Z, a-z, 0-9, _ and -, there are 64^10 possible topic names. Even if you
+could do hundreds of requests per seconds (which you cannot), it would take many years to brute force a topic name.
+
+For ntfy.sh, there's even a fail2ban in place which will ban your IP pretty quickly.
+
 ## Where can I donate?
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier).
 I would be humbled if you helped me carry the server and developer account costs. Even small donations are very much

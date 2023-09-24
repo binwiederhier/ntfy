@@ -128,9 +128,12 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [msgdrop](https://github.com/jbrubake/msgdrop) - Send and receive encrypted messages (Bash)
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager
-
+- [NtfyMe-Blender](https://github.com/NotNanook/NtfyMe-Blender) - Blender addon to send notifications to NtfyMe (Python)
+- [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that let's you share files from your share feed to a topic of your choice.
+  
 ## Blog + forum posts
 
+- [NetworkChunk - how did I NOT know about this?](https://www.youtube.com/watch?v=poDIT2ruQ9M) ⭐ - youtube.com - 8/2023
 - [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023
 - [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 7/2023
 - [Basic website monitoring using cronjobs and ntfy.sh](https://burkhardt.dev/2023/website-monitoring-cron-ntfy/) - burkhardt.dev - 6/2023 

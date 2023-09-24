@@ -1288,6 +1288,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
+* Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

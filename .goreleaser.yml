@@ -164,14 +164,14 @@ dockers:
   - image_templates:
       - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile-arm
     goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
   - image_templates:
       - &armv7_image "binwiederhier/ntfy:{{ .Tag }}-armv7"
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile-arm
     goarch: arm
     goarm: 7
     build_flag_templates:
@@ -179,7 +179,7 @@ dockers:
   - image_templates:
       - &armv6_image "binwiederhier/ntfy:{{ .Tag }}-armv6"
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile-arm
     goarch: arm
     goarm: 6
     build_flag_templates:

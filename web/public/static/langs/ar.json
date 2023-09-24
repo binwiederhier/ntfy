@@ -329,5 +329,6 @@
     "publish_dialog_attachment_limits_quota_reached": "يتجاوز الحصة، {{remainingBytes}} متبقية",
     "account_basics_tier_paid_until": "تم دفع مبلغ الاشتراك إلى غاية {{date}}، وسيتم تجديده تِلْقائيًا",
     "account_basics_tier_canceled_subscription": "تم إلغاء اشتراكك وسيتم إعادته إلى مستوى حساب مجاني بداية مِن {{date}}.",
-    "account_delete_dialog_billing_warning": "إلغاء حسابك أيضاً يلغي اشتراكك في الفوترة فوراً ولن تتمكن من الوصول إلى لوح الفوترة بعد الآن."
+    "account_delete_dialog_billing_warning": "إلغاء حسابك أيضاً يلغي اشتراكك في الفوترة فوراً ولن تتمكن من الوصول إلى لوح الفوترة بعد الآن.",
+    "nav_upgrade_banner_description": "حجز المواضيع والمزيد من الرسائل ورسائل البريد الإلكتروني والمرفقات الأكبر حجمًا"
 }

@@ -77,7 +77,7 @@
     "notifications_example": "Örnek",
     "notifications_more_details": "Daha fazla bilgi için <websiteLink>web sitesine</websiteLink> veya <docsLink>belgelendirmeye</docsLink> bakın.",
     "publish_dialog_chip_attach_url_label": "URL ile dosya ekle",
-    "prefs_notifications_min_priority_default_and_higher": "Öntanımlı öncelik ve üstü",
+    "prefs_notifications_min_priority_default_and_higher": "Varsayılan öncelik ve üstü",
     "prefs_notifications_delete_after_three_hours": "Üç saat sonra",
     "notifications_none_for_any_description": "Bir konuya bildirim göndermek için konu URL'sine PUT veya POST göndermeniz yeterlidir. İşte konularınızdan birini kullanan bir örnek.",
     "notifications_no_subscriptions_title": "Henüz aboneliğiniz yok gibi görünüyor.",

@@ -318,5 +318,20 @@
     "account_upgrade_dialog_tier_features_emails_one": "{{emails}} ел. писмо на ден",
     "account_upgrade_dialog_tier_features_emails_other": "{{emails}} ел. писма на ден",
     "account_upgrade_dialog_tier_features_calls_one": "{{calls}} телефонни обаждания на ден",
-    "account_usage_attachment_storage_description": "{{filesize}} на файл, изтриване след {{expiry}}"
+    "account_usage_attachment_storage_description": "{{filesize}} на файл, изтриване след {{expiry}}",
+    "account_upgrade_dialog_billing_contact_email": "За въпроси относно плащанията <Link>се свържете с нас</Link>.",
+    "account_upgrade_dialog_tier_current_label": "Текущо",
+    "account_upgrade_dialog_billing_contact_website": "За въпроси относно плащанията се обърнете към <Link>страницата</Link>.",
+    "account_upgrade_dialog_button_cancel_subscription": "Прекратяване на абонамент",
+    "account_upgrade_dialog_tier_features_attachment_file_size": "{{filesize}} на файл",
+    "account_upgrade_dialog_reservations_warning_one": "Избраното ниво разрешава по-малко резервирани теми, от колкото текущото. Преди промяна на нивото <strong>изтрийте най-малко една резервирана тема</strong>. Можете да премахвате теми в <Link>Настройки</Link>.",
+    "account_tokens_title": "Кодове за достъп",
+    "account_upgrade_dialog_tier_price_billed_monthly": "{{price}} на година. Плаща се всеки месец.",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} плащане на година. Спестявате {{save}}.",
+    "account_upgrade_dialog_tier_features_attachment_total_size": "{{totalsize}} общ обем",
+    "account_upgrade_dialog_tier_price_per_month": "на месец",
+    "account_upgrade_dialog_button_pay_now": "Плащане и абониране",
+    "account_upgrade_dialog_tier_selected_label": "Избрано",
+    "account_upgrade_dialog_button_update_subscription": "Премяна на абонамент",
+    "account_upgrade_dialog_reservations_warning_other": "Избраното ниво разрешава по-малко резервирани теми, от колкото текущото. Преди промяна на нивото <strong>изтрийте най-малко {{count}} резервирани теми</strong>. Можете да премахвате теми в <Link>Настройки</Link>."
 }

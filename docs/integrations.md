@@ -133,6 +133,12 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
   
 ## Blog + forum posts
 
+- [Why NTFY is the Ultimate Push Notification Tool for Your Needs](https://osintph.medium.com/why-ntfy-is-the-ultimate-push-notification-tool-for-your-needs-e767421c84c5) - osintph.medium.com - 9/2023
+- [Supercharge Your Alerts: Ntfy — The Ultimate Push Notification Solution](https://medium.com/spring-boot/supercharge-your-alerts-ntfy-the-ultimate-push-notification-solution-a3dda79651fe) - spring-boot.medium.com - 9/2023
+- [Deploy Ntfy using Docker](https://www.linkedin.com/pulse/deploy-ntfy-mohamed-sharfy/) - linkedin.com - 9/2023
+- [Send Notifications With Ntfy for New WordPress Posts](https://www.activepieces.com/blog/ntfy-notifications-for-wordpress-new-posts) - activepieces.com - 9/2023
+- [Get Ntfy Notifications About New Zendesk Ticket](https://www.activepieces.com/blog/ntfy-notifications-about-new-zendesk-tickets) - activepieces.com - 9/2023
+- [Podman Update Notifications via Ntfy](https://rair.dev/podman-upadte-notifications-ntfy/) - rair.dev - 9/2023
 - [NetworkChunk - how did I NOT know about this?](https://www.youtube.com/watch?v=poDIT2ruQ9M) ⭐ - youtube.com - 8/2023
 - [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023
 - [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 7/2023

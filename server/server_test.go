@@ -329,6 +329,27 @@ func TestServer_PublishPriority(t *testing.T) {
 	require.Equal(t, 40007, toHTTPError(t, response.Body.String()).Code)
 }
 
+func TestServer_PublishPriority_SpecialHTTPHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"Priority":   "u=4",
+		"X-Priority": "5",
+	})
+	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic?priority=4", "test", map[string]string{
+		"Priority": "u=9",
+	})
+	require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"p":        "2",
+		"priority": "u=9, i",
+	})
+	require.Equal(t, 2, toMessage(t, response.Body.String()).Priority)
+}
+
 func TestServer_PublishGETOnlyOneTopic(t *testing.T) {
 	// This tests a bug that allowed publishing topics with a comma in the name (no ticket)
 

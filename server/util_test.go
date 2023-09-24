@@ -2,9 +2,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"math/rand"
 	"net/http"
 	"strings"
 	"testing"
@@ -74,4 +74,17 @@ Accept: */*
 
 (peeked bytes not UTF-8, peek limit of 4096 bytes reached, hex: ` + fmt.Sprintf("%x", body[:4096]) + ` ...)`
 	require.Equal(t, expected, renderHTTPRequest(r))
+}
+
+func TestMaybeIgnoreSpecialHeader(t *testing.T) {
+	require.Empty(t, maybeIgnoreSpecialHeader("priority", "u=1"))
+	require.Empty(t, maybeIgnoreSpecialHeader("Priority", "u=1"))
+	require.Empty(t, maybeIgnoreSpecialHeader("Priority", "u=1, i"))
+}
+
+func TestMaybeDecodeHeaders(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.Header.Set("Priority", "u=1") // Cloudflare priority header
+	r.Header.Set("X-Priority", "5") // ntfy priority header
+	require.Equal(t, "5", readHeaderParam(r, "x-priority", "priority", "p"))
 }

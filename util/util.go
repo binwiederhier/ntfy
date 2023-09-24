@@ -161,11 +161,6 @@ func ParsePriority(priority string) (int, error) {
 	case "5", "max", "urgent":
 		return 5, nil
 	default:
-		// Ignore new HTTP Priority header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
-		// Cloudflare adds this to requests when forwarding to the backend (ntfy), so we just ignore it.
-		if strings.HasPrefix(p, "u=") {
-			return 3, nil
-		}
 		return 0, errInvalidPriority
 	}
 }

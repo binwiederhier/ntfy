@@ -20,8 +20,9 @@ To run the ntfy server, then just run `ntfy serve` (or `systemctl start ntfy` wh
 To send messages, use `ntfy publish`. To subscribe to topics, use `ntfy subscribe` (see [subscribing via CLI](subscribe/cli.md)
 for details). 
 
-If you like video tutorials, check out :simple-youtube: [Kris Occhipinti's ntfy install guide](https://www.youtube.com/watch?v=bZzqrX05mNU). 
-It's short and to the point. _I am not affiliated with Kris, I just liked the video._
+If you like tutorials, check out :simple-youtube: [Kris Occhipinti's ntfy install guide](https://www.youtube.com/watch?v=bZzqrX05mNU) on YouTube, or
+[Alex's Docker-based setup guide](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/). Both are great
+resources to get started. _I am not affiliated with Kris or Alex, I just liked their video/post._
 
 ## Linux binaries
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and

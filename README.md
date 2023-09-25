@@ -31,7 +31,10 @@ as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) a
 </p>
 
 ## [ntfy Pro](https://ntfy.sh/app) 💸 🎉
-I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self-host, or you want to support the development of ntfy (→ [Purchase via web app](https://ntfy.sh/app)). You can **buy a plan for as low as $3.33/month** (if you use promo code `MYTOPIC`, limited time only). You can also donate via [GitHub Sponsors](https://github.com/sponsors/binwiederhier), and [Liberapay](https://liberapay.com/ntfy). I would be very humbled by your sponsorship. ❤️ 
+I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self-host, or you want to support the development of 
+ntfy (→ [Purchase via web app](https://ntfy.sh/app)). You can **buy a plan for as low as $5/month**.
+You can also donate via [GitHub Sponsors](https://github.com/sponsors/binwiederhier), and [Liberapay](https://liberapay.com/ntfy).
+I would be very humbled by your sponsorship. ❤️ 
 
 ## **[Documentation](https://ntfy.sh/docs/)**
 

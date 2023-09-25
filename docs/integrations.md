@@ -129,17 +129,25 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager
 - [NtfyMe-Blender](https://github.com/NotNanook/NtfyMe-Blender) - Blender addon to send notifications to NtfyMe (Python)
-- [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that let's you share files from your share feed to a topic of your choice.
-  
+- [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
+- [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
+
 ## Blog + forum posts
 
+- [Installing Self Host NTFY On Linux Using Docker Container](https://www.pinoylinux.org/topicsplus/containers/installing-self-host-ntfy-on-linux-using-docker-container/) - pinoylinux.org - 9/2023
+- [Homelab Notifications with ntfy](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/) ⭐ - alexsguardian.net - 9/2023 
 - [Why NTFY is the Ultimate Push Notification Tool for Your Needs](https://osintph.medium.com/why-ntfy-is-the-ultimate-push-notification-tool-for-your-needs-e767421c84c5) - osintph.medium.com - 9/2023
 - [Supercharge Your Alerts: Ntfy — The Ultimate Push Notification Solution](https://medium.com/spring-boot/supercharge-your-alerts-ntfy-the-ultimate-push-notification-solution-a3dda79651fe) - spring-boot.medium.com - 9/2023
 - [Deploy Ntfy using Docker](https://www.linkedin.com/pulse/deploy-ntfy-mohamed-sharfy/) - linkedin.com - 9/2023
 - [Send Notifications With Ntfy for New WordPress Posts](https://www.activepieces.com/blog/ntfy-notifications-for-wordpress-new-posts) - activepieces.com - 9/2023
 - [Get Ntfy Notifications About New Zendesk Ticket](https://www.activepieces.com/blog/ntfy-notifications-about-new-zendesk-tickets) - activepieces.com - 9/2023
+- [Set reminder for recurring events using ntfy & Cron](https://www.youtube.com/watch?v=J3O4aQ-EcYk) - youtube.com - 9/2023
+- [ntfy - Installation and full configuration setup](https://www.youtube.com/watch?v=QMy14rGmpFI) - youtube.com - 9/2023
+- [How to install Ntfy.sh on Portainer / Docker Compose](https://www.youtube.com/watch?v=utD9GNbAwyg) - youtube.com - 9/2023
+- [ntfy - Push-Benachrichtigungen // Push Notifications](https://www.youtube.com/watch?v=LE3vRPPqZOU) - youtube.com - 9/2023
 - [Podman Update Notifications via Ntfy](https://rair.dev/podman-upadte-notifications-ntfy/) - rair.dev - 9/2023
 - [NetworkChunk - how did I NOT know about this?](https://www.youtube.com/watch?v=poDIT2ruQ9M) ⭐ - youtube.com - 8/2023
+- [NTFY - Command-Line Notifications](https://academy.networkchuck.com/blog/ntfy/) - academy.networkchuck.com - 8/2023
 - [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023
 - [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 7/2023
 - [Basic website monitoring using cronjobs and ntfy.sh](https://burkhardt.dev/2023/website-monitoring-cron-ntfy/) - burkhardt.dev - 6/2023 

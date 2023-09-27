@@ -40,10 +40,6 @@ Android has an [open bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1796434) 
 This causes ntfy to not automatically subscribe to web push, and requires you to go to the ntfy Settings page to enable
 it manually.
 
-## Safari does not play sounds for web push notifications
-Safari does not support playing sounds for web push notifications, and treats them all as silent. This will be fixed with
-iOS 17 / Safari 17, which will be released later in 2023.
-
 ## PWA on iOS sometimes crashes with an IndexedDB error (see [#787](https://github.com/binwiederhier/ntfy/issues/787))
 When resuming the installed PWA from the background, it sometimes crashes with an error from IndexedDB/Dexie, due to a
 [WebKit bug]( https://bugs.webkit.org/show_bug.cgi?id=197050). A reload will fix it until a permanent fix is found.

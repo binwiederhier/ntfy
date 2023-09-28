@@ -2288,7 +2288,7 @@ You can define which URL to open when a notification is clicked. This may be use
 to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
 the web browser (or the app) and open the website.
 
-To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its aliase `Click`).
+To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its alias `Click`).
 If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
 by another app, the responsible app may open. 
 

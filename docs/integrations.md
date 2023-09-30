@@ -129,6 +129,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager
 - [NtfyMe-Blender](https://github.com/NotNanook/NtfyMe-Blender) - Blender addon to send notifications to NtfyMe (Python)
+- [ntfy-ios-url-share](https://www.icloud.com/shortcuts/be8a7f49530c45f79733cfe3e41887e6) - An iOS shortcut that lets you share URLs easily and quickly.
 - [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
 

@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "ntfy",
+  "version": "0.0.1",
+
+  "description": "Simple extension to display the ntfy app as a browser action popup.",
+  "homepage_url": "https://ntfy.sh/",
+  "icons": {
+    "192": "icons/ntfy-192.png"
+  },
+
+  "action": {
+    "default_icon": "icons/ntfy-192.png",
+    "default_title": "ntfy",
+    "default_popup": "popup/ntfy.html"
+  }
+}

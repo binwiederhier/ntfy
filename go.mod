@@ -19,7 +19,7 @@ require (
 	golang.org/x/sync v0.3.0
 	golang.org/x/term v0.12.0
 	golang.org/x/time v0.3.0
-	google.golang.org/api v0.142.0
+	google.golang.org/api v0.143.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -28,9 +28,9 @@ replace github.com/emersion/go-smtp => github.com/emersion/go-smtp v0.17.0 // Pi
 require github.com/pkg/errors v0.9.1 // indirect
 
 require (
-	firebase.google.com/go/v4 v4.12.0
+	firebase.google.com/go/v4 v4.12.1
 	github.com/SherClockHolmes/webpush-go v1.2.0
-	github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/client_golang v1.17.0
 	github.com/stripe/stripe-go/v74 v74.30.0
 )
 
@@ -58,7 +58,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

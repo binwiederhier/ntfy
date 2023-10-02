@@ -34,12 +34,6 @@ your iOS device and your ntfy server are either on the same network, or that you
 Turn on tracing/debugging on the server (via `log-level: trace` or `log-level: debug`, see [troubleshooting](troubleshooting.md)),
 and read docs on [iOS instant notifications](https://docs.ntfy.sh/config/#ios-instant-notifications).
 
-## Firefox on Android not automatically subscribing to web push (see [#789](https://github.com/binwiederhier/ntfy/issues/789))
-ntfy defaults to web-push based subscriptions when installed as a [progressive web app](./subscribe/pwa.md). Firefox
-Android has an [open bug](https://bugzilla.mozilla.org/show_bug.cgi?id=1796434) where it reports the PWA mode incorrectly.
-This causes ntfy to not automatically subscribe to web push, and requires you to go to the ntfy Settings page to enable
-it manually.
-
 ## Safari does not play sounds for web push notifications
 Safari does not support playing sounds for web push notifications, and treats them all as silent. This will be fixed with
 iOS 17 / Safari 17, which will be released later in 2023.

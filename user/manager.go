@@ -161,7 +161,7 @@ const (
 		FROM user_access a
 		JOIN user u ON u.id = a.user_id
 		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic ESCAPE '\'
-		ORDER BY u.user DESC
+		ORDER BY u.user DESC, a.write DESC
 	`
 
 	insertUserQuery = `

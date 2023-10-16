@@ -161,7 +161,7 @@ const (
 		FROM user_access a
 		JOIN user u ON u.id = a.user_id
 		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic ESCAPE '\'
-		ORDER BY u.user DESC, a.write DESC
+		ORDER BY u.user DESC, LENGTH(a.topic) DESC, a.write DESC
 	`
 
 	insertUserQuery = `
@@ -197,13 +197,13 @@ const (
 	selectUserAllAccessQuery = `
 		SELECT user_id, topic, read, write
 		FROM user_access
-		ORDER BY write DESC, read DESC, topic
+		ORDER BY LENGTH(topic) DESC, write DESC, read DESC, topic
 	`
 	selectUserAccessQuery = `
 		SELECT topic, read, write
 		FROM user_access
 		WHERE user_id = (SELECT id FROM user WHERE user = ?)
-		ORDER BY write DESC, read DESC, topic
+		ORDER BY LENGTH(topic) DESC, write DESC, read DESC, topic
 	`
 	selectUserReservationsQuery = `
 		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write

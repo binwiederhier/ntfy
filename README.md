@@ -155,6 +155,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/spartan"><img src="https://github.com/spartan.png" width="40px" /></a>
 <a href="https://github.com/alexandzors"><img src="https://github.com/alexandzors.png" width="40px" /></a>
 <a href="https://github.com/dkramer95"><img src="https://github.com/dkramer95.png" width="40px" /></a>
+<a href="https://github.com/YezGotIt"><img src="https://github.com/YezGotIt.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

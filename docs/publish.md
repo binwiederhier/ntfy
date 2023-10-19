@@ -1131,7 +1131,7 @@ As of today, the following actions are supported:
   when the action button is tapped (only supported on Android)
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
 
-Here's an example of what that a notification with actions can look like:
+Here's an example of what a notification with actions can look like:
 
 <figure markdown>
   ![notification with actions](static/img/android-screenshot-notification-actions.png){ width=500 }

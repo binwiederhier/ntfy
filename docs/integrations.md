@@ -72,7 +72,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Projects + scripts 
 
-- [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
 - [Grafana-to-ntfy](https://github.com/kittyandrew/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Rust)
 - [Grafana-ntfy-webhook-integration](https://github.com/academo/grafana-alerting-ntfy-webhook-integration) - Integrates Grafana alerts webhooks (Go)
 - [Grafana-to-ntfy](https://gitlab.com/Saibe1111/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Node Js)
@@ -135,6 +134,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
 - [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
+- [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
 
 ## Blog + forum posts
 

@@ -47,10 +47,10 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	benGrants, err := a.Grants("ben")
 	require.Nil(t, err)
 	require.Equal(t, []Grant{
+		{"everyonewrite", PermissionDenyAll},
 		{"mytopic", PermissionReadWrite},
 		{"writeme", PermissionWrite},
 		{"readme", PermissionRead},
-		{"everyonewrite", PermissionDenyAll},
 	}, benGrants)
 
 	notben, err := a.Authenticate("ben", "this is wrong")

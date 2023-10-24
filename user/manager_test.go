@@ -1225,9 +1225,9 @@ func TestMigrationFrom4(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, 4, len(everyoneGrants))
-	require.Equal(t, "down_*", everyoneGrants[0].TopicPattern)
-	require.Equal(t, "left_*", everyoneGrants[1].TopicPattern)
-	require.Equal(t, "mytopic_", everyoneGrants[2].TopicPattern)
+	require.Equal(t, "mytopic_", everyoneGrants[0].TopicPattern)
+	require.Equal(t, "down_*", everyoneGrants[1].TopicPattern)
+	require.Equal(t, "left_*", everyoneGrants[2].TopicPattern)
 	require.Equal(t, "up*", everyoneGrants[3].TopicPattern)
 
 	// Check they are stored correctly in the database

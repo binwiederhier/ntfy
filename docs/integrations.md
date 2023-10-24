@@ -134,6 +134,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
 - [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
+- [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
 
 ## Blog + forum posts
 

@@ -227,10 +227,10 @@ func TestManager_UserManagement(t *testing.T) {
 	benGrants, err := a.Grants("ben")
 	require.Nil(t, err)
 	require.Equal(t, []Grant{
+		{"everyonewrite", PermissionDenyAll},
 		{"mytopic", PermissionReadWrite},
 		{"writeme", PermissionWrite},
 		{"readme", PermissionRead},
-		{"everyonewrite", PermissionDenyAll},
 	}, benGrants)
 
 	everyone, err := a.User(Everyone)

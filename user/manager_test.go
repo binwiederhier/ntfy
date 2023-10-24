@@ -20,10 +20,15 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("john", "john", RoleUser))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "writeme", PermissionWrite))
 	require.Nil(t, a.AllowAccess("ben", "everyonewrite", PermissionDenyAll)) // How unfair!
+	require.Nil(t, a.AllowAccess("john", "*", PermissionRead))
+	require.Nil(t, a.AllowAccess("john", "mytopic*", PermissionReadWrite))
+	require.Nil(t, a.AllowAccess("john", "mytopic_ro*", PermissionRead))
+	require.Nil(t, a.AllowAccess("john", "mytopic_deny*", PermissionDenyAll))
 	require.Nil(t, a.AllowAccess(Everyone, "announcements", PermissionRead))
 	require.Nil(t, a.AllowAccess(Everyone, "everyonewrite", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess(Everyone, "up*", PermissionWrite)) // Everyone can write to /up*
@@ -53,6 +58,21 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 		{"readme", PermissionRead},
 	}, benGrants)
 
+	john, err := a.Authenticate("john", "john")
+	require.Nil(t, err)
+	require.Equal(t, "john", john.Name)
+	require.True(t, strings.HasPrefix(john.Hash, "$2a$10$"))
+	require.Equal(t, RoleUser, john.Role)
+
+	johnGrants, err := a.Grants("john")
+	require.Nil(t, err)
+	require.Equal(t, []Grant{
+		{"mytopic_deny*", PermissionDenyAll},
+		{"mytopic_ro*", PermissionRead},
+		{"mytopic*", PermissionReadWrite},
+		{"*", PermissionRead},
+	}, johnGrants)
+
 	notben, err := a.Authenticate("ben", "this is wrong")
 	require.Nil(t, notben)
 	require.Equal(t, ErrUnauthenticated, err)
@@ -77,6 +97,20 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Equal(t, ErrUnauthorized, a.Authorize(ben, "everyonewrite", PermissionWrite))
 	require.Nil(t, a.Authorize(ben, "announcements", PermissionRead))
 	require.Equal(t, ErrUnauthorized, a.Authorize(ben, "announcements", PermissionWrite))
+
+	// user john should have
+	//  "deny" to mytopic_deny*,
+	//    "ro" to mytopic_ro*,
+	//    "rw" to mytopic*,
+	//    "ro" to the rest
+	require.Equal(t, ErrUnauthorized, a.Authorize(john, "mytopic_deny_case", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(john, "mytopic_deny_case", PermissionWrite))
+	require.Nil(t, a.Authorize(john, "mytopic_ro_test_case", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(john, "mytopic_ro_test_case", PermissionWrite))
+	require.Nil(t, a.Authorize(john, "mytopic_case1", PermissionRead))
+	require.Nil(t, a.Authorize(john, "mytopic_case1", PermissionWrite))
+	require.Nil(t, a.Authorize(john, "readme", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(john, "writeme", PermissionWrite))
 
 	// Everyone else can do barely anything
 	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "sometopicnotinthelist", PermissionRead))

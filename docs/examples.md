@@ -136,20 +136,19 @@ You can send a message during a workflow run with curl. Here is an example sendi
 ```
 
 ## Changedetection.io
-NTFY is an excellent choice for getting notifications when a website has a change sent to your mobile (or desktop), 
+ntfy is an excellent choice for getting notifications when a website has a change sent to your mobile (or desktop), 
 [changedetection.io](https://changedetection.io) or [https://github.com/dgtlmoon/changedetection.io](https://github.com/dgtlmoon/changedetection.io) 
 uses [apprise](https://github.com/caronc/apprise) library for notification integrations.
 
-To add any NTFY(s) notification to a website change simply add the [NTFY style URL](https://github.com/caronc/apprise/wiki/Notify_ntfy) 
+To add any ntfy(s) notification to a website change simply add the [NTFY style URL](https://github.com/caronc/apprise/wiki/Notify_ntfy) 
 to the notification list.
 
 For example `ntfy://{topic}` or `ntfy://{user}:{password}@{host}:{port}/{topics}`
 
-In your changedetection.io installation, click `Edit` > `Notifications` on a single watch then add the special NTFY URL 
-to the Notification List.
+In your changedetection.io installation, click `Edit` > `Notifications` on a single website watch (or group) then add 
+the special ntfy Apprise Notification URL to the Notification List.
 
 ![ntfy alerts on website change](static/img/cdio-setup.jpg)
-
 
 ## Watchtower (shoutrrr)
 You can use [shoutrrr](https://containrrr.dev/shoutrrr/latest/services/ntfy/) to send 

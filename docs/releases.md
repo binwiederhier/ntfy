@@ -1273,7 +1273,7 @@ Released Dec 28, 2021
 
 **Features & bug fixes:**
 
-* [Publish messages via e-mail](ntfy.sh/docs/publish/#e-mail-publishing) #66
+* [Publish messages via e-mail](publish.md#e-mail-publishing) #66
 * Server-side work to support [unifiedpush.org](https://unifiedpush.org) #64
 * Fixing the Santa bug #65
 

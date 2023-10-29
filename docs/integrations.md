@@ -24,6 +24,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
+- [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
 
 ## Integration via HTTP/SMTP/etc.
 

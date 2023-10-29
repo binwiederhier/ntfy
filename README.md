@@ -158,6 +158,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/YezGotIt"><img src="https://github.com/YezGotIt.png" width="40px" /></a>
 <a href="https://github.com/thomasskou"><img src="https://github.com/thomasskou.png" width="40px" /></a>
 <a href="https://github.com/surfernv"><img src="https://github.com/surfernv.png" width="40px" /></a>
+<a href="https://github.com/bear"><img src="https://github.com/bear.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

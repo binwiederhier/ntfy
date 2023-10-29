@@ -134,7 +134,7 @@ export const hashCode = (s) => {
  * convert `i18n.language` style str (e.g.: `en_US`) to kebab-case (e.g.: `en-US`),
  * which is expected by `<html lang>` and `Intl.DateTimeFormat`
  */
-export const getKebabCaseLangStr = (language) => language.replace(/_/g, '-');
+export const getKebabCaseLangStr = (language) => language.replace(/_/g, "-");
 
 export const formatShortDateTime = (timestamp, language) =>
   new Intl.DateTimeFormat(getKebabCaseLangStr(language), {

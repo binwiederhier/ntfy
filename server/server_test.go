@@ -512,6 +512,8 @@ func TestServer_PublishAtAndPrune(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages)) // Not affected by pruning
 	require.Equal(t, "a message", messages[0].Message)
+
+	time.Sleep(time.Second) // FIXME CI failing not sure why
 }
 
 func TestServer_PublishAndMultiPoll(t *testing.T) {

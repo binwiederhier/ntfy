@@ -111,18 +111,7 @@ build-deps-ubuntu:
 docs: docs-deps docs-build
 
 docs-build: .PHONY
-	@if ! /bin/echo -e "import sys\nif sys.version_info < (3,8):\n exit(1)" | python3; then \
-	  if which python3.8; then \
-	  	echo "python3.8 $(shell which mkdocs) build"; \
-	    python3.8 $(shell which mkdocs) build; \
-	  else \
-	    echo "ERROR: Python version too low. mkdocs-material needs >= 3.8"; \
-	    exit 1; \
-	  fi; \
-	else \
-	  echo "mkdocs build"; \
-	  mkdocs build; \
-	fi
+		mkdocs build
 
 docs-deps: .PHONY
 	pip3 install -r requirements.txt

@@ -39,5 +39,10 @@
     "publish_dialog_attach_placeholder": "Atodi ffeil drwy URL, e.e. https://f-droid.org/F-Droid.apk",
     "notifications_click_copy_url_button": "Copio linc",
     "notifications_actions_open_url_title": "Ewch i {{url}}",
-    "publish_dialog_email_label": "Ebost"
+    "publish_dialog_email_label": "Ebost",
+    "signup_form_confirm_password": "Cadarnhau cyfrinair",
+    "signup_form_button_submit": "Cofrestru",
+    "common_back": "Yn ôl",
+    "common_copy_to_clipboard": "Copio i'r clipfwrdd",
+    "signup_already_have_account": "Gyda chyfrif yn barod? Mewngofnodi!"
 }

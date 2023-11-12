@@ -356,5 +356,13 @@
     "nav_button_settings": "Asetukset",
     "publish_dialog_priority_min": "Min. etusijalla",
     "account_tokens_table_create_token_button": "Luo käyttöoikeustunnus",
-    "notifications_delete": "Poista"
+    "notifications_delete": "Poista",
+    "notifications_actions_not_supported": "Toimintoa ei tueta verkkosovelluksessa",
+    "notifications_actions_open_url_title": "Siirry osoitteeseen {{url}}",
+    "notifications_none_for_any_title": "Et ole saanut ilmoituksia.",
+    "notifications_none_for_topic_description": "Jos haluat lähettää ilmoituksia tähän topikkiin, PUT tai POST topikin URL-osoitteeseen.",
+    "notifications_none_for_any_description": "Jos haluat lähettää ilmoituksia topikkiin, PUT tai POST topikin URL-osoitteeseen. Tässä on esimerkki yhden topikin käyttämisestä.",
+    "notifications_no_subscriptions_title": "Näyttää siltä, että sinulla ei ole vielä tilauksia.",
+    "notifications_none_for_topic_title": "Et ole vielä saanut ilmoituksia tästä topikista.",
+    "notifications_actions_http_request_title": "Lähetä HTTP {{method}} to {{url}}"
 }

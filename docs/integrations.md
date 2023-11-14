@@ -136,6 +136,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
 - [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
 - [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
+- [jetspotter](https://github.com/vvanouytsel/jetspotter) - a tool to send notifications whenever specified types of aircraft are spotted near a specified location
 
 ## Blog + forum posts
 

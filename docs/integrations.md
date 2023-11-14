@@ -83,7 +83,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [backup-projects](https://gist.github.com/anthonyaxenov/826ba65abbabd5b00196bc3e6af76002) - Stupidly simple backup script for own projects (Shell)
 - [grav-plugin-whistleblower](https://github.com/Himmlisch-Studios/grav-plugin-whistleblower) - Grav CMS plugin to get notifications via ntfy (PHP)
 - [ntfy-server-status](https://github.com/filip2cz/ntfy-server-status) -  Checking if server is online and reporting through ntfy (C)
-- [borg-based backup](https://github.com/davidhi7/backup) - Simple borg-based backup script with notifications based on ntfy.sh or Discord webhooks (Python/Shell)
 - [ntfy.sh *arr script](https://github.com/agent-squirrel/nfty-arr-script) - Quick and hacky script to get sonarr/radarr to notify the ntfy.sh service (Shell)
 - [website-watcher](https://github.com/muety/website-watcher) - A small tool to watch websites for changes (with XPath support) (Python)
 - [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)

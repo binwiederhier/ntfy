@@ -111,7 +111,7 @@ build-deps-ubuntu:
 docs: docs-deps docs-build
 
 docs-build: .PHONY
-		mkdocs build
+	mkdocs build
 
 docs-deps: .PHONY
 	pip3 install -r requirements.txt

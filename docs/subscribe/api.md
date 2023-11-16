@@ -190,9 +190,10 @@ format. Keepalive messages are sent as empty lines.
 
 ## WebSockets
 You may also subscribe to topics via [WebSockets](https://en.wikipedia.org/wiki/WebSocket), which is also widely 
-supported in many languages. Most notably, WebSockets are natively supported in JavaScript. On the command line, 
-I recommend [websocat](https://github.com/vi/websocat), a fantastic tool similar to `socat` or `curl`, but specifically
-for WebSockets.  
+supported in many languages. Most notably, WebSockets are natively supported in JavaScript. You may also want to 
+check out the [full example on GitHub](https://github.com/binwiederhier/ntfy/tree/main/examples/web-example-websocket).
+On the command line, I recommend [websocat](https://github.com/vi/websocat), a fantastic tool similar to `socat` 
+or `curl`, but specifically for WebSockets.
 
 The WebSockets endpoint is available at `<topic>/ws` and returns messages as JSON objects similar to the 
 [JSON stream endpoint](#subscribe-as-json-stream). 

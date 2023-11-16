@@ -1293,6 +1293,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * PWA: hide install prompt on macOS 14 Safari ([#899](https://github.com/binwiederhier/ntfy/pull/899), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
 * Fix web app crash in Edge for languages with underline in locale ([#922](https://github.com/binwiederhier/ntfy/pull/922)/[#912](https://github.com/binwiederhier/ntfy/issues/912)/[#852](https://github.com/binwiederhier/ntfy/issues/852), thanks to [@imkero](https://github.com/imkero))
 
+**Additional languages:**
+
+* Finnish (thanks to [@Seppo](https://hosted.weblate.org/user/Seppo/)
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

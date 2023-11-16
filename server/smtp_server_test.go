@@ -1335,6 +1335,36 @@ Sent by
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
+func TestSmtpBackend_HTMLOnly_FromDiskStation(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: synology@mydomain.me
+RCPT TO: synology@mydomain.me
+DATA
+From: "=?UTF-8?B?Um9iYmll?=" <synology@mydomain.me>
+To: <synology@mydomain.me>
+Message-Id: <640e6f562895d.6c9584bcfa491ac9c546b480b32ffc1d@mydomain.me>
+MIME-Version: 1.0
+Subject: =?UTF-8?B?W1N5bm9sb2d5IE5BU10gVGVzdCBNZXNzYWdlIGZyb20gTGl0dHNfTkFT?=
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Congratulations! You have successfully set up the email notification on Synology_NAS.<BR>For further system configurations, please visit http://192.168.1.28:5000/, http://172.16.60.5:5000/.<BR>(If you cannot connect to the server, please contact the administrator.)<BR><BR>From Synology_NAS<BR><BR><BR>
+.
+`
+	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/synology", r.URL.Path)
+		require.Equal(t, "[Synology NAS] Test Message from Litts_NAS", r.Header.Get("Title"))
+		actual := readAll(t, r.Body)
+		expected := `Congratulations! You have successfully set up the email notification on Synology_NAS. For further system configurations, please visit http://192.168.1.28:5000/, http://172.16.60.5:5000/. (If you cannot connect to the server, please contact the administrator.)  From Synology_NAS`
+		require.Equal(t, expected, actual)
+	})
+	conf.SMTPServerDomain = "mydomain.me"
+	conf.SMTPServerAddrPrefix = ""
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
 func TestSmtpBackend_PlaintextWithToken(t *testing.T) {
 	email := `EHLO example.com
 MAIL FROM: phil@example.com

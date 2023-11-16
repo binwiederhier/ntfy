@@ -1858,10 +1858,52 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 	}
 }
 
-// maybeAuthenticate reads the "Authorization" header and will try to authenticate the user
+// maybeAuthenticate delegates between auth based on the Authorization header (Bearer/Basic), and auth
+// based on the user-defined header (as defined in the "auth-user-header" setting). The function prefers
+// the user-defined header, if both are present.
+//
+// This function will ALWAYS return a visitor, even if an error occurs (e.g. unauthorized), so
+// that subsequent logging calls still have a visitor context.
+func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
+	ip := extractIPAddress(r, s.config.BehindProxy)
+	vip := s.visitor(ip, nil) // IP-based visitor
+	if s.userManager == nil {
+		return vip, nil
+	}
+	if s.config.AuthUserHeader != "" && s.config.BehindProxy {
+		username := r.Header.Get(s.config.AuthUserHeader) // Do not allow a query param, only a header!
+		if username != "" {
+			return s.authenticateViaUserDefinedHeader(r, vip, username)
+		}
+	}
+	return s.authenticateViaAuthHeader(r, vip)
+}
+
+// authenticateViaUserDefinedHeader tries to authenticate the user via the header defined in the "auth-user-header"
+// configuration value if it is set. The value of the passed username is used to lookup the user in the database.
+// If it exists, authentication is successful.
+//
+// This function will ALWAYS return a visitor, even if an error occurs (e.g. unauthorized), so
+// that subsequent logging calls still have a visitor context.
+func (s *Server) authenticateViaUserDefinedHeader(r *http.Request, vip *visitor, username string) (*visitor, error) {
+	// Check the rate limiter first
+	if !vip.AuthAllowed() {
+		return vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
+	}
+	// Retrieve user from database; if found, we have a successful authentication
+	u, err := s.userManager.User(username)
+	if err != nil || u.Deleted {
+		vip.AuthFailed()
+		logr(r).Err(err).Debug("Authentication failed")
+		return vip, errHTTPUnauthorized
+	}
+	// User was found, meaning that auth was successful
+	return s.visitor(vip.ip, u), nil
+}
+
+// authenticateViaAuthHeader reads the "Authorization" header and will try to authenticate the user
 // if it is set.
 //
-//   - If auth-file is not configured, immediately return an IP-based visitor
 //   - If the header is not set or not supported (anything non-Basic and non-Bearer),
 //     an IP-based visitor is returned
 //   - If the header is set, authenticate will be called to check the username/password (Basic auth),
@@ -1869,13 +1911,8 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 //
 // This function will ALWAYS return a visitor, even if an error occurs (e.g. unauthorized), so
 // that subsequent logging calls still have a visitor context.
-func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
+func (s *Server) authenticateViaAuthHeader(r *http.Request, vip *visitor) (*visitor, error) {
 	// Read "Authorization" header value, and exit out early if it's not set
-	ip := extractIPAddress(r, s.config.BehindProxy)
-	vip := s.visitor(ip, nil)
-	if s.userManager == nil {
-		return vip, nil
-	}
 	header, err := readAuthHeader(r)
 	if err != nil {
 		return vip, err
@@ -1893,7 +1930,7 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 		return vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
 	// Authentication with user was successful
-	return s.visitor(ip, u), nil
+	return s.visitor(vip.ip, u), nil
 }
 
 // authenticate a user based on basic auth username/password (Authorization: Basic ...), or token auth (Authorization: Bearer ...).

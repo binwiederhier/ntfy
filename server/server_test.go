@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/user"
 	"io"
 	"math/rand"
 	"net/http"
@@ -21,6 +19,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
@@ -775,6 +776,58 @@ func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 	require.Equal(t, messageEvent, messages[1].Event)
 	require.Equal(t, "ZFS scrub failed", messages[1].Message)
 	require.Equal(t, keepaliveEvent, messages[2].Event)
+}
+
+func TestServer_User_Auth_Success_Admin(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	header := "X-User-Header"
+	c.AuthUserHeader = header
+	c.BehindProxy = true
+	s := newTestServer(t, c)
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		header: "phil",
+	})
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"success":true}`+"\n", response.Body.String())
+}
+
+func TestServer_User_Auth_Unknown_Admin(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	header := "X-User-Header"
+	c.AuthUserHeader = header
+	c.BehindProxy = true
+	s := newTestServer(t, c)
+
+	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+		header: "unknown",
+	})
+	require.Equal(t, 401, response.Code)
+	require.Equal(t, 40101, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_User_Auth_Fail_Rate_Limit(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	header := "X-User-Header"
+	c.AuthUserHeader = header
+	c.BehindProxy = true
+	c.VisitorAuthFailureLimitBurst = 10
+	s := newTestServer(t, c)
+
+	for i := 0; i < 10; i++ {
+		response := request(t, s, "PUT", "/announcements", "test", map[string]string{
+			header: "phil",
+		})
+		require.Equal(t, 401, response.Code)
+	}
+
+	response := request(t, s, "PUT", "/announcements", "test", map[string]string{
+		header: "phil",
+	})
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42909, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_Auth_Success_Admin(t *testing.T) {

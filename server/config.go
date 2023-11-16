@@ -92,6 +92,7 @@ type Config struct {
 	AuthDefault                          user.Permission
 	AuthBcryptCost                       int
 	AuthStatsQueueWriterInterval         time.Duration
+	AuthUserHeader                       string
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
@@ -247,5 +248,6 @@ func NewConfig() *Config {
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
+		AuthUserHeader:                       "",
 	}
 }

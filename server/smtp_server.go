@@ -29,6 +29,11 @@ var (
 	errUnsupportedContentType = errors.New("unsupported content type")
 )
 
+var (
+	onlySpacesRegex          = regexp.MustCompile(`(?m)^\s+$`)
+	consecutiveNewLinesRegex = regexp.MustCompile(`\n{3,}`)
+)
+
 const (
 	maxMultipartDepth = 2
 )
@@ -319,14 +324,8 @@ func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error)
 	return removeExtraEmptyLines(stripped), nil
 }
 
-func removeExtraEmptyLines(str string) string {
-	// Replace lines that contain only spaces with empty lines
-	re := regexp.MustCompile(`(?m)^\s+$`)
-	str = re.ReplaceAllString(str, "")
-
-	// Remove more than 2 consecutive empty lines
-	re = regexp.MustCompile(`\n{3,}`)
-	str = re.ReplaceAllString(str, "\n\n")
-
-	return str
+func removeExtraEmptyLines(s string) string {
+	s = onlySpacesRegex.ReplaceAllString(s, "")
+	s = consecutiveNewLinesRegex.ReplaceAllString(s, "\n\n")
+	return s
 }

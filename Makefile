@@ -95,6 +95,7 @@ docker-dev:
 		--build-arg COMMIT=$(COMMIT) \
 		./
 
+
 # Ubuntu-specific
 
 build-deps-ubuntu:
@@ -103,21 +104,27 @@ build-deps-ubuntu:
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
+		python3 \
+		python3-venv \
 		jq
 	which pip3 || sudo apt-get install -y python3-pip
+
 
 # Documentation
 
 docs: docs-deps docs-build
 
-docs-build: .PHONY
-	mkdocs build
+docs-venv: .PHONY
+	python3 -m venv ./venv
 
-docs-deps: .PHONY
-	pip3 install -r requirements.txt
+docs-build: docs-venv
+	(. venv/bin/activate && mkdocs build)
+
+docs-deps: docs-venv
+	(. venv/bin/activate && pip3 install -r requirements.txt)
 
 docs-deps-update: .PHONY
-	pip3 install -r requirements.txt --upgrade
+	(. venv/bin/activate && pip3 install -r requirements.txt --upgrade)
 
 
 # Web app

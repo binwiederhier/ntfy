@@ -9,13 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"golang.org/x/sync/errgroup"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
 	"io"
 	"net"
 	"net/http"
@@ -32,6 +25,14 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/util"
 )
 
 // Server is the main server, providing the UI and API for ntfy
@@ -48,15 +49,17 @@ type Server struct {
 	topics            map[string]*topic
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
-	messages          int64
+	messages          int64                               // Total number of messages (persisted if messageCache enabled)
+	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *messageCache                       // Database that stores the messages
+	webPush           *webPushStore                       // Database that stores web push subscriptions
 	fileCache         *fileCache                          // File system based cache that stores attachments
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
-	mu                sync.Mutex
+	mu                sync.RWMutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -75,17 +78,26 @@ var (
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
 
 	webConfigPath                                        = "/config.js"
+	webManifestPath                                      = "/manifest.webmanifest"
+	webRootHTMLPath                                      = "/app.html"
+	webServiceWorkerPath                                 = "/sw.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
-	apiTiers                                             = "/v1/tiers"
+	apiStatsPath                                         = "/v1/stats"
+	apiWebPushPath                                       = "/v1/webpush"
+	apiTiersPath                                         = "/v1/tiers"
+	apiUsersPath                                         = "/v1/users"
+	apiUsersAccessPath                                   = "/v1/users/access"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
 	apiAccountReservationPath                            = "/v1/account/reservation"
+	apiAccountPhonePath                                  = "/v1/account/phone"
+	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -96,13 +108,13 @@ var (
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
+	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
 
 	//go:embed site
-	webFs        embed.FS
-	webFsCached  = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
-	webSiteDir   = "/site"
-	webHomeIndex = "/home.html" // Landing page, only if "web-root: home"
-	webAppIndex  = "/app.html"  // React app
+	webFs       embed.FS
+	webFsCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: webFs}
+	webSiteDir  = "/site"
+	webAppIndex = "/app.html" // React app
 
 	//go:embed docs
 	docsStaticFs     embed.FS
@@ -116,9 +128,10 @@ const (
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
-	jsonBodyBytesLimit       = 16384
-	unifiedPushTopicPrefix   = "up" // Temporarily, we rate limit all "up*" topics based on the subscriber
-	unifiedPushTopicLength   = 14
+	jsonBodyBytesLimit       = 16384                     // Max number of bytes for a JSON request body
+	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
+	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
+	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
 )
 
 // WebSocket constants
@@ -144,7 +157,18 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	var webPush *webPushStore
+	if conf.WebPushPublicKey != "" {
+		webPush, err = newWebPushStore(conf.WebPushFile, conf.WebPushStartupQueries)
+		if err != nil {
+			return nil, err
+		}
+	}
 	topics, err := messageCache.Topics()
+	if err != nil {
+		return nil, err
+	}
+	messages, err := messageCache.Stats()
 	if err != nil {
 		return nil, err
 	}
@@ -177,15 +201,18 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s := &Server{
-		config:         conf,
-		messageCache:   messageCache,
-		fileCache:      fileCache,
-		firebaseClient: firebaseClient,
-		smtpSender:     mailer,
-		topics:         topics,
-		userManager:    userManager,
-		visitors:       make(map[string]*visitor),
-		stripe:         stripe,
+		config:          conf,
+		messageCache:    messageCache,
+		webPush:         webPush,
+		fileCache:       fileCache,
+		firebaseClient:  firebaseClient,
+		smtpSender:      mailer,
+		topics:          topics,
+		userManager:     userManager,
+		messages:        messages,
+		messagesHistory: []int64{messages},
+		visitors:        make(map[string]*visitor),
+		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	return s, nil
@@ -329,6 +356,9 @@ func (s *Server) closeDatabases() {
 		s.userManager.Close()
 	}
 	s.messageCache.Close()
+	if s.webPush != nil {
+		s.webPush.Close()
+	}
 }
 
 // handle is the main entry point for all HTTP requests
@@ -395,14 +425,26 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 }
 
 func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if r.Method == http.MethodGet && r.URL.Path == "/" {
-		return s.ensureWebEnabled(s.handleHome)(w, r, v)
+	if r.Method == http.MethodGet && r.URL.Path == "/" && s.config.WebRoot == "/" {
+		return s.ensureWebEnabled(s.handleRoot)(w, r, v)
 	} else if r.Method == http.MethodHead && r.URL.Path == "/" {
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
+		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {
+		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
+		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -441,13 +483,25 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensurePaymentsEnabled(s.ensureStripeCustomer(s.handleAccountBillingPortalSessionCreate))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountBillingWebhookPath {
 		return s.ensurePaymentsEnabled(s.ensureUserManager(s.handleAccountBillingWebhook))(w, r, v) // This request comes from Stripe!
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiers {
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhoneVerifyPath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberVerify)))(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
+		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
+	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
+		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
+	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {
+		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
+		return s.handleStats(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
 		return s.handleMetrics(w, r, v)
-	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
+	} else if r.Method == http.MethodGet && (staticRegex.MatchString(r.URL.Path) || r.URL.Path == webServiceWorkerPath || r.URL.Path == webRootHTMLPath) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
@@ -479,12 +533,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 	return errHTTPNotFound
 }
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if s.config.WebRootIsApp {
-		r.URL.Path = webAppIndex
-	} else {
-		r.URL.Path = webHomeIndex
-	}
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	r.URL.Path = webAppIndex
 	return s.handleStatic(w, r, v)
 }
 
@@ -516,18 +566,18 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 }
 
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	appRoot := "/"
-	if !s.config.WebRootIsApp {
-		appRoot = "/app"
-	}
 	response := &apiConfigResponse{
 		BaseURL:            "", // Will translate to window.location.origin
-		AppRoot:            appRoot,
+		AppRoot:            s.config.WebRoot,
 		EnableLogin:        s.config.EnableLogin,
 		EnableSignup:       s.config.EnableSignup,
 		EnablePayments:     s.config.StripeSecretKey != "",
+		EnableCalls:        s.config.TwilioAccount != "",
+		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
+		EnableWebPush:      s.config.WebPushPublicKey != "",
 		BillingContact:     s.config.BillingContact,
+		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
 	}
 	b, err := json.MarshalIndent(response, "", "  ")
@@ -539,6 +589,25 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	return err
 }
 
+// handleWebManifest serves the web app manifest for the progressive web app (PWA)
+func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	response := &webManifestResponse{
+		Name:            "ntfy web",
+		Description:     "ntfy lets you send push notifications via scripts from any computer or phone",
+		ShortName:       "ntfy",
+		Scope:           "/",
+		StartURL:        s.config.WebRoot,
+		Display:         "standalone",
+		BackgroundColor: "#ffffff",
+		ThemeColor:      "#317f6f",
+		Icons: []*webManifestIcon{
+			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
+			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
+		},
+	}
+	return s.writeJSONWithContentType(w, response, "application/manifest+json")
+}
+
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
 // and listen-metrics-http is not set.
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, _ *visitor) error {
@@ -546,15 +615,32 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, _ *visito
 	return nil
 }
 
+// handleStatic returns all static resources (excluding the docs), including the web app
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	r.URL.Path = webSiteDir + r.URL.Path
 	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
 	return nil
 }
 
+// handleDocs returns static resources related to the docs
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	util.Gzip(http.FileServer(http.FS(docsStaticCached))).ServeHTTP(w, r)
 	return nil
+}
+
+// handleStats returns the publicly available server stats
+func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	s.mu.RLock()
+	messages, n, rate := s.messages, len(s.messagesHistory), float64(0)
+	if n > 1 {
+		rate = float64(s.messagesHistory[n-1]-s.messagesHistory[0]) / (float64(n-1) * s.config.ManagerInterval.Seconds())
+	}
+	s.mu.RUnlock()
+	response := &apiStatsResponse{
+		Messages:     messages,
+		MessagesRate: rate,
+	}
+	return s.writeJSON(w, response)
 }
 
 // handleFile processes the download of attachment files. The method handles GET and HEAD requests against a file.
@@ -623,6 +709,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return err
 	}
 	defer f.Close()
+	if m.Attachment.Name != "" {
+		w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(m.Attachment.Name))
+	}
 	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
 	return err
 }
@@ -649,7 +738,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, err
 	}
 	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, unifiedpush, e := s.parsePublishParams(r, m)
+	cache, firebase, email, call, unifiedpush, e := s.parsePublishParams(r, m)
 	if e != nil {
 		return nil, e.With(t)
 	}
@@ -663,6 +752,14 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
+	} else if call != "" {
+		var httpErr *errHTTP
+		call, httpErr = s.convertPhoneNumber(v.User(), call)
+		if httpErr != nil {
+			return nil, httpErr.With(t)
+		} else if !vrate.CallAllowed() {
+			return nil, errHTTPTooManyRequestsLimitCalls.With(t)
+		}
 	}
 	if m.PollID != "" {
 		m = newPollRequestMessage(t.ID, m.PollID)
@@ -687,6 +784,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 			"message_firebase":    firebase,
 			"message_unifiedpush": unifiedpush,
 			"message_email":       email,
+			"message_call":        call,
 		})
 	if ev.IsTrace() {
 		ev.Field("message_body", util.MaybeMarshalJSON(m)).Trace("Received message")
@@ -703,8 +801,14 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		if s.smtpSender != nil && email != "" {
 			go s.sendEmail(v, m, email)
 		}
-		if s.config.UpstreamBaseURL != "" {
+		if s.config.TwilioAccount != "" && call != "" {
+			go s.callPhone(v, r, m, call)
+		}
+		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
 			go s.forwardPollRequest(v, m)
+		}
+		if s.config.WebPushPublicKey != "" {
+			go s.publishToWebPushEndpoints(v, m)
 		}
 	} else {
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
@@ -798,7 +902,11 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	}
+	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
 	req.Header.Set("X-Poll-ID", m.ID)
+	if s.config.UpstreamAccessToken != "" {
+		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
+	}
 	var httpClient = &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -807,12 +915,16 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	} else if response.StatusCode != http.StatusOK {
-		logvm(v, m).Err(err).Warn("Unable to publish poll request, unexpected HTTP status: %d", response.StatusCode)
+		if response.StatusCode == http.StatusTooManyRequests {
+			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s; you may solve this by sending fewer daily messages, or by configuring upstream-access-token (assuming you have an account with higher rate limits) ", s.config.UpstreamBaseURL, response.Status)
+		} else {
+			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s", s.config.UpstreamBaseURL, response.Status)
+		}
 		return
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email string, unifiedpush bool, err *errHTTP) {
+func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, call string, unifiedpush bool, err *errHTTP) {
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
@@ -828,7 +940,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if attach != "" {
 		if !urlRegex.MatchString(attach) {
-			return false, false, "", false, errHTTPBadRequestAttachmentURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
 		if m.Attachment.Name == "" {
@@ -846,13 +958,19 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if icon != "" {
 		if !urlRegex.MatchString(icon) {
-			return false, false, "", false, errHTTPBadRequestIconURLInvalid
+			return false, false, "", "", false, errHTTPBadRequestIconURLInvalid
 		}
 		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if s.smtpSender == nil && email != "" {
-		return false, false, "", false, errHTTPBadRequestEmailDisabled
+		return false, false, "", "", false, errHTTPBadRequestEmailDisabled
+	}
+	call = readParam(r, "x-call", "call")
+	if call != "" && (s.config.TwilioAccount == "" || s.userManager == nil) {
+		return false, false, "", "", false, errHTTPBadRequestPhoneCallsDisabled
+	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
+		return false, false, "", "", false, errHTTPBadRequestPhoneNumberInvalid
 	}
 	messageStr := strings.ReplaceAll(readParam(r, "x-message", "message", "m"), "\\n", "\n")
 	if messageStr != "" {
@@ -861,24 +979,27 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	var e error
 	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
 	if e != nil {
-		return false, false, "", false, errHTTPBadRequestPriorityInvalid
+		return false, false, "", "", false, errHTTPBadRequestPriorityInvalid
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, "", false, errHTTPBadRequestDelayNoCache
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCache
 		}
 		if email != "" {
-			return false, false, "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+			return false, false, "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+		}
+		if call != "" {
+			return false, false, "", "", false, errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, "", false, errHTTPBadRequestDelayCannotParse
+			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooSmall
+			return false, false, "", "", false, errHTTPBadRequestDelayTooSmall
 		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
-			return false, false, "", false, errHTTPBadRequestDelayTooLarge
+			return false, false, "", "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
 	}
@@ -886,8 +1007,12 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
 		}
+	}
+	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
+	if markdown || strings.ToLower(contentType) == "text/markdown" {
+		m.ContentType = "text/markdown"
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
 	if unifiedpush {
@@ -900,7 +1025,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		cache = false
 		email = ""
 	}
-	return cache, firebase, email, unifiedpush, nil
+	return cache, firebase, email, call, unifiedpush, nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
@@ -1170,7 +1295,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	defer conn.Close()
 
-	// Subscription connections can be canceled externally, see topic.CancelSubscribers
+	// Subscription connections can be canceled externally, see topic.CancelSubscribersExceptUser
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1412,6 +1537,7 @@ func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visito
 	return nil
 }
 
+// topicFromPath returns the topic from a root path (e.g. /mytopic), creating it if it doesn't exist.
 func (s *Server) topicFromPath(path string) (*topic, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -1420,6 +1546,7 @@ func (s *Server) topicFromPath(path string) (*topic, error) {
 	return s.topicFromID(parts[1])
 }
 
+// topicsFromPath returns the topic from a root path (e.g. /mytopic,mytopic2), creating it if it doesn't exist.
 func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -1433,6 +1560,7 @@ func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 	return topics, parts[1], nil
 }
 
+// topicsFromIDs returns the topics with the given IDs, creating them if they don't exist.
 func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1452,12 +1580,30 @@ func (s *Server) topicsFromIDs(ids ...string) ([]*topic, error) {
 	return topics, nil
 }
 
+// topicFromID returns the topic with the given ID, creating it if it doesn't exist.
 func (s *Server) topicFromID(id string) (*topic, error) {
 	topics, err := s.topicsFromIDs(id)
 	if err != nil {
 		return nil, err
 	}
 	return topics[0], nil
+}
+
+// topicsFromPattern returns a list of topics matching the given pattern, but it does not create them.
+func (s *Server) topicsFromPattern(pattern string) ([]*topic, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	patternRegexp, err := regexp.Compile("^" + strings.ReplaceAll(pattern, "*", ".*") + "$")
+	if err != nil {
+		return nil, err
+	}
+	topics := make([]*topic, 0)
+	for _, t := range s.topics {
+		if patternRegexp.MatchString(t.ID) {
+			topics = append(topics, t)
+		}
+	}
+	return topics, nil
 }
 
 func (s *Server) runSMTPServer() error {
@@ -1580,9 +1726,9 @@ func (s *Server) sendDelayedMessages() error {
 
 func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	logvm(v, m).Debug("Sending delayed message")
-	s.mu.Lock()
+	s.mu.RLock()
 	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if ok {
 		go func() {
 			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler
@@ -1596,6 +1742,9 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 	}
 	if s.config.UpstreamBaseURL != "" {
 		go s.forwardPollRequest(v, m)
+	}
+	if s.config.WebPushPublicKey != "" {
+		go s.publishToWebPushEndpoints(v, m)
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err
@@ -1640,6 +1789,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Icon != "" {
 			r.Header.Set("X-Icon", m.Icon)
 		}
+		if m.Markdown {
+			r.Header.Set("X-Markdown", "yes")
+		}
 		if len(m.Actions) > 0 {
 			actionsStr, err := json.Marshal(m.Actions)
 			if err != nil {
@@ -1652,6 +1804,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Delay != "" {
 			r.Header.Set("X-Delay", m.Delay)
+		}
+		if m.Call != "" {
+			r.Header.Set("X-Call", m.Call)
 		}
 		return next(w, r, v)
 	}
@@ -1814,10 +1969,28 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
-	w.Header().Set("Content-Type", "application/json")
+	return s.writeJSONWithContentType(w, v, "application/json")
+}
+
+func (s *Server) writeJSONWithContentType(w http.ResponseWriter, v any, contentType string) error {
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *Server) updateAndWriteStats(messagesCount int64) {
+	s.mu.Lock()
+	s.messagesHistory = append(s.messagesHistory, messagesCount)
+	if len(s.messagesHistory) > messagesHistoryMax {
+		s.messagesHistory = s.messagesHistory[1:]
+	}
+	s.mu.Unlock()
+	go func() {
+		if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+		}
+	}()
 }

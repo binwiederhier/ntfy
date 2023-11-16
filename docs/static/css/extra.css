@@ -71,7 +71,18 @@ figure video {
 }
 
 .remove-md-box td {
-    padding: 0 10px
+    padding: 0 10px;
+}
+
+.emoji-table .c {
+    vertical-align: middle !important;
+}
+
+.emoji-table .e {
+    font-size: 2.5em;
+    padding: 0 2px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
 }
 
 /* Lightbox; thanks to https://yossiabramov.com/blog/vanilla-js-lightbox */

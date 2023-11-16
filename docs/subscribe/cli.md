@@ -10,7 +10,7 @@ to topics via the ntfy CLI. The CLI is included in the same `ntfy` binary that c
 ## Install + configure
 To install the ntfy CLI, simply **follow the steps outlined on the [install page](../install.md)**. The ntfy server and 
 client are the same binary, so it's all very convenient. After installing, you can (optionally) configure the client 
-by creating `~/.config/ntfy/client.yml` (for the non-root user), or `/etc/ntfy/client.yml` (for the root user). You 
+by creating `~/.config/ntfy/client.yml` (for the non-root user), `~/Library/Application Support/ntfy/client.yml` (for the macOS non-root user), or `/etc/ntfy/client.yml` (for the root user). You 
 can find a [skeleton config](https://github.com/binwiederhier/ntfy/blob/main/client/client.yml) on GitHub. 
 
 If you just want to use [ntfy.sh](https://ntfy.sh), you don't have to change anything. If you **self-host your own server**,

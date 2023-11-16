@@ -2,7 +2,6 @@ package util
 
 import (
 	"errors"
-	"golang.org/x/time/rate"
 	"io"
 	"net/netip"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/stretchr/testify/require"
 )
@@ -49,6 +50,11 @@ func TestContains(t *testing.T) {
 	require.False(t, Contains(s, 3))
 }
 
+func TestContainsAll(t *testing.T) {
+	require.True(t, ContainsAll([]int{1, 2, 3}, []int{2, 3}))
+	require.False(t, ContainsAll([]int{1, 1}, []int{1, 2}))
+}
+
 func TestContainsIP(t *testing.T) {
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("1.1.1.1")))
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("fd12:1234:5678::9876")))
@@ -78,15 +84,6 @@ func TestParsePriority_Invalid(t *testing.T) {
 	for _, priority := range priorities {
 		_, err := ParsePriority(priority)
 		require.Equal(t, errInvalidPriority, err)
-	}
-}
-
-func TestParsePriority_HTTPSpecPriority(t *testing.T) {
-	priorities := []string{"u=1", "u=3", "u=7, i"} // see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority
-	for _, priority := range priorities {
-		actual, err := ParsePriority(priority)
-		require.Nil(t, err)
-		require.Equal(t, 3, actual) // Always expect 3!
 	}
 }
 

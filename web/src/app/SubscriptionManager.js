@@ -1,193 +1,262 @@
+import api from "./Api";
+import notifier from "./Notifier";
+import prefs from "./Prefs";
 import db from "./db";
-import {topicUrl} from "./utils";
+import { topicUrl } from "./utils";
 
 class SubscriptionManager {
-    /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
-    async all() {
-        const subscriptions = await db.subscriptions.toArray();
-        await Promise.all(subscriptions.map(async s => {
-            s.new = await db.notifications
-                .where({ subscriptionId: s.id, new: 1 })
-                .count();
-        }));
-        return subscriptions;
+  constructor(dbImpl) {
+    this.db = dbImpl;
+  }
+
+  /** All subscriptions, including "new count"; this is a JOIN, see https://dexie.org/docs/API-Reference#joining */
+  async all() {
+    const subscriptions = await this.db.subscriptions.toArray();
+    return Promise.all(
+      subscriptions.map(async (s) => ({
+        ...s,
+        new: await this.db.notifications.where({ subscriptionId: s.id, new: 1 }).count(),
+      }))
+    );
+  }
+
+  /**
+   * List of topics for which Web Push is enabled. This excludes (a) internal topics, (b) topics that are muted,
+   * and (c) topics from other hosts. Returns an empty list if Web Push is disabled.
+   *
+   * It is important to note that "mutedUntil" must be part of the where() query, otherwise the Dexie live query
+   * will not react to it, and the Web Push topics will not be updated when the user mutes a topic.
+   */
+  async webPushTopics(pushPossible) {
+    if (!pushPossible) {
+      return [];
     }
 
-    async get(subscriptionId) {
-        return await db.subscriptions.get(subscriptionId)
+    // the Promise.resolve wrapper is not superfluous, without it the live query breaks:
+    // https://dexie.org/docs/dexie-react-hooks/useLiveQuery()#calling-non-dexie-apis-from-querier
+    const enabled = await Promise.resolve(prefs.webPushEnabled());
+    if (!enabled) {
+      return [];
     }
 
-    async add(baseUrl, topic, internal) {
-        const id = topicUrl(baseUrl, topic);
-        const existingSubscription = await this.get(id);
-        if (existingSubscription) {
-            return existingSubscription;
-        }
-        const subscription = {
-            id: topicUrl(baseUrl, topic),
-            baseUrl: baseUrl,
-            topic: topic,
-            mutedUntil: 0,
-            last: null,
-            internal: internal || false
-        };
-        await db.subscriptions.put(subscription);
-        return subscription;
+    const subscriptions = await this.db.subscriptions.where({ baseUrl: config.base_url, mutedUntil: 0 }).toArray();
+    return subscriptions.filter(({ internal }) => !internal).map(({ topic }) => topic);
+  }
+
+  async get(subscriptionId) {
+    return this.db.subscriptions.get(subscriptionId);
+  }
+
+  async notify(subscriptionId, notification) {
+    const subscription = await this.get(subscriptionId);
+    if (subscription.mutedUntil > 0) {
+      return;
     }
 
-    async syncFromRemote(remoteSubscriptions, remoteReservations) {
-        console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
-
-        // Add remote subscriptions
-        let remoteIds = []; // = topicUrl(baseUrl, topic)
-        for (let i = 0; i < remoteSubscriptions.length; i++) {
-            const remote = remoteSubscriptions[i];
-            const local = await this.add(remote.base_url, remote.topic, false);
-            const reservation = remoteReservations?.find(r => remote.base_url === config.base_url && remote.topic === r.topic) || null;
-            await this.update(local.id, {
-                displayName: remote.display_name, // May be undefined
-                reservation: reservation // May be null!
-            });
-            remoteIds.push(local.id);
-        }
-
-        // Remove local subscriptions that do not exist remotely
-        const localSubscriptions = await db.subscriptions.toArray();
-        for (let i = 0; i < localSubscriptions.length; i++) {
-            const local = localSubscriptions[i];
-            const remoteExists = remoteIds.includes(local.id);
-            if (!local.internal && !remoteExists) {
-                await this.remove(local.id);
-            }
-        }
+    const priority = notification.priority ?? 3;
+    if (priority < (await prefs.minPriority())) {
+      return;
     }
 
-    async updateState(subscriptionId, state) {
-        db.subscriptions.update(subscriptionId, { state: state });
+    await notifier.notify(subscription, notification);
+  }
+
+  /**
+   * @param {string} baseUrl
+   * @param {string} topic
+   * @param {object} opts
+   * @param {boolean} opts.internal
+   * @returns
+   */
+  async add(baseUrl, topic, opts = {}) {
+    const id = topicUrl(baseUrl, topic);
+
+    const existingSubscription = await this.get(id);
+    if (existingSubscription) {
+      return existingSubscription;
     }
 
-    async remove(subscriptionId) {
-        await db.subscriptions.delete(subscriptionId);
-        await db.notifications
-            .where({subscriptionId: subscriptionId})
-            .delete();
-    }
+    const subscription = {
+      ...opts,
+      id: topicUrl(baseUrl, topic),
+      baseUrl,
+      topic,
+      mutedUntil: 0,
+      last: null,
+    };
 
-    async first() {
-        return db.subscriptions.toCollection().first(); // May be undefined
-    }
+    await this.db.subscriptions.put(subscription);
 
-    async getNotifications(subscriptionId) {
-        // This is quite awkward, but it is the recommended approach as per the Dexie docs.
-        // It's actually fine, because the reading and filtering is quite fast. The rendering is what's
-        // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
+    return subscription;
+  }
 
-        return db.notifications
-            .orderBy("time") // Sort by time first
-            .filter(n => n.subscriptionId === subscriptionId)
-            .reverse()
-            .toArray();
-    }
+  async syncFromRemote(remoteSubscriptions, remoteReservations) {
+    console.log(`[SubscriptionManager] Syncing subscriptions from remote`, remoteSubscriptions);
 
-    async getAllNotifications() {
-        return db.notifications
-            .orderBy("time") // Efficient, see docs
-            .reverse()
-            .toArray();
-    }
+    // Add remote subscriptions
+    const remoteIds = await Promise.all(
+      remoteSubscriptions.map(async (remote) => {
+        const reservation = remoteReservations?.find((r) => remote.base_url === config.base_url && remote.topic === r.topic) || null;
 
-    /** Adds notification, or returns false if it already exists */
-    async addNotification(subscriptionId, notification) {
-        const exists = await db.notifications.get(notification.id);
-        if (exists) {
-            return false;
-        }
-        try {
-            notification.new = 1; // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-            await db.notifications.add({ ...notification, subscriptionId }); // FIXME consider put() for double tab
-            await db.subscriptions.update(subscriptionId, {
-                last: notification.id
-            });
-        } catch (e) {
-            console.error(`[SubscriptionManager] Error adding notification`, e);
-        }
-        return true;
-    }
-
-    /** Adds/replaces notifications, will not throw if they exist */
-    async addNotifications(subscriptionId, notifications) {
-        const notificationsWithSubscriptionId = notifications
-            .map(notification => ({ ...notification, subscriptionId }));
-        const lastNotificationId = notifications.at(-1).id;
-        await db.notifications.bulkPut(notificationsWithSubscriptionId);
-        await db.subscriptions.update(subscriptionId, {
-            last: lastNotificationId
+        const local = await this.add(remote.base_url, remote.topic, {
+          displayName: remote.display_name, // May be undefined
+          reservation, // May be null!
         });
-    }
 
-    async updateNotification(notification) {
-        const exists = await db.notifications.get(notification.id);
-        if (!exists) {
-            return false;
+        return local.id;
+      })
+    );
+
+    // Remove local subscriptions that do not exist remotely
+    const localSubscriptions = await this.db.subscriptions.toArray();
+
+    await Promise.all(
+      localSubscriptions.map(async (local) => {
+        const remoteExists = remoteIds.includes(local.id);
+        if (!local.internal && !remoteExists) {
+          await this.remove(local);
         }
-        try {
-            await db.notifications.put({ ...notification });
-        } catch (e) {
-            console.error(`[SubscriptionManager] Error updating notification`, e);
-        }
-        return true;
+      })
+    );
+  }
+
+  async updateWebPushSubscriptions(topics) {
+    const hasWebPushTopics = topics.length > 0;
+    const browserSubscription = await notifier.webPushSubscription(hasWebPushTopics);
+
+    if (!browserSubscription) {
+      console.log(
+        "[SubscriptionManager] No browser subscription currently exists, so web push was never enabled or the notification permission was removed. Skipping."
+      );
+      return;
     }
 
-    async deleteNotification(notificationId) {
-        await db.notifications.delete(notificationId);
+    if (hasWebPushTopics) {
+      await api.updateWebPush(browserSubscription, topics);
+    } else {
+      await api.deleteWebPush(browserSubscription);
     }
+  }
 
-    async deleteNotifications(subscriptionId) {
-        await db.notifications
-            .where({subscriptionId: subscriptionId})
-            .delete();
-    }
+  async updateState(subscriptionId, state) {
+    this.db.subscriptions.update(subscriptionId, { state });
+  }
 
-    async markNotificationRead(notificationId) {
-        await db.notifications
-            .where({id: notificationId})
-            .modify({new: 0});
-    }
+  async remove(subscription) {
+    await this.db.subscriptions.delete(subscription.id);
+    await this.db.notifications.where({ subscriptionId: subscription.id }).delete();
+  }
 
-    async markNotificationsRead(subscriptionId) {
-        await db.notifications
-            .where({subscriptionId: subscriptionId, new: 1})
-            .modify({new: 0});
-    }
+  async first() {
+    return this.db.subscriptions.toCollection().first(); // May be undefined
+  }
 
-    async setMutedUntil(subscriptionId, mutedUntil) {
-        await db.subscriptions.update(subscriptionId, {
-            mutedUntil: mutedUntil
-        });
-    }
+  async getNotifications(subscriptionId) {
+    // This is quite awkward, but it is the recommended approach as per the Dexie docs.
+    // It's actually fine, because the reading and filtering is quite fast. The rendering is what's
+    // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
 
-    async setDisplayName(subscriptionId, displayName) {
-        await db.subscriptions.update(subscriptionId, {
-            displayName: displayName
-        });
-    }
+    return this.db.notifications
+      .orderBy("time") // Sort by time first
+      .filter((n) => n.subscriptionId === subscriptionId)
+      .reverse()
+      .toArray();
+  }
 
-    async setReservation(subscriptionId, reservation) {
-        await db.subscriptions.update(subscriptionId, {
-            reservation: reservation
-        });
-    }
+  async getAllNotifications() {
+    return this.db.notifications
+      .orderBy("time") // Efficient, see docs
+      .reverse()
+      .toArray();
+  }
 
-    async update(subscriptionId, params) {
-        await db.subscriptions.update(subscriptionId, params);
+  /** Adds notification, or returns false if it already exists */
+  async addNotification(subscriptionId, notification) {
+    const exists = await this.db.notifications.get(notification.id);
+    if (exists) {
+      return false;
     }
+    try {
+      // sw.js duplicates this logic, so if you change it here, change it there too
+      await this.db.notifications.add({
+        ...notification,
+        subscriptionId,
+        // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+        new: 1,
+      }); // FIXME consider put() for double tab
+      await this.db.subscriptions.update(subscriptionId, {
+        last: notification.id,
+      });
+    } catch (e) {
+      console.error(`[SubscriptionManager] Error adding notification`, e);
+    }
+    return true;
+  }
 
-    async pruneNotifications(thresholdTimestamp) {
-        await db.notifications
-            .where("time").below(thresholdTimestamp)
-            .delete();
+  /** Adds/replaces notifications, will not throw if they exist */
+  async addNotifications(subscriptionId, notifications) {
+    const notificationsWithSubscriptionId = notifications.map((notification) => ({ ...notification, subscriptionId }));
+    const lastNotificationId = notifications.at(-1).id;
+    await this.db.notifications.bulkPut(notificationsWithSubscriptionId);
+    await this.db.subscriptions.update(subscriptionId, {
+      last: lastNotificationId,
+    });
+  }
+
+  async updateNotification(notification) {
+    const exists = await this.db.notifications.get(notification.id);
+    if (!exists) {
+      return false;
     }
+    try {
+      await this.db.notifications.put({ ...notification });
+    } catch (e) {
+      console.error(`[SubscriptionManager] Error updating notification`, e);
+    }
+    return true;
+  }
+
+  async deleteNotification(notificationId) {
+    await this.db.notifications.delete(notificationId);
+  }
+
+  async deleteNotifications(subscriptionId) {
+    await this.db.notifications.where({ subscriptionId }).delete();
+  }
+
+  async markNotificationRead(notificationId) {
+    await this.db.notifications.where({ id: notificationId }).modify({ new: 0 });
+  }
+
+  async markNotificationsRead(subscriptionId) {
+    await this.db.notifications.where({ subscriptionId, new: 1 }).modify({ new: 0 });
+  }
+
+  async setMutedUntil(subscriptionId, mutedUntil) {
+    await this.db.subscriptions.update(subscriptionId, {
+      mutedUntil,
+    });
+  }
+
+  async setDisplayName(subscriptionId, displayName) {
+    await this.db.subscriptions.update(subscriptionId, {
+      displayName,
+    });
+  }
+
+  async setReservation(subscriptionId, reservation) {
+    await this.db.subscriptions.update(subscriptionId, {
+      reservation,
+    });
+  }
+
+  async update(subscriptionId, params) {
+    await this.db.subscriptions.update(subscriptionId, params);
+  }
+
+  async pruneNotifications(thresholdTimestamp) {
+    await this.db.notifications.where("time").below(thresholdTimestamp).delete();
+  }
 }
 
-const subscriptionManager = new SubscriptionManager();
-export default subscriptionManager;
+export default new SubscriptionManager(db());

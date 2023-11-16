@@ -72,7 +72,7 @@ ntfy subscribe TOPIC COMMAND
     $NTFY_TITLE     $title, $t            Message title
     $NTFY_PRIORITY  $priority, $prio, $p  Message priority (1=min, 5=max)
     $NTFY_TAGS      $tags, $tag, $ta      Message tags (comma separated list)
-	$NTFY_RAW       $raw                  Raw JSON message
+    $NTFY_RAW       $raw                  Raw JSON message
 
   Examples:
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
@@ -119,8 +119,7 @@ func execSubscribe(c *cli.Context) error {
 	}
 	if token != "" {
 		options = append(options, client.WithBearerAuth(token))
-	}
-	if user != "" {
+	} else if user != "" {
 		var pass string
 		parts := strings.SplitN(user, ":", 2)
 		if len(parts) == 2 {
@@ -136,6 +135,10 @@ func execSubscribe(c *cli.Context) error {
 			fmt.Fprintf(c.App.ErrWriter, "\r%s\r", strings.Repeat(" ", 20))
 		}
 		options = append(options, client.WithBasicAuth(user, pass))
+	} else if conf.DefaultToken != "" {
+		options = append(options, client.WithBearerAuth(conf.DefaultToken))
+	} else if conf.DefaultUser != "" && conf.DefaultPassword != nil {
+		options = append(options, client.WithBasicAuth(conf.DefaultUser, *conf.DefaultPassword))
 	}
 	if scheduled {
 		options = append(options, client.WithScheduled())
@@ -191,7 +194,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 			topicOptions = append(topicOptions, auth)
 		}
 
-		subscriptionID := cl.Subscribe(s.Topic, topicOptions...)
+		subscriptionID, err := cl.Subscribe(s.Topic, topicOptions...)
+		if err != nil {
+			return err
+		}
 		if s.Command != "" {
 			cmds[subscriptionID] = s.Command
 		} else if conf.DefaultCommand != "" {
@@ -201,7 +207,10 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 		}
 	}
 	if topic != "" {
-		subscriptionID := cl.Subscribe(topic, options...)
+		subscriptionID, err := cl.Subscribe(topic, options...)
+		if err != nil {
+			return err
+		}
 		cmds[subscriptionID] = command
 	}
 	for m := range cl.Messages {
@@ -216,12 +225,17 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic, 
 }
 
 func maybeAddAuthHeader(s client.Subscribe, conf *client.Config) client.SubscribeOption {
-	// check for subscription token then subscription user:pass
-	if s.Token != "" {
-		return client.WithBearerAuth(s.Token)
+	// if an explicit empty token or empty user:pass is given, exit without auth
+	if (s.Token != nil && *s.Token == "") || (s.User != nil && *s.User == "" && s.Password != nil && *s.Password == "") {
+		return client.WithEmptyAuth()
 	}
-	if s.User != "" && s.Password != nil {
-		return client.WithBasicAuth(s.User, *s.Password)
+
+	// check for subscription token then subscription user:pass
+	if s.Token != nil && *s.Token != "" {
+		return client.WithBearerAuth(*s.Token)
+	}
+	if s.User != nil && *s.User != "" && s.Password != nil {
+		return client.WithBasicAuth(*s.User, *s.Password)
 	}
 
 	// if no subscription token nor subscription user:pass, check for default token then default user:pass

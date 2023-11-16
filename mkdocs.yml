@@ -13,7 +13,7 @@ theme:
   language: en
   custom_dir: docs/_overrides
   logo: static/img/ntfy.png
-  favicon: static/img/favicon.png
+  favicon: static/img/favicon.ico
   include_search_page: false
   search_index_only: true
   palette:
@@ -64,7 +64,6 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
 
 plugins:
@@ -82,6 +81,7 @@ nav:
 - "Subscribing":
   - "From your phone": subscribe/phone.md
   - "From the Web app": subscribe/web.md
+  - "From the Desktop": subscribe/pwa.md
   - "From the CLI": subscribe/cli.md
   - "Using the API": subscribe/api.md
 - "Self-hosting":

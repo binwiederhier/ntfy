@@ -183,6 +183,19 @@ func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	require.Equal(t, ErrUserNotFound, err)
 }
 
+func TestManager_CreateToken_Only_Lower(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	// Create user, add reservations and token
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	u, err := a.User("user")
+	require.Nil(t, err)
+
+	token, err := a.CreateToken(u.ID, "", time.Now().Add(time.Hour), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.Equal(t, token.Value, strings.ToLower(token.Value))
+}
+
 func TestManager_UserManagement(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
@@ -317,7 +330,7 @@ func TestManager_Reservations(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AddReservation("ben", "ztopic", PermissionDenyAll))
+	require.Nil(t, a.AddReservation("ben", "ztopic_", PermissionDenyAll))
 	require.Nil(t, a.AddReservation("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "something-else", PermissionRead))
 
@@ -330,7 +343,7 @@ func TestManager_Reservations(t *testing.T) {
 		Everyone: PermissionRead,
 	}, reservations[0])
 	require.Equal(t, Reservation{
-		Topic:    "ztopic",
+		Topic:    "ztopic_",
 		Owner:    PermissionReadWrite,
 		Everyone: PermissionDenyAll,
 	}, reservations[1])
@@ -338,6 +351,14 @@ func TestManager_Reservations(t *testing.T) {
 	b, err := a.HasReservation("ben", "readme")
 	require.Nil(t, err)
 	require.True(t, b)
+
+	b, err = a.HasReservation("ben", "ztopic_")
+	require.Nil(t, err)
+	require.True(t, b)
+
+	b, err = a.HasReservation("ben", "ztopicX") // _ != X (used to be a SQL wildcard issue)
+	require.Nil(t, err)
+	require.False(t, b)
 
 	b, err = a.HasReservation("notben", "readme")
 	require.Nil(t, err)
@@ -358,11 +379,17 @@ func TestManager_Reservations(t *testing.T) {
 	err = a.AllowReservation("phil", "readme")
 	require.Equal(t, errTopicOwnedByOthers, err)
 
+	err = a.AllowReservation("phil", "ztopic_")
+	require.Equal(t, errTopicOwnedByOthers, err)
+
+	err = a.AllowReservation("phil", "ztopicX")
+	require.Nil(t, err)
+
 	err = a.AllowReservation("phil", "not-reserved")
 	require.Nil(t, err)
 
 	// Now remove them again
-	require.Nil(t, a.RemoveReservations("ben", "ztopic", "readme"))
+	require.Nil(t, a.RemoveReservations("ben", "ztopic_", "readme"))
 
 	count, err = a.ReservationsCount("ben")
 	require.Nil(t, err)
@@ -567,46 +594,80 @@ func TestManager_Token_Extend(t *testing.T) {
 }
 
 func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
+	// Tests that tokens are automatically deleted when the maximum number of tokens is reached
+
 	a := newTestManager(t, PermissionDenyAll)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
 
-	// Try to extend token for user without token
-	u, err := a.User("ben")
+	ben, err := a.User("ben")
 	require.Nil(t, err)
 
-	// Tokens
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+
+	// Create 2 tokens for phil
+	philTokens := make([]string, 0)
+	token, err := a.CreateToken(phil.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.NotEmpty(t, token.Value)
+	philTokens = append(philTokens, token.Value)
+
+	token, err = a.CreateToken(phil.ID, "", time.Unix(0, 0), netip.IPv4Unspecified())
+	require.Nil(t, err)
+	require.NotEmpty(t, token.Value)
+	philTokens = append(philTokens, token.Value)
+
+	// Create 22 tokens for ben (only 20 allowed!)
 	baseTime := time.Now().Add(24 * time.Hour)
-	tokens := make([]string, 0)
-	for i := 0; i < 22; i++ {
-		token, err := a.CreateToken(u.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
+	benTokens := make([]string, 0)
+	for i := 0; i < 22; i++ { //
+		token, err := a.CreateToken(ben.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
-		tokens = append(tokens, token.Value)
+		benTokens = append(benTokens, token.Value)
 
 		// Manually modify expiry date to avoid sorting issues (this is a hack)
 		_, err = a.db.Exec(`UPDATE user_token SET expires=? WHERE token=?`, baseTime.Add(time.Duration(i)*time.Minute).Unix(), token.Value)
 		require.Nil(t, err)
 	}
 
-	_, err = a.AuthenticateToken(tokens[0])
+	// Ben: The first 2 tokens should have been wiped and should not work anymore!
+	_, err = a.AuthenticateToken(benTokens[0])
 	require.Equal(t, ErrUnauthenticated, err)
 
-	_, err = a.AuthenticateToken(tokens[1])
+	_, err = a.AuthenticateToken(benTokens[1])
 	require.Equal(t, ErrUnauthenticated, err)
 
+	// Ben: The other tokens should still work
 	for i := 2; i < 22; i++ {
-		userWithToken, err := a.AuthenticateToken(tokens[i])
-		require.Nil(t, err, "token[%d]=%s failed", i, tokens[i])
+		userWithToken, err := a.AuthenticateToken(benTokens[i])
+		require.Nil(t, err, "token[%d]=%s failed", i, benTokens[i])
 		require.Equal(t, "ben", userWithToken.Name)
-		require.Equal(t, tokens[i], userWithToken.Token)
+		require.Equal(t, benTokens[i], userWithToken.Token)
 	}
 
-	var count int
-	rows, err := a.db.Query(`SELECT COUNT(*) FROM user_token`)
+	// Phil: All tokens should still work
+	for i := 0; i < 2; i++ {
+		userWithToken, err := a.AuthenticateToken(philTokens[i])
+		require.Nil(t, err, "token[%d]=%s failed", i, philTokens[i])
+		require.Equal(t, "phil", userWithToken.Name)
+		require.Equal(t, philTokens[i], userWithToken.Token)
+	}
+
+	var benCount int
+	rows, err := a.db.Query(`SELECT COUNT(*) FROM user_token WHERE user_id=?`, ben.ID)
 	require.Nil(t, err)
 	require.True(t, rows.Next())
-	require.Nil(t, rows.Scan(&count))
-	require.Equal(t, 20, count)
+	require.Nil(t, rows.Scan(&benCount))
+	require.Equal(t, 20, benCount)
+
+	var philCount int
+	rows, err = a.db.Query(`SELECT COUNT(*) FROM user_token WHERE user_id=?`, phil.ID)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+	require.Nil(t, rows.Scan(&philCount))
+	require.Equal(t, 2, philCount)
 }
 
 func TestManager_EnqueueStats_ResetStats(t *testing.T) {
@@ -893,7 +954,82 @@ func TestManager_Tier_Change_And_Reset(t *testing.T) {
 	require.Nil(t, a.ResetTier("phil"))
 }
 
-func TestSqliteCache_Migration_From1(t *testing.T) {
+func TestUser_PhoneNumberAddListRemove(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, a.AddPhoneNumber(phil.ID, "+1234567890"))
+
+	phoneNumbers, err := a.PhoneNumbers(phil.ID)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(phoneNumbers))
+	require.Equal(t, "+1234567890", phoneNumbers[0])
+
+	require.Nil(t, a.RemovePhoneNumber(phil.ID, "+1234567890"))
+	phoneNumbers, err = a.PhoneNumbers(phil.ID)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(phoneNumbers))
+
+	// Paranoia check: We do NOT want to keep phone numbers in there
+	rows, err := a.db.Query(`SELECT * FROM user_phone`)
+	require.Nil(t, err)
+	require.False(t, rows.Next())
+	require.Nil(t, rows.Close())
+}
+
+func TestUser_PhoneNumberAdd_Multiple_Users_Same_Number(t *testing.T) {
+	a := newTestManager(t, PermissionDenyAll)
+
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	ben, err := a.User("ben")
+	require.Nil(t, err)
+	require.Nil(t, a.AddPhoneNumber(phil.ID, "+1234567890"))
+	require.Nil(t, a.AddPhoneNumber(ben.ID, "+1234567890"))
+}
+
+func TestManager_Topic_Wildcard_With_Asterisk_Underscore(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, f, "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
+	require.Nil(t, a.AllowAccess(Everyone, "*_", PermissionRead))
+	require.Nil(t, a.AllowAccess(Everyone, "__*_", PermissionRead))
+	require.Nil(t, a.Authorize(nil, "allowed_", PermissionRead))
+	require.Nil(t, a.Authorize(nil, "__allowed_", PermissionRead))
+	require.Nil(t, a.Authorize(nil, "_allowed_", PermissionRead)) // The "%" in "%\_" matches the first "_"
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "notallowed", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "_notallowed", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "__notallowed", PermissionRead))
+}
+
+func TestManager_Topic_Wildcard_With_Underscore(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, f, "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
+	require.Nil(t, a.AllowAccess(Everyone, "mytopic_", PermissionReadWrite))
+	require.Nil(t, a.Authorize(nil, "mytopic_", PermissionRead))
+	require.Nil(t, a.Authorize(nil, "mytopic_", PermissionWrite))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "mytopicX", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "mytopicX", PermissionWrite))
+}
+
+func TestToFromSQLWildcard(t *testing.T) {
+	require.Equal(t, "up%", toSQLWildcard("up*"))
+	require.Equal(t, "up\\_%", toSQLWildcard("up_*"))
+	require.Equal(t, "foo", toSQLWildcard("foo"))
+
+	require.Equal(t, "up*", fromSQLWildcard("up%"))
+	require.Equal(t, "up_*", fromSQLWildcard("up\\_%"))
+	require.Equal(t, "foo", fromSQLWildcard("foo"))
+
+	require.Equal(t, "up*", fromSQLWildcard(toSQLWildcard("up*")))
+	require.Equal(t, "up_*", fromSQLWildcard(toSQLWildcard("up_*")))
+	require.Equal(t, "foo", fromSQLWildcard(toSQLWildcard("foo")))
+}
+
+func TestMigrationFrom1(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "user.db")
 	db, err := sql.Open("sqlite3", filename)
 	require.Nil(t, err)
@@ -976,6 +1112,152 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	require.Equal(t, 1, len(everyoneGrants))
 	require.Equal(t, "stats", everyoneGrants[0].TopicPattern)
 	require.Equal(t, PermissionRead, everyoneGrants[0].Allow)
+}
+
+func TestMigrationFrom4(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	db, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+
+	// Create "version 4" schema
+	_, err = db.Exec(`
+		BEGIN;
+		CREATE TABLE IF NOT EXISTS tier (
+			id TEXT PRIMARY KEY,
+			code TEXT NOT NULL,
+			name TEXT NOT NULL,
+			messages_limit INT NOT NULL,
+			messages_expiry_duration INT NOT NULL,
+			emails_limit INT NOT NULL,
+			calls_limit INT NOT NULL,
+			reservations_limit INT NOT NULL,
+			attachment_file_size_limit INT NOT NULL,
+			attachment_total_size_limit INT NOT NULL,
+			attachment_expiry_duration INT NOT NULL,
+			attachment_bandwidth_limit INT NOT NULL,
+			stripe_monthly_price_id TEXT,
+			stripe_yearly_price_id TEXT
+		);
+		CREATE UNIQUE INDEX idx_tier_code ON tier (code);
+		CREATE UNIQUE INDEX idx_tier_stripe_monthly_price_id ON tier (stripe_monthly_price_id);
+		CREATE UNIQUE INDEX idx_tier_stripe_yearly_price_id ON tier (stripe_yearly_price_id);
+		CREATE TABLE IF NOT EXISTS user (
+		    id TEXT PRIMARY KEY,
+			tier_id TEXT,
+			user TEXT NOT NULL,
+			pass TEXT NOT NULL,
+			role TEXT CHECK (role IN ('anonymous', 'admin', 'user')) NOT NULL,
+			prefs JSON NOT NULL DEFAULT '{}',
+			sync_topic TEXT NOT NULL,
+			stats_messages INT NOT NULL DEFAULT (0),
+			stats_emails INT NOT NULL DEFAULT (0),
+			stats_calls INT NOT NULL DEFAULT (0),
+			stripe_customer_id TEXT,
+			stripe_subscription_id TEXT,
+			stripe_subscription_status TEXT,
+			stripe_subscription_interval TEXT,
+			stripe_subscription_paid_until INT,
+			stripe_subscription_cancel_at INT,
+			created INT NOT NULL,
+			deleted INT,
+		    FOREIGN KEY (tier_id) REFERENCES tier (id)
+		);
+		CREATE UNIQUE INDEX idx_user ON user (user);
+		CREATE UNIQUE INDEX idx_user_stripe_customer_id ON user (stripe_customer_id);
+		CREATE UNIQUE INDEX idx_user_stripe_subscription_id ON user (stripe_subscription_id);
+		CREATE TABLE IF NOT EXISTS user_access (
+			user_id TEXT NOT NULL,
+			topic TEXT NOT NULL,
+			read INT NOT NULL,
+			write INT NOT NULL,
+			owner_user_id INT,
+			PRIMARY KEY (user_id, topic),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+		    FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE TABLE IF NOT EXISTS user_token (
+			user_id TEXT NOT NULL,
+			token TEXT NOT NULL,
+			label TEXT NOT NULL,
+			last_access INT NOT NULL,
+			last_origin TEXT NOT NULL,
+			expires INT NOT NULL,
+			PRIMARY KEY (user_id, token),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE TABLE IF NOT EXISTS user_phone (
+			user_id TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			PRIMARY KEY (user_id, phone_number),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		CREATE TABLE IF NOT EXISTS schemaVersion (
+			id INT PRIMARY KEY,
+			version INT NOT NULL
+		);
+		INSERT INTO user (id, user, pass, role, sync_topic, created)
+		VALUES ('u_everyone', '*', '', 'anonymous', '', UNIXEPOCH())
+		ON CONFLICT (id) DO NOTHING;
+		INSERT INTO schemaVersion (id, version) VALUES (1, 4);		
+		COMMIT;
+	`)
+	require.Nil(t, err)
+
+	// Insert a few ACL entries
+	_, err = db.Exec(`
+		BEGIN;
+		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'mytopic_', 1, 1);
+		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'up%', 1, 1);
+		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'down_%', 1, 1);
+		COMMIT;	
+	`)
+	require.Nil(t, err)
+
+	// Create manager to trigger migration
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	checkSchemaVersion(t, a.db)
+
+	// Add another
+	require.Nil(t, a.AllowAccess(Everyone, "left_*", PermissionReadWrite))
+
+	// Check "external view" of grants
+	everyoneGrants, err := a.Grants(Everyone)
+	require.Nil(t, err)
+
+	require.Equal(t, 4, len(everyoneGrants))
+	require.Equal(t, "down_*", everyoneGrants[0].TopicPattern)
+	require.Equal(t, "left_*", everyoneGrants[1].TopicPattern)
+	require.Equal(t, "mytopic_", everyoneGrants[2].TopicPattern)
+	require.Equal(t, "up*", everyoneGrants[3].TopicPattern)
+
+	// Check they are stored correctly in the database
+	rows, err := db.Query(`SELECT topic FROM user_access WHERE user_id = 'u_everyone' ORDER BY topic`)
+	require.Nil(t, err)
+	topicPatterns := make([]string, 0)
+	for rows.Next() {
+		var topicPattern string
+		require.Nil(t, rows.Scan(&topicPattern))
+		topicPatterns = append(topicPatterns, topicPattern)
+	}
+	require.Nil(t, rows.Close())
+	require.Equal(t, 4, len(topicPatterns))
+	require.Equal(t, "down\\_%", topicPatterns[0])
+	require.Equal(t, "left\\_%", topicPatterns[1])
+	require.Equal(t, "mytopic\\_", topicPatterns[2])
+	require.Equal(t, "up%", topicPatterns[3])
+
+	// Check that ACL works as excepted
+	require.Nil(t, a.Authorize(nil, "down_123", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "downX123", PermissionRead))
+
+	require.Nil(t, a.Authorize(nil, "left_abc", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "leftX123", PermissionRead))
+
+	require.Nil(t, a.Authorize(nil, "mytopic_", PermissionRead))
+	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "mytopicX", PermissionRead))
+
+	require.Nil(t, a.Authorize(nil, "up123", PermissionRead))
+	require.Nil(t, a.Authorize(nil, "up", PermissionRead)) // % matches 0 or more characters
 }
 
 func checkSchemaVersion(t *testing.T, db *sql.DB) {

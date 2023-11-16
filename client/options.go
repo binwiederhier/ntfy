@@ -72,6 +72,11 @@ func WithAttach(attach string) PublishOption {
 	return WithHeader("X-Attach", attach)
 }
 
+// WithMarkdown instructs the server to interpret the message body as Markdown
+func WithMarkdown() PublishOption {
+	return WithHeader("X-Markdown", "yes")
+}
+
 // WithFilename sets a filename for the attachment, and/or forces the HTTP body to interpreted as an attachment
 func WithFilename(filename string) PublishOption {
 	return WithHeader("X-Filename", filename)
@@ -90,6 +95,11 @@ func WithBasicAuth(user, pass string) PublishOption {
 // WithBearerAuth adds the Authorization header for Bearer auth to the request
 func WithBearerAuth(token string) PublishOption {
 	return WithHeader("Authorization", fmt.Sprintf("Bearer %s", token))
+}
+
+// WithEmptyAuth clears the Authorization header
+func WithEmptyAuth() PublishOption {
+	return RemoveHeader("Authorization")
 }
 
 // WithNoCache instructs the server not to cache the message server-side
@@ -178,6 +188,16 @@ func WithQueryParam(param, value string) RequestOption {
 			q := r.URL.Query()
 			q.Add(param, value)
 			r.URL.RawQuery = q.Encode()
+		}
+		return nil
+	}
+}
+
+// RemoveHeader is a generic option to remove a header from a request
+func RemoveHeader(header string) RequestOption {
+	return func(r *http.Request) error {
+		if header != "" {
+			delete(r.Header, header)
 		}
 		return nil
 	}

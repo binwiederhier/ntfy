@@ -59,11 +59,12 @@ var flagsServe = append(
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
 	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "disallowed-topics", Aliases: []string{"disallowed_topics"}, EnvVars: []string{"NTFY_DISALLOWED_TOPICS"}, Usage: "topics that are not allowed to be used"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", Aliases: []string{"web_root"}, EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "app", Usage: "sets web root to landing page (home), web app (app) or disabled (disable)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", Aliases: []string{"web_root"}, EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "/", Usage: "sets root of the web app (e.g. /, or /app), or disables it (disable)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "allows users to sign up via the web app, or API"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-login", Aliases: []string{"enable_login"}, EnvVars: []string{"NTFY_ENABLE_LOGIN"}, Value: false, Usage: "allows users to log in via the web app, or API"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-reservations", Aliases: []string{"enable_reservations"}, EnvVars: []string{"NTFY_ENABLE_RESERVATIONS"}, Value: false, Usage: "allows users to reserve topics (if their tier allows it)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-base-url", Aliases: []string{"upstream_base_url"}, EnvVars: []string{"NTFY_UPSTREAM_BASE_URL"}, Value: "", Usage: "forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-access-token", Aliases: []string{"upstream_access_token"}, EnvVars: []string{"NTFY_UPSTREAM_ACCESS_TOKEN"}, Value: "", Usage: "access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", Aliases: []string{"smtp_sender_addr"}, EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
@@ -71,6 +72,10 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", Aliases: []string{"smtp_server_listen"}, EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "SMTP server address (ip:port) for incoming emails, e.g. :25"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", Aliases: []string{"smtp_server_domain"}, EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "SMTP domain for incoming e-mail, e.g. ntfy.sh"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", Aliases: []string{"smtp_server_addr_prefix"}, EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-account", Aliases: []string{"twilio_account"}, EnvVars: []string{"NTFY_TWILIO_ACCOUNT"}, Usage: "Twilio account SID, used for phone calls, e.g. AC123..."}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-phone-number", Aliases: []string{"twilio_phone_number"}, EnvVars: []string{"NTFY_TWILIO_PHONE_NUMBER"}, Usage: "Twilio number to use for outgoing calls"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-verify-service", Aliases: []string{"twilio_verify_service"}, EnvVars: []string{"NTFY_TWILIO_VERIFY_SERVICE"}, Usage: "Twilio Verify service ID, used for phone number verification"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"visitor_subscription_limit"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", Aliases: []string{"visitor_attachment_total_size_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "100M", Usage: "total storage limit used for attachments per visitor"}),
@@ -89,6 +94,11 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-metrics", Aliases: []string{"enable_metrics"}, EnvVars: []string{"NTFY_ENABLE_METRICS"}, Value: false, Usage: "if set, Prometheus metrics are exposed via the /metrics endpoint"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "metrics-listen-http", Aliases: []string{"metrics_listen_http"}, EnvVars: []string{"NTFY_METRICS_LISTEN_HTTP"}, Usage: "ip:port used to expose the metrics endpoint (implicitly enables metrics)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "profile-listen-http", Aliases: []string{"profile_listen_http"}, EnvVars: []string{"NTFY_PROFILE_LISTEN_HTTP"}, Usage: "ip:port used to expose the profiling endpoints (implicitly enables profiling)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-public-key", Aliases: []string{"web_push_public_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PUBLIC_KEY"}, Usage: "public key used for web push notifications"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-private-key", Aliases: []string{"web_push_private_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PRIVATE_KEY"}, Usage: "private key used for web push notifications"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
 )
 
 var cmdServe = &cli.Command{
@@ -124,6 +134,11 @@ func execServe(c *cli.Context) error {
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
+	webPushPrivateKey := c.String("web-push-private-key")
+	webPushPublicKey := c.String("web-push-public-key")
+	webPushFile := c.String("web-push-file")
+	webPushEmailAddress := c.String("web-push-email-address")
+	webPushStartupQueries := c.String("web-push-startup-queries")
 	cacheFile := c.String("cache-file")
 	cacheDuration := c.Duration("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
@@ -144,6 +159,7 @@ func execServe(c *cli.Context) error {
 	enableLogin := c.Bool("enable-login")
 	enableReservations := c.Bool("enable-reservations")
 	upstreamBaseURL := c.String("upstream-base-url")
+	upstreamAccessToken := c.String("upstream-access-token")
 	smtpSenderAddr := c.String("smtp-sender-addr")
 	smtpSenderUser := c.String("smtp-sender-user")
 	smtpSenderPass := c.String("smtp-sender-pass")
@@ -151,6 +167,10 @@ func execServe(c *cli.Context) error {
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
+	twilioAccount := c.String("twilio-account")
+	twilioAuthToken := c.String("twilio-auth-token")
+	twilioPhoneNumber := c.String("twilio-phone-number")
+	twilioVerifyService := c.String("twilio-verify-service")
 	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorSubscriberRateLimiting := c.Bool("visitor-subscriber-rate-limiting")
@@ -173,6 +193,8 @@ func execServe(c *cli.Context) error {
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
+	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || webPushFile == "" || webPushEmailAddress == "" || baseURL == "") {
+		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-file, web-push-email-address, and base-url should be set. run 'ntfy webpush keys' to generate keys")
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {
@@ -195,8 +217,6 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, base-url must start with http:// or https://")
 	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
 		return errors.New("if set, base-url must not end with a slash (/)")
-	} else if !util.Contains([]string{"app", "home", "disable"}, webRoot) {
-		return errors.New("if set, web-root must be 'home' or 'app'")
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
@@ -211,10 +231,20 @@ func execServe(c *cli.Context) error {
 		return errors.New("cannot set enable-signup without also setting enable-login")
 	} else if stripeSecretKey != "" && (stripeWebhookKey == "" || baseURL == "") {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
+	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || authFile == "") {
+		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file must also be set")
 	}
 
-	webRootIsApp := webRoot == "app"
-	enableWeb := webRoot != "disable"
+	// Backwards compatibility
+	if webRoot == "app" {
+		webRoot = "/"
+	} else if webRoot == "home" {
+		webRoot = "/app"
+	} else if webRoot == "disable" {
+		webRoot = ""
+	} else if !strings.HasPrefix(webRoot, "/") {
+		webRoot = "/" + webRoot
+	}
 
 	// Default auth permissions
 	authDefault, err := user.ParsePermission(authDefaultAccess)
@@ -293,8 +323,9 @@ func execServe(c *cli.Context) error {
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.DisallowedTopics = disallowedTopics
-	conf.WebRootIsApp = webRootIsApp
+	conf.WebRoot = webRoot
 	conf.UpstreamBaseURL = upstreamBaseURL
+	conf.UpstreamAccessToken = upstreamAccessToken
 	conf.SMTPSenderAddr = smtpSenderAddr
 	conf.SMTPSenderUser = smtpSenderUser
 	conf.SMTPSenderPass = smtpSenderPass
@@ -302,6 +333,10 @@ func execServe(c *cli.Context) error {
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
+	conf.TwilioAccount = twilioAccount
+	conf.TwilioAuthToken = twilioAuthToken
+	conf.TwilioPhoneNumber = twilioPhoneNumber
+	conf.TwilioVerifyService = twilioVerifyService
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
@@ -317,7 +352,6 @@ func execServe(c *cli.Context) error {
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact
-	conf.EnableWeb = enableWeb
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
 	conf.EnableReservations = enableReservations
@@ -325,6 +359,11 @@ func execServe(c *cli.Context) error {
 	conf.MetricsListenHTTP = metricsListenHTTP
 	conf.ProfileListenHTTP = profileListenHTTP
 	conf.Version = c.App.Version
+	conf.WebPushPrivateKey = webPushPrivateKey
+	conf.WebPushPublicKey = webPushPublicKey
+	conf.WebPushFile = webPushFile
+	conf.WebPushEmailAddress = webPushEmailAddress
+	conf.WebPushStartupQueries = webPushStartupQueries
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

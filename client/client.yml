@@ -7,7 +7,10 @@
 
 # Default credentials will be used with "ntfy publish" and "ntfy subscribe" if no other credentials are provided.
 # You can set a default token to use or a default user:password combination, but not both. For an empty password,
-# use empty double-quotes ("")
+# use empty double-quotes ("").
+#
+# To override the default user:password combination or default token for a particular subscription (e.g., to send
+# no Authorization header), set the user:pass/token for the subscription to empty double-quotes ("").
 
 # default-token:
 

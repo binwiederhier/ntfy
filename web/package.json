@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "NODE_OPTIONS=\"--enable-source-maps\" vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "eslint --report-unused-disable-directives --ext .js,.jsx ./src/"
   },
   "dependencies": {
-    "@emotion/react": "^11.8.2",
-    "@emotion/styled": "^11.8.1",
+    "@emotion/cache": "^11.11.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.4.2",
     "@mui/material": "latest",
     "dexie": "^3.2.1",
@@ -24,10 +27,25 @@
     "react-dom": "latest",
     "react-i18next": "^11.16.2",
     "react-infinite-scroll-component": "^6.1.0",
+    "react-remark": "^2.1.0",
     "react-router-dom": "^6.2.2",
-    "react-scripts": "^5.0.0",
     "stacktrace-gps": "^3.0.4",
-    "stacktrace-js": "^2.0.2"
+    "stacktrace-js": "^2.0.2",
+    "stylis": "^4.3.0",
+    "stylis-plugin-rtl": "^2.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "eslint": "^8.41.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^2.8.8",
+    "vite": "^4.3.9",
+    "vite-plugin-pwa": "^0.15.0"
   },
   "browserslist": {
     "production": [
@@ -40,5 +58,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "prettier": {
+    "printWidth": 140
   }
 }

@@ -1,0 +1,59 @@
+FROM golang:1.20-bullseye as builder
+
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG NODE_MAJOR=18
+
+RUN apt-get update && apt-get install -y \
+       build-essential ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" >> /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y \
+      python3-pip \
+      python3-venv \
+      nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ADD Makefile .
+
+# docs
+ADD ./requirements.txt .
+RUN make docs-deps
+ADD ./mkdocs.yml .
+ADD ./docs ./docs
+RUN make docs-build
+
+# web
+ADD ./web/package.json ./web/package-lock.json ./web/
+RUN make web-deps
+ADD ./web ./web
+RUN make web-build
+
+# cli & server
+ADD go.mod go.sum main.go ./
+ADD ./client ./client
+ADD ./cmd ./cmd
+ADD ./log ./log
+ADD ./server ./server
+ADD ./user ./user
+ADD ./util ./util
+RUN make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
+
+FROM alpine
+
+LABEL org.opencontainers.image.authors="philipp.heckel@gmail.com"
+LABEL org.opencontainers.image.url="https://ntfy.sh/"
+LABEL org.opencontainers.image.documentation="https://docs.ntfy.sh/"
+LABEL org.opencontainers.image.source="https://github.com/binwiederhier/ntfy"
+LABEL org.opencontainers.image.vendor="Philipp C. Heckel"
+LABEL org.opencontainers.image.licenses="Apache-2.0, GPL-2.0"
+LABEL org.opencontainers.image.title="ntfy"
+LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
+
+COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
+
+EXPOSE 80/tcp
+ENTRYPOINT ["ntfy"]

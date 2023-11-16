@@ -2,7 +2,141 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
-### ntfy server v2.3.1 
+## ntfy server v2.7.0
+Released August 17, 2023
+
+This release ships Markdown support for the web app (not in the Android app yet), and adds support for 
+right-to-left languages (RTL) in the web app. It also fixes a few issues around date/time formatting, 
+internationalization support, a CLI auth bug.
+
+Furthermore, it fixes a security issue around access tokens getting erroneously deleted for other users
+in a specific scenario. This was a denial-of-service-type security issue, since it **effectively allowed a
+single user to deny access to all other users of a ntfy instance**. Please note that while tokens were
+erroneously deleted, **nobody but the token owner ever had access to it.** Please refer to [the ticket](https://github.com/binwiederhier/ntfy/issues/838)
+for details. **Please upgrade your ntfy instance if you run a multi-user system.**
+
+**Features:**
+
+* Add support for [Markdown formatting](publish.md#markdown-formatting) in web app ([#310](https://github.com/binwiederhier/ntfy/issues/310), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* Add support for right-to-left languages (RTL) in the web app ([#663](https://github.com/binwiederhier/ntfy/issues/663), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Security:** ⚠️
+
+* Fixes issue with access tokens getting deleted ([#838](https://github.com/binwiederhier/ntfy/issues/838))
+
+**Bug fixes + maintenance:**
+
+* Fix issues with date/time with different locales ([#700](https://github.com/binwiederhier/ntfy/issues/700), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Re-init i18n on each service worker message to avoid missing translations ([#817](https://github.com/binwiederhier/ntfy/pull/817), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* You can now unset the default user:pass/token in `client.yml` for an individual subscription to remove the Authorization header ([#829](https://github.com/binwiederhier/ntfy/issues/829), thanks to [@tomeon](https://github.com/tomeon) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+
+**Documentation:**
+
+* Update docs for Apache config ([#819](https://github.com/binwiederhier/ntfy/pull/819), thanks to [@nisbet-hubbard](https://github.com/nisbet-hubbard))
+
+## ntfy server v2.6.2
+Released June 30, 2023
+
+With this release, the ntfy web app now contains a **[progressive web app](subscribe/pwa.md) (PWA)
+with Web Push support**, which means you'll be able to **install the ntfy web app on your desktop or phone** similar 
+to a native app (__even on iOS!__ 🥳). Installing the PWA gives ntfy web its own launcher, a standalone window, 
+push notifications, and an app badge with the unread notification count. Note that for self-hosted servers, 
+[Web Push](config.md#web-push) must be configured.
+
+On top of that, this release also brings **dark mode** 🧛🌙 to the web app.
+
+🙏 A huge thanks for this release goes to [@nimbleghost](https://github.com/nimbleghost), for basically implementing the 
+Web Push / PWA and dark mode feature by himself. I'm really grateful for your contributions.
+
+❤️ If you like ntfy, **please consider sponsoring us** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or buying a [paid plan via the web app](https://ntfy.sh/app) (20% off
+if you use promo code `MYTOPIC`). ntfy will always remain open source.
+
+**Features:**
+
+* The web app now supports Web Push, and is installable as a [progressive web app (PWA)](https://docs.ntfy.sh/subscribe/pwa/) on Chrome, Edge, Android, and iOS ([#751](https://github.com/binwiederhier/ntfy/pull/751), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Support for dark mode in the web app ([#206](https://github.com/binwiederhier/ntfy/issues/206), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Bug fixes:**
+
+* Support encoding any header as RFC 2047 ([#737](https://github.com/binwiederhier/ntfy/issues/737), thanks to [@cfouche3005](https://github.com/cfouche3005) for reporting)
+* Do not forward poll requests for UnifiedPush messages (no ticket, thanks to NoName for reporting)
+* Fix `ntfy pub %` segfaulting ([#760](https://github.com/binwiederhier/ntfy/issues/760), thanks to [@clesmian](https://github.com/clesmian) for reporting)
+* Newly created access tokens are now lowercase only to fully support `<topic>+<token>@<domain>` email syntax ([#773](https://github.com/binwiederhier/ntfy/issues/773), thanks to gingervitiz for reporting)
+* The .1 release fixes a few visual issues with dark mode, and other web app updates ([#791](https://github.com/binwiederhier/ntfy/pull/791), [#793](https://github.com/binwiederhier/ntfy/pull/793), [#792](https://github.com/binwiederhier/ntfy/pull/792), thanks to [@nimbleghost](https://github.com/nimbleghost)) 
+* The .2 release fixes issues with the service worker in Firefox and adds automatic service worker updates ([#795](https://github.com/binwiederhier/ntfy/pull/795), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Maintenance:**
+
+* Improved GitHub Actions flow ([#745](https://github.com/binwiederhier/ntfy/pull/745), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Add JS formatter "prettier" ([#746](https://github.com/binwiederhier/ntfy/pull/746), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Add eslint with eslint-config-airbnb ([#748](https://github.com/binwiederhier/ntfy/pull/748), thanks to [@nimbleghost](https://github.com/nimbleghost))
+* Web: Switch to Vite ([#749](https://github.com/binwiederhier/ntfy/pull/749), thanks to [@nimbleghost](https://github.com/nimbleghost))
+
+**Changes in tarball/zip naming:**   
+Due to a [change in GoReleaser](https://goreleaser.com/deprecations/#archivesreplacements), some of the binary release 
+archives now have slightly different names. My apologies if this causes issues in the downstream projects that use ntfy:
+
+- `ntfy_v${VERSION}_windows_x86_64.zip` -> `ntfy_v${VERSION}_windows_amd64.zip`
+- `ntfy_v${VERSION}_linux_x86_64.tar.gz` -> `ntfy_v${VERSION}_linux_amd64.tar.gz`
+- `ntfy_v${VERSION}_macOS_all.tar.gz` -> `ntfy_v${VERSION}_darwin_all.tar.gz`
+
+## ntfy server v2.5.0
+Released May 18, 2023
+
+This release brings a number of new features, including support for text-to-speech style [phone calls](publish.md#phone-calls), 
+an admin API to manage users and ACL (currently in beta, and hence undocumented), and support for authorized access to 
+upstream servers via the `upstream-access-token` config option.
+
+❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app) (20% off
+if you use promo code `MYTOPIC`). ntfy will always remain open source.
+
+**Features:**
+
+* Support for text-to-speech style [phone calls](publish.md#phone-calls) using the `X-Call` header (no ticket)
+* Admin API to manage users and ACL, `v1/users` + `v1/users/access` (intentionally undocumented as of now, [#722](https://github.com/binwiederhier/ntfy/issues/722), thanks to [@CreativeWarlock](https://github.com/CreativeWarlock) for sponsoring this ticket)
+* Added `upstream-access-token` config option to allow authorized access to upstream servers (no ticket)
+
+**Bug fixes + maintenance:**
+
+* Removed old ntfy website from ntfy entirely (no ticket)
+* Make emoji lookup for emails more efficient ([#725](https://github.com/binwiederhier/ntfy/pull/725), thanks to [@adamantike](https://github.com/adamantike))
+* Fix potential subscriber ID clash ([#712](https://github.com/binwiederhier/ntfy/issues/712), thanks to [@peterbourgon](https://github.com/peterbourgon) for reporting, and [@dropdevrahul](https://github.com/dropdevrahul) for fixing)
+* Support for `quoted-printable` in incoming emails ([#719](https://github.com/binwiederhier/ntfy/pull/719), thanks to [@Aerion](https://github.com/Aerion))
+* Attachments with filenames that are downloaded using a browser will now download with the proper filename ([#726](https://github.com/binwiederhier/ntfy/issues/726), thanks to [@un99known99](https://github.com/un99known99) for reporting, and [@wunter8](https://github.com/wunter8) for fixing)
+* Fix web app i18n issue in account preferences ([#730](https://github.com/binwiederhier/ntfy/issues/730), thanks to [@codebude](https://github.com/codebude) for reporting)
+
+## ntfy server v2.4.0
+Released Apr 26, 2023
+
+This release adds a tiny `v1/stats` endpoint to expose how many messages have been published, and adds support to encode the `X-Title`,
+`X-Message` and `X-Tags` header as RFC 2047. It's a pretty small release, and mainly enables the release of the new ntfy.sh website.
+
+❤️ If you like ntfy, **please consider sponsoring me** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or by buying a [paid plan via the web app](https://ntfy.sh/app). ntfy
+will always remain open source.
+
+**Features:**
+
+* [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) can now be installed via Homebrew (thanks to [@Moulick](https://github.com/Moulick))
+* Added `v1/stats` endpoint to expose messages stats (no ticket)
+* Support [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2) encoded headers (no ticket, honorable mention to [mqttwarn](https://github.com/jpmens/mqttwarn/pull/638) and [@amotl](https://github.com/amotl))
+
+**Bug fixes + maintenance:**
+
+* Hide country flags on Windows ([#606](https://github.com/binwiederhier/ntfy/issues/606), thanks to [@cmeis](https://github.com/cmeis) for reporting, and to [@pokej6](https://github.com/pokej6) for fixing it)
+* `ntfy sub` now uses default auth credentials as defined in `client.yml` ([#698](https://github.com/binwiederhier/ntfy/issues/698), thanks to [@CrimsonFez](https://github.com/CrimsonFez) for reporting, and to [@wunter8](https://github.com/wunter8) for fixing it)
+
+**Documentation:**
+
+* Updated PowerShell examples ([#697](https://github.com/binwiederhier/ntfy/pull/697), thanks to [@Natfan](https://github.com/Natfan))
+
+**Additional languages:**
+
+* Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/Shjosan/))
+
+## ntfy server v2.3.1 
 Released March 30, 2023
 
 This release disables server-initiated polling of iOS devices entirely, thereby eliminating the thundering herd problem
@@ -1139,7 +1273,7 @@ Released Dec 28, 2021
 
 **Features & bug fixes:**
 
-* [Publish messages via e-mail](ntfy.sh/docs/publish/#e-mail-publishing) #66
+* [Publish messages via e-mail](publish.md#e-mail-publishing) #66
 * Server-side work to support [unifiedpush.org](https://unifiedpush.org) #64
 * Fixing the Santa bug #65
 
@@ -1148,6 +1282,20 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
+
+### ntfy server v2.8.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
+* Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
+* Add special logic to ignore `Priority` header if it resembled a RFC 9218 value ([#851](https://github.com/binwiederhier/ntfy/pull/851)/[#895](https://github.com/binwiederhier/ntfy/pull/895), thanks to [@gusdleon](https://github.com/gusdleon), see also [#351](https://github.com/binwiederhier/ntfy/issues/351), [#353](https://github.com/binwiederhier/ntfy/issues/353), [#461](https://github.com/binwiederhier/ntfy/issues/461))
+* PWA: hide install prompt on macOS 14 Safari ([#899](https://github.com/binwiederhier/ntfy/pull/899), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* Fix web app crash in Edge for languages with underline in locale ([#922](https://github.com/binwiederhier/ntfy/pull/922)/[#912](https://github.com/binwiederhier/ntfy/issues/912)/[#852](https://github.com/binwiederhier/ntfy/issues/852), thanks to [@imkero](https://github.com/imkero))
+
+**Additional languages:**
+
+* Finnish (thanks to [@Seppo](https://hosted.weblate.org/user/Seppo/)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
@@ -1159,6 +1307,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * UnifiedPush subscriptions now include the `Rate-Topics` header to facilitate subscriber-based billing ([#652](https://github.com/binwiederhier/ntfy/issues/652), thanks to [@wunter8](https://github.com/wunter8))
 * Subscriptions without icons no longer appear to use another subscription's icon ([#634](https://github.com/binwiederhier/ntfy/issues/634), thanks to [@topcaser](https://github.com/topcaser) for reporting and to [@wunter8](https://github.com/wunter8) for fixing)
+* Bumped all dependencies to the latest versions (no ticket)
 
 **Additional languages:**
 

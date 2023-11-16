@@ -1,11 +1,12 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
 	"net/http"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/user"
 
 	"heckel.io/ntfy/util"
 )
@@ -24,23 +25,24 @@ const (
 
 // message represents a message published to a topic
 type message struct {
-	ID         string      `json:"id"`                // Random message ID
-	Time       int64       `json:"time"`              // Unix time in seconds
-	Expires    int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
-	Event      string      `json:"event"`             // One of the above
-	Topic      string      `json:"topic"`
-	Title      string      `json:"title,omitempty"`
-	Message    string      `json:"message,omitempty"`
-	Priority   int         `json:"priority,omitempty"`
-	Tags       []string    `json:"tags,omitempty"`
-	Click      string      `json:"click,omitempty"`
-	Icon       string      `json:"icon,omitempty"`
-	Actions    []*action   `json:"actions,omitempty"`
-	Attachment *attachment `json:"attachment,omitempty"`
-	PollID     string      `json:"poll_id,omitempty"`
-	Encoding   string      `json:"encoding,omitempty"` // empty for raw UTF-8, or "base64" for encoded bytes
-	Sender     netip.Addr  `json:"-"`                  // IP address of uploader, used for rate limiting
-	User       string      `json:"-"`                  // Username of the uploader, used to associated attachments
+	ID          string      `json:"id"`                // Random message ID
+	Time        int64       `json:"time"`              // Unix time in seconds
+	Expires     int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
+	Event       string      `json:"event"`             // One of the above
+	Topic       string      `json:"topic"`
+	Title       string      `json:"title,omitempty"`
+	Message     string      `json:"message,omitempty"`
+	Priority    int         `json:"priority,omitempty"`
+	Tags        []string    `json:"tags,omitempty"`
+	Click       string      `json:"click,omitempty"`
+	Icon        string      `json:"icon,omitempty"`
+	Actions     []*action   `json:"actions,omitempty"`
+	Attachment  *attachment `json:"attachment,omitempty"`
+	PollID      string      `json:"poll_id,omitempty"`
+	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
+	Encoding    string      `json:"encoding,omitempty"`     // empty for raw UTF-8, or "base64" for encoded bytes
+	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
+	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
 }
 
 func (m *message) Context() log.Context {
@@ -99,8 +101,10 @@ type publishMessage struct {
 	Icon     string   `json:"icon"`
 	Actions  []action `json:"actions"`
 	Attach   string   `json:"attach"`
+	Markdown bool     `json:"markdown"`
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
+	Call     string   `json:"call"`
 	Delay    string   `json:"delay"`
 }
 
@@ -239,6 +243,45 @@ type apiHealthResponse struct {
 	Healthy bool `json:"healthy"`
 }
 
+type apiStatsResponse struct {
+	Messages     int64   `json:"messages"`
+	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
+}
+
+type apiUserAddRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Tier     string `json:"tier"`
+	// Do not add 'role' here. We don't want to add admins via the API.
+}
+
+type apiUserResponse struct {
+	Username string                  `json:"username"`
+	Role     string                  `json:"role"`
+	Tier     string                  `json:"tier,omitempty"`
+	Grants   []*apiUserGrantResponse `json:"grants,omitempty"`
+}
+
+type apiUserGrantResponse struct {
+	Topic      string `json:"topic"` // This may be a pattern
+	Permission string `json:"permission"`
+}
+
+type apiUserDeleteRequest struct {
+	Username string `json:"username"`
+}
+
+type apiAccessAllowRequest struct {
+	Username   string `json:"username"`
+	Topic      string `json:"topic"` // This may be a pattern
+	Permission string `json:"permission"`
+}
+
+type apiAccessResetRequest struct {
+	Username string `json:"username"`
+	Topic    string `json:"topic"`
+}
+
 type apiAccountCreateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -272,6 +315,16 @@ type apiAccountTokenResponse struct {
 	Expires    int64  `json:"expires,omitempty"` // Unix timestamp
 }
 
+type apiAccountPhoneNumberVerifyRequest struct {
+	Number  string `json:"number"`
+	Channel string `json:"channel"`
+}
+
+type apiAccountPhoneNumberAddRequest struct {
+	Number string `json:"number"`
+	Code   string `json:"code"` // Only set when adding a phone number
+}
+
 type apiAccountTier struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
@@ -282,6 +335,7 @@ type apiAccountLimits struct {
 	Messages                 int64  `json:"messages"`
 	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
 	Emails                   int64  `json:"emails"`
+	Calls                    int64  `json:"calls"`
 	Reservations             int64  `json:"reservations"`
 	AttachmentTotalSize      int64  `json:"attachment_total_size"`
 	AttachmentFileSize       int64  `json:"attachment_file_size"`
@@ -294,6 +348,8 @@ type apiAccountStats struct {
 	MessagesRemaining            int64 `json:"messages_remaining"`
 	Emails                       int64 `json:"emails"`
 	EmailsRemaining              int64 `json:"emails_remaining"`
+	Calls                        int64 `json:"calls"`
+	CallsRemaining               int64 `json:"calls_remaining"`
 	Reservations                 int64 `json:"reservations"`
 	ReservationsRemaining        int64 `json:"reservations_remaining"`
 	AttachmentTotalSize          int64 `json:"attachment_total_size"`
@@ -323,6 +379,7 @@ type apiAccountResponse struct {
 	Subscriptions []*user.Subscription       `json:"subscriptions,omitempty"`
 	Reservations  []*apiAccountReservation   `json:"reservations,omitempty"`
 	Tokens        []*apiAccountTokenResponse `json:"tokens,omitempty"`
+	PhoneNumbers  []string                   `json:"phone_numbers,omitempty"`
 	Tier          *apiAccountTier            `json:"tier,omitempty"`
 	Limits        *apiAccountLimits          `json:"limits,omitempty"`
 	Stats         *apiAccountStats           `json:"stats,omitempty"`
@@ -340,8 +397,12 @@ type apiConfigResponse struct {
 	EnableLogin        bool     `json:"enable_login"`
 	EnableSignup       bool     `json:"enable_signup"`
 	EnablePayments     bool     `json:"enable_payments"`
+	EnableCalls        bool     `json:"enable_calls"`
+	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
+	EnableWebPush      bool     `json:"enable_web_push"`
 	BillingContact     string   `json:"billing_contact"`
+	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
 }
 
@@ -405,4 +466,76 @@ type apiStripeSubscriptionUpdatedEvent struct {
 type apiStripeSubscriptionDeletedEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
+}
+
+type apiWebPushUpdateSubscriptionRequest struct {
+	Endpoint string   `json:"endpoint"`
+	Auth     string   `json:"auth"`
+	P256dh   string   `json:"p256dh"`
+	Topics   []string `json:"topics"`
+}
+
+// List of possible Web Push events (see sw.js)
+const (
+	webPushMessageEvent  = "message"
+	webPushExpiringEvent = "subscription_expiring"
+)
+
+type webPushPayload struct {
+	Event          string   `json:"event"`
+	SubscriptionID string   `json:"subscription_id"`
+	Message        *message `json:"message"`
+}
+
+func newWebPushPayload(subscriptionID string, message *message) *webPushPayload {
+	return &webPushPayload{
+		Event:          webPushMessageEvent,
+		SubscriptionID: subscriptionID,
+		Message:        message,
+	}
+}
+
+type webPushControlMessagePayload struct {
+	Event string `json:"event"`
+}
+
+func newWebPushSubscriptionExpiringPayload() *webPushControlMessagePayload {
+	return &webPushControlMessagePayload{
+		Event: webPushExpiringEvent,
+	}
+}
+
+type webPushSubscription struct {
+	ID       string
+	Endpoint string
+	Auth     string
+	P256dh   string
+	UserID   string
+}
+
+func (w *webPushSubscription) Context() log.Context {
+	return map[string]any{
+		"web_push_subscription_id":       w.ID,
+		"web_push_subscription_user_id":  w.UserID,
+		"web_push_subscription_endpoint": w.Endpoint,
+	}
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/Manifest
+type webManifestResponse struct {
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	ShortName       string             `json:"short_name"`
+	Scope           string             `json:"scope"`
+	StartURL        string             `json:"start_url"`
+	Display         string             `json:"display"`
+	BackgroundColor string             `json:"background_color"`
+	ThemeColor      string             `json:"theme_color"`
+	Icons           []*webManifestIcon `json:"icons"`
+}
+
+type webManifestIcon struct {
+	SRC   string `json:"src"`
+	Sizes string `json:"sizes"`
+	Type  string `json:"type"`
 }

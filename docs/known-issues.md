@@ -1,5 +1,5 @@
 # Known issues
-This is an incomplete list of known issues with the ntfy server, Android app, and iOS app. You can find a complete
+This is an incomplete list of known issues with the ntfy server, web app, Android app, and iOS app. You can find a complete
 list [on GitHub](https://github.com/binwiederhier/ntfy/labels/%F0%9F%AA%B2%20bug), but I thought it may be helpful
 to have the prominent ones here to link to.
 
@@ -26,3 +26,18 @@ Be sure that in your selfhosted server:
 
 * Set `upstream-base-url: "https://ntfy.sh"` (**not your own hostname!**)
 * Ensure that the URL you set in `base-url` **matches exactly** what you set the Default Server in iOS to 
+
+## iOS app seeing "New message", but not real message content
+If you see `New message` notifications on iOS, your iPhone can likely not talk to your self-hosted server. Be sure that
+your iOS device and your ntfy server are either on the same network, or that your phone can actually reach the server.
+
+Turn on tracing/debugging on the server (via `log-level: trace` or `log-level: debug`, see [troubleshooting](troubleshooting.md)),
+and read docs on [iOS instant notifications](https://docs.ntfy.sh/config/#ios-instant-notifications).
+
+## Safari does not play sounds for web push notifications
+Safari does not support playing sounds for web push notifications, and treats them all as silent. This will be fixed with
+iOS 17 / Safari 17, which will be released later in 2023.
+
+## PWA on iOS sometimes crashes with an IndexedDB error (see [#787](https://github.com/binwiederhier/ntfy/issues/787))
+When resuming the installed PWA from the background, it sometimes crashes with an error from IndexedDB/Dexie, due to a
+[WebKit bug]( https://bugs.webkit.org/show_bug.cgi?id=197050). A reload will fix it until a permanent fix is found.

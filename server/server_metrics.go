@@ -15,6 +15,8 @@ var (
 	metricEmailsPublishedFailure       prometheus.Counter
 	metricEmailsReceivedSuccess        prometheus.Counter
 	metricEmailsReceivedFailure        prometheus.Counter
+	metricCallsMadeSuccess             prometheus.Counter
+	metricCallsMadeFailure             prometheus.Counter
 	metricUnifiedPushPublishedSuccess  prometheus.Counter
 	metricMatrixPublishedSuccess       prometheus.Counter
 	metricMatrixPublishedFailure       prometheus.Counter
@@ -57,6 +59,12 @@ func initMetrics() {
 	metricEmailsReceivedFailure = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_emails_received_failure",
 	})
+	metricCallsMadeSuccess = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_calls_made_success",
+	})
+	metricCallsMadeFailure = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_calls_made_failure",
+	})
 	metricUnifiedPushPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_unifiedpush_published_success",
 	})
@@ -95,6 +103,8 @@ func initMetrics() {
 		metricEmailsPublishedFailure,
 		metricEmailsReceivedSuccess,
 		metricEmailsReceivedFailure,
+		metricCallsMadeSuccess,
+		metricCallsMadeFailure,
 		metricUnifiedPushPublishedSuccess,
 		metricMatrixPublishedSuccess,
 		metricMatrixPublishedFailure,

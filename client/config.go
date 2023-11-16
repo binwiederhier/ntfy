@@ -23,9 +23,9 @@ type Config struct {
 // Subscribe is the struct for a Subscription within Config
 type Subscribe struct {
 	Topic    string            `yaml:"topic"`
-	User     string            `yaml:"user"`
+	User     *string           `yaml:"user"`
 	Password *string           `yaml:"password"`
-	Token    string            `yaml:"token"`
+	Token    *string           `yaml:"token"`
 	Command  string            `yaml:"command"`
 	If       map[string]string `yaml:"if"`
 }

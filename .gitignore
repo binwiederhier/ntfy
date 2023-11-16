@@ -1,4 +1,5 @@
 dist/
+dev-dist/
 build/
 .idea/
 .vscode/
@@ -12,3 +13,5 @@ secrets/
 node_modules/
 .DS_Store
 __pycache__
+web/dev-dist/
+venv/

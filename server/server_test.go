@@ -18,11 +18,11 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/log"
 	"heckel.io/ntfy/util"
@@ -220,11 +220,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 	rr = request(t, s, "GET", "/mytopic", "", nil)
 	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow"/>`)
-
-	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
-	require.Equal(t, 200, rr.Code)
-	require.Contains(t, rr.Body.String(), `/* general styling */`)
+	require.Contains(t, rr.Body.String(), `<meta name="robots" content="noindex, nofollow" />`)
 
 	rr = request(t, s, "GET", "/docs", "", nil)
 	require.Equal(t, 301, rr.Code)
@@ -234,7 +230,7 @@ func TestServer_StaticSites(t *testing.T) {
 
 func TestServer_WebEnabled(t *testing.T) {
 	conf := newTestConfig(t)
-	conf.EnableWeb = false
+	conf.WebRoot = "" // Disable web app
 	s := newTestServer(t, conf)
 
 	rr := request(t, s, "GET", "/", "", nil)
@@ -243,11 +239,17 @@ func TestServer_WebEnabled(t *testing.T) {
 	rr = request(t, s, "GET", "/config.js", "", nil)
 	require.Equal(t, 404, rr.Code)
 
+	rr = request(t, s, "GET", "/sw.js", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	rr = request(t, s, "GET", "/app.html", "", nil)
+	require.Equal(t, 404, rr.Code)
+
 	rr = request(t, s, "GET", "/static/css/home.css", "", nil)
 	require.Equal(t, 404, rr.Code)
 
 	conf2 := newTestConfig(t)
-	conf2.EnableWeb = true
+	conf2.WebRoot = "/"
 	s2 := newTestServer(t, conf2)
 
 	rr = request(t, s2, "GET", "/", "", nil)
@@ -256,8 +258,34 @@ func TestServer_WebEnabled(t *testing.T) {
 	rr = request(t, s2, "GET", "/config.js", "", nil)
 	require.Equal(t, 200, rr.Code)
 
-	rr = request(t, s2, "GET", "/static/css/home.css", "", nil)
+	rr = request(t, s2, "GET", "/sw.js", "", nil)
 	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s2, "GET", "/app.html", "", nil)
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestServer_WebPushEnabled(t *testing.T) {
+	conf := newTestConfig(t)
+	conf.WebRoot = "" // Disable web app
+	s := newTestServer(t, conf)
+
+	rr := request(t, s, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	conf2 := newTestConfig(t)
+	s2 := newTestServer(t, conf2)
+
+	rr = request(t, s2, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 404, rr.Code)
+
+	conf3 := newTestConfigWithWebPush(t)
+	s3 := newTestServer(t, conf3)
+
+	rr = request(t, s3, "GET", "/manifest.webmanifest", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "application/manifest+json", rr.Header().Get("Content-Type"))
+
 }
 
 func TestServer_PublishLargeMessage(t *testing.T) {
@@ -299,6 +327,27 @@ func TestServer_PublishPriority(t *testing.T) {
 
 	response = request(t, s, "GET", "/mytopic/trigger?priority=INVALID", "test", nil)
 	require.Equal(t, 40007, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_PublishPriority_SpecialHTTPHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"Priority":   "u=4",
+		"X-Priority": "5",
+	})
+	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic?priority=4", "test", map[string]string{
+		"Priority": "u=9",
+	})
+	require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"p":        "2",
+		"priority": "u=9, i",
+	})
+	require.Equal(t, 2, toMessage(t, response.Body.String()).Priority)
 }
 
 func TestServer_PublishGETOnlyOneTopic(t *testing.T) {
@@ -463,6 +512,8 @@ func TestServer_PublishAtAndPrune(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages)) // Not affected by pruning
 	require.Equal(t, "a message", messages[0].Message)
+
+	time.Sleep(time.Second) // FIXME CI failing not sure why
 }
 
 func TestServer_PublishAndMultiPoll(t *testing.T) {
@@ -1199,7 +1250,20 @@ func TestServer_PublishDelayedEmail_Fail(t *testing.T) {
 		"E-Mail": "test@example.com",
 		"Delay":  "20 min",
 	})
-	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40003, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_PublishDelayedCall_Fail(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.TwilioAccount = "AC1234567890"
+	c.TwilioAuthToken = "AAEAA1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", "fail", map[string]string{
+		"Call":  "yes",
+		"Delay": "20 min",
+	})
+	require.Equal(t, 40037, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {
@@ -1477,6 +1541,39 @@ func TestServer_PublishActions_AndPoll(t *testing.T) {
 	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
 }
 
+func TestServer_PublishMarkdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "**make this bold**", map[string]string{
+		"Content-Type": "text/markdown",
+	})
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "**make this bold**", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
+}
+
+func TestServer_PublishMarkdown_QueryParam(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic?md=1", "**make this bold**", nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "**make this bold**", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
+}
+
+func TestServer_PublishMarkdown_NotMarkdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", "**make this bold**", map[string]string{
+		"Content-Type": "not-markdown",
+	})
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "", m.ContentType)
+}
+
 func TestServer_PublishAsJSON(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
@@ -1494,10 +1591,23 @@ func TestServer_PublishAsJSON(t *testing.T) {
 	require.Equal(t, "google.pdf", m.Attachment.Name)
 	require.Equal(t, "http://ntfy.sh", m.Click)
 	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+	require.Equal(t, "", m.ContentType)
 
 	require.Equal(t, 4, m.Priority)
 	require.True(t, m.Time > time.Now().Unix()+29*60)
 	require.True(t, m.Time < time.Now().Unix()+31*60)
+}
+
+func TestServer_PublishAsJSON_Markdown(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic","message":"**This is bold**","markdown":true}`
+	response := request(t, s, "PUT", "/", body, nil)
+	require.Equal(t, 200, response.Code)
+
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "mytopic", m.Topic)
+	require.Equal(t, "**This is bold**", m.Message)
+	require.Equal(t, "text/markdown", m.ContentType)
 }
 
 func TestServer_PublishAsJSON_RateLimit_MessageDailyLimit(t *testing.T) {
@@ -2106,8 +2216,8 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	start = time.Now()
 	response := request(t, s, "PUT", "/mytopic", "some body", nil)
 	m := toMessage(t, response.Body.String())
-	assert.Equal(t, "some body", m.Message)
-	assert.True(t, time.Since(start) < 100*time.Millisecond)
+	require.Equal(t, "some body", m.Message)
+	require.True(t, time.Since(start) < 100*time.Millisecond)
 	log.Info("Done: Publishing message; took %s", time.Since(start).Round(time.Millisecond))
 
 	// Wait for all goroutines
@@ -2399,6 +2509,184 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 	require.Nil(t, s.topics["announcements"].rateVisitor)
 }
 
+func TestServer_MessageHistoryAndStatsEndpoint(t *testing.T) {
+	c := newTestConfig(t)
+	c.ManagerInterval = 2 * time.Second
+	s := newTestServer(t, c)
+
+	// Publish some messages, and get stats
+	for i := 0; i < 5; i++ {
+		response := request(t, s, "POST", "/mytopic", "some message", nil)
+		require.Equal(t, 200, response.Code)
+	}
+	require.Equal(t, int64(5), s.messages)
+	require.Equal(t, []int64{0}, s.messagesHistory)
+
+	response := request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":5,"messages_rate":0}`+"\n", response.Body.String())
+
+	// Run manager and see message history update
+	s.execManager()
+	require.Equal(t, []int64{0, 5}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":5,"messages_rate":2.5}`+"\n", response.Body.String()) // 5 messages in 2 seconds = 2.5 messages per second
+
+	// Publish some more messages
+	for i := 0; i < 10; i++ {
+		response := request(t, s, "POST", "/mytopic", "some message", nil)
+		require.Equal(t, 200, response.Code)
+	}
+	require.Equal(t, int64(15), s.messages)
+	require.Equal(t, []int64{0, 5}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":15,"messages_rate":2.5}`+"\n", response.Body.String()) // Rate did not update yet
+
+	// Run manager and see message history update
+	s.execManager()
+	require.Equal(t, []int64{0, 5, 15}, s.messagesHistory)
+
+	response = request(t, s, "GET", "/v1/stats", "", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"messages":15,"messages_rate":3.75}`+"\n", response.Body.String()) // 15 messages in 4 seconds = 3.75 messages per second
+}
+
+func TestServer_MessageHistoryMaxSize(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	for i := 0; i < 20; i++ {
+		s.messages = int64(i)
+		s.execManager()
+	}
+	require.Equal(t, []int64{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, s.messagesHistory)
+}
+
+func TestServer_MessageCountPersistence(t *testing.T) {
+	c := newTestConfig(t)
+	s := newTestServer(t, c)
+	s.messages = 1234
+	s.execManager()
+	waitFor(t, func() bool {
+		messages, err := s.messageCache.Stats()
+		require.Nil(t, err)
+		return messages == 1234
+	})
+
+	s = newTestServer(t, c)
+	require.Equal(t, int64(1234), s.messages)
+}
+
+func TestServer_PublishWithUTF8MimeHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/mytopic", "some attachment", map[string]string{
+		"X-Filename": "some =?UTF-8?q?=C3=A4?=ttachment.txt",
+		"X-Message":  "=?UTF-8?B?8J+HqfCfh6o=?=",
+		"X-Title":    "=?UTF-8?B?bnRmeSDlvojmo5I=?=, no really I mean it! =?UTF-8?Q?This is q=C3=BC=C3=B6ted-print=C3=A4ble.?=",
+		"X-Tags":     "=?UTF-8?B?8J+HqfCfh6o=?=, =?UTF-8?B?bnRmeSDlvojmo5I=?=",
+		"X-Click":    "=?uTf-8?b?aHR0cHM6Ly/wn5KpLmxh?=",
+		"X-Actions":  "http, \"=?utf-8?q?Mettre =C3=A0 jour?=\", \"https://my.tld/webhook/netbird-update\"; =?utf-8?b?aHR0cCwg6L+Z5piv5LiA5Liq5qCH562+LCBodHRwczovL/CfkqkubGE=?=",
+	})
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "🇩🇪", m.Message)
+	require.Equal(t, "ntfy 很棒, no really I mean it! This is qüöted-printäble.", m.Title)
+	require.Equal(t, "some ättachment.txt", m.Attachment.Name)
+	require.Equal(t, "🇩🇪", m.Tags[0])
+	require.Equal(t, "ntfy 很棒", m.Tags[1])
+	require.Equal(t, "https://💩.la", m.Click)
+	require.Equal(t, "Mettre à jour", m.Actions[0].Label)
+	require.Equal(t, "http", m.Actions[1].Action)
+	require.Equal(t, "这是一个标签", m.Actions[1].Label)
+	require.Equal(t, "https://💩.la", m.Actions[1].URL)
+}
+
+func TestServer_UpstreamBaseURL_Success(t *testing.T) {
+	var pollID atomic.Pointer[string]
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/87c9cddf7b0105f5fe849bf084c6e600be0fde99be3223335199b4965bd7b735", r.URL.Path)
+		require.Equal(t, "", string(body))
+		require.NotEmpty(t, r.Header.Get("X-Poll-ID"))
+		pollID.Store(util.String(r.Header.Get("X-Poll-ID")))
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	s := newTestServer(t, c)
+
+	// Send message, and wait for upstream server to receive it
+	response := request(t, s, "PUT", "/mytopic", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+	waitFor(t, func() bool {
+		pID := pollID.Load()
+		return pID != nil && *pID == m.ID
+	})
+}
+
+func TestServer_UpstreamBaseURL_With_Access_Token_Success(t *testing.T) {
+	var pollID atomic.Pointer[string]
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/a1c72bcb4daf5af54d13ef86aea8f76c11e8b88320d55f1811d5d7b173bcc1df", r.URL.Path)
+		require.Equal(t, "Bearer tk_1234567890", r.Header.Get("Authorization"))
+		require.Equal(t, "", string(body))
+		require.NotEmpty(t, r.Header.Get("X-Poll-ID"))
+		pollID.Store(util.String(r.Header.Get("X-Poll-ID")))
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	c.UpstreamAccessToken = "tk_1234567890"
+	s := newTestServer(t, c)
+
+	// Send message, and wait for upstream server to receive it
+	response := request(t, s, "PUT", "/mytopic1", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+	waitFor(t, func() bool {
+		pID := pollID.Load()
+		return pID != nil && *pID == m.ID
+	})
+}
+
+func TestServer_UpstreamBaseURL_DoNotForwardUnifiedPush(t *testing.T) {
+	upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("UnifiedPush messages should not be forwarded")
+	}))
+	defer upstreamServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.BaseURL = "http://myserver.internal"
+	c.UpstreamBaseURL = upstreamServer.URL
+	s := newTestServer(t, c)
+
+	// Send UP message, this should not forward to upstream server
+	response := request(t, s, "PUT", "/mytopic?up=1", `hi there`, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.NotEmpty(t, m.ID)
+	require.Equal(t, "hi there", m.Message)
+
+	// Forwarding is done asynchronously, so wait a bit.
+	// This ensures that the t.Fatal above is actually not triggered.
+	time.Sleep(500 * time.Millisecond)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
@@ -2408,19 +2696,33 @@ func newTestConfig(t *testing.T) *Config {
 	return conf
 }
 
-func newTestConfigWithAuthFile(t *testing.T) *Config {
-	conf := newTestConfig(t)
+func configureAuth(t *testing.T, conf *Config) *Config {
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	conf.AuthBcryptCost = bcrypt.MinCost // This speeds up tests a lot
 	return conf
 }
 
+func newTestConfigWithAuthFile(t *testing.T) *Config {
+	conf := newTestConfig(t)
+	conf = configureAuth(t, conf)
+	return conf
+}
+
+func newTestConfigWithWebPush(t *testing.T) *Config {
+	conf := newTestConfig(t)
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	require.Nil(t, err)
+	conf.WebPushFile = filepath.Join(t.TempDir(), "webpush.db")
+	conf.WebPushEmailAddress = "testing@example.com"
+	conf.WebPushPrivateKey = privateKey
+	conf.WebPushPublicKey = publicKey
+	return conf
+}
+
 func newTestServer(t *testing.T, config *Config) *Server {
 	server, err := New(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	return server
 }
 
@@ -2500,7 +2802,7 @@ func waitForWithMaxWait(t *testing.T, maxWait time.Duration, f func() bool) {
 		if f() {
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatalf("Function f did not succeed after %v: %v", maxWait, string(debug.Stack()))
 }

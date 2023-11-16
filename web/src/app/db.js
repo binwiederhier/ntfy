@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import Dexie from "dexie";
 import session from "./Session";
 
 // Uses Dexie.js
@@ -7,15 +7,25 @@ import session from "./Session";
 // Notes:
 // - As per docs, we only declare the indexable columns, not all columns
 
-// The IndexedDB database name is based on the logged-in user
-const dbName = (session.username()) ? `ntfy-${session.username()}` : "ntfy";
-const db = new Dexie(dbName);
+const createDatabase = (username) => {
+  const dbName = username ? `ntfy-${username}` : "ntfy"; // IndexedDB database is based on the logged-in user
+  const db = new Dexie(dbName);
 
-db.version(1).stores({
-    subscriptions: '&id,baseUrl',
-    notifications: '&id,subscriptionId,time,new,[subscriptionId+new]', // compound key for query performance
-    users: '&baseUrl,username',
-    prefs: '&key'
-});
+  db.version(2).stores({
+    subscriptions: "&id,baseUrl,[baseUrl+mutedUntil]",
+    notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
+    users: "&baseUrl,username",
+    prefs: "&key",
+  });
+
+  return db;
+};
+
+export const dbAsync = async () => {
+  const username = await session.usernameAsync();
+  return createDatabase(username);
+};
+
+const db = () => createDatabase(session.username());
 
 export default db;

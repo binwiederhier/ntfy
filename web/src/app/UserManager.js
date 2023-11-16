@@ -2,46 +2,49 @@ import db from "./db";
 import session from "./Session";
 
 class UserManager {
-    async all() {
-        const users = await db.users.toArray();
-        if (session.exists()) {
-            users.unshift(this.localUser());
-        }
-        return users;
-    }
+  constructor(dbImpl) {
+    this.db = dbImpl;
+  }
 
-    async get(baseUrl) {
-        if (session.exists() && baseUrl === config.base_url) {
-            return this.localUser();
-        }
-        return db.users.get(baseUrl);
+  async all() {
+    const users = await this.db.users.toArray();
+    if (session.exists()) {
+      users.unshift(this.localUser());
     }
+    return users;
+  }
 
-    async save(user) {
-        if (session.exists() && user.baseUrl === config.base_url) {
-            return;
-        }
-        await db.users.put(user);
+  async get(baseUrl) {
+    if (session.exists() && baseUrl === config.base_url) {
+      return this.localUser();
     }
+    return this.db.users.get(baseUrl);
+  }
 
-    async delete(baseUrl) {
-        if (session.exists() && baseUrl === config.base_url) {
-            return;
-        }
-        await db.users.delete(baseUrl);
+  async save(user) {
+    if (session.exists() && user.baseUrl === config.base_url) {
+      return;
     }
+    await this.db.users.put(user);
+  }
 
-    localUser() {
-        if (!session.exists()) {
-            return null;
-        }
-        return {
-            baseUrl: config.base_url,
-            username: session.username(),
-            token: session.token() // Not "password"!
-        };
+  async delete(baseUrl) {
+    if (session.exists() && baseUrl === config.base_url) {
+      return;
     }
+    await this.db.users.delete(baseUrl);
+  }
+
+  localUser() {
+    if (!session.exists()) {
+      return null;
+    }
+    return {
+      baseUrl: config.base_url,
+      username: session.username(),
+      token: session.token(), // Not "password"!
+    };
+  }
 }
 
-const userManager = new UserManager();
-export default userManager;
+export default new UserManager(db());

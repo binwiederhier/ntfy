@@ -1,0 +1,21 @@
+{
+    "common_add": "Thêm",
+    "common_back": "Quay lại",
+    "signup_title": "Tạo tài khoản ntfy",
+    "signup_form_toggle_password_visibility": "Hiện mật khẩu",
+    "login_form_button_submit": "Đăng nhập",
+    "common_copy_to_clipboard": "Lưu vào clipboard",
+    "signup_form_username": "Tên user",
+    "signup_already_have_account": "Đã có tài khoản? Đăng nhập!",
+    "signup_disabled": "Đăng kí bị đóng",
+    "signup_error_username_taken": "Tên {{username}} đã được sử dụng",
+    "signup_error_creation_limit_reached": "Đã bị giới hạn tạo tài khoản",
+    "login_title": "Đăng nhập vào tài khoản ntfy",
+    "login_link_signup": "Đăng kí",
+    "login_disabled": "Đăng nhập bị đóng",
+    "action_bar_show_menu": "Hiện menu",
+    "signup_form_password": "Mật khẩu",
+    "action_bar_settings": "Cài đặt",
+    "signup_form_confirm_password": "Xác nhận mật khẩu",
+    "signup_form_button_submit": "Đăng kí"
+}

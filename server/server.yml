@@ -144,6 +144,39 @@
 # smtp-server-domain:
 # smtp-server-addr-prefix:
 
+# Web Push support (background notifications for browsers)
+#
+# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, users
+# can enable background notifications in the web app. Once enabled, ntfy will forward published messages to the push
+# endpoint, which will then forward it to the browser.
+#
+# You must configure web-push-public/private key, web-push-file, and web-push-email-address below to enable Web Push.
+# Run "ntfy webpush keys" to generate the keys.
+#
+# - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
+# - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
+# - web-push-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
+# - web-push-email-address is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+# - web-push-startup-queries is an optional list of queries to run on startup`
+#
+# web-push-public-key:
+# web-push-private-key:
+# web-push-file:
+# web-push-email-address:
+# web-push-startup-queries:
+
+# If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.
+#
+# - twilio-account is the Twilio account SID, e.g. AC12345beefbeef67890beefbeef122586
+# - twilio-auth-token is the Twilio auth token, e.g. affebeef258625862586258625862586
+# - twilio-phone-number is the outgoing phone number you purchased, e.g. +18775132586
+# - twilio-verify-service is the Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586
+#
+# twilio-account:
+# twilio-auth-token:
+# twilio-phone-number:
+# twilio-verify-service:
+
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
 #
@@ -167,11 +200,13 @@
 #
 # disallowed-topics:
 
-# Defines if the root route (/) is pointing to the landing page (as on ntfy.sh) or the
-# web app. If you self-host, you don't want to change this.
-# Can be "app" (default), "home" or "disable" to disable the web app entirely.
+# Defines the root path of the web app, or disables the web app entirely.
 #
-# web-root: app
+# Can be any simple path, e.g. "/", "/app", or "/ntfy". For backwards-compatibility reasons,
+# the values "app" (maps to "/"), "home" (maps to "/app"), or "disable" (maps to "") to disable
+# the web app entirely.
+#
+# web-root: /
 
 # Various feature flags used to control the web app, and API access, mainly around user and
 # account management.
@@ -194,7 +229,12 @@
 # the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
 # This is to prevent the upstream server and Firebase/APNS from being able to read the message.
 #
+# - upstream-base-url is the base URL of the upstream server. Should be "https://ntfy.sh".
+# - upstream-access-token is the token used to authenticate with the upstream server. This is only required
+#   if you exceed the upstream rate limits, or the uptream server requires authentication.
+#
 # upstream-base-url:
+# upstream-access-token:
 
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
@@ -301,6 +341,10 @@
 #      - "field=value -> level" to match a value exactly, e.g. "tag=manager -> trace"
 #      - "field -> level" to match any value, e.g. "time_taken_ms -> debug"
 #   Warning: Using log-level-overrides has a performance penalty. Only use it for temporary debugging.
+#
+# Check your permissions:
+#   If you are running ntfy with systemd, make sure this log file is owned by the
+#   ntfy user and group by running: chown ntfy.ntfy <filename>.
 #
 # Example (good for production):
 #   log-level: info

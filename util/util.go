@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"io"
 	"math/rand"
 	"net/netip"
@@ -17,12 +16,15 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
 )
 
 const (
-	randomStringCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randomStringCharset          = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randomStringLowerCaseCharset = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 var (
@@ -67,15 +69,12 @@ func ContainsIP(haystack []netip.Prefix, needle netip.Addr) bool {
 
 // ContainsAll returns true if all needles are contained in haystack
 func ContainsAll[T comparable](haystack []T, needles []T) bool {
-	matches := 0
-	for _, s := range haystack {
-		for _, needle := range needles {
-			if s == needle {
-				matches++
-			}
+	for _, needle := range needles {
+		if !Contains(haystack, needle) {
+			return false
 		}
 	}
-	return matches == len(needles)
+	return true
 }
 
 // SplitNoEmpty splits a string using strings.Split, but filters out empty strings
@@ -114,11 +113,20 @@ func RandomString(length int) string {
 
 // RandomStringPrefix returns a random string with a given length, with a prefix
 func RandomStringPrefix(prefix string, length int) string {
+	return randomStringPrefixWithCharset(prefix, length, randomStringCharset)
+}
+
+// RandomLowerStringPrefix returns a random lowercase-only string with a given length, with a prefix
+func RandomLowerStringPrefix(prefix string, length int) string {
+	return randomStringPrefixWithCharset(prefix, length, randomStringLowerCaseCharset)
+}
+
+func randomStringPrefixWithCharset(prefix string, length int, charset string) string {
 	randomMutex.Lock() // Who would have thought that random.Intn() is not thread-safe?!
 	defer randomMutex.Unlock()
 	b := make([]byte, length-len(prefix))
 	for i := range b {
-		b[i] = randomStringCharset[random.Intn(len(randomStringCharset))]
+		b[i] = charset[random.Intn(len(charset))]
 	}
 	return prefix + string(b)
 }
@@ -153,11 +161,6 @@ func ParsePriority(priority string) (int, error) {
 	case "5", "max", "urgent":
 		return 5, nil
 	default:
-		// Ignore new HTTP Priority header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
-		// Cloudflare adds this to requests when forwarding to the backend (ntfy), so we just ignore it.
-		if strings.HasPrefix(p, "u=") {
-			return 3, nil
-		}
 		return 0, errInvalidPriority
 	}
 }

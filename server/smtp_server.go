@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -296,6 +297,8 @@ func readTextMailBody(reader io.Reader, contentType, transferEncoding string) (s
 func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, error) {
 	if strings.ToLower(transferEncoding) == "base64" {
 		reader = base64.NewDecoder(base64.StdEncoding, reader)
+	} else if strings.ToLower(transferEncoding) == "quoted-printable" {
+		reader = quotedprintable.NewReader(reader)
 	}
 	body, err := io.ReadAll(reader)
 	if err != nil {

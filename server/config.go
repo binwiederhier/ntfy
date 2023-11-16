@@ -1,10 +1,11 @@
 package server
 
 import (
-	"heckel.io/ntfy/user"
 	"io/fs"
 	"net/netip"
 	"time"
+
+	"heckel.io/ntfy/user"
 )
 
 // Defines default config settings (excluding limits, see below)
@@ -20,6 +21,12 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+)
+
+// Defines default Web Push settings
+const (
+	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
+	DefaultWebPushExpiryDuration        = 9 * 24 * time.Hour
 )
 
 // Defines all global and per-visitor limits
@@ -92,12 +99,13 @@ type Config struct {
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
 	DisallowedTopics                     []string
-	WebRootIsApp                         bool
+	WebRoot                              string // empty to disable
 	DelayedSenderInterval                time.Duration
 	FirebaseKeepaliveInterval            time.Duration
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
+	UpstreamAccessToken                  string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string
@@ -105,6 +113,12 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
+	TwilioAccount                        string
+	TwilioAuthToken                      string
+	TwilioPhoneNumber                    string
+	TwilioCallsBaseURL                   string
+	TwilioVerifyBaseURL                  string
+	TwilioVerifyService                  string
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
@@ -133,13 +147,19 @@ type Config struct {
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
-	EnableWeb                            bool
 	EnableSignup                         bool // Enable creation of accounts via API and UI
 	EnableLogin                          bool
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
 	Version                              string // injected by App
+	WebPushPrivateKey                    string
+	WebPushPublicKey                     string
+	WebPushFile                          string
+	WebPushEmailAddress                  string
+	WebPushStartupQueries                string
+	WebPushExpiryDuration                time.Duration
+	WebPushExpiryWarningDuration         time.Duration
 }
 
 // NewConfig instantiates a default new server config
@@ -171,12 +191,13 @@ func NewConfig() *Config {
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
 		DisallowedTopics:                     DefaultDisallowedTopics,
-		WebRootIsApp:                         false,
+		WebRoot:                              "/",
 		DelayedSenderInterval:                DefaultDelayedSenderInterval,
 		FirebaseKeepaliveInterval:            DefaultFirebaseKeepaliveInterval,
 		FirebasePollInterval:                 DefaultFirebasePollInterval,
 		FirebaseQuotaExceededPenaltyDuration: DefaultFirebaseQuotaExceededPenaltyDuration,
 		UpstreamBaseURL:                      "",
+		UpstreamAccessToken:                  "",
 		SMTPSenderAddr:                       "",
 		SMTPSenderUser:                       "",
 		SMTPSenderPass:                       "",
@@ -184,6 +205,12 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
+		TwilioCallsBaseURL:                   "https://api.twilio.com", // Override for tests
+		TwilioAccount:                        "",
+		TwilioAuthToken:                      "",
+		TwilioPhoneNumber:                    "",
+		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
+		TwilioVerifyService:                  "",
 		MessageLimit:                         DefaultMessageLengthLimit,
 		MinDelay:                             DefaultMinDelay,
 		MaxDelay:                             DefaultMaxDelay,
@@ -209,11 +236,16 @@ func NewConfig() *Config {
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,
 		BillingContact:                       "",
-		EnableWeb:                            true,
 		EnableSignup:                         false,
 		EnableLogin:                          false,
 		EnableReservations:                   false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
+		WebPushPrivateKey:                    "",
+		WebPushPublicKey:                     "",
+		WebPushFile:                          "",
+		WebPushEmailAddress:                  "",
+		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
+		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
 	}
 }

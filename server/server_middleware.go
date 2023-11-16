@@ -51,7 +51,16 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 
 func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if !s.config.EnableWeb {
+		if s.config.WebRoot == "" {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
+}
+
+func (s *Server) ensureWebPushEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.config.WebRoot == "" || s.config.WebPushPublicKey == "" {
 			return errHTTPNotFound
 		}
 		return next(w, r, v)
@@ -74,6 +83,24 @@ func (s *Server) ensureUser(next handleFunc) handleFunc {
 		}
 		return next(w, r, v)
 	})
+}
+
+func (s *Server) ensureAdmin(next handleFunc) handleFunc {
+	return s.ensureUserManager(func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if !v.User().IsAdmin() {
+			return errHTTPUnauthorized
+		}
+		return next(w, r, v)
+	})
+}
+
+func (s *Server) ensureCallsEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.config.TwilioAccount == "" || s.userManager == nil {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
 }
 
 func (s *Server) ensurePaymentsEnabled(next handleFunc) handleFunc {

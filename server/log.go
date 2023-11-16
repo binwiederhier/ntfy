@@ -20,6 +20,7 @@ const (
 	tagFirebase     = "firebase"
 	tagSMTP         = "smtp"  // Receive email
 	tagEmail        = "email" // Send email
+	tagTwilio       = "twilio"
 	tagFileCache    = "file_cache"
 	tagMessageCache = "message_cache"
 	tagStripe       = "stripe"
@@ -28,6 +29,7 @@ const (
 	tagResetter     = "resetter"
 	tagWebsocket    = "websocket"
 	tagMatrix       = "matrix"
+	tagWebPush      = "webpush"
 )
 
 var (

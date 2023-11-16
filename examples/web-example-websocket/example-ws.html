@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ntfy.sh: WebSocket Example</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+        body { font-size: 1.2em; line-height: 130%; }
+        #events { font-family: monospace; }
+    </style>
+</head>
+<body>
+<h1>ntfy.sh: WebSocket Example</h1>
+<p>
+    This is an example showing how to use <a href="https://ntfy.sh">ntfy.sh</a> with
+    <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSocket">WebSocket</a>.<br/>
+    This example doesn't need a server. You can just save the HTML page and run it from anywhere.
+</p>
+<button id="publishButton">Send test notification</button>
+<p><b>Log:</b></p>
+<div id="events"></div>
+
+<script type="text/javascript">
+    const publishURL = `https://ntfy.sh/example`;
+    const subscribeURL = `wss://ntfy.sh/example/ws`;
+    const events = document.getElementById('events');
+    const websocket = new WebSocket(subscribeURL);
+
+    // Publish button
+    document.getElementById("publishButton").onclick = () => {
+        fetch(publishURL, {
+            method: 'POST', // works with PUT as well, though that sends an OPTIONS request too!
+            body: `It is ${new Date().toString()}. This is a test.`
+        })
+    };
+
+    // Incoming events
+    websocket.onopen = () => {
+        let event = document.createElement('div');
+        event.innerHTML = `WebSocket connected to ${subscribeURL}`;
+        events.appendChild(event);
+    };
+    websocket.onerror = (e) => {
+        let event = document.createElement('div');
+        event.innerHTML = `WebSocket error: Failed to connect to ${subscribeURL}`;
+        events.appendChild(event);
+    };
+    websocket.onmessage = (e) => {
+        let event = document.createElement('div');
+        event.innerHTML = e.data;
+        events.appendChild(event);
+    };
+</script>
+
+</body>
+</html>

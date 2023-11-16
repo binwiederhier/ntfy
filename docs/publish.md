@@ -38,7 +38,12 @@ Here's an example showing how to publish a simple message using a POST request:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Post' -Uri https://ntfy.sh/mytopic -Body "Backup successful" -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Body = "Backup successful"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -124,12 +129,17 @@ a [title](#message-title), and [tag messages](#tags-emojis) 🥳 🎉. Here's an
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/phil_alerts"
-    $headers = @{ Title="Unauthorized access detected"
-                  Priority="urgent"
-                  Tags="warning,skull" }
-    $body = "Remote access to phils-laptop detected. Act right away."              
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/phil_alerts"
+      Headers = @{
+        Title = "Unauthorized access detected"
+        Priority = "urgent"
+        Tags = "warning,skull"
+      }
+      Body = "Remote access to phils-laptop detected. Act right away."
+    }
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -242,18 +252,21 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mydoorbell"
-    $headers = @{ Click="https://home.nest.com/"
-                  Attach="https://nest.com/view/yAxkasd.jpg"
-                  Actions="http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
-                  Email="phil@example.com" }
-    $body = @'
-    There's someone at the door. 🐶
-       
-    Please check if it's a good boy or a hooman.
-    Doggies have been known to ring the doorbell.
-    '@
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mydoorbell"
+      Headers = @{
+        Click = "https://home.nest.com"
+        Attach = "https://nest.com/view/yAxksd.jpg"
+        Actions = "http, Open door, https://api.nest.com/open/yAxkasd, clear=true"
+        Email = "phil@example.com"
+      }
+      Body = "There's someone at the door. 🐶`n
+      `n
+      Please check if it's a good boy or a hooman.`n
+      Doggies have been known to ring the doorbell.`n"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -342,10 +355,15 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/controversial"
-    $headers = @{ Title="Dogs are better than cats" }
-    $body = "Oh my ..."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/controversial"
+      Headers = @{
+        Title = "Dogs are better than cats"
+      }
+      Body = "Oh my ..."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -372,6 +390,12 @@ you can set the `X-Title` header (or any of its aliases: `Title`, `ti`, or `t`).
   ![notification with title](static/img/notification-with-title.png){ width=500 }
   <figcaption>Detail view of notification with title</figcaption>
 </figure>
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including the title)
+    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 ## Message priority
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -432,10 +456,15 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/phil_alerts"
-    $headers = @{ Priority="5" }
-    $body = "An urgent message"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = 'POST'
+      URI = "https://ntfy.sh/phil_alerts"
+      Headers = @{
+        Priority = "5"
+      }
+      Body = "An urgent message"
+    }
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -553,10 +582,15 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/backups"
-    $headers = @{ Tags="warning,mailsrv13,daily-backup" }
-    $body = "Backup of mailsrv13 failed"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/backups"
+      Headers = @{
+        Tags = "warning,mailsrv13,daily-backup"
+      }
+      Body = "Backup of mailsrv13 failed"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -582,6 +616,115 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 <figure markdown>
   ![priority notification](static/img/notification-with-tags.png){ width=500 }
   <figcaption>Detail view of notifications with tags</figcaption>
+</figure>
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode the tags header or individual tags
+    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `tag1,=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=,tag2` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+
+## Markdown formatting
+_Supported on:_ :material-firefox:
+
+You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/) 🤩. That means you can use 
+**bold text**, *italicized text*, links, images, and more. Supported Markdown features (web app only for now):
+
+- [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italics* (`*italics*`)
+- [Links](https://www.markdownguide.org/basic-syntax/#links) (`[some tool](https://ntfy.sh)`)
+- [Images](https://www.markdownguide.org/basic-syntax/#images) (`![some image](https://bing.com/logo.png)`)
+- [Code blocks](https://www.markdownguide.org/basic-syntax/#code-blocks) (` ```code blocks``` `) and [inline code](https://www.markdownguide.org/basic-syntax/#inline-code) (`` `inline code` ``)
+- [Headings](https://www.markdownguide.org/basic-syntax/#headings) (`# headings`, `## headings`, etc.)
+- [Lists](https://www.markdownguide.org/basic-syntax/#lists) (`- lists`, `1. lists`, etc.)
+- [Blockquotes](https://www.markdownguide.org/basic-syntax/#blockquotes) (`> blockquotes`)
+- [Horizontal rules](https://www.markdownguide.org/basic-syntax/#horizontal-rules) (`---`)
+
+By default, messages sent to ntfy are rendered as plain text. To enable Markdown, set the `X-Markdown` header (or any of
+its aliases: `Markdown`, or `md`) to `true` (or `1` or `yes`), or set the `Content-Type` header to `text/markdown`.
+As of today, **Markdown is only supported in the web app.** Here's an example of how to enable Markdown formatting:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -d "Look ma, **bold text**, *italics*, ..." \
+        -H "Markdown: yes" \
+        ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --markdown \
+        mytopic \
+        "Look ma, **bold text**, *italics*, ..."
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    Markdown: yes
+
+    Look ma, **bold text**, *italics*, ...
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic', {
+      method: 'POST', // PUT works too
+      body: 'Look ma, **bold text**, *italics*, ...',
+      headers: { 'Markdown': 'yes' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    http.Post("https://ntfy.sh/mytopic", "text/markdown",
+        strings.NewReader("Look ma, **bold text**, *italics*, ..."))
+
+    // or
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic", 
+        strings.NewReader("Look ma, **bold text**, *italics*, ..."))
+    req.Header.Set("Markdown", "yes")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Body = "Look ma, **bold text**, *italics*, ..."
+      Headers = @{
+        Markdown = "yes"
+      }
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/mytopic", 
+        data="Look ma, **bold text**, *italics*, ..."
+        headers={ "Markdown": "yes" }))
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST', // PUT also works
+            'header' => 'Content-Type: text/markdown', // !
+            'content' => 'Look ma, **bold text**, *italics*, ...'
+        ]
+    ]));
+    ```
+
+Here's what that looks like in the web app:
+
+<figure markdown>
+  ![markdown](static/img/web-markdown.png){ width=500 }
+  <figcaption>Markdown formatting in the web app</figcaption>
 </figure>
 
 ## Scheduled delivery
@@ -645,10 +788,15 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/hello"
-    $headers = @{ At="tomorrow, 10am" }
-    $body = "Good morning"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/hello"
+      Headers = @{
+        At = "tomorrow, 10am"
+      }
+      Body = "Good morning"
+    }
+    Invoke-RestMethod @Request
     ```
     
 === "Python"
@@ -729,7 +877,7 @@ For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhoo
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/trigger"
+    Invoke-RestMethod "ntfy.sh/mywebhook/trigger"
     ```    
 
 === "Python"
@@ -778,7 +926,7 @@ Here's an example with a custom message, tags and a priority:
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod -Method 'Get' -Uri "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    Invoke-RestMethod "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
     ```
 
 === "Python"
@@ -883,25 +1031,29 @@ is the only required one:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic    = "mytopic"
-        title    = "Low disk space alert"
-        message  = "Disk space is low at 5.1 GB"
-        priority = 4
-        attach   = "https://filesrv.lan/space.jpg"
-        filename = "diskspace.jpg"
-        tags     = @("warning", "cd")
-        click    = "https://homecamera.lan/xasds1h2xsSsa/"
-        actions  = @(
-            @{ 
-                action = "view"
-                label  = "Admin panel"
-                url    = "https://filesrv.lan/admin"
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic    = "mytopic"
+        Title    = "Low disk space alert"
+        Message  = "Disk space is low at 5.1 GB"
+        Priority = 4
+        Attach   = "https://filesrv.lan/space.jpg"
+        FileName = "diskspace.jpg"
+        Tags     = @("warning", "cd")
+        Click    = "https://homecamera.lan/xasds1h2xsSsa/"
+        Actions  = @(
+          @{ 
+            Action = "view"
+            Label  = "Admin panel"
+            URL    = "https://filesrv.lan/admin"
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -956,9 +1108,12 @@ all the supported fields:
 | `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
 | `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `markdown` | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                    |
+| `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
 | `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
 | `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
+| `call`     | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
 
 ## Action buttons
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -976,7 +1131,7 @@ As of today, the following actions are supported:
   when the action button is tapped (only supported on Android)
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
 
-Here's an example of what that a notification with actions can look like:
+Here's an example of what a notification with actions can look like:
 
 <figure markdown>
   ![notification with actions](static/img/android-screenshot-notification-actions.png){ width=500 }
@@ -1061,10 +1216,15 @@ As an example, here's how you can create the above notification using this forma
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'" }
-    $body = "You left the house. Turn down the A/C?"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions="view, Open portal, https://home.nest.com/, clear=true; http, Turn down, https://api.nest.com/, body='{\"temperature\": 65}'"
+      }
+      Body = "You left the house. Turn down the A/C?"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1086,7 +1246,13 @@ As an example, here's how you can create the above notification using this forma
         ]
     ]));
     ```
- 
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any header (including actions) 
+    as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
+
 #### Using a JSON array
 Alternatively, the same actions can be defined as **JSON array**, if the notification is defined as part of the JSON body 
 (see [publish as JSON](#publish-as-json)):
@@ -1214,26 +1380,30 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic   = "myhome"
-        message = "You left the house. Turn down the A/C?"
-        actions = @(
-            @{
-                action = "view"
-                label  = "Open portal"
-                url    = "https://home.nest.com/"
-                clear  = $true
-            },
-            @{
-                action = "http"
-                label  = "Turn down"
-                url    = "https://api.nest.com/"
-                body   = '{"temperature": 65}'
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic   = "myhome"
+        Message = "You left the house. Turn down the A/C?"
+        Actions = @(
+          @{
+            Action = "view"
+            Label  = "Open portal"
+            URL    = "https://home.nest.com/"
+            Clear  = $true
+          },
+          @{
+            Action = "http"
+            Label  = "Turn down"
+            URL    = "https://api.nest.com/"
+            Body   = '{"temperature": 65}'
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1358,10 +1528,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392" }
-    $body = "Somebody retweeted your tweet."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions = "view, Open Twitter, https://twitter.com/binwiederhier/status/1467633927951163392"
+      }
+      Body = "Somebody retweeted your tweet."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1474,19 +1649,23 @@ And the same example using [JSON publishing](#publish-as-json):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic = "myhome"
-        message = "Somebody retweeted your tweet."
-        actions = @(
-            @{
-                "action"="view"
-                "label"="Open Twitter"
-                "url"="https://twitter.com/binwiederhier/status/1467633927951163392"
-            }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic = "myhome"
+        Message = "Somebody retweeted your tweet."
+        Actions = @(
+          @{
+            Action = "view"
+            Label  = "Open Twitter"
+            URL    = "https://twitter.com/binwiederhier/status/1467633927951163392"
+          }
         )
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1600,10 +1779,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/wifey"
-    $headers = @{ Actions="broadcast, Take picture, extras.cmd=pic, extras.camera=front" }
-    $body = "Your wife requested you send a picture of yourself."
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/wifey"
+      Headers = @{
+        Actions = "broadcast, Take picture, extras.cmd=pic, extras.camera=front"
+      }
+      Body = "Your wife requested you send a picture of yourself."
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1733,23 +1917,26 @@ And the same example using [JSON publishing](#publish-as-json):
     ``` powershell
     # Powershell requires the 'Depth' argument to equal 3 here to expand 'Extras',
     # otherwise it will read System.Collections.Hashtable in the returned JSON
-
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic = "wifey"
-        message = "Your wife requested you send a picture of yourself."
-        actions = @(
-            @{
-                action = "broadcast"
-                label = "Take picture"
-                extras = @{
-                     cmd ="pic"
-                     camera = "front"
-                }
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-Json -Depth 3 @{
+        Topic = "wifey"
+        Message = "Your wife requested you send a picture of yourself."
+        Actions = @(
+          @{
+            Action = "broadcast"
+            Label = "Take picture"
+            Extras = @{
+              CMD ="pic"
+              Camera = "front"
             }
+          }
         )
-    } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1861,10 +2048,15 @@ Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/myhome"
-    $headers = @{ Actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}" }
-    $body = "Garage door has been open for 15 minutes. Close it?"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions="http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}"
+      }
+      Body = "Garage door has been open for 15 minutes. Close it?"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -1881,7 +2073,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
+                'Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}',
             'content' => 'Garage door has been open for 15 minutes. Close it?'
         ]
     ]));
@@ -2005,24 +2197,28 @@ And the same example using [JSON publishing](#publish-as-json):
     # Powershell requires the 'Depth' argument to equal 3 here to expand 'headers', 
     # otherwise it will read System.Collections.Hashtable in the returned JSON
 
-    $uri = "https://ntfy.sh"
-    $body = @{
-        topic   = "myhome"
-        message = "Garage door has been open for 15 minutes. Close it?"
-        actions = @(
-            @{
-                action  = "http"
-                label   = "Close door"
-                url     = "https://api.mygarage.lan/"
-                method  = "PUT"
-                headers = @{
-                    Authorization = "Bearer zAzsx1sk.."
-                }
-                body    = '{"action": "close"}'
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-Json -Depth 3 @{
+        Topic   = "myhome"
+        Message = "Garage door has been open for 15 minutes. Close it?"
+        Actions = @(
+          @{
+            Action  = "http"
+            Label   = "Close door"
+            URL     = "https://api.mygarage.lan/"
+            Method  = "PUT"
+            Headers = @{
+              Authorization = "Bearer zAzsx1sk.."
             }
+            Body    = ConvertTo-JSON @{Action = "close"}
+          }
         )
-    } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -ContentType "application/json" -UseBasicParsing
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2092,7 +2288,7 @@ You can define which URL to open when a notification is clicked. This may be use
 to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
 the web browser (or the app) and open the website.
 
-To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its aliase `Click`).
+To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its alias `Click`).
 If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
 by another app, the responsible app may open. 
 
@@ -2149,10 +2345,13 @@ Here's an example that will open Reddit when the notification is clicked:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/reddit_alerts"
-    $headers = @{ Click="https://www.reddit.com/message/messages" }
-    $body = "New messages on Reddit"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/reddit_alerts"
+      Headers = @{ Click="https://www.reddit.com/message/messages" }
+      Body = "New messages on Reddit"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2321,9 +2520,12 @@ Here's an example showing how to attach an APK file:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mydownloads"
-    $headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mydownloads"
+      Headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2414,12 +2616,17 @@ Here's an example showing how to include an icon:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/tvshows"
-    $headers = @{ Title"="Kodi: Resuming Playback"
-                  Tags="arrow_forward"
-                  Icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" }
-    $body = "The Wire, S01E01"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/tvshows"
+      Headers = @{
+        Title = "Kodi: Resuming Playback"
+        Tags = "arrow_forward"
+        Icon = "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+      }
+      Body = "The Wire, S01E01"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2525,13 +2732,18 @@ that, your IP address appears in the e-mail body. This is to prevent abuse.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/alerts"
-    $headers = @{ Title"="Low disk space alert"
-                  Priority="high"
-                  Tags="warning,skull,backup-host,ssh-login")
-                  Email="phil@example.com" }
-    $body = "Unknown login from 5.31.23.83 to backups.example.com"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/alerts"
+      Headers = @{
+        Title = "Low disk space alert"
+        Priority = "high"
+        Tags = "warning,skull,backup-host,ssh-login")
+        Email = "phil@example.com"
+      }
+      Body = "Unknown login from 5.31.23.83 to backups.example.com"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2596,6 +2808,133 @@ title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://nt
   <figcaption>Publishing a message via e-mail</figcaption>
 </figure>
 
+## Phone calls
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+You can use ntfy to call a phone and **read the message out loud using text-to-speech**. 
+Similar to email notifications, this can be useful to blast-notify yourself on all possible channels, or to notify people that do not have 
+the ntfy app installed on their phone.
+
+**Phone numbers have to be previously verified** (via the [web app](https://ntfy.sh/account)), so this feature is 
+**only available to authenticated users** (no anonymous phone calls). To forward a message as a voice call, pass a phone
+number in the `X-Call` header (or its alias: `Call`), prefixed with a plus sign and the country code, e.g. `+12223334444`. 
+You may also simply pass `yes` as a value to pick the first of your verified phone numbers. 
+On ntfy.sh, this feature is only supported to [ntfy Pro](https://ntfy.sh/app) plans.
+
+<figure markdown>
+  ![phone number verification](static/img/web-phone-verify.png)
+  <figcaption>Phone number verification in the <a href="https://ntfy.sh/account">web app</a></figcaption>
+</figure>
+
+As of today, the text-to-speed voice used will only support English. If there is demand for other languages, we'll
+be happy to add support for that. Please [open an issue on GitHub](https://github.com/binwiederhier/ntfy/issues).
+
+!!! info
+    You are responsible for the message content, and **you must abide by the [Twilio Acceptable Use Policy](https://www.twilio.com/en-us/legal/aup)**.
+    This particularly means that you must not use this feature to send unsolicited messages, or messages that are illegal or
+    violate the rights of others. Please read the policy for details. Failure to do so may result in your account being suspended or terminated.
+
+Here's how you use it:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -u :tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
+        -H "Call: +12223334444" \
+        -d "Your garage seems to be on fire. You should probably check that out." \
+        ntfy.sh/alerts
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --token=tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2 \
+        --call=+12223334444 \
+        alerts "Your garage seems to be on fire. You should probably check that out."
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /alerts HTTP/1.1
+    Host: ntfy.sh
+    Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2
+    Call: +12223334444
+
+    Your garage seems to be on fire. You should probably check that out.
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/alerts', {
+        method: 'POST',
+        body: "Your garage seems to be on fire. You should probably check that out.",
+        headers: { 
+            'Authorization': 'Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2',
+            'Call': '+12223334444'
+        }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/alerts", 
+        strings.NewReader("Your garage seems to be on fire. You should probably check that out."))
+    req.Header.Set("Call", "+12223334444")
+    req.Header.Set("Authorization", "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/alerts"
+      Headers = @{
+        Authorization = "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+        Call = "+12223334444"
+      }
+      Body = "Your garage seems to be on fire. You should probably check that out."
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/alerts",
+        data="Your garage seems to be on fire. You should probably check that out.",
+        headers={ 
+            "Authorization": "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2",
+            "Call": "+12223334444"
+        })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/alerts', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2\r\n" .
+                "Call: +12223334444",
+            'content' => 'Your garage seems to be on fire. You should probably check that out.'
+        ]
+    ]));
+    ```
+
+Here's what a phone call from ntfy sounds like:
+
+<audio controls>
+    <source src="../static/audio/ntfy-phone-call.mp3" type="audio/mpeg">
+    <source src="../static/audio/ntfy-phone-call.ogg" type="audio/ogg">
+</audio>
+
+Audio transcript:
+
+> You have a notification from ntfy on topic alerts.        
+> Message: Your garage seems to be on fire. You should probably check that out. End message.   
+> This message was sent by user phil. It will be repeated up to three times.
+
 ## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
@@ -2609,7 +2948,7 @@ To publish/subscribe to protected topics, you can:
     When using Basic auth, base64 only encodes username and password. It **is not encrypting it**. For your 
     self-hosted server, **be sure to use HTTPS to avoid eavesdropping** and exposing your password. 
 
-### Username & password
+### Username + password
 The simplest way to authenticate against a ntfy server is to use [Basic auth](https://en.wikipedia.org/wiki/Basic_access_authentication).
 Here's an example with a user `testuser` and password `fakepassword`:
 
@@ -2657,14 +2996,37 @@ Here's an example with a user `testuser` and password `fakepassword`:
     http.DefaultClient.Do(req)
     ```
 
-=== "PowerShell"
+=== "PowerShell 7+"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $credentials = 'testuser:fakepassword'
-    $encodedCredentials = [convert]::ToBase64String([text.Encoding]::UTF8.GetBytes($credentials))
-    $headers = @{Authorization="Basic $encodedCredentials"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # Get the credentials from the user
+    $Credential = Get-Credential testuser
+
+    # Alternatively, create a PSCredential object with the password from scratch
+    $Credential = [PSCredential]::new("testuser", (ConvertTo-SecureString "password" -AsPlainText -Force))
+    
+    # Note that the Authentication parameter requires PowerShell 7 or later
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Authentication = "Basic"
+      Credential = $Credential
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "PowerShell 5 and earlier"
+    ``` powershell
+    # With PowerShell 5 or earlier, we need to create the base64 username:password string ourselves
+    $CredentialString = "$($Credential.Username):$($Credential.GetNetworkCredential().Password)"
+    $EncodedCredential = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($CredentialString))
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{ Authorization = "Basic $EncodedCredential"}
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2761,12 +3123,29 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
     http.DefaultClient.Do(req)
     ```
 
-=== "PowerShell"
+=== "PowerShell 7+"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $headers = @{Authorization="Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # With PowerShell 7 or greater, we can use the Authentication and Token parameters
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Authorization = "Bearer"
+      Token = "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "PowerShell 5 and earlier"
+    ``` powershell
+    # In PowerShell 5 and below, we can only send the Bearer token as a string in the Headers
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{ Authorization = "Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2" }
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2841,10 +3220,16 @@ access token. This is primarily useful to make `curl` calls easier, e.g. `curl -
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets"
-    $headers = @{Authorization="Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"}
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message -Headers $headers -Method "Post" -UseBasicParsing
+    # Note that PSCredentials *must* have a username, so we fall back to placing the authorization in the Headers as with PowerShell 5
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets"
+      Headers = @{
+        Authorization = "Basic OnRrX0FnUWRxN21WQm9GRDM3elFWTjI5Umh1TXpOSXoy"
+      }
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2913,9 +3298,12 @@ Here's an example using the `auth` query parameter:
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
-    $message = "Look ma, with auth"
-    Invoke-RestMethod -Uri $uri -Body $message  -Method "Post" -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.example.com/mysecrets?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw"
+      Body = "Look ma, with auth"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -2953,6 +3341,12 @@ The following command will generate the appropriate value for you on *nix system
 
 ```
 echo -n "Basic `echo -n 'testuser:fakepassword' | base64`" | base64 | tr -d '='
+```
+
+For access tokens, you can use this instead:
+
+```
+echo -n "Bearer faketoken" | base64 | tr -d '='
 ```
 
 ## Advanced features
@@ -3012,10 +3406,13 @@ are still delivered to connected subscribers, but [`since=`](subscribe/api.md#fe
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mytopic"
-    $headers = @{ Cache="no" }
-    $body = "This message won't be stored server-side"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Headers = @{ Cache="no" }
+      Body = "This message won't be stored server-side"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -3092,10 +3489,13 @@ to `no`. This will instruct the server not to forward messages to Firebase.
 
 === "PowerShell"
     ``` powershell
-    $uri = "https://ntfy.sh/mytopic"
-    $headers = @{ Firebase="no" }
-    $body = "This message won't be forwarded to FCM"
-    Invoke-RestMethod -Method 'Post' -Uri $uri -Body $body -Headers $headers -UseBasicParsing
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/mytopic"
+      Headers = @{ Firebase="no" }
+      Body = "This message won't be forwarded to FCM"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
@@ -3161,17 +3561,18 @@ There are a few limitations to the API to prevent abuse and to keep the server h
 are configurable via the server side [rate limiting settings](config.md#rate-limiting). Most of these limits you won't run into,
 but just in case, let's list them all:
 
-| Limit                           | Description                                                                                                                                                                                                             |
-|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Message length**              | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                                                                 |
-| **Requests**                    | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds.                                                |
-| **Daily messages**              | By default, the number of messages is governed by the request limits. This can be overridden. On ntfy.sh, the daily message limit is 1,000.                                                                             |
-| **E-mails**                     | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour. On ntfy.sh, the daily limit is 10.                     |
-| **Subscription limit**          | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                                                                   |
-| **Attachment size limit**       | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors. On ntfy.sh, the attachment size limit is 5 MB, and the per-visitor total is 50 MB. |
-| **Attachment expiry**           | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                                                                            |
-| **Attachment bandwidth**        | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected. On ntfy.sh, the daily bandwidth limit is 200 MB.                      |
-| **Total number of topics**      | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                                                               |
+| Limit                      | Description                                                                                                                                                                                                             |
+|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Message length**         | Each message can be up to 4,096 bytes long. Longer messages are treated as [attachments](#attachments).                                                                                                                 |
+| **Requests**               | By default, the server is configured to allow 60 requests per visitor at once, and then refills the your allowed requests bucket at a rate of one request per 5 seconds.                                                |
+| **Daily messages**         | By default, the number of messages is governed by the request limits. This can be overridden. On ntfy.sh, the daily message limit is 250.                                                                               |
+| **E-mails**                | By default, the server is configured to allow sending 16 e-mails per visitor at once, and then refills the your allowed e-mail bucket at a rate of one per hour. On ntfy.sh, the daily limit is 5.                      |
+| **Phone calls**            | By default, the server does not allow any phone calls, except for users with a tier that has a call limit.                                                                                                              |
+| **Subscription limit**     | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                                                                   |
+| **Attachment size limit**  | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors. On ntfy.sh, the attachment size limit is 2 MB, and the per-visitor total is 20 MB. |
+| **Attachment expiry**      | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                                                                            |
+| **Attachment bandwidth**   | By default, the server allows 500 MB of GET/PUT/POST traffic for attachments per visitor in a 24 hour period. Traffic exceeding that is rejected. On ntfy.sh, the daily bandwidth limit is 200 MB.                      |
+| **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                                                               |
 
 These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
 a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
@@ -3180,6 +3581,12 @@ a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier li
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
 when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
 table in their canonical form.
+
+!!! info
+    ntfy supports UTF-8 in HTTP headers, but [not every library or programming language does](https://www.jmix.io/blog/utf-8-in-http-headers/).
+    If non-ASCII characters are causing issues for you in the title (i.e. you're seeing `?` symbols), you may also encode any
+    header as [RFC 2047](https://datatracker.ietf.org/doc/html/rfc2047#section-2), e.g. `=?UTF-8?B?8J+HqfCfh6o=?=` ([base64](https://en.wikipedia.org/wiki/Base64)),
+    or `=?UTF-8?Q?=C3=84pfel?=` ([quoted-printable](https://en.wikipedia.org/wiki/Quoted-printable)).
 
 | Parameter       | Aliases                                    | Description                                                                                   |
 |-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|
@@ -3191,11 +3598,14 @@ table in their canonical form.
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
+| `X-Markdown`    | `Markdown`, `md`                           | Enable [Markdown formatting](#markdown-formatting) in the notification body                   |
 | `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
+| `X-Call`        | `Call`                                     | Phone number for [phone calls](#phone-calls)                                                  |
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |
 | `X-Firebase`    | `Firebase`                                 | Allows disabling [sending to Firebase](#disable-firebase)                                     |
 | `X-UnifiedPush` | `UnifiedPush`, `up`                        | [UnifiedPush](#unifiedpush) publish option, only to be used by UnifiedPush apps               |
 | `X-Poll-ID`     | `Poll-ID`                                  | Internal parameter, used for [iOS push notifications](config.md#ios-instant-notifications)    |
 | `Authorization` | -                                          | If supported by the server, you can [login to access](#authentication) protected topics       |
+| `Content-Type`  | -                                          | If set to `text/markdown`, [Markdown formatting](#markdown-formatting) is enabled             |

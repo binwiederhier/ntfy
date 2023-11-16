@@ -31,10 +31,16 @@ help:
 	@echo "  make cli-darwin-server          - Build client & server (no GoReleaser, current arch, macOS)"
 	@echo "  make cli-client                 - Build client only (no GoReleaser, current arch, Linux/macOS/Windows)"
 	@echo
+	@echo "Build dev Docker:"
+	@echo "  make docker-dev                 - Build client & server for current architecture using Docker only"
+	@echo
 	@echo "Build web app:"
 	@echo "  make web                        - Build the web app"
 	@echo "  make web-deps                   - Install web app dependencies (npm install the universe)"
 	@echo "  make web-build                  - Actually build the web app"
+	@echo "  make web-lint                   - Run eslint on the web app"
+	@echo "  make web-fmt                    - Run prettier on the web app"
+	@echo "  make web-fmt-check              - Run prettier on the web app, but don't change anything"
 	@echo
 	@echo "Build documentation:"
 	@echo "  make docs                       - Build the documentation"
@@ -80,40 +86,45 @@ build: web docs cli
 update: web-deps-update cli-deps-update docs-deps-update
 	docker pull alpine
 
+docker-dev:
+	docker build \
+		--file ./Dockerfile-build \
+		--tag binwiederhier/ntfy:$(VERSION) \
+		--tag binwiederhier/ntfy:dev \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		./
+
+
 # Ubuntu-specific
 
 build-deps-ubuntu:
-	sudo apt update
-	sudo apt install -y \
+	sudo apt-get update
+	sudo apt-get install -y \
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
+		python3 \
+		python3-venv \
 		jq
-	which pip3 || sudo apt install -y python3-pip
+	which pip3 || sudo apt-get install -y python3-pip
+
 
 # Documentation
 
 docs: docs-deps docs-build
 
-docs-build: .PHONY
-	@if ! /bin/echo -e "import sys\nif sys.version_info < (3,8):\n exit(1)" | python3; then \
-	  if which python3.8; then \
-	  	echo "python3.8 $(shell which mkdocs) build"; \
-	    python3.8 $(shell which mkdocs) build; \
-	  else \
-	    echo "ERROR: Python version too low. mkdocs-material needs >= 3.8"; \
-	    exit 1; \
-	  fi; \
-	else \
-	  echo "mkdocs build"; \
-	  mkdocs build; \
-	fi
+docs-venv: .PHONY
+	python3 -m venv ./venv
 
-docs-deps: .PHONY
-	pip3 install -r requirements.txt
+docs-build: docs-venv
+	(. venv/bin/activate && mkdocs build)
+
+docs-deps: docs-venv
+	(. venv/bin/activate && pip3 install -r requirements.txt)
 
 docs-deps-update: .PHONY
-	pip3 install -r requirements.txt --upgrade
+	(. venv/bin/activate && pip3 install -r requirements.txt --upgrade)
 
 
 # Web app
@@ -127,8 +138,7 @@ web-build:
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \
 		&& rm \
-			../server/site/config.js \
-			../server/site/asset-manifest.json
+			../server/site/config.js
 
 web-deps:
 	cd web && npm install
@@ -137,6 +147,14 @@ web-deps:
 web-deps-update:
 	cd web && npm update
 
+web-fmt:
+	cd web && npm run format
+
+web-fmt-check:
+	cd web && npm run format:check
+
+web-lint:
+	cd web && npm run lint
 
 # Main server/client build
 
@@ -226,7 +244,7 @@ cli-build-results:
 
 # Test/check targets
 
-check: test fmt-check vet lint staticcheck
+check: test web-fmt-check fmt-check vet web-lint lint staticcheck
 
 test: .PHONY
 	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
@@ -253,7 +271,7 @@ coverage-upload:
 
 # Lint/formatting targets
 
-fmt:
+fmt: web-fmt
 	gofmt -s -w .
 
 fmt-check:

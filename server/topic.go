@@ -1,11 +1,12 @@
 package server
 
 import (
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
 	"math/rand"
 	"sync"
 	"time"
+
+	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/util"
 )
 
 const (
@@ -44,10 +45,16 @@ func newTopic(id string) *topic {
 }
 
 // Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, userID string, cancel func()) int {
+func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscriberID int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	subscriberID := rand.Int()
+	for i := 0; i < 5; i++ { // Best effort retry
+		subscriberID = rand.Int()
+		_, exists := t.subscribers[subscriberID]
+		if !exists {
+			break
+		}
+	}
 	t.subscribers[subscriberID] = &topicSubscriber{
 		userID:     userID, // May be empty
 		subscriber: s,
@@ -134,22 +141,38 @@ func (t *topic) Keepalive() {
 	t.lastAccess = time.Now()
 }
 
-// CancelSubscribers calls the cancel function for all subscribers, forcing
-func (t *topic) CancelSubscribers(exceptUserID string) {
+// CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing
+func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, s := range t.subscribers {
 		if s.userID != exceptUserID {
-			log.
-				Tag(tagSubscribe).
-				With(t).
-				Fields(log.Context{
-					"user_id": s.userID,
-				}).
-				Debug("Canceling subscriber %s", s.userID)
-			s.cancel()
+			t.cancelUserSubscriber(s)
 		}
 	}
+}
+
+// CancelSubscriberUser kills the subscriber with the given user ID
+func (t *topic) CancelSubscriberUser(userID string) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, s := range t.subscribers {
+		if s.userID == userID {
+			t.cancelUserSubscriber(s)
+			return
+		}
+	}
+}
+
+func (t *topic) cancelUserSubscriber(s *topicSubscriber) {
+	log.
+		Tag(tagSubscribe).
+		With(t).
+		Fields(log.Context{
+			"user_id": s.userID,
+		}).
+		Debug("Canceling subscriber with user ID %s", s.userID)
+	s.cancel()
 }
 
 func (t *topic) Context() log.Context {

@@ -15,6 +15,7 @@ func (s *Server) execManager() {
 	s.pruneTokens()
 	s.pruneAttachments()
 	s.pruneMessages()
+	s.pruneAndNotifyWebPushSubscriptions()
 
 	// Message count per topic
 	var messagesCached int
@@ -73,9 +74,14 @@ func (s *Server) execManager() {
 	}
 
 	// Print stats
-	s.mu.Lock()
+	s.mu.RLock()
 	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
-	s.mu.Unlock()
+	s.mu.RUnlock()
+
+	// Update stats
+	s.updateAndWriteStats(messagesCount)
+
+	// Log stats
 	log.
 		Tag(tagManager).
 		Fields(log.Context{

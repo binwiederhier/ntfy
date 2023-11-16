@@ -11,21 +11,23 @@ import (
 	"heckel.io/ntfy/util"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
-// Event type constants
 const (
-	MessageEvent     = "message"
-	KeepaliveEvent   = "keepalive"
-	OpenEvent        = "open"
-	PollRequestEvent = "poll_request"
+	// MessageEvent identifies a message event
+	MessageEvent = "message"
 )
 
 const (
 	maxResponseBytes = 4096
+)
+
+var (
+	topicRegex = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`) // Same as in server/server.go
 )
 
 // Client is the ntfy client that can be used to publish and subscribe to ntfy topics
@@ -96,8 +98,14 @@ func (c *Client) Publish(topic, message string, options ...PublishOption) (*Mess
 // To pass title, priority and tags, check out WithTitle, WithPriority, WithTagsList, WithDelay, WithNoCache,
 // WithNoFirebase, and the generic WithHeader.
 func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishOption) (*Message, error) {
-	topicURL := c.expandTopicURL(topic)
-	req, _ := http.NewRequest("POST", topicURL, body)
+	topicURL, err := c.expandTopicURL(topic)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", topicURL, body)
+	if err != nil {
+		return nil, err
+	}
 	for _, option := range options {
 		if err := option(req); err != nil {
 			return nil, err
@@ -133,11 +141,14 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
 // By default, all messages will be returned, but you can change this behavior using a SubscribeOption.
 // See WithSince, WithSinceAll, WithSinceUnixTime, WithScheduled, and the generic WithQueryParam.
 func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, error) {
+	topicURL, err := c.expandTopicURL(topic)
+	if err != nil {
+		return nil, err
+	}
 	ctx := context.Background()
 	messages := make([]*Message, 0)
 	msgChan := make(chan *Message)
 	errChan := make(chan error)
-	topicURL := c.expandTopicURL(topic)
 	log.Debug("%s Polling from topic", util.ShortTopicURL(topicURL))
 	options = append(options, WithPoll())
 	go func() {
@@ -166,15 +177,18 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 // Example:
 //
 //	c := client.New(client.NewConfig())
-//	subscriptionID := c.Subscribe("mytopic")
+//	subscriptionID, _ := c.Subscribe("mytopic")
 //	for m := range c.Messages {
 //	  fmt.Printf("New message: %s", m.Message)
 //	}
-func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
+func (c *Client) Subscribe(topic string, options ...SubscribeOption) (string, error) {
+	topicURL, err := c.expandTopicURL(topic)
+	if err != nil {
+		return "", err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	subscriptionID := util.RandomString(10)
-	topicURL := c.expandTopicURL(topic)
 	log.Debug("%s Subscribing to topic", util.ShortTopicURL(topicURL))
 	ctx, cancel := context.WithCancel(context.Background())
 	c.subscriptions[subscriptionID] = &subscription{
@@ -183,7 +197,7 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) string {
 		cancel:   cancel,
 	}
 	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, subscriptionID, options...)
-	return subscriptionID
+	return subscriptionID, nil
 }
 
 // Unsubscribe unsubscribes from a topic that has been previously subscribed to using the unique
@@ -199,31 +213,16 @@ func (c *Client) Unsubscribe(subscriptionID string) {
 	sub.cancel()
 }
 
-// UnsubscribeAll unsubscribes from a topic that has been previously subscribed with Subscribe.
-// If there are multiple subscriptions matching the topic, all of them are unsubscribed from.
-//
-// A topic can be either a full URL (e.g. https://myhost.lan/mytopic), a short URL which is then prepended https://
-// (e.g. myhost.lan -> https://myhost.lan), or a short name which is expanded using the default host in the
-// config (e.g. mytopic -> https://ntfy.sh/mytopic).
-func (c *Client) UnsubscribeAll(topic string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	topicURL := c.expandTopicURL(topic)
-	for _, sub := range c.subscriptions {
-		if sub.topicURL == topicURL {
-			delete(c.subscriptions, sub.ID)
-			sub.cancel()
-		}
-	}
-}
-
-func (c *Client) expandTopicURL(topic string) string {
+func (c *Client) expandTopicURL(topic string) (string, error) {
 	if strings.HasPrefix(topic, "http://") || strings.HasPrefix(topic, "https://") {
-		return topic
+		return topic, nil
 	} else if strings.Contains(topic, "/") {
-		return fmt.Sprintf("https://%s", topic)
+		return fmt.Sprintf("https://%s", topic), nil
 	}
-	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic)
+	if !topicRegex.MatchString(topic) {
+		return "", fmt.Errorf("invalid topic name: %s", topic)
+	}
+	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic), nil
 }
 
 func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL, subcriptionID string, options ...SubscribeOption) {

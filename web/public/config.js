@@ -6,12 +6,16 @@
 // During web development, you may change values here for rapid testing.
 
 var config = {
-    base_url: window.location.origin, // Change to test against a different server
-    app_root: "/app",
-    enable_login: true,
-    enable_signup: true,
-    enable_payments: true,
-    enable_reservations: true,
-    billing_contact: "",
-    disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"]
+  base_url: window.location.origin, // Change to test against a different server
+  app_root: "/",
+  enable_login: true,
+  enable_signup: true,
+  enable_payments: false,
+  enable_reservations: true,
+  enable_emails: true,
+  enable_calls: true,
+  enable_web_push: true,
+  billing_contact: "",
+  web_push_public_key: "",
+  disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"],
 };

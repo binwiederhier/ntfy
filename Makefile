@@ -120,7 +120,7 @@ docs-venv: .PHONY
 	$(PYTHON) -m venv ./venv
 
 docs-build: docs-venv
-	(. venv/bin/activate && $(PYTHON) mkdocs build)
+	(. venv/bin/activate && $(PYTHON) -m mkdocs build)
 
 docs-deps: docs-venv
 	(. venv/bin/activate && $(PIP) install -r requirements.txt)

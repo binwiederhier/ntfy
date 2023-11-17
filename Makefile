@@ -1,4 +1,6 @@
 MAKEFLAGS := --jobs=1
+PYTHON := python3
+PIP := pip3
 VERSION := $(shell git describe --tag)
 COMMIT := $(shell git rev-parse --short HEAD)
 
@@ -115,16 +117,16 @@ build-deps-ubuntu:
 docs: docs-deps docs-build
 
 docs-venv: .PHONY
-	python3 -m venv ./venv
+	$(PYTHON) -m venv ./venv
 
 docs-build: docs-venv
-	(. venv/bin/activate && mkdocs build)
+	(. venv/bin/activate && $(PYTHON) mkdocs build)
 
 docs-deps: docs-venv
-	(. venv/bin/activate && pip3 install -r requirements.txt)
+	(. venv/bin/activate && $(PIP) install -r requirements.txt)
 
 docs-deps-update: .PHONY
-	(. venv/bin/activate && pip3 install -r requirements.txt --upgrade)
+	(. venv/bin/activate && $(PIP) install -r requirements.txt --upgrade)
 
 
 # Web app

@@ -69,7 +69,7 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 	t.Parallel()
 	to := newTopic("mytopic")
 
-	// Fix random seed to force same number generation
+	//lint:ignore SA1019 Fix random seed to force same number generation
 	rand.Seed(1)
 	a := rand.Int()
 	to.subscribers[a] = &topicSubscriber{
@@ -82,7 +82,7 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 		return nil
 	}
 
-	// Force rand.Int to generate the same id once more
+	//lint:ignore SA1019 Force rand.Int to generate the same id once more
 	rand.Seed(1)
 	id := to.Subscribe(subFn, "b", func() {})
 	res := to.subscribers[id]

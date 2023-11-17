@@ -17,10 +17,6 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixMilli())
-}
-
 func TestCLI_Serve_Unix_Curl(t *testing.T) {
 	sockFile := filepath.Join(t.TempDir(), "ntfy.sock")
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system

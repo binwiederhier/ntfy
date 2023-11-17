@@ -1,4 +1,4 @@
-module heckel.io/ntfy
+module heckel.io/ntfy/v2
 
 go 1.21
 

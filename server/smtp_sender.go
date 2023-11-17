@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/util"
 )
 
 type mailer interface {

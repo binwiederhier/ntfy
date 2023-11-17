@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 )
 
 type contextKey int

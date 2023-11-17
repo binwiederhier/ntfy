@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"io"
 	"math/rand"
 	"net/http"
@@ -24,8 +24,8 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/util"
 )
 
 func TestMain(m *testing.M) {

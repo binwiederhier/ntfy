@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/v2/server"
 	"math/rand"
 	"net/http"
 	"path/filepath"

@@ -2,7 +2,7 @@ package client_test
 
 import (
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/client"
+	"heckel.io/ntfy/v2/client"
 	"os"
 	"path/filepath"
 	"testing"

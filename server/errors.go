@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/v2/log"
 	"net/http"
 )
 

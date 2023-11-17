@@ -1,7 +1,7 @@
 package server
 
 import (
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"net/http"
 )
 

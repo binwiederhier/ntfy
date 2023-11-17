@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"net/netip"
 	"time"
 )

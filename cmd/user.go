@@ -6,13 +6,13 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 )
 
 const (

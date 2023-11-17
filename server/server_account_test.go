@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"io"
 	"net/netip"
 	"path/filepath"

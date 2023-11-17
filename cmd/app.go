@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/v2/log"
 	"os"
 	"regexp"
 )

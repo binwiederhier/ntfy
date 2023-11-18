@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"io"
 	"net/http"
 	"strings"

@@ -12,14 +12,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/test"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/client"
+	"heckel.io/ntfy/v2/test"
+	"heckel.io/ntfy/v2/util"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixMilli())
-}
 
 func TestCLI_Serve_Unix_Curl(t *testing.T) {
 	sockFile := filepath.Join(t.TempDir(), "ntfy.sock")

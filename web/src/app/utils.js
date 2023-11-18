@@ -130,14 +130,20 @@ export const hashCode = (s) => {
   return hash;
 };
 
+/**
+ * convert `i18n.language` style str (e.g.: `en_US`) to kebab-case (e.g.: `en-US`),
+ * which is expected by `<html lang>` and `Intl.DateTimeFormat`
+ */
+export const getKebabCaseLangStr = (language) => language.replace(/_/g, "-");
+
 export const formatShortDateTime = (timestamp, language) =>
-  new Intl.DateTimeFormat(language, {
+  new Intl.DateTimeFormat(getKebabCaseLangStr(language), {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(timestamp * 1000));
 
 export const formatShortDate = (timestamp, language) =>
-  new Intl.DateTimeFormat(language, { dateStyle: "short" }).format(new Date(timestamp * 1000));
+  new Intl.DateTimeFormat(getKebabCaseLangStr(language), { dateStyle: "short" }).format(new Date(timestamp * 1000));
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 bytes";

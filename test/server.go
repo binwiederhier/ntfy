@@ -2,17 +2,12 @@ package test
 
 import (
 	"fmt"
-	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/v2/server"
 	"math/rand"
 	"net/http"
 	"path/filepath"
 	"testing"
-	"time"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixMilli())
-}
 
 // StartServer starts a server.Server with a random port and waits for the server to be up
 func StartServer(t *testing.T) (*server.Server, int) {

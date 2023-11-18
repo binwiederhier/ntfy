@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stripe/stripe-go/v74"
 	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"net/netip"
 	"path/filepath"
 	"strings"

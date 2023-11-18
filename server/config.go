@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"time"
 
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 )
 
 // Defines default config settings (excluding limits, see below)

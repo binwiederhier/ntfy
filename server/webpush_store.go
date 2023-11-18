@@ -3,7 +3,7 @@ package server
 import (
 	"database/sql"
 	"errors"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"net/netip"
 	"time"
 

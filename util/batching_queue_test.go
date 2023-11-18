@@ -2,7 +2,7 @@ package util_test
 
 import (
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"math/rand"
 	"sync"
 	"testing"

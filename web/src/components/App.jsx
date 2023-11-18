@@ -11,7 +11,7 @@ import ActionBar from "./ActionBar";
 import Preferences from "./Preferences";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import { expandUrl } from "../app/utils";
+import { expandUrl, getKebabCaseLangStr } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import { useAccountListener, useBackgroundProcesses, useConnectionListeners, useWebPushTopics } from "./hooks";
@@ -56,7 +56,7 @@ const App = () => {
   );
 
   useEffect(() => {
-    document.documentElement.setAttribute("lang", i18n.language);
+    document.documentElement.setAttribute("lang", getKebabCaseLangStr(i18n.language));
     document.dir = languageDir;
   }, [i18n.language, languageDir]);
 

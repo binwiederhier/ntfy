@@ -2,8 +2,8 @@ package server
 
 import (
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"sync/atomic"
 	"testing"
 	"time"

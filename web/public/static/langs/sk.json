@@ -231,7 +231,7 @@
     "prefs_reservations_dialog_title_delete": "Odstrániť rezervovanú tému",
     "prefs_users_table": "Tabuľka používateľov",
     "prefs_reservations_table_topic_header": "Téma",
-    "reservation_delete_dialog_submit_button": "Odstrániť rezerváciu",
+    "reservation_delete_dialog_submit_button": "Vymazať rezerváciu",
     "prefs_reservations_limit_reached": "Dosiahli ste limit rezervovaných tém.",
     "account_upgrade_dialog_interval_monthly": "Mesačne",
     "prefs_users_add_button": "Pridať používateľa",

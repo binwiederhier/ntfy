@@ -2,9 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"net/http"
 	"net/netip"
 	"strings"

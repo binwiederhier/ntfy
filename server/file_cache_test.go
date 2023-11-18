@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"os"
 	"strings"
 	"testing"

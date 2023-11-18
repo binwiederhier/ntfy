@@ -5,7 +5,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"gopkg.in/yaml.v2"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"os"
 )
 

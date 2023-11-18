@@ -2,14 +2,14 @@ package server
 
 import (
 	"fmt"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 	"net/netip"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 )
 
 const (

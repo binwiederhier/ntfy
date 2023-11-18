@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/test"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/test"
+	"heckel.io/ntfy/v2/util"
 	"net/http"
 	"net/http/httptest"
 	"os"

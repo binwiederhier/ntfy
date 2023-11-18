@@ -429,7 +429,7 @@ steps:
 
 ### XCode setup
 
-1. Follow step 4 of [https://firebase.google.com/docs/ios/setup](Add Firebase to your Apple project) to install the 
+1. Follow step 4 of [Add Firebase to your Apple project](https://firebase.google.com/docs/ios/setup) to install the 
    `firebase-ios-sdk` in XCode, if it's not already present - you can select any packages in addition to Firebase Core / Firebase Messaging
 1. Similarly, install the SQLite.swift package dependency in XCode
 1. When running the debug build, ensure XCode is pointed to the connected iOS device - registering for push notifications does not work in the iOS simulators

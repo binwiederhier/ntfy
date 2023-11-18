@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 )
 
 const (

@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"io"
 	"mime"
 	"net/http"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stripe/stripe-go/v74"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"io/fs"
 	"math"
 	"net"
@@ -17,12 +17,12 @@ import (
 	"syscall"
 	"time"
 
-	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/v2/log"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/server"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/util"
 )
 
 func init() {

@@ -1273,7 +1273,7 @@ Released Dec 28, 2021
 
 **Features & bug fixes:**
 
-* [Publish messages via e-mail](ntfy.sh/docs/publish/#e-mail-publishing) #66
+* [Publish messages via e-mail](publish.md#e-mail-publishing) #66
 * Server-side work to support [unifiedpush.org](https://unifiedpush.org) #64
 * Fixing the Santa bug #65
 
@@ -1287,10 +1287,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
+* Support for HTML-only emails ([#690](https://github.com/binwiederhier/ntfy/issues/690)/[#693](https://github.com/binwiederhier/ntfy/pull/693), thanks to [@teastrainer](https://github.com/teastrainer) and [@CrazyWolf13](https://github.com/CrazyWolf13) for reporting)
 * Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
 * Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
 * Add special logic to ignore `Priority` header if it resembled a RFC 9218 value ([#851](https://github.com/binwiederhier/ntfy/pull/851)/[#895](https://github.com/binwiederhier/ntfy/pull/895), thanks to [@gusdleon](https://github.com/gusdleon), see also [#351](https://github.com/binwiederhier/ntfy/issues/351), [#353](https://github.com/binwiederhier/ntfy/issues/353), [#461](https://github.com/binwiederhier/ntfy/issues/461))
 * PWA: hide install prompt on macOS 14 Safari ([#899](https://github.com/binwiederhier/ntfy/pull/899), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* Fix web app crash in Edge for languages with underline in locale ([#922](https://github.com/binwiederhier/ntfy/pull/922)/[#912](https://github.com/binwiederhier/ntfy/issues/912)/[#852](https://github.com/binwiederhier/ntfy/issues/852), thanks to [@imkero](https://github.com/imkero))
+
+**Additional languages:**
+
+* Finnish (thanks to [@Seppo](https://hosted.weblate.org/user/Seppo/)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

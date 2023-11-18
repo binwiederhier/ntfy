@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"regexp"
 	"strings"
 	"unicode/utf8"

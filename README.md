@@ -2,7 +2,7 @@
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
-[![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy)
+[![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy/v2)
 [![Tests](https://github.com/binwiederhier/ntfy/workflows/test/badge.svg)](https://github.com/binwiederhier/ntfy/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/binwiederhier/ntfy)](https://goreportcard.com/report/github.com/binwiederhier/ntfy)
 [![codecov](https://codecov.io/gh/binwiederhier/ntfy/branch/main/graph/badge.svg?token=A597KQ463G)](https://codecov.io/gh/binwiederhier/ntfy)
@@ -155,6 +155,16 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/spartan"><img src="https://github.com/spartan.png" width="40px" /></a>
 <a href="https://github.com/alexandzors"><img src="https://github.com/alexandzors.png" width="40px" /></a>
 <a href="https://github.com/dkramer95"><img src="https://github.com/dkramer95.png" width="40px" /></a>
+<a href="https://github.com/YezGotIt"><img src="https://github.com/YezGotIt.png" width="40px" /></a>
+<a href="https://github.com/thomasskou"><img src="https://github.com/thomasskou.png" width="40px" /></a>
+<a href="https://github.com/surfernv"><img src="https://github.com/surfernv.png" width="40px" /></a>
+<a href="https://github.com/richardleach"><img src="https://github.com/richardleach.png" width="40px" /></a>
+<a href="https://github.com/bear"><img src="https://github.com/bear.png" width="40px" /></a>
+<a href="https://github.com/cminter"><img src="https://github.com/cminter.png" width="40px" /></a>
+<a href="https://github.com/bahur142"><img src="https://github.com/bahur142.png" width="40px" /></a>
+<a href="https://github.com/pgwiebes"><img src="https://github.com/pgwiebes.png" width="40px" /></a>
+<a href="https://github.com/ralhei"><img src="https://github.com/ralhei.png" width="40px" /></a>
+<a href="https://github.com/TechMDW"><img src="https://github.com/TechMDW.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

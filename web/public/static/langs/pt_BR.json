@@ -192,7 +192,7 @@
     "action_bar_reservation_add": "Reserve topic",
     "action_bar_reservation_edit": "Change reservation",
     "signup_disabled": "Registrar está desativado",
-    "signup_error_username_taken": "Usuário  {{username}} já existe",
+    "signup_error_username_taken": "Usuário {{username}} já existe",
     "signup_error_creation_limit_reached": "Limite de criação de contas atingido",
     "action_bar_reservation_delete": "Remover reserva",
     "action_bar_account": "Conta",

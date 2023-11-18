@@ -3,13 +3,13 @@ package server
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -24,8 +24,8 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/util"
 )
 
 func TestMain(m *testing.M) {
@@ -512,6 +512,8 @@ func TestServer_PublishAtAndPrune(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages)) // Not affected by pruning
 	require.Equal(t, "a message", messages[0].Message)
+
+	time.Sleep(time.Second) // FIXME CI failing not sure why
 }
 
 func TestServer_PublishAndMultiPoll(t *testing.T) {

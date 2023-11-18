@@ -39,8 +39,8 @@ help:
 	@echo "  make web-deps                   - Install web app dependencies (npm install the universe)"
 	@echo "  make web-build                  - Actually build the web app"
 	@echo "  make web-lint                   - Run eslint on the web app"
-	@echo "  make web-format                 - Run prettier on the web app"
-	@echo "  make web-format-check           - Run prettier on the web app, but don't change anything"
+	@echo "  make web-fmt                    - Run prettier on the web app"
+	@echo "  make web-fmt-check              - Run prettier on the web app, but don't change anything"
 	@echo
 	@echo "Build documentation:"
 	@echo "  make docs                       - Build the documentation"
@@ -95,6 +95,7 @@ docker-dev:
 		--build-arg COMMIT=$(COMMIT) \
 		./
 
+
 # Ubuntu-specific
 
 build-deps-ubuntu:
@@ -103,32 +104,27 @@ build-deps-ubuntu:
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
+		python3 \
+		python3-venv \
 		jq
 	which pip3 || sudo apt-get install -y python3-pip
+
 
 # Documentation
 
 docs: docs-deps docs-build
 
-docs-build: .PHONY
-	@if ! /bin/echo -e "import sys\nif sys.version_info < (3,8):\n exit(1)" | python3; then \
-	  if which python3.8; then \
-	  	echo "python3.8 $(shell which mkdocs) build"; \
-	    python3.8 $(shell which mkdocs) build; \
-	  else \
-	    echo "ERROR: Python version too low. mkdocs-material needs >= 3.8"; \
-	    exit 1; \
-	  fi; \
-	else \
-	  echo "mkdocs build"; \
-	  mkdocs build; \
-	fi
+docs-venv: .PHONY
+	python3 -m venv ./venv
 
-docs-deps: .PHONY
-	pip3 install -r requirements.txt
+docs-build: docs-venv
+	(. venv/bin/activate && mkdocs build)
+
+docs-deps: docs-venv
+	(. venv/bin/activate && pip3 install -r requirements.txt)
 
 docs-deps-update: .PHONY
-	pip3 install -r requirements.txt --upgrade
+	(. venv/bin/activate && pip3 install -r requirements.txt --upgrade)
 
 
 # Web app
@@ -151,10 +147,10 @@ web-deps:
 web-deps-update:
 	cd web && npm update
 
-web-format:
+web-fmt:
 	cd web && npm run format
 
-web-format-check:
+web-fmt-check:
 	cd web && npm run format:check
 
 web-lint:
@@ -248,7 +244,7 @@ cli-build-results:
 
 # Test/check targets
 
-check: test web-format-check fmt-check vet web-lint lint staticcheck
+check: test web-fmt-check fmt-check vet web-lint lint staticcheck
 
 test: .PHONY
 	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
@@ -275,7 +271,7 @@ coverage-upload:
 
 # Lint/formatting targets
 
-fmt:
+fmt: web-fmt
 	gofmt -s -w .
 
 fmt-check:

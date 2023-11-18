@@ -2,7 +2,7 @@ package server_test
 
 import (
 	"github.com/stretchr/testify/assert"
-	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/v2/server"
 	"testing"
 )
 

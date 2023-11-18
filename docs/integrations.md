@@ -24,6 +24,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
+- [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -82,7 +83,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [backup-projects](https://gist.github.com/anthonyaxenov/826ba65abbabd5b00196bc3e6af76002) - Stupidly simple backup script for own projects (Shell)
 - [grav-plugin-whistleblower](https://github.com/Himmlisch-Studios/grav-plugin-whistleblower) - Grav CMS plugin to get notifications via ntfy (PHP)
 - [ntfy-server-status](https://github.com/filip2cz/ntfy-server-status) -  Checking if server is online and reporting through ntfy (C)
-- [borg-based backup](https://github.com/davidhi7/backup) - Simple borg-based backup script with notifications based on ntfy.sh or Discord webhooks (Python/Shell)
 - [ntfy.sh *arr script](https://github.com/agent-squirrel/nfty-arr-script) - Quick and hacky script to get sonarr/radarr to notify the ntfy.sh service (Shell)
 - [website-watcher](https://github.com/muety/website-watcher) - A small tool to watch websites for changes (with XPath support) (Python)
 - [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)
@@ -133,6 +133,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-ios-url-share](https://www.icloud.com/shortcuts/be8a7f49530c45f79733cfe3e41887e6) - An iOS shortcut that lets you share URLs easily and quickly.
 - [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
+- [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
+- [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
+- [jetspotter](https://github.com/vvanouytsel/jetspotter) - a tool to send notifications whenever specified types of aircraft are spotted near a specified location
 
 ## Blog + forum posts
 
@@ -235,6 +238,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
 | [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
 | [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
+| [ntfy.fossman.de](https://ntfy.fossman.de/)       | 🇩🇪 Germany       |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

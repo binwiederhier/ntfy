@@ -253,6 +253,8 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 			password, err := term.ReadPassword(int(f.Fd())) // This is always going to be 0
 			if err != nil {
 				return nil, err
+			} else if len(password) == 0 {
+				return nil, errors.New("password cannot be empty")
 			}
 			return password, nil
 		}
@@ -272,7 +274,9 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 		}
 		password = append(password, buf[0])
 	}
-
+	if len(password) == 0 {
+		return nil, errors.New("password cannot be empty")
+	}
 	return password, nil
 }
 

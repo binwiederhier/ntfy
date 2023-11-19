@@ -135,7 +135,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
 - [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
 - [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
-- [jetspotter](https://github.com/vvanouytsel/jetspotter) - a tool to send notifications whenever specified types of aircraft are spotted near a specified location
+- [jetspotter](https://github.com/vvanouytsel/jetspotter) - send notifications when planes are spotted near you (Go)
+- [monitoring_ntfy](https://www.drupal.org/project/monitoring_ntfy) - Drupal monitoring Ntfy.sh integration (PHP/Drupal)
+- [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
 
 ## Blog + forum posts
 
@@ -151,6 +153,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [How to install Ntfy.sh on Portainer / Docker Compose](https://www.youtube.com/watch?v=utD9GNbAwyg) - youtube.com - 9/2023
 - [ntfy - Push-Benachrichtigungen // Push Notifications](https://www.youtube.com/watch?v=LE3vRPPqZOU) - youtube.com - 9/2023
 - [Podman Update Notifications via Ntfy](https://rair.dev/podman-upadte-notifications-ntfy/) - rair.dev - 9/2023
+- [How to Send Alerts From Raspberry Pi Pico W to a Phone or Tablet](https://www.tomshardware.com/how-to/send-alerts-raspberry-pi-pico-w-to-mobile-device) - tomshardware.com - 8/2023
 - [NetworkChunk - how did I NOT know about this?](https://www.youtube.com/watch?v=poDIT2ruQ9M) ⭐ - youtube.com - 8/2023
 - [NTFY - Command-Line Notifications](https://academy.networkchuck.com/blog/ntfy/) - academy.networkchuck.com - 8/2023
 - [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023

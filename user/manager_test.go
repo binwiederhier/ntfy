@@ -98,7 +98,7 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Nil(t, a.Authorize(ben, "announcements", PermissionRead))
 	require.Equal(t, ErrUnauthorized, a.Authorize(ben, "announcements", PermissionWrite))
 
-	// user john should have
+	// User john should have
 	//  "deny" to mytopic_deny*,
 	//    "ro" to mytopic_ro*,
 	//    "rw" to mytopic*,
@@ -127,6 +127,22 @@ func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	require.Nil(t, a.Authorize(nil, "everyonewrite", PermissionWrite))
 	require.Nil(t, a.Authorize(nil, "up1234", PermissionWrite)) // Wildcard permission
 	require.Nil(t, a.Authorize(nil, "up5678", PermissionWrite))
+}
+
+func TestManager_Access_Order_LengthWriteRead(t *testing.T) {
+	// This test validates issue #914 / #917, i.e. that write permissions are prioritized over read permissions,
+	// and longer ACL rules are prioritized as well.
+
+	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AllowAccess("ben", "test*", PermissionReadWrite))
+	require.Nil(t, a.AllowAccess("ben", "*", PermissionRead))
+
+	ben, err := a.Authenticate("ben", "ben")
+	require.Nil(t, err)
+	require.Nil(t, a.Authorize(ben, "any-topic-can-be-read", PermissionRead))
+	require.Nil(t, a.Authorize(ben, "this-too", PermissionRead))
+	require.Nil(t, a.Authorize(ben, "test123", PermissionWrite))
 }
 
 func TestManager_AddUser_Invalid(t *testing.T) {

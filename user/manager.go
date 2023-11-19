@@ -833,8 +833,10 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	if user != nil {
 		username = user.Name
 	}
-	// Select the read/write permissions for this user/topic combo. The query may return two
-	// rows (one for everyone, and one for the user), but prioritizes the user.
+	// Select the read/write permissions for this user/topic combo.
+	// - The query may return two rows (one for everyone, and one for the user), but prioritizes the user.
+	// - Furthermore, the query prioritizes more specific permissions (longer!) over more generic ones, e.g. "test*" > "*"
+	// - It also prioritizes write permissions over read permissions
 	rows, err := a.db.Query(selectTopicPermsQuery, Everyone, username, topic)
 	if err != nil {
 		return err

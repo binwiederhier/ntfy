@@ -24,7 +24,7 @@ get a list of [command line options](#command-line-options).
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
 
-Here are a few working sample configs:
+Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
 
 === "server.yml (HTTP-only, with cache + attachments)"
     ``` yaml
@@ -71,6 +71,56 @@ Here are a few working sample configs:
     smtp-server-domain: "ntfy.sh"
     smtp-server-addr-prefix: "ntfy-"
     keepalive-interval: "45s"
+    ```
+
+Alternatively, you can also use command line arguments or environment variables to configure the server. Here's an example
+using Docker Compose (i.e. `docker-compose.yml`):
+
+=== "Docker Compose (w/ auth, cache, attachments)"
+    ``` yaml
+	version: '3'
+	services:
+	  ntfy:
+	    image: binwiederhier/ntfy
+	    restart: unless-stopped
+	    environment:
+	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+	      NTFY_BEHIND_PROXY: true
+	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+	      NTFY_ENABLE_LOGIN: true
+	    volumes:
+	      - ./:/var/lib/ntfy
+	    ports:
+	      - 80:80
+	    command: serve
+    ```
+
+=== "Docker Compose (w/ auth, cache, web push, iOS)"
+    ``` yaml
+	version: '3'
+	services:
+	  ntfy:
+	    image: binwiederhier/ntfy
+	    restart: unless-stopped
+	    environment:
+	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+	      NTFY_BEHIND_PROXY: true
+	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+	      NTFY_ENABLE_LOGIN: true
+	      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
+	      NTFY_WEB_PUSH_PUBLIC_KEY: <public_key>
+	      NTFY_WEB_PUSH_PRIVATE_KEY: <private_key>
+	      NTFY_WEB_PUSH_FILE: /etc/ntfy/webpush.db
+	      NTFY_WEB_PUSH_EMAIL_ADDRESS: <email>
+	    volumes:
+	      - ./:/var/lib/ntfy
+	    ports:
+	      - 8093:80
+	    command: serve
     ```
 
 ## Message cache

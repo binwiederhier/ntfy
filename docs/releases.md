@@ -2,6 +2,25 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.8.0
+Released November 19, 2023
+
+This release brings a handful of random bug fixes: two unrelated access control list fixes, a fix around web app crashes for languages with underscores in the language code (e.g. `zh_Hant`, `zh_Hans`, `pt_BR`, ...), a workaround for the `Priority` header (often used in Cloudflare setups), and support among others support for HTML-only emails (finally), web app crash fixes 
+
+**Bug fixes + maintenance:**
+
+* Support for HTML-only emails ([#690](https://github.com/binwiederhier/ntfy/issues/690)/[#693](https://github.com/binwiederhier/ntfy/pull/693), thanks to [@teastrainer](https://github.com/teastrainer) and [@CrazyWolf13](https://github.com/CrazyWolf13) for reporting)
+* Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
+* Fix ACL issue with order of read/write rules ([#914](https://github.com/binwiederhier/ntfy/issues/914)/[#917](https://github.com/binwiederhier/ntfy/pull/917), thanks to [@sandman7920](https://github.com/sandman7920))
+* Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
+* Add special logic to ignore `Priority` header if it resembles an RFC 9218 value ([#851](https://github.com/binwiederhier/ntfy/pull/851)/[#895](https://github.com/binwiederhier/ntfy/pull/895), thanks to [@gusdleon](https://github.com/gusdleon), see also [#351](https://github.com/binwiederhier/ntfy/issues/351), [#353](https://github.com/binwiederhier/ntfy/issues/353), [#461](https://github.com/binwiederhier/ntfy/issues/461))
+* PWA: hide install prompt on macOS 14 Safari ([#899](https://github.com/binwiederhier/ntfy/pull/899), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
+* Fix web app crash in Edge for languages with underline in locale ([#922](https://github.com/binwiederhier/ntfy/pull/922)/[#912](https://github.com/binwiederhier/ntfy/issues/912)/[#852](https://github.com/binwiederhier/ntfy/issues/852), thanks to [@imkero](https://github.com/imkero))
+
+**Additional languages:**
+
+* Finnish (thanks to [@Seppo](https://hosted.weblate.org/user/Seppo/))
+
 ## ntfy server v2.7.0
 Released August 17, 2023
 
@@ -1282,22 +1301,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.8.0 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
-* Support for HTML-only emails ([#690](https://github.com/binwiederhier/ntfy/issues/690)/[#693](https://github.com/binwiederhier/ntfy/pull/693), thanks to [@teastrainer](https://github.com/teastrainer) and [@CrazyWolf13](https://github.com/CrazyWolf13) for reporting)
-* Fix ACL issue with topic patterns containing underscores ([#840](https://github.com/binwiederhier/ntfy/issues/840), thanks to [@Joe-0237](https://github.com/Joe-0237) for reporting)
-* Fix ACL issue with order of read/write rules ([#914](https://github.com/binwiederhier/ntfy/issues/914)/[#917](https://github.com/binwiederhier/ntfy/pull/917), thanks to [@sandman7920](https://github.com/sandman7920))
-* Re-add `tzdata` to Docker images for amd64 image ([#894](https://github.com/binwiederhier/ntfy/issues/894), [#307](https://github.com/binwiederhier/ntfy/pull/307))
-* Add special logic to ignore `Priority` header if it resembles an RFC 9218 value ([#851](https://github.com/binwiederhier/ntfy/pull/851)/[#895](https://github.com/binwiederhier/ntfy/pull/895), thanks to [@gusdleon](https://github.com/gusdleon), see also [#351](https://github.com/binwiederhier/ntfy/issues/351), [#353](https://github.com/binwiederhier/ntfy/issues/353), [#461](https://github.com/binwiederhier/ntfy/issues/461))
-* PWA: hide install prompt on macOS 14 Safari ([#899](https://github.com/binwiederhier/ntfy/pull/899), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves))
-* Fix web app crash in Edge for languages with underline in locale ([#922](https://github.com/binwiederhier/ntfy/pull/922)/[#912](https://github.com/binwiederhier/ntfy/issues/912)/[#852](https://github.com/binwiederhier/ntfy/issues/852), thanks to [@imkero](https://github.com/imkero))
-
-**Additional languages:**
-
-* Finnish (thanks to [@Seppo](https://hosted.weblate.org/user/Seppo/))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

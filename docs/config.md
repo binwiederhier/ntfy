@@ -85,6 +85,7 @@ using Docker Compose (i.e. `docker-compose.yml`):
 	    restart: unless-stopped
 	    environment:
 	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
 	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
 	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
 	      NTFY_BEHIND_PROXY: true
@@ -106,6 +107,7 @@ using Docker Compose (i.e. `docker-compose.yml`):
 	    restart: unless-stopped
 	    environment:
 	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
 	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
 	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
 	      NTFY_BEHIND_PROXY: true

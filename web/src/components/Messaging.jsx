@@ -10,6 +10,7 @@ import Navigation from "./Navigation";
 
 const Messaging = (props) => {
   const [message, setMessage] = useState("");
+  const [attachFile, setAttachFile] = useState(null);
   const [dialogKey, setDialogKey] = useState(0);
 
   const { dialogOpenMode } = props;
@@ -22,12 +23,19 @@ const Messaging = (props) => {
   const handleDialogClose = () => {
     props.onDialogOpenModeChange("");
     setDialogKey((prev) => prev + 1);
+    setAttachFile(null);
   };
 
   return (
     <>
       {subscription && (
-        <MessageBar subscription={subscription} message={message} onMessageChange={setMessage} onOpenDialogClick={handleOpenDialogClick} />
+        <MessageBar
+          subscription={subscription}
+          message={message}
+          onMessageChange={setMessage}
+          onFilePasted={setAttachFile}
+          onOpenDialogClick={handleOpenDialogClick}
+        />
       )}
       <PublishDialog
         key={`publishDialog${dialogKey}`} // Resets dialog when canceled/closed
@@ -35,6 +43,7 @@ const Messaging = (props) => {
         baseUrl={subscription?.baseUrl ?? config.base_url}
         topic={subscription?.topic ?? ""}
         message={message}
+        attachFile={attachFile}
         onClose={handleDialogClose}
         onDragEnter={() => props.onDialogOpenModeChange((prev) => prev || PublishDialog.OPEN_MODE_DRAG)} // Only update if not already open
         onResetOpenMode={() => props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)}
@@ -56,6 +65,21 @@ const MessageBar = (props) => {
     }
     props.onMessageChange("");
   };
+
+  const handlePaste = (ev) => {
+    const clipboardData = ev.clipboardData || window.clipboardData;
+    const { items } = clipboardData;
+    for (let i = 0; i < items.length; i += 1) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const blob = items[i].getAsFile();
+        props.onFilePasted(blob);
+        props.onOpenDialogClick();
+        console.log(`[MessageBar] Pasted image`, blob);
+        break;
+      }
+    }
+  };
+
   return (
     <Paper
       elevation={3}
@@ -89,6 +113,7 @@ const MessageBar = (props) => {
             handleSendClick();
           }
         }}
+        onPaste={handlePaste}
       />
       <IconButton color="inherit" size="large" edge="end" onClick={handleSendClick} aria-label={t("message_bar_publish")}>
         <SendIcon />

@@ -235,6 +235,13 @@ const PublishDialog = (props) => {
     await checkAttachmentLimits(file);
   };
 
+  useEffect(() => {
+    if (props.attachFile) {
+      updateAttachFile(props.attachFile);
+      console.log(`[PublishDialog] Attach file changed`, props.attachFile);
+    }
+  }, [props.attachFile]);
+
   const handleAttachFileChanged = async (ev) => {
     await updateAttachFile(ev.target.files[0]);
   };

@@ -74,7 +74,6 @@ const MessageBar = (props) => {
         const blob = items[i].getAsFile();
         props.onFilePasted(blob);
         props.onOpenDialogClick();
-        console.log(`[MessageBar] Pasted image`, blob);
         break;
       }
     }

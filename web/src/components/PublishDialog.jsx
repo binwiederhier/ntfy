@@ -238,7 +238,6 @@ const PublishDialog = (props) => {
   useEffect(() => {
     if (props.attachFile) {
       updateAttachFile(props.attachFile);
-      console.log(`[PublishDialog] Attach file changed`, props.attachFile);
     }
   }, [props.attachFile]);
 

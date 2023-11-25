@@ -26,6 +26,16 @@ const Messaging = (props) => {
     setAttachFile(null);
   };
 
+  const getPastedImage = (ev) => {
+    const { items } = ev.clipboardData;
+    for (let i = 0; i < items.length; i += 1) {
+      if (items[i].type.indexOf("image") !== -1) {
+        return items[i].getAsFile();
+      }
+    }
+    return null;
+  };
+
   return (
     <>
       {subscription && (
@@ -35,6 +45,7 @@ const Messaging = (props) => {
           onMessageChange={setMessage}
           onFilePasted={setAttachFile}
           onOpenDialogClick={handleOpenDialogClick}
+          getPastedImage={getPastedImage}
         />
       )}
       <PublishDialog
@@ -44,6 +55,7 @@ const Messaging = (props) => {
         topic={subscription?.topic ?? ""}
         message={message}
         attachFile={attachFile}
+        getPastedImage={getPastedImage}
         onClose={handleDialogClose}
         onDragEnter={() => props.onDialogOpenModeChange((prev) => prev || PublishDialog.OPEN_MODE_DRAG)} // Only update if not already open
         onResetOpenMode={() => props.onDialogOpenModeChange(PublishDialog.OPEN_MODE_DEFAULT)}
@@ -67,15 +79,10 @@ const MessageBar = (props) => {
   };
 
   const handlePaste = (ev) => {
-    const clipboardData = ev.clipboardData || window.clipboardData;
-    const { items } = clipboardData;
-    for (let i = 0; i < items.length; i += 1) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const blob = items[i].getAsFile();
-        props.onFilePasted(blob);
-        props.onOpenDialogClick();
-        break;
-      }
+    const blob = props.getPastedImage(ev);
+    if (blob) {
+      props.onFilePasted(blob);
+      props.onOpenDialogClick();
     }
   };
 

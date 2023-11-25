@@ -241,6 +241,13 @@ const PublishDialog = (props) => {
     }
   }, [props.attachFile]);
 
+  const handlePaste = (ev) => {
+    const blob = props.getPastedImage(ev);
+    if (blob) {
+      updateAttachFile(blob);
+    }
+  };
+
   const handleAttachFileChanged = async (ev) => {
     await updateAttachFile(ev.target.files[0]);
   };
@@ -363,6 +370,7 @@ const PublishDialog = (props) => {
             inputProps={{
               "aria-label": t("publish_dialog_message_label"),
             }}
+            onPaste={handlePaste}
           />
           <FormControlLabel
             label={t("publish_dialog_checkbox_markdown")}

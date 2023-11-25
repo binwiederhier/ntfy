@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box } from "@mui/material";
+import { Box, Link } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import fileDocument from "../img/file-document.svg";
 import fileImage from "../img/file-image.svg";
@@ -32,16 +32,18 @@ const AttachmentIcon = (props) => {
     imageLabel = t("notifications_attachment_file_document");
   }
   return (
-    <Box
-      component="img"
-      src={imageFile}
-      alt={imageLabel}
-      loading="lazy"
-      sx={{
-        width: "28px",
-        height: "28px",
-      }}
-    />
+    <Link href={props.href} target="_blank">
+      <Box
+        component="img"
+        src={imageFile}
+        alt={imageLabel}
+        loading="lazy"
+        sx={{
+          width: "28px",
+          height: "28px",
+        }}
+      />
+    </Link>
   );
 };
 

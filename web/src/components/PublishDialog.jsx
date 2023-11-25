@@ -798,7 +798,7 @@ const AttachmentBox = (props) => {
           borderRadius: "4px",
         }}
       >
-        <AttachmentIcon type={file.type} />
+        <AttachmentIcon type={file.type} href={URL.createObjectURL(file)} />
         <Box sx={{ marginLeft: 1, textAlign: "left" }}>
           <ExpandingTextField
             minWidth={140}

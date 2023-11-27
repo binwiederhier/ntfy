@@ -116,7 +116,7 @@ using Docker Compose (i.e. `docker-compose.yml`):
 	      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
 	      NTFY_WEB_PUSH_PUBLIC_KEY: <public_key>
 	      NTFY_WEB_PUSH_PRIVATE_KEY: <private_key>
-	      NTFY_WEB_PUSH_FILE: /etc/ntfy/webpush.db
+	      NTFY_WEB_PUSH_FILE: /var/lib/ntfy/webpush.db
 	      NTFY_WEB_PUSH_EMAIL_ADDRESS: <email>
 	    volumes:
 	      - ./:/var/lib/ntfy

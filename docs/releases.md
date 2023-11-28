@@ -2,6 +2,17 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+## ntfy iOS app v1.3
+Released Nov 26, 2023
+
+This release (hopefully) fixes the issues with the iOS UI not updating properly when new notifications arrive, as well as notifications not being received (anymore) after previously working. Both issues have been annoying and known bugs for a long time, and I hope that they are finally fixed. 
+
+Many thanks to [@tcaputi](https://github.com/tcaputi) for fixing the issues, and to the anonymous donor for sponsoring these fixes.
+
+**Bug fixes:**
+
+* UI not updating properly ([#267](https://github.com/binwiederhier/ntfy/issues/267)/[#402](https://github.com/binwiederhier/ntfy/issues/402), thanks to [@tcaputi](https://github.com/tcaputi))
+
 ### ntfy server v2.8.0
 Released November 19, 2023
 

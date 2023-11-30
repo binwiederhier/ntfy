@@ -173,7 +173,7 @@ shoutrrr send -u "ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m
 Authentication tokens are also supported via the generic webhook and authorization header using this url format (replace the domain, topic and token with your own):
 
 ```
-generic+https://ntfy.mydomain.com/my_watchtower_topic?@authorization=Bearer+token`
+generic+https://DOMAIN/TOPIC?@authorization=Bearer+TOKEN`
 ```
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd

@@ -333,5 +333,7 @@
     "account_upgrade_dialog_button_pay_now": "Плащане и абониране",
     "account_upgrade_dialog_tier_selected_label": "Избрано",
     "account_upgrade_dialog_button_update_subscription": "Премяна на абонамент",
-    "account_upgrade_dialog_reservations_warning_other": "Избраното ниво разрешава по-малко резервирани теми, от колкото текущото. Преди промяна на нивото <strong>изтрийте най-малко {{count}} резервирани теми</strong>. Можете да премахвате теми в <Link>Настройки</Link>."
+    "account_upgrade_dialog_reservations_warning_other": "Избраното ниво разрешава по-малко резервирани теми, от колкото текущото. Преди промяна на нивото <strong>изтрийте най-малко {{count}} резервирани теми</strong>. Можете да премахвате теми в <Link>Настройки</Link>.",
+    "account_tokens_table_expires_header": "Изтича",
+    "account_tokens_table_never_expires": "Никога"
 }

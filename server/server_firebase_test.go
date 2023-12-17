@@ -92,7 +92,7 @@ func TestToFirebaseMessage_Keepalive(t *testing.T) {
 }
 
 func TestToFirebaseMessage_Open(t *testing.T) {
-	m := newOpenMessage("mytopic")
+	m := newOpenMessage("mytopic", false)
 	fbm, err := toFirebaseMessage(m, nil)
 	require.Nil(t, err)
 	require.Equal(t, "mytopic", fbm.Topic)

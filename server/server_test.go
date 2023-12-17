@@ -136,7 +136,7 @@ func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 
 	require.Equal(t, openEvent, messages[0].Event)
 	require.Equal(t, "mytopic", messages[0].Topic)
-	require.Equal(t, "", messages[0].Message)
+	require.Equal(t, "new_topic", messages[0].Message)
 	require.Equal(t, "", messages[0].Title)
 	require.Equal(t, 0, messages[0].Priority)
 	require.Nil(t, messages[0].Tags)
@@ -147,6 +147,56 @@ func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 	require.Equal(t, "", messages[1].Title)
 	require.Equal(t, 0, messages[1].Priority)
 	require.Nil(t, messages[1].Tags)
+
+	// The next time subscribing to the same topic will not result in new_topic on open
+	rr = httptest.NewRecorder()
+	ctx, cancel = context.WithCancel(context.Background())
+	req, err = http.NewRequestWithContext(ctx, "GET", "/mytopic/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		s.handle(rr, req)
+		doneChan <- true
+	}()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	<-doneChan
+
+	messages = toMessages(t, rr.Body.String())
+	require.Equal(t, 1, len(messages))
+
+	require.Equal(t, openEvent, messages[0].Event)
+	require.Equal(t, "mytopic", messages[0].Topic)
+	require.Equal(t, "", messages[0].Message)
+	require.Equal(t, "", messages[0].Title)
+	require.Equal(t, 0, messages[0].Priority)
+	require.Nil(t, messages[0].Tags)
+
+	// Subscribing to any new topic again will result in new_topic being sent
+	rr = httptest.NewRecorder()
+	ctx, cancel = context.WithCancel(context.Background())
+	req, err = http.NewRequestWithContext(ctx, "GET", "/mytopic,topic2/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		s.handle(rr, req)
+		doneChan <- true
+	}()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	<-doneChan
+
+	messages = toMessages(t, rr.Body.String())
+	require.Equal(t, 1, len(messages))
+
+	require.Equal(t, openEvent, messages[0].Event)
+	require.Equal(t, "mytopic,topic2", messages[0].Topic)
+	require.Equal(t, "new_topic", messages[0].Message)
+	require.Equal(t, "", messages[0].Title)
+	require.Equal(t, 0, messages[0].Priority)
+	require.Nil(t, messages[0].Tags)
 }
 
 func TestServer_PublishAndSubscribe(t *testing.T) {

@@ -1218,8 +1218,11 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	createdNewTopics := false
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
+		createdNewTopics = createdNewTopics || t.NeverSubscribed()
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
@@ -1227,7 +1230,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, newOpenMessage(topicsStr, createdNewTopics)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
@@ -1367,8 +1370,11 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
+
+	createdNewTopic := false
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
+		createdNewTopic = createdNewTopic || t.NeverSubscribed()
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
@@ -1376,7 +1382,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+
+	if err := sub(v, newOpenMessage(topicsStr, createdNewTopic)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {

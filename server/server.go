@@ -848,18 +848,12 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		minc(metricMessagesPublishedFailure)
 		minc(metricMatrixPublishedFailure)
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			topic, err := fromContext[*topic](r, contextTopic)
-			if err != nil {
-				return err
-			}
+		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPNoSubscriberUnifiedPush.HTTPCode {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
-				return writeMatrixResponse(w, pushKey)
-			}
+			return writeMatrixResponse(w, pushKey)
 		}
 		return err
 	}

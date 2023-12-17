@@ -19,11 +19,12 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID          string
-	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
-	lastAccess  time.Time
-	mu          sync.RWMutex
+	ID              string
+	subscribers     map[int]*topicSubscriber
+	rateVisitor     *visitor
+	lastAccess      time.Time
+	neverSubscribed bool
+	mu              sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -41,6 +42,7 @@ func newTopic(id string) *topic {
 		ID:          id,
 		subscribers: make(map[int]*topicSubscriber),
 		lastAccess:  time.Now(),
+		neverSubscribed: true,
 	}
 }
 
@@ -61,6 +63,7 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 		cancel:     cancel,
 	}
 	t.lastAccess = time.Now()
+	t.neverSubscribed = false
 	return subscriberID
 }
 
@@ -77,6 +80,12 @@ func (t *topic) LastAccess() time.Time {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.lastAccess
+}
+
+func (t *topic) NeverSubscribed() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.neverSubscribed
 }
 
 func (t *topic) SetRateVisitor(v *visitor) {

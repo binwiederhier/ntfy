@@ -744,10 +744,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
-		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
-		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
-		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
-		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
+		// Rate-Topics header). The 404 response might remove the push subscription from application servers,
+		// but the client should resubscribe them when sent the new_topic parameter.
+		return nil, errHTTPNoSubscriberUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {

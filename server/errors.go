@@ -117,9 +117,10 @@ var (
 	errHTTPBadRequestWebPushSubscriptionInvalid      = &errHTTP{40038, http.StatusBadRequest, "invalid request: web push payload malformed", "", nil}
 	errHTTPBadRequestWebPushEndpointUnknown          = &errHTTP{40039, http.StatusBadRequest, "invalid request: web push endpoint unknown", "", nil}
 	errHTTPBadRequestWebPushTopicCountTooHigh        = &errHTTP{40040, http.StatusBadRequest, "invalid request: too many web push topic subscriptions", "", nil}
-	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}
+	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
+	errHTTPNoSubscriberUnifiedPush                   = &errHTTP{40401, http.StatusInsufficientStorage, "cannot publish to UnifiedPush topic without previously active subscriber", "", nil}
 	errHTTPConflictUserExists                        = &errHTTP{40901, http.StatusConflict, "conflict: user already exists", "", nil}
 	errHTTPConflictTopicReserved                     = &errHTTP{40902, http.StatusConflict, "conflict: access control entry for topic or topic pattern already exists", "", nil}
 	errHTTPConflictSubscriptionExists                = &errHTTP{40903, http.StatusConflict, "conflict: topic subscription already exists", "", nil}
@@ -142,5 +143,4 @@ var (
 	errHTTPInternalErrorInvalidPath                  = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid path", "", nil}
 	errHTTPInternalErrorMissingBaseURL               = &errHTTP{50003, http.StatusInternalServerError, "internal server error: base-url must be be configured for this feature", "https://ntfy.sh/docs/config/", nil}
 	errHTTPInternalErrorWebPushUnableToPublish       = &errHTTP{50004, http.StatusInternalServerError, "internal server error: unable to publish web push message", "", nil}
-	errHTTPInsufficientStorageUnifiedPush            = &errHTTP{50701, http.StatusInsufficientStorage, "cannot publish to UnifiedPush topic without previously active subscriber", "", nil}
 )

@@ -39,9 +39,9 @@ type subscriber func(v *visitor, msg *message) error
 // newTopic creates a new topic
 func newTopic(id string) *topic {
 	return &topic{
-		ID:          id,
-		subscribers: make(map[int]*topicSubscriber),
-		lastAccess:  time.Now(),
+		ID:              id,
+		subscribers:     make(map[int]*topicSubscriber),
+		lastAccess:      time.Now(),
 		neverSubscribed: true,
 	}
 }

@@ -13,11 +13,11 @@ import (
 
 // List of possible events
 const (
-	openEvent        = "open"
-	keepaliveEvent   = "keepalive"
-	messageEvent     = "message"
-	pollRequestEvent = "poll_request"
-	createdNewTopicParameter = "new_topic"
+	openEvent           = "open"
+	openCreatedNewTopic = "new_topic"
+	keepaliveEvent      = "keepalive"
+	messageEvent        = "message"
+	pollRequestEvent    = "poll_request"
 )
 
 const (
@@ -127,7 +127,7 @@ func newMessage(event, topic, msg string) *message {
 func newOpenMessage(topic string, createdNewTopics bool) *message {
 	msg := ""
 	if createdNewTopics { // can expand this to a comma seperated string for more future parameters
-		msg = createdNewTopicParameter
+		msg = openCreatedNewTopic
 	}
 	return newMessage(openEvent, topic, msg)
 }

@@ -91,8 +91,8 @@ update: web-deps-update cli-deps-update docs-deps-update
 docker-dev:
 	docker build \
 		--file ./Dockerfile-build \
-		--tag binwiederhier/ntfy:$(VERSION) \
-		--tag binwiederhier/ntfy:dev \
+		--tag subarudad/ntfy:$(VERSION) \
+		--tag subarudad/ntfy:dev \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMMIT=$(COMMIT) \
 		./

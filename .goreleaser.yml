@@ -155,21 +155,21 @@ changelog:
       - '^test:'
 dockers:
   - image_templates:
-      - &amd64_image "binwiederhier/ntfy:{{ .Tag }}-amd64"
+      - &amd64_image "subarudad/ntfy:{{ .Tag }}-amd64"
     use: buildx
     dockerfile: Dockerfile
     goarch: amd64
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
-      - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
+      - &arm64v8_image "subarudad/ntfy:{{ .Tag }}-arm64v8"
     use: buildx
     dockerfile: Dockerfile-arm
     goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
   - image_templates:
-      - &armv7_image "binwiederhier/ntfy:{{ .Tag }}-armv7"
+      - &armv7_image "subarudad/ntfy:{{ .Tag }}-armv7"
     use: buildx
     dockerfile: Dockerfile-arm
     goarch: arm
@@ -177,7 +177,7 @@ dockers:
     build_flag_templates:
       - "--platform=linux/arm/v7"
   - image_templates:
-      - &armv6_image "binwiederhier/ntfy:{{ .Tag }}-armv6"
+      - &armv6_image "subarudad/ntfy:{{ .Tag }}-armv6"
     use: buildx
     dockerfile: Dockerfile-arm
     goarch: arm
@@ -185,13 +185,13 @@ dockers:
     build_flag_templates:
       - "--platform=linux/arm/v6"
 docker_manifests:
-  - name_template: "binwiederhier/ntfy:latest"
+  - name_template: "subarudad/ntfy:latest"
     image_templates:
       - *amd64_image
       - *arm64v8_image
       - *armv7_image
       - *armv6_image
-  - name_template: "binwiederhier/ntfy:{{ .Tag }}"
+  - name_template: "subarudad/ntfy:{{ .Tag }}"
     image_templates:
       - *amd64_image
       - *arm64v8_image

@@ -3,8 +3,8 @@ site_name: ntfy
 site_url: https://ntfy.sh
 site_description: Send push notifications to your phone via PUT/POST
 copyright: Made with ❤️ by Philipp C. Heckel
-repo_name: binwiederhier/ntfy
-repo_url: https://github.com/binwiederhier/ntfy
+repo_name: subarudad/ntfy
+repo_url: https://github.com/subarudad/ntfy
 edit_uri: blob/main/docs/
 
 theme:
@@ -39,7 +39,7 @@ extra:
   homepage: /
   social:
     - icon: fontawesome/brands/github-alt
-      link: https://github.com/binwiederhier
+      link: https://github.com/subarudad
 extra_javascript:
   - static/js/extra.js
 extra_css:

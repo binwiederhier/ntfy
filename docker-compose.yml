@@ -1,7 +1,7 @@
 version: "2.1"
 services:
   ntfy:
-    image: binwiederhier/ntfy
+    image: subarudad/ntfy
     container_name: ntfy
     command:
       - serve

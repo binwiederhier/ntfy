@@ -101,5 +101,11 @@
     "notifications_click_open_button": "Deschide link",
     "publish_dialog_emoji_picker_show": "Alege un emoji",
     "notifications_loading": "Încărcare notificări…",
-    "publish_dialog_priority_low": "Prioritate joasă"
+    "publish_dialog_priority_low": "Prioritate joasă",
+    "signup_form_username": "Nume de utilizator",
+    "signup_form_button_submit": "Înscrie-te",
+    "common_copy_to_clipboard": "Copiază în clipboard",
+    "signup_form_toggle_password_visibility": "Schimbă vizibilitatea parolei",
+    "signup_title": "Crează un cont ntfy",
+    "signup_already_have_account": "Deja ai un cont? Autentifică-te!"
 }

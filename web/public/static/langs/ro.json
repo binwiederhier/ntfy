@@ -107,5 +107,21 @@
     "common_copy_to_clipboard": "Copiază în clipboard",
     "signup_form_toggle_password_visibility": "Schimbă vizibilitatea parolei",
     "signup_title": "Crează un cont ntfy",
-    "signup_already_have_account": "Deja ai un cont? Autentifică-te!"
+    "signup_already_have_account": "Deja ai un cont? Autentifică-te!",
+    "login_disabled": "Autentificarea este dezactivată",
+    "signup_error_creation_limit_reached": "S-a atins limita de conturi",
+    "action_bar_toggle_action_menu": "Deschide/Închide meniul de acțiuni",
+    "action_bar_sign_up": "Înscriere",
+    "message_bar_publish": "Publică mesajul",
+    "login_link_signup": "Înscrie-te",
+    "action_bar_sign_in": "Autentificare",
+    "action_bar_reservation_edit": "Schimbă rezervarea",
+    "action_bar_reservation_delete": "Șterge rezervarea",
+    "login_form_button_submit": "Autentifică-te",
+    "signup_disabled": "Înscrierea este dezactivată",
+    "action_bar_profile_logout": "Ieșire",
+    "message_bar_show_dialog": "Arată dialogul de publicare",
+    "signup_error_username_taken": "Numele de utilizator {{username}} este deja folosit",
+    "login_title": "Autentifică-te în contul ntfy",
+    "action_bar_reservation_add": "Rezervă topicul"
 }

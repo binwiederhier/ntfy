@@ -363,7 +363,7 @@ To build your own version with Firebase, you must:
 * And change `app_base_url` in [values.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/values.xml)
 * Then run:
 ```
-# To build an unsigned .apk (app/build/outputs/apk/play/*.apk)
+# To build an unsigned .apk (app/build/outputs/apk/play/release/*.apk)
 ./gradlew assemblePlayRelease
 
 # To build a bundle .aab (app/play/release/*.aab)

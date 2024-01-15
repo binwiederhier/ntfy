@@ -263,43 +263,20 @@ will be used, otherwise, the subscription settings will override the defaults.
     require authentication), be sure that the servers/topics you subscribe to use HTTPS to prevent leaking the username and password.
 
 ### Using the systemd service
-You can use the `ntfy-client` systemd service (see [ntfy-client.service](https://github.com/binwiederhier/ntfy/blob/main/client/ntfy-client.service))
-to subscribe to multiple topics just like in the example above. The service is automatically installed (but not started)
-if you install the deb/rpm package. To configure it, simply edit `/etc/ntfy/client.yml` and run `sudo systemctl restart ntfy-client`.
+You can use the `ntfy-client` systemd services to subscribe to multiple topics just like in the example above.
+You have the option of either enabling `ntfy-client` as a system service (see
+[here](https://github.com/binwiederhier/ntfy/blob/main/client/ntfy-client.service))
+or user service (see [here](https://github.com/binwiederhier/ntfy/blob/main/client/user/ntfy-client.service)).
+The services are automatically installed (but not started) if you install the deb/rpm/AUR package.
+The system service ensures that ntfy is run at startup (useful for servers),
+while the user service starts ntfy only after the user has logged in. The user service is recommended for personal machine use.
+
+To configure `ntfy-client` as a system service it, edit `/etc/ntfy/client.yml` and run `sudo systemctl restart ntfy-client`.
+
+To configure `ntfy-client` as a user service it, edit `~/.config/ntfy/client.yml` and run `systemctl --user restart ntfy-client` (without sudo).
 
 !!! info
-    The `ntfy-client.service` runs as user `ntfy`, meaning that typical Linux permission restrictions apply. See below
-    for how to fix this.
-
-If the service runs on your personal desktop machine, you may want to override the service user/group (`User=` and `Group=`), and 
-adjust the `DISPLAY` and `DBUS_SESSION_BUS_ADDRESS` environment variables. This will allow you to run commands in your X session 
-as the primary machine user.
-
-You can either manually override these systemd service entries with `sudo systemctl edit ntfy-client`, and add this
-(assuming your user is `phil`). Don't forget to run `sudo systemctl daemon-reload` and `sudo systemctl restart ntfy-client`
-after editing the service file:
-
-=== "/etc/systemd/system/ntfy-client.service.d/override.conf"
-    ```
-    [Service]
-    User=phil
-    Group=phil
-    Environment="DISPLAY=:0" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
-    ```
-Or you can run the following script that creates this override config for you:
-
-```
-sudo sh -c 'cat > /etc/systemd/system/ntfy-client.service.d/override.conf' <<EOF
-[Service]
-User=$USER
-Group=$USER
-Environment="DISPLAY=:0" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus"
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl restart ntfy-client
-```
-
+    The system service runs as user `ntfy`, meaning that typical Linux permission restrictions apply. It also means that the system service cannot run commands in your X session as the primary machine user (unlike the user service).
 
 ### Authentication
 Depending on whether the server is configured to support [access control](../config.md#access-control), some topics

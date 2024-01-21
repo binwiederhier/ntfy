@@ -13,10 +13,11 @@ import (
 
 // List of possible events
 const (
-	openEvent        = "open"
-	keepaliveEvent   = "keepalive"
-	messageEvent     = "message"
-	pollRequestEvent = "poll_request"
+	openEvent           = "open"
+	openCreatedNewTopic = "new_topic"
+	keepaliveEvent      = "keepalive"
+	messageEvent        = "message"
+	pollRequestEvent    = "poll_request"
 )
 
 const (
@@ -123,8 +124,12 @@ func newMessage(event, topic, msg string) *message {
 }
 
 // newOpenMessage is a convenience method to create an open message
-func newOpenMessage(topic string) *message {
-	return newMessage(openEvent, topic, "")
+func newOpenMessage(topic string, createdNewTopics bool) *message {
+	msg := ""
+	if createdNewTopics { // can expand this to a comma seperated string for more future parameters
+		msg = openCreatedNewTopic
+	}
+	return newMessage(openEvent, topic, msg)
 }
 
 // newKeepaliveMessage is a convenience method to create a keepalive message

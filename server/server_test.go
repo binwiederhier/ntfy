@@ -136,7 +136,7 @@ func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 
 	require.Equal(t, openEvent, messages[0].Event)
 	require.Equal(t, "mytopic", messages[0].Topic)
-	require.Equal(t, "", messages[0].Message)
+	require.Equal(t, "new_topic", messages[0].Message)
 	require.Equal(t, "", messages[0].Title)
 	require.Equal(t, 0, messages[0].Priority)
 	require.Nil(t, messages[0].Tags)
@@ -147,6 +147,56 @@ func TestServer_SubscribeOpenAndKeepalive(t *testing.T) {
 	require.Equal(t, "", messages[1].Title)
 	require.Equal(t, 0, messages[1].Priority)
 	require.Nil(t, messages[1].Tags)
+
+	// The next time subscribing to the same topic will not result in new_topic on open
+	rr = httptest.NewRecorder()
+	ctx, cancel = context.WithCancel(context.Background())
+	req, err = http.NewRequestWithContext(ctx, "GET", "/mytopic/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		s.handle(rr, req)
+		doneChan <- true
+	}()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	<-doneChan
+
+	messages = toMessages(t, rr.Body.String())
+	require.Equal(t, 1, len(messages))
+
+	require.Equal(t, openEvent, messages[0].Event)
+	require.Equal(t, "mytopic", messages[0].Topic)
+	require.Equal(t, "", messages[0].Message)
+	require.Equal(t, "", messages[0].Title)
+	require.Equal(t, 0, messages[0].Priority)
+	require.Nil(t, messages[0].Tags)
+
+	// Subscribing to any new topic again will result in new_topic being sent
+	rr = httptest.NewRecorder()
+	ctx, cancel = context.WithCancel(context.Background())
+	req, err = http.NewRequestWithContext(ctx, "GET", "/mytopic,topic2/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		s.handle(rr, req)
+		doneChan <- true
+	}()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	<-doneChan
+
+	messages = toMessages(t, rr.Body.String())
+	require.Equal(t, 1, len(messages))
+
+	require.Equal(t, openEvent, messages[0].Event)
+	require.Equal(t, "mytopic,topic2", messages[0].Topic)
+	require.Equal(t, "new_topic", messages[0].Message)
+	require.Equal(t, "", messages[0].Title)
+	require.Equal(t, 0, messages[0].Priority)
+	require.Nil(t, messages[0].Tags)
 }
 
 func TestServer_PublishAndSubscribe(t *testing.T) {
@@ -1456,8 +1506,8 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 	s := newTestServer(t, c)
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-	require.Equal(t, 507, response.Code)
-	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`+"\n", response.Body.String())
 }
 
 func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.T) {
@@ -1466,16 +1516,16 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 	s := newTestServer(t, c)
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
 
-	// No success if no rate visitor set (this also creates the topic in memory)
+	// Simply reject if no rate visitor set (this creates the topic in memory)
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-	require.Equal(t, 507, response.Code)
-	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`, strings.TrimSpace(response.Body.String()))
 	require.Nil(t, s.topics["mytopic"].rateVisitor)
 
 	// Fake: This topic has been around for 13 hours without a rate visitor
 	s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
 
-	// Same request should now return HTTP 200 with a rejected pushkey
+	// Same request should still return an HTTP 200 with a rejected pushkey
 	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`, strings.TrimSpace(response.Body.String()))

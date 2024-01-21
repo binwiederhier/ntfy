@@ -744,10 +744,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
-		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
-		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
-		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
-		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
+		// Rate-Topics header). The 404 response might remove the push subscription from application servers,
+		// but the client should resubscribe them when sent the new_topic parameter.
+		return nil, errHTTPNoSubscriberUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
@@ -848,18 +847,12 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		minc(metricMessagesPublishedFailure)
 		minc(metricMatrixPublishedFailure)
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			topic, err := fromContext[*topic](r, contextTopic)
-			if err != nil {
-				return err
-			}
+		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPNoSubscriberUnifiedPush.HTTPCode {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
-				return writeMatrixResponse(w, pushKey)
-			}
+			return writeMatrixResponse(w, pushKey)
 		}
 		return err
 	}
@@ -1225,8 +1218,11 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	createdNewTopics := false
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
+		createdNewTopics = createdNewTopics || t.NeverSubscribed()
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
@@ -1234,7 +1230,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, newOpenMessage(topicsStr, createdNewTopics)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
@@ -1374,8 +1370,11 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
+
+	createdNewTopic := false
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
+		createdNewTopic = createdNewTopic || t.NeverSubscribed()
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
 	}
 	defer func() {
@@ -1383,7 +1382,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+
+	if err := sub(v, newOpenMessage(topicsStr, createdNewTopic)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {

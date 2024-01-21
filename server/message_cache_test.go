@@ -32,8 +32,8 @@ func testCacheMessages(t *testing.T, c *messageCache) {
 	require.Nil(t, c.AddMessage(m2))
 
 	// Adding invalid
-	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newKeepaliveMessage("mytopic"))) // These should not be added!
-	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example")))      // These should not be added!
+	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newKeepaliveMessage("mytopic")))   // These should not be added!
+	require.Equal(t, errUnexpectedMessageType, c.AddMessage(newOpenMessage("example", false))) // These should not be added!
 
 	// mytopic: count
 	counts, err := c.MessageCounts()

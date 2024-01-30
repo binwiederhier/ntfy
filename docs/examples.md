@@ -162,8 +162,11 @@ services:
     image: containrrr/watchtower
     environment:
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_SKIP_TITLE=True
       - WATCHTOWER_NOTIFICATION_URL=ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
 ```
+
+The environment variable `WATCHTOWER_NOTIFICATION_SKIP_TITLE` is required to prevent Watchtower from [replacing the `title` query parameter](https://containrrr.dev/watchtower/notifications/#settings). If omitted, the provided notification title will not be used.
 
 Or, if you only want to send notifications using shoutrrr:
 ```

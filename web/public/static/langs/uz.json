@@ -1,1 +1,27 @@
-{}
+{
+    "signup_title": "ntfy hisobini yaratish",
+    "signup_form_password": "Parol",
+    "signup_form_confirm_password": "Parolni tasdiqlang",
+    "signup_error_username_taken": "Foydalanuvchi nomi {{username}} allaqachon foydalanilmoqda",
+    "signup_error_creation_limit_reached": "Boshqa hisob raqam ocha olmaysiz",
+    "login_title": "Ntfy hisobingizga kiring",
+    "login_form_button_submit": "Kirish",
+    "login_link_signup": "Ro'yxatdan o'tish",
+    "login_disabled": "Kirish o'chirilgan",
+    "action_bar_show_menu": "Menyuni ko'rsatish",
+    "action_bar_logo_alt": "ntfy logotipi",
+    "action_bar_settings": "Sozlamalar",
+    "action_bar_change_display_name": "Ko'rsatilgan nomni o'zgartiring",
+    "action_bar_reservation_add": "Zaxira mavzusi",
+    "common_cancel": "Bekor qilish",
+    "common_save": "Saqlash",
+    "common_add": "Qo‘shish",
+    "common_back": "Orqaga",
+    "common_copy_to_clipboard": "Xotiraga nusxalash",
+    "signup_form_username": "Foydalanuvchi nomi",
+    "signup_form_button_submit": "Ro‘yxatdan o‘tish",
+    "signup_form_toggle_password_visibility": "Parol ko‘rinishini o‘zgartirish",
+    "signup_already_have_account": "Hisobingiz bormi? Tizimga kiring!",
+    "signup_disabled": "Ro‘yxatdan o‘tish o‘chirilgan",
+    "action_bar_account": "Hisob"
+}

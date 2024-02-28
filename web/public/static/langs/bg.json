@@ -85,7 +85,7 @@
     "publish_dialog_title_label": "Заглавие",
     "publish_dialog_priority_label": "Приоритет",
     "publish_dialog_click_placeholder": "Адрес, който се отваря при щракване върху известието",
-    "publish_dialog_email_placeholder": "Поща, на която да се препрати известието, напр. phil@example.com",
+    "publish_dialog_email_placeholder": "Адрес, към който да бъдат препращани известия, напр. phil@example.com",
     "publish_dialog_attach_label": "Адрес на прикачения файл",
     "publish_dialog_filename_placeholder": "Име на прикачения файл",
     "publish_dialog_attach_placeholder": "Прикачете файл от адрес, напр. https://f-droid.org/F-Droid.apk",
@@ -257,7 +257,7 @@
     "account_tokens_dialog_button_cancel": "Отказ",
     "account_delete_title": "Премахване на профила",
     "account_upgrade_dialog_title": "Промяна нивото на профила",
-    "account_usage_emails_title": "Изпратени съобщения",
+    "account_usage_emails_title": "Изпратени електронни писма",
     "account_usage_reservations_title": "Резервирани теми",
     "account_usage_reservations_none": "Няма резервирани теми",
     "account_usage_cannot_create_portal_session": "Порталът за разплащане не може да бъде отворен",
@@ -373,5 +373,12 @@
     "prefs_reservations_table_everyone_read_write": "Всички могат да публикуват и да се абонират",
     "reservation_delete_dialog_submit_button": "Премахване на резервирането",
     "account_tokens_description": "Използвайте код за достъп когато публикувате или се абонирате през ППИ на ntfy, за да не се налага да изпращате потребителско име и парола. Прочетете <Link>документацията</Link> за повече информация.",
-    "account_tokens_delete_dialog_description": "Преди да премахвате код за достъп се уверете, че не се използва от приложения или скриптове. <strong>Действието е необратимо.</strong>"
+    "account_tokens_delete_dialog_description": "Преди да премахвате код за достъп се уверете, че не се използва от приложения или скриптове. <strong>Действието е необратимо.</strong>",
+    "prefs_reservations_dialog_description": "Резервирането ви осигурява собственост върху темата и ви дава възможност да определяте права за достъп от други потребители.",
+    "reservation_delete_dialog_action_keep_title": "Пазене на съобщения и прикачени файлове",
+    "reservation_delete_dialog_action_keep_description": "Съобщенията и прикачените файлове, които са във временната памет на сървъра ще бъдат достъпни за всеки, който знае името на темата.",
+    "reservation_delete_dialog_action_delete_title": "Премахване на съобщения и прикачени файлове",
+    "reservation_delete_dialog_action_delete_description": "Съобщенията и прикачените файлове, които са във временната памет ще бъдат премахнати. Действието е необратимо.",
+    "prefs_reservations_description": "Тук можете да резервирате тема за собствено ползване. Резервирането ви осигурява собственост върху темата и ви дава възможност да определяте права за достъп от други потребители.",
+    "reservation_delete_dialog_description": "С премахването на резервирането вие се отказвате от собствеността върху темата и давате възможност друг потребител да я резервира. Можете да оставите или да премахнете съществуващите съобщения и прикачени файлове."
 }

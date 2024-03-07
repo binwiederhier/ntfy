@@ -432,17 +432,6 @@ func execServe(c *cli.Context) error {
 	return nil
 }
 
-func parseSize(s string, defaultValue int64) (v int64, err error) {
-	if s == "" {
-		return defaultValue, nil
-	}
-	v, err = util.ParseSize(s)
-	if err != nil {
-		return 0, err
-	}
-	return v, nil
-}
-
 func sigHandlerConfigReload(config string) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGHUP)

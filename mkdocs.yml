@@ -64,39 +64,40 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - pymdownx.emoji:
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+hooks:
+  - docs/hooks.py
 
 plugins:
   - search
   - minify:
       minify_html: true
-  - mkdocs-simple-hooks:
-      hooks:
-        on_post_build: "docs.hooks:copy_fonts"
 
 nav:
-- "Getting started": index.md
-- "Publishing":
-  - "Sending messages": publish.md
-- "Subscribing":
-  - "From your phone": subscribe/phone.md
-  - "From the Web app": subscribe/web.md
-  - "From the Desktop": subscribe/pwa.md
-  - "From the CLI": subscribe/cli.md
-  - "Using the API": subscribe/api.md
-- "Self-hosting":
-  - "Installation": install.md
-  - "Configuration": config.md
-- "Other things":
-  - "FAQs": faq.md
-  - "Examples": examples.md
-  - "Integrations + projects": integrations.md
-  - "Release notes": releases.md
-  - "Emojis 🥳 🎉": emojis.md
-  - "Troubleshooting": troubleshooting.md
-  - "Known issues": known-issues.md
-  - "Deprecation notices": deprecations.md
-  - "Development": develop.md
-  - "Privacy policy": privacy.md
+  - "Getting started": index.md
+  - "Publishing":
+      - "Sending messages": publish.md
+  - "Subscribing":
+      - "From your phone": subscribe/phone.md
+      - "From the Web app": subscribe/web.md
+      - "From the Desktop": subscribe/pwa.md
+      - "From the CLI": subscribe/cli.md
+      - "Using the API": subscribe/api.md
+  - "Self-hosting":
+      - "Installation": install.md
+      - "Configuration": config.md
+  - "Other things":
+      - "FAQs": faq.md
+      - "Examples": examples.md
+      - "Integrations + projects": integrations.md
+      - "Release notes": releases.md
+      - "Emojis 🥳 🎉": emojis.md
+      - "Troubleshooting": troubleshooting.md
+      - "Known issues": known-issues.md
+      - "Deprecation notices": deprecations.md
+      - "Development": develop.md
+      - "Privacy policy": privacy.md
 
 

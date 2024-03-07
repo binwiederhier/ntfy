@@ -738,9 +738,8 @@ Usage is pretty straight forward. You can set the delivery time using the `X-Del
 `3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
 [and more](https://github.com/olebedev/when)). 
 
-As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can currently
-not be configured otherwise ([let me know](https://github.com/binwiederhier/ntfy/issues) if you'd like to change 
-these limits).
+As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can be configured
+with the `message-delay-limit` option).
 
 For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours 
 after they were delivered (or whatever the server-side cache duration is set to). For instance, if a message is scheduled
@@ -2438,6 +2437,17 @@ Here's an example showing how to upload an image:
     req, _ := http.NewRequest("PUT", "https://ntfy.sh/flowers", file)
     req.Header.Set("Filename", "flower.jpg")
     http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      Uri = "ntfy.sh/flowers"
+      InFile = "flower.jpg"
+      Headers = @{"Filename" = "flower.jpg"}
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"

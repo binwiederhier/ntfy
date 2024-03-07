@@ -162,12 +162,21 @@ services:
     image: containrrr/watchtower
     environment:
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_SKIP_TITLE=True
       - WATCHTOWER_NOTIFICATION_URL=ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
 ```
+
+The environment variable `WATCHTOWER_NOTIFICATION_SKIP_TITLE` is required to prevent Watchtower from [replacing the `title` query parameter](https://containrrr.dev/watchtower/notifications/#settings). If omitted, the provided notification title will not be used.
 
 Or, if you only want to send notifications using shoutrrr:
 ```
 shoutrrr send -u "ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
+```
+
+Authentication tokens are also supported via the generic webhook and authorization header using this url format (replace the domain, topic and token with your own):
+
+```
+generic+https://DOMAIN/TOPIC?@authorization=Bearer+TOKEN`
 ```
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd

@@ -733,7 +733,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if err != nil {
 		return nil, err
 	}
-	body, err := util.Peek(r.Body, s.config.MessageLimit)
+	body, err := util.Peek(r.Body, s.config.MessageSizeLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -743,8 +743,8 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, e.With(t)
 	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
-		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting (see
-		// Rate-Topics header). The 5xx response is because some app servers (in particular Mastodon) will remove
+		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
+		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
@@ -996,9 +996,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
 			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse
-		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
 			return false, false, "", "", false, errHTTPBadRequestDelayTooSmall
-		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
+		} else if delay.Unix() > time.Now().Add(s.config.MessageDelayMax).Unix() {
 			return false, false, "", "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
@@ -1182,7 +1182,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		return err
 	}
-	poll, since, scheduled, filters, rateTopics, err := parseSubscribeParams(r)
+	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
 	}
@@ -1212,7 +1212,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics, rateTopics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1278,7 +1278,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if err != nil {
 		return err
 	}
-	poll, since, scheduled, filters, rateTopics, err := parseSubscribeParams(r)
+	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
 	}
@@ -1364,7 +1364,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics, rateTopics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1397,7 +1397,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	return err
 }
 
-func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, scheduled bool, filters *queryFilter, rateTopics []string, err error) {
+func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, scheduled bool, filters *queryFilter, err error) {
 	poll = readBoolParam(r, false, "x-poll", "poll", "po")
 	scheduled = readBoolParam(r, false, "x-scheduled", "scheduled", "sched")
 	since, err = parseSince(r, poll)
@@ -1408,7 +1408,6 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 	if err != nil {
 		return
 	}
-	rateTopics = readCommaSeparatedParam(r, "x-rate-topics", "rate-topics")
 	return
 }
 
@@ -1420,9 +1419,8 @@ func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, schedu
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
-// Note: This TEMPORARILY also registers all topics starting with "up" (= UnifiedPush). This is to ease the transition
-// until the Android app will send the "Rate-Topics" header.
-func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, rateTopics []string) error {
+// This only applies to UnifiedPush topics ("up...").
+func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
 		return nil
@@ -1431,7 +1429,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if (strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength) || util.Contains(rateTopics, t.ID) {
+		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
@@ -1756,7 +1754,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit*2, false) // 2x to account for JSON format overhead
+		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageSizeLimit*2, false) // 2x to account for JSON format overhead
 		if err != nil {
 			return err
 		}
@@ -1814,7 +1812,7 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 
 func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
+		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageSizeLimit)
 		if err != nil {
 			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Invalid Matrix request")
 			if e, ok := err.(*errMatrixPushkeyRejected); ok {

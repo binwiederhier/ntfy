@@ -189,7 +189,7 @@
     "prefs_notifications_delete_after_three_hours_description": "Le notifiche vengono eliminate automaticamente dopo tre ore",
     "error_boundary_unsupported_indexeddb_description": "L'app web ntfy ha bisogno di IndexedDB per funzionare e il tuo browser non supporta IndexedDB in modalità di navigazione privata.<br/><br/>Anche se questo è un peccato, non ha molto senso usare il web ntfy app in modalità di navigazione privata comunque, perché tutto è archiviato nella memoria del browser. Puoi leggere di più a riguardo <githubLink>in questo numero di GitHub</githubLink> o parlarci su <discordLink>Discord</discordLink> o <matrixLink>Matrix</matrixLink>.",
     "nav_upgrade_banner_label": "Passa alla versione Pro di ntfy",
-    "alert_not_supported_context_description": "Le Notificche sono supportate solo tramite HTTPS. Questa è una limitazione delle <mdnLink>Notifications API</mdnLink>.",
+    "alert_not_supported_context_description": "Le Notifiche sono supportate solo tramite HTTPS. Questa è una limitazione delle <mdnLink>Notifications API</mdnLink>.",
     "account_basics_password_dialog_new_password_label": "Nuova password",
     "action_bar_profile_logout": "Esci",
     "account_basics_tier_interval_monthly": "mensile",

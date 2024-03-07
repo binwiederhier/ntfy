@@ -83,6 +83,8 @@ func ParseDuration(s string) (time.Duration, error) {
 	return 0, errInvalidDuration
 }
 
+// FormatDuration formats a time.Duration into a human-readable string, e.g. "2d", "20h", "30m", "40s".
+// It rounds to the largest unit that is not zero, thereby effectively rounding down.
 func FormatDuration(d time.Duration) string {
 	if d >= 24*time.Hour {
 		return strconv.Itoa(int(d/(24*time.Hour))) + "d"

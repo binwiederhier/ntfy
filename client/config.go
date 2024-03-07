@@ -2,6 +2,7 @@ package client
 
 import (
 	"gopkg.in/yaml.v2"
+	"heckel.io/ntfy/v2/log"
 	"os"
 )
 
@@ -44,6 +45,7 @@ func NewConfig() *Config {
 
 // LoadConfig loads the Client config from a yaml file
 func LoadConfig(filename string) (*Config, error) {
+	log.Debug("Loading client config from %s", filename)
 	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err

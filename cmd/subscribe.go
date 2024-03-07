@@ -310,28 +310,43 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 	if filename != "" {
 		return client.LoadConfig(filename)
 	}
-	configFile := defaultClientConfigFile()
-	if s, _ := os.Stat(configFile); s != nil {
-		return client.LoadConfig(configFile)
+	configFile, err := defaultClientConfigFile()
+	if err != nil {
+		log.Warn("Could not determine default client config file: %s", err.Error())
+	} else {
+		if s, _ := os.Stat(configFile); s != nil {
+			return client.LoadConfig(configFile)
+		}
+		log.Debug("Config file %s not found", configFile)
 	}
+	log.Debug("Loading default config")
 	return client.NewConfig(), nil
 }
 
 //lint:ignore U1000 Conditionally used in different builds
-func defaultClientConfigFileUnix() string {
-	u, _ := user.Current()
+func defaultClientConfigFileUnix() (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("could not determine current user: %w", err)
+	}
 	configFile := clientRootConfigFileUnixAbsolute
 	if u.Uid != "0" {
-		homeDir, _ := os.UserConfigDir()
-		return filepath.Join(homeDir, clientUserConfigFileUnixRelative)
+		homeDir, err := os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("could not determine user config dir: %w", err)
+		}
+		return filepath.Join(homeDir, clientUserConfigFileUnixRelative), nil
 	}
-	return configFile
+	return configFile, nil
 }
 
 //lint:ignore U1000 Conditionally used in different builds
-func defaultClientConfigFileWindows() string {
-	homeDir, _ := os.UserConfigDir()
-	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative)
+func defaultClientConfigFileWindows() (string, error) {
+	homeDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine user config dir: %w", err)
+	}
+	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative), nil
 }
 
 func logMessagePrefix(m *client.Message) string {

@@ -10,6 +10,6 @@ var (
 	scriptLauncher = []string{"cmd.exe", "/Q", "/C"}
 )
 
-func defaultClientConfigFile() string {
+func defaultClientConfigFile() (string, error) {
 	return defaultClientConfigFileWindows()
 }

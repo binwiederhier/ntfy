@@ -30,10 +30,10 @@ const (
 	visitorDefaultCallsLimit = int64(0)
 )
 
-// Constants used to convert a tier-user's MessageLimit (see user.Tier) into adequate request limiter
+// Constants used to convert a tier-user's MessageSizeLimit (see user.Tier) into adequate request limiter
 // values (token bucket). This is only used to increase the values in server.yml, never decrease them.
 //
-// Example: Assuming a user.Tier's MessageLimit is 10,000:
+// Example: Assuming a user.Tier's MessageSizeLimit is 10,000:
 // - the allowed burst is 500 (= 10,000 * 5%), which is < 1000 (the max)
 // - the replenish rate is 2 * 10,000 / 24 hours
 const (

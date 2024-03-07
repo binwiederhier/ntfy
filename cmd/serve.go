@@ -6,23 +6,22 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stripe/stripe-go/v74"
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"io/fs"
 	"math"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
-
-	"heckel.io/ntfy/v2/log"
-
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/server"
-	"heckel.io/ntfy/v2/util"
 )
 
 func init() {
@@ -35,7 +34,7 @@ const (
 
 var flagsServe = append(
 	append([]cli.Flag{}, flagsDefault...),
-	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, DefaultText: defaultServerConfigFile, Usage: "config file"},
+	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
@@ -45,19 +44,19 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: server.DefaultCacheDuration, Usage: "buffer messages for this time to allow `since` requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Value: util.FormatDuration(server.DefaultCacheBatchTimeout), Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-startup-queries", Aliases: []string{"cache_startup_queries"}, EnvVars: []string{"NTFY_CACHE_STARTUP_QUERIES"}, Usage: "queries run when the cache database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-startup-queries", Aliases: []string{"auth_startup_queries"}, EnvVars: []string{"NTFY_AUTH_STARTUP_QUERIES"}, Usage: "queries run when the auth database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"auth_default_access", "p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, DefaultText: "5G", Usage: "limit of the on-disk attachment cache"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, DefaultText: "15M", Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: server.DefaultAttachmentExpiryDuration, DefaultText: "3h", Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: server.DefaultKeepaliveInterval, Usage: "interval of keepalive messages"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: server.DefaultManagerInterval, Usage: "interval of for message pruning and stats printing"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentFileSizeLimit), Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultAttachmentExpiryDuration), Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: util.FormatDuration(server.DefaultKeepaliveInterval), Usage: "interval of keepalive messages"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: util.FormatDuration(server.DefaultManagerInterval), Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "disallowed-topics", Aliases: []string{"disallowed_topics"}, EnvVars: []string{"NTFY_DISALLOWED_TOPICS"}, Usage: "topics that are not allowed to be used"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-root", Aliases: []string{"web_root"}, EnvVars: []string{"NTFY_WEB_ROOT"}, Value: "/", Usage: "sets root of the web app (e.g. /, or /app), or disables it (disable)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-signup", Aliases: []string{"enable_signup"}, EnvVars: []string{"NTFY_ENABLE_SIGNUP"}, Value: false, Usage: "allows users to sign up via the web app, or API"}),
@@ -76,16 +75,18 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-phone-number", Aliases: []string{"twilio_phone_number"}, EnvVars: []string{"NTFY_TWILIO_PHONE_NUMBER"}, Usage: "Twilio number to use for outgoing calls"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-verify-service", Aliases: []string{"twilio_verify_service"}, EnvVars: []string{"NTFY_TWILIO_VERIFY_SERVICE"}, Usage: "Twilio Verify service ID, used for phone number verification"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-size-limit", Aliases: []string{"message_size_limit"}, EnvVars: []string{"NTFY_MESSAGE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultMessageSizeLimit), Usage: "size limit for the message (see docs for limitations)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-delay-limit", Aliases: []string{"message_delay_limit"}, EnvVars: []string{"NTFY_MESSAGE_DELAY_LIMIT"}, Value: util.FormatDuration(server.DefaultMessageDelayMax), Usage: "max duration a message can be scheduled into the future"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"visitor_subscription_limit"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", Aliases: []string{"visitor_attachment_total_size_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: "100M", Usage: "total storage limit used for attachments per visitor"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", Aliases: []string{"visitor_attachment_total_size_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultVisitorAttachmentTotalSizeLimit), Usage: "total storage limit used for attachments per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-bandwidth-limit", Aliases: []string{"visitor_attachment_daily_bandwidth_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload bandwidth limit per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", Aliases: []string{"visitor_request_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-request-limit-replenish", Aliases: []string{"visitor_request_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: server.DefaultVisitorRequestLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-request-limit-replenish", Aliases: []string{"visitor_request_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_REPLENISH"}, Value: util.FormatDuration(server.DefaultVisitorRequestLimitReplenish), Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-request-limit-exempt-hosts", Aliases: []string{"visitor_request_limit_exempt_hosts"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS"}, Value: "", Usage: "hostnames and/or IP addresses of hosts that will be exempt from the visitor request limit"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-message-daily-limit", Aliases: []string{"visitor_message_daily_limit"}, EnvVars: []string{"NTFY_VISITOR_MESSAGE_DAILY_LIMIT"}, Value: server.DefaultVisitorMessageDailyLimit, Usage: "max messages per visitor per day, derived from request limit if unset"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", Aliases: []string{"visitor_email_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
-	altsrc.NewDurationFlag(&cli.DurationFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: server.DefaultVisitorEmailLimitReplenish, Usage: "interval at which burst limit is replenished (one per x)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: util.FormatDuration(server.DefaultVisitorEmailLimitReplenish), Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "visitor-subscriber-rate-limiting", Aliases: []string{"visitor_subscriber_rate_limiting"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING"}, Value: false, Usage: "enables subscriber-based rate limiting"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
@@ -126,7 +127,7 @@ func execServe(c *cli.Context) error {
 
 	// Read all the options
 	config := c.String("config")
-	baseURL := c.String("base-url")
+	baseURL := strings.TrimSuffix(c.String("base-url"), "/")
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
@@ -140,19 +141,19 @@ func execServe(c *cli.Context) error {
 	webPushEmailAddress := c.String("web-push-email-address")
 	webPushStartupQueries := c.String("web-push-startup-queries")
 	cacheFile := c.String("cache-file")
-	cacheDuration := c.Duration("cache-duration")
+	cacheDurationStr := c.String("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
 	cacheBatchSize := c.Int("cache-batch-size")
-	cacheBatchTimeout := c.Duration("cache-batch-timeout")
+	cacheBatchTimeoutStr := c.String("cache-batch-timeout")
 	authFile := c.String("auth-file")
 	authStartupQueries := c.String("auth-startup-queries")
 	authDefaultAccess := c.String("auth-default-access")
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
-	attachmentExpiryDuration := c.Duration("attachment-expiry-duration")
-	keepaliveInterval := c.Duration("keepalive-interval")
-	managerInterval := c.Duration("manager-interval")
+	attachmentExpiryDurationStr := c.String("attachment-expiry-duration")
+	keepaliveIntervalStr := c.String("keepalive-interval")
+	managerIntervalStr := c.String("manager-interval")
 	disallowedTopics := c.StringSlice("disallowed-topics")
 	webRoot := c.String("web-root")
 	enableSignup := c.Bool("enable-signup")
@@ -171,17 +172,19 @@ func execServe(c *cli.Context) error {
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioPhoneNumber := c.String("twilio-phone-number")
 	twilioVerifyService := c.String("twilio-verify-service")
+	messageSizeLimitStr := c.String("message-size-limit")
+	messageDelayLimitStr := c.String("message-delay-limit")
 	totalTopicLimit := c.Int("global-topic-limit")
 	visitorSubscriptionLimit := c.Int("visitor-subscription-limit")
 	visitorSubscriberRateLimiting := c.Bool("visitor-subscriber-rate-limiting")
 	visitorAttachmentTotalSizeLimitStr := c.String("visitor-attachment-total-size-limit")
 	visitorAttachmentDailyBandwidthLimitStr := c.String("visitor-attachment-daily-bandwidth-limit")
 	visitorRequestLimitBurst := c.Int("visitor-request-limit-burst")
-	visitorRequestLimitReplenish := c.Duration("visitor-request-limit-replenish")
+	visitorRequestLimitReplenishStr := c.String("visitor-request-limit-replenish")
 	visitorRequestLimitExemptHosts := util.SplitNoEmpty(c.String("visitor-request-limit-exempt-hosts"), ",")
 	visitorMessageDailyLimit := c.Int("visitor-message-daily-limit")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
-	visitorEmailLimitReplenish := c.Duration("visitor-email-limit-replenish")
+	visitorEmailLimitReplenishStr := c.String("visitor-email-limit-replenish")
 	behindProxy := c.Bool("behind-proxy")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
@@ -189,6 +192,64 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
+
+	// Convert durations
+	cacheDuration, err := util.ParseDuration(cacheDurationStr)
+	if err != nil {
+		return fmt.Errorf("invalid cache duration: %s", cacheDurationStr)
+	}
+	cacheBatchTimeout, err := util.ParseDuration(cacheBatchTimeoutStr)
+	if err != nil {
+		return fmt.Errorf("invalid cache batch timeout: %s", cacheBatchTimeoutStr)
+	}
+	attachmentExpiryDuration, err := util.ParseDuration(attachmentExpiryDurationStr)
+	if err != nil {
+		return fmt.Errorf("invalid attachment expiry duration: %s", attachmentExpiryDurationStr)
+	}
+	keepaliveInterval, err := util.ParseDuration(keepaliveIntervalStr)
+	if err != nil {
+		return fmt.Errorf("invalid keepalive interval: %s", keepaliveIntervalStr)
+	}
+	managerInterval, err := util.ParseDuration(managerIntervalStr)
+	if err != nil {
+		return fmt.Errorf("invalid manager interval: %s", managerIntervalStr)
+	}
+	messageDelayLimit, err := util.ParseDuration(messageDelayLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid message delay limit: %s", messageDelayLimitStr)
+	}
+	visitorRequestLimitReplenish, err := util.ParseDuration(visitorRequestLimitReplenishStr)
+	if err != nil {
+		return fmt.Errorf("invalid visitor request limit replenish: %s", visitorRequestLimitReplenishStr)
+	}
+	visitorEmailLimitReplenish, err := util.ParseDuration(visitorEmailLimitReplenishStr)
+	if err != nil {
+		return fmt.Errorf("invalid visitor email limit replenish: %s", visitorEmailLimitReplenishStr)
+	}
+
+	// Convert sizes to bytes
+	messageSizeLimit, err := util.ParseSize(messageSizeLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid message size limit: %s", messageSizeLimitStr)
+	}
+	attachmentTotalSizeLimit, err := util.ParseSize(attachmentTotalSizeLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid attachment total size limit: %s", attachmentTotalSizeLimitStr)
+	}
+	attachmentFileSizeLimit, err := util.ParseSize(attachmentFileSizeLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid attachment file size limit: %s", attachmentFileSizeLimitStr)
+	}
+	visitorAttachmentTotalSizeLimit, err := util.ParseSize(visitorAttachmentTotalSizeLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid visitor attachment total size limit: %s", visitorAttachmentTotalSizeLimitStr)
+	}
+	visitorAttachmentDailyBandwidthLimit, err := util.ParseSize(visitorAttachmentDailyBandwidthLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid visitor attachment daily bandwidth limit: %s", visitorAttachmentDailyBandwidthLimitStr)
+	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
+		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
+	}
 
 	// Check values
 	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
@@ -213,10 +274,15 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
-		return errors.New("if set, base-url must start with http:// or https://")
-	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
-		return errors.New("if set, base-url must not end with a slash (/)")
+	} else if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
+		} else if u.Scheme != "http" && u.Scheme != "https" {
+			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
+		} else if u.Path != "" {
+			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
+		}
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
@@ -233,6 +299,11 @@ func execServe(c *cli.Context) error {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
 	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || authFile == "") {
 		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file must also be set")
+	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
+		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
+		if messageSizeLimit > 5*1024*1024 {
+			return errors.New("message-size-limit cannot be higher than 5M")
+		}
 	}
 
 	// Backwards compatibility
@@ -255,26 +326,6 @@ func execServe(c *cli.Context) error {
 	// Special case: Unset default
 	if listenHTTP == "-" {
 		listenHTTP = ""
-	}
-
-	// Convert sizes to bytes
-	attachmentTotalSizeLimit, err := parseSize(attachmentTotalSizeLimitStr, server.DefaultAttachmentTotalSizeLimit)
-	if err != nil {
-		return err
-	}
-	attachmentFileSizeLimit, err := parseSize(attachmentFileSizeLimitStr, server.DefaultAttachmentFileSizeLimit)
-	if err != nil {
-		return err
-	}
-	visitorAttachmentTotalSizeLimit, err := parseSize(visitorAttachmentTotalSizeLimitStr, server.DefaultVisitorAttachmentTotalSizeLimit)
-	if err != nil {
-		return err
-	}
-	visitorAttachmentDailyBandwidthLimit, err := parseSize(visitorAttachmentDailyBandwidthLimitStr, server.DefaultVisitorAttachmentDailyBandwidthLimit)
-	if err != nil {
-		return err
-	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
-		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
 
 	// Resolve hosts
@@ -337,6 +388,8 @@ func execServe(c *cli.Context) error {
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioPhoneNumber = twilioPhoneNumber
 	conf.TwilioVerifyService = twilioVerifyService
+	conf.MessageSizeLimit = int(messageSizeLimit)
+	conf.MessageDelayMax = messageDelayLimit
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
@@ -377,17 +430,6 @@ func execServe(c *cli.Context) error {
 	}
 	log.Info("Exiting.")
 	return nil
-}
-
-func parseSize(s string, defaultValue int64) (v int64, err error) {
-	if s == "" {
-		return defaultValue, nil
-	}
-	v, err = util.ParseSize(s)
-	if err != nil {
-		return 0, err
-	}
-	return v, nil
 }
 
 func sigHandlerConfigReload(config string) {

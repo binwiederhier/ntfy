@@ -366,9 +366,9 @@ func printTier(c *cli.Context, tier *user.Tier) {
 	fmt.Fprintf(c.App.ErrWriter, "- Email limit: %d\n", tier.EmailLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Phone call limit: %d\n", tier.CallLimit)
 	fmt.Fprintf(c.App.ErrWriter, "- Reservation limit: %d\n", tier.ReservationLimit)
-	fmt.Fprintf(c.App.ErrWriter, "- Attachment file size limit: %s\n", util.FormatSize(tier.AttachmentFileSizeLimit))
-	fmt.Fprintf(c.App.ErrWriter, "- Attachment total size limit: %s\n", util.FormatSize(tier.AttachmentTotalSizeLimit))
+	fmt.Fprintf(c.App.ErrWriter, "- Attachment file size limit: %s\n", util.FormatSizeHuman(tier.AttachmentFileSizeLimit))
+	fmt.Fprintf(c.App.ErrWriter, "- Attachment total size limit: %s\n", util.FormatSizeHuman(tier.AttachmentTotalSizeLimit))
 	fmt.Fprintf(c.App.ErrWriter, "- Attachment expiry duration: %s (%d seconds)\n", tier.AttachmentExpiryDuration.String(), int64(tier.AttachmentExpiryDuration.Seconds()))
-	fmt.Fprintf(c.App.ErrWriter, "- Attachment daily bandwidth limit: %s\n", util.FormatSize(tier.AttachmentBandwidthLimit))
+	fmt.Fprintf(c.App.ErrWriter, "- Attachment daily bandwidth limit: %s\n", util.FormatSizeHuman(tier.AttachmentBandwidthLimit))
 	fmt.Fprintf(c.App.ErrWriter, "- Stripe prices (monthly/yearly): %s\n", prices)
 }

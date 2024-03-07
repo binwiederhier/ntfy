@@ -1,4 +1,4 @@
-# Deprecation notices
+# Deprecations and breaking changes
 This page is used to list deprecation notices for ntfy. Deprecated commands and options will be 
 **removed after 1-3 months** from the time they were deprecated. How long the feature is deprecated
 before the behavior is changed depends on the severity of the change, and how prominent the feature is.

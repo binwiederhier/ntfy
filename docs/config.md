@@ -404,10 +404,10 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     ```
 
 ### Example: UnifiedPush
-[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
-has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. 
+[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/developers/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
+has anonymous write access to the [topic](https://unifiedpush.org/developers/spec/definitions/#endpoint) used for push messages. 
 The topic names used by UnifiedPush all start with the `up*` prefix. Please refer to the 
-**[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users)** for more details.
+**[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users-acl)** for more details.
 
 To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either 
 allow anonymous write access for the entire prefix or explicitly per topic:
@@ -995,6 +995,15 @@ are the easiest), and then configure the following options:
 After you have configured phone calls, create a [tier](#tiers) with a call limit (e.g. `ntfy tier create --call-limit=10 ...`),
 and then assign it to a user. Users may then use the `X-Call` header to receive a phone call when publishing a message.
 
+## Message limits
+There are a few message limits that you can configure:
+
+* `message-size-limit` defines the max size of a message body. Please note message sizes >4K are **not recommended,
+   and largely untested**. The Android/iOS and other clients may not work, or work properly. If FCM and/or APNS is used,
+   the limit should stay 4K, because their limits are around that size. If you increase this size limit regardless, 
+   FCM and APNS will NOT work for large messages.
+* `message-delay-limit` defines the max delay of a message when using the "Delay" header and [scheduled delivery](publish.md#scheduled-delivery).
+
 ## Rate limiting
 !!! info
     Be aware that if you are running ntfy behind a proxy, you must set the `behind-proxy` flag. 
@@ -1078,19 +1087,22 @@ By default, ntfy puts almost all rate limits on the message publisher, e.g. numb
 size are all based on the visitor who publishes a message. **Subscriber-based rate limiting is a way to use the rate limits
 of a topic's subscriber, instead of the limits of the publisher.**
 
-If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
-to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
-publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+If subscriber-based rate limiting is enabled, **messages published on UnifiedPush topics** (topics starting with `up`, e.g. `up123456789012`) 
+will be counted towards the "rate visitor" of the topic. A "rate visitor" is the first subscriber to the topic. 
 
-Once enabled, a client may send a `Rate-Topics: <topic1>,<topic2>,...` header when subscribing to topics via
-HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
-to use when publishing on this topic. Note that setting the rate visitor requires **read-write permission** on the topic.
+Once enabled, a client subscribing to UnifiedPush topics via HTTP stream, or websockets, will be automatically registered as
+a "rate visitor", i.e. the visitor whose rate limits will be used when publishing on this topic. Note that setting the rate visitor
+requires **read-write permission** on the topic.
 
-UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
+If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
 response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
 `visitor-message-daily-limit`.
 
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
+
+!!! info
+    Due to a [denial-of-service issue](https://github.com/binwiederhier/ntfy/issues/1048), support for the `Rate-Topics`
+    header was removed entirely. This is unfortunate, but subscriber-based rate limiting will still work for `up*` topics.
 
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,
@@ -1388,6 +1400,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `twilio-verify-service`                    | `NTFY_TWILIO_VERIFY_SERVICE`                    | *string*                                            | -                 | Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586                                                                                                                                                              |
 | `keepalive-interval`                       | `NTFY_KEEPALIVE_INTERVAL`                       | *duration*                                          | 45s               | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that. |
 | `manager-interval`                         | `NTFY_MANAGER_INTERVAL`                         | *duration*                                          | 1m                | Interval in which the manager prunes old messages, deletes topics and prints the stats.                                                                                                                                         |
+| `message-size-limit`                       | `NTFY_MESSAGE_SIZE_LIMIT`                       | *size*                                              | 4K                | The size limit for the message body. Please note that this is largely untested, and that FCM/APNS have limits around 4KB. If you increase this size limit, FCM and APNS will NOT work for large messages.                       |
+| `message-delay-limit`                      | `NTFY_MESSAGE_DELAY_LIMIT`                      | *duration*                                          | 3d                | Amount of time a message can be [scheduled](publish.md#scheduled-delivery) into the future when using the `Delay` header                                                                                                        |
 | `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*                                            | 15,000            | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                     |
 | `upstream-base-url`                        | `NTFY_UPSTREAM_BASE_URL`                        | *URL*                                               | `https://ntfy.sh` | Forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers                                                                                                                   |
 | `upstream-access-token`                    | `NTFY_UPSTREAM_ACCESS_TOKEN`                    | *string*                                            | `tk_zyYLYj...`    | Access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth                                                                                                  |
@@ -1414,7 +1428,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
 | `web-push-startup-queries`                 | `NTFY_WEB_PUSH_STARTUP_QUERIES`                 | *string*                                            | -                 | Web Push: SQL queries to run against subscription database at startup                                                                                                                                                           |
 
-The format for a *duration* is: `<number>(smh)`, e.g. 30s, 20m or 1h.   
+The format for a *duration* is: `<number>(smhd)`, e.g. 30s, 20m, 1h or 3d.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.
 
 ## Command line options
@@ -1446,7 +1460,7 @@ OPTIONS:
    --log-level-overrides value, --log_level_overrides value [ --log-level-overrides value, --log_level_overrides value ]  set log level overrides [$NTFY_LOG_LEVEL_OVERRIDES]
    --log-format value, --log_format value                                                                                 set log format (default: "text") [$NTFY_LOG_FORMAT]
    --log-file value, --log_file value                                                                                     set log file, default is STDOUT [$NTFY_LOG_FILE]
-   --config value, -c value                                                                                               config file (default: /etc/ntfy/server.yml) [$NTFY_CONFIG_FILE]
+   --config value, -c value                                                                                               config file (default: "/etc/ntfy/server.yml") [$NTFY_CONFIG_FILE]
    --base-url value, --base_url value, -B value                                                                           externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
    --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
@@ -1456,19 +1470,19 @@ OPTIONS:
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
    --cache-file value, --cache_file value, -C value                                                                       cache file used for message caching [$NTFY_CACHE_FILE]
-   --cache-duration since, --cache_duration since, -b since                                                               buffer messages for this time to allow since requests (default: 12h0m0s) [$NTFY_CACHE_DURATION]
+   --cache-duration since, --cache_duration since, -b since                                                               buffer messages for this time to allow since requests (default: "12h") [$NTFY_CACHE_DURATION]
    --cache-batch-size value, --cache_batch_size value                                                                     max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]
-   --cache-batch-timeout value, --cache_batch_timeout value                                                               timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: 0s) [$NTFY_CACHE_BATCH_TIMEOUT]
+   --cache-batch-timeout value, --cache_batch_timeout value                                                               timeout for batched async writes to the message cache (if zero, writes are synchronous) (default: "0s") [$NTFY_CACHE_BATCH_TIMEOUT]
    --cache-startup-queries value, --cache_startup_queries value                                                           queries run when the cache database is initialized [$NTFY_CACHE_STARTUP_QUERIES]
    --auth-file value, --auth_file value, -H value                                                                         auth database file used for access control [$NTFY_AUTH_FILE]
    --auth-startup-queries value, --auth_startup_queries value                                                             queries run when the auth database is initialized [$NTFY_AUTH_STARTUP_QUERIES]
    --auth-default-access value, --auth_default_access value, -p value                                                     default permissions if no matching entries in the auth database are found (default: "read-write") [$NTFY_AUTH_DEFAULT_ACCESS]
    --attachment-cache-dir value, --attachment_cache_dir value                                                             cache directory for attached files [$NTFY_ATTACHMENT_CACHE_DIR]
-   --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                                     limit of the on-disk attachment cache (default: 5G) [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
-   --attachment-file-size-limit value, --attachment_file_size_limit value, -Y value                                       per-file attachment size limit (e.g. 300k, 2M, 100M) (default: 15M) [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
-   --attachment-expiry-duration value, --attachment_expiry_duration value, -X value                                       duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: 3h) [$NTFY_ATTACHMENT_EXPIRY_DURATION]
-   --keepalive-interval value, --keepalive_interval value, -k value                                                       interval of keepalive messages (default: 45s) [$NTFY_KEEPALIVE_INTERVAL]
-   --manager-interval value, --manager_interval value, -m value                                                           interval of for message pruning and stats printing (default: 1m0s) [$NTFY_MANAGER_INTERVAL]
+   --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                                     limit of the on-disk attachment cache (default: "5G") [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
+   --attachment-file-size-limit value, --attachment_file_size_limit value, -Y value                                       per-file attachment size limit (e.g. 300k, 2M, 100M) (default: "15M") [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
+   --attachment-expiry-duration value, --attachment_expiry_duration value, -X value                                       duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: "3h") [$NTFY_ATTACHMENT_EXPIRY_DURATION]
+   --keepalive-interval value, --keepalive_interval value, -k value                                                       interval of keepalive messages (default: "45s") [$NTFY_KEEPALIVE_INTERVAL]
+   --manager-interval value, --manager_interval value, -m value                                                           interval of for message pruning and stats printing (default: "1m") [$NTFY_MANAGER_INTERVAL]
    --disallowed-topics value, --disallowed_topics value [ --disallowed-topics value, --disallowed_topics value ]          topics that are not allowed to be used [$NTFY_DISALLOWED_TOPICS]
    --web-root value, --web_root value                                                                                     sets root of the web app (e.g. /, or /app), or disables it (disable) (default: "/") [$NTFY_WEB_ROOT]
    --enable-signup, --enable_signup                                                                                       allows users to sign up via the web app, or API (default: false) [$NTFY_ENABLE_SIGNUP]
@@ -1487,16 +1501,18 @@ OPTIONS:
    --twilio-auth-token value, --twilio_auth_token value                                                                   Twilio auth token [$NTFY_TWILIO_AUTH_TOKEN]
    --twilio-phone-number value, --twilio_phone_number value                                                               Twilio number to use for outgoing calls [$NTFY_TWILIO_PHONE_NUMBER]
    --twilio-verify-service value, --twilio_verify_service value                                                           Twilio Verify service ID, used for phone number verification [$NTFY_TWILIO_VERIFY_SERVICE]
+   --message-size-limit value, --message_size_limit value                                                                 size limit for the message (see docs for limitations) (default: "4K") [$NTFY_MESSAGE_SIZE_LIMIT]
+   --message-delay-limit value, --message_delay_limit value                                                               max duration a message can be scheduled into the future (default: "3d") [$NTFY_MESSAGE_DELAY_LIMIT]
    --global-topic-limit value, --global_topic_limit value, -T value                                                       total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
    --visitor-subscription-limit value, --visitor_subscription_limit value                                                 number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
    --visitor-attachment-total-size-limit value, --visitor_attachment_total_size_limit value                               total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
    --visitor-attachment-daily-bandwidth-limit value, --visitor_attachment_daily_bandwidth_limit value                     total daily attachment download/upload bandwidth limit per visitor (default: "500M") [$NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT]
    --visitor-request-limit-burst value, --visitor_request_limit_burst value                                               initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
-   --visitor-request-limit-replenish value, --visitor_request_limit_replenish value                                       interval at which burst limit is replenished (one per x) (default: 5s) [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
+   --visitor-request-limit-replenish value, --visitor_request_limit_replenish value                                       interval at which burst limit is replenished (one per x) (default: "5s") [$NTFY_VISITOR_REQUEST_LIMIT_REPLENISH]
    --visitor-request-limit-exempt-hosts value, --visitor_request_limit_exempt_hosts value                                 hostnames and/or IP addresses of hosts that will be exempt from the visitor request limit [$NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS]
    --visitor-message-daily-limit value, --visitor_message_daily_limit value                                               max messages per visitor per day, derived from request limit if unset (default: 0) [$NTFY_VISITOR_MESSAGE_DAILY_LIMIT]
    --visitor-email-limit-burst value, --visitor_email_limit_burst value                                                   initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
-   --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                                           interval at which burst limit is replenished (one per x) (default: 1h0m0s) [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
+   --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                                           interval at which burst limit is replenished (one per x) (default: "1h") [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
    --visitor-subscriber-rate-limiting, --visitor_subscriber_rate_limiting                                                 enables subscriber-based rate limiting (default: false) [$NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING]
    --behind-proxy, --behind_proxy, -P                                                                                     if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
    --stripe-secret-key value, --stripe_secret_key value                                                                   key used for the Stripe API communication, this enables payments [$NTFY_STRIPE_SECRET_KEY]
@@ -1509,6 +1525,6 @@ OPTIONS:
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
    --web-push-file value, --web_push_file value                                                                           file used to store web push subscriptions [$NTFY_WEB_PUSH_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
-   --web-push-startup-queries value, --web_push_startup-queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]   
+   --web-push-startup-queries value, --web_push_startup_queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]
    --help, -h                                                                                                             show help
 ```

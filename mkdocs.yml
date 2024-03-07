@@ -65,15 +65,15 @@ markdown_extensions:
   - md_in_html
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+hooks:
+  - docs/hooks.py
 
 plugins:
   - search
   - minify:
       minify_html: true
-  - mkdocs-simple-hooks:
-      hooks:
-        on_post_build: "docs.hooks:copy_fonts"
 
 nav:
   - "Getting started": index.md

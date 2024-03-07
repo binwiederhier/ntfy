@@ -12,6 +12,7 @@ import (
 const (
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
+	DefaultCacheBatchTimeout                    = time.Duration(0)
 	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
 	DefaultManagerInterval                      = time.Minute
 	DefaultDelayedSenderInterval                = 10 * time.Second

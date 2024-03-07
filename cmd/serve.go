@@ -45,7 +45,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-batch-timeout", Aliases: []string{"cache_batch_timeout"}, EnvVars: []string{"NTFY_CACHE_BATCH_TIMEOUT"}, Value: util.FormatDuration(server.DefaultCacheBatchTimeout), Usage: "timeout for batched async writes to the message cache (if zero, writes are synchronous)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-startup-queries", Aliases: []string{"cache_startup_queries"}, EnvVars: []string{"NTFY_CACHE_STARTUP_QUERIES"}, Usage: "queries run when the cache database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-startup-queries", Aliases: []string{"auth_startup_queries"}, EnvVars: []string{"NTFY_AUTH_STARTUP_QUERIES"}, Usage: "queries run when the auth database is initialized"}),
@@ -195,57 +195,57 @@ func execServe(c *cli.Context) error {
 	// Convert durations
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid cache duration: %s", cacheDurationStr)
 	}
 	cacheBatchTimeout, err := util.ParseDuration(cacheBatchTimeoutStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid cache batch timeout: %s", cacheBatchTimeoutStr)
 	}
 	attachmentExpiryDuration, err := util.ParseDuration(attachmentExpiryDurationStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid attachment expiry duration: %s", attachmentExpiryDurationStr)
 	}
 	keepaliveInterval, err := util.ParseDuration(keepaliveIntervalStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid keepalive interval: %s", keepaliveIntervalStr)
 	}
 	managerInterval, err := util.ParseDuration(managerIntervalStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid manager interval: %s", managerIntervalStr)
 	}
 	messageDelayLimit, err := util.ParseDuration(messageDelayLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid message delay limit: %s", messageDelayLimitStr)
 	}
 	visitorRequestLimitReplenish, err := util.ParseDuration(visitorRequestLimitReplenishStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid visitor request limit replenish: %s", visitorRequestLimitReplenishStr)
 	}
 	visitorEmailLimitReplenish, err := util.ParseDuration(visitorEmailLimitReplenishStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid visitor email limit replenish: %s", visitorEmailLimitReplenishStr)
 	}
 
 	// Convert sizes to bytes
-	messageSizeLimit, err := parseSize(messageSizeLimitStr, server.DefaultMessageSizeLimit)
+	messageSizeLimit, err := util.ParseSize(messageSizeLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid message size limit: %s", messageSizeLimitStr)
 	}
-	attachmentTotalSizeLimit, err := parseSize(attachmentTotalSizeLimitStr, server.DefaultAttachmentTotalSizeLimit)
+	attachmentTotalSizeLimit, err := util.ParseSize(attachmentTotalSizeLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid attachment total size limit: %s", attachmentTotalSizeLimitStr)
 	}
-	attachmentFileSizeLimit, err := parseSize(attachmentFileSizeLimitStr, server.DefaultAttachmentFileSizeLimit)
+	attachmentFileSizeLimit, err := util.ParseSize(attachmentFileSizeLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid attachment file size limit: %s", attachmentFileSizeLimitStr)
 	}
-	visitorAttachmentTotalSizeLimit, err := parseSize(visitorAttachmentTotalSizeLimitStr, server.DefaultVisitorAttachmentTotalSizeLimit)
+	visitorAttachmentTotalSizeLimit, err := util.ParseSize(visitorAttachmentTotalSizeLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid visitor attachment total size limit: %s", visitorAttachmentTotalSizeLimitStr)
 	}
-	visitorAttachmentDailyBandwidthLimit, err := parseSize(visitorAttachmentDailyBandwidthLimitStr, server.DefaultVisitorAttachmentDailyBandwidthLimit)
+	visitorAttachmentDailyBandwidthLimit, err := util.ParseSize(visitorAttachmentDailyBandwidthLimitStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid visitor attachment daily bandwidth limit: %s", visitorAttachmentDailyBandwidthLimitStr)
 	} else if visitorAttachmentDailyBandwidthLimit > math.MaxInt {
 		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
@@ -293,8 +293,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
 	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || authFile == "") {
 		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file must also be set")
-	} else if messageSizeLimit > 4096 {
-		log.Warn("message-size-limit is >4K, this is not recommended and largely untested, and may lead to issues with some clients")
+	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
+		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
 		if messageSizeLimit > 5*1024*1024 {
 			return errors.New("message-size-limit cannot be higher than 5M")
 		}

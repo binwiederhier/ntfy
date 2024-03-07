@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	errUnparsableTime = errors.New("unable to parse time")
-	durationStrRegex  = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
+	errInvalidDuration = errors.New("unable to parse duration")
+	durationStrRegex   = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
 )
 
 const (
@@ -51,7 +51,7 @@ func ParseFutureTime(s string, now time.Time) (time.Time, error) {
 	if err == nil {
 		return t, nil
 	}
-	return time.Time{}, errUnparsableTime
+	return time.Time{}, errInvalidDuration
 }
 
 // ParseDuration is like time.ParseDuration, except that it also understands days (d), which
@@ -65,7 +65,7 @@ func ParseDuration(s string) (time.Duration, error) {
 	if matches != nil {
 		number, err := strconv.Atoi(matches[1])
 		if err != nil {
-			return 0, errUnparsableTime
+			return 0, errInvalidDuration
 		}
 		switch unit := matches[2][0:1]; unit {
 		case "d":
@@ -77,10 +77,10 @@ func ParseDuration(s string) (time.Duration, error) {
 		case "s":
 			return time.Duration(number) * time.Second, nil
 		default:
-			return 0, errUnparsableTime
+			return 0, errInvalidDuration
 		}
 	}
-	return 0, errUnparsableTime
+	return 0, errInvalidDuration
 }
 
 func FormatDuration(d time.Duration) string {
@@ -104,7 +104,7 @@ func parseFromDuration(s string, now time.Time) (time.Time, error) {
 	if err == nil {
 		return now.Add(d), nil
 	}
-	return time.Time{}, errUnparsableTime
+	return time.Time{}, errInvalidDuration
 }
 
 func parseUnixTime(s string, now time.Time) (time.Time, error) {
@@ -112,7 +112,7 @@ func parseUnixTime(s string, now time.Time) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	} else if int64(t) < now.Unix() {
-		return time.Time{}, errUnparsableTime
+		return time.Time{}, errInvalidDuration
 	}
 	return time.Unix(int64(t), 0).UTC(), nil
 }
@@ -120,7 +120,7 @@ func parseUnixTime(s string, now time.Time) (time.Time, error) {
 func parseNaturalTime(s string, now time.Time) (time.Time, error) {
 	r, err := when.EN.Parse(s, now) // returns "nil, nil" if no matches!
 	if err != nil || r == nil {
-		return time.Time{}, errUnparsableTime
+		return time.Time{}, errInvalidDuration
 	} else if r.Time.After(now) {
 		return r.Time, nil
 	}
@@ -128,9 +128,9 @@ func parseNaturalTime(s string, now time.Time) (time.Time, error) {
 	// simply append "tomorrow, " to it.
 	r, err = when.EN.Parse("tomorrow, "+s, now) // returns "nil, nil" if no matches!
 	if err != nil || r == nil {
-		return time.Time{}, errUnparsableTime
+		return time.Time{}, errInvalidDuration
 	} else if r.Time.After(now) {
 		return r.Time, nil
 	}
-	return time.Time{}, errUnparsableTime
+	return time.Time{}, errInvalidDuration
 }

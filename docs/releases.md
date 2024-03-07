@@ -2,6 +2,32 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.9.0
+Released Mar 7, 2024
+
+A small release after a long pause (lots of day job work). This release adds for **larger messages** and **longer message delays** in scheduled delivery messages. The web app also now supports pasting images from the clipboard. Other than that, only a few bug fixes and documentation updates, and a teeny tiny breaking change 😬.
+
+!!! info
+    ⚠️ **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used. Normally I'd never remove a feature, but this is a security issue, and likely affects almost nobody.
+
+**Features:**
+
+* Support for larger message delays with `message-delay-limit` (see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050)/[#1019](https://github.com/binwiederhier/ntfy/issues/1019), thanks to [@MrChadMWood](https://github.com/MrChadMWood) for reporting)
+* Support for larger message body sizes with `message-size-limit` (use at your own risk, see [message limits](config.md#message-limits), [#836](https://github.com/binwiederhier/ntfy/pull/836)/[#1050](https://github.com/binwiederhier/ntfy/pull/1050), thanks to [@zhzy0077](https://github.com/zhzy0077) for implementing this, and to [@nkjshlsqja7331](https://github.com/nkjshlsqja7331) for reporting)
+* Web app: You can now paste images into the message bar or publish dialog ([#963](https://github.com/binwiederhier/ntfy/pull/963)/[#572](https://github.com/binwiederhier/ntfy/issues/572), thanks to [@cmj2002](https://github.com/cmj2002) for implementing, and [@rounakdatta](https://github.com/rounakdatta) for reporting)
+
+**Bug fixes + maintenance:**
+
+* ⚠️ Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048))
+* Add non-root user to Docker image, ntfy can be run as non-root ([#967](https://github.com/binwiederhier/ntfy/pull/967)/[#966](https://github.com/binwiederhier/ntfy/issues/966), thanks to [@arahja](https://github.com/arahja))
+
+**Documentation:**
+
+* Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
+* Update Watchtower example ([#1014](https://github.com/binwiederhier/ntfy/pull/1014), thanks to [@lennart-m](https://github.com/lennart-m))
+* Fix dead links ([#1022](https://github.com/binwiederhier/ntfy/pull/1022), thanks to [@DerRockWolf](https://github.com/DerRockWolf))
+* PowerShell file upload example ([#1004](https://github.com/binwiederhier/ntfy/pull/1004), thanks to [@YMan84](https://github.com/YMan84))
+
 ## ntfy iOS app v1.3
 Released Nov 26, 2023
 
@@ -1312,29 +1338,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.9.0
-
-!!! info
-    ⚠️ **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used. Normally I'd never remove a feature, but this is a security issue, and likely affects almost nobody.
-
-**Features:**
-
-* Support for larger message delays with `message-delay-limit` (see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050)/[#1019](https://github.com/binwiederhier/ntfy/issues/1019), thanks to [@MrChadMWood](https://github.com/MrChadMWood) for reporting)
-* Support for larger message body sizes with `message-size-limit` (use at your own risk, see [message limits](config.md#message-limits), [#836](https://github.com/binwiederhier/ntfy/pull/836)/[#1050](https://github.com/binwiederhier/ntfy/pull/1050), thanks to [@zhzy0077](https://github.com/zhzy0077) for implementing this, and to [@nkjshlsqja7331](https://github.com/nkjshlsqja7331) for reporting)
-* Web app: You can now paste images into the message bar or publish dialog ([#963](https://github.com/binwiederhier/ntfy/pull/963)/[#572](https://github.com/binwiederhier/ntfy/issues/572), thanks to [@cmj2002](https://github.com/cmj2002) for implementing, and [@rounakdatta](https://github.com/rounakdatta) for reporting)
-
-**Bug fixes + maintenance:**
-
-* ⚠️ Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
-* Add non-root user to Docker image, ntfy can be run as non-root ([#967](https://github.com/binwiederhier/ntfy/pull/967)/[#966](https://github.com/binwiederhier/ntfy/issues/966), thanks to [@arahja](https://github.com/arahja))
-
-**Documentation:**
-
-* Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
-* Update Watchtower example ([#1014](https://github.com/binwiederhier/ntfy/pull/1014), thanks to [@lennart-m](https://github.com/lennart-m))
-* Fix dead links ([#1022](https://github.com/binwiederhier/ntfy/pull/1022), thanks to [@DerRockWolf](https://github.com/DerRockWolf))
-* PowerShell file upload example ([#1004](https://github.com/binwiederhier/ntfy/pull/1004), thanks to [@YMan84](https://github.com/YMan84))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

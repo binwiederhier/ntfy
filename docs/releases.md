@@ -1323,6 +1323,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Support for larger message delays with `message-delay-limit` (see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050)/[#1019](https://github.com/binwiederhier/ntfy/issues/1019), thanks to [@MrChadMWood](https://github.com/MrChadMWood) for reporting)
 * Support for larger message body sizes with `message-size-limit` (use at your own risk, see [message limits](config.md#message-limits), [#836](https://github.com/binwiederhier/ntfy/pull/836)/[#1050](https://github.com/binwiederhier/ntfy/pull/1050), thanks to [@zhzy0077](https://github.com/zhzy0077) for implementing this, and to [@nkjshlsqja7331](https://github.com/nkjshlsqja7331) for reporting)
 
+**Features:**
+
+* You can now send custom fields within an `extras` field in a JSON POST/PUT request ([#827](https://github.com/binwiederhier/ntfy/issues/827), thanks to [@tka85](https://github.com/tka85) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+
 **Bug fixes + maintenance:**
 
 * Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 

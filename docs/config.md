@@ -1078,19 +1078,22 @@ By default, ntfy puts almost all rate limits on the message publisher, e.g. numb
 size are all based on the visitor who publishes a message. **Subscriber-based rate limiting is a way to use the rate limits
 of a topic's subscriber, instead of the limits of the publisher.**
 
-If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
-to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
-publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+If subscriber-based rate limiting is enabled, **messages published on UnifiedPush topics** (topics starting with `up`, e.g. `up123456789012`) 
+will be counted towards the "rate visitor" of the topic. A "rate visitor" is the first subscriber to the topic. 
 
-Once enabled, a client may send a `Rate-Topics: <topic1>,<topic2>,...` header when subscribing to topics via
-HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
-to use when publishing on this topic. Note that setting the rate visitor requires **read-write permission** on the topic.
+Once enabled, a client subscribing to UnifiedPush topics via HTTP stream, or websockets, will be automatically registered as
+a "rate visitor", i.e. the visitor whose rate limits will be used when publishing on this topic. Note that setting the rate visitor
+requires **read-write permission** on the topic.
 
-UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
+If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
 response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
 `visitor-message-daily-limit`.
 
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
+
+!!! info
+    Due to a denial-of-service issue, support for the `Rate-Topics` header was removed entirely. This is unfortunate,
+    but subscriber-based rate limiting will still work for `up*` topics.
 
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,

@@ -277,15 +277,14 @@
 
 # Rate limiting: Enable subscriber-based rate limiting (mostly used for UnifiedPush)
 #
-# If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
-# to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
-# publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+# If subscriber-based rate limiting is enabled, messages published on UnifiedPush topics** (topics starting with "up")
+# will be counted towards the "rate visitor" of the topic. A "rate visitor" is the first subscriber to the topic.
 #
-# Once enabled, a client may send a "Rate-Topics: <topic1>,<topic2>,..." header when subscribing to topics via
-# HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
-# to use when publishing on this topic. Note: Setting the rate visitor requires READ-WRITE permission on the topic.
+# Once enabled, a client subscribing to UnifiedPush topics via HTTP stream, or websockets, will be automatically registered as
+# a "rate visitor", i.e. the visitor whose rate limits will be used when publishing on this topic. Note that setting the rate visitor
+# requires **read-write permission** on the topic.
 #
-# UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to a HTTP 507 response if
+# If this setting is enabled, publishing to UnifiedPush topics will lead to a HTTP 507 response if
 # no "rate visitor" has been previously registered. This is to avoid burning the publisher's "visitor-message-daily-limit".
 #
 # visitor-subscriber-rate-limiting: false

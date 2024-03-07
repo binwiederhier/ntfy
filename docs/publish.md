@@ -457,6 +457,7 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
 === "PowerShell"
     ``` powershell
     $Request = @{
+      Method = 'POST'
       URI = "https://ntfy.sh/phil_alerts"
       Headers = @{
         Priority = "5"
@@ -1033,7 +1034,7 @@ is the only required one:
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-JSON @{
         Topic    = "mytopic"
         Title    = "Low disk space alert"
         Message  = "Disk space is low at 5.1 GB"
@@ -1042,7 +1043,7 @@ is the only required one:
         FileName = "diskspace.jpg"
         Tags     = @("warning", "cd")
         Click    = "https://homecamera.lan/xasds1h2xsSsa/"
-        Actions  = ConvertTo-JSON @(
+        Actions  = @(
           @{ 
             Action = "view"
             Label  = "Admin panel"
@@ -1130,7 +1131,7 @@ As of today, the following actions are supported:
   when the action button is tapped (only supported on Android)
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
 
-Here's an example of what that a notification with actions can look like:
+Here's an example of what a notification with actions can look like:
 
 <figure markdown>
   ![notification with actions](static/img/android-screenshot-notification-actions.png){ width=500 }
@@ -1919,10 +1920,10 @@ And the same example using [JSON publishing](#publish-as-json):
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-Json -Depth 3 @{
         Topic = "wifey"
         Message = "Your wife requested you send a picture of yourself."
-        Actions = ConvertTo-Json -Depth 3 @(
+        Actions = @(
           @{
             Action = "broadcast"
             Label = "Take picture"
@@ -2072,7 +2073,7 @@ Here's an example using the [`X-Actions` header](#using-a-header):
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}",
+                'Actions: http, Close door, https://api.mygarage.lan/, method=PUT, headers.Authorization=Bearer zAzsx1sk.., body={\"action\": \"close\"}',
             'content' => 'Garage door has been open for 15 minutes. Close it?'
         ]
     ]));
@@ -2199,10 +2200,10 @@ And the same example using [JSON publishing](#publish-as-json):
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.sh"
-      Body = @{
+      Body = ConvertTo-Json -Depth 3 @{
         Topic   = "myhome"
         Message = "Garage door has been open for 15 minutes. Close it?"
-        Actions = ConvertTo-Json -Depth 3 @(
+        Actions = @(
           @{
             Action  = "http"
             Label   = "Close door"
@@ -2287,7 +2288,7 @@ You can define which URL to open when a notification is clicked. This may be use
 to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
 the web browser (or the app) and open the website.
 
-To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its aliase `Click`).
+To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its alias `Click`).
 If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
 by another app, the responsible app may open. 
 

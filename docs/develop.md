@@ -363,7 +363,7 @@ To build your own version with Firebase, you must:
 * And change `app_base_url` in [values.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/values.xml)
 * Then run:
 ```
-# To build an unsigned .apk (app/build/outputs/apk/play/*.apk)
+# To build an unsigned .apk (app/build/outputs/apk/play/release/*.apk)
 ./gradlew assemblePlayRelease
 
 # To build a bundle .aab (app/play/release/*.aab)
@@ -429,7 +429,7 @@ steps:
 
 ### XCode setup
 
-1. Follow step 4 of [https://firebase.google.com/docs/ios/setup](Add Firebase to your Apple project) to install the 
+1. Follow step 4 of [Add Firebase to your Apple project](https://firebase.google.com/docs/ios/setup) to install the 
    `firebase-ios-sdk` in XCode, if it's not already present - you can select any packages in addition to Firebase Core / Firebase Messaging
 1. Similarly, install the SQLite.swift package dependency in XCode
 1. When running the debug build, ensure XCode is pointed to the connected iOS device - registering for push notifications does not work in the iOS simulators

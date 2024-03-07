@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/server"
+	"heckel.io/ntfy/v2/server"
 )
 
 func TestCLI_WebPush_GenerateKeys(t *testing.T) {

@@ -3,9 +3,9 @@ package client_test
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/client"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/test"
+	"heckel.io/ntfy/v2/client"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/test"
 	"os"
 	"testing"
 	"time"

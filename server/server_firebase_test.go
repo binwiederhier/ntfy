@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"net/netip"
 	"strings"
 	"sync"

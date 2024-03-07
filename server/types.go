@@ -5,10 +5,10 @@ import (
 	"net/netip"
 	"time"
 
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 )
 
 // List of possible events

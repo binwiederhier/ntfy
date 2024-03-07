@@ -87,15 +87,6 @@ func TestParsePriority_Invalid(t *testing.T) {
 	}
 }
 
-func TestParsePriority_HTTPSpecPriority(t *testing.T) {
-	priorities := []string{"u=1", "u=3", "u=7, i"} // see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority
-	for _, priority := range priorities {
-		actual, err := ParsePriority(priority)
-		require.Nil(t, err)
-		require.Equal(t, 3, actual) // Always expect 3!
-	}
-}
-
 func TestPriorityString(t *testing.T) {
 	priorities := []int{0, 1, 2, 3, 4, 5}
 	expected := []string{"default", "min", "low", "default", "high", "max"}

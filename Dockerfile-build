@@ -1,14 +1,20 @@
-FROM golang:1.20-bullseye as builder
+FROM golang:1.21-bullseye as builder
 
 ARG VERSION=dev
 ARG COMMIT=unknown
+ARG NODE_MAJOR=18
 
-RUN apt-get update
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash
-RUN apt-get install -y \
-    build-essential \
-    nodejs \
-    python3-pip
+RUN apt-get update && apt-get install -y \
+       build-essential ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" >> /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y \
+      python3-pip \
+      python3-venv \
+      nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 ADD Makefile .
@@ -19,7 +25,7 @@ RUN make docs-deps
 ADD ./mkdocs.yml .
 ADD ./docs ./docs
 RUN make docs-build
- 
+
 # web
 ADD ./web/package.json ./web/package-lock.json ./web/
 RUN make web-deps
@@ -47,6 +53,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0, GPL-2.0"
 LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
 
+RUN adduser -D -u 1000 ntfy
 COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
 
 EXPOSE 80/tcp

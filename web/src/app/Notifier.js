@@ -124,9 +124,17 @@ class Notifier {
     return window.location.protocol === "https:" || window.location.hostname.match("^127.") || window.location.hostname === "localhost";
   }
 
+  // no PushManager when not installed, but it _is_ supported.
   iosSupportedButInstallRequired() {
-    // no PushManager when not installed, but it _is_ supported.
-    return config.enable_web_push && "serviceWorker" in navigator && window.navigator.standalone === false;
+    return (
+      config.enable_web_push &&
+      // a service worker exists
+      "serviceWorker" in navigator &&
+      // but the pushmanager API is missing, which implies we're on an iOS device without installing
+      !("PushManager" in window) &&
+      // check that this is the case by checking for `standalone`, which only exists on Safari
+      window.navigator.standalone === false
+    );
   }
 }
 

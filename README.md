@@ -2,7 +2,7 @@
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
 [![Release](https://img.shields.io/github/release/binwiederhier/ntfy.svg?color=success&style=flat-square)](https://github.com/binwiederhier/ntfy/releases/latest)
-[![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy)
+[![Go Reference](https://pkg.go.dev/badge/heckel.io/ntfy.svg)](https://pkg.go.dev/heckel.io/ntfy/v2)
 [![Tests](https://github.com/binwiederhier/ntfy/workflows/test/badge.svg)](https://github.com/binwiederhier/ntfy/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/binwiederhier/ntfy)](https://goreportcard.com/report/github.com/binwiederhier/ntfy)
 [![codecov](https://codecov.io/gh/binwiederhier/ntfy/branch/main/graph/badge.svg?token=A597KQ463G)](https://codecov.io/gh/binwiederhier/ntfy)
@@ -18,7 +18,7 @@ notification service. With ntfy, you can **send notifications to your phone or d
 **without having to sign up or pay any fees**. If you'd like to run your own instance of the service, you can easily do 
 so since ntfy is open source.
 
-You can access the free version of ntfy at **[ntfy.sh](https://ntfy.sh)**. There is also an [open source Android app](https://github.com/binwiederhier/ntfy-android)
+You can access the free version of ntfy at **[ntfy.sh](https://ntfy.sh)**. There is also an [open-source Android app](https://github.com/binwiederhier/ntfy-android)
 available on [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/),
 as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) available on the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
@@ -31,7 +31,10 @@ as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) a
 </p>
 
 ## [ntfy Pro](https://ntfy.sh/app) 💸 🎉
-I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self-host, or you want to support the development of ntfy (→ [Purchase via web app](https://ntfy.sh/app)). You can **buy a plan for as low as $3.33/month** (if you use promo code `MYTOPIC`, limited time only). You can also donate via [GitHub Sponsors](https://github.com/sponsors/binwiederhier), and [Liberapay](https://liberapay.com/ntfy). I would be very humbled by your sponsorship. ❤️ 
+I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self-host, or you want to support the development of 
+ntfy (→ [Purchase via web app](https://ntfy.sh/app)). You can **buy a plan for as low as $5/month**.
+You can also donate via [GitHub Sponsors](https://github.com/sponsors/binwiederhier), and [Liberapay](https://liberapay.com/ntfy).
+I would be very humbled by your sponsorship. ❤️ 
 
 ## **[Documentation](https://ntfy.sh/docs/)**
 
@@ -41,7 +44,7 @@ I now offer paid plans for [ntfy.sh](https://ntfy.sh/) if you don't want to self
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
 
-## Chat / forum
+## Chat/forum
 There are a few ways to get in touch with me and/or the rest of the community. Feel free to use any of these methods. Whatever
 works best for you:
 
@@ -50,13 +53,13 @@ works best for you:
 * [Lemmy discussion board](https://discuss.ntfy.sh/c/ntfy) - asynchronous forum (_new as of June 2023_)
 * [GitHub issues](https://github.com/binwiederhier/ntfy/issues) - questions, features, bugs
 
-## Announcements / beta testers
+## Announcements/beta testers
 For announcements of new releases and cutting-edge beta versions, please subscribe to the [ntfy.sh/announcements](https://ntfy.sh/announcements) 
 topic. If you'd like to test the iOS app, join [TestFlight](https://testflight.apple.com/join/P1fFnAm9). For Android betas,
 join Discord/Matrix (I'll eventually make a testing channel in Google Play).
 
 ## Contributing
-I welcome any and all contributions. Just create a PR or an issue. For larger features/ideas, please reach out
+I welcome any contributions. Just create a PR or an issue. For larger features/ideas, please reach out
 on Discord/Matrix first to see if I'd accept them. To contribute code, check out the [build instructions](https://ntfy.sh/docs/develop/) 
 for the server and the Android app. Or, if you'd like to help translate 🇩🇪 🇺🇸 🇧🇬, you can start immediately in
 [Hosted Weblate](https://hosted.weblate.org/projects/ntfy/).
@@ -143,6 +146,28 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/KevinWang15"><img src="https://github.com/KevinWang15.png" width="40px" /></a>
 <a href="https://github.com/darkmattercoder"><img src="https://github.com/darkmattercoder.png" width="40px" /></a>
 <a href="https://github.com/bmcgonag"><img src="https://github.com/bmcgonag.png" width="40px" /></a>
+<a href="https://github.com/skorokithakis"><img src="https://github.com/skorokithakis.png" width="40px" /></a>
+<a href="https://github.com/eenturk"><img src="https://github.com/eenturk.png" width="40px" /></a>
+<a href="https://github.com/spirossi"><img src="https://github.com/spirossi.png" width="40px" /></a>
+<a href="https://github.com/teomarcdhio"><img src="https://github.com/teomarcdhio.png" width="40px" /></a>
+<a href="https://github.com/MarcMichalsky"><img src="https://github.com/MarcMichalsky.png" width="40px" /></a>
+<a href="https://github.com/LuckVintage"><img src="https://github.com/LuckVintage.png" width="40px" /></a>
+<a href="https://github.com/spartan"><img src="https://github.com/spartan.png" width="40px" /></a>
+<a href="https://github.com/alexandzors"><img src="https://github.com/alexandzors.png" width="40px" /></a>
+<a href="https://github.com/dkramer95"><img src="https://github.com/dkramer95.png" width="40px" /></a>
+<a href="https://github.com/YezGotIt"><img src="https://github.com/YezGotIt.png" width="40px" /></a>
+<a href="https://github.com/thomasskou"><img src="https://github.com/thomasskou.png" width="40px" /></a>
+<a href="https://github.com/surfernv"><img src="https://github.com/surfernv.png" width="40px" /></a>
+<a href="https://github.com/richardleach"><img src="https://github.com/richardleach.png" width="40px" /></a>
+<a href="https://github.com/bear"><img src="https://github.com/bear.png" width="40px" /></a>
+<a href="https://github.com/cminter"><img src="https://github.com/cminter.png" width="40px" /></a>
+<a href="https://github.com/bahur142"><img src="https://github.com/bahur142.png" width="40px" /></a>
+<a href="https://github.com/pgwiebes"><img src="https://github.com/pgwiebes.png" width="40px" /></a>
+<a href="https://github.com/ralhei"><img src="https://github.com/ralhei.png" width="40px" /></a>
+<a href="https://github.com/TechMDW"><img src="https://github.com/TechMDW.png" width="40px" /></a>
+<a href="https://github.com/ubipo"><img src="https://github.com/ubipo.png" width="40px" /></a>
+<a href="https://github.com/tka85"><img src="https://github.com/tka85.png" width="40px" /></a>
+<a href="https://github.com/beekeeb"><img src="https://github.com/beekeeb.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:
@@ -160,7 +185,7 @@ _Please be sure to read the complete [Code of Conduct](CODE_OF_CONDUCT.md)._
 Made with ❤️ by [Philipp C. Heckel](https://heckel.io).   
 The project is dual licensed under the [Apache License 2.0](LICENSE) and the [GPLv2 License](LICENSE.GPLv2).
 
-Third party libraries and resources:
+Third-party libraries and resources:
 * [github.com/urfave/cli](https://github.com/urfave/cli) (MIT) is used to drive the CLI
 * [Mixkit sounds](https://mixkit.co/free-sound-effects/notification/) (Mixkit Free License) are used as notification sounds
 * [Sounds from notificationsounds.com](https://notificationsounds.com) (Creative Commons Attribution) are used as notification sounds

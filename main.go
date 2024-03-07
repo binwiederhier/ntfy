@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/cmd"
+	"heckel.io/ntfy/v2/cmd"
 	"os"
 	"runtime"
 )

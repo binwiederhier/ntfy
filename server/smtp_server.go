@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/emersion/go-smtp"
+	"github.com/microcosm-cc/bluemonday"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -25,6 +27,11 @@ var (
 	errTooManyRecipients      = errors.New("too many recipients")
 	errMultipartNestedTooDeep = errors.New("multipart message nested too deep")
 	errUnsupportedContentType = errors.New("unsupported content type")
+)
+
+var (
+	onlySpacesRegex          = regexp.MustCompile(`(?m)^\s+$`)
+	consecutiveNewLinesRegex = regexp.MustCompile(`\n{3,}`)
 )
 
 const (
@@ -232,35 +239,64 @@ func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if strings.ToLower(contentType) == "text/plain" {
-		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
-	} else if strings.HasPrefix(strings.ToLower(contentType), "multipart/") {
-		return readMultipartMailBody(body, params, 0)
+	canonicalContentType := strings.ToLower(contentType)
+	if canonicalContentType == "text/plain" || canonicalContentType == "text/html" {
+		return readTextMailBody(body, canonicalContentType, header.Get("Content-Transfer-Encoding"))
+	} else if strings.HasPrefix(canonicalContentType, "multipart/") {
+		return readMultipartMailBody(body, params)
 	}
 	return "", errUnsupportedContentType
 }
 
-func readMultipartMailBody(body io.Reader, params map[string]string, depth int) (string, error) {
+func readMultipartMailBody(body io.Reader, params map[string]string) (string, error) {
+	parts := make(map[string]string)
+	if err := readMultipartMailBodyParts(body, params, 0, parts); err != nil && err != io.EOF {
+		return "", err
+	} else if s, ok := parts["text/plain"]; ok {
+		return s, nil
+	} else if s, ok := parts["text/html"]; ok {
+		return s, nil
+	}
+	return "", io.EOF
+}
+
+func readMultipartMailBodyParts(body io.Reader, params map[string]string, depth int, parts map[string]string) error {
 	if depth >= maxMultipartDepth {
-		return "", errMultipartNestedTooDeep
+		return errMultipartNestedTooDeep
 	}
 	mr := multipart.NewReader(body, params["boundary"])
 	for {
 		part, err := mr.NextPart()
 		if err != nil { // may be io.EOF
-			return "", err
+			return err
 		}
 		partContentType, partParams, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
 		if err != nil {
-			return "", err
+			return err
 		}
-		if strings.ToLower(partContentType) == "text/plain" {
-			return readPlainTextMailBody(part, part.Header.Get("Content-Transfer-Encoding"))
+		canonicalPartContentType := strings.ToLower(partContentType)
+		if canonicalPartContentType == "text/plain" || canonicalPartContentType == "text/html" {
+			s, err := readTextMailBody(part, canonicalPartContentType, part.Header.Get("Content-Transfer-Encoding"))
+			if err != nil {
+				return err
+			}
+			parts[canonicalPartContentType] = s
 		} else if strings.HasPrefix(strings.ToLower(partContentType), "multipart/") {
-			return readMultipartMailBody(part, partParams, depth+1)
+			if err := readMultipartMailBodyParts(part, partParams, depth+1, parts); err != nil {
+				return err
+			}
 		}
 		// Continue with next part
 	}
+}
+
+func readTextMailBody(reader io.Reader, contentType, transferEncoding string) (string, error) {
+	if contentType == "text/plain" {
+		return readPlainTextMailBody(reader, transferEncoding)
+	} else if contentType == "text/html" {
+		return readHTMLMailBody(reader, transferEncoding)
+	}
+	return "", fmt.Errorf("unsupported content type: %s", contentType)
 }
 
 func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, error) {
@@ -274,4 +310,22 @@ func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, e
 		return "", err
 	}
 	return string(body), nil
+}
+
+func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error) {
+	body, err := readPlainTextMailBody(reader, transferEncoding)
+	if err != nil {
+		return "", err
+	}
+	stripped := bluemonday.
+		StrictPolicy().
+		AddSpaceWhenStrippingTag(true).
+		Sanitize(body)
+	return removeExtraEmptyLines(stripped), nil
+}
+
+func removeExtraEmptyLines(s string) string {
+	s = onlySpacesRegex.ReplaceAllString(s, "")
+	s = consecutiveNewLinesRegex.ReplaceAllString(s, "\n\n")
+	return s
 }

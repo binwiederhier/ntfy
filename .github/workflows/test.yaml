@@ -1,39 +1,30 @@
 name: test
-on: [push, pull_request]
+on: [ push, pull_request ]
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
-      -
-        name: Install Go
+      - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20.x'
-      -
-        name: Install node
+          go-version: '1.22.x'
+      - name: Install node
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
-      -
-        name: Install dependencies
+      - name: Install dependencies
         run: make build-deps-ubuntu
-      -
-        name: Build docs (required for tests)
+      - name: Build docs (required for tests)
         run: make docs
-      -
-        name: Build web app (required for tests)
+      - name: Build web app (required for tests)
         run: make web
-      -
-        name: Run tests, formatting, vetting and linting
+      - name: Run tests, formatting, vetting and linting
         run: make check
-      -
-        name: Run coverage
+      - name: Run coverage
         run: make coverage
-      -
-        name: Upload coverage to codecov.io
+      - name: Upload coverage to codecov.io
         run: make coverage-upload

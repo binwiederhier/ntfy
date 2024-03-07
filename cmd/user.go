@@ -6,13 +6,13 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 )
 
 const (
@@ -198,7 +198,6 @@ func execUserAdd(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
-
 		password = p
 	}
 	if err := manager.AddUser(username, password, role); err != nil {
@@ -343,6 +342,8 @@ func readPasswordAndConfirm(c *cli.Context) (string, error) {
 	password, err := util.ReadPassword(c.App.Reader)
 	if err != nil {
 		return "", err
+	} else if len(password) == 0 {
+		return "", errors.New("password cannot be empty")
 	}
 	fmt.Fprintf(c.App.ErrWriter, "\r%s\rconfirm: ", strings.Repeat(" ", 25))
 	confirm, err := util.ReadPassword(c.App.Reader)

@@ -161,11 +161,6 @@ func ParsePriority(priority string) (int, error) {
 	case "5", "max", "urgent":
 		return 5, nil
 	default:
-		// Ignore new HTTP Priority header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
-		// Cloudflare adds this to requests when forwarding to the backend (ntfy), so we just ignore it.
-		if strings.HasPrefix(p, "u=") {
-			return 3, nil
-		}
 		return 0, errInvalidPriority
 	}
 }
@@ -258,6 +253,8 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 			password, err := term.ReadPassword(int(f.Fd())) // This is always going to be 0
 			if err != nil {
 				return nil, err
+			} else if len(password) == 0 {
+				return nil, errors.New("password cannot be empty")
 			}
 			return password, nil
 		}
@@ -277,7 +274,9 @@ func ReadPassword(in io.Reader) ([]byte, error) {
 		}
 		password = append(password, buf[0])
 	}
-
+	if len(password) == 0 {
+		return nil, errors.New("password cannot be empty")
+	}
 	return password, nil
 }
 

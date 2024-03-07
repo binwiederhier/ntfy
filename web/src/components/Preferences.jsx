@@ -544,6 +544,7 @@ const Language = () => {
     "🇯🇵",
     "🇷🇺",
     "🇹🇷",
+    "🇫🇮",
   ]).slice(0, 3);
   const showFlags = !navigator.userAgent.includes("Windows");
   let title = t("prefs_appearance_language_title");
@@ -571,7 +572,8 @@ const Language = () => {
           <MenuItem value="id">Bahasa Indonesia</MenuItem>
           <MenuItem value="bg">Български</MenuItem>
           <MenuItem value="cs">Čeština</MenuItem>
-          <MenuItem value="zh_Hans">中文</MenuItem>
+          <MenuItem value="zh_Hant">繁體中文</MenuItem>
+          <MenuItem value="zh_Hans">简体中文</MenuItem>
           <MenuItem value="da">Dansk</MenuItem>
           <MenuItem value="de">Deutsch</MenuItem>
           <MenuItem value="es">Español</MenuItem>
@@ -587,6 +589,7 @@ const Language = () => {
           <MenuItem value="pt_BR">Português (Brasil)</MenuItem>
           <MenuItem value="pl">Polski</MenuItem>
           <MenuItem value="ru">Русский</MenuItem>
+          <MenuItem value="fi">Suomi</MenuItem>
           <MenuItem value="sv">Svenska</MenuItem>
           <MenuItem value="tr">Türkçe</MenuItem>
         </Select>

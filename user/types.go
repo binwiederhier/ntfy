@@ -3,7 +3,7 @@ package user
 import (
 	"errors"
 	"github.com/stripe/stripe-go/v74"
-	"heckel.io/ntfy/log"
+	"heckel.io/ntfy/v2/log"
 	"net/netip"
 	"regexp"
 	"strings"

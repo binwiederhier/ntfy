@@ -3,13 +3,13 @@ package server
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/user"
+	"heckel.io/ntfy/v2/user"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -24,8 +24,8 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/log"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/util"
 )
 
 func TestMain(m *testing.M) {
@@ -329,6 +329,27 @@ func TestServer_PublishPriority(t *testing.T) {
 	require.Equal(t, 40007, toHTTPError(t, response.Body.String()).Code)
 }
 
+func TestServer_PublishPriority_SpecialHTTPHeader(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+
+	response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"Priority":   "u=4",
+		"X-Priority": "5",
+	})
+	require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic?priority=4", "test", map[string]string{
+		"Priority": "u=9",
+	})
+	require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+	response = request(t, s, "POST", "/mytopic", "test", map[string]string{
+		"p":        "2",
+		"priority": "u=9, i",
+	})
+	require.Equal(t, 2, toMessage(t, response.Body.String()).Priority)
+}
+
 func TestServer_PublishGETOnlyOneTopic(t *testing.T) {
 	// This tests a bug that allowed publishing topics with a comma in the name (no ticket)
 
@@ -491,6 +512,8 @@ func TestServer_PublishAtAndPrune(t *testing.T) {
 	messages := toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages)) // Not affected by pruning
 	require.Equal(t, "a message", messages[0].Message)
+
+	time.Sleep(time.Second) // FIXME CI failing not sure why
 }
 
 func TestServer_PublishAndMultiPoll(t *testing.T) {
@@ -1323,9 +1346,7 @@ func TestServer_PublishUnifiedPushBinary_AndPoll(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
 	// Register a UnifiedPush subscriber
-	response := request(t, s, "GET", "/up123456789012/json?poll=1", "", map[string]string{
-		"Rate-Topics": "up123456789012",
-	})
+	response := request(t, s, "GET", "/up123456789012/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
 
 	// Publish message to topic
@@ -1356,9 +1377,7 @@ func TestServer_PublishUnifiedPushBinary_Truncated(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
 	// Register a UnifiedPush subscriber
-	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "mytopic",
-	})
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
 
 	// Publish message to topic
@@ -1377,9 +1396,7 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
 	// Register a UnifiedPush subscriber
-	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "mytopic",
-	})
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
 
 	// Publish UnifiedPush text message
@@ -1411,9 +1428,7 @@ func TestServer_MatrixGateway_Discovery_Failure_Unconfigured(t *testing.T) {
 func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 
-	response := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "mytopic", // Register first!
-	})
+	response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, response.Code)
 
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/mytopic?up=1"}]}}`
@@ -2243,16 +2258,14 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 
-	// "Register" visitor 1.2.3.4 to topic "subscriber1topic" as a rate limit visitor
+	// "Register" visitor 1.2.3.4 to topic "upAAAAAAAAAAAA" as a rate limit visitor
 	subscriber1Fn := func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4"
 	}
-	rr := request(t, s, "GET", "/subscriber1topic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "subscriber1topic",
-	}, subscriber1Fn)
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriber1Fn)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
-	require.Equal(t, "1.2.3.4", s.topics["subscriber1topic"].rateVisitor.ip.String())
+	require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
 
 	// "Register" visitor 8.7.7.1 to topic "up012345678912" as a rate limit visitor (implicitly via topic name)
 	subscriber2Fn := func(r *http.Request) {
@@ -2266,10 +2279,10 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 	// Publish 2 messages to "subscriber1topic" as visitor 9.9.9.9. It'd be 3 normally, but the
 	// GET request before is also counted towards the request limiter.
 	for i := 0; i < 2; i++ {
-		rr := request(t, s, "PUT", "/subscriber1topic", "some message", nil)
+		rr := request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, rr.Code)
 	}
-	rr = request(t, s, "PUT", "/subscriber1topic", "some message", nil)
+	rr = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", nil)
 	require.Equal(t, 429, rr.Code)
 
 	// Publish another 2 messages to "up012345678912" as visitor 9.9.9.9
@@ -2302,14 +2315,12 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 	// Subscriber rate limiting is disabled!
 
 	// Registering visitor 1.2.3.4 to topic has no effect
-	rr := request(t, s, "GET", "/subscriber1topic/json?poll=1", "", map[string]string{
-		"Rate-Topics": "subscriber1topic",
-	}, func(r *http.Request) {
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4"
 	})
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
-	require.Nil(t, s.topics["subscriber1topic"].rateVisitor)
+	require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 	// Registering visitor 8.7.7.1 to topic has no effect
 	rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, func(r *http.Request) {
@@ -2319,7 +2330,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 	require.Equal(t, "", rr.Body.String())
 	require.Nil(t, s.topics["up012345678912"].rateVisitor)
 
-	// Publish 3 messages to "subscriber1topic" as visitor 9.9.9.9
+	// Publish 3 messages to "upAAAAAAAAAAAA" as visitor 9.9.9.9
 	for i := 0; i < 3; i++ {
 		rr := request(t, s, "PUT", "/subscriber1topic", "some message", nil)
 		require.Equal(t, 200, rr.Code)
@@ -2392,78 +2403,28 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	subscriberFn := func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4"
 	}
-	rr := request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
-		"rate-topics": "mytopic",
-	}, subscriberFn)
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
-	require.Equal(t, "1.2.3.4", s.topics["mytopic"].rateVisitor.ip.String())
-	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["mytopic"].rateVisitor)
+	require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
+	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 	// Publish message, observe rate visitor tokens being decreased
-	response := request(t, s, "POST", "/mytopic", "some message", nil)
+	response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
-	require.Equal(t, int64(1), s.topics["mytopic"].rateVisitor.messagesLimiter.Value())
-	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["mytopic"].rateVisitor)
+	require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.messagesLimiter.Value())
+	require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 	// Expire visitor
 	s.visitors["ip:1.2.3.4"].seen = time.Now().Add(-1 * 25 * time.Hour)
 	s.pruneVisitors()
 
 	// Publish message again, observe that rateVisitor is not used anymore and is reset
-	response = request(t, s, "POST", "/mytopic", "some message", nil)
+	response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
-	require.Nil(t, s.topics["mytopic"].rateVisitor)
+	require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 	require.Nil(t, s.visitors["ip:1.2.3.4"])
-}
-
-func TestServer_SubscriberRateLimiting_ProtectedTopics(t *testing.T) {
-	c := newTestConfigWithAuthFile(t)
-	c.AuthDefault = user.PermissionDenyAll
-	c.VisitorSubscriberRateLimiting = true
-	s := newTestServer(t, c)
-
-	// Create some ACLs
-	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		Code:         "test",
-		MessageLimit: 5,
-	}))
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
-	require.Nil(t, s.userManager.ChangeTier("ben", "test"))
-	require.Nil(t, s.userManager.AllowAccess("ben", "announcements", user.PermissionReadWrite))
-	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
-	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "public_topic", user.PermissionReadWrite))
-
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
-	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-	require.Nil(t, s.userManager.AddReservation("phil", "reserved-for-phil", user.PermissionReadWrite))
-
-	// Set rate visitor as user "phil" on topic
-	// - "reserved-for-phil": Allowed, because I am the owner
-	// - "public_topic": Allowed, because it has read-write permissions for everyone
-	// - "announcements": NOT allowed, because it has read-only permissions for everyone
-	rr := request(t, s, "GET", "/reserved-for-phil,public_topic,announcements/json?poll=1", "", map[string]string{
-		"Authorization": util.BasicAuth("phil", "phil"),
-		"Rate-Topics":   "reserved-for-phil,public_topic,announcements",
-	})
-	require.Equal(t, 200, rr.Code)
-	require.Equal(t, "phil", s.topics["reserved-for-phil"].rateVisitor.user.Name)
-	require.Equal(t, "phil", s.topics["public_topic"].rateVisitor.user.Name)
-	require.Nil(t, s.topics["announcements"].rateVisitor)
-
-	// Set rate visitor as user "ben" on topic
-	// - "reserved-for-phil": NOT allowed, because I am not the owner
-	// - "public_topic": Allowed, because it has read-write permissions for everyone
-	// - "announcements": Allowed, because I have read-write permissions
-	rr = request(t, s, "GET", "/reserved-for-phil,public_topic,announcements/json?poll=1", "", map[string]string{
-		"Authorization": util.BasicAuth("ben", "ben"),
-		"Rate-Topics":   "reserved-for-phil,public_topic,announcements",
-	})
-	require.Equal(t, 200, rr.Code)
-	require.Equal(t, "phil", s.topics["reserved-for-phil"].rateVisitor.user.Name)
-	require.Equal(t, "ben", s.topics["public_topic"].rateVisitor.user.Name)
-	require.Equal(t, "ben", s.topics["announcements"].rateVisitor.user.Name)
 }
 
 func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {

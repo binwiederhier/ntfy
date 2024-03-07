@@ -23,6 +23,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Platypush](https://docs.platypush.tech/platypush/plugins/ntfy.html) - Automation platform aimed to run on any device that can run Python
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
+- [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
+- [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -56,7 +58,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy](https://github.com/ffflorian/ntfy) - Send notifications over ntfy (JS)
 - [ntfy_dart](https://github.com/jr1221/ntfy_dart) - Dart wrapper around the ntfy API (Dart)
 - [gotfy](https://github.com/AnthonyHewins/gotfy) - A Go wrapper for the ntfy API (Go)
-- [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP) 
+- [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP)
+- [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 
 ## CLIs + GUIs
 
@@ -80,7 +83,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [backup-projects](https://gist.github.com/anthonyaxenov/826ba65abbabd5b00196bc3e6af76002) - Stupidly simple backup script for own projects (Shell)
 - [grav-plugin-whistleblower](https://github.com/Himmlisch-Studios/grav-plugin-whistleblower) - Grav CMS plugin to get notifications via ntfy (PHP)
 - [ntfy-server-status](https://github.com/filip2cz/ntfy-server-status) -  Checking if server is online and reporting through ntfy (C)
-- [borg-based backup](https://github.com/davidhi7/backup) - Simple borg-based backup script with notifications based on ntfy.sh or Discord webhooks (Python/Shell)
 - [ntfy.sh *arr script](https://github.com/agent-squirrel/nfty-arr-script) - Quick and hacky script to get sonarr/radarr to notify the ntfy.sh service (Shell)
 - [website-watcher](https://github.com/muety/website-watcher) - A small tool to watch websites for changes (with XPath support) (Python)
 - [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)
@@ -127,10 +129,35 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [msgdrop](https://github.com/jbrubake/msgdrop) - Send and receive encrypted messages (Bash)
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager
+- [NtfyMe-Blender](https://github.com/NotNanook/NtfyMe-Blender) - Blender addon to send notifications to NtfyMe (Python)
+- [ntfy-ios-url-share](https://www.icloud.com/shortcuts/be8a7f49530c45f79733cfe3e41887e6) - An iOS shortcut that lets you share URLs easily and quickly.
+- [ntfy-ios-filesharing](https://www.icloud.com/shortcuts/fe948d151b2e4ae08fb2f9d6b27d680b) - An iOS shortcut that lets you share files from your share feed to a topic of your choice.
+- [systemd-ntfy](https://hackage.haskell.org/package/systemd-ntfy) - monitor a set of systemd services an send a notification to ntfy.sh whenever their status changes
+- [RouterOS Scripts](https://git.eworm.de/cgit/routeros-scripts/about/) - a collection of scripts for MikroTik RouterOS
+- [ntfy-android-builder](https://github.com/TheBlusky/ntfy-android-builder) - Script for building ntfy-android with custom Firebase configuration (Docker/Shell)
+- [jetspotter](https://github.com/vvanouytsel/jetspotter) - send notifications when planes are spotted near you (Go)
+- [monitoring_ntfy](https://www.drupal.org/project/monitoring_ntfy) - Drupal monitoring Ntfy.sh integration (PHP/Drupal)
+- [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
 
 ## Blog + forum posts
 
-- [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 9/2021
+- [Installing Self Host NTFY On Linux Using Docker Container](https://www.pinoylinux.org/topicsplus/containers/installing-self-host-ntfy-on-linux-using-docker-container/) - pinoylinux.org - 9/2023
+- [Homelab Notifications with ntfy](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/) ⭐ - alexsguardian.net - 9/2023 
+- [Why NTFY is the Ultimate Push Notification Tool for Your Needs](https://osintph.medium.com/why-ntfy-is-the-ultimate-push-notification-tool-for-your-needs-e767421c84c5) - osintph.medium.com - 9/2023
+- [Supercharge Your Alerts: Ntfy — The Ultimate Push Notification Solution](https://medium.com/spring-boot/supercharge-your-alerts-ntfy-the-ultimate-push-notification-solution-a3dda79651fe) - spring-boot.medium.com - 9/2023
+- [Deploy Ntfy using Docker](https://www.linkedin.com/pulse/deploy-ntfy-mohamed-sharfy/) - linkedin.com - 9/2023
+- [Send Notifications With Ntfy for New WordPress Posts](https://www.activepieces.com/blog/ntfy-notifications-for-wordpress-new-posts) - activepieces.com - 9/2023
+- [Get Ntfy Notifications About New Zendesk Ticket](https://www.activepieces.com/blog/ntfy-notifications-about-new-zendesk-tickets) - activepieces.com - 9/2023
+- [Set reminder for recurring events using ntfy & Cron](https://www.youtube.com/watch?v=J3O4aQ-EcYk) - youtube.com - 9/2023
+- [ntfy - Installation and full configuration setup](https://www.youtube.com/watch?v=QMy14rGmpFI) - youtube.com - 9/2023
+- [How to install Ntfy.sh on Portainer / Docker Compose](https://www.youtube.com/watch?v=utD9GNbAwyg) - youtube.com - 9/2023
+- [ntfy - Push-Benachrichtigungen // Push Notifications](https://www.youtube.com/watch?v=LE3vRPPqZOU) - youtube.com - 9/2023
+- [Podman Update Notifications via Ntfy](https://rair.dev/podman-upadte-notifications-ntfy/) - rair.dev - 9/2023
+- [How to Send Alerts From Raspberry Pi Pico W to a Phone or Tablet](https://www.tomshardware.com/how-to/send-alerts-raspberry-pi-pico-w-to-mobile-device) - tomshardware.com - 8/2023
+- [NetworkChunk - how did I NOT know about this?](https://www.youtube.com/watch?v=poDIT2ruQ9M) ⭐ - youtube.com - 8/2023
+- [NTFY - Command-Line Notifications](https://academy.networkchuck.com/blog/ntfy/) - academy.networkchuck.com - 8/2023
+- [Open Source Push Notifications! Get notified of any event you can imagine. Triggers abound!](https://www.youtube.com/watch?v=WJgwWXt79pE) ⭐ - youtube.com - 8/2023
+- [How to install and self host an Ntfy server on Linux](https://linuxconfig.org/how-to-install-and-self-host-an-ntfy-server-on-linux) - linuxconfig.org - 7/2023
 - [Basic website monitoring using cronjobs and ntfy.sh](https://burkhardt.dev/2023/website-monitoring-cron-ntfy/) - burkhardt.dev - 6/2023 
 - [Pingdom alternative in one line of curl through ntfy.sh](https://piqoni.bearblog.dev/uptime-monitoring-in-one-line-of-curl/) - bearblog.dev - 6/2023 
 - [#OpenSourceDiscovery 78: ntfy.sh](https://opensourcedisc.substack.com/p/opensourcediscovery-78-ntfysh) - opensourcedisc.substack.com - 6/2023 
@@ -214,6 +241,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |
 | [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
 | [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
+| [ntfy.fossman.de](https://ntfy.fossman.de/)       | 🇩🇪 Germany       |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

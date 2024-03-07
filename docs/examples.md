@@ -135,6 +135,21 @@ You can send a message during a workflow run with curl. Here is an example sendi
       ${{ secrets.NTFY_URL }}
 ```
 
+## Changedetection.io
+ntfy is an excellent choice for getting notifications when a website has a change sent to your mobile (or desktop), 
+[changedetection.io](https://changedetection.io) or on GitHub ([dgtlmoon/changedetection.io](https://github.com/dgtlmoon/changedetection.io)) 
+uses [apprise](https://github.com/caronc/apprise) library for notification integrations.
+
+To add any ntfy(s) notification to a website change simply add the [ntfy style URL](https://github.com/caronc/apprise/wiki/Notify_ntfy) 
+to the notification list.
+
+For example `ntfy://{topic}` or `ntfy://{user}:{password}@{host}:{port}/{topics}`
+
+In your changedetection.io installation, click `Edit` > `Notifications` on a single website watch (or group) then add 
+the special ntfy Apprise Notification URL to the Notification List.
+
+![ntfy alerts on website change](static/img/cdio-setup.jpg)
+
 ## Watchtower (shoutrrr)
 You can use [shoutrrr](https://containrrr.dev/shoutrrr/latest/services/ntfy/) to send 
 [Watchtower](https://github.com/containrrr/watchtower/) notifications to your ntfy topic.
@@ -147,12 +162,21 @@ services:
     image: containrrr/watchtower
     environment:
       - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_SKIP_TITLE=True
       - WATCHTOWER_NOTIFICATION_URL=ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates
 ```
+
+The environment variable `WATCHTOWER_NOTIFICATION_SKIP_TITLE` is required to prevent Watchtower from [replacing the `title` query parameter](https://containrrr.dev/watchtower/notifications/#settings). If omitted, the provided notification title will not be used.
 
 Or, if you only want to send notifications using shoutrrr:
 ```
 shoutrrr send -u "ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
+```
+
+Authentication tokens are also supported via the generic webhook and authorization header using this url format (replace the domain, topic and token with your own):
+
+```
+generic+https://DOMAIN/TOPIC?@authorization=Bearer+TOKEN`
 ```
 
 ## Sonarr, Radarr, Lidarr, Readarr, Prowlarr, SABnzbd

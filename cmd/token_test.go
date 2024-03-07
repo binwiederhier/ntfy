@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/server"
-	"heckel.io/ntfy/test"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/test"
 	"regexp"
 	"testing"
 )

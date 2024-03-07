@@ -3,7 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"log"
 	"os"
 	"sort"

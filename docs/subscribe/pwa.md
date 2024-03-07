@@ -26,6 +26,13 @@ app drawer:
     <a href="../../static/img/pwa-badge.png"><img src="../../static/img/pwa-badge.png"/></a>
 </div>
 
+### Safari on macOS
+To install and register the web app via Safari, click on the Share menu and click Add to Dock. You need to be on macOS Sonoma (14) or higher.
+
+<div id="pwa-screenshots-safari-desktop" class="screenshots">
+    <a href="../../static/img/pwa-install-macos-safari-add-to-dock.png"><img src="../../static/img/pwa-install-macos-safari-add-to-dock.png"/></a>
+</div>
+
 ### Chrome/Firefox on Android
 For Chrome on Android, either click the "Add to Home Screen" banner at the bottom of the screen, or select "Install app"
 in the menu, and then click "Install" in the popup menu. After installation, you can find the app in your app drawer, 

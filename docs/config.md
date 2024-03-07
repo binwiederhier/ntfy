@@ -24,7 +24,7 @@ get a list of [command line options](#command-line-options).
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
 
-Here are a few working sample configs:
+Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
 
 === "server.yml (HTTP-only, with cache + attachments)"
     ``` yaml
@@ -40,6 +40,14 @@ Here are a few working sample configs:
     listen-https: ":443"
     key-file: "/etc/letsencrypt/live/ntfy.example.com.key"
     cert-file: "/etc/letsencrypt/live/ntfy.example.com.crt"
+    cache-file: "/var/cache/ntfy/cache.db"
+    attachment-cache-dir: "/var/cache/ntfy/attachments"
+    ```
+
+=== "server.yml (behind proxy, with cache + attachments)"
+    ``` yaml
+    base-url: "http://ntfy.example.com"
+    listen-http: ":2586"
     cache-file: "/var/cache/ntfy/cache.db"
     attachment-cache-dir: "/var/cache/ntfy/attachments"
     ```
@@ -63,6 +71,58 @@ Here are a few working sample configs:
     smtp-server-domain: "ntfy.sh"
     smtp-server-addr-prefix: "ntfy-"
     keepalive-interval: "45s"
+    ```
+
+Alternatively, you can also use command line arguments or environment variables to configure the server. Here's an example
+using Docker Compose (i.e. `docker-compose.yml`):
+
+=== "Docker Compose (w/ auth, cache, attachments)"
+    ``` yaml
+	version: '3'
+	services:
+	  ntfy:
+	    image: binwiederhier/ntfy
+	    restart: unless-stopped
+	    environment:
+	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+	      NTFY_BEHIND_PROXY: true
+	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+	      NTFY_ENABLE_LOGIN: true
+	    volumes:
+	      - ./:/var/lib/ntfy
+	    ports:
+	      - 80:80
+	    command: serve
+    ```
+
+=== "Docker Compose (w/ auth, cache, web push, iOS)"
+    ``` yaml
+	version: '3'
+	services:
+	  ntfy:
+	    image: binwiederhier/ntfy
+	    restart: unless-stopped
+	    environment:
+	      NTFY_BASE_URL: http://ntfy.example.com
+	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+	      NTFY_BEHIND_PROXY: true
+	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+	      NTFY_ENABLE_LOGIN: true
+	      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
+	      NTFY_WEB_PUSH_PUBLIC_KEY: <public_key>
+	      NTFY_WEB_PUSH_PRIVATE_KEY: <private_key>
+	      NTFY_WEB_PUSH_FILE: /var/lib/ntfy/webpush.db
+	      NTFY_WEB_PUSH_EMAIL_ADDRESS: <email>
+	    volumes:
+	      - ./:/var/lib/ntfy
+	    ports:
+	      - 8093:80
+	    command: serve
     ```
 
 ## Message cache
@@ -344,10 +404,10 @@ with the given username/password. Be sure to use HTTPS to avoid eavesdropping an
     ```
 
 ### Example: UnifiedPush
-[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
-has anonymous write access to the [topic](https://unifiedpush.org/spec/definitions/#endpoint) used for push messages. 
+[UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/developers/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
+has anonymous write access to the [topic](https://unifiedpush.org/developers/spec/definitions/#endpoint) used for push messages. 
 The topic names used by UnifiedPush all start with the `up*` prefix. Please refer to the 
-**[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users)** for more details.
+**[UnifiedPush documentation](https://unifiedpush.org/users/distributors/ntfy/#limit-access-to-some-users-acl)** for more details.
 
 To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either 
 allow anonymous write access for the entire prefix or explicitly per topic:
@@ -457,6 +517,31 @@ $ dig MX ntfy.sh +short
 $ dig A mx1.ntfy.sh +short 
 3.139.215.220
 ```
+
+### Local-only email
+If you want to send emails from an internal service on the same network as your ntfy instance, you do not need to
+worry about DNS records at all. Define a port for the SMTP server and pick an SMTP server domain (can be
+anything).
+
+=== "/etc/ntfy/server.yml"
+    ``` yaml
+    smtp-server-listen: ":25"
+    smtp-server-domain: "example.com"
+    smtp-server-addr-prefix: "ntfy-"  # optional
+    ```
+
+Then, in the email settings of your internal service, set the SMTP server address to the IP address of your
+ntfy instance. Set the port to the value you defined in `smtp-server-listen`. Leave any username and password
+fields empty. In the "From" address, pick anything (e.g., "alerts@ntfy.sh"); the value doesn't matter.
+In the "To" address, put in an email address that follows this pattern: `[topic]@[smtp-server-domain]` (or
+`[smtp-server-addr-prefix][topic]@[smtp-server-domain]` if you set `smtp-server-addr-prefix`).
+
+So if you used `example.com` as the SMTP server domain, and you want to send a message to the `email-alerts`
+topic, set the "To" address to `email-alerts@example.com`. If the topic has access restrictions, you will need
+to include an access token in the "To" address, such as `email-alerts+tk_AbC123dEf456@example.com`.
+
+If the internal service lets you use define an email "Subject", it will become the title of the notification.
+The body of the email will become the message of the notification.
 
 ## Behind a proxy (TLS, etc.)
 !!! warning
@@ -649,8 +734,8 @@ or the root domain:
     <VirtualHost *:80>
         ServerName ntfy.sh
 
-        # Proxy connections to ntfy (requires "a2enmod proxy")
-        ProxyPass / http://127.0.0.1:2586/
+        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
         ProxyPassReverse / http://127.0.0.1:2586/
 
         SetEnv proxy-nokeepalive 1
@@ -658,19 +743,13 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
-
-        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
-        RewriteCond %{HTTP:Upgrade} websocket [NC]
-        RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L]
         
         # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix 
-        RewriteCond %{REQUEST_METHOD} GET
-        RewriteRule ^/([-_A-Za-z0-9]{0,64})$ https://%{SERVER_NAME}/$1 [R,L]
+        # it to work with curl without the annoying https:// prefix (requires "a2enmod alias")
+        <If "%{REQUEST_METHOD} == 'GET'">
+            RedirectMatch permanent "^/([-_A-Za-z0-9]{0,64})$" "https://%{SERVER_NAME}/$1"
+        </If>
+
     </VirtualHost>
     
     <VirtualHost *:443>
@@ -681,8 +760,8 @@ or the root domain:
         SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
         Include /etc/letsencrypt/options-ssl-apache.conf
 
-        # Proxy connections to ntfy (requires "a2enmod proxy")
-        ProxyPass / http://127.0.0.1:2586/
+        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
         ProxyPassReverse / http://127.0.0.1:2586/
 
         SetEnv proxy-nokeepalive 1
@@ -690,14 +769,7 @@ or the root domain:
 
         # Higher than the max message size of 4096 bytes 
         LimitRequestBody 102400
-
-        # Enable mod_rewrite (requires "a2enmod rewrite")
-        RewriteEngine on
-
-        # WebSockets support (requires "a2enmod rewrite proxy_wstunnel")
-        RewriteCond %{HTTP:Upgrade} websocket [NC]
-        RewriteCond %{HTTP:Connection} upgrade [NC]
-        RewriteRule ^/?(.*) "ws://127.0.0.1:2586/$1" [P,L] 
+	
     </VirtualHost>
     ```
 
@@ -1006,19 +1078,22 @@ By default, ntfy puts almost all rate limits on the message publisher, e.g. numb
 size are all based on the visitor who publishes a message. **Subscriber-based rate limiting is a way to use the rate limits
 of a topic's subscriber, instead of the limits of the publisher.**
 
-If enabled, subscribers may opt to have published messages counted against their own rate limits, as opposed
-to the publisher's rate limits. This is especially useful to increase the amount of messages that high-volume
-publishers (e.g. Matrix/Mastodon servers) are allowed to send.
+If subscriber-based rate limiting is enabled, **messages published on UnifiedPush topics** (topics starting with `up`, e.g. `up123456789012`) 
+will be counted towards the "rate visitor" of the topic. A "rate visitor" is the first subscriber to the topic. 
 
-Once enabled, a client may send a `Rate-Topics: <topic1>,<topic2>,...` header when subscribing to topics via
-HTTP stream, or websockets, thereby registering itself as the "rate visitor", i.e. the visitor whose rate limits
-to use when publishing on this topic. Note that setting the rate visitor requires **read-write permission** on the topic.
+Once enabled, a client subscribing to UnifiedPush topics via HTTP stream, or websockets, will be automatically registered as
+a "rate visitor", i.e. the visitor whose rate limits will be used when publishing on this topic. Note that setting the rate visitor
+requires **read-write permission** on the topic.
 
-UnifiedPush only: If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
+If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
 response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
 `visitor-message-daily-limit`.
 
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
+
+!!! info
+    Due to a denial-of-service issue, support for the `Rate-Topics` header was removed entirely. This is unfortunate,
+    but subscriber-based rate limiting will still work for `up*` topics.
 
 ## Tuning for scale
 If you're running ntfy for your home server, you probably don't need to worry about scale at all. In its default config,
@@ -1160,10 +1235,10 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
 
 ## Health checks
 A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
-If a non-200 HTTP status code is returned or if the returned `health` field is `false` the ntfy service should be considered as unhealthy.
+If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.
 
 ```json
-{"health":true}
+{"healthy":true}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.

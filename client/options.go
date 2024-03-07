@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	"heckel.io/ntfy/util"
+	"heckel.io/ntfy/v2/util"
 	"net/http"
 	"strings"
 	"time"

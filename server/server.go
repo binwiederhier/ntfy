@@ -733,7 +733,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if err != nil {
 		return nil, err
 	}
-	body, err := util.Peek(r.Body, s.config.MessageLimit)
+	body, err := util.Peek(r.Body, s.config.MessageSizeLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -996,9 +996,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
 			return false, false, "", "", false, errHTTPBadRequestDelayCannotParse
-		} else if delay.Unix() < time.Now().Add(s.config.MinDelay).Unix() {
+		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
 			return false, false, "", "", false, errHTTPBadRequestDelayTooSmall
-		} else if delay.Unix() > time.Now().Add(s.config.MaxDelay).Unix() {
+		} else if delay.Unix() > time.Now().Add(s.config.MessageDelayMax).Unix() {
 			return false, false, "", "", false, errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
@@ -1754,7 +1754,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
 // before passing it on to the next handler. This is meant to be used in combination with handlePublish.
 func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageLimit*2, false) // 2x to account for JSON format overhead
+		m, err := readJSONWithLimit[publishMessage](r.Body, s.config.MessageSizeLimit*2, false) // 2x to account for JSON format overhead
 		if err != nil {
 			return err
 		}
@@ -1812,7 +1812,7 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 
 func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageLimit)
+		newRequest, err := newRequestFromMatrixJSON(r, s.config.BaseURL, s.config.MessageSizeLimit)
 		if err != nil {
 			logvr(v, r).Tag(tagMatrix).Err(err).Debug("Invalid Matrix request")
 			if e, ok := err.(*errMatrixPushkeyRejected); ok {

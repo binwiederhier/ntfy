@@ -92,3 +92,27 @@ func TestParseDuration(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, time.Duration(0), d)
 }
+
+func TestFormatDuration(t *testing.T) {
+	values := []struct {
+		duration time.Duration
+		expected string
+	}{
+		{24 * time.Second, "24s"},
+		{56 * time.Minute, "56m"},
+		{time.Hour, "1h"},
+		{2 * time.Hour, "2h"},
+		{24 * time.Hour, "1d"},
+		{3 * 24 * time.Hour, "3d"},
+	}
+	for _, value := range values {
+		require.Equal(t, value.expected, FormatDuration(value.duration))
+		d, err := ParseDuration(FormatDuration(value.duration))
+		require.Nil(t, err)
+		require.Equalf(t, value.duration, d, "duration does not match: %v != %v", value.duration, d)
+	}
+}
+
+func TestFormatDuration_Rounded(t *testing.T) {
+	require.Equal(t, "1d", FormatDuration(47*time.Hour))
+}

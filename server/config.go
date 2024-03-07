@@ -15,8 +15,8 @@ const (
 	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
 	DefaultManagerInterval                      = time.Minute
 	DefaultDelayedSenderInterval                = 10 * time.Second
-	DefaultMinDelay                             = 10 * time.Second
-	DefaultMaxDelay                             = 3 * 24 * time.Hour
+	DefaultMessageDelayMin                      = 10 * time.Second
+	DefaultMessageDelayMax                      = 3 * 24 * time.Hour
 	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
@@ -34,7 +34,7 @@ const (
 // - total topic limit: max number of topics overall
 // - various attachment limits
 const (
-	DefaultMessageLengthLimit       = 4096 // Bytes
+	DefaultMessageSizeLimit         = 4096 // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
 	DefaultTotalTopicLimit          = 15000
 	DefaultAttachmentTotalSizeLimit = int64(5 * 1024 * 1024 * 1024) // 5 GB
 	DefaultAttachmentFileSizeLimit  = int64(15 * 1024 * 1024)       // 15 MB
@@ -122,9 +122,9 @@ type Config struct {
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
-	MessageLimit                         int
-	MinDelay                             time.Duration
-	MaxDelay                             time.Duration
+	MessageDelayMin                      time.Duration
+	MessageDelayMax                      time.Duration
+	MessageSizeLimit                     int
 	TotalTopicLimit                      int
 	TotalAttachmentSizeLimit             int64
 	VisitorSubscriptionLimit             int
@@ -211,9 +211,9 @@ func NewConfig() *Config {
 		TwilioPhoneNumber:                    "",
 		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
 		TwilioVerifyService:                  "",
-		MessageLimit:                         DefaultMessageLengthLimit,
-		MinDelay:                             DefaultMinDelay,
-		MaxDelay:                             DefaultMaxDelay,
+		MessageSizeLimit:                     DefaultMessageSizeLimit,
+		MessageDelayMin:                      DefaultMessageDelayMin,
+		MessageDelayMax:                      DefaultMessageDelayMax,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,
 		TotalAttachmentSizeLimit:             0,
 		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,

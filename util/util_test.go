@@ -110,33 +110,47 @@ func TestShortTopicURL(t *testing.T) {
 
 func TestParseSize_10GSuccess(t *testing.T) {
 	s, err := ParseSize("10G")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	require.Equal(t, int64(10*1024*1024*1024), s)
 }
 
 func TestParseSize_10MUpperCaseSuccess(t *testing.T) {
 	s, err := ParseSize("10M")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	require.Equal(t, int64(10*1024*1024), s)
 }
 
 func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
 	s, err := ParseSize("10k")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	require.Equal(t, int64(10*1024), s)
 }
 
 func TestParseSize_FailureInvalid(t *testing.T) {
 	_, err := ParseSize("not a size")
-	if err == nil {
-		t.Fatalf("expected error, but got none")
+	require.Nil(t, err)
+}
+
+func TestFormatSize(t *testing.T) {
+	values := []struct {
+		size     int64
+		expected string
+	}{
+		{10, "10"},
+		{10 * 1024, "10K"},
+		{10 * 1024 * 1024, "10M"},
+		{10 * 1024 * 1024 * 1024, "10G"},
 	}
+	for _, value := range values {
+		require.Equal(t, value.expected, FormatSize(value.size))
+		s, err := ParseSize(FormatSize(value.size))
+		require.Nil(t, err)
+		require.Equalf(t, value.size, s, "size does not match: %d != %d", value.size, s)
+	}
+}
+
+func TestFormatSize_Rounded(t *testing.T) {
+	require.Equal(t, "10K", FormatSize(10*1024+999))
 }
 
 func TestSplitKV(t *testing.T) {

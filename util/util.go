@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/netip"
 	"os"
@@ -215,6 +216,8 @@ func ParseSize(s string) (int64, error) {
 		return -1, fmt.Errorf("cannot convert number %s", matches[1])
 	}
 	switch strings.ToUpper(matches[2]) {
+	case "T":
+		return int64(value) * 1024 * 1024 * 1024 * 1024, nil
 	case "G":
 		return int64(value) * 1024 * 1024 * 1024, nil
 	case "M":
@@ -226,8 +229,23 @@ func ParseSize(s string) (int64, error) {
 	}
 }
 
-// FormatSize formats bytes into a human-readable notation, e.g. 2.1 MB
+// FormatSize formats the size in a way that it can be parsed by ParseSize.
+// It does not include decimal places. Uneven sizes are rounded down.
 func FormatSize(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%d%c", int(math.Floor(float64(b)/float64(div))), "KMGT"[exp])
+}
+
+// FormatSizeHuman formats bytes into a human-readable notation, e.g. 2.1 MB
+func FormatSizeHuman(b int64) string {
 	const unit = 1024
 	if b < unit {
 		return fmt.Sprintf("%d bytes", b)
@@ -237,7 +255,7 @@ func FormatSize(b int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGT"[exp])
 }
 
 // ReadPassword will read a password from STDIN. If the terminal supports it, it will not print the

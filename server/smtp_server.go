@@ -150,8 +150,8 @@ func (s *smtpSession) Data(r io.Reader) error {
 			return err
 		}
 		body = strings.TrimSpace(body)
-		if len(body) > conf.MessageLimit {
-			body = body[:conf.MessageLimit]
+		if len(body) > conf.MessageSizeLimit {
+			body = body[:conf.MessageSizeLimit]
 		}
 		m := newDefaultMessage(s.topic, body)
 		subject := strings.TrimSpace(msg.Header.Get("Subject"))

@@ -718,11 +718,11 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:         "starter",
-		MessageLimit: 10,
+		MessageSizeLimit: 10,
 	}))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:         "pro",
-		MessageLimit: 20,
+		MessageSizeLimit: 20,
 	}))
 	require.Nil(t, s.userManager.ChangeTier("phil", "starter"))
 

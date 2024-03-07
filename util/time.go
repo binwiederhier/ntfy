@@ -83,6 +83,22 @@ func ParseDuration(s string) (time.Duration, error) {
 	return 0, errUnparsableTime
 }
 
+func FormatDuration(d time.Duration) string {
+	if d >= 24*time.Hour {
+		return strconv.Itoa(int(d/(24*time.Hour))) + "d"
+	}
+	if d >= time.Hour {
+		return strconv.Itoa(int(d/time.Hour)) + "h"
+	}
+	if d >= time.Minute {
+		return strconv.Itoa(int(d/time.Minute)) + "m"
+	}
+	if d >= time.Second {
+		return strconv.Itoa(int(d/time.Second)) + "s"
+	}
+	return "0s"
+}
+
 func parseFromDuration(s string, now time.Time) (time.Time, error) {
 	d, err := ParseDuration(s)
 	if err == nil {

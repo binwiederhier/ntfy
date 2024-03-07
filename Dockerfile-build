@@ -53,6 +53,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0, GPL-2.0"
 LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
 
+RUN adduser -D -u 1000 ntfy
 COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
 
 EXPOSE 80/tcp

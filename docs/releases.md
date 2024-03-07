@@ -1333,6 +1333,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
 * Update Watchtower example ([#1014](https://github.com/binwiederhier/ntfy/pull/1014), thanks to [@lennart-m](https://github.com/lennart-m))
 * Fix dead links ([#1022](https://github.com/binwiederhier/ntfy/pull/1022), thanks to [@DerRockWolf](https://github.com/DerRockWolf))
+* PowerShell file upload example ([#1004](https://github.com/binwiederhier/ntfy/pull/1004), thanks to [@YMan84](https://github.com/YMan84))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

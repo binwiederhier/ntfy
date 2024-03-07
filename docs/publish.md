@@ -2438,18 +2438,18 @@ Here's an example showing how to upload an image:
     req.Header.Set("Filename", "flower.jpg")
     http.DefaultClient.Do(req)
     ```
-    
+
 === "PowerShell"
     ``` powershell
-$Request = @{
-    Method = "POST" 
-    Uri = "ntfy.sh/flowers"
-    InFile = "flower.jpg"
-    Headers = @{"Filename" = "flower.jpg"}
-}
+    $Request = @{
+      Method = "POST"
+      Uri = "ntfy.sh/flowers"
+      InFile = "flower.jpg"
+      Headers = @{"Filename" = "flower.jpg"}
+    }
     Invoke-RestMethod @Request
     ```
-    
+
 === "Python"
     ``` python
     requests.put("https://ntfy.sh/flowers",

@@ -16,6 +16,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -126,7 +127,7 @@ func execServe(c *cli.Context) error {
 
 	// Read all the options
 	config := c.String("config")
-	baseURL := c.String("base-url")
+	baseURL := strings.TrimSuffix(c.String("base-url"), "/")
 	listenHTTP := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
@@ -273,10 +274,15 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if baseURL != "" && !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
-		return errors.New("if set, base-url must start with http:// or https://")
-	} else if baseURL != "" && strings.HasSuffix(baseURL, "/") {
-		return errors.New("if set, base-url must not end with a slash (/)")
+	} else if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
+		} else if u.Scheme != "http" && u.Scheme != "https" {
+			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
+		} else if u.Path != "" {
+			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
+		}
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {

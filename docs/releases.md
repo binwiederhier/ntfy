@@ -1315,6 +1315,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.9.0
 
+**Features:**
+
+* Support for larger message delays with `message-delay-limit` (see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050)/[#1019](https://github.com/binwiederhier/ntfy/issues/1019), thanks to [@MrChadMWood](https://github.com/MrChadMWood) for reporting)
+* Support for larger message body sizes with `message-size-limit` (use at your own risk, see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050), thanks to [@zhzy0077](https://github.com/zhzy0077) for implementing this, and to [@nkjshlsqja7331](https://github.com/nkjshlsqja7331) for reporting)
+
 **Bug fixes + maintenance:**
 
 * Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
@@ -1325,6 +1330,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
 * Update Watchtower example ([#1014](https://github.com/binwiederhier/ntfy/pull/1014), thanks to [@lennart-m](https://github.com/lennart-m))
 * Fix dead links ([#1022](https://github.com/binwiederhier/ntfy/pull/1022), thanks to [@DerRockWolf](https://github.com/DerRockWolf))
+
+!!! warning
+    **Breaking change**: The `Rate-Topics` header was removed due to a ([DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used.
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

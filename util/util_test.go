@@ -128,7 +128,7 @@ func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
 
 func TestParseSize_FailureInvalid(t *testing.T) {
 	_, err := ParseSize("not a size")
-	require.Nil(t, err)
+	require.Error(t, err)
 }
 
 func TestFormatSize(t *testing.T) {

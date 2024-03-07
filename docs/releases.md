@@ -1313,6 +1313,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.9.0
+
+**Bug fixes + maintenance:**
+
+* Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

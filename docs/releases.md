@@ -19,7 +19,6 @@ A small release after a long pause (lots of day job work). This release adds for
 **Bug fixes + maintenance:**
 
 * ⚠️ Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048))
-* Add non-root user to Docker image, ntfy can be run as non-root ([#967](https://github.com/binwiederhier/ntfy/pull/967)/[#966](https://github.com/binwiederhier/ntfy/issues/966), thanks to [@arahja](https://github.com/arahja))
 
 **Documentation:**
 

@@ -6,6 +6,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Official integrations
 
+- [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
@@ -16,7 +17,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Gatus](https://gatus.io/) ⭐ - Automated service health dashboard
 - [Automatisch](https://automatisch.io/) ⭐ - Open source Zapier alternative / workflow automation tool
 - [FlexGet](https://flexget.com/Plugins/Notifiers/ntfysh) ⭐ - Multipurpose automation tool for all of your media
-- [Shoutrrr](https://containrrr.dev/shoutrrr/v0.7/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
+- [Shoutrrr](https://containrrr.dev/shoutrrr/v0.8/services/ntfy/) ⭐ - Notification library for gophers and their furry friends.
 - [Netdata](https://learn.netdata.cloud/docs/alerts-and-notifications/notifications/agent-alert-notifications/ntfy) ⭐ - Real-time performance monitoring
 - [Deployer](https://github.com/deployphp/deployer) ⭐ - PHP deployment tool
 - [Scrt.link](https://scrt.link/) - Share a secret
@@ -24,7 +25,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [diun](https://crazymax.dev/diun/) - Docker Image Update Notifier
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
-- [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
+- [HetrixTools](https://docs.hetrixtools.com/ntfy-sh-notifications/) - Uptime monitoring
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -138,9 +139,15 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [jetspotter](https://github.com/vvanouytsel/jetspotter) - send notifications when planes are spotted near you (Go)
 - [monitoring_ntfy](https://www.drupal.org/project/monitoring_ntfy) - Drupal monitoring Ntfy.sh integration (PHP/Drupal)
 - [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
+- [notify-via-ntfy](https://exchange.checkmk.com/p/notify-via-ntfy) - Checkmk plugin to send notifications via ntfy (Python)
+- [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 
 ## Blog + forum posts
 
+- [Boost Your Productivity with ntfy.sh: The Ultimate Notification Tool for Command-Line Users](https://dev.to/archetypal/boost-your-productivity-with-ntfysh-the-ultimate-notification-tool-for-command-line-users-iil) - dev.to - 3/2024
+- [Introducing the Monitoring Ntfy.sh Integration Module: Real-time Notifications for Drupal Monitoring](https://cyberschorsch.dev/drupal/introducing-monitoring-ntfysh-integration-module-real-time-notifications-drupal-monitoring) - cyberschorsch.dev - 11/2023
+- [How to install Ntfy.sh on CasaOS using BigBearCasaOS](https://www.youtube.com/watch?v=wSWhtSNwTd8) - youtube.com - 10/2023
+- [Ntfy: Your Ultimate Push Notification Powerhouse!](https://kkamalesh117.medium.com/ntfy-your-ultimate-push-notification-powerhouse-1968c070f1d1) - kkamalesh117.medium.com - 9/2023
 - [Installing Self Host NTFY On Linux Using Docker Container](https://www.pinoylinux.org/topicsplus/containers/installing-self-host-ntfy-on-linux-using-docker-container/) - pinoylinux.org - 9/2023
 - [Homelab Notifications with ntfy](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/) ⭐ - alexsguardian.net - 9/2023 
 - [Why NTFY is the Ultimate Push Notification Tool for Your Needs](https://osintph.medium.com/why-ntfy-is-the-ultimate-push-notification-tool-for-your-needs-e767421c84c5) - osintph.medium.com - 9/2023
@@ -225,7 +232,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - ugeek.github.io - 11/2021
 - [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
 - [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021
-
 
 ## Alternative ntfy servers
 

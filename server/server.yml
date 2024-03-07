@@ -236,6 +236,16 @@
 # upstream-base-url:
 # upstream-access-token:
 
+# Configures message-specific limits
+#
+# - message-size-limit defines the max size of a message body. Please note message sizes >4K are NOT RECOMMENDED,
+#   and largely untested. If FCM and/or APNS is used, the limit should stay 4K, because their limits are around that size.
+#   If you increase this size limit regardless, FCM and APNS will NOT work for large messages.
+# - message-delay-limit defines the max delay of a message when using the "Delay" header.
+#
+# message-size-limit: "4k"
+# message-delay-limit: "3d"
+
 # Rate limiting: Total number of topics before the server rejects new topics.
 #
 # global-topic-limit: 15000

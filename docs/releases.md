@@ -1319,6 +1319,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
 
+**Documentation:**
+
+* Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

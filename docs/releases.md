@@ -1318,10 +1318,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
+* Add non-root user to Docker image, ntfy can be run as non-root ([#967](https://github.com/binwiederhier/ntfy/pull/967)/[#966](https://github.com/binwiederhier/ntfy/issues/966), thanks to [@arahja](https://github.com/arahja))
 
 **Documentation:**
 
 * Remove `mkdocs-simple-hooks` ([#1016](https://github.com/binwiederhier/ntfy/pull/1016), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht))
+* Update Watchtower example ([#1014](https://github.com/binwiederhier/ntfy/pull/1014), thanks to [@lennart-m](https://github.com/lennart-m))
+* Fix dead links ([#1022](https://github.com/binwiederhier/ntfy/pull/1022), thanks to [@DerRockWolf](https://github.com/DerRockWolf))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

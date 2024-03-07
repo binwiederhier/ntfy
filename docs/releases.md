@@ -1316,16 +1316,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ### ntfy server v2.9.0
 
 !!! info
-    **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used.
+    ⚠️ **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used. Normally I'd never remove a feature, but this is a security issue, and likely affects almost nobody.
 
 **Features:**
 
 * Support for larger message delays with `message-delay-limit` (see [message limits](config.md#message-limits), [#1050](https://github.com/binwiederhier/ntfy/pull/1050)/[#1019](https://github.com/binwiederhier/ntfy/issues/1019), thanks to [@MrChadMWood](https://github.com/MrChadMWood) for reporting)
 * Support for larger message body sizes with `message-size-limit` (use at your own risk, see [message limits](config.md#message-limits), [#836](https://github.com/binwiederhier/ntfy/pull/836)/[#1050](https://github.com/binwiederhier/ntfy/pull/1050), thanks to [@zhzy0077](https://github.com/zhzy0077) for implementing this, and to [@nkjshlsqja7331](https://github.com/nkjshlsqja7331) for reporting)
+* Web app: You can now paste images into the message bar or publish dialog ([#963](https://github.com/binwiederhier/ntfy/pull/963)/[#572](https://github.com/binwiederhier/ntfy/issues/572), thanks to [@cmj2002](https://github.com/cmj2002) for implementing, and [@rounakdatta](https://github.com/rounakdatta) for reporting)
 
 **Bug fixes + maintenance:**
 
-* Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
+* ⚠️ Remove `Rate-Topics` header due to DoS security issue if `visitor-subscriber-rate-limiting: true` ([#1048](https://github.com/binwiederhier/ntfy/issues/1048)) 
 * Add non-root user to Docker image, ntfy can be run as non-root ([#967](https://github.com/binwiederhier/ntfy/pull/967)/[#966](https://github.com/binwiederhier/ntfy/issues/966), thanks to [@arahja](https://github.com/arahja))
 
 **Documentation:**

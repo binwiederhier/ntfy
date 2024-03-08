@@ -69,7 +69,7 @@ for the server and the Android app. Or, if you'd like to help translate 🇩🇪
 ## Sponsors
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier),
 and [Liberapay](https://liberapay.com/ntfy). I would be humbled if you helped me carry the server and developer 
-account costs. Even small donations are very much appreciated. A big fat **Thank You** to the folks already sponsoring ntfy:
+account costs. Even small donations are very much appreciated. A big fat **Thank You** to the folks who have sponsored ntfy in the past, or are still sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
@@ -172,6 +172,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/CataIana"><img src="https://github.com/CataIana.png" width="40px" /></a>
 <a href="https://github.com/ajay-actuary"><img src="https://github.com/ajay-actuary.png" width="40px" /></a>
 <a href="https://github.com/mursec"><img src="https://github.com/mursec.png" width="40px" /></a>
+<a href="https://github.com/FrameXX"><img src="https://github.com/FrameXX.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

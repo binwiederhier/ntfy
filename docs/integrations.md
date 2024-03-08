@@ -145,8 +145,11 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 ## Blog + forum posts
 
 - [Boost Your Productivity with ntfy.sh: The Ultimate Notification Tool for Command-Line Users](https://dev.to/archetypal/boost-your-productivity-with-ntfysh-the-ultimate-notification-tool-for-command-line-users-iil) - dev.to - 3/2024
+- [Nextcloud Talk (F-Droid version) notifications using ntfy (ntfy.sh)](https://www.youtube.com/watch?v=0a6PpfN5PD8) - youtube.com - 2/2024
+- [ZFS and SMART Warnings via Ntfy](https://rair.dev/zfs-smart-ntfy/) - rair.dev - 2/2024
 - [Introducing the Monitoring Ntfy.sh Integration Module: Real-time Notifications for Drupal Monitoring](https://cyberschorsch.dev/drupal/introducing-monitoring-ntfysh-integration-module-real-time-notifications-drupal-monitoring) - cyberschorsch.dev - 11/2023
 - [How to install Ntfy.sh on CasaOS using BigBearCasaOS](https://www.youtube.com/watch?v=wSWhtSNwTd8) - youtube.com - 10/2023
+- [Podman Update Notifications via Ntfy](https://rair.dev/podman-update-notifications-ntfy/) - rair.dev - 9/2023
 - [Ntfy: Your Ultimate Push Notification Powerhouse!](https://kkamalesh117.medium.com/ntfy-your-ultimate-push-notification-powerhouse-1968c070f1d1) - kkamalesh117.medium.com - 9/2023
 - [Installing Self Host NTFY On Linux Using Docker Container](https://www.pinoylinux.org/topicsplus/containers/installing-self-host-ntfy-on-linux-using-docker-container/) - pinoylinux.org - 9/2023
 - [Homelab Notifications with ntfy](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/) ⭐ - alexsguardian.net - 9/2023 

@@ -180,7 +180,6 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/rxsantos"><img src="https://github.com/rxsantos.png" width="40px" /></a>
 <a href="https://github.com/hermannx5"><img src="https://github.com/hermannx5.png" width="40px" /></a>
 <a href="https://github.com/rwxd"><img src="https://github.com/rwxd.png" width="40px" /></a>
-<a href="https://github.com/rwxd"><img src="https://github.com/rwxd.png" width="40px" /></a>
 <a href="https://github.com/Integral-Tech"><img src="https://github.com/Integral-Tech.png" width="40px" /></a>
 <a href="https://github.com/TheTomik1"><img src="https://github.com/TheTomik1.png" width="40px" /></a>
 <a href="https://github.com/dav23r"><img src="https://github.com/dav23r.png" width="40px" /></a>

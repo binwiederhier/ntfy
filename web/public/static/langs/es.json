@@ -16,7 +16,7 @@
     "nav_button_publish_message": "Publicar notificación",
     "notifications_copied_to_clipboard": "Copiado al portapapeles",
     "alert_not_supported_title": "Notificaciones no soportadas",
-    "alert_not_supported_description": "Las notificaciones no están soportadas por tu navegador.",
+    "alert_not_supported_description": "Su navegador no soporta notificaciones.",
     "notifications_tags": "Etiquetas",
     "notifications_attachment_copy_url_title": "Copiar la URL del archivo adjunto en el portapapeles",
     "notifications_attachment_copy_url_button": "Copiar URL",
@@ -381,5 +381,13 @@
     "account_basics_phone_numbers_dialog_title": "Agregar número de teléfono",
     "account_basics_phone_numbers_dialog_code_placeholder": "p.ej. 123456",
     "publish_dialog_call_item": "Llamar al número de teléfono {{number}}",
-    "publish_dialog_chip_call_no_verified_numbers_tooltip": "No hay números de teléfono verificados"
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "No hay números de teléfono verificados",
+    "action_bar_mute_notifications": "Silenciar Notificaciones",
+    "action_bar_unmute_notifications": "Reactivar notificaciones",
+    "alert_notification_permission_denied_title": "Notificaciones bloqueadas",
+    "alert_notification_permission_denied_description": "Porfavor, reactivelas en su navegador",
+    "alert_notification_ios_install_required_title": "Requiere instalacion de iOS",
+    "alert_notification_ios_install_required_description": "Haz click en el icono de compartir y Añadir a pantalla de inicio para activar las notificaciones de iOS",
+    "notifications_actions_failed_notification": "Acción fallida",
+    "publish_dialog_checkbox_markdown": "Formatear como Markdown"
 }

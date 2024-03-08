@@ -171,6 +171,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/tomershvueli"><img src="https://github.com/tomershvueli.png" width="40px" /></a>
 <a href="https://github.com/CataIana"><img src="https://github.com/CataIana.png" width="40px" /></a>
 <a href="https://github.com/ajay-actuary"><img src="https://github.com/ajay-actuary.png" width="40px" /></a>
+<a href="https://github.com/mursec"><img src="https://github.com/mursec.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

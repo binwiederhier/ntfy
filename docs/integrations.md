@@ -147,9 +147,14 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Boost Your Productivity with ntfy.sh: The Ultimate Notification Tool for Command-Line Users](https://dev.to/archetypal/boost-your-productivity-with-ntfysh-the-ultimate-notification-tool-for-command-line-users-iil) - dev.to - 3/2024
 - [Nextcloud Talk (F-Droid version) notifications using ntfy (ntfy.sh)](https://www.youtube.com/watch?v=0a6PpfN5PD8) - youtube.com - 2/2024
 - [ZFS and SMART Warnings via Ntfy](https://rair.dev/zfs-smart-ntfy/) - rair.dev - 2/2024
+- [Automating Security Camera Notifications With Home Assistant and Ntfy](https://runtimeterror.dev/automating-camera-notifications-home-assistant-ntfy/) ⭐ - runtimeterror.dev - 2/2024
+- [Ntfy: self-hosted notification service](https://medium.com/@williamdonze/ntfy-self-hosted-notification-service-0f3eada6e657) ⭐ - williamdonze.medium.com - 1/2024
+- [Let’s Supercharge Snowflake Alerts with Cool ntfy Open-source Notifications!](https://sarathi-data-ml-cloud.medium.com/lets-supercharge-snowflake-alerts-with-cool-ntfy-open-source-notifications-296da442c331) - sarathi-data-ml-cloud.medium.com - 1/2024
+- [Setting up NTFY with Ngnix-Proxy-Manager, authentication and Ansible notifications](https://random-it-blog.de/rocky-linux/setting-up-ntfy-with-ngnix-proxy-manager-authentication-and-ansible-notifications/) - random-it-blog.de - 12/2023
 - [Introducing the Monitoring Ntfy.sh Integration Module: Real-time Notifications for Drupal Monitoring](https://cyberschorsch.dev/drupal/introducing-monitoring-ntfysh-integration-module-real-time-notifications-drupal-monitoring) - cyberschorsch.dev - 11/2023
 - [How to install Ntfy.sh on CasaOS using BigBearCasaOS](https://www.youtube.com/watch?v=wSWhtSNwTd8) - youtube.com - 10/2023
 - [Podman Update Notifications via Ntfy](https://rair.dev/podman-update-notifications-ntfy/) - rair.dev - 9/2023
+- [Easy Push Notifications With ntfy.sh](https://runtimeterror.dev/easy-push-notifications-with-ntfy/) ⭐ - runtimeterror.dev - 9/2023
 - [Ntfy: Your Ultimate Push Notification Powerhouse!](https://kkamalesh117.medium.com/ntfy-your-ultimate-push-notification-powerhouse-1968c070f1d1) - kkamalesh117.medium.com - 9/2023
 - [Installing Self Host NTFY On Linux Using Docker Container](https://www.pinoylinux.org/topicsplus/containers/installing-self-host-ntfy-on-linux-using-docker-container/) - pinoylinux.org - 9/2023
 - [Homelab Notifications with ntfy](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/) ⭐ - alexsguardian.net - 9/2023 

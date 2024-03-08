@@ -174,6 +174,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/mursec"><img src="https://github.com/mursec.png" width="40px" /></a>
 <a href="https://github.com/FrameXX"><img src="https://github.com/FrameXX.png" width="40px" /></a>
 <a href="https://github.com/vovayartsev"><img src="https://github.com/vovayartsev.png" width="40px" /></a>
+<a href="https://github.com/dwain-lab"><img src="https://github.com/dwain-lab.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

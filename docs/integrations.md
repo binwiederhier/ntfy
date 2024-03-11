@@ -144,6 +144,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
+- [ntfy / Emacs Lisp](https://speechcode.com/blog/ntfy/) - speechcode.com - 3/2024
 - [Boost Your Productivity with ntfy.sh: The Ultimate Notification Tool for Command-Line Users](https://dev.to/archetypal/boost-your-productivity-with-ntfysh-the-ultimate-notification-tool-for-command-line-users-iil) - dev.to - 3/2024
 - [Nextcloud Talk (F-Droid version) notifications using ntfy (ntfy.sh)](https://www.youtube.com/watch?v=0a6PpfN5PD8) - youtube.com - 2/2024
 - [ZFS and SMART Warnings via Ntfy](https://rair.dev/zfs-smart-ntfy/) - rair.dev - 2/2024

@@ -2625,6 +2625,126 @@ func TestServer_UpstreamBaseURL_DoNotForwardUnifiedPush(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 }
 
+func TestServer_MessageTemplate(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
+		"X-Template-Message": "${foo}",
+		"X-Template-Title":   "${nested.title}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "bar", m.Message)
+	require.Equal(t, "here", m.Title)
+}
+
+func TestServer_MessageTemplate_RepeatPlaceholder(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
+		"Template-Message": "${foo} is ${foo}",
+		"Template-Title":   "${nested.title} is ${nested.title}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "bar is bar", m.Message)
+	require.Equal(t, "here is here", m.Title)
+}
+
+func TestServer_MessageTemplate_JSONBody(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic": "mytopic", "message": "{\"foo\":\"bar\",\"nested\":{\"title\":\"here\"}}"}`
+	response := request(t, s, "PUT", "/", body, map[string]string{
+		"tpl-m": "${foo}",
+		"tpl-t": "${nested.title}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "bar", m.Message)
+	require.Equal(t, "here", m.Title)
+}
+
+func TestServer_MessageTemplate_MalformedJSONBody(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic": "mytopic", "message": "{\"foo\":\"bar\",\"nested\":{\"title\":\"here\"INVALID"}`
+	response := request(t, s, "PUT", "/", body, map[string]string{
+		"X-Template-Message": "${foo}",
+		"X-Template-Title":   "${nested.title}",
+	})
+
+	require.Equal(t, 200, response.Code, "Got %s", response)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "{\"foo\":\"bar\",\"nested\":{\"title\":\"here\"INVALID", m.Message)
+	require.Equal(t, "", m.Title)
+}
+
+func TestServer_MessageTemplate_PlaceholderTypo(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
+		"X-Template-Message": "${food}",
+		"X-Template-Title":   "${nested.titl}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "${food}", m.Message)
+	require.Equal(t, "${nested.titl}", m.Title)
+}
+
+func TestServer_MessageTemplate_MultiplePlaceholders(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
+		"X-Template-Message": "${foo} is ${nested.title}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "bar is here", m.Message)
+}
+
+func TestServer_MessageTemplate_NestedPlaceholders(t *testing.T) {
+	// not intended to work recursively for now
+	// i.e., ${${nested.bar}} should NOT evaluate to ${foo} and then to "bar"
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here","bar":"foo"}}`, map[string]string{
+		"X-Template-Message": "${${nested.bar}}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "${${nested.bar}}", m.Message)
+}
+
+func TestServer_MessageTemplate_NestedPlaceholdersFunky(t *testing.T) {
+	// The above example can technically work
+	// ${${nested.bar}} would be interpreted as a nested GJSON path with key "${nested" then key "bar"
+	// so you would probably expect the output to be "works!", BUT the second } in the placeholder is not
+	// included by the regex, so it is still there after replacing the placeholder, thus giving you "works!}"
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here","bar":"foo"}, "${nested":{"bar":"works!"}}`, map[string]string{
+		"X-Template-Message": "${${nested.bar}}",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "works!}", m.Message)
+}
+
+func TestServer_MessageTemplate_FancyGJSON(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	jsonBody := `{"foo": "bar", "errors": [{"level": "severe", "url": "https://severe1.com"},{"level": "warning", "url": "https://warning.com"},{"level": "severe", "url": "https://severe2.com"}]}`
+	response := request(t, s, "PUT", "/mytopic", jsonBody, map[string]string{
+		"X-Template-Message": `${errors.#(level=="severe")#.url}`,
+		"X-Template-Title":   `${errors.#(level=="severe")#|#} Severe Errors`,
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, `["https://severe1.com","https://severe2.com"]`, m.Message)
+	require.Equal(t, `2 Severe Errors`, m.Title)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

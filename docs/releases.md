@@ -1338,6 +1338,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.9.1 (UNRELEASED)
+
+**Features:**
+
+* You can now include a message and/or title template that will be filled with values from a JSON body, great for services that let you specify a webhook URL but do not let you change the webhook body (such as Grafana). ([#724](https://github.com/binwiederhier/ntfy/issues/724), thanks to [@wunter8](https://github.com/wunter8) for implementing)
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

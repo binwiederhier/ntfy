@@ -110,6 +110,7 @@ var (
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
 	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
+	templateVarRegex                                     = regexp.MustCompile(`\${([^}]+)}`)
 
 	//go:embed site
 	webFs       embed.FS
@@ -1076,36 +1077,28 @@ func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedRead
 	return nil
 }
 
+func replaceGJSONTemplate(template string, source string) string {
+	matches := templateVarRegex.FindAllStringSubmatch(template, -1)
+	for _, v := range matches {
+		query := v[1]
+		if result := gjson.Get(source, query); result.Exists() {
+			template = strings.ReplaceAll(template, fmt.Sprintf("${%s}", query), result.String())
+		}
+	}
+	return template
+}
+
 func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser, template bool) error {
 	if !utf8.Valid(body.PeekedBytes) {
 		return errHTTPBadRequestMessageNotUTF8.With(m)
 	}
 	if len(body.PeekedBytes) > 0 { // Empty body should not override message (publish via GET!)
-		peakedBody := strings.TrimSpace(string(body.PeekedBytes)) // Truncates the message to the peek limit if required
-		if template && gjson.Valid(peakedBody) {
-			// Replace JSON paths in message
-			r := regexp.MustCompile(`\${([^}]+)}`)
-			matches := r.FindAllStringSubmatch(m.Message, -1)
-			for _, v := range matches {
-				query := v[1]
-				result := gjson.Get(peakedBody, query)
-				if result.Exists() {
-					m.Message = strings.ReplaceAll(m.Message, fmt.Sprintf("${%s}", query), result.String())
-				}
-			}
-
-			// Replace JSON paths in title
-			r = regexp.MustCompile(`\${([^}]+)}`)
-			matches = r.FindAllStringSubmatch(m.Title, -1)
-			for _, v := range matches {
-				query := v[1]
-				result := gjson.Get(peakedBody, query)
-				if result.Exists() {
-					m.Title = strings.ReplaceAll(m.Title, fmt.Sprintf("${%s}", query), result.String())
-				}
-			}
+		peekedBody := strings.TrimSpace(string(body.PeekedBytes)) // Truncates the message to the peek limit if required
+		if template && gjson.Valid(peekedBody) {
+			m.Message = replaceGJSONTemplate(m.Message, peekedBody)
+			m.Title = replaceGJSONTemplate(m.Title, peekedBody)
 		} else {
-			m.Message = peakedBody
+			m.Message = peekedBody
 		}
 	}
 	if m.Attachment != nil && m.Attachment.Name != "" && m.Message == "" {

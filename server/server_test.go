@@ -2754,6 +2754,35 @@ func TestServer_MessageTemplate_FancyGJSON(t *testing.T) {
 	require.Equal(t, `2 Severe Errors`, m.Title)
 }
 
+func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageOK(t *testing.T) {
+	c := newTestConfig(t)
+	c.MessageSizeLimit = 25 // 25 < len(HTTP body) < 25*2 && len(m.Message) < 25
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
+		"X-Message":  "${foo}",
+		"X-Title":    "${nested.title}",
+		"X-Template": "1",
+	})
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "bar", m.Message)
+	require.Equal(t, "here", m.Title)
+}
+
+func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageTooLong(t *testing.T) {
+	c := newTestConfig(t)
+	c.MessageSizeLimit = 21 // 21 < len(HTTP body) < 21*2 && !len(m.Message) < 21
+	s := newTestServer(t, c)
+	response := request(t, s, "PUT", "/mytopic", `{"foo":"This is a long message"}`, map[string]string{
+		"X-Message":  "${foo}",
+		"X-Template": "1",
+	})
+
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40041, toHTTPError(t, response.Body.String()).Code)
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

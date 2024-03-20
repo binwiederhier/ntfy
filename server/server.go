@@ -970,7 +970,6 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	call = readParam(r, "x-call", "call")
 	if call != "" && (s.config.TwilioAccount == "" || s.userManager == nil) {
-		print("call: %s", call)
 		return false, false, "", "", false, false, errHTTPBadRequestPhoneCallsDisabled
 	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
 		return false, false, "", "", false, false, errHTTPBadRequestPhoneNumberInvalid

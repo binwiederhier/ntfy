@@ -3559,26 +3559,31 @@ ntfy server plays the role of the Push Gateway, as well as the Push Provider. Un
 
 ### Message and Title Templates
 Some services let you specify a webhook URL but do not let you modify the webhook body (e.g., Grafana). Instead of using a separate
-bridge program to parse the webhook body into the format ntfy expects, you can include a message template and/or a title template
+bridge program to parse the webhook body into the format ntfy expects, you can include a templated message and/or a templated title 
 which will be populated based on the fields of the webhook body (so long as the webhook body is valid JSON).
 
-Send the message template with the header `X-Template-Message`, `Template-Message`, or `tpl-m`. Send the title template with the
-header `X-Template-Title`, `Template-Title`, or `tpl-t`. (No other fields can be filled with a template at this time).
-
-In the template, include paths to the appropriate JSON fields surrounded by `${` and `}`. See an example below.
+Enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`) to "yes". Then, include templates
+in your message and/or title (no other fields can be filled with a template at this time) by including paths to the
+appropriate JSON fields surrounded by `${` and `}`. See an example below.
 See [GJSON docs](https://github.com/tidwall/gjson/blob/master/SYNTAX.md) for supported JSON path syntax.
+[https://gjson.dev/](https://gjson.dev/) is a great resource for testing your templates.
 
 === "HTTP"
     ``` http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
-    X-Template-Message: Error message: ${error.desc}
-    X-Template-Title: ${hostname}: A ${error.level} error has occurred
+    X-Message: Error message: ${error.desc}
+    X-Title: ${hostname}: A ${error.level} error has occurred
+    X-Template: yes
 
     {"hostname": "philipp-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}
     ```
 
 The example above would send a notification with a title "philipp-pc: A severe error has occurred" and a message "Error message: Disk has run out of space".
+
+For Grafana webhooks, you might find it helpful to use the headers `X-Title: Grafana alert: ${title}` and `X-Message: ${message}`.
+Alternatively, you can include the params in the webhook URL. For example, by
+appending `?template=yes&title=Grafana alert: ${title}&message=${message}` to the URL.
 
 ## Public topics
 Obviously all topics on ntfy.sh are public, but there are a few designated topics that are used in examples, and topics

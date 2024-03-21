@@ -117,7 +117,8 @@ var (
 	errHTTPBadRequestWebPushSubscriptionInvalid      = &errHTTP{40038, http.StatusBadRequest, "invalid request: web push payload malformed", "", nil}
 	errHTTPBadRequestWebPushEndpointUnknown          = &errHTTP{40039, http.StatusBadRequest, "invalid request: web push endpoint unknown", "", nil}
 	errHTTPBadRequestWebPushTopicCountTooHigh        = &errHTTP{40040, http.StatusBadRequest, "invalid request: too many web push topic subscriptions", "", nil}
-	errHTTPBadRequestTemplatedMessageTooLarge        = &errHTTP{40041, http.StatusBadRequest, "invalid request: message is too large after replacing template", "", nil}
+	errHTTPBadRequestTemplatedMessageTooLarge        = &errHTTP{40041, http.StatusBadRequest, "invalid request: message or title is too large after replacing template", "", nil}
+	errHTTPBadRequestTemplatedMessageNotJSON         = &errHTTP{40042, http.StatusBadRequest, "invalid request: message body must be JSON if templating is enabled", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

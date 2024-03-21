@@ -10,6 +10,7 @@ import (
 )
 
 func TestCLI_Access_Show(t *testing.T) {
+	t.Parallel()
 	s, conf, port := newTestServerWithAuth(t)
 	defer test.StopServer(t, s, port)
 
@@ -19,6 +20,7 @@ func TestCLI_Access_Show(t *testing.T) {
 }
 
 func TestCLI_Access_Grant_And_Publish(t *testing.T) {
+	t.Parallel()
 	s, conf, port := newTestServerWithAuth(t)
 	defer test.StopServer(t, s, port)
 

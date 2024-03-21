@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"heckel.io/ntfy/v2/user"
 	"net/http"
 )
@@ -45,7 +46,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 		return errHTTPBadRequest.Wrap("username invalid, or password missing")
 	}
 	u, err := s.userManager.User(req.Username)
-	if err != nil && err != user.ErrUserNotFound {
+	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return err
 	} else if u != nil {
 		return errHTTPConflictUserExists
@@ -53,7 +54,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	var tier *user.Tier
 	if req.Tier != "" {
 		tier, err = s.userManager.Tier(req.Tier)
-		if err == user.ErrTierNotFound {
+		if errors.Is(err, user.ErrTierNotFound) {
 			return errHTTPBadRequestTierInvalid
 		} else if err != nil {
 			return err
@@ -76,7 +77,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	u, err := s.userManager.User(req.Username)
-	if err == user.ErrUserNotFound {
+	if errors.Is(err, user.ErrUserNotFound) {
 		return errHTTPBadRequestUserNotFound
 	} else if err != nil {
 		return err
@@ -98,7 +99,7 @@ func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	_, err = s.userManager.User(req.Username)
-	if err == user.ErrUserNotFound {
+	if errors.Is(err, user.ErrUserNotFound) {
 		return errHTTPBadRequestUserNotFound
 	} else if err != nil {
 		return err

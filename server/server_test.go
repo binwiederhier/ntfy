@@ -2669,6 +2669,7 @@ func TestServer_MessageTemplate_JSONBody(t *testing.T) {
 }
 
 func TestServer_MessageTemplate_MalformedJSONBody(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic": "mytopic", "message": "{\"foo\":\"bar\",\"nested\":{\"title\":\"here\"INVALID"}`
 	response := request(t, s, "PUT", "/", body, map[string]string{
@@ -2677,13 +2678,12 @@ func TestServer_MessageTemplate_MalformedJSONBody(t *testing.T) {
 		"X-Template": "1",
 	})
 
-	require.Equal(t, 200, response.Code, "Got %s", response)
-	m := toMessage(t, response.Body.String())
-	require.Equal(t, "{\"foo\":\"bar\",\"nested\":{\"title\":\"here\"INVALID", m.Message)
-	require.Equal(t, "${nested.title}", m.Title)
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40042, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_MessageTemplate_PlaceholderTypo(t *testing.T) {
+	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
 	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
 		"X-Message":  "${food}",
@@ -2756,12 +2756,12 @@ func TestServer_MessageTemplate_FancyGJSON(t *testing.T) {
 
 func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageOK(t *testing.T) {
 	c := newTestConfig(t)
-	c.MessageSizeLimit = 25 // 25 < len(HTTP body) < 25*2 && len(m.Message) < 25
+	c.MessageSizeLimit = 25 // 25 < len(HTTP body) < 32k, and len(m.Message) < 25
 	s := newTestServer(t, c)
 	response := request(t, s, "PUT", "/mytopic", `{"foo":"bar", "nested":{"title":"here"}}`, map[string]string{
 		"X-Message":  "${foo}",
 		"X-Title":    "${nested.title}",
-		"X-Template": "1",
+		"X-Template": "yes",
 	})
 
 	require.Equal(t, 200, response.Code)
@@ -2772,7 +2772,7 @@ func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageOK(t *testing.
 
 func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageTooLong(t *testing.T) {
 	c := newTestConfig(t)
-	c.MessageSizeLimit = 21 // 21 < len(HTTP body) < 21*2 && !len(m.Message) < 21
+	c.MessageSizeLimit = 21 // 21 < len(HTTP body) < 32k, but !len(m.Message) < 21
 	s := newTestServer(t, c)
 	response := request(t, s, "PUT", "/mytopic", `{"foo":"This is a long message"}`, map[string]string{
 		"X-Message":  "${foo}",
@@ -2781,6 +2781,30 @@ func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageTooLong(t *tes
 
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, 40041, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestServer_MessageTemplate_Grafana(t *testing.T) {
+	c := newTestConfig(t)
+	s := newTestServer(t, c)
+	body := `{"receiver":"ntfy\\.example\\.com/alerts","status":"resolved","alerts":[{"status":"resolved","labels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"annotations":{"summary":"15m load average too high"},"startsAt":"2024-03-15T02:28:00Z","endsAt":"2024-03-15T02:42:00Z","generatorURL":"localhost:3000/alerting/grafana/NW9oDw-4z/view","fingerprint":"becbfb94bd81ef48","silenceURL":"localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter","dashboardURL":"","panelURL":"","values":{"B":18.98211314475876,"C":0},"valueString":"[ var='B' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=18.98211314475876 ], [ var='C' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=0 ]"}],"groupLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts"},"commonLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"commonAnnotations":{"summary":"15m load average too high"},"externalURL":"localhost:3000/","version":"1","groupKey":"{}:{alertname=\"Load avg 15m too high\", grafana_folder=\"Node alerts\"}","truncatedAlerts":0,"orgId":1,"title":"[RESOLVED] Load avg 15m too high Node alerts (10.108.0.2:9100 node-exporter)","state":"ok","message":"**Resolved**\n\nValue: B=18.98211314475876, C=0\nLabels:\n - alertname = Load avg 15m too high\n - grafana_folder = Node alerts\n - instance = 10.108.0.2:9100\n - job = node-exporter\nAnnotations:\n - summary = 15m load average too high\nSource: localhost:3000/alerting/grafana/NW9oDw-4z/view\nSilence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter\n"}`
+	response := request(t, s, "PUT", "/mytopic?tpl=yes&title=Grafana+alert:+${title}&message=${message}", body, nil)
+
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "Grafana alert: [RESOLVED] Load avg 15m too high Node alerts (10.108.0.2:9100 node-exporter)", m.Title)
+	require.Equal(t, `**Resolved**
+
+Value: B=18.98211314475876, C=0
+Labels:
+ - alertname = Load avg 15m too high
+ - grafana_folder = Node alerts
+ - instance = 10.108.0.2:9100
+ - job = node-exporter
+Annotations:
+ - summary = 15m load average too high
+Source: localhost:3000/alerting/grafana/NW9oDw-4z/view
+Silence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter
+`, m.Message)
 }
 
 func newTestConfig(t *testing.T) *Config {

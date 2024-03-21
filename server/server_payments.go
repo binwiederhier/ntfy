@@ -115,7 +115,7 @@ func (s *Server) handleAccountBillingSubscriptionCreate(w http.ResponseWriter, r
 	if u.Billing.StripeSubscriptionID != "" {
 		return errHTTPBadRequestBillingSubscriptionExists
 	}
-	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (s *Server) handleAccountBillingSubscriptionUpdate(w http.ResponseWriter, r
 	if u.Billing.StripeSubscriptionID == "" {
 		return errNoBillingSubscription
 	}
-	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountBillingSubscriptionChangeRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (s *Server) handleAccountBillingWebhook(_ http.ResponseWriter, r *http.Requ
 	if stripeSignature == "" {
 		return errHTTPBadRequestBillingRequestInvalid
 	}
-	body, err := util.Peek(r.Body, jsonBodyBytesLimit)
+	body, err := util.Peek(r.Body, httpBodyBytesLimit)
 	if err != nil {
 		return err
 	} else if body.LimitReached {

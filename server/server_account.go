@@ -28,7 +28,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 			return errHTTPTooManyRequestsLimitAccountCreation
 		}
 	}
-	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
+	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 }
 
 func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccountDeleteRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountDeleteRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if req.Password == "" {
@@ -192,7 +192,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPasswordChangeRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if req.Password == "" || req.NewPassword == "" {
@@ -210,7 +210,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccountTokenIssueRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
+	req, err := readJSONWithLimit[apiAccountTokenIssueRequest](r.Body, httpBodyBytesLimit, true) // Allow empty body!
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
+	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, httpBodyBytesLimit, true) // Allow empty body!
 	if err != nil {
 		return err
 	} else if req.Token == "" {
@@ -302,7 +302,7 @@ func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newPrefs, err := readJSONWithLimit[user.Prefs](r.Body, jsonBodyBytesLimit, false)
+	newPrefs, err := readJSONWithLimit[user.Prefs](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (s *Server) handleAccountSettingsChange(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	newSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit, false)
+	newSubscription, err := readJSONWithLimit[user.Subscription](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (s *Server) handleAccountSubscriptionAdd(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleAccountSubscriptionChange(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, jsonBodyBytesLimit, false)
+	updatedSubscription, err := readJSONWithLimit[user.Subscription](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -417,7 +417,7 @@ func (s *Server) handleAccountSubscriptionDelete(w http.ResponseWriter, r *http.
 // it is already reserved by someone else.
 func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountReservationRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -532,7 +532,7 @@ func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *vi
 
 func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberVerifyRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberVerifyRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if !phoneNumberRegex.MatchString(req.Number) {
@@ -563,7 +563,7 @@ func (s *Server) handleAccountPhoneNumberVerify(w http.ResponseWriter, r *http.R
 
 func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -582,7 +582,7 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
-	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccountPhoneNumberAddRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}

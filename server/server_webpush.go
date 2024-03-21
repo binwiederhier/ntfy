@@ -38,7 +38,7 @@ func init() {
 }
 
 func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil || req.Endpoint == "" || req.P256dh == "" || req.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	} else if !webPushAllowedEndpointsRegex.MatchString(req.Endpoint) {
@@ -66,7 +66,7 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleWebPushDelete(w http.ResponseWriter, r *http.Request, _ *visitor) error {
-	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, httpBodyBytesLimit, false)
 	if err != nil || req.Endpoint == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
 	}

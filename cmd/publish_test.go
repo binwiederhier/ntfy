@@ -17,6 +17,7 @@ import (
 )
 
 func TestCLI_Publish_Subscribe_Poll_Real_Server(t *testing.T) {
+	t.Parallel()
 	testMessage := util.RandomString(10)
 	app, _, _, _ := newTestApp()
 	require.Nil(t, app.Run([]string{"ntfy", "publish", "ntfytest", "ntfy unit test " + testMessage}))
@@ -35,6 +36,7 @@ func TestCLI_Publish_Subscribe_Poll_Real_Server(t *testing.T) {
 }
 
 func TestCLI_Publish_Subscribe_Poll(t *testing.T) {
+	t.Parallel()
 	s, port := test.StartServer(t)
 	defer test.StopServer(t, s, port)
 	topic := fmt.Sprintf("http://127.0.0.1:%d/mytopic", port)
@@ -51,6 +53,7 @@ func TestCLI_Publish_Subscribe_Poll(t *testing.T) {
 }
 
 func TestCLI_Publish_All_The_Things(t *testing.T) {
+	t.Parallel()
 	s, port := test.StartServer(t)
 	defer test.StopServer(t, s, port)
 	topic := fmt.Sprintf("http://127.0.0.1:%d/mytopic", port)

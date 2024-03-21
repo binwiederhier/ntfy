@@ -39,7 +39,7 @@ func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visit
 }
 
 func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiUserAddRequest](r.Body, httpBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiUserAddRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	} else if !user.AllowedUsername(req.Username) || req.Password == "" {
@@ -72,7 +72,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 }
 
 func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiUserDeleteRequest](r.Body, httpBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiUserDeleteRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 }
 
 func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccessAllowRequest](r.Body, httpBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccessAllowRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *vi
 }
 
 func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiAccessResetRequest](r.Body, httpBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiAccessResetRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
 	}

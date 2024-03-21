@@ -131,7 +131,7 @@ const (
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
-	httpBodyBytesLimit       = 32768                     // Max number of bytes for a request bodys (unless MessageLimit is higher)
+	jsonBodyBytesLimit       = 32768                     // Max number of bytes for a request bodys (unless MessageLimit is higher)
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
@@ -1047,7 +1047,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 //  6. curl -T file.txt ntfy.sh/mytopic
 //     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 //  7. curl -T file.txt ntfy.sh/mytopic
-//     If file.txt is > message limit or template && file.txt > message limit*2, treat it as an attachment
+//     In all other cases, mostly if file.txt is > message limit, treat it as an attachment
 func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, template, unifiedpush bool) error {
 	if m.Event == pollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)
@@ -1095,7 +1095,7 @@ func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser
 }
 
 func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedReadCloser) error {
-	body, err := util.Peek(body, httpBodyBytesLimit)
+	body, err := util.Peek(body, jsonBodyBytesLimit)
 	if err != nil {
 		return err
 	} else if body.LimitReached {
@@ -1111,6 +1111,16 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedR
 		return errHTTPBadRequestTemplatedMessageTooLarge
 	}
 	return nil
+}
+
+func replaceGJSONTemplate(template string, source string) string {
+	matches := templateVarRegex.FindAllStringSubmatch(template, -1)
+	for _, m := range matches {
+		if result := gjson.Get(source, m[1]); result.Exists() {
+			template = strings.ReplaceAll(template, fmt.Sprintf(templateVarFormat, m[1]), result.String())
+		}
+	}
+	return template
 }
 
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser) error {
@@ -1161,16 +1171,6 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		return err
 	}
 	return nil
-}
-
-func replaceGJSONTemplate(template string, source string) string {
-	matches := templateVarRegex.FindAllStringSubmatch(template, -1)
-	for _, m := range matches {
-		if result := gjson.Get(source, m[1]); result.Exists() {
-			template = strings.ReplaceAll(template, fmt.Sprintf(templateVarFormat, m[1]), result.String())
-		}
-	}
-	return template
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request, v *visitor) error {

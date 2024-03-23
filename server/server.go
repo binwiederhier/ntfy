@@ -135,6 +135,7 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	templateMaxExecutionTime = 100 * time.Millisecond
 )
 
 // WebSocket constants
@@ -1102,34 +1103,30 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedR
 		return errHTTPEntityTooLargeJSONBody
 	}
 	peekedBody := strings.TrimSpace(string(body.PeekedBytes))
-	m.Message = replaceTemplate(m.Message, peekedBody)
-	m.Title = replaceTemplate(m.Title, peekedBody)
+	if m.Message, err = replaceTemplate(m.Message, peekedBody); err != nil {
+		return err
+	}
+	if m.Title, err = replaceTemplate(m.Title, peekedBody); err != nil {
+		return err
+	}
 	if len(m.Message) > s.config.MessageSizeLimit {
 		return errHTTPBadRequestTemplatedMessageTooLarge
 	}
 	return nil
 }
 
-func replaceTemplate(tpl string, source string) string {
-	rendered, err := replaceTemplateInternal(tpl, source)
-	if err != nil {
-		return "<invalid template>"
-	}
-	return rendered
-}
-
-func replaceTemplateInternal(tpl string, source string) (string, error) {
+func replaceTemplate(tpl string, source string) (string, error) {
 	var data any
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
-		return "", err
+		return "", errHTTPBadRequestTemplatedMessageNotJSON
 	}
 	t, err := template.New("").Parse(tpl)
 	if err != nil {
-		return "", err
+		return "", errHTTPBadRequestTemplateInvalid
 	}
 	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		return "", err
+	if err := t.Execute(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), data); err != nil {
+		return "", errHTTPBadRequestTemplateExecutionFailed
 	}
 	return buf.String(), nil
 }

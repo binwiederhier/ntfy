@@ -23,13 +23,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 	"unicode/utf8"
 
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/tidwall/gjson"
 	"golang.org/x/sync/errgroup"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
@@ -1095,32 +1095,43 @@ func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser
 }
 
 func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedReadCloser) error {
-	body, err := util.Peek(body, jsonBodyBytesLimit)
+	body, err := util.Peek(body, max(s.config.MessageSizeLimit, jsonBodyBytesLimit))
 	if err != nil {
 		return err
 	} else if body.LimitReached {
 		return errHTTPEntityTooLargeJSONBody
 	}
 	peekedBody := strings.TrimSpace(string(body.PeekedBytes))
-	if !gjson.Valid(peekedBody) {
-		return errHTTPBadRequestTemplatedMessageNotJSON
-	}
-	m.Message = replaceGJSONTemplate(m.Message, peekedBody)
-	m.Title = replaceGJSONTemplate(m.Title, peekedBody)
+	m.Message = replaceTemplate(m.Message, peekedBody)
+	m.Title = replaceTemplate(m.Title, peekedBody)
 	if len(m.Message) > s.config.MessageSizeLimit {
 		return errHTTPBadRequestTemplatedMessageTooLarge
 	}
 	return nil
 }
 
-func replaceGJSONTemplate(template string, source string) string {
-	matches := templateVarRegex.FindAllStringSubmatch(template, -1)
-	for _, m := range matches {
-		if result := gjson.Get(source, m[1]); result.Exists() {
-			template = strings.ReplaceAll(template, fmt.Sprintf(templateVarFormat, m[1]), result.String())
-		}
+func replaceTemplate(tpl string, source string) string {
+	rendered, err := replaceTemplateInternal(tpl, source)
+	if err != nil {
+		return "<invalid template>"
 	}
-	return template
+	return rendered
+}
+
+func replaceTemplateInternal(tpl string, source string) (string, error) {
+	var data any
+	if err := json.Unmarshal([]byte(source), &data); err != nil {
+		return "", err
+	}
+	t, err := template.New("").Parse(tpl)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser) error {

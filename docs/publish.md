@@ -938,6 +938,37 @@ Here's an example with a custom message, tags and a priority:
     file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
     ```
 
+
+## JSON templating
+Some services let you specify a webhook URL but do not let you modify the webhook body (e.g. GitHub, Grafana). Instead of using a separate
+bridge program to parse the webhook body into the format ntfy expects, you can include a templated message and/or a templated title
+which will be populated based on the fields of the webhook body (so long as the webhook body is valid JSON).
+
+Enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`) to `yes`, or (more appropriately for webhooks)
+by setting the `?template=yes` query parameter. Then, include templates in your message and/or title by including paths to the
+appropriate JSON fields surrounded by `${` and `}`, e.g. `${alert.title}` or `${error.desc}`, depending on your JSON payload.
+
+Please refer to the [GJSON docs](https://github.com/tidwall/gjson/blob/master/SYNTAX.md) for supported JSON path syntax, as well as 
+[gjson.dev](https://gjson.dev/) to test your templates.
+
+=== "HTTP"
+    ``` http
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    X-Message: Error message: ${error.desc}
+    X-Title: ${hostname}: A ${error.level} error has occurred
+    X-Template: yes
+
+    {"hostname": "philipp-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}
+    ```
+
+The example above would send a notification with a title "philipp-pc: A severe error has occurred" and a message "Error message: Disk has run out of space".
+
+For Grafana webhooks, you might find it helpful to use the headers `X-Title: Grafana alert: ${title}` and `X-Message: ${message}`.
+Alternatively, you can include the params in the webhook URL. For example, by
+appending `?template=yes&title=Grafana alert: ${title}&message=${message}` to the URL.
+
+
 ## Publish as JSON
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
@@ -3556,34 +3587,6 @@ ntfy server plays the role of the Push Gateway, as well as the Push Provider. Un
 
 !!! info
     This is not a generic Matrix Push Gateway. It only works in combination with UnifiedPush and ntfy.
-
-### Message and Title Templates
-Some services let you specify a webhook URL but do not let you modify the webhook body (e.g., Grafana). Instead of using a separate
-bridge program to parse the webhook body into the format ntfy expects, you can include a templated message and/or a templated title 
-which will be populated based on the fields of the webhook body (so long as the webhook body is valid JSON).
-
-Enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`) to "yes". Then, include templates
-in your message and/or title (no other fields can be filled with a template at this time) by including paths to the
-appropriate JSON fields surrounded by `${` and `}`. See an example below.
-See [GJSON docs](https://github.com/tidwall/gjson/blob/master/SYNTAX.md) for supported JSON path syntax.
-[https://gjson.dev/](https://gjson.dev/) is a great resource for testing your templates.
-
-=== "HTTP"
-    ``` http
-    POST /mytopic HTTP/1.1
-    Host: ntfy.sh
-    X-Message: Error message: ${error.desc}
-    X-Title: ${hostname}: A ${error.level} error has occurred
-    X-Template: yes
-
-    {"hostname": "philipp-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}
-    ```
-
-The example above would send a notification with a title "philipp-pc: A severe error has occurred" and a message "Error message: Disk has run out of space".
-
-For Grafana webhooks, you might find it helpful to use the headers `X-Title: Grafana alert: ${title}` and `X-Message: ${message}`.
-Alternatively, you can include the params in the webhook URL. For example, by
-appending `?template=yes&title=Grafana alert: ${title}&message=${message}` to the URL.
 
 ## Public topics
 Obviously all topics on ntfy.sh are public, but there are a few designated topics that are used in examples, and topics

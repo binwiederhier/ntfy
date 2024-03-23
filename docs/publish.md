@@ -3136,11 +3136,13 @@ with the token `tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`:
 === "PowerShell 7+"
     ``` powershell
     # With PowerShell 7 or greater, we can use the Authentication and Token parameters
+    # The Token parameter must be in the form of a System.Security.SecureString
+	
     $Request = @{
       Method = "POST"
       URI = "https://ntfy.example.com/mysecrets"
-      Authorization = "Bearer"
-      Token = "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2"
+      Authentication = "Bearer"
+      Token = ConvertTo-SecureString "tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2" -AsPlainText
       Body = "Look ma, with auth"
     }
     Invoke-RestMethod @Request

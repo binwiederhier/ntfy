@@ -8,7 +8,6 @@ import (
 )
 
 func TestNewYamlSourceFromFile(t *testing.T) {
-	t.Parallel()
 	filename := filepath.Join(t.TempDir(), "server.yml")
 	contents := `
 # Normal options

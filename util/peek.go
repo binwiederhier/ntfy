@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"strings"
 )
@@ -26,7 +27,7 @@ func Peek(underlying io.ReadCloser, limit int) (*PeekedReadCloser, error) {
 	}
 	peeked := make([]byte, limit)
 	read, err := io.ReadFull(underlying, peeked)
-	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && err != io.EOF {
 		return nil, err
 	}
 	return &PeekedReadCloser{
@@ -44,7 +45,7 @@ func (r *PeekedReadCloser) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 	n, err = r.peeked.Read(p)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return r.underlying.Read(p)
 	} else if err != nil {
 		return 0, err

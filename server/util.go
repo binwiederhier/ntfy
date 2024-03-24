@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"heckel.io/ntfy/v2/util"
 	"io"
@@ -104,9 +105,9 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 
 func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, error) {
 	obj, err := util.UnmarshalJSONWithLimit[T](r, limit, allowEmpty)
-	if err == util.ErrUnmarshalJSON {
+	if errors.Is(err, util.ErrUnmarshalJSON) {
 		return nil, errHTTPBadRequestJSONInvalid
-	} else if err == util.ErrTooLargeJSON {
+	} else if errors.Is(err, util.ErrTooLargeJSON) {
 		return nil, errHTTPEntityTooLargeJSONBody
 	} else if err != nil {
 		return nil, err

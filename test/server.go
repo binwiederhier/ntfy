@@ -16,7 +16,7 @@ func StartServer(t *testing.T) (*server.Server, int) {
 
 // StartServerWithConfig starts a server.Server with a random port and waits for the server to be up
 func StartServerWithConfig(t *testing.T, conf *server.Config) (*server.Server, int) {
-	port := 10000 + rand.Intn(20000)
+	port := 10000 + rand.Intn(30000)
 	conf.ListenHTTP = fmt.Sprintf(":%d", port)
 	conf.AttachmentCacheDir = t.TempDir()
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")

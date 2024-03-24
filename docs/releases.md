@@ -1342,7 +1342,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* You can now include a message and/or title template that will be filled with values from a JSON body, great for services that let you specify a webhook URL but do not let you change the webhook body (such as Grafana). ([#724](https://github.com/binwiederhier/ntfy/issues/724), thanks to [@wunter8](https://github.com/wunter8) for implementing)
+* [Message templating](publish.md#message-templating): You can now include a message and/or title template that will be filled with values from a JSON body (e.g. `curl -gd '{"alert":"Disk space low"}' "ntfy.sh/mytopic?tpl=1&m={{.alert}}"`), which is great for services that let you specify a webhook URL but do not let you change the webhook body (such as GitHub, or Grafana). ([#724](https://github.com/binwiederhier/ntfy/issues/724), thanks to [@wunter8](https://github.com/wunter8) for implementing)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

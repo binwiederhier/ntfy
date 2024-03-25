@@ -2,13 +2,28 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.10.0
+Released Mar 27, 2024
+
+This release adds support for **message templating** in the ntfy server, which allows you to include a message and/or
+title template that will be filled with values from a JSON body (e.g. `curl -gd '{"alert":"Disk space low"}' "ntfy.sh/mytopic?tpl=1&m={{.alert}}"`).
+This is great for services that let you specify a webhook URL but do not let you change the webhook body (such as GitHub, or Grafana).
+
+**Features:**
+
+* [Message templating](publish.md#message-templating): You can now include a message and/or title template that will be filled with values from a JSON body ([#724](https://github.com/binwiederhier/ntfy/issues/724), thanks to [@wunter8](https://github.com/wunter8) for implementing)
+
 ### ntfy server v2.9.0
 Released Mar 7, 2024
 
-A small release after a long pause (lots of day job work). This release adds for **larger messages** and **longer message delays** in scheduled delivery messages. The web app also now supports pasting images from the clipboard. Other than that, only a few bug fixes and documentation updates, and a teeny tiny breaking change 😬.
+A small release after a long pause (lots of day job work). This release adds for **larger messages** and **longer
+message delays** in scheduled delivery messages. The web app also now supports pasting images from the clipboard. Other
+than that, only a few bug fixes and documentation updates, and a teeny tiny breaking change 😬.
 
 !!! info
-    ⚠️ **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used. Normally I'd never remove a feature, but this is a security issue, and likely affects almost nobody.
+    ⚠️ **Breaking change**: The `Rate-Topics` header was removed due to a [DoS issue](https://github.com/binwiederhier/ntfy/issues/1048). This only affects
+    installations with `visitor-subscriber-rate-limiting: true`, which is not the default and likely very rarely used.
+    Normally I'd never remove a feature, but this is a security issue, and likely affects almost nobody.
 
 **Features:**
 
@@ -30,7 +45,9 @@ A small release after a long pause (lots of day job work). This release adds for
 ## ntfy iOS app v1.3
 Released Nov 26, 2023
 
-This release (hopefully) fixes the issues with the iOS UI not updating properly when new notifications arrive, as well as notifications not being received (anymore) after previously working. Both issues have been annoying and known bugs for a long time, and I hope that they are finally fixed. 
+This release (hopefully) fixes the issues with the iOS UI not updating properly when new notifications arrive, as well
+as notifications not being received (anymore) after previously working. Both issues have been annoying and known bugs
+for a long time, and I hope that they are finally fixed. 
 
 Many thanks to [@tcaputi](https://github.com/tcaputi) for fixing the issues, and to the anonymous donor for sponsoring these fixes.
 
@@ -41,7 +58,10 @@ Many thanks to [@tcaputi](https://github.com/tcaputi) for fixing the issues, and
 ## ntfy server v2.8.0
 Released November 19, 2023
 
-This release brings a handful of random bug fixes: two unrelated access control list fixes, a fix around web app crashes for languages with underscores in the language code (e.g. `zh_Hant`, `zh_Hans`, `pt_BR`, ...), a workaround for the `Priority` header (often used in Cloudflare setups), and support among others support for HTML-only emails (finally), web app crash fixes 
+This release brings a handful of random bug fixes: two unrelated access control list fixes, a fix around web app crashes
+for languages with underscores in the language code (e.g. `zh_Hant`, `zh_Hans`, `pt_BR`, ...), a workaround for the
+`Priority` header (often used in Cloudflare setups), and support among others support for HTML-only emails (finally),
+web app crash fixes 
 
 **Bug fixes + maintenance:**
 
@@ -1337,12 +1357,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.9.1 (UNRELEASED)
-
-**Features:**
-
-* [Message templating](publish.md#message-templating): You can now include a message and/or title template that will be filled with values from a JSON body (e.g. `curl -gd '{"alert":"Disk space low"}' "ntfy.sh/mytopic?tpl=1&m={{.alert}}"`), which is great for services that let you specify a webhook URL but do not let you change the webhook body (such as GitHub, or Grafana). ([#724](https://github.com/binwiederhier/ntfy/issues/724), thanks to [@wunter8](https://github.com/wunter8) for implementing)
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

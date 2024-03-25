@@ -2824,11 +2824,12 @@ template ""}}`,
 		`We cannot {{- template "aa"}}`,
 	}
 	for _, disallowedTemplate := range disallowedTemplates {
+		messageTemplate := disallowedTemplate
 		t.Run(disallowedTemplate, func(t *testing.T) {
 			t.Parallel()
 			response := request(t, s, "PUT", `/mytopic`, `{}`, map[string]string{
 				"Template": "yes",
-				"Message":  disallowedTemplate,
+				"Message":  messageTemplate,
 			})
 			require.Equal(t, 400, response.Code)
 			require.Equal(t, 40044, toHTTPError(t, response.Body.String()).Code)

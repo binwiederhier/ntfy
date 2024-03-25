@@ -136,6 +136,12 @@ const (
 	templateMaxExecutionTime = 100 * time.Millisecond
 )
 
+var (
+	// templateDisallowedRegex tests a template for disallowed expressions. While not really dangerous, they
+	// are not useful, and seem potentially troublesome.
+	templateDisallowedRegex = regexp.MustCompile(`(?m)\{\{-?\s*(call|template|define)\b`)
+)
+
 // WebSocket constants
 const (
 	wsWriteWait  = 2 * time.Second
@@ -1108,15 +1114,18 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedR
 		return err
 	}
 	if len(m.Message) > s.config.MessageSizeLimit {
-		return errHTTPBadRequestTemplatedMessageTooLarge
+		return errHTTPBadRequestTemplateMessageTooLarge
 	}
 	return nil
 }
 
 func replaceTemplate(tpl string, source string) (string, error) {
+	if templateDisallowedRegex.MatchString(tpl) {
+		return "", errHTTPBadRequestTemplateDisallowedFunctionCalls
+	}
 	var data any
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
-		return "", errHTTPBadRequestTemplatedMessageNotJSON
+		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
 	t, err := template.New("").Parse(tpl)
 	if err != nil {
@@ -1124,7 +1133,7 @@ func replaceTemplate(tpl string, source string) (string, error) {
 	}
 	var buf bytes.Buffer
 	if err := t.Execute(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), data); err != nil {
-		return "", errHTTPBadRequestTemplateExecutionFailed
+		return "", errHTTPBadRequestTemplateExecuteFailed
 	}
 	return buf.String(), nil
 }

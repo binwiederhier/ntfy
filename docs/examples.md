@@ -607,6 +607,8 @@ This will only work on selfhosted [traccar](https://www.traccar.org/) ([Github](
 
 The easiest way to integrate traccar with ntfy, is to configure ntfy as the SMS provider for your instance. You then can set your ntfy topic as your account's phone number in traccar. Sending the email notifications to ntfy will not work, as ntfy does not support HTML emails.
 
+**Info:** Add a phone number to your traccar account not in device, as otherwise it will not try to send SMS.
+
 **Caution:** JSON publishing is only possible, when POST-ing to the root URL of the ntfy instance. (see [documentation](publish.md#publish-as-json))
 ```xml
         <entry key='sms.http.url'>https://ntfy.sh</entry>

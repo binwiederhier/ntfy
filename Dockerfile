@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
 
 RUN apk add --no-cache tzdata \
- && /usr/sbin/adduser -D -u 1000 ntfy
+ && /usr/sbin/adduser -D -u 10001 ntfy
 COPY ntfy /usr/bin
 
 EXPOSE 80/tcp

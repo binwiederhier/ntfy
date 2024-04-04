@@ -37,7 +37,11 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	}
 	logvr(v, r).Tag(tagAccount).Field("user_name", newAccount.Username).Info("Creating user %s", newAccount.Username)
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil {
-		return err
+		if err.Error() == "invalid argument" {
+			return errHTTPBadRequestInvalidArgument
+		} else {
+			return err
+		}
 	}
 	v.AccountCreated()
 	return s.writeJSON(w, newSuccessResponse())

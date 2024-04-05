@@ -122,7 +122,7 @@ var (
 	errHTTPBadRequestTemplateInvalid                 = &errHTTP{40043, http.StatusBadRequest, "invalid request: could not parse template", "https://ntfy.sh/docs/publish/#message-templating", nil}
 	errHTTPBadRequestTemplateDisallowedFunctionCalls = &errHTTP{40044, http.StatusBadRequest, "invalid request: template contains disallowed function calls, e.g. template, call, or define", "https://ntfy.sh/docs/publish/#message-templating", nil}
 	errHTTPBadRequestTemplateExecuteFailed           = &errHTTP{40045, http.StatusBadRequest, "invalid request: template execution failed", "https://ntfy.sh/docs/publish/#message-templating", nil}
-	errHTTPBadRequestInvalidArgument                 = &errHTTP{40046, http.StatusBadRequest, "invalid request: invalid argument", "", nil}
+	errHTTPBadRequestInvalidUsername                 = &errHTTP{40046, http.StatusBadRequest, "invalid request: invalid username", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

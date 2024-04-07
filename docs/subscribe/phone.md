@@ -95,7 +95,7 @@ The reason for this is [Firebase Cloud Messaging (FCM)](https://firebase.google.
 notifications. Firebase is overall pretty bad at delivering messages in time, but on Android, most apps are stuck with it.
 
 The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in the Google Play flavor of the app.
-It won't use Firebase for any self-hosted servers, and not at all in the the F-Droid flavor.
+It won't use Firebase for any self-hosted servers, and not at all in the F-Droid flavor.
 
 ## Share to topic
 _Supported on:_ :material-android:

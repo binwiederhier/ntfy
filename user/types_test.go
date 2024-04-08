@@ -64,12 +64,12 @@ func TestTierContext(t *testing.T) {
 
 func TestUsernameRegex(t *testing.T) {
 	username := "phil"
-	username_email := "phil@ntfy.sh"
-	username_email_alias := "phil+alias@ntfy.sh"
-	username_invalid := "phil\rocks"
+	usernameEmail := "phil@ntfy.sh"
+	usernameEmailAlias := "phil+alias@ntfy.sh"
+	usernameInvalid := "phil\rocks"
 
 	require.True(t, AllowedUsername(username))
-	require.True(t, AllowedUsername(username_email))
-	require.True(t, AllowedUsername(username_email_alias))
-	require.False(t, AllowedUsername(username_invalid))
+	require.True(t, AllowedUsername(usernameEmail))
+	require.True(t, AllowedUsername(usernameEmailAlias))
+	require.False(t, AllowedUsername(usernameInvalid))
 }

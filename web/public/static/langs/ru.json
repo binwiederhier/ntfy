@@ -391,5 +391,17 @@
     "web_push_subscription_expiring_title": "Уведомления будут приостановлены",
     "web_push_subscription_expiring_body": "Откройте ntfy, чтобы продолжать получать уведомления",
     "web_push_unknown_notification_title": "Получено неизвестное уведомление от сервера",
-    "web_push_unknown_notification_body": "Вам может потребоваться обновить ntfy, для этого откройте веб-приложение"
+    "web_push_unknown_notification_body": "Вам может потребоваться обновить ntfy, для этого откройте веб-приложение",
+    "prefs_notifications_web_push_title": "Фоновые уведомления",
+    "prefs_notifications_web_push_enabled_description": "Уведомления приходят даже когда веб-приложение не запущено (через Web Push)",
+    "prefs_notifications_web_push_disabled_description": "Уведомления приходят, когда веб-приложение запущено (через WebSocket)",
+    "prefs_appearance_theme_title": "Тема",
+    "prefs_notifications_web_push_enabled": "Включено для {{server}}",
+    "prefs_notifications_web_push_disabled": "Выключено",
+    "notifications_actions_failed_notification": "Неудачное действие",
+    "publish_dialog_checkbox_markdown": "Форматировать как Markdown",
+    "subscribe_dialog_subscribe_use_another_background_info": "Уведомления с других серверов не будут получены, когда веб-приложение не открыто",
+    "prefs_appearance_theme_system": "Системный (по умолчанию)",
+    "prefs_appearance_theme_dark": "Ночной режим",
+    "prefs_appearance_theme_light": "Дневной режим"
 }

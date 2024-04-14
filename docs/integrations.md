@@ -34,6 +34,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Overseer](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
 - [Tautulli](https://github.com/Tautulli/Tautulli) ⭐ - Monitoring and tracking tool for Plex (integration [via webhook](https://github.com/Tautulli/Tautulli/wiki/Notification-Agents-Guide#webhook))
 - [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway (integration via [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy))
+- [Proxmox-Ntfy](https://github.com/qtsone/proxmox-ntfy) - Python script that monitors Proxmox tasks and sends notifications using the Ntfy service.
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

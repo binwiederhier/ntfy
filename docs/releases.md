@@ -1373,3 +1373,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
+
+### ntfy server v2.11.0
+
+**Bug fixes + maintenance:**
+
+* Re-add database index `idx_topic` to the `messages` table to fix performance issues on ntfy.sh (no ticket, big thanks to [@tcaputi](https://github.com/tcaputi) for finding this issue)

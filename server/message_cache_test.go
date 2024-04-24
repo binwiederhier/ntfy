@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -509,6 +508,14 @@ func TestSqliteCache_Migration_From1(t *testing.T) {
 	messages, err = c.Messages("mytopic", sinceAllMessages, true)
 	require.Nil(t, err)
 	require.Equal(t, 11, len(messages))
+
+	// Check that index "idx_topic" exists
+	rows, err := c.db.Query(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_topic'`)
+	require.Nil(t, err)
+	require.True(t, rows.Next())
+	var indexName string
+	require.Nil(t, rows.Scan(&indexName))
+	require.Equal(t, "idx_topic", indexName)
 }
 
 func TestSqliteCache_Migration_From9(t *testing.T) {
@@ -675,15 +682,15 @@ func checkSchemaVersion(t *testing.T, db *sql.DB) {
 
 func TestMemCache_NopCache(t *testing.T) {
 	c, _ := newNopCache()
-	assert.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))
+	require.Nil(t, c.AddMessage(newDefaultMessage("mytopic", "my message")))
 
 	messages, err := c.Messages("mytopic", sinceAllMessages, false)
-	assert.Nil(t, err)
-	assert.Empty(t, messages)
+	require.Nil(t, err)
+	require.Empty(t, messages)
 
 	topics, err := c.Topics()
-	assert.Nil(t, err)
-	assert.Empty(t, topics)
+	require.Nil(t, err)
+	require.Empty(t, topics)
 }
 
 func newSqliteTestCache(t *testing.T) *messageCache {
@@ -700,16 +707,12 @@ func newSqliteTestCacheFile(t *testing.T) string {
 
 func newSqliteTestCacheFromFile(t *testing.T, filename, startupQueries string) *messageCache {
 	c, err := newSqliteCache(filename, startupQueries, time.Hour, 0, 0, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	return c
 }
 
 func newMemTestCache(t *testing.T) *messageCache {
 	c, err := newMemCache()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	return c
 }

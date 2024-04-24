@@ -122,7 +122,7 @@ const (
 
 // Schema management queries
 const (
-	currentSchemaVersion          = 12
+	currentSchemaVersion          = 13
 	createSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -246,6 +246,11 @@ const (
 	migrate11To12AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN content_type TEXT NOT NULL DEFAULT('');
 	`
+
+	// 12 -> 13
+	migrate12To13AlterMessagesTableQuery = `
+		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
+	`
 )
 
 var (
@@ -262,6 +267,7 @@ var (
 		9:  migrateFrom9,
 		10: migrateFrom10,
 		11: migrateFrom11,
+		12: migrateFrom12,
 	}
 )
 
@@ -966,6 +972,22 @@ func migrateFrom11(db *sql.DB, _ time.Duration) error {
 		return err
 	}
 	if _, err := tx.Exec(updateSchemaVersion, 12); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func migrateFrom12(db *sql.DB, _ time.Duration) error {
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 12 to 13")
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(migrate12To13AlterMessagesTableQuery); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(updateSchemaVersion, 13); err != nil {
 		return err
 	}
 	return tx.Commit()

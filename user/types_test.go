@@ -61,3 +61,15 @@ func TestTierContext(t *testing.T) {
 	require.Equal(t, "price_456", context["stripe_yearly_price_id"])
 
 }
+
+func TestUsernameRegex(t *testing.T) {
+	username := "phil"
+	usernameEmail := "phil@ntfy.sh"
+	usernameEmailAlias := "phil+alias@ntfy.sh"
+	usernameInvalid := "phil\rocks"
+
+	require.True(t, AllowedUsername(username))
+	require.True(t, AllowedUsername(usernameEmail))
+	require.True(t, AllowedUsername(usernameEmailAlias))
+	require.False(t, AllowedUsername(usernameInvalid))
+}

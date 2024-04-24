@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -37,6 +38,9 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 	}
 	logvr(v, r).Tag(tagAccount).Field("user_name", newAccount.Username).Info("Creating user %s", newAccount.Username)
 	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil {
+		if errors.Is(err, user.ErrInvalidArgument) {
+			return errHTTPBadRequestInvalidUsername
+		}
 		return err
 	}
 	v.AccountCreated()

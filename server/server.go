@@ -53,7 +53,7 @@ type Server struct {
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
-	messageCache      *messageCache                       // Database that stores the messages
+	messageCache      MessageCache                        // Database that stores the messages
 	webPush           *webPushStore                       // Database that stores web push subscriptions
 	fileCache         *fileCache                          // File system based cache that stores attachments
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
@@ -226,11 +226,13 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-func createMessageCache(conf *Config) (*messageCache, error) {
+func createMessageCache(conf *Config) (MessageCache, error) {
 	if conf.CacheDuration == 0 {
 		return newNopCache()
+	} else if strings.HasPrefix(conf.CacheFile, "postgres:") {
+		return newPgMessageCache(strings.TrimPrefix(conf.CacheFile, "postgres:"), conf.CacheStartupQueries, conf.CacheBatchSize, conf.CacheBatchTimeout)
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
+		return newSqliteMessageCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
 	}
 	return newMemCache()
 }
@@ -1525,7 +1527,7 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 	return nil
 }
 
-// sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
+// sendOldMessages selects old messages from the sqliteMessageCache and calls sub for each of them. It uses since as the
 // marker, returning only messages that are newer than the marker.
 func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {

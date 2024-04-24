@@ -389,7 +389,7 @@ func TestServer_PublishAt(t *testing.T) {
 
 	// Update message time to the past
 	fakeTime := time.Now().Add(-10 * time.Second).Unix()
-	_, err := s.messageCache.db.Exec(`UPDATE messages SET time=?`, fakeTime)
+	_, err := s.messageCache.DB().Exec(`UPDATE messages SET time=?`, fakeTime)
 	require.Nil(t, err)
 
 	// Trigger delayed message sending
@@ -425,7 +425,7 @@ func TestServer_PublishAt_FromUser(t *testing.T) {
 
 	// Update message time to the past
 	fakeTime := time.Now().Add(-10 * time.Second).Unix()
-	_, err := s.messageCache.db.Exec(`UPDATE messages SET time=?`, fakeTime)
+	_, err := s.messageCache.DB().Exec(`UPDATE messages SET time=?`, fakeTime)
 	require.Nil(t, err)
 
 	// Trigger delayed message sending
@@ -2189,7 +2189,7 @@ func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 		require.Nil(t, err)
 		messages = append(messages, newDefaultMessage(topicID, "some message"))
 	}
-	require.Nil(t, s.messageCache.addMessages(messages))
+	require.Nil(t, s.messageCache.AddMessages(messages))
 	log.Info("Done: Adding %d messages; took %s", count, time.Since(start).Round(time.Millisecond))
 
 	// Update stats

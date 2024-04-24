@@ -192,6 +192,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/afunworm"><img src="https://github.com/afunworm.png" width="40px" /></a>
 <a href="https://github.com/PTR-inc"><img src="https://github.com/PTR-inc.png" width="40px" /></a>
 <a href="https://github.com/spudooli"><img src="https://github.com/spudooli.png" width="40px" /></a>
+<a href="https://github.com/IMarkoMC"><img src="https://github.com/IMarkoMC.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

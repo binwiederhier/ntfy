@@ -593,6 +593,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		return err
 	}
 	w.Header().Set("Content-Type", "text/javascript")
+	w.Header().Set("Cache-Control", "no-cache")
 	_, err = io.WriteString(w, fmt.Sprintf("// Generated server configuration\nvar config = %s;\n", string(b)))
 	return err
 }

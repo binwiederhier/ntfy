@@ -350,5 +350,14 @@
     "alert_notification_permission_denied_description": "الرجاء اعادة منح الصلاحيات في المتصفح",
     "alert_notification_permission_denied_title": "الإشعارات مغلقة",
     "notifications_actions_failed_notification": "حدث غير منفذ",
-    "prefs_notifications_web_push_disabled": "ملغي"
+    "prefs_notifications_web_push_disabled": "ملغي",
+    "account_basics_phone_numbers_dialog_channel_call": "اتصل",
+    "account_basics_phone_numbers_title": "أرقام الهواتف",
+    "account_basics_phone_numbers_dialog_channel_sms": "رسالة نصية قصيرة",
+    "account_basics_phone_numbers_dialog_check_verification_button": "رمز التأكيد",
+    "account_basics_phone_numbers_dialog_number_label": "رقم الهاتف",
+    "account_basics_phone_numbers_dialog_verify_button_call": "اتصل بي",
+    "account_basics_phone_numbers_dialog_code_label": "رمز التحقّق",
+    "account_upgrade_dialog_tier_price_per_month": "شهر",
+    "prefs_appearance_theme_title": "الحُلّة"
 }

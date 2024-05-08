@@ -380,5 +380,12 @@
     "account_basics_phone_numbers_dialog_channel_sms": "SMS",
     "account_upgrade_dialog_tier_features_calls_other": "{{calls}} dagliga telefonsamtal",
     "account_upgrade_dialog_tier_features_no_calls": "Inga telefonsamtal",
-    "account_upgrade_dialog_tier_features_calls_one": "{{calls}} dagliga telefonsamtal"
+    "account_upgrade_dialog_tier_features_calls_one": "{{calls}} dagliga telefonsamtal",
+    "action_bar_mute_notifications": "Stäng av aviseringar",
+    "action_bar_unmute_notifications": "Slå på aviseringar",
+    "alert_notification_permission_denied_description": "Vänligen aktivera dem i din weblsäare",
+    "alert_notification_ios_install_required_title": "iOS installation krävs",
+    "notifications_actions_failed_notification": "Misslyckad åtgärd",
+    "alert_notification_permission_denied_title": "Notifieringar är blockerade",
+    "alert_notification_ios_install_required_description": "Klicka på delaikonen och Lägg till på hemskärmen för att aktivera notifieringarna i iOS"
 }

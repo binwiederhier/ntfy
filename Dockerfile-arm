@@ -12,8 +12,6 @@ LABEL org.opencontainers.image.description="Send push notifications to your phon
 # Alpine does not support adding "tzdata" on ARM anymore, see
 # https://github.com/binwiederhier/ntfy/issues/894
 
-RUN /usr/sbin/adduser -D -u 10001 ntfy
-
 COPY ntfy /usr/bin
 
 EXPOSE 80/tcp

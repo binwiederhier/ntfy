@@ -309,5 +309,13 @@
     "account_upgrade_dialog_interval_yearly_discount_save": "desconto de {{discount}}%",
     "account_upgrade_dialog_interval_yearly_discount_save_up_to": "desconto de até {{discount}}%",
     "account_upgrade_dialog_cancel_warning": "Isso <strong>cancelará sua assinatura</strong> e fará downgrade de sua conta em {{date}}. Nessa data, as reservas de tópicos, bem como as mensagens armazenadas em cache no servidor <strong>serão excluídas</strong>.",
-    "account_upgrade_dialog_reservations_warning_one": "O nível selecionada permite menos tópicos reservados do que a camada atual. Antes de alterar seu nível, <strong>exclua pelo menos uma reserva</strong>. Você pode remover reservas nas <Link>Configurações</Link>"
+    "account_upgrade_dialog_reservations_warning_one": "O nível selecionada permite menos tópicos reservados do que a camada atual. Antes de alterar seu nível, <strong>exclua pelo menos uma reserva</strong>. Você pode remover reservas nas <Link>Configurações</Link>",
+    "account_upgrade_dialog_reservations_warning_other": "O plano selecionado permite menos tópicos reservados do que o seu plano atual. Antes de mudar seu plano, exclua por favor ao menos {{count}} reservas. Você pode remover reservas em Configurações.",
+    "account_upgrade_dialog_tier_features_no_reservations": "Sem tópicos reservados",
+    "account_upgrade_dialog_tier_features_messages_one": "{{messages}} mensagen diária",
+    "account_upgrade_dialog_tier_features_emails_one": "{{emails}} email diário",
+    "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} tópico reservado",
+    "account_upgrade_dialog_tier_features_reservations_other": "{{reservations}} tópicos reservados",
+    "account_upgrade_dialog_tier_features_emails_other": "{{emails}} emails diários",
+    "account_upgrade_dialog_tier_features_messages_other": "{{messages}} mensagens diárias"
 }

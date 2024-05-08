@@ -2306,6 +2306,22 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 	require.Equal(t, 429, rr.Code)
 }
 
+func TestServer_SubscriberRateLimiting_NotWrongTopic(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4"
+	}
+	rr := request(t, s, "GET", "/alerts,upAAAAAAAAAAAA,upBBBBBBBBBBBB/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, "", rr.Body.String())
+	require.Nil(t, s.topics["alerts"].rateVisitor)
+	require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
+	require.Equal(t, "1.2.3.4", s.topics["upBBBBBBBBBBBB"].rateVisitor.ip.String())
+}
+
 func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.VisitorRequestLimitBurst = 3

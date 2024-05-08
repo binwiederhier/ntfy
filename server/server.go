@@ -1499,6 +1499,9 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// - topic is not reserved, and v.user has write access
 	writableRateTopics := make([]*topic, 0)
 	for _, t := range topics {
+		if !util.Contains(eligibleRateTopics, t) {
+			continue
+		}
 		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
 		if err != nil {
 			return err

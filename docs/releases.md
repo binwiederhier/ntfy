@@ -1380,3 +1380,4 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Re-add database index `idx_topic` to the `messages` table to fix performance issues on ntfy.sh (no ticket, big thanks to [@tcaputi](https://github.com/tcaputi) for finding this issue)
 * Do not set rate visitor for non-eligible topics (no ticket)
+* Do not cache `config.js` ([#1098](https://github.com/binwiederhier/ntfy/pull/1098), thanks to [@wunter8](https://github.com/wunter8))

@@ -2,6 +2,21 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.11.0
+Released May 13, 2024
+
+This is a tiny release that fixes a database index issue that caused performance issues on ntfy.sh. It also fixes a bug
+in the rate visitor logic that caused rate visitors to be assigned to seemingly random topics. Nothing major this time.
+
+❤️ Quick reminder that if you like ntfy, **please consider sponsoring us** via [GitHub Sponsors](https://github.com/sponsors/binwiederhier)
+and [Liberapay](https://en.liberapay.com/ntfy/), or buying a [paid plan via the web app](https://ntfy.sh/app). ntfy will always remain open source.
+
+**Bug fixes + maintenance:**
+
+* Re-add database index `idx_topic` to the `messages` table to fix performance issues on ntfy.sh (no ticket, big thanks to [@tcaputi](https://github.com/tcaputi) for finding this issue)
+* Do not set rate visitor for non-eligible topics (no ticket)
+* Do not cache `config.js` ([#1098](https://github.com/binwiederhier/ntfy/pull/1098), thanks to [@wunter8](https://github.com/wunter8))
+
 ### ntfy server v2.10.0
 Released Mar 27, 2024
 
@@ -1373,11 +1388,3 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Additional languages:**
 
 * Swedish (thanks to [@hellbown](https://hosted.weblate.org/user/hellbown/))
-
-### ntfy server v2.11.0 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
-* Re-add database index `idx_topic` to the `messages` table to fix performance issues on ntfy.sh (no ticket, big thanks to [@tcaputi](https://github.com/tcaputi) for finding this issue)
-* Do not set rate visitor for non-eligible topics (no ticket)
-* Do not cache `config.js` ([#1098](https://github.com/binwiederhier/ntfy/pull/1098), thanks to [@wunter8](https://github.com/wunter8))

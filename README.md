@@ -197,6 +197,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/Riolku"><img src="https://github.com/Riolku.png" width="40px" /></a>
 <a href="https://github.com/arnbrhm"><img src="https://github.com/arnbrhm.png" width="40px" /></a>
 <a href="https://github.com/herzkerl"><img src="https://github.com/herzkerl.png" width="40px" /></a>
+<a href="https://github.com/0x45796164"><img src="https://github.com/0x45796164.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

@@ -154,6 +154,23 @@ func SetOutput(w io.Writer) {
 	log.SetOutput(output)
 }
 
+func Reopen() error {
+	mu.Lock()
+	defer mu.Unlock()
+	if f, ok := output.(*os.File); ok {
+		logFile := f.Name()
+		f.Close()
+
+		w, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if err != nil {
+			return err
+		}
+		output = &peekLogWriter{w}
+		log.SetOutput(output)
+	}
+	return nil
+}
+
 // File returns the log file, if any, or an empty string otherwise
 func File() string {
 	mu.RLock()

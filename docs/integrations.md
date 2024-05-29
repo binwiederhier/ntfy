@@ -127,7 +127,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyd](https://github.com/joachimschmidt557/ntfyd) - ntfy desktop daemon (Zig)
 - [ntfy-browser](https://github.com/johman10/ntfy-browser) - browser extension to receive notifications without having the page open (TypeScript)
 - [ntfy-electron](https://github.com/xdpirate/ntfy-electron) - Electron wrapper for the ntfy web app (JS)
-- [systemd-ntfy-poweronoff](https://github.com/stendler/systemd-ntfy-poweronoff) -  Systemd services to send notifications on system startup and shutdown (Go)
+- [systemd-ntfy-poweronoff](https://github.com/stendler/systemd-ntfy-poweronoff) - Systemd services to send notifications on system startup, shutdown and service failure
 - [msgdrop](https://github.com/jbrubake/msgdrop) - Send and receive encrypted messages (Bash)
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager

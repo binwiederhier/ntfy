@@ -84,6 +84,22 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 	require.Equal(t, "my first message", sender.Messages()[0].APNS.Payload.CustomData["message"])
 }
 
+func TestServer_PublishWithoutFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", map[string]string{
+		"firebase": "no",
+	})
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+
+	time.Sleep(100 * time.Millisecond) // Firebase publishing happens
+	require.Equal(t, 0, len(sender.Messages()))
+}
+
 func TestServer_PublishWithFirebase_WithoutUsers_AndWithoutPanic(t *testing.T) {
 	// This tests issue #641, which used to panic before the fix
 
@@ -1667,6 +1683,35 @@ func TestServer_PublishAsJSON_WithActions(t *testing.T) {
 	require.Equal(t, "Turn down", m.Actions[1].Label)
 	require.Equal(t, "https://api.nest.com/device/XZ1D2", m.Actions[1].URL)
 	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
+}
+
+func TestServer_PublishAsJSON_NoCache(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic","message": "this message is not cached","cache":"no"}`
+	response := request(t, s, "PUT", "/", body, nil)
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+	require.Equal(t, "this message is not cached", msg.Message)
+	require.Equal(t, int64(0), msg.Expires)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Empty(t, messages)
+}
+
+func TestServer_PublishAsJSON_WithoutFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	body := `{"topic":"mytopic","message": "my first message","firebase":"no"}`
+	response := request(t, s, "PUT", "/", body, nil)
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+
+	time.Sleep(100 * time.Millisecond) // Firebase publishing happens
+	require.Equal(t, 0, len(sender.Messages()))
 }
 
 func TestServer_PublishAsJSON_Invalid(t *testing.T) {

@@ -142,6 +142,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
 - [notify-via-ntfy](https://exchange.checkmk.com/p/notify-via-ntfy) - Checkmk plugin to send notifications via ntfy (Python)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
+- [container-update-check](https://github.com/stendler/container-update-check) - Scripts to check and notify if a podman or docker container image can be updated (Podman/Shell)
+- [ignition-combustion-template](https://github.com/stendler/ignition-combustion-template) - Templates and scripts to generate a configuration to automatically setup a system on first boot. Including systemd-ntfy-poweronoff (Shell)
 
 ## Blog + forum posts
 

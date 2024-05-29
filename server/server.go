@@ -1862,6 +1862,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)
 		}
+		if m.Cache != "" {
+			r.Header.Set("X-Cache", m.Cache)
+		}
+		if m.Firebase != "" {
+			r.Header.Set("X-Firebase", m.Firebase)
+		}
 		return next(w, r, v)
 	}
 }

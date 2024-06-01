@@ -19,7 +19,7 @@
     "alert_notification_permission_required_description": "Conceder permissão ao seu navegador para mostrar notificações.",
     "alert_not_supported_title": "Notificações não suportadas",
     "notifications_list": "Lista de notificações",
-    "alert_not_supported_description": "As notificações não são suportadas pelo seu navegador.",
+    "alert_not_supported_description": "As notificações não são suportadas pelo seu navegador",
     "notifications_list_item": "Notificação",
     "notifications_mark_read": "Marcar como lido",
     "notifications_delete": "Apagar",
@@ -226,5 +226,17 @@
     "publish_dialog_call_placeholder": "Número de telefone para ligar com a mensagem, ex: +12223334444, ou 'Sim'",
     "publish_dialog_call_reset": "Remover chamada telefônica",
     "publish_dialog_chip_call_label": "Chamada telefônica",
-    "subscribe_dialog_subscribe_button_generate_topic_name": "Gerar nome"
+    "subscribe_dialog_subscribe_button_generate_topic_name": "Gerar nome",
+    "action_bar_unmute_notifications": "Restaurar notificações",
+    "alert_notification_ios_install_required_description": "Clique no ícone Compartilhar e Adicionar à Tela Inicial para ativar as notificações no iOS",
+    "publish_dialog_checkbox_markdown": "Formatar como Markdown",
+    "publish_dialog_chip_call_no_verified_numbers_tooltip": "Números de telefone não verificados",
+    "subscribe_dialog_error_topic_already_reserved": "Tópico já está reservado",
+    "action_bar_mute_notifications": "Silenciar notificações",
+    "alert_notification_permission_denied_title": "Notificações estão bloqueadas",
+    "alert_notification_permission_denied_description": "Por favor reative-as em seu navegador",
+    "alert_notification_ios_install_required_title": "Requer instalação em iOS",
+    "notifications_actions_failed_notification": "Houve uma falha na ação",
+    "publish_dialog_call_item": "Ligar para o número {{number}}",
+    "subscribe_dialog_subscribe_use_another_background_info": "Notificações de outros servidores não serão recebidas enquanto o aplicativo web não estiver aberto"
 }

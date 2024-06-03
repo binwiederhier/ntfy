@@ -2853,6 +2853,39 @@ template ""}}`,
 	}
 }
 
+func TestServer_MessageTemplate_SprigFunctions(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	bodies := []string{
+		`{"foo":"bar","nested":{"title":"here"}}`,
+		`{"topic":"ntfy-test"}`,
+		`{"topic":"another-topic"}`,
+	}
+	templates := []string{
+		`{{.foo | upper}} is {{.nested.title | repeat 3}}`,
+		`{{if hasPrefix "ntfy-" .topic}}Topic: {{trimPrefix "ntfy-" .topic}}{{ else }}Topic: {{.topic}}{{end}}`,
+		`{{if hasPrefix "ntfy-" .topic}}Topic: {{trimPrefix "ntfy-" .topic}}{{ else }}Topic: {{.topic}}{{end}}`,
+	}
+	targets := []string{
+		`BAR is hereherehere`,
+		`Topic: test`,
+		`Topic: another-topic`,
+	}
+	for i, body := range bodies {
+		template := templates[i]
+		target := targets[i]
+		t.Run(template, func(t *testing.T) {
+			response := request(t, s, "PUT", `/mytopic`, body, map[string]string{
+				"Template": "yes",
+				"Message":  template,
+			})
+			require.Equal(t, 200, response.Code)
+			m := toMessage(t, response.Body.String())
+			require.Equal(t, target, m.Message)
+		})
+	}
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

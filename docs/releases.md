@@ -1373,6 +1373,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.11.1 (UNRELEASED)
+
+**Features:**
+
+* You can now use [Sprig](https://github.com/Masterminds/sprig) functions in message/title templates ([#1121](https://github.com/binwiederhier/ntfy/issues/1121), thanks to [@davidatkinsondoyle](https://github.com/davidatkinsondoyle) for reporting and to 
+[@wunter8](https://github.com/wunter8) for implementing)
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

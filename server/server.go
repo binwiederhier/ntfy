@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/emersion/go-smtp"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -1128,7 +1129,7 @@ func replaceTemplate(tpl string, source string) (string, error) {
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	t, err := template.New("").Parse(tpl)
+	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid
 	}

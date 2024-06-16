@@ -72,6 +72,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfysh-windows](https://github.com/lucas-bortoli/ntfysh-windows) - A ntfy client for Windows Desktop
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
 - [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
+- [wlzntfy]([https://](https://github.com/Walzen-Group/ntfy-toaster)) - wlzntfy is a minimalistic notification-only go client for Windows, focused on delivering rich(ish) Windows toasts.
 
 ## Projects + scripts 
 

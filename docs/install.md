@@ -30,37 +30,41 @@ deb/rpm packages.
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_amd64.tar.gz
-    tar zxvf ntfy_2.11.0_linux_amd64.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_amd64/ntfy /usr/local/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_amd64/{client,server}/*.yml /etc/ntfy
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget -O ntfy_${NTFY_VERSION}_linux_amd64.tar.gz "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_amd64.tar.gz"
+    tar zxvf ntfy_${NTFY_VERSION}_linux_amd64.tar.gz 
+    sudo cp -a ntfy_${NTFY_VERSION}_linux_amd64/ntfy /usr/local/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_${NTFY_VERSION}_linux_amd64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "armv6"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.tar.gz
-    tar zxvf ntfy_2.11.0_linux_armv6.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_armv6/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_armv6/{client,server}/*.yml /etc/ntfy
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget -O ntfy_${NTFY_VERSION}_linux_armv6.tar.gz "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_armv6.tar.gz"
+    tar zxvf ntfy_${NTFY_VERSION}_linux_armv6.tar.gz 
+    sudo cp -a ntfy_${NTFY_VERSION}_linux_armv6/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_${NTFY_VERSION}_linux_armv6/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv7.tar.gz
-    tar zxvf ntfy_2.11.0_linux_armv7.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_armv7/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_armv7/{client,server}/*.yml /etc/ntfy
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget -O ntfy_${NTFY_VERSION}_linux_armv7.tar.gz "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_armv7.tar.gz"
+    tar zxvf ntfy_${NTFY_VERSION}_linux_armv7.tar.gz 
+    sudo cp -a ntfy_${NTFY_VERSION}_linux_armv7/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_${NTFY_VERSION}_linux_armv7/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_arm64.tar.gz
-    tar zxvf ntfy_2.11.0_linux_arm64.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_arm64/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_arm64/{client,server}/*.yml /etc/ntfy
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget -O ntfy_${NTFY_VERSION}_linux_arm64.tar.gz "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_arm64.tar.gz"
+    tar zxvf ntfy_${NTFY_VERSION}_linux_arm64.tar.gz 
+    sudo cp -a ntfy_${NTFY_VERSION}_linux_arm64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_${NTFY_VERSION}_linux_arm64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
@@ -110,32 +114,36 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_amd64.deb
-    sudo dpkg -i ntfy_*.deb
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_amd64.deb"
+    sudo dpkg -i ntfy_${NTFY_VERSION}_linux_amd64.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
 
 === "armv6"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.deb
-    sudo dpkg -i ntfy_*.deb
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_armv6.deb"
+    sudo dpkg -i ntfy_${NTFY_VERSION}_linux_armv6.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv7.deb
-    sudo dpkg -i ntfy_*.deb
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_armv7.deb"
+    sudo dpkg -i ntfy_${NTFY_VERSION}_linux_armv7.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_arm64.deb
-    sudo dpkg -i ntfy_*.deb
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/latest/download/ntfy_${NTFY_VERSION}_linux_arm64.deb"
+    sudo dpkg -i ntfy_${NTFY_VERSION}_linux_arm64.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
@@ -144,28 +152,36 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_amd64.rpm
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/download/v${NTFY_VERSION}/ntfy_${NTFY_VERSION}_linux_amd64.rpm"
+    sudo rpm -ivh ntfy_${NTFY_VERSION}_linux_amd64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "armv6"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.rpm
-    sudo systemctl enable ntfy
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/download/v${NTFY_VERSION}/ntfy_${NTFY_VERSION}_linux_armv6.rpm"
+    sudo rpm -ivh ntfy_${NTFY_VERSION}_linux_armv6.rpm
+    sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv7.rpm
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/download/v${NTFY_VERSION}/ntfy_${NTFY_VERSION}_linux_armv7.rpm"
+    sudo rpm -ivh ntfy_${NTFY_VERSION}_linux_armv7.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "arm64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_arm64.rpm
+    NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget "https://github.com/binwiederhier/ntfy/releases/download/v${NTFY_VERSION}/ntfy_${NTFY_VERSION}_linux_arm64.rpm"
+    sudo rpm -ivh ntfy_${NTFY_VERSION}_linux_arm64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
@@ -202,11 +218,12 @@ If run as `root`, ntfy will look for its config at `/etc/ntfy/client.yml`. For a
 `~/Library/Application Support/ntfy/client.yml` (sample included in the tarball).
 
 ```bash
-curl -L https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_darwin_all.tar.gz > ntfy_2.11.0_darwin_all.tar.gz
-tar zxvf ntfy_2.11.0_darwin_all.tar.gz
-sudo cp -a ntfy_2.11.0_darwin_all/ntfy /usr/local/bin/ntfy
+NTFY_VERSION=$(curl -s "https://api.github.com/repos/binwiederhier/ntfy/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+wget "https://github.com/binwiederhier/ntfy/releases/download/v${NTFY_VERSION}/ntfy_${NTFY_VERSION}_darwin_all.tar.gz"
+tar zxvf ntfy_${NTFY_VERSION}_darwin_all.tar.gz
+sudo cp -a ntfy_${NTFY_VERSION}_darwin_all/ntfy /usr/local/bin/ntfy
 mkdir ~/Library/Application\ Support/ntfy 
-cp ntfy_2.11.0_darwin_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
+cp ntfy_${NTFY_VERSION}_darwin_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
 ntfy --help
 ```
 

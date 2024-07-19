@@ -382,6 +382,6 @@
     "account_usage_calls_none": "Noch keine Anrufe mit diesem Account getätigt",
     "account_upgrade_dialog_tier_features_calls_one": "{{calls}} Telefonanrufe pro Tag",
     "action_bar_mute_notifications": "Benachrichtigungen stummschalten",
-    "action_bar_unmute_notifications": "Benachrichtigungen lautschalten",
+    "action_bar_unmute_notifications": "Benachrichtigungen laut schalten",
     "alert_notification_permission_denied_title": "Benachrichtigungen sind blockiert"
 }

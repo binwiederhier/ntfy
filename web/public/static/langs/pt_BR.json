@@ -11,7 +11,7 @@
     "alert_notification_permission_required_description": "Conceder ao navegador permissão para mostrar notificações.",
     "alert_notification_permission_required_button": "Conceder agora",
     "alert_not_supported_title": "Notificações não são suportadas",
-    "alert_not_supported_description": "Notificações não são suportadas pelo seu navagador.",
+    "alert_not_supported_description": "Notificações não são suportadas pelo seu navegador.",
     "notifications_copied_to_clipboard": "Copiado para a área de transferência",
     "notifications_tags": "Etiquetas",
     "notifications_attachment_copy_url_title": "Copiar URL do anexo para a área de transferência",
@@ -317,5 +317,9 @@
     "account_upgrade_dialog_tier_features_reservations_one": "{{reservations}} tópico reservado",
     "account_upgrade_dialog_tier_features_reservations_other": "{{reservations}} tópicos reservados",
     "account_upgrade_dialog_tier_features_emails_other": "{{emails}} emails diários",
-    "account_upgrade_dialog_tier_features_messages_other": "{{messages}} mensagens diárias"
+    "account_upgrade_dialog_tier_features_messages_other": "{{messages}} mensagens diárias",
+    "account_upgrade_dialog_tier_current_label": "Atual",
+    "account_upgrade_dialog_tier_price_per_month": "mês",
+    "account_upgrade_dialog_button_cancel": "Cancelar",
+    "account_upgrade_dialog_tier_selected_label": "Selecionado"
 }

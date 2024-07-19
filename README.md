@@ -207,6 +207,7 @@ account costs. Even small donations are very much appreciated. A big fat **Thank
 <a href="https://github.com/Proximus888"><img src="https://github.com/Proximus888.png" width="40px" /></a>
 <a href="https://github.com/wielandp"><img src="https://github.com/wielandp.png" width="40px" /></a>
 <a href="https://github.com/chxseh"><img src="https://github.com/chxseh.png" width="40px" /></a>
+<a href="https://github.com/user8446"><img src="https://github.com/user8446.png" width="40px" /></a>
 
 I'd also like to thank JetBrains for their awesome [IntelliJ IDEA](https://www.jetbrains.com/idea/),
 and [DigitalOcean](https://m.do.co/c/442b929528db) (*referral link*) for supporting the project:

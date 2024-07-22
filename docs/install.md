@@ -287,6 +287,7 @@ services:
     image: binwiederhier/ntfy
     container_name: ntfy
     command:
+      - ntfy
       - serve
     environment:
       - TZ=UTC    # optional: set desired timezone

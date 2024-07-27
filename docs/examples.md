@@ -173,7 +173,14 @@ Or, if you only want to send notifications using shoutrrr:
 shoutrrr send -u "ntfy://ntfy.sh/my_watchtower_topic?title=WatchtowerUpdates" -m "testMessage"
 ```
 
-Authentication tokens are also supported via the generic webhook and authorization header using this url format (replace the domain, topic and token with your own):
+Authentication tokens are also supported:
+
+- (Recommended) Ntfy url format (replace the domain, topic and token with your own):
+```
+ntfy://:TOKEN@DOMAIN/TOPIC
+```
+
+- Generic webhook and authorization header using this url format (replace the domain, topic and token with your own):
 
 ```
 generic+https://DOMAIN/TOPIC?@authorization=Bearer+TOKEN`

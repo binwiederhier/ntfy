@@ -777,6 +777,7 @@ or the root domain:
     ```
     # Note that this config is most certainly incomplete. Please help out and let me know what's missing
     # via Discord/Matrix or in a GitHub issue.
+    # Note: Caddy automatically handles both HTTP and WebSockets with reverse_proxy 
 
     ntfy.sh, http://nfty.sh {
         reverse_proxy 127.0.0.1:2586

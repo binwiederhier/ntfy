@@ -352,5 +352,6 @@
     "account_tokens_table_last_access_header": "Ultimo accesso",
     "account_tokens_table_expires_header": "Scade",
     "account_tokens_table_never_expires": "Non scade mai",
-    "account_tokens_table_current_session": "Sessione corrente del browser"
+    "account_tokens_table_current_session": "Sessione corrente del browser",
+    "account_upgrade_dialog_interval_yearly_discount_save_up_to": "Risparmia fino al {{discount}}%"
 }

@@ -172,7 +172,7 @@
     "account_tokens_table_token_header": "Token",
     "prefs_notifications_delete_after_never": "Nunca",
     "prefs_users_description": "Engadir/eliminar usuarias dos temas protexidos. Ten en conta que as credenciais gárdanse na almacenaxe local do navegador.",
-    "subscribe_dialog_subscribe_description": "Os temas poderían non estar proxetidos con contrasinal, así que elixe un nome complicado de adiviñar. Unha vez subscrita, podes PUT/POST notificacións.",
+    "subscribe_dialog_subscribe_description": "Os temas poden non estar protexidos con contrasinal, asi que escolle un nome que non sexa fácil de pesquisar. Unha vez suscrito, podes notificar con PUT/POST.",
     "account_upgrade_dialog_interval_yearly_discount_save_up_to": "aforro ata un {{discount}}%",
     "account_tokens_dialog_label": "Etiqueta, ex. notificación de Radarr",
     "account_tokens_table_expires_header": "Caducidade",

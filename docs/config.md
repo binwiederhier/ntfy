@@ -1242,6 +1242,8 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     maxretry = 10
     ```
 
+!!! info If you run nginx in a container, append `, chain=DOCKER-USER` to the jail.local action.
+
 ## Health checks
 A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
 If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.

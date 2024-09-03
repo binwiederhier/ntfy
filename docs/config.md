@@ -631,7 +631,7 @@ or the root domain:
       listen 443 ssl http2;
       server_name ntfy.sh;
     
-      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6see https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
       ssl_session_timeout 1d;
       ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
       ssl_session_tickets off;
@@ -698,7 +698,7 @@ or the root domain:
       listen 443 ssl http2;
       server_name ntfy.sh;
     
-      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6see https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
       ssl_session_timeout 1d;
       ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
       ssl_session_tickets off;

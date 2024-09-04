@@ -123,5 +123,8 @@
     "message_bar_show_dialog": "Arată dialogul de publicare",
     "signup_error_username_taken": "Numele de utilizator {{username}} este deja folosit",
     "login_title": "Autentifică-te în contul ntfy",
-    "action_bar_reservation_add": "Rezervă topicul"
+    "action_bar_reservation_add": "Rezervă topicul",
+    "action_bar_mute_notifications": "Oprește notificările",
+    "action_bar_unmute_notifications": "Pornește notificările",
+    "nav_topics_title": "Subiecte abonate"
 }

@@ -142,6 +142,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
 - [notify-via-ntfy](https://exchange.checkmk.com/p/notify-via-ntfy) - Checkmk plugin to send notifications via ntfy (Python)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
+- [ntfy.tg](https://github.com/Sid-Sun/ntfy.tg) - A telegram bot to receive messages from ntfy.sh topics (Go)
 
 ## Blog + forum posts
 

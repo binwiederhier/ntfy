@@ -383,5 +383,7 @@
     "account_upgrade_dialog_tier_features_calls_one": "{{calls}} Telefonanrufe pro Tag",
     "action_bar_mute_notifications": "Benachrichtigungen stummschalten",
     "action_bar_unmute_notifications": "Benachrichtigungen laut schalten",
-    "alert_notification_permission_denied_title": "Benachrichtigungen sind blockiert"
+    "alert_notification_permission_denied_title": "Benachrichtigungen sind blockiert",
+    "alert_notification_permission_denied_description": "Bitte reaktiviere diese in deinem Browser",
+    "notifications_actions_failed_notification": "Aktion nicht erfolgreich"
 }

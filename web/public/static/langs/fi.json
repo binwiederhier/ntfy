@@ -400,5 +400,11 @@
     "error_boundary_button_reload_ntfy": "Lataa ntfy uudelleen",
     "web_push_subscription_expiring_title": "Ilmoitukset keskeytetään",
     "web_push_subscription_expiring_body": "Avaa ntfy jatkaaksesi ilmoitusten vastaanottamista",
-    "web_push_unknown_notification_title": "Tuntematon ilmoitus vastaanotettu palvelimelta"
+    "web_push_unknown_notification_title": "Tuntematon ilmoitus vastaanotettu palvelimelta",
+    "alert_notification_ios_install_required_description": "Napauta Jaa-kuvaketta ja Lisää aloitusnäyttöön ottaaksesi ilmoitukset käyttöön iOS:ssä",
+    "prefs_notifications_web_push_disabled_description": "Ilmoituksia vastaanotetaan, kun verkkosovellus on käynnissä (WebSocket:in kautta)",
+    "web_push_unknown_notification_body": "Voit joutua päivittämään ntfy:n avaamalla verkkosovelluksen",
+    "notifications_actions_failed_notification": "Epäonnistunut toiminto",
+    "subscribe_dialog_subscribe_use_another_background_info": "Ilmoituksia muilta palvelimilta ei vastaanoteta, mikäli verkkosovellus ei ole avoinna",
+    "prefs_notifications_web_push_enabled_description": "Ilmoituksia vastaanotetaan siitä huolimatta, että verkkosovellus ei ole käynnissä (Web Push:n kautta)"
 }

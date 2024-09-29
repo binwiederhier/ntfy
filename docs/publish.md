@@ -837,8 +837,7 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
-a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
-like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
+a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support.
 
 To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
 any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 

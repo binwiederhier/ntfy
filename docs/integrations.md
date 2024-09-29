@@ -129,7 +129,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyd](https://github.com/joachimschmidt557/ntfyd) - ntfy desktop daemon (Zig)
 - [ntfy-browser](https://github.com/johman10/ntfy-browser) - browser extension to receive notifications without having the page open (TypeScript)
 - [ntfy-electron](https://github.com/xdpirate/ntfy-electron) - Electron wrapper for the ntfy web app (JS)
-- [systemd-ntfy-poweronoff](https://github.com/stendler/systemd-ntfy-poweronoff) -  Systemd services to send notifications on system startup and shutdown (Go)
+- [systemd-ntfy-poweronoff](https://github.com/stendler/systemd-ntfy-poweronoff) - Systemd services to send notifications on system startup, shutdown and service failure
 - [msgdrop](https://github.com/jbrubake/msgdrop) - Send and receive encrypted messages (Bash)
 - [vigilant](https://github.com/VerifiedJoseph/vigilant) - Monitor RSS/ATOM and JSON feeds, and send push notifications on new entries (PHP)
 - [ansible-role-ntfy-alertmanager](https://github.com/bleetube/ansible-role-ntfy-alertmanager) - Ansible role to install xenrox/ntfy-alertmanager
@@ -144,6 +144,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Notify](https://flathub.org/apps/com.ranfdev.Notify) - Native GTK4 client for ntfy (Rust) 
 - [notify-via-ntfy](https://exchange.checkmk.com/p/notify-via-ntfy) - Checkmk plugin to send notifications via ntfy (Python)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
+- [container-update-check](https://github.com/stendler/container-update-check) - Scripts to check and notify if a podman or docker container image can be updated (Podman/Shell)
+- [ignition-combustion-template](https://github.com/stendler/ignition-combustion-template) - Templates and scripts to generate a configuration to automatically setup a system on first boot. Including systemd-ntfy-poweronoff (Shell)
 
 ## Blog + forum posts
 

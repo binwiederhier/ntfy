@@ -110,7 +110,7 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if trailer != "" {
 		message += "\n\n" + trailer
 	}
-	date := time.Unix(m.Time, 0).Format(time.RFC1123Z)
+	date := time.Unix(m.Time, 0).UTC().Format(time.RFC1123Z)
 	subject = mime.BEncoding.Encode("utf-8", subject)
 	body := `From: "{shortTopicURL}" <{from}>
 To: {to}

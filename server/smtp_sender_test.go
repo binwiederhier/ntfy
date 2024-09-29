@@ -15,6 +15,7 @@ func TestFormatMail_Basic(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: A simple message
 Content-Type: text/plain; charset="utf-8"
 
@@ -36,6 +37,7 @@ func TestFormatMail_JustEmojis(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: =?utf-8?b?8J+YgCBBIHNpbXBsZSBtZXNzYWdl?=
 Content-Type: text/plain; charset="utf-8"
 
@@ -57,6 +59,7 @@ func TestFormatMail_JustOtherTags(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: A simple message
 Content-Type: text/plain; charset="utf-8"
 
@@ -80,6 +83,7 @@ func TestFormatMail_JustPriority(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: A simple message
 Content-Type: text/plain; charset="utf-8"
 
@@ -103,6 +107,7 @@ func TestFormatMail_UTF8Subject(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: =?utf-8?b?IDo6IEEgbm90IHNvIHNpbXBsZSB0aXRsZSDDtsOkw7zDnyDCoUhvbGEsIHNl?= =?utf-8?b?w7FvciE=?=
 Content-Type: text/plain; charset="utf-8"
 
@@ -126,6 +131,7 @@ func TestFormatMail_WithAllTheThings(t *testing.T) {
 	})
 	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
 To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
 Subject: =?utf-8?b?4pqg77iPIPCfkoAgT2ggbm8g8J+ZiCBUaGlzIGlzIGEgbWVzc2FnZSBhY3Jv?= =?utf-8?b?c3MgbXVsdGlwbGUgbGluZXM=?=
 Content-Type: text/plain; charset="utf-8"
 

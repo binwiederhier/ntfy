@@ -1373,6 +1373,23 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.12.0 (UNRELEASED)
+
+**Features:**
+
+* Add username/password auth to email publishing ([#1164](https://github.com/binwiederhier/ntfy/pull/1164), thanks to [@bishtawi](https://github.com/bishtawi))
+
+**Bug fixes + maintenance:**
+
+* Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [pcouy](https://github.com/pcouy))
+
+**Documentation:**
+
+* Various docs updates ([](https://github.com/binwiederhier/ntfy/pull/1161), thanks to [@OneWeekNotice](https://github.com/OneWeekNotice))
+* Typo in config docs ([#1177](https://github.com/binwiederhier/ntfy/pull/1177), thanks to [@hoho4190](https://github.com/hoho4190))
+* Typo in CLI docs ([#1172](https://github.com/binwiederhier/ntfy/pull/1172), thanks to [@anirvan](https://github.com/anirvan))
+* Correction about MacroDroid ([](https://github.com/binwiederhier/ntfy/pull/1137), thanks to [@ShlomoCode](https://github.com/ShlomoCode))
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

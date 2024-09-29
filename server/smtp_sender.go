@@ -110,9 +110,11 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if trailer != "" {
 		message += "\n\n" + trailer
 	}
+	date := time.Unix(m.Time, 0).Format(time.RFC1123Z)
 	subject = mime.BEncoding.Encode("utf-8", subject)
 	body := `From: "{shortTopicURL}" <{from}>
 To: {to}
+Date: {date}
 Subject: {subject}
 Content-Type: text/plain; charset="utf-8"
 
@@ -122,6 +124,7 @@ Content-Type: text/plain; charset="utf-8"
 This message was sent by {ip} at {time} via {topicURL}`
 	body = strings.ReplaceAll(body, "{from}", from)
 	body = strings.ReplaceAll(body, "{to}", to)
+	body = strings.ReplaceAll(body, "{date}", date)
 	body = strings.ReplaceAll(body, "{subject}", subject)
 	body = strings.ReplaceAll(body, "{message}", message)
 	body = strings.ReplaceAll(body, "{topicURL}", topicURL)

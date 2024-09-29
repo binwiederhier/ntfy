@@ -777,6 +777,7 @@ or the root domain:
     ```
     # Note that this config is most certainly incomplete. Please help out and let me know what's missing
     # via Discord/Matrix or in a GitHub issue.
+    # Note: Caddy automatically handles both HTTP and WebSockets with reverse_proxy 
 
     ntfy.sh, http://nfty.sh {
         reverse_proxy 127.0.0.1:2586
@@ -1427,6 +1428,9 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `web-push-file`                            | `NTFY_WEB_PUSH_FILE`                            | *string*                                            | -                 | Web Push: Database file that stores subscriptions                                                                                                                                                                               |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                  |
 | `web-push-startup-queries`                 | `NTFY_WEB_PUSH_STARTUP_QUERIES`                 | *string*                                            | -                 | Web Push: SQL queries to run against subscription database at startup                                                                                                                                                           |
+| `log-format`                               | `NTFY_LOG_FORMAT`                               | *string*                                            | `text`            | Defines the output format, can be text or json                                                                                                                                                                                  |
+| `log-file`                                 | `NTFY_LOG_FILE`                                 | *string*                                            | -                 | Defines the filename to write logs to. If this is not set, ntfy logs to stderr                                                                                                                                                  |
+| `log-level`                                | `NTFY_LOG_LEVEL`                                | *string*                                            | `info`            | Defines the default log level, can be one of trace, debug, info, warn or error                                                                                                                                                  |
 
 The format for a *duration* is: `<number>(smhd)`, e.g. 30s, 20m, 1h or 3d.   
 The format for a *size* is: `<number>(GMK)`, e.g. 1G, 200M or 4000k.

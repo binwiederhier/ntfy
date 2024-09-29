@@ -1385,10 +1385,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Documentation:**
 
-* Various docs updates ([](https://github.com/binwiederhier/ntfy/pull/1161), thanks to [@OneWeekNotice](https://github.com/OneWeekNotice))
+* Various docs updates ([#1161](https://github.com/binwiederhier/ntfy/pull/1161), thanks to [@OneWeekNotice](https://github.com/OneWeekNotice))
 * Typo in config docs ([#1177](https://github.com/binwiederhier/ntfy/pull/1177), thanks to [@hoho4190](https://github.com/hoho4190))
 * Typo in CLI docs ([#1172](https://github.com/binwiederhier/ntfy/pull/1172), thanks to [@anirvan](https://github.com/anirvan))
-* Correction about MacroDroid ([](https://github.com/binwiederhier/ntfy/pull/1137), thanks to [@ShlomoCode](https://github.com/ShlomoCode))
+* Correction about MacroDroid ([#1137](https://github.com/binwiederhier/ntfy/pull/1137), thanks to [@ShlomoCode](https://github.com/ShlomoCode))
+* Note about fail2ban in Docker ([#1175](https://github.com/binwiederhier/ntfy/pull/1175)), thanks to [@Measurity](https://github.com/Measurity))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

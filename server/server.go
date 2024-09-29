@@ -1828,7 +1828,7 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Priority != 0 {
 			r.Header.Set("X-Priority", fmt.Sprintf("%d", m.Priority))
 		}
-		if m.Tags != nil && len(m.Tags) > 0 {
+		if len(m.Tags) > 0 {
 			r.Header.Set("X-Tags", strings.Join(m.Tags, ","))
 		}
 		if m.Attach != "" {

@@ -1243,7 +1243,9 @@ and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-a
     maxretry = 10
     ```
 
-!!! info If you run nginx in a container, append `, chain=DOCKER-USER` to the jail.local action.
+Note that if you run nginx in a container, append `, chain=DOCKER-USER` to the jail.local action. By default, the jail action chain
+is `INPUT`, but `FORWARD` is used when using docker networks. `DOCKER-USER`, available when using docker, is part of the `FORWARD`
+chain.
 
 ## Health checks
 A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.

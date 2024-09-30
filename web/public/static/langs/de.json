@@ -386,5 +386,21 @@
     "alert_notification_permission_denied_title": "Benachrichtigungen sind blockiert",
     "alert_notification_permission_denied_description": "Bitte reaktiviere diese in deinem Browser",
     "notifications_actions_failed_notification": "Aktion nicht erfolgreich",
-    "alert_notification_ios_install_required_title": "iOS Installation erforderlich"
+    "alert_notification_ios_install_required_title": "iOS Installation erforderlich",
+    "alert_notification_ios_install_required_description": "Klicke auf das Teilen-Symbol und “Zum Home-Bildschirm” um auf iOS Benachrichtigungen zu aktivieren",
+    "subscribe_dialog_subscribe_use_another_background_info": "Benachrichtigungen von anderen Servern werden nicht empfangen, wenn die Web App nicht geöffnet ist",
+    "publish_dialog_checkbox_markdown": "Als Markdown formatieren",
+    "prefs_notifications_web_push_title": "Hintergrund-Benachrichtigungen",
+    "prefs_notifications_web_push_disabled_description": "Benachrichtigungen werden empfangen wenn die Web App läuft (über WebSocket)",
+    "prefs_notifications_web_push_enabled": "Aktiviert für {{server}}",
+    "prefs_notifications_web_push_disabled": "Deaktiviert",
+    "prefs_appearance_theme_title": "Thema",
+    "prefs_appearance_theme_system": "System (Standard)",
+    "prefs_appearance_theme_dark": "Nachtmodus",
+    "prefs_appearance_theme_light": "Tagmodus",
+    "error_boundary_button_reload_ntfy": "ntfy neu laden",
+    "web_push_subscription_expiring_title": "Benachrichtigungen werden pausiert",
+    "web_push_subscription_expiring_body": "Öffne ntfy um weiterhin Benachrichtigungen zu erhalten",
+    "web_push_unknown_notification_title": "Unbekannte Benachrichtigung vom server empfangen",
+    "web_push_unknown_notification_body": "Du musst möglicherweise  ntfy aktualisieren, indem du die Web App öffnest."
 }

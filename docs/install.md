@@ -37,6 +37,15 @@ deb/rpm packages.
     sudo ntfy serve
     ```
 
+=== "armv5"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.3.1/ntfy_2.3.1_linux_armv5.tar.gz
+    tar zxvf ntfy_2.3.1_linux_armv5.tar.gz
+    sudo cp -a ntfy_2.3.1_linux_armv5/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_2.3.1_linux_armv5/{client,server}/*.yml /etc/ntfy
+    sudo ntfy serve
+    ```
+
 === "armv6"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.tar.gz
@@ -73,7 +82,20 @@ Installation via Debian repository:
     curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/archive.heckel.io.gpg
     sudo apt install apt-transport-https
     sudo sh -c "echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/archive.heckel.io.gpg] https://archive.heckel.io/apt debian main' \
-        > /etc/apt/sources.list.d/archive.heckel.io.list"  
+        > /etc/apt/sources.list.d/archive.heckel.io.list"
+    sudo apt update
+    sudo apt install ntfy
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+    ```
+
+=== "armv5/armel"
+    ```bash
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://archive.heckel.io/apt/pubkey.txt | sudo gpg --dearmor -o /etc/apt/keyrings/archive.heckel.io.gpg
+    sudo apt install apt-transport-https
+    sudo sh -c "echo 'deb [arch=armel signed-by=/etc/apt/keyrings/archive.heckel.io.gpg] https://archive.heckel.io/apt debian main' \
+        > /etc/apt/sources.list.d/archive.heckel.io.list"
     sudo apt update
     sudo apt install ntfy
     sudo systemctl enable ntfy
@@ -116,6 +138,13 @@ Manually installing the .deb file:
     sudo systemctl start ntfy
     ```
 
+=== "armv5"
+    ```bash
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.3.1/ntfy_2.3.1_linux_armv5.deb
+    sudo dpkg -i ntfy_*.deb
+    sudo systemctl enable ntfy
+    sudo systemctl start ntfy
+
 === "armv6"
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.deb
@@ -146,6 +175,13 @@ Manually installing the .deb file:
     ```bash
     sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_amd64.rpm
     sudo systemctl enable ntfy 
+    sudo systemctl start ntfy
+    ```
+
+=== "armv5"
+    ```bash
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.3.1/ntfy_2.3.1_linux_armv5.rpm
+    sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
 

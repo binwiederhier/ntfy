@@ -22,6 +22,7 @@ help:
 	@echo "Build server & client (using GoReleaser, not release version):"
 	@echo "  make cli                        - Build server & client (all architectures)"
 	@echo "  make cli-linux-amd64            - Build server & client (Linux, amd64 only)"
+	@echo "  make cli-linux-armv5            - Build server & client (Linux, armv5 only)"
 	@echo "  make cli-linux-armv6            - Build server & client (Linux, armv6 only)"
 	@echo "  make cli-linux-armv7            - Build server & client (Linux, armv7 only)"
 	@echo "  make cli-linux-arm64            - Build server & client (Linux, arm64 only)"
@@ -165,6 +166,9 @@ cli: cli-deps
 
 cli-linux-amd64: cli-deps-static-sites
 	goreleaser build --snapshot --clean --id ntfy_linux_amd64
+
+cli-linux-armv5: cli-deps-static-sites cli-deps-gcc-armv6-armv7
+	goreleaser build --snapshot --clean --id ntfy_linux_armv5
 
 cli-linux-armv6: cli-deps-static-sites cli-deps-gcc-armv6-armv7
 	goreleaser build --snapshot --clean --id ntfy_linux_armv6

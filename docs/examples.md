@@ -61,10 +61,10 @@ to notify yourself on SSH login.
 === "/etc/pam.d/sshd"
     ```
     # at the end of the file
-    session optional pam_exec.so /usr/bin/ntfy-ssh-login.sh
+    session optional pam_exec.so /usr/local/bin/ntfy-ssh-login.sh
     ```
 
-=== "/usr/bin/ntfy-ssh-login.sh"
+=== "/usr/local/bin/ntfy-ssh-login.sh"
     ```bash
     #!/bin/bash
     if [ "${PAM_TYPE}" = "open_session" ]; then

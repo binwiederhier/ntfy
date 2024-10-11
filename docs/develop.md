@@ -119,7 +119,7 @@ $ make
 Typical commands (more see below):
   make build                   - Build web app, documentation and server/client (sloowwww)
   make cli-linux-amd64         - Build server/client binary (amd64, no web app or docs)
-  make install-linux-amd64     - Install ntfy binary to /usr/bin/ntfy (amd64)
+  make install-linux-amd64     - Install ntfy binary to /usr/local/bin/ntfy (amd64)
   make web                     - Build the web app
   make docs                    - Build the documentation
   make check                   - Run all tests, vetting/formatting checks and linters

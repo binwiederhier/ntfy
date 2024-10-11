@@ -41,7 +41,7 @@ deb/rpm packages.
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv6.tar.gz
     tar zxvf ntfy_2.11.0_linux_armv6.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_armv6/ntfy /usr/bin/ntfy
+    sudo cp -a ntfy_2.11.0_linux_armv6/ntfy /usr/local/bin/ntfy
     sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_armv6/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
@@ -50,7 +50,7 @@ deb/rpm packages.
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_armv7.tar.gz
     tar zxvf ntfy_2.11.0_linux_armv7.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_armv7/ntfy /usr/bin/ntfy
+    sudo cp -a ntfy_2.11.0_linux_armv7/ntfy /usr/local/bin/ntfy
     sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_armv7/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
@@ -59,7 +59,7 @@ deb/rpm packages.
     ```bash
     wget https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_linux_arm64.tar.gz
     tar zxvf ntfy_2.11.0_linux_arm64.tar.gz
-    sudo cp -a ntfy_2.11.0_linux_arm64/ntfy /usr/bin/ntfy
+    sudo cp -a ntfy_2.11.0_linux_arm64/ntfy /usr/local/bin/ntfy
     sudo mkdir /etc/ntfy && sudo cp ntfy_2.11.0_linux_arm64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```

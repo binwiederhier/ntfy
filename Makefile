@@ -10,7 +10,7 @@ help:
 	@echo "Typical commands (more see below):"
 	@echo "  make build                      - Build web app, documentation and server/client (sloowwww)"
 	@echo "  make cli-linux-amd64            - Build server/client binary (amd64, no web app or docs)"
-	@echo "  make install-linux-amd64        - Install ntfy binary to /usr/bin/ntfy (amd64)"
+	@echo "  make install-linux-amd64        - Install ntfy binary to /usr/local/bin/ntfy (amd64)"
 	@echo "  make web                        - Build the web app"
 	@echo "  make docs                       - Build the documentation"
 	@echo "  make check                      - Run all tests, vetting/formatting checks and linters"
@@ -68,10 +68,10 @@ help:
 	@echo "  make release-snapshot           - Create a test release"
 	@echo
 	@echo "Install locally (requires sudo):"
-	@echo "  make install-linux-amd64        - Copy amd64 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-armv6        - Copy armv6 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-armv7        - Copy armv7 binary from dist/ to /usr/bin/ntfy"
-	@echo "  make install-linux-arm64        - Copy arm64 binary from dist/ to /usr/bin/ntfy"
+	@echo "  make install-linux-amd64        - Copy amd64 binary from dist/ to /usr/local/bin/ntfy"
+	@echo "  make install-linux-armv6        - Copy armv6 binary from dist/ to /usr/local/bin/ntfy"
+	@echo "  make install-linux-armv7        - Copy armv7 binary from dist/ to /usr/local/bin/ntfy"
+	@echo "  make install-linux-arm64        - Copy arm64 binary from dist/ to /usr/local/bin/ntfy"
 	@echo "  make install-linux-deb-amd64    - Install .deb from dist/ (amd64 only)"
 	@echo "  make install-linux-deb-armv6    - Install .deb from dist/ (armv6 only)"
 	@echo "  make install-linux-deb-armv7    - Install .deb from dist/ (armv7 only)"
@@ -322,19 +322,19 @@ release-checks:
 # Installing targets
 
 install-linux-amd64: remove-binary
-	sudo cp -a dist/ntfy_linux_amd64_linux_amd64_v1/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_amd64_linux_amd64_v1/ntfy /usr/local/bin/ntfy
 
 install-linux-armv6: remove-binary
-	sudo cp -a dist/ntfy_linux_armv6_linux_arm_6/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_armv6_linux_arm_6/ntfy /usr/local/bin/ntfy
 
 install-linux-armv7: remove-binary
-	sudo cp -a dist/ntfy_linux_armv7_linux_arm_7/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_armv7_linux_arm_7/ntfy /usr/local/bin/ntfy
 
 install-linux-arm64: remove-binary
-	sudo cp -a dist/ntfy_linux_arm64_linux_arm64/ntfy /usr/bin/ntfy
+	sudo cp -a dist/ntfy_linux_arm64_linux_arm64/ntfy /usr/local/bin/ntfy
 
 remove-binary:
-	sudo rm -f /usr/bin/ntfy
+	sudo rm -f /usr/local/bin/ntfy
 
 install-linux-amd64-deb: purge-package
 	sudo dpkg -i dist/ntfy_*_linux_amd64.deb

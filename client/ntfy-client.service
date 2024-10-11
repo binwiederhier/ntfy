@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=ntfy
 Group=ntfy
-ExecStart=/usr/bin/ntfy subscribe --config /etc/ntfy/client.yml --from-config
+ExecStart=/usr/local/bin/ntfy subscribe --config /etc/ntfy/client.yml --from-config
 Restart=on-failure
 
 [Install]

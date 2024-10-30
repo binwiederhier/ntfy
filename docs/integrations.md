@@ -74,6 +74,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
 - [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
 - [wlzntfy](https://github.com/Walzen-Group/ntfy-toaster) - A minimalistic, receive-only toast notification client for Windows 11
+- [ntfy-notify](https://github.com/HolgerHuo/ntfy-notify) - A Linux daemon to send ntfy messages to desktop notifications
 
 ## Projects + scripts 
 

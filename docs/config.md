@@ -877,8 +877,8 @@ a database to keep track of the browser's subscriptions, and an admin email addr
 - `web-push-file` is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
 - `web-push-email-address` is the admin email address send to the push provider, e.g. `sysadmin@example.com`
 - `web-push-startup-queries` is an optional list of queries to run on startup`
-- `web-push-expiry-warning-duration` defines the duration for which unused subscriptions are sent a warning (default is `7d`)
-- `web-push-expiry-duration` defines the duration for which unused subscriptions will expire (default is `9d`)
+- `web-push-expiry-warning-duration` defines the duration after which unused subscriptions are sent a warning (default is `7d`)
+- `web-push-expiry-duration` defines the duration after which unused subscriptions will expire (default is `9d`)
 
 Limitations:
 

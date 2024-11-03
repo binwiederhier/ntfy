@@ -146,6 +146,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 - [container-update-check](https://github.com/stendler/container-update-check) - Scripts to check and notify if a podman or docker container image can be updated (Podman/Shell)
 - [ignition-combustion-template](https://github.com/stendler/ignition-combustion-template) - Templates and scripts to generate a configuration to automatically setup a system on first boot. Including systemd-ntfy-poweronoff (Shell)
+- [owncast-ntfy](https://github.com/holgerhuo/owncast-ntfy) - Proxy Owncast Notifications to ntfy (go)
 
 ## Blog + forum posts
 

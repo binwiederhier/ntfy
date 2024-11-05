@@ -1378,6 +1378,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Add username/password auth to email publishing ([#1164](https://github.com/binwiederhier/ntfy/pull/1164), thanks to [@bishtawi](https://github.com/bishtawi))
+* Add `latest` subscription param for grabbing just the most recent message (thanks to [@wunter8](https://github.com/wunter8))
 
 **Bug fixes + maintenance:**
 

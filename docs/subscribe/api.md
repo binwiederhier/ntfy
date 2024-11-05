@@ -257,6 +257,14 @@ curl -s "ntfy.sh/mytopic/json?since=1645970742"
 curl -s "ntfy.sh/mytopic/json?since=nFS3knfcQ1xe"
 ```
 
+### Fetch latest message
+If you only want the most recent message sent to a topic and do not have a message ID or timestamp to use with
+`since=`, you can use `since=latest` to grab the most recent message from the cache for a particular topic.
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1&since=latest"
+```
+
 ### Fetch scheduled messages
 Messages that are [scheduled to be delivered](../publish.md#scheduled-delivery) at a later date are not typically 
 returned when subscribing via the API, which makes sense, because after all, the messages have technically not been 

@@ -1556,8 +1556,8 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled b
 
 // parseSince returns a timestamp identifying the time span from which cached messages should be received.
 //
-// Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h), or
-// "all" for all messages.
+// Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h),
+// "all" for all messages, or "latest" for the most recent message for a topic
 func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 	since := readParam(r, "x-since", "since", "si")
 
@@ -1569,6 +1569,8 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 		return sinceNoMessages, nil
 	} else if since == "all" {
 		return sinceAllMessages, nil
+	} else if since == "latest" {
+		return sinceLatestMessage, nil
 	} else if since == "none" {
 		return sinceNoMessages, nil
 	}

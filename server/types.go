@@ -539,3 +539,7 @@ type webManifestIcon struct {
 	Sizes string `json:"sizes"`
 	Type  string `json:"type"`
 }
+
+type templateNamesResponse struct {
+	Templates []string `json:"templates"`
+}

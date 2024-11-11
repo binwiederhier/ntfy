@@ -1075,6 +1075,33 @@ This example uses the `message`/`m` and `title`/`t` query parameters, but obviou
 `Message`/`Title` headers. It will send a notification with a title `phil-pc: A severe error has occurred` and a message
 `Error message: Disk has run out of space`.
 
+### Server templates
+
+In order to avoid running into limitations related to the URL length and to simplify reusing templates across publishing systems,
+title/message templates can also be provided by the server and then simply referenced during publishing.
+
+This feature has to be enabled on the server first, by specifying a base directory for templates using the `--template-directory`.
+All files within this directory (subdirectories are not supported) with the file extension *.tpl* are considered
+templates to be used during publishing, referenced by their basename (without the extension).
+
+To use a template, use `server` instead of `yes`/`1` for the templating parameter. The `message` and `title` parameters
+are used as template name.
+
+!!! info
+    The templating feature applies to both the title and message both in equal parts. You can *not* mix and match,
+    e.g. by specifying a template name for the title and an inline template for the body.
+
+Assuming the server is running with the following template directory:
+
+```
+/etc/ntfy/templates
+|_ grafana_title.tpl
+|_ grafana_body.tpl
+\_ hello_world.tpl
+```
+
+You can now publish your payload to the following endpoint: `https://ntfy.sh/mytopic?tpl=server&title=hello_world&message=grafana_body`
+
 ## Publish as JSON
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 

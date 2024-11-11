@@ -100,6 +100,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "template-directory", Aliases: []string{"template_directory"}, EnvVars: []string{"NTFY_TEMPLATE_DIRECTORY"}, Usage: "Directory to serve message templates from"}),
 )
 
 var cmdServe = &cli.Command{
@@ -140,6 +141,7 @@ func execServe(c *cli.Context) error {
 	webPushFile := c.String("web-push-file")
 	webPushEmailAddress := c.String("web-push-email-address")
 	webPushStartupQueries := c.String("web-push-startup-queries")
+	templateDirectory := c.String("template-directory")
 	cacheFile := c.String("cache-file")
 	cacheDurationStr := c.String("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
@@ -256,6 +258,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if set, FCM key file must exist")
 	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || webPushFile == "" || webPushEmailAddress == "" || baseURL == "") {
 		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-file, web-push-email-address, and base-url should be set. run 'ntfy webpush keys' to generate keys")
+	} else if templateDirectory != "" && !util.DirectoryExists(templateDirectory) {
+		return fmt.Errorf("templates directory %q does not exist", templateDirectory)
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {
@@ -417,6 +421,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushFile = webPushFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 	conf.WebPushStartupQueries = webPushStartupQueries
+	conf.TemplateDirectory = templateDirectory
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

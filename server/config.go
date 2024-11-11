@@ -161,6 +161,7 @@ type Config struct {
 	WebPushStartupQueries                string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
+	TemplateDirectory                    string
 }
 
 // NewConfig instantiates a default new server config
@@ -248,5 +249,6 @@ func NewConfig() *Config {
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
+		TemplateDirectory:                    "",
 	}
 }

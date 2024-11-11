@@ -121,6 +121,15 @@ func (s *Server) ensureStripeCustomer(next handleFunc) handleFunc {
 	})
 }
 
+func (s *Server) ensureTemplatesEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.config.TemplateDirectory == "" {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
+}
+
 func (s *Server) withAccountSync(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		err := next(w, r, v)

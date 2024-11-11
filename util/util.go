@@ -48,6 +48,15 @@ func FileExists(filename string) bool {
 	return stat != nil
 }
 
+// DirectoryExists checks if a path exists and is a directory.
+func DirectoryExists(filename string) bool {
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
+}
+
 // Contains returns true if needle is contained in haystack
 func Contains[T comparable](haystack []T, needle T) bool {
 	for _, s := range haystack {

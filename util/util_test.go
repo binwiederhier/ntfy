@@ -32,6 +32,34 @@ func TestFileExists(t *testing.T) {
 	require.False(t, FileExists(filename+".doesnotexist"))
 }
 
+func TestDirectoryExists(t *testing.T) {
+	var testCases = map[string]struct {
+		have string
+		want bool
+	}{
+		"empty string": {},
+		"temp dir": {
+			have: t.TempDir(),
+			want: true,
+		},
+		"existing file": {
+			have: os.Args[0],
+		},
+		"non-existing path": {
+			have: filepath.Join(t.TempDir(), "foo", "bar"),
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := DirectoryExists(test.have)
+			if got != test.want {
+				t.Fatalf("DirectoryExists(%q) returned %t; expected %t", test.have, got, test.want)
+			}
+		})
+	}
+}
+
 func TestInStringList(t *testing.T) {
 	s := []string{"one", "two"}
 	require.True(t, Contains(s, "two"))

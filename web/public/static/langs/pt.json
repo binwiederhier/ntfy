@@ -291,7 +291,7 @@
     "account_usage_calls_title": "Ligações realizadas",
     "account_usage_calls_none": "Esta conta não pode realizar ligações",
     "account_usage_reservations_title": "Tópicos reservados",
-    "account_basics_username_title": "Utilizador",
+    "account_basics_username_title": "Usuário",
     "account_delete_dialog_description": "Isto irá eliminar definitivamente a sua conta, incluindo dados que estejam armazenados no servidor. Apos ser eliminado, o nome de utilizador ficará indisponível durante 7 dias. Se deseja mesmo proceder, por favor confirm com a sua palavra pass na caixa abaixo.",
     "account_delete_dialog_button_submit": "Eliminar conta definitivamente",
     "account_delete_dialog_billing_warning": "Eliminar a sua conta também cancela a sua subscrição de faturação imediatamente. Não terá acesso ao portal de faturação de futuro.",

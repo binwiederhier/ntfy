@@ -195,5 +195,16 @@
     "signup_form_username": "Brukernavn",
     "signup_form_password": "Passord",
     "signup_form_button_submit": "Meld deg på",
-    "signup_form_confirm_password": "Bekreft passord"
+    "signup_form_confirm_password": "Bekreft passord",
+    "signup_disabled": "Registrering er deaktivert",
+    "common_copy_to_clipboard": "Kopier til utklippstavle",
+    "signup_form_toggle_password_visibility": "Slå av/på passordvisning",
+    "signup_already_have_account": "Har du allerede en konto? Logg inn!",
+    "signup_error_username_taken": "Brukernavnet {{username}} er allerede opptatt",
+    "signup_error_creation_limit_reached": "Grense for nye kontoer nådd",
+    "login_title": "Logg inn på ntfy-kontoen din",
+    "login_form_button_submit": "Logg inn",
+    "login_link_signup": "Registrer deg",
+    "login_disabled": "Innlogging deaktivert",
+    "action_bar_change_display_name": "Endre visningsnavn"
 }

@@ -1007,7 +1007,7 @@ Here's an **easier example with a shorter JSON payload**:
 
 === "Command line (curl)"
     ```
-    # To use { and } in the URL without encoding, we need to turn of
+    # To use { and } in the URL without encoding, we need to turn off
     # curl's globbing using --globoff
 
     curl \

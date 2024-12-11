@@ -4,6 +4,16 @@ There are quite a few projects that work with ntfy, integrate ntfy, or have been
 
 I've added a ⭐ to projects or posts that have a significant following, or had a lot of interaction by the community.
 
+## Table of Contents
+- [Official integrations](#official-integrations)
+- [Integration via HTTP/SMTP/etc.](#integration-via-httpsmtpetc)
+- [UnifiedPush integrations](#unifiedpush-integrations)
+- [Libraries](#libraries)
+- [CLIs + GUIs](#clis--guis)
+- [Projects + scripts](#projects--scripts)
+- [Blog + forum posts](#blog--forum-posts)
+- [Alternative ntfy servers](#alternative-ntfy-servers)
+
 ## Official integrations
 
 - [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification

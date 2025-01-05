@@ -144,6 +144,7 @@ type Config struct {
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
 	BehindProxy                          bool
+	ProxyClientIPHeader                  string
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
@@ -233,6 +234,7 @@ func NewConfig() *Config {
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorSubscriberRateLimiting:        false,
 		BehindProxy:                          false,
+		ProxyClientIPHeader:                  "",
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

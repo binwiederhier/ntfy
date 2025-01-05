@@ -5,13 +5,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/stripe/stripe-go/v74"
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/server"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"io/fs"
 	"math"
 	"net"
@@ -22,6 +15,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/stripe/stripe-go/v74"
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 func init() {
@@ -89,6 +90,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: util.FormatDuration(server.DefaultVisitorEmailLimitReplenish), Usage: "interval at which burst limit is replenished (one per x)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "visitor-subscriber-rate-limiting", Aliases: []string{"visitor_subscriber_rate_limiting"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING"}, Value: false, Usage: "enables subscriber-based rate limiting"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-client-ip-header", Aliases: []string{"proxy_client_ip_header"}, EnvVars: []string{"NTFY_PROXY_CLIENT_IP_HEADER"}, Value: "", Usage: "if set, use specified header to determine visitor IP address instead of XFF (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-webhook-key", Aliases: []string{"stripe_webhook_key"}, EnvVars: []string{"NTFY_STRIPE_WEBHOOK_KEY"}, Value: "", Usage: "key required to validate the authenticity of incoming webhooks from Stripe"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "billing-contact", Aliases: []string{"billing_contact"}, EnvVars: []string{"NTFY_BILLING_CONTACT"}, Value: "", Usage: "e-mail or website to display in upgrade dialog (only if payments are enabled)"}),
@@ -186,6 +188,7 @@ func execServe(c *cli.Context) error {
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
 	visitorEmailLimitReplenishStr := c.String("visitor-email-limit-replenish")
 	behindProxy := c.Bool("behind-proxy")
+	proxyClientIPHeader := c.String("proxy-client-ip-header")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
 	billingContact := c.String("billing-contact")
@@ -402,6 +405,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.VisitorSubscriberRateLimiting = visitorSubscriberRateLimiting
 	conf.BehindProxy = behindProxy
+	conf.ProxyClientIPHeader = proxyClientIPHeader
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact

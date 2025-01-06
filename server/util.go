@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/v2/util"
 	"io"
 	"mime"
 	"net/http"
 	"net/netip"
 	"regexp"
 	"strings"
-
-	"heckel.io/ntfy/v2/util"
 )
 
 var (

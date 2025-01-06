@@ -1925,7 +1925,7 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // that subsequent logging calls still have a visitor context.
 func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	// Read "Authorization" header value, and exit out early if it's not set
-	ip := extractIPAddress(r, s.config.BehindProxy)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyClientIPHeader)
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
 		return vip, nil
@@ -2000,7 +2000,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 	if err != nil {
 		return nil, err
 	}
-	ip := extractIPAddress(r, s.config.BehindProxy)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyClientIPHeader)
 	go s.userManager.EnqueueTokenUpdate(token, &user.TokenUpdate{
 		LastAccess: time.Now(),
 		LastOrigin: ip,

@@ -555,12 +555,13 @@ Whatever your reasons may be, there are a few things to consider.
 If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the 
 [rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier for a visitor, 
 as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
-be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
+be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address. If your proxy or CDN provider uses a custom header to securely pass the source IP/Client IP to your application, you can specify that header instead of using the XFF. Using the custom header (unique per provide/cdn/proxy), will disable the use of the XFF header.
 
 === "/etc/ntfy/server.yml"
     ``` yaml
     # Tell ntfy to use "X-Forwarded-For" to identify visitors
     behind-proxy: true
+    proxy-client-ip-header: "X-Client-IP"
     ```
 
 ### TLS/SSL

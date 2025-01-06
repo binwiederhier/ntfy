@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/user"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,9 +21,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/v2/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"

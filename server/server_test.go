@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/v2/user"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +19,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
@@ -2179,6 +2180,19 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 	v, err := s.maybeAuthenticate(r)
 	require.Nil(t, err)
 	require.Equal(t, "234.5.2.1", v.ip.String())
+}
+
+func TestServer_Visitor_Custom_ClientIP_Header(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyClientIPHeader = "X-Client-IP"
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11"
+	r.Header.Set("X-Client-IP", "1.2.3.4")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "1.2.3.4", v.ip.String())
 }
 
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {

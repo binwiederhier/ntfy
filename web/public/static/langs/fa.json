@@ -32,5 +32,6 @@
     "action_bar_reservation_edit": "تغییر رزرو",
     "action_bar_reservation_delete": "حذف رزرو",
     "action_bar_mute_notifications": "ساکت کردن اعلان ها",
-    "action_bar_clear_notifications": "پاک کردن تمام اعلان ها"
+    "action_bar_clear_notifications": "پاک کردن تمام اعلان ها",
+    "action_bar_toggle_action_menu": "گشودن يا بستن فهرست کنش"
 }

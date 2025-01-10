@@ -91,6 +91,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [website-watcher](https://github.com/muety/website-watcher) - A small tool to watch websites for changes (with XPath support) (Python)
 - [siteeagle](https://github.com/tpanum/siteeagle) - A small Python script to monitor websites and notify changes (Python)
 - [send_to_phone](https://github.com/whipped-cream/send_to_phone) - Scripts to upload a file to Transfer.sh and ping ntfy with the download link (Python)
+- [Ntfyhook](https://git.rocord.dev/rocord01/ntfyhook) - Proxy/compatibility layer between Discord webhooks and Ntfy (JS)
 - [ntfy Discord bot](https://github.com/R0dn3yS/ntfy-bot) - WIP ntfy discord bot (TypeScript)
 - [ntfy Discord bot](https://github.com/binwiederhier/ntfy-bot) - ntfy Discord bot (Go)
 - [ntfy Discord bot](https://github.com/jr1221/ntfy_discord_bot) - An advanced modal-based bot for interacting with the ntfy.sh API (Dart)

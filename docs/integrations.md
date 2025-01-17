@@ -246,6 +246,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - ugeek.github.io - 11/2021
 - [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
 - [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021
+- [ntfy on The Canary in the Cage Podcast](https://odysee.com/@TheCanaryInTheCage:b/The-Canary-in-the-Cage-Episode-42:1?r=4gitYjTacQqPEjf22874USecDQYJ5y5E&t=3062) - odysee.com - 1/2025
 
 ## Alternative ntfy servers
 

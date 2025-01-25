@@ -865,7 +865,7 @@ it'll show `New message` as a popup.
 ## Web Push
 [Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API) ([RFC8030](https://datatracker.ietf.org/doc/html/rfc8030))
 allows ntfy to receive push notifications, even when the ntfy web app (or even the browser, depending on the platform) is closed. 
-When enabled, the user can enable **background notifications** for their topics in the wep app under Settings. Once enabled by the
+When enabled, the user can enable **background notifications** for their topics in the web app under Settings. Once enabled by the
 user, ntfy will forward published messages to the push endpoint (browser-provided, e.g. fcm.googleapis.com), which will then
 forward it to the browser.
 

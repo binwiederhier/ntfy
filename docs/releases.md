@@ -1381,6 +1381,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Write VAPID keys to file in `ntfy webpush --output-file` ([#1138](https://github.com/binwiederhier/ntfy/pull/1138), thanks to [@nogweii](https://github.com/nogweii))
 * Add Docker major/minor version to image tags ([#1271](https://github.com/binwiederhier/ntfy/pull/1271), thanks to [@RoboMagus](https://github.com/RoboMagus))
 * Add `latest` subscription param for grabbing just the most recent message ([#1216](https://github.com/binwiederhier/ntfy/pull/1216), thanks to [@wunter8](https://github.com/wunter8))
+* You can now change passwords via the accounts API (thanks to [@wunter8](https://github.com/wunter8) for implementing)
 
 **Bug fixes + maintenance:**
 

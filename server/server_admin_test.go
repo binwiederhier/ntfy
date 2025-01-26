@@ -49,6 +49,52 @@ func TestUser_AddRemove(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
+
+	// Check user was deleted
+	users, err = s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, "emma", users[1].Name)
+	require.Equal(t, user.Everyone, users[2].Name)
+}
+
+func TestUser_ChangePassword(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+
+	// Create user via API
+	rr := request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Try to login with first password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Change password via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben-two", "force":true}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Make sure first password fails
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 401, rr.Code)
+
+	// Try to login with second password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben-two"),
+	})
+	require.Equal(t, 200, rr.Code)
 }
 
 func TestUser_AddRemove_Failures(t *testing.T) {

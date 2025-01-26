@@ -49,6 +49,12 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return err
 	} else if u != nil {
+		if req.Force == true {
+			if err := s.userManager.ChangePassword(req.Username, req.Password); err != nil {
+				return err
+			}
+			return s.writeJSON(w, newSuccessResponse())
+		}
 		return errHTTPConflictUserExists
 	}
 	var tier *user.Tier

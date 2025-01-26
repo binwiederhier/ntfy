@@ -257,6 +257,7 @@ type apiUserAddRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Tier     string `json:"tier"`
+	Force    bool   `json:"force"` // Used to change passwords/override existing user
 	// Do not add 'role' here. We don't want to add admins via the API.
 }
 

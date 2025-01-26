@@ -49,7 +49,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return err
 	} else if u != nil {
-		if req.Force == true {
+		if req.Force {
 			if u.IsAdmin() {
 				return errHTTPForbidden
 			}

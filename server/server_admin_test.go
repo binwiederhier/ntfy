@@ -59,7 +59,7 @@ func TestUser_AddRemove(t *testing.T) {
 	require.Equal(t, user.Everyone, users[2].Name)
 }
 
-func TestUser_ChangePassword(t *testing.T) {
+func TestUser_ChangeUserPassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
@@ -95,6 +95,21 @@ func TestUser_ChangePassword(t *testing.T) {
 		"Authorization": util.BasicAuth("ben", "ben-two"),
 	})
 	require.Equal(t, 200, rr.Code)
+}
+
+func TestUser_DontChangeAdminPassword(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin))
+
+	// Try to change password via API
+	rr := request(t, s, "PUT", "/v1/users", `{"username": "admin", "password": "admin-new", "force":true}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 403, rr.Code)
 }
 
 func TestUser_AddRemove_Failures(t *testing.T) {

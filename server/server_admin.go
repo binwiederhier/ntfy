@@ -50,6 +50,9 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 		return err
 	} else if u != nil {
 		if req.Force == true {
+			if u.IsAdmin() {
+				return errHTTPForbidden
+			}
 			if err := s.userManager.ChangePassword(req.Username, req.Password); err != nil {
 				return err
 			}

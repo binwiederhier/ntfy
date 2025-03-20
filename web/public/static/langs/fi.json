@@ -266,7 +266,7 @@
     "alert_not_supported_title": "Ilmoituksia ei tueta",
     "account_tokens_dialog_button_cancel": "Peruuta",
     "subscribe_dialog_error_user_anonymous": "Anonyymi",
-    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} laskutetaan vuosittain. Tallenna {{save}}.",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} laskutetaan vuosittain. Säästä {{save}}.",
     "prefs_notifications_min_priority_high_and_higher": "Korkea prioriteetti ja korkeammat",
     "account_usage_basis_ip_description": "Tämän tilin käyttötilastot ja rajoitukset perustuvat IP-osoitteeseesi, joten ne voidaan jakaa muiden käyttäjien kanssa. Yllä esitetyt rajat ovat likimääräisiä perustuen olemassa oleviin rajoituksiin.",
     "publish_dialog_priority_high": "Korkea prioriteetti",

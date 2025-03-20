@@ -170,7 +170,7 @@
     "account_basics_tier_description": "Tilisi taso",
     "account_basics_phone_numbers_description": "Puheluilmoituksia varten",
     "prefs_reservations_dialog_title_add": "Varaa topikki",
-    "account_basics_tier_free": "Vapaa",
+    "account_basics_tier_free": "Maksuton",
     "account_upgrade_dialog_cancel_warning": "Tämä <strong>peruuttaa tilauksesi</strong> ja alentaa tilisi {{date}}. Tuona päivänä topikit sekä palvelimen välimuistissa olevat viestit <strong>poistetaan</strong>.",
     "notifications_click_copy_url_button": "Kopioi linkki",
     "account_basics_tier_admin": "Admin",

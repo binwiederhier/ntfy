@@ -403,5 +403,6 @@
     "error_boundary_button_reload_ntfy": "Перезавантажити ntfy",
     "web_push_subscription_expiring_title": "Сповіщення буде призупинено",
     "web_push_subscription_expiring_body": "Відкрийте ntfy, щоб продовжити отримувати сповіщення",
-    "web_push_unknown_notification_body": "Можливо вам потрібно оновити ntfy шляхом відкриття вебзастосунку"
+    "web_push_unknown_notification_body": "Можливо вам потрібно оновити ntfy шляхом відкриття вебзастосунку",
+    "alert_notification_ios_install_required_title": "потрібно встановити на iOS"
 }

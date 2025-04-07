@@ -540,7 +540,7 @@ kubectl apply -k /ntfy
                       cpu: 150m
                       memory: 150Mi
               volumeMounts:
-                  - mountPath: /etc/ntfy/server.yml
+                  - mountPath: /etc/ntfy
                     subPath: server.yml
                     name: config-volume # generated vie configMapGenerator from kustomization file
                   - mountPath: /var/cache/ntfy

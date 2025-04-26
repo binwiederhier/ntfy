@@ -36,6 +36,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway (integration via [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy))
 - [Proxmox-Ntfy](https://github.com/qtsone/proxmox-ntfy) - Python script that monitors Proxmox tasks and sends notifications using the Ntfy service.
 - [Scrutiny](https://github.com/AnalogJ/scrutiny) - WebUI for smartd S.M.A.R.T monitoring. Scrutiny includes shoutrrr/ntfy integration ([see integration README](https://github.com/AnalogJ/scrutiny?tab=readme-ov-file#notifications))
+- [UptimeObserver](https://uptimeobserver.com) - Uptime Monitoring tool for Websites, APIs, SSL Certificates, DNS, Domain Names and Ports. [Integration Guide](https://support.uptimeobserver.com/integrations/ntfy/)
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 

@@ -1885,14 +1885,14 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 }
 
 func (s *Server) authorizeTopicWrite(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionWrite)
+	return s.authorizeTopic(next, user.PermissionWrite)
 }
 
 func (s *Server) authorizeTopicRead(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionRead)
+	return s.authorizeTopic(next, user.PermissionRead)
 }
 
-func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc {
+func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.userManager == nil {
 			return next(w, r, v)

@@ -413,7 +413,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		} else {
 			ev.Info("WebSocket error: %s", err.Error())
 		}
-		return // Do not attempt to write to upgraded connection
+		w.WriteHeader(httpErr.HTTPCode)
+		return // Do not attempt to write any body to upgraded connection
 	}
 	if isNormalError {
 		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)

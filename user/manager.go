@@ -864,14 +864,23 @@ func (a *Manager) resolvePerms(base, perm Permission) error {
 }
 
 // AddUser adds a user with the given username, password and role
-func (a *Manager) AddUser(username, password string, role Role) error {
+func (a *Manager) AddUser(username, password string, role Role, hashed bool) error {
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
-	if err != nil {
-		return err
+
+	var hash []byte
+	var err error = nil
+
+	if hashed {
+		hash = []byte(password)
+	} else {
+		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
+		if err != nil {
+			return err
+		}
 	}
+
 	userID := util.RandomStringPrefix(userIDPrefix, userIDLength)
 	syncTopic, now := util.RandomStringPrefix(syncTopicPrefix, syncTopicLength), time.Now().Unix()
 	if _, err = a.db.Exec(insertUserQuery, userID, username, hash, role, syncTopic, now); err != nil {
@@ -1192,10 +1201,17 @@ func (a *Manager) ReservationOwner(topic string) (string, error) {
 }
 
 // ChangePassword changes a user's password
-func (a *Manager) ChangePassword(username, password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
-	if err != nil {
-		return err
+func (a *Manager) ChangePassword(username, password string, hashed bool) error {
+	var hash []byte
+	var err error
+
+	if hashed {
+		hash = []byte(password)
+	} else {
+		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
+		if err != nil {
+			return err
+		}
 	}
 	if _, err := a.db.Exec(updateUserPassQuery, hash, username); err != nil {
 		return err

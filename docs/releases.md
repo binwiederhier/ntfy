@@ -1382,6 +1382,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [pcouy](https://github.com/pcouy))
+* Security updates for dependencies and Docker images
 
 **Documentation:**
 

@@ -9,7 +9,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22.x'
+          go-version: '1.24.x'
       - name: Install node
         uses: actions/setup-node@v3
         with:

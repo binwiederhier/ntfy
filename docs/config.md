@@ -50,6 +50,7 @@ Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
     listen-http: ":2586"
     cache-file: "/var/cache/ntfy/cache.db"
     attachment-cache-dir: "/var/cache/ntfy/attachments"
+    behind-proxy: true
     ```
 
 === "server.yml (ntfy.sh config)"

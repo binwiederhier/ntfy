@@ -1016,7 +1016,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap("%s", e.Error())
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")

@@ -26,6 +26,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
 - [HetrixTools](https://docs.hetrixtools.com/ntfy-sh-notifications/) - Uptime monitoring
+- [EasyMorph](https://help.easymorph.com/doku.php?id=transformations:sendntfymessage) - Visual data transformation and automation tool
 - [Monibot](https://monibot.io/) - Monibot monitors your websites, servers and applications and notifies you if something goes wrong.
 
 ## Integration via HTTP/SMTP/etc.

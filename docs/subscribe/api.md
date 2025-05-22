@@ -132,7 +132,7 @@ easy to use. Here's what it looks like. You may also want to check out the [full
 ### Subscribe as raw stream
 The `/raw` endpoint will output one line per message, and **will only include the message body**. It's useful for extremely
 simple scripts, and doesn't include all the data. Additional fields such as [priority](../publish.md#message-priority), 
-[tags](../publish.md#tags--emojis--) or [message title](../publish.md#message-title) are not included in this output 
+[tags](../publish.md#tags-emojis) or [message title](../publish.md#message-title) are not included in this output 
 format. Keepalive messages are sent as empty lines.
 
 === "Command line (curl)"
@@ -305,7 +305,7 @@ Depending on whether the server is configured to support [access control](../con
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
 To publish/subscribe to protected topics, you can:
 
-* Use [basic auth](../publish.md#basic-auth), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+* Use [basic auth](../publish.md#authentication), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
 * or use the [`auth` query parameter](../publish.md#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 Please refer to the [publishing documentation](../publish.md#authentication) for additional details.

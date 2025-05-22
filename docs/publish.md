@@ -1007,7 +1007,7 @@ Here's an **easier example with a shorter JSON payload**:
 
 === "Command line (curl)"
     ```
-    # To use { and } in the URL without encoding, we need to turn of
+    # To use { and } in the URL without encoding, we need to turn off
     # curl's globbing using --globoff
 
     curl \
@@ -1243,7 +1243,7 @@ all the supported fields:
 | `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
 | `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
-| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)   |
 | `markdown` | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                    |
 | `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
@@ -3094,7 +3094,7 @@ may be read/write protected so that only users with the correct credentials can 
 To publish/subscribe to protected topics, you can: 
 
 * Use [username & password](#username-password) via Basic auth, e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
-* Use [access tokens](#bearer-auth) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
+* Use [access tokens](#access-tokens) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
 * or use either with the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 !!! warning

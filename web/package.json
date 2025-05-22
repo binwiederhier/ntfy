@@ -44,8 +44,8 @@
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^2.8.8",
-    "vite": "^4.3.9",
-    "vite-plugin-pwa": "^0.15.0"
+    "vite": "^6.3.5",
+    "vite-plugin-pwa": "^1.0.0"
   },
   "browserslist": {
     "production": [

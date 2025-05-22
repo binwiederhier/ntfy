@@ -11,9 +11,9 @@ import (
 	"github.com/urfave/cli/v2/altsrc"
 )
 
-var flagsWebpush = append(
+var flagsWebPush = append(
 	[]cli.Flag{},
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"f"}, Usage: "write vapid keys to this file"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "output-file", Aliases: []string{"f"}, Usage: "write VAPID keys to this file"}),
 )
 
 func init() {
@@ -33,7 +33,7 @@ var cmdWebPush = &cli.Command{
 			Usage:     "Generate VAPID keys to enable browser background push notifications",
 			UsageText: "ntfy webpush keys",
 			Category:  categoryServer,
-			Flags:     flagsWebpush,
+			Flags:     flagsWebPush,
 		},
 	},
 }
@@ -44,16 +44,16 @@ func generateWebPushKeys(c *cli.Context) error {
 		return err
 	}
 
-	if keyFile := c.String("key-file"); keyFile != "" {
+	if outputFIle := c.String("output-file"); outputFIle != "" {
 		contents := fmt.Sprintf(`---
 web-push-public-key: %s
 web-push-private-key: %s
 `, publicKey, privateKey)
-		err = os.WriteFile(keyFile, []byte(contents), 0660)
+		err = os.WriteFile(outputFIle, []byte(contents), 0660)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys written to %s.`, keyFile)
+		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys written to %s.`, outputFIle)
 	} else {
 		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
 

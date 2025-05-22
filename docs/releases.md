@@ -1377,19 +1377,31 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Add username/password auth to email publishing ([#1164](https://github.com/binwiederhier/ntfy/pull/1164), thanks to [@bishtawi](https://github.com/bishtawi))
+* Add username/password auth to email publishing ([#1164](https://github.com/binwiederhier/ntfy/pull/1164), thanks to [@bishtawi](https://github.com/bishtawi) for implementing)
+* Write VAPID keys to file in `ntfy webpush --output-file` ([#1138](https://github.com/binwiederhier/ntfy/pull/1138), thanks to [@nogweii](https://github.com/nogweii) for implementing)
 
 **Bug fixes + maintenance:**
 
-* Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [@pcouy](https://github.com/pcouy))
 * Security updates for dependencies and Docker images ([#1341](https://github.com/binwiederhier/ntfy/pull/1341))
+* Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [@pcouy](https://github.com/pcouy))
 * Fix IP address parsing when behind a proxy ([#1266](https://github.com/binwiederhier/ntfy/pull/1266), thanks to [@mmatuska](https://github.com/mmatuska))
 * Make sure UnifiedPush messages are not treated as attachments ([#1312](https://github.com/binwiederhier/ntfy/pull/1312), thanks to [@vkrause](https://github.com/vkrause))
 * Add OCI image version to Docker image ([#1307](https://github.com/binwiederhier/ntfy/pull/1307), thanks to [@jlssmt](https://github.com/jlssmt))
+* WebSocket returning incorrect HTTP error code ([#1338](https://github.com/binwiederhier/ntfy/pull/1338) / [#1337](https://github.com/binwiederhier/ntfy/pull/1337), thanks to [@wunter8](https://github.com/wunter8) for debugging and implementing)
 
 **Documentation:**
 
-* Lots of new integrations: [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp), [UptimeObserver](https://uptimeobserver.com), [alertmanager-ntfy-relay](https://github.com/therobbielee/alertmanager-ntfy-relay), [Monibot](https://monibot.io/), ... Amazing! 
+* Lots of new integrations and projects. Amazing!
+    * [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp)
+    * [UptimeObserver](https://uptimeobserver.com)
+    * [alertmanager-ntfy-relay](https://github.com/therobbielee/alertmanager-ntfy-relay)
+    * [Monibot](https://monibot.io/)
+    * [Daily_Fact_Ntfy](https://github.com/thiswillbeyourgithub/Daily_Fact_Ntfy)
+    * [EasyMorph](https://help.easymorph.com/doku.php?id=transformations:sendntfymessage)
+    * [ntfy-run](https://github.com/quantum5/ntfy-run)
+    * [Clipboard IO](https://github.com/jim3692/clipboard-io)
+    * [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp)
+    * [InvaderInformant](https://github.com/patricksthannon/InvaderInformant)
 * Various docs updates ([#1161](https://github.com/binwiederhier/ntfy/pull/1161), thanks to [@OneWeekNotice](https://github.com/OneWeekNotice))
 * Typo in config docs ([#1177](https://github.com/binwiederhier/ntfy/pull/1177), thanks to [@hoho4190](https://github.com/hoho4190))
 * Typo in CLI docs ([#1172](https://github.com/binwiederhier/ntfy/pull/1172), thanks to [@anirvan](https://github.com/anirvan))

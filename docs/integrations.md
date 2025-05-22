@@ -9,9 +9,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Integration via HTTP/SMTP/etc.](#integration-via-httpsmtpetc)
 - [UnifiedPush integrations](#unifiedpush-integrations)
 - [Libraries](#libraries)
-- [CLIs + GUIs](#clis--guis)
-- [Projects + scripts](#projects--scripts)
-- [Blog + forum posts](#blog--forum-posts)
+- [CLIs + GUIs](#clis-guis)
+- [Projects + scripts](#projects-scripts)
+- [Blog + forum posts](#blog-forum-posts)
 - [Alternative ntfy servers](#alternative-ntfy-servers)
 
 ## Official integrations

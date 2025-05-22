@@ -198,7 +198,7 @@ func (w *peekLogWriter) Write(p []byte) (n int, err error) {
 	if len(p) == 0 || p[0] == '{' || CurrentFormat() == TextFormat {
 		return w.w.Write(p)
 	}
-	m := newEvent().Tag(tagStdLog).Render(InfoLevel, strings.TrimSpace(string(p)))
+	m := newEvent().Tag(tagStdLog).Render(InfoLevel, "%s", strings.TrimSpace(string(p)))
 	if m == "" {
 		return 0, nil
 	}

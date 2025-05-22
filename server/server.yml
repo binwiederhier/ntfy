@@ -95,6 +95,20 @@
 # auth-default-access: "read-write"
 # auth-startup-queries:
 
+# If set, the value of the defined header will be used as an authenticated user (DANGER DANGER!).
+#
+# For instance, if "auth-user-header: X-Forwarded-User", a request from a client (or reverse proxy)
+# with the header "X-Forwarded-User: myuser" would be authenticated as the user "myuser" without any
+# further password checking.
+#
+# This is useful to integrate ntfy with other authentication systems such as Authelia,
+# or Keycloak. This setting can only be set if "behind-proxy" is also set.
+#
+# WARNING: Be sure that your proxy or auth system manages the defined header, and that attackers
+#          cannot just pass it manually. Otherwise, they can impersonate any user!
+#
+# auth-user-header:
+
 # If set, the X-Forwarded-For header is used to determine the visitor IP address
 # instead of the remote address of the connection.
 #

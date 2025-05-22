@@ -82,7 +82,7 @@ func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
 		ip, err = netip.ParseAddr(remoteAddr)
 		if err != nil {
 			ip = netip.IPv4Unspecified()
-			if remoteAddr != "@" || !behindProxy { // RemoteAddr is @ when unix socket is used
+			if remoteAddr != "@" && !behindProxy { // RemoteAddr is @ when unix socket is used
 				logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", remoteAddr)
 			}
 		}

@@ -424,9 +424,9 @@ func execServe(c *cli.Context) error {
 	// Run server
 	s, err := server.New(conf)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("%s", err.Error())
 	} else if err := s.Run(); err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("%s", err.Error())
 	}
 	log.Info("Exiting.")
 	return nil

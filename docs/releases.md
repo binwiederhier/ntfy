@@ -689,7 +689,7 @@ minute or so, due to competing stats gathering (personal installations will like
 
 **Features:**
 
-* Add `cache-startup-queries` option to allow custom [SQLite performance tuning](config.md#wal-for-message-cache) (no ticket)
+* Add `cache-startup-queries` option to allow custom [SQLite performance tuning](config.md#message-cache) (no ticket)
 * ntfy CLI can now [wait for a command or PID](subscribe/cli.md#wait-for-pidcommand) before publishing ([#263](https://github.com/binwiederhier/ntfy/issues/263), thanks to the [original ntfy](https://github.com/dschep/ntfy) for the idea)
 * Trace: Log entire HTTP request to simplify debugging (no ticket)
 * Allow setting user password via `NTFY_PASSWORD` env variable ([#327](https://github.com/binwiederhier/ntfy/pull/327), thanks to [@Kenix3](https://github.com/Kenix3))
@@ -1381,15 +1381,21 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [pcouy](https://github.com/pcouy))
+* Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [@pcouy](https://github.com/pcouy))
+* Security updates for dependencies and Docker images ([#1341](https://github.com/binwiederhier/ntfy/pull/1341))
+* Fix IP address parsing when behind a proxy ([#1266](https://github.com/binwiederhier/ntfy/pull/1266), thanks to [@mmatuska](https://github.com/mmatuska))
+* Make sure UnifiedPush messages are not treated as attachments ([#1312](https://github.com/binwiederhier/ntfy/pull/1312), thanks to [@vkrause](https://github.com/vkrause))
+* Add OCI image version to Docker image ([#1307](https://github.com/binwiederhier/ntfy/pull/1307), thanks to [@jlssmt](https://github.com/jlssmt))
 
 **Documentation:**
 
+* Lots of new integrations: [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp), [UptimeObserver](https://uptimeobserver.com), [alertmanager-ntfy-relay](https://github.com/therobbielee/alertmanager-ntfy-relay), [Monibot](https://monibot.io/), ... Amazing! 
 * Various docs updates ([#1161](https://github.com/binwiederhier/ntfy/pull/1161), thanks to [@OneWeekNotice](https://github.com/OneWeekNotice))
 * Typo in config docs ([#1177](https://github.com/binwiederhier/ntfy/pull/1177), thanks to [@hoho4190](https://github.com/hoho4190))
 * Typo in CLI docs ([#1172](https://github.com/binwiederhier/ntfy/pull/1172), thanks to [@anirvan](https://github.com/anirvan))
 * Correction about MacroDroid ([#1137](https://github.com/binwiederhier/ntfy/pull/1137), thanks to [@ShlomoCode](https://github.com/ShlomoCode))
 * Note about fail2ban in Docker ([#1175](https://github.com/binwiederhier/ntfy/pull/1175)), thanks to [@Measurity](https://github.com/Measurity))
+* Lots of other tiny docs updates, tanks to everyone who contributed!
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

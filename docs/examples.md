@@ -31,6 +31,12 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 */6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
 ```
 
+You can also use [`ntfy-run`](https://github.com/quantum5/ntfy-run) to send the output of your cronjob in the
+notification, so that you know exactly why it failed:
+
+```
+0 0 * * * ntfy-run -n https://ntfy.sh/backups --success-priority low --failure-tags warning ~/backup-computer
+```
 
 ## Low disk space alerts
 Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but 

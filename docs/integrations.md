@@ -152,6 +152,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 - [container-update-check](https://github.com/stendler/container-update-check) - Scripts to check and notify if a podman or docker container image can be updated (Podman/Shell)
 - [ignition-combustion-template](https://github.com/stendler/ignition-combustion-template) - Templates and scripts to generate a configuration to automatically setup a system on first boot. Including systemd-ntfy-poweronoff (Shell)
+- [ntfy-run](https://github.com/quantum5/ntfy-run) - Tool to run a command, capture its output, and send it to ntfy (Rust)
 - [Clipboard IO](https://github.com/jim3692/clipboard-io) - End to end encrypted clipboard
 - [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp) - An ntfy MCP server for sending/fetching ntfy notifications to your self-hosted ntfy server from AI Agents (supports secure token auth & more - use with npx or docker!) (Node/Typescript)
 - [InvaderInformant](https://github.com/patricksthannon/InvaderInformant) - Script for Mac OS systems that monitors new or dropped connections to your network using ntfy (Shell)

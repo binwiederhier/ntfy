@@ -166,6 +166,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Clipboard IO](https://github.com/jim3692/clipboard-io) - End to end encrypted clipboard
 - [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp) - An ntfy MCP server for sending/fetching ntfy notifications to your self-hosted ntfy server from AI Agents (supports secure token auth & more - use with npx or docker!) (Node/Typescript)
 - [InvaderInformant](https://github.com/patricksthannon/InvaderInformant) - Script for Mac OS systems that monitors new or dropped connections to your network using ntfy (Shell)
+- [NtfyPwsh](https://github.com/ptmorris1/NtfyPwsh) - PowerShell module to help send messages to ntfy (PowerShell)
 
 ## Blog + forum posts
 
@@ -267,6 +268,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
 - [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021
 - [ntfy on The Canary in the Cage Podcast](https://odysee.com/@TheCanaryInTheCage:b/The-Canary-in-the-Cage-Episode-42:1?r=4gitYjTacQqPEjf22874USecDQYJ5y5E&t=3062) - odysee.com - 1/2025
+- [NtfyPwsh - A PowerShell Module to Send Ntfy Messages](https://ptmorris1.github.io/posts/NtfyPwsh/) - github.io - 5/2025
 
 ## Alternative ntfy servers
 

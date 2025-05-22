@@ -7,7 +7,7 @@ or POST requests. I use it to notify myself when scripts fail, or long-running c
 <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="static/img/badge-fdroid.png"></a>
 <a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img src="static/img/badge-appstore.png"></a>
 
-To [receive notifications on your phone](subscribe/phone.md), install the app, either via Google Play or F-Droid.
+To [receive notifications on your phone](subscribe/phone.md), install the app, either via Google Play, App Store or F-Droid.
 Once installed, open it and subscribe to a topic of your choosing. Topics don't have to explicitly be created, so just
 pick a name and use it later when you [publish a message](publish.md). Note that **topic names are public, so it's wise 
 to choose something that cannot be guessed easily.** 

@@ -1277,6 +1277,7 @@ func TestServer_PublishEmailNoMailer_Fail(t *testing.T) {
 func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
+	defer s.messageCache.Close()
 
 	subFn := func(v *visitor, msg *message) error {
 		return nil
@@ -1288,12 +1289,21 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 	})
 	require.Equal(t, 200, response.Code)
 	waitFor(t, func() bool {
+		s.mu.Lock()
+		tp, exists := s.topics["mytopic"]
+		s.mu.Unlock()
+		if !exists {
+			return false
+		}
 		// .lastAccess set in t.Publish() -> t.Keepalive() in Goroutine
-		s.topics["mytopic"].mu.RLock()
-		defer s.topics["mytopic"].mu.RUnlock()
-		return s.topics["mytopic"].lastAccess.Unix() >= time.Now().Unix()-2 &&
-			s.topics["mytopic"].lastAccess.Unix() <= time.Now().Unix()+2
+		tp.mu.RLock()
+		defer tp.mu.RUnlock()
+		return tp.lastAccess.Unix() >= time.Now().Unix()-2 &&
+			tp.lastAccess.Unix() <= time.Now().Unix()+2
 	})
+
+	// Hack!
+	time.Sleep(time.Second)
 
 	// Topic won't get pruned
 	s.execManager()

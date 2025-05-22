@@ -837,8 +837,7 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
 In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
-a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support (e.g.
-like the [MacroDroid](https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid) Android app).
+a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support.
 
 To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
 any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 
@@ -1008,7 +1007,7 @@ Here's an **easier example with a shorter JSON payload**:
 
 === "Command line (curl)"
     ```
-    # To use { and } in the URL without encoding, we need to turn of
+    # To use { and } in the URL without encoding, we need to turn off
     # curl's globbing using --globoff
 
     curl \
@@ -1244,7 +1243,7 @@ all the supported fields:
 | `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
 | `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
 | `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
-| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-url)     |
+| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)   |
 | `markdown` | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                    |
 | `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
 | `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
@@ -2942,10 +2941,16 @@ format is:
 ntfy-$topic@ntfy.sh
 ```
 
-If [access control](config.md#access-control) is enabled, and the target topic does not support anonymous writes, e-mail publishing won't work without providing an authorized access token. That will change the format of the e-mail's recipient address to
+If [access control](config.md#access-control) is enabled, and the target topic does not support anonymous writes, e-mail publishing won't work
+without providing an authorized access token or using SMTP AUTH PLAIN. 
+
+If you use [access tokens](#access-tokens), that will change the format of the e-mail's recipient address to
 ```
 ntfy-$topic+$token@ntfy.sh
 ```
+
+To use [username/password](https://docs.ntfy.sh/publish/#username-password), you can use SMTP PLAIN auth when authenticating
+to the ntfy server.
 
 As of today, e-mail publishing only supports adding a [message title](#message-title) (the e-mail subject). Tags, priority,
 delay and other features are not supported (yet). Here's an example that will publish a message with the 
@@ -3089,7 +3094,7 @@ may be read/write protected so that only users with the correct credentials can 
 To publish/subscribe to protected topics, you can: 
 
 * Use [username & password](#username-password) via Basic auth, e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
-* Use [access tokens](#bearer-auth) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
+* Use [access tokens](#access-tokens) via Bearer/Basic auth, e.g. `Authorization: Bearer tk_AgQdq7mVBoFD37zQVN29RhuMzNIz2`
 * or use either with the [`auth` query parameter](#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 !!! warning

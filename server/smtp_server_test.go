@@ -1386,6 +1386,28 @@ what's up
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
+func TestSmtpBackend_PlaintextWithPlainAuth(t *testing.T) {
+	email := `EHLO example.com
+AUTH PLAIN dGVzdAB0ZXN0ADEyMzQ=
+MAIL FROM: phil@example.com
+RCPT TO: ntfy-mytopic@ntfy.sh
+DATA
+Subject: Very short mail
+
+what's up
+.
+`
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "Very short mail", r.Header.Get("Title"))
+		require.Equal(t, "Basic dGVzdDoxMjM0", r.Header.Get("Authorization"))
+		require.Equal(t, "what's up", readAll(t, r.Body))
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
 type smtpHandlerFunc func(http.ResponseWriter, *http.Request)
 
 func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c net.Conn, conf *Config, scanner *bufio.Scanner) {

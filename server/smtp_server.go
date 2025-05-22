@@ -70,15 +70,19 @@ func (b *smtpBackend) Counts() (total int64, success int64, failure int64) {
 
 // smtpSession is returned after EHLO.
 type smtpSession struct {
-	backend *smtpBackend
-	conn    *smtp.Conn
-	topic   string
-	token   string
-	mu      sync.Mutex
+	backend   *smtpBackend
+	conn      *smtp.Conn
+	topic     string
+	token     string // If email address contains token, e.g. topic+token@domain
+	basicAuth string // If SMTP AUTH PLAIN was used
+	mu        sync.Mutex
 }
 
-func (s *smtpSession) AuthPlain(username, _ string) error {
+func (s *smtpSession) AuthPlain(username, password string) error {
 	logem(s.conn).Field("smtp_username", username).Debug("AUTH PLAIN (with username %s)", username)
+	s.mu.Lock()
+	s.basicAuth = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	s.mu.Unlock()
 	return nil
 }
 
@@ -198,6 +202,8 @@ func (s *smtpSession) publishMessage(m *message) error {
 	}
 	if s.token != "" {
 		req.Header.Add("Authorization", "Bearer "+s.token)
+	} else if s.basicAuth != "" {
+		req.Header.Add("Authorization", "Basic "+s.basicAuth)
 	}
 	rr := httptest.NewRecorder()
 	s.backend.handler(rr, req)
@@ -214,6 +220,9 @@ func (s *smtpSession) Reset() {
 }
 
 func (s *smtpSession) Logout() error {
+	s.mu.Lock()
+	s.basicAuth = ""
+	s.mu.Unlock()
 	return nil
 }
 

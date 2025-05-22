@@ -317,7 +317,7 @@ You can either add your username and password to the configuration file:
 	   password: mypass
 	```
 
-Or with the `ntfy subscibe` command:
+Or with the `ntfy subscribe` command:
 ```
 ntfy subscribe \
   -u phil:mypass \

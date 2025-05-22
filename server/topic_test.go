@@ -10,8 +10,6 @@ import (
 )
 
 func TestTopic_CancelSubscribersExceptUser(t *testing.T) {
-	t.Parallel()
-
 	subFn := func(v *visitor, msg *message) error {
 		return nil
 	}

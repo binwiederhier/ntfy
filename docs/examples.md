@@ -639,44 +639,39 @@ or by simply providing traccar with a valid username/password combination.
 
 This example provides a simple way to send notifications using [ntfy.sh](https://ntfy.sh) when a terminal command completes. It includes success or failure indicators based on the command's exit status.
 
-### Setup
-
-1. Store your ntfy.sh bearer token securely if access control is enabled:
+Store your ntfy.sh bearer token securely if access control is enabled:
 
    ```sh
    echo "your_bearer_token_here" > ~/.ntfy_token
    chmod 600 ~/.ntfy_token
    ```
 
-1. Add the following function and alias to your `.bashrc` or `.bash_profile`:
+Add the following function and alias to your `.bashrc` or `.bash_profile`:
 
-    ```sh
-    # Function for alert notifications using ntfy.sh
-    notify_via_ntfy() {
-    local exit_status=$?  # Capture the exit status before doing anything else
-    local token=$(< ~/.ntfy_token)  # Securely read the token
-    local status_icon="$([ $exit_status -eq 0 ] && echo magic_wand || echo warning)"
-    local last_command=$(history | tail -n1 | sed -e 's/^[[:space:]]*[0-9]\{1,\}[[:space:]]*//' -e 's/[;&|][[:space:]]*alert$//')
+   ```sh
+   # Function for alert notifications using ntfy.sh
+   notify_via_ntfy() {
+       local exit_status=$?  # Capture the exit status before doing anything else
+       local token=$(< ~/.ntfy_token)  # Securely read the token
+       local status_icon="$([ $exit_status -eq 0 ] && echo magic_wand || echo warning)"
+       local last_command=$(history | tail -n1 | sed -e 's/^[[:space:]]*[0-9]\{1,\}[[:space:]]*//' -e 's/[;&|][[:space:]]*alert$//')
 
-    curl -s -X POST "https://n.example.dev/alerts" \
-        -H "Authorization: Bearer $token" \
-        -H "Title: Terminal" \
-        -H "X-Priority: 3" \
-        -H "Tags: $status_icon" \
-        -d "Command: $last_command (Exit: $exit_status)"
+       curl -s -X POST "https://n.example.dev/alerts" \
+           -H "Authorization: Bearer $token" \
+           -H "Title: Terminal" \
+           -H "X-Priority: 3" \
+           -H "Tags: $status_icon" \
+           -d "Command: $last_command (Exit: $exit_status)"
 
-    echo "Tags: $status_icon"
-    echo "$last_command (Exit: $exit_status)"
-    }
+       echo "Tags: $status_icon"
+       echo "$last_command (Exit: $exit_status)"
+   }
 
-    # Add an "alert" alias for long running commands using ntfy.sh
-    alias alert='notify_via_ntfy'
+   # Add an "alert" alias for long running commands using ntfy.sh
+   alias alert='notify_via_ntfy'
+   ```
 
-    ```
-
-### Usage
-
-Run any long-running command and append `alert` to notify when it completes:
+Now you can run any long-running command and append `alert` to notify when it completes:
 
 ```sh
 sleep 10; alert
@@ -685,11 +680,10 @@ sleep 10; alert
 
 **Notification Sent** with a success 🪄 (`magic_wand`) or failure ⚠️ (`warning`) tag.
 
-#### Simulating Failures
-
 To test failure notifications:
 
 ```sh
 false; alert  # Always fails (exit 1)
 ls --invalid; alert  # Invalid option
 cat nonexistent_file; alert  # File not found
+```

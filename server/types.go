@@ -169,8 +169,12 @@ func (t sinceMarker) IsNone() bool {
 	return t == sinceNoMessages
 }
 
+func (t sinceMarker) IsLatest() bool {
+	return t == sinceLatestMessage
+}
+
 func (t sinceMarker) IsID() bool {
-	return t.id != ""
+	return t.id != "" && t.id != "latest"
 }
 
 func (t sinceMarker) Time() time.Time {
@@ -182,8 +186,9 @@ func (t sinceMarker) ID() string {
 }
 
 var (
-	sinceAllMessages = sinceMarker{time.Unix(0, 0), ""}
-	sinceNoMessages  = sinceMarker{time.Unix(1, 0), ""}
+	sinceAllMessages   = sinceMarker{time.Unix(0, 0), ""}
+	sinceNoMessages    = sinceMarker{time.Unix(1, 0), ""}
+	sinceLatestMessage = sinceMarker{time.Unix(0, 0), "latest"}
 )
 
 type queryFilter struct {

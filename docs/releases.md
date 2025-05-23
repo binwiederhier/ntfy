@@ -1379,6 +1379,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Add username/password auth to email publishing ([#1164](https://github.com/binwiederhier/ntfy/pull/1164), thanks to [@bishtawi](https://github.com/bishtawi) for implementing)
 * Write VAPID keys to file in `ntfy webpush --output-file` ([#1138](https://github.com/binwiederhier/ntfy/pull/1138), thanks to [@nogweii](https://github.com/nogweii) for implementing)
+* Add Docker major/minor version to image tags ([#1271](https://github.com/binwiederhier/ntfy/pull/1271), thanks to [@RoboMagus](https://github.com/RoboMagus))
 
 **Bug fixes + maintenance:**
 
@@ -1389,7 +1390,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Make sure UnifiedPush messages are not treated as attachments ([#1312](https://github.com/binwiederhier/ntfy/pull/1312), thanks to [@vkrause](https://github.com/vkrause))
 * Add OCI image version to Docker image ([#1307](https://github.com/binwiederhier/ntfy/pull/1307), thanks to [@jlssmt](https://github.com/jlssmt))
 * WebSocket returning incorrect HTTP error code ([#1338](https://github.com/binwiederhier/ntfy/pull/1338) / [#1337](https://github.com/binwiederhier/ntfy/pull/1337), thanks to [@wunter8](https://github.com/wunter8) for debugging and implementing)
-* Make Markdown in web app scrollable horizontally ([#1262](https://github.com/binwiederhier/ntfy/pull/1262), thanks to [@rake5k](https://github.com/rake5k) for fixing)
+* Make Markdown in the web app scrollable horizontally ([#1262](https://github.com/binwiederhier/ntfy/pull/1262), thanks to [@rake5k](https://github.com/rake5k) for fixing)
 
 **Documentation:**
 

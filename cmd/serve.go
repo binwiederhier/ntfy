@@ -5,13 +5,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/stripe/stripe-go/v74"
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/server"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"io/fs"
 	"math"
 	"net"
@@ -22,6 +15,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/stripe/stripe-go/v74"
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 func init() {
@@ -491,6 +492,9 @@ func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
 		log.Info("Log level is %v, %d override(s) in place", strings.ToUpper(newLevelStr), len(overrides))
 	} else {
 		log.Info("Log level is %v", strings.ToUpper(newLevelStr))
+	}
+	if err := log.Reopen(); err != nil {
+		return fmt.Errorf("cannot reopen log file: %s", err.Error())
 	}
 	return nil
 }

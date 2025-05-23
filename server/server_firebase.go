@@ -50,7 +50,7 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 		ev.Field("firebase_message", util.MaybeMarshalJSON(fbm)).Trace("Firebase message")
 	}
 	err = c.sender.Send(fbm)
-	if err == errFirebaseQuotaExceeded {
+	if errors.Is(err, errFirebaseQuotaExceeded) {
 		logvm(v, m).
 			Tag(tagFirebase).
 			Err(err).
@@ -133,7 +133,7 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			"time":    fmt.Sprintf("%d", m.Time),
 			"event":   m.Event,
 			"topic":   m.Topic,
-			"message": m.Message,
+			"message": newMessageBody,
 			"poll_id": m.PollID,
 		}
 		apnsConfig = createAPNSAlertConfig(m, data)
@@ -173,28 +173,29 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			}
 			apnsConfig = createAPNSAlertConfig(m, data)
 		} else {
-			// If anonymous read for a topic is not allowed, we cannot send the message along
+			// If "anonymous read" for a topic is not allowed, we cannot send the message along
 			// via Firebase. Instead, we send a "poll_request" message, asking the client to poll.
-			//App function needs all the data to create a message object, if not, it fails,
-			//so we set it but put a placeholders to not to send the actual message
-			//but generic title and message instead, we also add the poll_id so client knowns
-			//what message is goint to "decode" (retrieve)
+			//
+			// The data map needs to contain all the fields for it to function properly. If not all
+			// fields are set, the iOS app fails to decode the message.
+			//
+			// See https://github.com/binwiederhier/ntfy/pull/1345
 			data = map[string]string{
-                                "id":    m.ID,
-                                "time":  fmt.Sprintf("%d", m.Time),
-                                "event": pollRequestEvent,
-                                "topic": m.Topic,
-                                "priority":     fmt.Sprintf("%d", m.Priority),                                            
-                                "tags":         strings.Join(m.Tags, ","),                                                
-                                "click":        m.Click,                                                                  
-                                "icon":         m.Icon,                                                                      
-                                "title":        "Private",                                                                     
-                                "message":      "Message",                                                                
-                                "content_type": m.ContentType,                                                            
-                                "encoding":     m.Encoding,
-                                "poll_id": m.ID,
-                        }
-                        apnsConfig = createAPNSAlertConfig(m, data)
+				"id":           m.ID,
+				"time":         fmt.Sprintf("%d", m.Time),
+				"event":        pollRequestEvent,
+				"topic":        m.Topic,
+				"priority":     fmt.Sprintf("%d", m.Priority),
+				"tags":         "",
+				"click":        "",
+				"icon":         "",
+				"title":        "",
+				"message":      newMessageBody,
+				"content_type": m.ContentType,
+				"encoding":     m.Encoding,
+				"poll_id":      m.ID,
+			}
+			apnsConfig = createAPNSAlertConfig(m, data)
 		}
 	}
 	var androidConfig *messaging.AndroidConfig
@@ -238,23 +239,14 @@ func createAPNSAlertConfig(m *message, data map[string]string) *messaging.APNSCo
 	for k, v := range data {
 		apnsData[k] = v
 	}
-	alertTitle := m.Title
-        alertBody := maybeTruncateAPNSBodyMessage(m.Message)
-        // If the event is pollRequestEvent (server/topic is restricted) we dont want to
-	//send the actual message to Firebase/APNS, so we send a generic text
-	//if for some reason, client cant retrieve the message, it shows this as the message and title
-        if event, ok := data["event"]; ok && event == pollRequestEvent {
-                alertTitle = "New Notification received"
-                alertBody = "Message cant be retrieved, open the app and refresh content"
-        }
 	return &messaging.APNSConfig{
 		Payload: &messaging.APNSPayload{
 			CustomData: apnsData,
 			Aps: &messaging.Aps{
 				MutableContent: true,
 				Alert: &messaging.ApsAlert{
-					Title: alertTitle,
-					Body:  alertBody,
+					Title: m.Title,
+					Body:  maybeTruncateAPNSBodyMessage(m.Message),
 				},
 			},
 		},

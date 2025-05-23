@@ -18,6 +18,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 ## Official integrations
 
 - [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
+- [Home Assistant](https://www.home-assistant.io/integrations/ntfy) ⭐ - Home Assistant is an open-source platform for automating and controlling smart home devices.
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
@@ -39,7 +40,6 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [HetrixTools](https://docs.hetrixtools.com/ntfy-sh-notifications/) - Uptime monitoring
 - [EasyMorph](https://help.easymorph.com/doku.php?id=transformations:sendntfymessage) - Visual data transformation and automation tool
 - [Monibot](https://monibot.io/) - Monibot monitors your websites, servers and applications and notifies you if something goes wrong.
-- [Home Assistant](https://www.home-assistant.io/integrations/ntfy) - Home Assistant is an open-source platform for automating and controlling smart home devices.
 
 ## Integration via HTTP/SMTP/etc.
 

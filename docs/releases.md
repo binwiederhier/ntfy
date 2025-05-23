@@ -1383,11 +1383,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Security updates for dependencies and Docker images ([#1341](https://github.com/binwiederhier/ntfy/pull/1341))
+* Fix iOS delivery issues for read-protected topics ([#1207](https://github.com/binwiederhier/ntfy/pull/1287), thanks a lot to [@barart](https://github.com/barart)!)
 * Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [@pcouy](https://github.com/pcouy))
 * Fix IP address parsing when behind a proxy ([#1266](https://github.com/binwiederhier/ntfy/pull/1266), thanks to [@mmatuska](https://github.com/mmatuska))
 * Make sure UnifiedPush messages are not treated as attachments ([#1312](https://github.com/binwiederhier/ntfy/pull/1312), thanks to [@vkrause](https://github.com/vkrause))
 * Add OCI image version to Docker image ([#1307](https://github.com/binwiederhier/ntfy/pull/1307), thanks to [@jlssmt](https://github.com/jlssmt))
 * WebSocket returning incorrect HTTP error code ([#1338](https://github.com/binwiederhier/ntfy/pull/1338) / [#1337](https://github.com/binwiederhier/ntfy/pull/1337), thanks to [@wunter8](https://github.com/wunter8) for debugging and implementing)
+* Make Markdown in web app scrollable horizontally ([#1262](https://github.com/binwiederhier/ntfy/pull/1262), thanks to [@rake5k](https://github.com/rake5k) for fixing)
 
 **Documentation:**
 

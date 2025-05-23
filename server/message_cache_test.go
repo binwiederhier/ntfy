@@ -66,6 +66,11 @@ func testCacheMessages(t *testing.T, c *messageCache) {
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "my other message", messages[0].Message)
 
+	// mytopic: latest
+	messages, _ = c.Messages("mytopic", sinceLatestMessage, false)
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "my other message", messages[0].Message)
+
 	// example: count
 	counts, err = c.MessageCounts()
 	require.Nil(t, err)

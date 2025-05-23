@@ -594,6 +594,11 @@ func TestServer_PublishAndPollSince(t *testing.T) {
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "test 2", messages[0].Message)
 
+	response = request(t, s, "GET", "/mytopic/json?poll=1&since=latest", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "test 2", messages[0].Message)
+
 	response = request(t, s, "GET", "/mytopic/json?poll=1&since=INVALID", "", nil)
 	require.Equal(t, 40008, toHTTPError(t, response.Body.String()).Code)
 }

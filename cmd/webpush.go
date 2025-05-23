@@ -44,16 +44,16 @@ func generateWebPushKeys(c *cli.Context) error {
 		return err
 	}
 
-	if outputFIle := c.String("output-file"); outputFIle != "" {
+	if outputFile := c.String("output-file"); outputFile != "" {
 		contents := fmt.Sprintf(`---
 web-push-public-key: %s
 web-push-private-key: %s
 `, publicKey, privateKey)
-		err = os.WriteFile(outputFIle, []byte(contents), 0660)
+		err = os.WriteFile(outputFile, []byte(contents), 0660)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys written to %s.`, outputFIle)
+		_, err = fmt.Fprintf(c.App.ErrWriter, "Web Push keys written to %s.\n", outputFile)
 	} else {
 		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
 

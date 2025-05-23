@@ -413,7 +413,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		} else {
 			ev.Info("WebSocket error: %s", err.Error())
 		}
-		return // Do not attempt to write to upgraded connection
+		w.WriteHeader(httpErr.HTTPCode)
+		return // Do not attempt to write any body to upgraded connection
 	}
 	if isNormalError {
 		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
@@ -1016,7 +1017,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap("%s", e.Error())
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
@@ -1025,7 +1026,8 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	template = readBoolParam(r, false, "x-template", "template", "tpl")
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
-	if unifiedpush {
+	contentEncoding := readParam(r, "content-encoding")
+	if unifiedpush || contentEncoding == "aes128gcm" {
 		firebase = false
 		unifiedpush = true
 	}
@@ -1887,14 +1889,14 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 }
 
 func (s *Server) authorizeTopicWrite(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionWrite)
+	return s.authorizeTopic(next, user.PermissionWrite)
 }
 
 func (s *Server) authorizeTopicRead(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionRead)
+	return s.authorizeTopic(next, user.PermissionRead)
 }
 
-func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc {
+func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.userManager == nil {
 			return next(w, r, v)

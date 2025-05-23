@@ -50,7 +50,7 @@ func (c *firebaseClient) Send(v *visitor, m *message) error {
 		ev.Field("firebase_message", util.MaybeMarshalJSON(fbm)).Trace("Firebase message")
 	}
 	err = c.sender.Send(fbm)
-	if err == errFirebaseQuotaExceeded {
+	if errors.Is(err, errFirebaseQuotaExceeded) {
 		logvm(v, m).
 			Tag(tagFirebase).
 			Err(err).
@@ -133,7 +133,7 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			"time":    fmt.Sprintf("%d", m.Time),
 			"event":   m.Event,
 			"topic":   m.Topic,
-			"message": m.Message,
+			"message": newMessageBody,
 			"poll_id": m.PollID,
 		}
 		apnsConfig = createAPNSAlertConfig(m, data)
@@ -173,15 +173,29 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			}
 			apnsConfig = createAPNSAlertConfig(m, data)
 		} else {
-			// If anonymous read for a topic is not allowed, we cannot send the message along
+			// If "anonymous read" for a topic is not allowed, we cannot send the message along
 			// via Firebase. Instead, we send a "poll_request" message, asking the client to poll.
+			//
+			// The data map needs to contain all the fields for it to function properly. If not all
+			// fields are set, the iOS app fails to decode the message.
+			//
+			// See https://github.com/binwiederhier/ntfy/pull/1345
 			data = map[string]string{
-				"id":    m.ID,
-				"time":  fmt.Sprintf("%d", m.Time),
-				"event": pollRequestEvent,
-				"topic": m.Topic,
+				"id":           m.ID,
+				"time":         fmt.Sprintf("%d", m.Time),
+				"event":        pollRequestEvent,
+				"topic":        m.Topic,
+				"priority":     fmt.Sprintf("%d", m.Priority),
+				"tags":         "",
+				"click":        "",
+				"icon":         "",
+				"title":        "",
+				"message":      newMessageBody,
+				"content_type": m.ContentType,
+				"encoding":     m.Encoding,
+				"poll_id":      m.ID,
 			}
-			// TODO Handle APNS?
+			apnsConfig = createAPNSAlertConfig(m, data)
 		}
 	}
 	var androidConfig *messaging.AndroidConfig

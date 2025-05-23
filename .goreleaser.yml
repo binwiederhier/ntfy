@@ -197,3 +197,15 @@ docker_manifests:
       - *arm64v8_image
       - *armv7_image
       - *armv6_image
+  - name_template: "binwiederhier/ntfy:v{{ .Major }}"
+    image_templates:
+      - *amd64_image
+      - *arm64v8_image
+      - *armv7_image
+      - *armv6_image
+  - name_template: "binwiederhier/ntfy:v{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - *amd64_image
+      - *arm64v8_image
+      - *armv7_image
+      - *armv6_image

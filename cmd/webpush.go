@@ -4,9 +4,16 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+)
+
+var flagsWebPush = append(
+	[]cli.Flag{},
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "output-file", Aliases: []string{"f"}, Usage: "write VAPID keys to this file"}),
 )
 
 func init() {
@@ -26,6 +33,7 @@ var cmdWebPush = &cli.Command{
 			Usage:     "Generate VAPID keys to enable browser background push notifications",
 			UsageText: "ntfy webpush keys",
 			Category:  categoryServer,
+			Flags:     flagsWebPush,
 		},
 	},
 }
@@ -35,7 +43,19 @@ func generateWebPushKeys(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
+
+	if outputFIle := c.String("output-file"); outputFIle != "" {
+		contents := fmt.Sprintf(`---
+web-push-public-key: %s
+web-push-private-key: %s
+`, publicKey, privateKey)
+		err = os.WriteFile(outputFIle, []byte(contents), 0660)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys written to %s.`, outputFIle)
+	} else {
+		_, err = fmt.Fprintf(c.App.ErrWriter, `Web Push keys generated. Add the following lines to your config file:
 
 web-push-public-key: %s
 web-push-private-key: %s
@@ -44,5 +64,6 @@ web-push-email-address: <email address>
 
 See https://ntfy.sh/docs/config/#web-push for details.
 `, publicKey, privateKey)
+	}
 	return err
 }

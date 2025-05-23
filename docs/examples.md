@@ -31,6 +31,12 @@ GitHub have been hopeless. In case it ever becomes available, I want to know imm
 */6 * * * * if curl -s https://api.github.com/users/ntfy | grep "Not Found"; then curl -d "github.com/ntfy is available" -H "Tags: tada" -H "Prio: high" ntfy.sh/my-alerts; fi
 ```
 
+You can also use [`ntfy-run`](https://github.com/quantum5/ntfy-run) to send the output of your cronjob in the
+notification, so that you know exactly why it failed:
+
+```
+0 0 * * * ntfy-run -n https://ntfy.sh/backups --success-priority low --failure-tags warning ~/backup-computer
+```
 
 ## Low disk space alerts
 Here's a simple cronjob that I use to alert me when the disk space on the root disk is running low. It's simple, but 
@@ -633,4 +639,57 @@ or by simply providing traccar with a valid username/password combination.
 ```xml
         <entry key='sms.http.user'>phil</entry>
         <entry key='sms.http.password'>mypass</entry>
+```
+
+## Terminal Notifications for Long-Running Commands
+
+This example provides a simple way to send notifications using [ntfy.sh](https://ntfy.sh) when a terminal command completes. It includes success or failure indicators based on the command's exit status.
+
+Store your ntfy.sh bearer token securely if access control is enabled:
+
+   ```sh
+   echo "your_bearer_token_here" > ~/.ntfy_token
+   chmod 600 ~/.ntfy_token
+   ```
+
+Add the following function and alias to your `.bashrc` or `.bash_profile`:
+
+   ```sh
+   # Function for alert notifications using ntfy.sh
+   notify_via_ntfy() {
+       local exit_status=$?  # Capture the exit status before doing anything else
+       local token=$(< ~/.ntfy_token)  # Securely read the token
+       local status_icon="$([ $exit_status -eq 0 ] && echo magic_wand || echo warning)"
+       local last_command=$(history | tail -n1 | sed -e 's/^[[:space:]]*[0-9]\{1,\}[[:space:]]*//' -e 's/[;&|][[:space:]]*alert$//')
+
+       curl -s -X POST "https://n.example.dev/alerts" \
+           -H "Authorization: Bearer $token" \
+           -H "Title: Terminal" \
+           -H "X-Priority: 3" \
+           -H "Tags: $status_icon" \
+           -d "Command: $last_command (Exit: $exit_status)"
+
+       echo "Tags: $status_icon"
+       echo "$last_command (Exit: $exit_status)"
+   }
+
+   # Add an "alert" alias for long running commands using ntfy.sh
+   alias alert='notify_via_ntfy'
+   ```
+
+Now you can run any long-running command and append `alert` to notify when it completes:
+
+```sh
+sleep 10; alert
+```
+![ntfy notifications on mobile device](static/img/mobile-screenshot-notification.png)
+
+**Notification Sent** with a success 🪄 (`magic_wand`) or failure ⚠️ (`warning`) tag.
+
+To test failure notifications:
+
+```sh
+false; alert  # Always fails (exit 1)
+ls --invalid; alert  # Invalid option
+cat nonexistent_file; alert  # File not found
 ```

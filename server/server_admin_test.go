@@ -20,7 +20,7 @@ func TestUser_AddRemove(t *testing.T) {
 	}))
 
 	// Create user via API
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "ben", "password":"ben"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"ben"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -67,7 +67,7 @@ func TestUser_ChangeUserPassword(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
 
 	// Create user via API
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password": "ben"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -79,7 +79,7 @@ func TestUser_ChangeUserPassword(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 
 	// Change password via API
-	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben-two", "force":true}`, map[string]string{
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben-two"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -106,7 +106,7 @@ func TestUser_DontChangeAdminPassword(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin))
 
 	// Try to change password via API
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "admin", "password": "admin-new", "force":true}`, map[string]string{
+	rr := request(t, s, "PUT", "/v1/users", `{"username": "admin", "password": "admin-new"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 403, rr.Code)
@@ -121,19 +121,19 @@ func TestUser_AddRemove_Failures(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 
 	// Cannot create user with invalid username
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "not valid", "password":"ben"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/users", `{"username": "not valid", "password":"ben"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 400, rr.Code)
 
 	// Cannot create user if user already exists
-	rr = request(t, s, "PUT", "/v1/users", `{"username": "phil", "password":"phil"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/users", `{"username": "phil", "password":"phil"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 40901, toHTTPError(t, rr.Body.String()).Code)
 
 	// Cannot create user with invalid tier
-	rr = request(t, s, "PUT", "/v1/users", `{"username": "emma", "password":"emma", "tier": "invalid"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/users", `{"username": "emma", "password":"emma", "tier": "invalid"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)

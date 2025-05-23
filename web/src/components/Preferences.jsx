@@ -592,6 +592,7 @@ const Language = () => {
           <MenuItem value="fi">Suomi</MenuItem>
           <MenuItem value="sv">Svenska</MenuItem>
           <MenuItem value="tr">Türkçe</MenuItem>
+          <MenuItem value="ta">தமிழ்</MenuItem>
         </Select>
       </FormControl>
     </Pref>

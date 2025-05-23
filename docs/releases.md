@@ -1413,6 +1413,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Note about fail2ban in Docker ([#1175](https://github.com/binwiederhier/ntfy/pull/1175)), thanks to [@Measurity](https://github.com/Measurity))
 * Lots of other tiny docs updates, tanks to everyone who contributed!
 
+**Languages**
+
+* Update new languages from Weblate. Thanks to all the contributors!
+* Added Tamil (தமிழ்) as a new language to the web app
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

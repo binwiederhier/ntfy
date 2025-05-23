@@ -5,6 +5,7 @@ There are quite a few projects that work with ntfy, integrate ntfy, or have been
 I've added a ⭐ to projects or posts that have a significant following, or had a lot of interaction by the community.
 
 ## Table of Contents
+
 - [Official integrations](#official-integrations)
 - [Integration via HTTP/SMTP/etc.](#integration-via-httpsmtpetc)
 - [UnifiedPush integrations](#unifiedpush-integrations)
@@ -38,6 +39,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [HetrixTools](https://docs.hetrixtools.com/ntfy-sh-notifications/) - Uptime monitoring
 - [EasyMorph](https://help.easymorph.com/doku.php?id=transformations:sendntfymessage) - Visual data transformation and automation tool
 - [Monibot](https://monibot.io/) - Monibot monitors your websites, servers and applications and notifies you if something goes wrong.
+- [Home Assistant](https://www.home-assistant.io/integrations/ntfy) - Home Assistant is an open-source platform for automating and controlling smart home devices.
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -76,6 +78,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [gotfy](https://github.com/AnthonyHewins/gotfy) - A Go wrapper for the ntfy API (Go)
 - [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
+- [aiontfy](https://github.com/tr4nt0r/aiontfy) - Asynchronous client library for publishing and subscribing to ntfy (Python)
 
 ## CLIs + GUIs
 

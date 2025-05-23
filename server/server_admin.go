@@ -74,8 +74,10 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 	req, err := readJSONWithLimit[apiUserAddOrUpdateRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
-	} else if !user.AllowedUsername(req.Username) || req.Password == "" {
-		return errHTTPBadRequest.Wrap("username invalid, or password missing")
+	} else if !user.AllowedUsername(req.Username) {
+		return errHTTPBadRequest.Wrap("username invalid")
+	} else if req.Password == "" && req.Tier == "" {
+		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\" or \"tier\"")
 	}
 	u, err := s.userManager.User(req.Username)
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
@@ -84,10 +86,15 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		if u.IsAdmin() {
 			return errHTTPForbidden
 		}
-		if err := s.userManager.ChangePassword(req.Username, req.Password); err != nil {
+		if req.Password != "" {
+			if err := s.userManager.ChangePassword(req.Username, req.Password); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := s.userManager.AddUser(req.Username, req.Password, user.RoleUser); err != nil {
 			return err
 		}
-		return s.writeJSON(w, newSuccessResponse())
 	}
 	var tier *user.Tier
 	if req.Tier != "" {
@@ -97,9 +104,6 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		} else if err != nil {
 			return err
 		}
-	}
-	if err := s.userManager.AddUser(req.Username, req.Password, user.RoleUser); err != nil {
-		return err
 	}
 	if tier != nil {
 		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {

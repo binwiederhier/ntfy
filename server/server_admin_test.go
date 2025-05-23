@@ -57,6 +57,12 @@ func TestUser_AddRemove(t *testing.T) {
 	require.Equal(t, "phil", users[0].Name)
 	require.Equal(t, "emma", users[1].Name)
 	require.Equal(t, user.Everyone, users[2].Name)
+
+	// Reject invalid user change
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 400, rr.Code)
 }
 
 func TestUser_ChangeUserPassword(t *testing.T) {
@@ -95,6 +101,46 @@ func TestUser_ChangeUserPassword(t *testing.T) {
 		"Authorization": util.BasicAuth("ben", "ben-two"),
 	})
 	require.Equal(t, 200, rr.Code)
+}
+
+func TestUser_ChangeUserTier(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin, tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier1",
+	}))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier2",
+	}))
+
+	// Create user with tier via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"ben", "tier": "tier1"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users
+	users, err := s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, "ben", users[1].Name)
+	require.Equal(t, user.RoleUser, users[1].Role)
+	require.Equal(t, "tier1", users[1].Tier.Code)
+
+	// Change user tier via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "tier": "tier2"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users again
+	users, err = s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, "tier2", users[1].Tier.Code)
 }
 
 func TestUser_DontChangeAdminPassword(t *testing.T) {

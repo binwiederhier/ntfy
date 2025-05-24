@@ -97,6 +97,8 @@
   "notifications_none_for_any_description": "To send notifications to a topic, simply PUT or POST to the topic URL. Here's an example using one of your topics.",
   "notifications_no_subscriptions_title": "It looks like you don't have any subscriptions yet.",
   "notifications_no_subscriptions_description": "Click the \"{{linktext}}\" link to create or subscribe to a topic. After that, you can send messages via PUT or POST and you'll receive notifications here.",
+  "notifications_no_subscriptions_login_title": "This page requires a Login.",
+  "notifications_no_subscriptions_login_description": "Click \"{{linktext}}\" to login into your account.",
   "notifications_example": "Example",
   "notifications_more_details": "For more information, check out the <websiteLink>website</websiteLink> or <docsLink>documentation</docsLink>.",
   "display_name_dialog_title": "Change display name",

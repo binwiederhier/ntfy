@@ -212,7 +212,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
-	_, err := s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-7*24*time.Hour).Unix())
+	_, err := s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-55*24*time.Hour).Unix())
 	require.Nil(t, err)
 
 	s.pruneAndNotifyWebPushSubscriptions()
@@ -222,7 +222,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 		return received.Load()
 	})
 
-	_, err = s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-9*24*time.Hour).Unix())
+	_, err = s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-60*24*time.Hour).Unix())
 	require.Nil(t, err)
 
 	s.pruneAndNotifyWebPushSubscriptions()

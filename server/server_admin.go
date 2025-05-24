@@ -70,6 +70,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
+
 func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiUserAddOrUpdateRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
@@ -96,16 +97,12 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 			return err
 		}
 	}
-	var tier *user.Tier
 	if req.Tier != "" {
-		tier, err = s.userManager.Tier(req.Tier)
-		if errors.Is(err, user.ErrTierNotFound) {
+		if _, err = s.userManager.Tier(req.Tier); errors.Is(err, user.ErrTierNotFound) {
 			return errHTTPBadRequestTierInvalid
 		} else if err != nil {
 			return err
 		}
-	}
-	if tier != nil {
 		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {
 			return err
 		}

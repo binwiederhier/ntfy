@@ -253,7 +253,7 @@ type apiStatsResponse struct {
 	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
 }
 
-type apiUserAddRequest struct {
+type apiUserAddOrUpdateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Tier     string `json:"tier"`

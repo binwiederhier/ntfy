@@ -446,8 +446,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
-	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersUpdate)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {

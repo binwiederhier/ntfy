@@ -20,7 +20,7 @@ func TestUser_AddRemove(t *testing.T) {
 	}))
 
 	// Create user via API
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "ben", "password":"ben"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"ben"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
@@ -49,6 +49,165 @@ func TestUser_AddRemove(t *testing.T) {
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 200, rr.Code)
+
+	// Check user was deleted
+	users, err = s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, "emma", users[1].Name)
+	require.Equal(t, user.Everyone, users[2].Name)
+
+	// Reject invalid user change
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 400, rr.Code)
+}
+
+func TestUser_ChangeUserPassword(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+
+	// Create user via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password": "ben"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Try to login with first password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Change password via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "password": "ben-two"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Make sure first password fails
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 401, rr.Code)
+
+	// Try to login with second password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben-two"),
+	})
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestUser_ChangeUserTier(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin, tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier1",
+	}))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier2",
+	}))
+
+	// Create user with tier via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"ben", "tier": "tier1"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users
+	users, err := s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, "ben", users[1].Name)
+	require.Equal(t, user.RoleUser, users[1].Role)
+	require.Equal(t, "tier1", users[1].Tier.Code)
+
+	// Change user tier via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "tier": "tier2"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users again
+	users, err = s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, "tier2", users[1].Tier.Code)
+}
+
+func TestUser_ChangeUserPasswordAndTier(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin, tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier1",
+	}))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "tier2",
+	}))
+
+	// Create user with tier via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"ben", "tier": "tier1"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users
+	users, err := s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, "ben", users[1].Name)
+	require.Equal(t, user.RoleUser, users[1].Role)
+	require.Equal(t, "tier1", users[1].Tier.Code)
+
+	// Change user password and tier via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "password":"ben-two", "tier": "tier2"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Make sure first password fails
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 401, rr.Code)
+
+	// Try to login with second password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben-two"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check new tier
+	users, err = s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, "tier2", users[1].Tier.Code)
+}
+
+func TestUser_DontChangeAdminPassword(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin))
+
+	// Try to change password via API
+	rr := request(t, s, "PUT", "/v1/users", `{"username": "admin", "password": "admin-new"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 403, rr.Code)
 }
 
 func TestUser_AddRemove_Failures(t *testing.T) {
@@ -60,19 +219,19 @@ func TestUser_AddRemove_Failures(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
 
 	// Cannot create user with invalid username
-	rr := request(t, s, "PUT", "/v1/users", `{"username": "not valid", "password":"ben"}`, map[string]string{
+	rr := request(t, s, "POST", "/v1/users", `{"username": "not valid", "password":"ben"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 400, rr.Code)
 
 	// Cannot create user if user already exists
-	rr = request(t, s, "PUT", "/v1/users", `{"username": "phil", "password":"phil"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/users", `{"username": "phil", "password":"phil"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 40901, toHTTPError(t, rr.Body.String()).Code)
 
 	// Cannot create user with invalid tier
-	rr = request(t, s, "PUT", "/v1/users", `{"username": "emma", "password":"emma", "tier": "invalid"}`, map[string]string{
+	rr = request(t, s, "POST", "/v1/users", `{"username": "emma", "password":"emma", "tier": "invalid"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 	})
 	require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)

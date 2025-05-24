@@ -1387,6 +1387,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Security updates for dependencies and Docker images ([#1341](https://github.com/binwiederhier/ntfy/pull/1341))
+* Upgrade to Vite 6 ([#1342](https://github.com/binwiederhier/ntfy/pull/1342), thanks Dependabot)
 * Fix iOS delivery issues for read-protected topics ([#1207](https://github.com/binwiederhier/ntfy/pull/1287), thanks a lot to [@barart](https://github.com/barart)!)
 * Add `Date` header to outgoing emails to avoid rejection ([#1141](https://github.com/binwiederhier/ntfy/pull/1141), thanks to [@pcouy](https://github.com/pcouy))
 * Fix IP address parsing when behind a proxy ([#1266](https://github.com/binwiederhier/ntfy/pull/1266), thanks to [@mmatuska](https://github.com/mmatuska))

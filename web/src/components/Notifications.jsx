@@ -640,12 +640,16 @@ const NoSubscriptions = () => {
         {!session.exists() && config.require_login && t("notifications_no_subscriptions_login_title")}
       </Typography>
       <Paragraph>
-        {!session.exists() && !config.require_login && t("notifications_no_subscriptions_description", {
-          linktext: t("nav_button_subscribe"),
-        })}
-        {!session.exists() && config.require_login && t("notifications_no_subscriptions_login_description", {
-          linktext: t("action_bar_sign_in"),
-        })}
+        {!session.exists() &&
+          !config.require_login &&
+          t("notifications_no_subscriptions_description", {
+            linktext: t("nav_button_subscribe"),
+          })}
+        {!session.exists() &&
+          config.require_login &&
+          t("notifications_no_subscriptions_login_description", {
+            linktext: t("action_bar_sign_in"),
+          })}
       </Paragraph>
       <Paragraph>
         <ForMoreDetails />

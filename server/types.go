@@ -401,13 +401,13 @@ type apiConfigResponse struct {
 	BaseURL            string   `json:"base_url"`
 	AppRoot            string   `json:"app_root"`
 	EnableLogin        bool     `json:"enable_login"`
+	RequireLogin       bool     `json:"require_login"`
 	EnableSignup       bool     `json:"enable_signup"`
 	EnablePayments     bool     `json:"enable_payments"`
 	EnableCalls        bool     `json:"enable_calls"`
 	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
 	EnableWebPush      bool     `json:"enable_web_push"`
-	RequireLogin       bool     `json:"require_login"`
 	BillingContact     string   `json:"billing_contact"`
 	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`

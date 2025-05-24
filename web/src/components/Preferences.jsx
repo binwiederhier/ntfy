@@ -66,20 +66,20 @@ const maybeUpdateAccountSettings = async (payload) => {
 };
 
 const Preferences = () => {
-  if (!session.exists() or !config.requireLogin) {
+  if (!session.exists() || !config.require_login) {
     window.location.href = routes.app;
     return <></>;
   }
-    return (
-        <Container maxWidth="md" sx={{ marginTop: 3, marginBottom: 3 }}>
-            <Stack spacing={3}>
-              <Notifications />
-              <Reservations />
-              <Users />
-              <Appearance />
-            </Stack>
-        </Container>
-    );
+  return (
+    <Container maxWidth="md" sx={{ marginTop: 3, marginBottom: 3 }}>
+      <Stack spacing={3}>
+        <Notifications />
+        <Reservations />
+        <Users />
+        <Appearance />
+      </Stack>
+    </Container>
+  );
 };
 
 const Notifications = () => {

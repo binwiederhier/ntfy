@@ -159,6 +159,7 @@ func execServe(c *cli.Context) error {
 	webRoot := c.String("web-root")
 	enableSignup := c.Bool("enable-signup")
 	enableLogin := c.Bool("enable-login")
+	requireLogin := c.Bool("require-login")
 	enableReservations := c.Bool("enable-reservations")
 	upstreamBaseURL := c.String("upstream-base-url")
 	upstreamAccessToken := c.String("upstream-access-token")
@@ -408,6 +409,7 @@ func execServe(c *cli.Context) error {
 	conf.BillingContact = billingContact
 	conf.EnableSignup = enableSignup
 	conf.EnableLogin = enableLogin
+	conf.RequireLogin = requireLogin
 	conf.EnableReservations = enableReservations
 	conf.EnableMetrics = enableMetrics
 	conf.MetricsListenHTTP = metricsListenHTTP

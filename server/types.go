@@ -105,6 +105,8 @@ type publishMessage struct {
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
 	Call     string   `json:"call"`
+	Cache    string   `json:"cache"`    // use string as it defaults to true (or use &bool instead)
+	Firebase string   `json:"firebase"` // use string as it defaults to true (or use &bool instead)
 	Delay    string   `json:"delay"`
 }
 

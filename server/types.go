@@ -256,6 +256,7 @@ type apiStatsResponse struct {
 type apiUserAddOrUpdateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Hash     string `json:"hash"`
 	Tier     string `json:"tier"`
 	// Do not add 'role' here. We don't want to add admins via the API.
 }

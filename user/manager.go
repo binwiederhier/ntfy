@@ -868,10 +868,8 @@ func (a *Manager) AddUser(username, password string, role Role, hashed bool) err
 	if !AllowedUsername(username) || !AllowedRole(role) {
 		return ErrInvalidArgument
 	}
-
 	var hash []byte
 	var err error = nil
-
 	if hashed {
 		hash = []byte(password)
 	} else {
@@ -880,7 +878,6 @@ func (a *Manager) AddUser(username, password string, role Role, hashed bool) err
 			return err
 		}
 	}
-
 	userID := util.RandomStringPrefix(userIDPrefix, userIDLength)
 	syncTopic, now := util.RandomStringPrefix(syncTopicPrefix, syncTopicLength), time.Now().Unix()
 	if _, err = a.db.Exec(insertUserQuery, userID, username, hash, role, syncTopic, now); err != nil {

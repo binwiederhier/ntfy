@@ -65,12 +65,41 @@ func TestUser_AddRemove(t *testing.T) {
 	require.Equal(t, 400, rr.Code)
 }
 
+func TestUser_AddWithPasswordHash(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+
+	// Create user via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "hash":"$2a$04$2aPIIqPXQU16OfkSUZH1XOzpu1gsPRKkrfVdFLgWQ.tqb.vtTCuVe"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check that user can login with password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Check users
+	users, err := s.userManager.Users()
+	require.Nil(t, err)
+	require.Equal(t, 3, len(users))
+	require.Equal(t, "phil", users[0].Name)
+	require.Equal(t, user.RoleAdmin, users[0].Role)
+	require.Equal(t, "ben", users[1].Name)
+	require.Equal(t, user.RoleUser, users[1].Role)
+}
+
 func TestUser_ChangeUserPassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
 	// Create admin
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 
 	// Create user via API
 	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password": "ben"}`, map[string]string{
@@ -108,7 +137,7 @@ func TestUser_ChangeUserTier(t *testing.T) {
 	defer s.closeDatabases()
 
 	// Create admin, tier
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code: "tier1",
 	}))
@@ -148,7 +177,7 @@ func TestUser_ChangeUserPasswordAndTier(t *testing.T) {
 	defer s.closeDatabases()
 
 	// Create admin, tier
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code: "tier1",
 	}))
@@ -195,13 +224,45 @@ func TestUser_ChangeUserPasswordAndTier(t *testing.T) {
 	require.Equal(t, "tier2", users[1].Tier.Code)
 }
 
+func TestUser_ChangeUserPasswordWithHash(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithAuthFile(t))
+	defer s.closeDatabases()
+
+	// Create admin
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+
+	// Create user with tier via API
+	rr := request(t, s, "POST", "/v1/users", `{"username": "ben", "password":"not-ben"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Try to login with first password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "not-ben"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Change user password and tier via API
+	rr = request(t, s, "PUT", "/v1/users", `{"username": "ben", "hash":"$2a$04$2aPIIqPXQU16OfkSUZH1XOzpu1gsPRKkrfVdFLgWQ.tqb.vtTCuVe"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// Try to login with second password
+	rr = request(t, s, "POST", "/v1/account/token", "", map[string]string{
+		"Authorization": util.BasicAuth("ben", "ben"),
+	})
+	require.Equal(t, 200, rr.Code)
+}
+
 func TestUser_DontChangeAdminPassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
 	// Create admin
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin, false))
 
 	// Try to change password via API
 	rr := request(t, s, "PUT", "/v1/users", `{"username": "admin", "password": "admin-new"}`, map[string]string{

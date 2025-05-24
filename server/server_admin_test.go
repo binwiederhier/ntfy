@@ -14,7 +14,7 @@ func TestUser_AddRemove(t *testing.T) {
 	defer s.closeDatabases()
 
 	// Create admin, tier
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code: "tier1",
 	}))
@@ -215,8 +215,8 @@ func TestUser_AddRemove_Failures(t *testing.T) {
 	defer s.closeDatabases()
 
 	// Create admin
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 
 	// Cannot create user with invalid username
 	rr := request(t, s, "POST", "/v1/users", `{"username": "not valid", "password":"ben"}`, map[string]string{
@@ -256,8 +256,8 @@ func TestAccess_AllowReset(t *testing.T) {
 	defer s.closeDatabases()
 
 	// User and admin
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 
 	// Subscribing not allowed
 	rr := request(t, s, "GET", "/gold/json?poll=1", "", map[string]string{
@@ -297,7 +297,7 @@ func TestAccess_AllowReset_NonAdminAttempt(t *testing.T) {
 	defer s.closeDatabases()
 
 	// User
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 
 	// Grant access fails, because non-admin
 	rr := request(t, s, "POST", "/v1/users/access", `{"username": "ben", "topic":"gold", "permission":"ro"}`, map[string]string{
@@ -313,8 +313,8 @@ func TestAccess_AllowReset_KillConnection(t *testing.T) {
 	defer s.closeDatabases()
 
 	// User and admin, grant access to "gol*" topics
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "gol*", user.PermissionRead)) // Wildcard!
 
 	start, timeTaken := time.Now(), atomic.Int64{}

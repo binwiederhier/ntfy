@@ -87,9 +87,9 @@ func TestAccount_Signup_AsUser(t *testing.T) {
 	defer s.closeDatabases()
 
 	log.Info("1")
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	log.Info("2")
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	log.Info("3")
 	rr := request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"emma"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -174,7 +174,7 @@ func TestAccount_ChangeSettings(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	u, _ := s.userManager.User("phil")
 	token, _ := s.userManager.CreateToken(u.ID, "", time.Unix(0, 0), netip.IPv4Unspecified())
 
@@ -203,7 +203,7 @@ func TestAccount_Subscription_AddUpdateDelete(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	rr := request(t, s, "POST", "/v1/account/subscription", `{"base_url": "http://abc.com", "topic": "def"}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -254,7 +254,7 @@ func TestAccount_ChangePassword(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	rr := request(t, s, "POST", "/v1/account/password", `{"password": "WRONG", "new_password": ""}`, map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -296,7 +296,7 @@ func TestAccount_ExtendToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -332,7 +332,7 @@ func TestAccount_ExtendToken_NoTokenProvided(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	rr := request(t, s, "PATCH", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"), // Not Bearer!
@@ -345,7 +345,7 @@ func TestAccount_DeleteToken(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 	defer s.closeDatabases()
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	rr := request(t, s, "POST", "/v1/account/token", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -455,14 +455,14 @@ func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 		Code:             "pro",
 		ReservationLimit: 2,
 	}))
-	require.Nil(t, s.userManager.AddUser("noadmin1", "pass", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("noadmin1", "pass", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("noadmin1", "pro"))
 	require.Nil(t, s.userManager.AddReservation("noadmin1", "mytopic", user.PermissionDenyAll))
 
-	require.Nil(t, s.userManager.AddUser("noadmin2", "pass", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("noadmin2", "pass", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("noadmin2", "pro"))
 
-	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "adminpass", user.RoleAdmin, false))
 
 	// Admin can reserve topic
 	rr := request(t, s, "POST", "/v1/account/reservation", `{"topic":"sometopic","everyone":"deny-all"}`, map[string]string{
@@ -624,7 +624,7 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	s := newTestServer(t, conf)
 
 	// Create user with tier
-	require.Nil(t, s.userManager.AddUser("phil", "mypass", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "mypass", user.RoleUser, false))
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code:                     "pro",
 		MessageLimit:             20,

@@ -96,7 +96,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	config.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, config)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
 	response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{
@@ -126,7 +126,7 @@ func TestServer_WebPush_DeleteAccountUnsubscribe(t *testing.T) {
 	config := configureAuth(t, newTestConfigWithWebPush(t))
 	s := newTestServer(t, config)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
 	response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{

@@ -287,6 +287,7 @@ services:
     image: binwiederhier/ntfy
     container_name: ntfy
     command:
+      - ntfy
       - serve
     environment:
       - TZ=UTC    # optional: set desired timezone
@@ -340,7 +341,7 @@ unmanned pod.
           containers:
           - name: ntfy
             image: binwiederhier/ntfy
-            args: ["serve"]
+            args: ["ntfy", "serve"]
             resources:
               limits:
                 memory: "128Mi"
@@ -389,7 +390,7 @@ unmanned pod.
           containers:
           - name: ntfy
             image: binwiederhier/ntfy
-            args: ["serve", "--cache-file", "/var/cache/ntfy/cache.db"]
+            args: ["ntfy", "serve", "--cache-file", "/var/cache/ntfy/cache.db"]
             ports:
             - containerPort: 80
               name: http
@@ -424,7 +425,7 @@ unmanned pod.
       containers:
       - name: ntfy
         image: binwiederhier/ntfy
-        args: ["serve"]
+        args: ["ntfy", "serve"]
         resources:
           limits:
             memory: "128Mi"
@@ -519,7 +520,7 @@ kubectl apply -k /ntfy
           containers:
             - name: ntfy 
               image: binwiederhier/ntfy:v1.28.0 # set deployed version
-              args: ["serve"]
+              args: ["ntfy", "serve"]
               env:  #example of adjustments made in environmental variables
                 - name: TZ # set timezone
                   value: XXXXXXX

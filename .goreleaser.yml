@@ -90,6 +90,8 @@ nfpms:
         type: "config|noreplace"
       - src: client/ntfy-client.service
         dst: /lib/systemd/system/ntfy-client.service
+      - src: client/user/ntfy-client.service
+        dst: /lib/systemd/user/ntfy-client.service
       - dst: /var/cache/ntfy
         type: dir
       - dst: /var/cache/ntfy/attachments
@@ -119,6 +121,7 @@ archives:
       - server/ntfy.service
       - client/client.yml
       - client/ntfy-client.service
+      - client/user/ntfy-client.service
   -
     id: ntfy_windows
     builds:

@@ -60,7 +60,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 			return err
 		}
 	}
-	if err := s.userManager.AddUser(req.Username, req.Password, user.RoleUser); err != nil {
+	if err := s.userManager.AddUser(req.Username, req.Password, user.RoleUser, false); err != nil {
 		return err
 	}
 	if tier != nil {

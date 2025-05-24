@@ -18,9 +18,9 @@ const minBcryptTimingMillis = int64(50) // Ideally should be >100ms, but this sh
 
 func TestManager_FullScenario_Default_DenyAll(t *testing.T) {
 	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AddUser("john", "john", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+	require.Nil(t, a.AddUser("john", "john", RoleUser, false))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "writeme", PermissionWrite))
@@ -134,7 +134,7 @@ func TestManager_Access_Order_LengthWriteRead(t *testing.T) {
 	// and longer ACL rules are prioritized as well.
 
 	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	require.Nil(t, a.AllowAccess("ben", "test*", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess("ben", "*", PermissionRead))
 
@@ -147,20 +147,20 @@ func TestManager_Access_Order_LengthWriteRead(t *testing.T) {
 
 func TestManager_AddUser_Invalid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Equal(t, ErrInvalidArgument, a.AddUser("  invalid  ", "pass", RoleAdmin))
-	require.Equal(t, ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role"))
+	require.Equal(t, ErrInvalidArgument, a.AddUser("  invalid  ", "pass", RoleAdmin, false))
+	require.Equal(t, ErrInvalidArgument, a.AddUser("validuser", "pass", "invalid-role", false))
 }
 
 func TestManager_AddUser_Timing(t *testing.T) {
 	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
 	start := time.Now().UnixMilli()
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, false))
 	require.GreaterOrEqual(t, time.Now().UnixMilli()-start, minBcryptTimingMillis)
 }
 
 func TestManager_AddUser_And_Query(t *testing.T) {
 	a := newTestManagerFromFile(t, filepath.Join(t.TempDir(), "user.db"), "", PermissionDenyAll, DefaultUserPasswordBcryptCost, DefaultUserStatsQueueWriterInterval)
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, false))
 	require.Nil(t, a.ChangeBilling("user", &Billing{
 		StripeCustomerID:            "acct_123",
 		StripeSubscriptionID:        "sub_123",
@@ -187,7 +187,7 @@ func TestManager_MarkUserRemoved_RemoveDeletedUsers(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
 	// Create user, add reservations and token
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, false))
 	require.Nil(t, a.AddReservation("user", "mytopic", PermissionRead))
 
 	u, err := a.User("user")
@@ -237,7 +237,7 @@ func TestManager_CreateToken_Only_Lower(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
 	// Create user, add reservations and token
-	require.Nil(t, a.AddUser("user", "pass", RoleAdmin))
+	require.Nil(t, a.AddUser("user", "pass", RoleAdmin, false))
 	u, err := a.User("user")
 	require.Nil(t, err)
 
@@ -248,8 +248,8 @@ func TestManager_CreateToken_Only_Lower(t *testing.T) {
 
 func TestManager_UserManagement(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "writeme", PermissionWrite))
@@ -339,21 +339,31 @@ func TestManager_UserManagement(t *testing.T) {
 
 func TestManager_ChangePassword(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin))
+	require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, false))
+	require.Nil(t, a.AddUser("jane", "$2b$10$OyqU72muEy7VMd1SAU2Iru5IbeSMgrtCGHu/fWLmxL1MwlijQXWbG", RoleUser, true))
 
 	_, err := a.Authenticate("phil", "phil")
 	require.Nil(t, err)
 
-	require.Nil(t, a.ChangePassword("phil", "newpass"))
+	_, err = a.Authenticate("jane", "jane")
+	require.Nil(t, err)
+
+	require.Nil(t, a.ChangePassword("phil", "newpass", false))
 	_, err = a.Authenticate("phil", "phil")
 	require.Equal(t, ErrUnauthenticated, err)
 	_, err = a.Authenticate("phil", "newpass")
+	require.Nil(t, err)
+
+	require.Nil(t, a.ChangePassword("jane", "$2b$10$CNaCW.q1R431urlbQ5Drh.zl48TiiOeJSmZgfcswkZiPbJGQ1ApSS", true))
+	_, err = a.Authenticate("jane", "jane")
+	require.Equal(t, ErrUnauthenticated, err)
+	_, err = a.Authenticate("jane", "newpass")
 	require.Nil(t, err)
 }
 
 func TestManager_ChangeRole(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	require.Nil(t, a.AllowAccess("ben", "mytopic", PermissionReadWrite))
 	require.Nil(t, a.AllowAccess("ben", "readme", PermissionRead))
 
@@ -378,8 +388,8 @@ func TestManager_ChangeRole(t *testing.T) {
 
 func TestManager_Reservations(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	require.Nil(t, a.AddReservation("ben", "ztopic_", PermissionDenyAll))
 	require.Nil(t, a.AddReservation("ben", "readme", PermissionRead))
 	require.Nil(t, a.AllowAccess("ben", "something-else", PermissionRead))
@@ -460,7 +470,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 		AttachmentTotalSizeLimit: 524288000,
 		AttachmentExpiryDuration: 24 * time.Hour,
 	}))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	require.Nil(t, a.ChangeTier("ben", "pro"))
 	require.Nil(t, a.AddReservation("ben", "mytopic", PermissionDenyAll))
 
@@ -507,7 +517,7 @@ func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 
 func TestManager_Token_Valid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	u, err := a.User("ben")
 	require.Nil(t, err)
@@ -551,7 +561,7 @@ func TestManager_Token_Valid(t *testing.T) {
 
 func TestManager_Token_Invalid(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	u, err := a.AuthenticateToken(strings.Repeat("x", 32)) // 32 == token length
 	require.Nil(t, u)
@@ -570,7 +580,7 @@ func TestManager_Token_NotFound(t *testing.T) {
 
 func TestManager_Token_Expire(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	u, err := a.User("ben")
 	require.Nil(t, err)
@@ -618,7 +628,7 @@ func TestManager_Token_Expire(t *testing.T) {
 
 func TestManager_Token_Extend(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	// Try to extend token for user without token
 	u, err := a.User("ben")
@@ -647,8 +657,8 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	// Tests that tokens are automatically deleted when the maximum number of tokens is reached
 
 	a := newTestManager(t, PermissionDenyAll)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
 
 	ben, err := a.User("ben")
 	require.Nil(t, err)
@@ -723,7 +733,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 func TestManager_EnqueueStats_ResetStats(t *testing.T) {
 	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
 	require.Nil(t, err)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	// Baseline: No messages or emails
 	u, err := a.User("ben")
@@ -765,7 +775,7 @@ func TestManager_EnqueueStats_ResetStats(t *testing.T) {
 func TestManager_EnqueueTokenUpdate(t *testing.T) {
 	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 500*time.Millisecond)
 	require.Nil(t, err)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	// Create user and token
 	u, err := a.User("ben")
@@ -798,7 +808,7 @@ func TestManager_EnqueueTokenUpdate(t *testing.T) {
 func TestManager_ChangeSettings(t *testing.T) {
 	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
 	require.Nil(t, err)
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
 	// No settings
 	u, err := a.User("ben")
@@ -866,7 +876,7 @@ func TestManager_Tier_Create_Update_List_Delete(t *testing.T) {
 		AttachmentBandwidthLimit: 21474836480,
 		StripeMonthlyPriceID:     "price_2",
 	}))
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
 	require.Nil(t, a.ChangeTier("phil", "pro"))
 
 	ti, err := a.Tier("pro")
@@ -981,7 +991,7 @@ func TestManager_Tier_Change_And_Reset(t *testing.T) {
 		Name:             "Pro",
 		ReservationLimit: 4,
 	}))
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
 	require.Nil(t, a.ChangeTier("phil", "pro"))
 
 	// Add 10 reservations (pro tier allows that)
@@ -1007,7 +1017,7 @@ func TestManager_Tier_Change_And_Reset(t *testing.T) {
 func TestUser_PhoneNumberAddListRemove(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
 	phil, err := a.User("phil")
 	require.Nil(t, err)
 	require.Nil(t, a.AddPhoneNumber(phil.ID, "+1234567890"))
@@ -1032,8 +1042,8 @@ func TestUser_PhoneNumberAddListRemove(t *testing.T) {
 func TestUser_PhoneNumberAdd_Multiple_Users_Same_Number(t *testing.T) {
 	a := newTestManager(t, PermissionDenyAll)
 
-	require.Nil(t, a.AddUser("phil", "phil", RoleUser))
-	require.Nil(t, a.AddUser("ben", "ben", RoleUser))
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 	phil, err := a.User("phil")
 	require.Nil(t, err)
 	ben, err := a.User("ben")

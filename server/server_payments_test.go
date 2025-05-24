@@ -148,7 +148,7 @@ func TestPayments_SubscriptionCreate_NotAStripeCustomer_Success(t *testing.T) {
 		Code:                 "pro",
 		StripeMonthlyPriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	// Create subscription
 	response := request(t, s, "POST", "/v1/account/billing/subscription", `{"tier": "pro", "interval": "month"}`, map[string]string{
@@ -184,7 +184,7 @@ func TestPayments_SubscriptionCreate_StripeCustomer_Success(t *testing.T) {
 		Code:                 "pro",
 		StripeMonthlyPriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -226,7 +226,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 		Code:                 "pro",
 		StripeMonthlyPriceID: "price_123",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -280,7 +280,7 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		MessageLimit:          220, // 220 * 5% = 11 requests before rate limiting kicks in
 		MessageExpiryDuration: time.Hour,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser)) // No tier
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false)) // No tier
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 
@@ -461,7 +461,7 @@ func TestPayments_Webhook_Subscription_Updated_Downgrade_From_PastDue_To_Active(
 		AttachmentTotalSizeLimit: 1000000,
 		AttachmentBandwidthLimit: 1000000,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll))
 	require.Nil(t, s.userManager.AddReservation("phil", "ztopic", user.PermissionDenyAll))
@@ -570,7 +570,7 @@ func TestPayments_Webhook_Subscription_Deleted(t *testing.T) {
 		StripeMonthlyPriceID: "price_1234",
 		ReservationLimit:     1,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll))
 
@@ -658,7 +658,7 @@ func TestPayments_Subscription_Update_Different_Tier(t *testing.T) {
 		StripeMonthlyPriceID: "price_456",
 		StripeYearlyPriceID:  "price_457",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
 		StripeCustomerID:     "acct_123",
@@ -690,7 +690,7 @@ func TestPayments_Subscription_Delete_At_Period_End(t *testing.T) {
 		Return(&stripe.Subscription{}, nil)
 
 	// Create user
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
 		StripeCustomerID:     "acct_123",
 		StripeSubscriptionID: "sub_123",
@@ -724,7 +724,7 @@ func TestPayments_CreatePortalSession(t *testing.T) {
 		}, nil)
 
 	// Create user
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeBilling("phil", &user.Billing{
 		StripeCustomerID:     "acct_123",
 		StripeSubscriptionID: "sub_123",

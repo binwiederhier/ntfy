@@ -23,7 +23,7 @@ If you want to chat, simply join the Discord server (https://discord.gg/cT7ECsZj
 the Matrix room (https://matrix.to/#/#ntfy:matrix.org).
 
 ntfy %s (%s), runtime %s, built at %s
-Copyright (C) 2022 Philipp C. Heckel, licensed under Apache License 2.0 & GPLv2
+Copyright (C) Philipp C. Heckel, licensed under Apache License 2.0 & GPLv2
 `, version, commit[:7], runtime.Version(), date)
 
 	app := cmd.New()

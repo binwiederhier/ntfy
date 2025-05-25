@@ -40,16 +40,5 @@ if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
         systemctl restart ntfy-client.service >/dev/null || true
       fi
     fi
-    
-    # inform user about systemd user service
-    echo
-    echo "------------------------------------------------------------------------"
-    echo "ntfy includes a systemd user service."
-    echo "To enable it, run following commands as your regular user (not as root):"
-    echo
-    echo "  systemctl --user enable ntfy-client.service"
-    echo "  systemctl --user start ntfy-client.service"
-    echo "------------------------------------------------------------------------"
-    echo
   fi
 fi

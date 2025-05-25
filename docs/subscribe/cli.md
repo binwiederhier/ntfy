@@ -190,6 +190,10 @@ Here's an example config file that subscribes to three different topics, executi
 
 === "~/.config/ntfy/client.yml (Linux)"
     ```yaml
+    default-host: https://ntfy.sh
+    default-user: phill
+    default-password: mypass
+
     subscribe:
     - topic: echo-this
       command: 'echo "Message received: $message"'
@@ -210,9 +214,12 @@ Here's an example config file that subscribes to three different topics, executi
             fi
     ```
 
-
 === "~/Library/Application Support/ntfy/client.yml (macOS)"
     ```yaml
+    default-host: https://ntfy.sh
+    default-user: phill
+    default-password: mypass
+
     subscribe:
       - topic: echo-this
         command: 'echo "Message received: $message"'
@@ -226,6 +233,10 @@ Here's an example config file that subscribes to three different topics, executi
 
 === "%AppData%\ntfy\client.yml (Windows)"
     ```yaml
+    default-host: https://ntfy.sh
+    default-user: phill
+    default-password: mypass
+
     subscribe:
     - topic: echo-this
       command: 'echo Message received: %message%'
@@ -264,19 +275,30 @@ will be used, otherwise, the subscription settings will override the defaults.
 
 ### Using the systemd service
 You can use the `ntfy-client` systemd services to subscribe to multiple topics just like in the example above.
-You have the option of either enabling `ntfy-client` as a system service (see
-[here](https://github.com/binwiederhier/ntfy/blob/main/client/ntfy-client.service))
-or user service (see [here](https://github.com/binwiederhier/ntfy/blob/main/client/user/ntfy-client.service)).
-The services are automatically installed (but not started) if you install the deb/rpm/AUR package.
-The system service ensures that ntfy is run at startup (useful for servers),
-while the user service starts ntfy only after the user has logged in. The user service is recommended for personal machine use.
 
-To configure `ntfy-client` as a system service it, edit `/etc/ntfy/client.yml` and run `sudo systemctl restart ntfy-client`.
+You have the option of either enabling `ntfy-client` as a **system service** (see [here](https://github.com/binwiederhier/ntfy/blob/main/client/ntfy-client.service))
+or **user service** (see [here](https://github.com/binwiederhier/ntfy/blob/main/client/user/ntfy-client.service)). Neither system service nor user service are enabled or started by default, so you have to do that yourself.
 
-To configure `ntfy-client` as a user service it, edit `~/.config/ntfy/client.yml` and run `systemctl --user restart ntfy-client` (without sudo).
+**System service:** The `ntfy-client` systemd system service runs as the `ntfy` user. When enabled, it is started at system boot. To configure it as a system
+service, edit `/etc/ntfy/client.yml` and then enable/start the service (as root), like so:
 
-!!! info
-    The system service runs as user `ntfy`, meaning that typical Linux permission restrictions apply. It also means that the system service cannot run commands in your X session as the primary machine user (unlike the user service).
+```
+sudo systemctl enable ntfy-client
+sudo systemctl restart ntfy-client
+```
+
+The system service runs as user `ntfy`, meaning that typical Linux permission restrictions apply. It also means that the system service cannot run commands in your X session as the primary machine user (unlike the user service).
+
+**User service:** The `ntfy-client` user service is run when the user logs into their desktop environment. To enable/start it, edit `~/.config/ntfy/client.yml` and
+run the following commands (without sudo!):
+
+```
+systemctl --user enable ntfy-client
+systemctl --user restart ntfy-client
+```
+
+Unlike the system service, the user service can interact with the user's desktop environment, and run commands like `notify-send` to display desktop notifications.
+It can also run commands that require access to the user's home directory, such as `gnome-calculator`.
 
 ### Authentication
 Depending on whether the server is configured to support [access control](../config.md#access-control), some topics

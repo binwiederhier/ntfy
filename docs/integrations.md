@@ -45,7 +45,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 - [Watchtower](https://containrrr.dev/watchtower/) ⭐ - Automating Docker container base image updates (see [integration example](examples.md#watchtower-shoutrrr))
 - [Jellyfin](https://jellyfin.org/) ⭐ - The Free Software Media System (see [integration example](examples.md#))
-- [Overseer](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
+- [Overseerr](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
 - [Tautulli](https://github.com/Tautulli/Tautulli) ⭐ - Monitoring and tracking tool for Plex (integration [via webhook](https://github.com/Tautulli/Tautulli/wiki/Notification-Agents-Guide#webhook))
 - [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway (integration via [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy))
 - [Proxmox-Ntfy](https://github.com/qtsone/proxmox-ntfy) - Python script that monitors Proxmox tasks and sends notifications using the Ntfy service.
@@ -170,6 +170,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp) - An ntfy MCP server for sending/fetching ntfy notifications to your self-hosted ntfy server from AI Agents (supports secure token auth & more - use with npx or docker!) (Node/Typescript)
 - [InvaderInformant](https://github.com/patricksthannon/InvaderInformant) - Script for Mac OS systems that monitors new or dropped connections to your network using ntfy (Shell)
 - [NtfyPwsh](https://github.com/ptmorris1/NtfyPwsh) - PowerShell module to help send messages to ntfy (PowerShell)
+- [ntfyrr](https://github.com/leukosaima/ntfyrr) - Currently an Overseerr webhook notification to ntfy helper service.
 
 ## Blog + forum posts
 

@@ -28,7 +28,7 @@ const (
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
-	tokenMaxCount                   = 20 // Only keep this many tokens in the table per user
+	tokenMaxCount                   = 60 // Only keep this many tokens in the table per user
 	tag                             = "user_manager"
 )
 

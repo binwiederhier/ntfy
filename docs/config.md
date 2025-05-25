@@ -295,7 +295,7 @@ want to use a dedicated token to publish from your backup host, and one from you
     but not yet implemented.
 
 The `ntfy token` command can be used to manage access tokens for users. Tokens can have labels, and they can expire
-automatically (or never expire). Each user can have up to 20 tokens (hardcoded). 
+automatically (or never expire). Each user can have up to 60 tokens (hardcoded). 
 
 **Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
 ```

@@ -1397,6 +1397,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * WebSocket returning incorrect HTTP error code ([#1338](https://github.com/binwiederhier/ntfy/pull/1338) / [#1337](https://github.com/binwiederhier/ntfy/pull/1337), thanks to [@wunter8](https://github.com/wunter8) for debugging and implementing)
 * Make Markdown in the web app scrollable horizontally ([#1262](https://github.com/binwiederhier/ntfy/pull/1262), thanks to [@rake5k](https://github.com/rake5k) for fixing)
 * Make sure WebPush subscription topics are actually deleted (no ticket)
+* Increase the number of access tokens per user to 60 ([#1308](https://github.com/binwiederhier/ntfy/issues/1308))
 
 **Documentation:**
 

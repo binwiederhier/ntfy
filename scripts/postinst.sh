@@ -33,12 +33,23 @@ if [ "$1" = "configure" ] || [ "$1" -ge 1 ]; then
       fi
     fi
     if systemctl is-active -q ntfy-client.service; then
-      echo "Restarting ntfy-client.service ..."
+      echo "Restarting ntfy-client.service (system) ..."
       if [ -x /usr/bin/deb-systemd-invoke ]; then
         deb-systemd-invoke try-restart ntfy-client.service >/dev/null || true
       else
         systemctl restart ntfy-client.service >/dev/null || true
       fi
     fi
+    
+    # inform user about systemd user service
+    echo
+    echo "------------------------------------------------------------------------"
+    echo "ntfy includes a systemd user service."
+    echo "To enable it, run following commands as your regular user (not as root):"
+    echo
+    echo "  systemctl --user enable ntfy-client.service"
+    echo "  systemctl --user start ntfy-client.service"
+    echo "------------------------------------------------------------------------"
+    echo
   fi
 fi

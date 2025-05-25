@@ -678,10 +678,10 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	require.NotEmpty(t, token.Value)
 	philTokens = append(philTokens, token.Value)
 
-	// Create 22 tokens for ben (only 20 allowed!)
+	// Create 62 tokens for ben (only 60 allowed!)
 	baseTime := time.Now().Add(24 * time.Hour)
 	benTokens := make([]string, 0)
-	for i := 0; i < 22; i++ { //
+	for i := 0; i < 62; i++ { //
 		token, err := a.CreateToken(ben.ID, "", time.Now().Add(72*time.Hour), netip.IPv4Unspecified())
 		require.Nil(t, err)
 		require.NotEmpty(t, token.Value)
@@ -700,7 +700,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	require.Equal(t, ErrUnauthenticated, err)
 
 	// Ben: The other tokens should still work
-	for i := 2; i < 22; i++ {
+	for i := 2; i < 62; i++ {
 		userWithToken, err := a.AuthenticateToken(benTokens[i])
 		require.Nil(t, err, "token[%d]=%s failed", i, benTokens[i])
 		require.Equal(t, "ben", userWithToken.Name)
@@ -720,7 +720,7 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, rows.Next())
 	require.Nil(t, rows.Scan(&benCount))
-	require.Equal(t, 20, benCount)
+	require.Equal(t, 60, benCount)
 
 	var philCount int
 	rows, err = a.db.Query(`SELECT COUNT(*) FROM user_token WHERE user_id=?`, phil.ID)

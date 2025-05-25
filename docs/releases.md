@@ -1399,6 +1399,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Make Markdown in the web app scrollable horizontally ([#1262](https://github.com/binwiederhier/ntfy/pull/1262), thanks to [@rake5k](https://github.com/rake5k) for fixing)
 * Make sure WebPush subscription topics are actually deleted (no ticket)
 * Increase the number of access tokens per user to 60 ([#1308](https://github.com/binwiederhier/ntfy/issues/1308))
+* Allow specifying `cache` and `firebase` via JSON publishing ([#1119](https://github.com/binwiederhier/ntfy/issues/1119)/[#1123](https://github.com/binwiederhier/ntfy/pull/1123), thanks to [@stendler](https://github.com/stendler))
 
 **Documentation:**
 

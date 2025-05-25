@@ -240,6 +240,8 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 		"content_type": "",
 		"poll_id":      m.ID,
 	}, fbm.Data)
+	require.Equal(t, "", fbm.APNS.Payload.Aps.Alert.Title)
+	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
 }
 
 func TestToFirebaseMessage_PollRequest(t *testing.T) {

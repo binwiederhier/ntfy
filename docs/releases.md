@@ -1381,10 +1381,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Write VAPID keys to file in `ntfy webpush --output-file` ([#1138](https://github.com/binwiederhier/ntfy/pull/1138), thanks to [@nogweii](https://github.com/nogweii))
 * Add Docker major/minor version to image tags ([#1271](https://github.com/binwiederhier/ntfy/pull/1271), thanks to [@RoboMagus](https://github.com/RoboMagus))
 * Add `latest` subscription param for grabbing just the most recent message ([#1216](https://github.com/binwiederhier/ntfy/pull/1216), thanks to [@wunter8](https://github.com/wunter8))
-* Allow using `NTFY_PASSWORD_HASH` in `ntfy user` command instead of raw password ([#1340](https://github.com/binwiederhier/ntfy/pull/1340), thanks to [@wunter8](https://github.com/wunter8) for implementing)
+  * Allow using `NTFY_PASSWORD_HASH` in `ntfy user` command instead of raw password ([#1340](https://github.com/binwiederhier/ntfy/pull/1340), thanks to [@Tom-Hubrecht](https://github.com/Tom-Hubrecht) for implementing)
 * You can now change passwords via `v1/users` API ([#1267](https://github.com/binwiederhier/ntfy/pull/1267), thanks to [@wunter8](https://github.com/wunter8) for implementing)
 * Make WebPush subscription warning/expiry configurable, increase default to 55/60 days ([#1212](https://github.com/binwiederhier/ntfy/pull/1212), thanks to [@KuroSetsuna29](https://github.com/KuroSetsuna29))
-* Support [systemd user service](https://docs.ntfy.sh/subscribe/cli/#using-the-systemd-service) `ntfy-client.service` ([](https://github.com/binwiederhier/ntfy/pull/1002), thanks to [@dandersch](https://github.com/dandersch))
+* Support [systemd user service](https://docs.ntfy.sh/subscribe/cli/#using-the-systemd-service) `ntfy-client.service` ([#1002](https://github.com/binwiederhier/ntfy/pull/1002), thanks to [@dandersch](https://github.com/dandersch))
 
 **Bug fixes + maintenance:**
 
@@ -1419,7 +1419,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Typo in CLI docs ([#1172](https://github.com/binwiederhier/ntfy/pull/1172), thanks to [@anirvan](https://github.com/anirvan))
 * Correction about MacroDroid ([#1137](https://github.com/binwiederhier/ntfy/pull/1137), thanks to [@ShlomoCode](https://github.com/ShlomoCode))
 * Note about fail2ban in Docker ([#1175](https://github.com/binwiederhier/ntfy/pull/1175)), thanks to [@Measurity](https://github.com/Measurity))
-* Lots of other tiny docs updates, tanks to everyone who contributed!
+* Lots of other tiny docs updates, thanks to everyone who contributed!
 
 **Languages**
 

@@ -223,11 +223,15 @@ brew install ntfy
 
 
 ## Windows
-The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on Windows as well.
+The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe`) as well as ntfy server is supported on Windows as well.
 To install, please [download the latest ZIP](https://github.com/binwiederhier/ntfy/releases/download/v2.11.0/ntfy_2.11.0_windows_amd64.zip),
 extract it and place the `ntfy.exe` binary somewhere in your `%Path%`. 
 
 The default path for the client config file is at `%AppData%\ntfy\client.yml` (not created automatically, sample in the ZIP file).
+
+To use the server you can either specify options via the commandline or use a server.yml file by running: ntfy.exe serve --config YOURPATH\server.yml
+
+It's possible to run the server as a Windows service. The recommended command to install ntfy server as a service is: sc.exe create ntfy start= auto binPath= "YOURPATH\ntfy.exe serve --config YOURPATH\server.yml"
 
 Also available in [Scoop's](https://scoop.sh) Main repository:
 

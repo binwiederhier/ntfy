@@ -63,7 +63,7 @@ func TestServer_Twilio_Call_Add_Verify_Call_Delete_Success(t *testing.T) {
 		MessageLimit: 10,
 		CallLimit:    1,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -140,7 +140,7 @@ func TestServer_Twilio_Call_Success(t *testing.T) {
 		MessageLimit: 10,
 		CallLimit:    1,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -185,7 +185,7 @@ func TestServer_Twilio_Call_Success_With_Yes(t *testing.T) {
 		MessageLimit: 10,
 		CallLimit:    1,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
@@ -216,7 +216,7 @@ func TestServer_Twilio_Call_UnverifiedNumber(t *testing.T) {
 		MessageLimit: 10,
 		CallLimit:    1,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
 
 	// Do the thing

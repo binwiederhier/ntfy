@@ -189,6 +189,7 @@ const MarkdownContainer = styled("div")`
   }
 
   pre {
+    overflow-x: scroll;
     padding: 0.9rem;
   }
 

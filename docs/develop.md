@@ -384,7 +384,7 @@ strictly based off of my development on this app. There may be other versions of
 ### Apple setup
 
 !!! info
-    Along with this step, the [PLIST Deployment](#plist-deployment-and-configuration) step is also required 
+    Along with this step, the [PLIST Deployment](#plist-config) step is also required 
     for these changes to take effect in the iOS app.
 
 1. [Create a new key in Apple Developer Member Center](https://developer.apple.com/account/resources/authkeys/add)

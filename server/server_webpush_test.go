@@ -96,7 +96,7 @@ func TestServer_WebPush_TopicSubscribeProtected_Allowed(t *testing.T) {
 	config.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, config)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
 	response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{
@@ -126,7 +126,7 @@ func TestServer_WebPush_DeleteAccountUnsubscribe(t *testing.T) {
 	config := configureAuth(t, newTestConfigWithWebPush(t))
 	s := newTestServer(t, config)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "test-topic", user.PermissionReadWrite))
 
 	response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint), map[string]string{
@@ -212,7 +212,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	addSubscription(t, s, pushService.URL+"/push-receive", "test-topic")
 	requireSubscriptionCount(t, s, "test-topic", 1)
 
-	_, err := s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-7*24*time.Hour).Unix())
+	_, err := s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-55*24*time.Hour).Unix())
 	require.Nil(t, err)
 
 	s.pruneAndNotifyWebPushSubscriptions()
@@ -222,7 +222,7 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 		return received.Load()
 	})
 
-	_, err = s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-9*24*time.Hour).Unix())
+	_, err = s.webPush.db.Exec("UPDATE subscription SET updated_at = ?", time.Now().Add(-60*24*time.Hour).Unix())
 	require.Nil(t, err)
 
 	s.pruneAndNotifyWebPushSubscriptions()

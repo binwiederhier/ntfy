@@ -39,11 +39,11 @@ func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visit
 }
 
 func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	req, err := readJSONWithLimit[apiUserAddRequest](r.Body, jsonBodyBytesLimit, false)
+	req, err := readJSONWithLimit[apiUserAddOrUpdateRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
 		return err
-	} else if !user.AllowedUsername(req.Username) || req.Password == "" {
-		return errHTTPBadRequest.Wrap("username invalid, or password missing")
+	} else if !user.AllowedUsername(req.Username) || (req.Password == "" && req.Hash == "") {
+		return errHTTPBadRequest.Wrap("username invalid, or password/password_hash missing")
 	}
 	u, err := s.userManager.User(req.Username)
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
@@ -60,10 +60,61 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 			return err
 		}
 	}
-	if err := s.userManager.AddUser(req.Username, req.Password, user.RoleUser); err != nil {
+	password, hashed := req.Password, false
+	if req.Hash != "" {
+		password, hashed = req.Hash, true
+	}
+	if err := s.userManager.AddUser(req.Username, password, user.RoleUser, hashed); err != nil {
 		return err
 	}
 	if tier != nil {
+		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {
+			return err
+		}
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	req, err := readJSONWithLimit[apiUserAddOrUpdateRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	} else if !user.AllowedUsername(req.Username) {
+		return errHTTPBadRequest.Wrap("username invalid")
+	} else if req.Password == "" && req.Hash == "" && req.Tier == "" {
+		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\", \"password_hash\" or \"tier\"")
+	}
+	u, err := s.userManager.User(req.Username)
+	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
+		return err
+	} else if u != nil {
+		if u.IsAdmin() {
+			return errHTTPForbidden
+		}
+		if req.Hash != "" {
+			if err := s.userManager.ChangePassword(req.Username, req.Hash, true); err != nil {
+				return err
+			}
+		} else if req.Password != "" {
+			if err := s.userManager.ChangePassword(req.Username, req.Password, false); err != nil {
+				return err
+			}
+		}
+	} else {
+		password, hashed := req.Password, false
+		if req.Hash != "" {
+			password, hashed = req.Hash, true
+		}
+		if err := s.userManager.AddUser(req.Username, password, user.RoleUser, hashed); err != nil {
+			return err
+		}
+	}
+	if req.Tier != "" {
+		if _, err = s.userManager.Tier(req.Tier); errors.Is(err, user.ErrTierNotFound) {
+			return errHTTPBadRequestTierInvalid
+		} else if err != nil {
+			return err
+		}
 		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {
 			return err
 		}

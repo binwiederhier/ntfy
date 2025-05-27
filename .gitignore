@@ -15,7 +15,3 @@ node_modules/
 __pycache__
 web/dev-dist/
 venv/
-.cursorindexingignore
-.specstory/
-# SpecStory explanation file
-.specstory/.what-is-this.md

@@ -404,5 +404,10 @@
     "prefs_reservations_dialog_title_add": "Zarezerwuj temat",
     "reservation_delete_dialog_action_keep_title": "Zachowaj wiadomości i załącznik w pamięci cache",
     "reservation_delete_dialog_action_keep_description": "Wiadomości i załączniki które są zapisane w pamięci cache będą dostępne publicznie dla każdego znającego nazwę powiązanego z nimi tematu.",
-    "web_push_unknown_notification_title": "Nieznane powiadomienie otrzymane od serwera"
+    "web_push_unknown_notification_title": "Nieznane powiadomienie otrzymane od serwera",
+    "action_bar_unmute_notifications": "Włącz ponownie powiadomienia",
+    "prefs_appearance_theme_title": "Wygląd",
+    "prefs_reservations_dialog_description": "Zastrzeżenie tematu daje użytkownikowi prawo własności do tego tematu i umożliwia zdefiniowanie uprawnień dostępu do tego tematu dla innych użytkowników.",
+    "reservation_delete_dialog_description": "Usunięcie rezerwacji powoduje rezygnację z prawa własności do tematu i umożliwia innym jego zarezerwowanie. Istniejące wiadomości i załączniki można zachować lub usunąć.",
+    "web_push_unknown_notification_body": "Konieczne może być zaktualizowanie ntfy poprzez otwarcie aplikacji internetowej"
 }

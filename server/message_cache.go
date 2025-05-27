@@ -99,6 +99,13 @@ const (
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time, id
 	`
+	selectMessagesLatestQuery = `
+		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		FROM messages
+		WHERE topic = ? AND published = 1
+		ORDER BY time DESC, id DESC
+		LIMIT 1
+  `
 	selectMessagesDueQuery = `
 		SELECT mid, time, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages 
@@ -416,6 +423,8 @@ func (c *messageCache) addMessages(ms []*message) error {
 func (c *messageCache) Messages(topic string, since sinceMarker, scheduled bool) ([]*message, error) {
 	if since.IsNone() {
 		return make([]*message, 0), nil
+	} else if since.IsLatest() {
+		return c.messagesLatest(topic)
 	} else if since.IsID() {
 		return c.messagesSinceID(topic, since, scheduled)
 	}
@@ -456,6 +465,14 @@ func (c *messageCache) messagesSinceID(topic string, since sinceMarker, schedule
 	} else {
 		rows, err = c.db.Query(selectMessagesSinceIDQuery, topic, rowID)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return readMessages(rows)
+}
+
+func (c *messageCache) messagesLatest(topic string) ([]*message, error) {
+	rows, err := c.db.Query(selectMessagesLatestQuery, topic)
 	if err != nil {
 		return nil, err
 	}

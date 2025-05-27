@@ -170,7 +170,7 @@
     "account_basics_tier_description": "Tilisi taso",
     "account_basics_phone_numbers_description": "Puheluilmoituksia varten",
     "prefs_reservations_dialog_title_add": "Varaa topikki",
-    "account_basics_tier_free": "Vapaa",
+    "account_basics_tier_free": "Maksuton",
     "account_upgrade_dialog_cancel_warning": "Tämä <strong>peruuttaa tilauksesi</strong> ja alentaa tilisi {{date}}. Tuona päivänä topikit sekä palvelimen välimuistissa olevat viestit <strong>poistetaan</strong>.",
     "notifications_click_copy_url_button": "Kopioi linkki",
     "account_basics_tier_admin": "Admin",
@@ -266,7 +266,7 @@
     "alert_not_supported_title": "Ilmoituksia ei tueta",
     "account_tokens_dialog_button_cancel": "Peruuta",
     "subscribe_dialog_error_user_anonymous": "Anonyymi",
-    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} laskutetaan vuosittain. Tallenna {{save}}.",
+    "account_upgrade_dialog_tier_price_billed_yearly": "{{price}} laskutetaan vuosittain. Säästä {{save}}.",
     "prefs_notifications_min_priority_high_and_higher": "Korkea prioriteetti ja korkeammat",
     "account_usage_basis_ip_description": "Tämän tilin käyttötilastot ja rajoitukset perustuvat IP-osoitteeseesi, joten ne voidaan jakaa muiden käyttäjien kanssa. Yllä esitetyt rajat ovat likimääräisiä perustuen olemassa oleviin rajoituksiin.",
     "publish_dialog_priority_high": "Korkea prioriteetti",
@@ -400,5 +400,11 @@
     "error_boundary_button_reload_ntfy": "Lataa ntfy uudelleen",
     "web_push_subscription_expiring_title": "Ilmoitukset keskeytetään",
     "web_push_subscription_expiring_body": "Avaa ntfy jatkaaksesi ilmoitusten vastaanottamista",
-    "web_push_unknown_notification_title": "Tuntematon ilmoitus vastaanotettu palvelimelta"
+    "web_push_unknown_notification_title": "Tuntematon ilmoitus vastaanotettu palvelimelta",
+    "alert_notification_ios_install_required_description": "Napauta Jaa-kuvaketta ja Lisää aloitusnäyttöön ottaaksesi ilmoitukset käyttöön iOS:ssä",
+    "prefs_notifications_web_push_disabled_description": "Ilmoituksia vastaanotetaan, kun verkkosovellus on käynnissä (WebSocket:in kautta)",
+    "web_push_unknown_notification_body": "Voit joutua päivittämään ntfy:n avaamalla verkkosovelluksen",
+    "notifications_actions_failed_notification": "Epäonnistunut toiminto",
+    "subscribe_dialog_subscribe_use_another_background_info": "Ilmoituksia muilta palvelimilta ei vastaanoteta, mikäli verkkosovellus ei ole avoinna",
+    "prefs_notifications_web_push_enabled_description": "Ilmoituksia vastaanotetaan siitä huolimatta, että verkkosovellus ei ole käynnissä (Web Push:n kautta)"
 }

@@ -26,8 +26,8 @@ const (
 
 // Defines default Web Push settings
 const (
-	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
-	DefaultWebPushExpiryDuration        = 9 * 24 * time.Hour
+	DefaultWebPushExpiryWarningDuration = 55 * 24 * time.Hour
+	DefaultWebPushExpiryDuration        = 60 * 24 * time.Hour
 )
 
 // Defines all global and per-visitor limits

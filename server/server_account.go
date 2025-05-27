@@ -37,7 +37,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		return errHTTPConflictUserExists
 	}
 	logvr(v, r).Tag(tagAccount).Field("user_name", newAccount.Username).Info("Creating user %s", newAccount.Username)
-	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser); err != nil {
+	if err := s.userManager.AddUser(newAccount.Username, newAccount.Password, user.RoleUser, false); err != nil {
 		if errors.Is(err, user.ErrInvalidArgument) {
 			return errHTTPBadRequestInvalidUsername
 		}
@@ -207,7 +207,7 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 		return errHTTPBadRequestIncorrectPasswordConfirmation
 	}
 	logvr(v, r).Tag(tagAccount).Debug("Changing password for user %s", u.Name)
-	if err := s.userManager.ChangePassword(u.Name, req.NewPassword); err != nil {
+	if err := s.userManager.ChangePassword(u.Name, req.NewPassword, false); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

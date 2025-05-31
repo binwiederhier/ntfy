@@ -31,6 +31,7 @@ help:
 	@echo "Build server & client (without GoReleaser):"
 	@echo "  make cli-linux-server           - Build client & server (no GoReleaser, current arch, Linux)"
 	@echo "  make cli-darwin-server          - Build client & server (no GoReleaser, current arch, macOS)"
+	@echo "  make cli-windows-server         - Build client & server (no GoReleaser, amd64 only, Windows)"
 	@echo "  make cli-client                 - Build client only (no GoReleaser, current arch, Linux/macOS/Windows)"
 	@echo
 	@echo "Build dev Docker:"
@@ -201,6 +202,16 @@ cli-darwin-server: cli-deps-static-sites
 		-ldflags \
 		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
+cli-windows-server: cli-deps-static-sites
+	# This is a target to build the CLI (including the server) for Windows.
+	# Use this for Windows development, if you really don't want to install GoReleaser ...
+	mkdir -p dist/ntfy_windows_server server/docs
+	CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build \
+		-o dist/ntfy_windows_server/ntfy.exe \
+		-tags sqlite_omit_load_extension,osusergo,netgo \
+		-ldflags \
+		"-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
+
 cli-client: cli-deps-static-sites
 	# This is a target to build the CLI (excluding the server) manually. This should work on Linux/macOS/Windows.
 	# Use this for development, if you really don't want to install GoReleaser ...
@@ -213,7 +224,7 @@ cli-client: cli-deps-static-sites
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 
-cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64
+cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64 cli-deps-gcc-windows
 
 cli-deps-static-sites:
 	mkdir -p server/docs server/site
@@ -227,6 +238,9 @@ cli-deps-gcc-armv6-armv7:
 
 cli-deps-gcc-arm64:
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
+
+cli-deps-gcc-windows:
+	which x86_64-w64-mingw32-gcc || { echo "ERROR: Windows cross compiler not installed. On Ubuntu, run: apt install gcc-mingw-w64-x86-64"; exit 1; }
 
 cli-deps-update:
 	go get -u

@@ -24,7 +24,7 @@
     "nav_button_subscribe": "Berlangganan ke topik",
     "alert_notification_permission_required_title": "Notifikasi dinonaktifkan",
     "alert_notification_permission_required_description": "Berikan izin ke peramban untuk menampilkan notifikasi desktop.",
-    "alert_not_supported_description": "Notifikasi tidak didukung dalam peramban Anda.",
+    "alert_not_supported_description": "Notifikasi tidak didukung dalam peramban Anda",
     "notifications_attachment_open_title": "Pergi ke {{url}}",
     "notifications_attachment_open_button": "Buka lampiran",
     "notifications_attachment_link_expires": "tautan kadaluwarsa {{date}}",

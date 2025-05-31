@@ -26,8 +26,8 @@ const (
 
 // Defines default Web Push settings
 const (
-	DefaultWebPushExpiryWarningDuration = 7 * 24 * time.Hour
-	DefaultWebPushExpiryDuration        = 9 * 24 * time.Hour
+	DefaultWebPushExpiryWarningDuration = 55 * 24 * time.Hour
+	DefaultWebPushExpiryDuration        = 60 * 24 * time.Hour
 )
 
 // Defines all global and per-visitor limits
@@ -144,7 +144,7 @@ type Config struct {
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
 	BehindProxy                          bool
-	ProxyClientIPHeader                  string
+	ProxyForwardedHeader                 string
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
@@ -233,8 +233,8 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorSubscriberRateLimiting:        false,
-		BehindProxy:                          false,
-		ProxyClientIPHeader:                  "",
+		BehindProxy:                          false,             // If true, the server will trust the proxy client IP header to determine the client IP address
+		ProxyForwardedHeader:                 "X-Forwarded-For", // Default header for reverse proxy client IPs
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

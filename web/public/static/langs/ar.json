@@ -359,5 +359,6 @@
     "account_basics_phone_numbers_dialog_verify_button_call": "اتصل بي",
     "account_basics_phone_numbers_dialog_code_label": "رمز التحقّق",
     "account_upgrade_dialog_tier_price_per_month": "شهر",
-    "prefs_appearance_theme_title": "الحُلّة"
+    "prefs_appearance_theme_title": "الحُلّة",
+    "subscribe_dialog_subscribe_use_another_background_info": "لن يتم استلام الاشعارات من الخوادم الخارجية عندما يكون تطبيق الويب مغلقاً"
 }

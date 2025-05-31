@@ -132,7 +132,7 @@ easy to use. Here's what it looks like. You may also want to check out the [full
 ### Subscribe as raw stream
 The `/raw` endpoint will output one line per message, and **will only include the message body**. It's useful for extremely
 simple scripts, and doesn't include all the data. Additional fields such as [priority](../publish.md#message-priority), 
-[tags](../publish.md#tags--emojis--) or [message title](../publish.md#message-title) are not included in this output 
+[tags](../publish.md#tags-emojis) or [message title](../publish.md#message-title) are not included in this output 
 format. Keepalive messages are sent as empty lines.
 
 === "Command line (curl)"
@@ -257,6 +257,14 @@ curl -s "ntfy.sh/mytopic/json?since=1645970742"
 curl -s "ntfy.sh/mytopic/json?since=nFS3knfcQ1xe"
 ```
 
+### Fetch latest message
+If you only want the most recent message sent to a topic and do not have a message ID or timestamp to use with
+`since=`, you can use `since=latest` to grab the most recent message from the cache for a particular topic.
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1&since=latest"
+```
+
 ### Fetch scheduled messages
 Messages that are [scheduled to be delivered](../publish.md#scheduled-delivery) at a later date are not typically 
 returned when subscribing via the API, which makes sense, because after all, the messages have technically not been 
@@ -305,7 +313,7 @@ Depending on whether the server is configured to support [access control](../con
 may be read/write protected so that only users with the correct credentials can subscribe or publish to them.
 To publish/subscribe to protected topics, you can:
 
-* Use [basic auth](../publish.md#basic-auth), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
+* Use [basic auth](../publish.md#authentication), e.g. `Authorization: Basic dGVzdHVzZXI6ZmFrZXBhc3N3b3Jk`
 * or use the [`auth` query parameter](../publish.md#query-param), e.g. `?auth=QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM04zYjNKaw`
 
 Please refer to the [publishing documentation](../publish.md#authentication) for additional details.

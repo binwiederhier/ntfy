@@ -4,9 +4,21 @@ There are quite a few projects that work with ntfy, integrate ntfy, or have been
 
 I've added a ⭐ to projects or posts that have a significant following, or had a lot of interaction by the community.
 
+## Table of Contents
+
+- [Official integrations](#official-integrations)
+- [Integration via HTTP/SMTP/etc.](#integration-via-httpsmtpetc)
+- [UnifiedPush integrations](#unifiedpush-integrations)
+- [Libraries](#libraries)
+- [CLIs + GUIs](#clis-guis)
+- [Projects + scripts](#projects-scripts)
+- [Blog + forum posts](#blog-forum-posts)
+- [Alternative ntfy servers](#alternative-ntfy-servers)
+
 ## Official integrations
 
 - [changedetection.io](https://changedetection.io) ⭐ - Website change detection and notification
+- [Home Assistant](https://www.home-assistant.io/integrations/ntfy) ⭐ - Home Assistant is an open-source platform for automating and controlling smart home devices.
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
@@ -26,16 +38,21 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Cloudron](https://www.cloudron.io/store/sh.ntfy.cloudronapp.html) - Platform that makes it easy to manage web apps on your server
 - [Xitoring](https://xitoring.com/docs/notifications/notification-roles/ntfy/) - Server and Uptime monitoring
 - [HetrixTools](https://docs.hetrixtools.com/ntfy-sh-notifications/) - Uptime monitoring
+- [EasyMorph](https://help.easymorph.com/doku.php?id=transformations:sendntfymessage) - Visual data transformation and automation tool
+- [Monibot](https://monibot.io/) - Monibot monitors your websites, servers and applications and notifies you if something goes wrong.
+- [Miniflux](https://miniflux.app/docs/ntfy.html) - Minimalist and opinionated feed reader
+- [Beszel](https://beszel.dev/guide/notifications/ntfy) - Server monitoring platform
 
 ## Integration via HTTP/SMTP/etc.
 
 - [Watchtower](https://containrrr.dev/watchtower/) ⭐ - Automating Docker container base image updates (see [integration example](examples.md#watchtower-shoutrrr))
 - [Jellyfin](https://jellyfin.org/) ⭐ - The Free Software Media System (see [integration example](examples.md#))
-- [Overseer](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
+- [Overseerr](https://docs.overseerr.dev/using-overseerr/notifications/webhooks) ⭐ - a request management and media discovery tool for Plex (see [integration example](examples.md#jellyseerroverseerr-webhook))
 - [Tautulli](https://github.com/Tautulli/Tautulli) ⭐ - Monitoring and tracking tool for Plex (integration [via webhook](https://github.com/Tautulli/Tautulli/wiki/Notification-Agents-Guide#webhook))
 - [Mailrise](https://github.com/YoRyan/mailrise) - An SMTP gateway (integration via [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy))
 - [Proxmox-Ntfy](https://github.com/qtsone/proxmox-ntfy) - Python script that monitors Proxmox tasks and sends notifications using the Ntfy service.
 - [Scrutiny](https://github.com/AnalogJ/scrutiny) - WebUI for smartd S.M.A.R.T monitoring. Scrutiny includes shoutrrr/ntfy integration ([see integration README](https://github.com/AnalogJ/scrutiny?tab=readme-ov-file#notifications))
+- [UptimeObserver](https://uptimeobserver.com) - Uptime Monitoring tool for Websites, APIs, SSL Certificates, DNS, Domain Names and Ports. [Integration Guide](https://support.uptimeobserver.com/integrations/ntfy/)
 
 ## [UnifiedPush](https://unifiedpush.org/users/apps/) integrations
 
@@ -63,17 +80,21 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [gotfy](https://github.com/AnthonyHewins/gotfy) - A Go wrapper for the ntfy API (Go)
 - [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
+- [aiontfy](https://github.com/tr4nt0r/aiontfy) - Asynchronous client library for publishing and subscribing to ntfy (Python)
 
 ## CLIs + GUIs
 
 - [ntfy.sh.sh](https://github.com/mininmobile/ntfy.sh.sh) - Run scripts on ntfy.sh events
-- [ntfy Desktop client](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
+- [ntfy-desktop](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
+- [ntfy-desktop](https://github.com/Aetherinox/ntfy-desktop) - Desktop client for Windows, Linux, and MacOS with push notifications
 - [ntfy svelte front-end](https://github.com/novatorem/Ntfy) - Front-end built with svelte
 - [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
 - [ntfysh-windows](https://github.com/lucas-bortoli/ntfysh-windows) - A ntfy client for Windows Desktop
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
 - [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
 - [wlzntfy](https://github.com/Walzen-Group/ntfy-toaster) - A minimalistic, receive-only toast notification client for Windows 11
+- [Ntfy_CSV_Reminders](https://github.com/thiswillbeyourgithub/Ntfy_CSV_Reminders) - A Python tool that sends random-timing phone notifications for recurring tasks by using daily probability checks based on CSV-defined frequencies.
+- [Daily Fact Ntfy](https://github.com/thiswillbeyourgithub/Daily_Fact_Ntfy) - Generate [llm](https://github.com/simonw/llm) generated fact every day about any topic you're interested in.
 
 ## Projects + scripts 
 
@@ -82,6 +103,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Grafana-to-ntfy](https://gitlab.com/Saibe1111/grafana-to-ntfy) - Grafana-to-ntfy alerts channel (Node Js)
 - [ntfy-long-zsh-command](https://github.com/robfox92/ntfy-long-zsh-command) - Notifies you once a long-running command completes (zsh)
 - [ntfy-shellscripts](https://github.com/nickexyz/ntfy-shellscripts) - A few scripts for the ntfy project (Shell)
+- [alertmanager-ntfy-relay](https://github.com/therobbielee/alertmanager-ntfy-relay) - ntfy.sh relay for Alertmanager (Go)
 - [QuickStatus](https://github.com/corneliusroot/QuickStatus) - A shell script to alert to any immediate problems upon login (Shell)
 - [ntfy.el](https://github.com/shombando/ntfy) - Send notifications from Emacs (Emacs)
 - [backup-projects](https://gist.github.com/anthonyaxenov/826ba65abbabd5b00196bc3e6af76002) - Stupidly simple backup script for own projects (Shell)
@@ -146,9 +168,24 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 - [container-update-check](https://github.com/stendler/container-update-check) - Scripts to check and notify if a podman or docker container image can be updated (Podman/Shell)
 - [ignition-combustion-template](https://github.com/stendler/ignition-combustion-template) - Templates and scripts to generate a configuration to automatically setup a system on first boot. Including systemd-ntfy-poweronoff (Shell)
+- [ntfy-run](https://github.com/quantum5/ntfy-run) - Tool to run a command, capture its output, and send it to ntfy (Rust)
+- [Clipboard IO](https://github.com/jim3692/clipboard-io) - End to end encrypted clipboard
+- [ntfy-me-mcp](https://github.com/gitmotion/ntfy-me-mcp) - An ntfy MCP server for sending/fetching ntfy notifications to your self-hosted ntfy server from AI Agents (supports secure token auth & more - use with npx or docker!) (Node/Typescript)
+- [InvaderInformant](https://github.com/patricksthannon/InvaderInformant) - Script for Mac OS systems that monitors new or dropped connections to your network using ntfy (Shell)
+- [NtfyPwsh](https://github.com/ptmorris1/NtfyPwsh) - PowerShell module to help send messages to ntfy (PowerShell)
+- [ntfyrr](https://github.com/leukosaima/ntfyrr) - Currently an Overseerr webhook notification to ntfy helper service.
 
 ## Blog + forum posts
 
+- [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025
+- [Notifications about (almost) anything with ntfy.sh](https://hamatti.org/posts/notifications-about-almost-anything-with-ntfy-sh/) - hamatti.org - 6/2025
+- [I set up a self-hosted notification service for everything, and I'll never look back](https://www.xda-developers.com/set-up-self-hosted-notification-service/) ⭐ - xda-developers.com - 5/2025
+- [How to Set Up Ntfy: Self-Hosted Push Notifications Made Easy](https://www.youtube.com/watch?v=wDJDiAYZ3H0) - youtube.com (sass drew) - 1/2025
+- [The NTFY is a game-changer FREE solution for IT people](https://www.youtube.com/watch?v=NtlztHT-sRw) - youtube.com (Valters Tech Turf) - 1/2025
+- [Notify: A Powerful Tool for Real-Time Notifications (ntfy.sh)](https://www.youtube.com/watch?v=XXTTeVfGBz0) - youtube.com (LinuxCloudHacks) - 12/2025
+- [Push notifications with ntfy and n8n](https://www.youtube.com/watch?v=DKG1R3xYvwQ) - youtube.com (Oskar) - 10/2024
+- [Setup ntfy for selfhosted notifications with Cloudflare Tunnel](https://medium.com/@svenvanginkel/setup-ntfy-for-selfhosted-notifications-with-cloudflare-tunnel-e342f470177d) - medium.com (Sven van Ginkel) - 10/2024
+- [Self-Host NTFY - How It Works & Easy Setup Guide](https://www.youtube.com/watch?v=79wHc_jfrJE) ⭐ - youtube.com (Techdox)- 9/2024
 - [ntfy / Emacs Lisp](https://speechcode.com/blog/ntfy/) - speechcode.com - 3/2024
 - [Boost Your Productivity with ntfy.sh: The Ultimate Notification Tool for Command-Line Users](https://dev.to/archetypal/boost-your-productivity-with-ntfysh-the-ultimate-notification-tool-for-command-line-users-iil) - dev.to - 3/2024
 - [Nextcloud Talk (F-Droid version) notifications using ntfy (ntfy.sh)](https://www.youtube.com/watch?v=0a6PpfN5PD8) - youtube.com - 2/2024
@@ -246,6 +283,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy otro sistema de notificaciones pub-sub simple basado en HTTP](https://ugeek.github.io/blog/post/2021-11-05-ntfy-sh-otro-sistema-de-notificaciones-pub-sub-simple-basado-en-http.html) - ugeek.github.io - 11/2021
 - [Show HN: A tool to send push notifications to your phone, written in Go](https://news.ycombinator.com/item?id=29715464) ⭐ - news.ycombinator.com - 12/2021
 - [Reddit selfhostable post](https://www.reddit.com/r/selfhosted/comments/qxlsm9/my_open_source_notification_android_app_and/) ⭐ - reddit.com - 11/2021
+- [ntfy on The Canary in the Cage Podcast](https://odysee.com/@TheCanaryInTheCage:b/The-Canary-in-the-Cage-Episode-42:1?r=4gitYjTacQqPEjf22874USecDQYJ5y5E&t=3062) - odysee.com - 1/2025
+- [NtfyPwsh - A PowerShell Module to Send Ntfy Messages](https://ptmorris1.github.io/posts/NtfyPwsh/) - github.io - 5/2025
 
 ## Alternative ntfy servers
 

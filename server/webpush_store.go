@@ -79,8 +79,9 @@ const (
 	deleteWebPushSubscriptionByUserIDQuery    = `DELETE FROM subscription WHERE user_id = ?`
 	deleteWebPushSubscriptionByAgeQuery       = `DELETE FROM subscription WHERE updated_at <= ?` // Full table scan!
 
-	insertWebPushSubscriptionTopicQuery    = `INSERT INTO subscription_topic (subscription_id, topic) VALUES (?, ?)`
-	deleteWebPushSubscriptionTopicAllQuery = `DELETE FROM subscription_topic WHERE subscription_id = ?`
+	insertWebPushSubscriptionTopicQuery               = `INSERT INTO subscription_topic (subscription_id, topic) VALUES (?, ?)`
+	deleteWebPushSubscriptionTopicAllQuery            = `DELETE FROM subscription_topic WHERE subscription_id = ?`
+	deleteWebPushSubscriptionTopicWithoutSubscription = `DELETE FROM subscription_topic WHERE subscription_id NOT IN (SELECT id FROM subscription)`
 )
 
 // Schema management queries
@@ -271,6 +272,10 @@ func (c *webPushStore) RemoveSubscriptionsByUserID(userID string) error {
 // RemoveExpiredSubscriptions removes all subscriptions that have not been updated for a given time period
 func (c *webPushStore) RemoveExpiredSubscriptions(expireAfter time.Duration) error {
 	_, err := c.db.Exec(deleteWebPushSubscriptionByAgeQuery, time.Now().Add(-expireAfter).Unix())
+	if err != nil {
+		return err
+	}
+	_, err = c.db.Exec(deleteWebPushSubscriptionTopicWithoutSubscription)
 	return err
 }
 

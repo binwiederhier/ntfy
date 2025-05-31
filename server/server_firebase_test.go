@@ -223,14 +223,25 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 	require.Equal(t, &messaging.AndroidConfig{
 		Priority: "high",
 	}, fbm.Android)
-	require.Equal(t, "", fbm.Data["message"])
-	require.Equal(t, "", fbm.Data["priority"])
+	require.Equal(t, "New message", fbm.Data["message"])
+	require.Equal(t, "5", fbm.Data["priority"])
 	require.Equal(t, map[string]string{
-		"id":    m.ID,
-		"time":  fmt.Sprintf("%d", m.Time),
-		"event": "poll_request",
-		"topic": "mytopic",
+		"id":           m.ID,
+		"time":         fmt.Sprintf("%d", m.Time),
+		"event":        "poll_request",
+		"topic":        "mytopic",
+		"message":      "New message",
+		"title":        "",
+		"tags":         "",
+		"click":        "",
+		"icon":         "",
+		"priority":     "5",
+		"encoding":     "",
+		"content_type": "",
+		"poll_id":      m.ID,
 	}, fbm.Data)
+	require.Equal(t, "", fbm.APNS.Payload.Aps.Alert.Title)
+	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
 }
 
 func TestToFirebaseMessage_PollRequest(t *testing.T) {

@@ -101,6 +101,8 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryDuration), Usage: "automatically expire unused subscriptions after this time"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-warning-duration", Aliases: []string{"web_push_expiry_warning_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryWarningDuration), Usage: "send web push warning notification after this time before expiring unused subscriptions"}),
 )
 
 var cmdServe = &cli.Command{
@@ -141,6 +143,8 @@ func execServe(c *cli.Context) error {
 	webPushFile := c.String("web-push-file")
 	webPushEmailAddress := c.String("web-push-email-address")
 	webPushStartupQueries := c.String("web-push-startup-queries")
+	webPushExpiryDurationStr := c.String("web-push-expiry-duration")
+	webPushExpiryWarningDurationStr := c.String("web-push-expiry-warning-duration")
 	cacheFile := c.String("cache-file")
 	cacheDurationStr := c.String("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
@@ -228,6 +232,14 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid visitor email limit replenish: %s", visitorEmailLimitReplenishStr)
 	}
+	webPushExpiryDuration, err := util.ParseDuration(webPushExpiryDurationStr)
+	if err != nil {
+		return fmt.Errorf("invalid web push expiry duration: %s", webPushExpiryDurationStr)
+	}
+	webPushExpiryWarningDuration, err := util.ParseDuration(webPushExpiryWarningDurationStr)
+	if err != nil {
+		return fmt.Errorf("invalid web push expiry warning duration: %s", webPushExpiryWarningDurationStr)
+	}
 
 	// Convert sizes to bytes
 	messageSizeLimit, err := util.ParseSize(messageSizeLimitStr)
@@ -306,6 +318,8 @@ func execServe(c *cli.Context) error {
 		if messageSizeLimit > 5*1024*1024 {
 			return errors.New("message-size-limit cannot be higher than 5M")
 		}
+	} else if webPushExpiryWarningDuration > 0 && webPushExpiryWarningDuration > webPushExpiryDuration {
+		return errors.New("web push expiry warning duration cannot be higher than web push expiry duration")
 	}
 
 	// Backwards compatibility
@@ -404,7 +418,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
 	conf.VisitorSubscriberRateLimiting = visitorSubscriberRateLimiting
 	conf.BehindProxy = behindProxy
-	conf.ProxyClientIPHeader = proxyClientIPHeader
+	conf.ProxyForwardedHeader = proxyClientIPHeader
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact
@@ -420,6 +434,8 @@ func execServe(c *cli.Context) error {
 	conf.WebPushFile = webPushFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 	conf.WebPushStartupQueries = webPushStartupQueries
+	conf.WebPushExpiryDuration = webPushExpiryDuration
+	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)
@@ -427,9 +443,9 @@ func execServe(c *cli.Context) error {
 	// Run server
 	s, err := server.New(conf)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("%s", err.Error())
 	} else if err := s.Run(); err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("%s", err.Error())
 	}
 	log.Info("Exiting.")
 	return nil

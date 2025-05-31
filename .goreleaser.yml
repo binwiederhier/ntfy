@@ -90,6 +90,8 @@ nfpms:
         type: "config|noreplace"
       - src: client/ntfy-client.service
         dst: /lib/systemd/system/ntfy-client.service
+      - src: client/user/ntfy-client.service
+        dst: /lib/systemd/user/ntfy-client.service
       - dst: /var/cache/ntfy
         type: dir
       - dst: /var/cache/ntfy/attachments
@@ -119,6 +121,7 @@ archives:
       - server/ntfy.service
       - client/client.yml
       - client/ntfy-client.service
+      - client/user/ntfy-client.service
   -
     id: ntfy_windows
     builds:
@@ -192,6 +195,18 @@ docker_manifests:
       - *armv7_image
       - *armv6_image
   - name_template: "binwiederhier/ntfy:{{ .Tag }}"
+    image_templates:
+      - *amd64_image
+      - *arm64v8_image
+      - *armv7_image
+      - *armv6_image
+  - name_template: "binwiederhier/ntfy:v{{ .Major }}"
+    image_templates:
+      - *amd64_image
+      - *arm64v8_image
+      - *armv7_image
+      - *armv6_image
+  - name_template: "binwiederhier/ntfy:v{{ .Major }}.{{ .Minor }}"
     image_templates:
       - *amd64_image
       - *arm64v8_image

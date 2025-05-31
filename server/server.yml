@@ -146,7 +146,7 @@
 
 # Web Push support (background notifications for browsers)
 #
-# If enabled, allows ntfy to receive push notifications, even when the ntfy web app is closed. When enabled, users
+# If enabled, allows the ntfy web app to receive push notifications, even when the web app is closed. When enabled, users
 # can enable background notifications in the web app. Once enabled, ntfy will forward published messages to the push
 # endpoint, which will then forward it to the browser.
 #
@@ -155,15 +155,19 @@
 #
 # - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 # - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
-# - web-push-file is a database file to keep track of browser subscription endpoints, e.g. `/var/cache/ntfy/webpush.db`
-# - web-push-email-address is the admin email address send to the push provider, e.g. `sysadmin@example.com`
+# - web-push-file is a database file to keep track of browser subscription endpoints, e.g. /var/cache/ntfy/webpush.db
+# - web-push-email-address is the admin email address send to the push provider, e.g. sysadmin@example.com
 # - web-push-startup-queries is an optional list of queries to run on startup`
+# - web-push-expiry-warning-duration defines the duration after which unused subscriptions are sent a warning (default is 55d`)
+# - web-push-expiry-duration defines the duration after which unused subscriptions will expire (default is 60d)
 #
 # web-push-public-key:
 # web-push-private-key:
 # web-push-file:
 # web-push-email-address:
 # web-push-startup-queries:
+# web-push-expiry-warning-duration: "55d"
+# web-push-expiry-duration: "60d"
 
 # If enabled, ntfy can perform voice calls via Twilio via the "X-Call" header.
 #

@@ -84,6 +84,22 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 	require.Equal(t, "my first message", sender.Messages()[0].APNS.Payload.CustomData["message"])
 }
 
+func TestServer_PublishWithoutFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	response := request(t, s, "PUT", "/mytopic", "my first message", map[string]string{
+		"firebase": "no",
+	})
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+
+	time.Sleep(100 * time.Millisecond) // Firebase publishing happens
+	require.Equal(t, 0, len(sender.Messages()))
+}
+
 func TestServer_PublishWithFirebase_WithoutUsers_AndWithoutPanic(t *testing.T) {
 	// This tests issue #641, which used to panic before the fix
 
@@ -411,7 +427,7 @@ func TestServer_PublishAt_FromUser(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, newTestConfigWithAuthFile(t))
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
 		"In":            "1h",
@@ -590,6 +606,11 @@ func TestServer_PublishAndPollSince(t *testing.T) {
 	require.Equal(t, "test 1", messages[0].Message)
 
 	response = request(t, s, "GET", "/mytopic/json?poll=1&since=100ms", "", nil)
+	messages = toMessages(t, response.Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "test 2", messages[0].Message)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1&since=latest", "", nil)
 	messages = toMessages(t, response.Body.String())
 	require.Equal(t, 1, len(messages))
 	require.Equal(t, "test 2", messages[0].Message)
@@ -781,7 +802,7 @@ func TestServer_Auth_Success_Admin(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "phil"),
@@ -795,7 +816,7 @@ func TestServer_Auth_Success_User(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -809,7 +830,7 @@ func TestServer_Auth_Success_User_MultipleTopics(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "mytopic", user.PermissionReadWrite))
 	require.Nil(t, s.userManager.AllowAccess("ben", "anothertopic", user.PermissionReadWrite))
 
@@ -830,7 +851,7 @@ func TestServer_Auth_Fail_InvalidPass(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
 		"Authorization": util.BasicAuth("phil", "INVALID"),
@@ -843,7 +864,7 @@ func TestServer_Auth_Fail_Unauthorized(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", user.PermissionReadWrite)) // Not mytopic!
 
 	response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
@@ -857,7 +878,7 @@ func TestServer_Auth_Fail_CannotPublish(t *testing.T) {
 	c.AuthDefault = user.PermissionReadWrite // Open by default
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "private", user.PermissionDenyAll))
 	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
 
@@ -906,7 +927,7 @@ func TestServer_Auth_ViaQuery(t *testing.T) {
 	c.AuthDefault = user.PermissionDenyAll
 	s := newTestServer(t, c)
 
-	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin))
+	require.Nil(t, s.userManager.AddUser("ben", "some pass", user.RoleAdmin, false))
 
 	u := fmt.Sprintf("/mytopic/json?poll=1&auth=%s", base64.RawURLEncoding.EncodeToString([]byte(util.BasicAuth("ben", "some pass"))))
 	response := request(t, s, "GET", u, "", nil)
@@ -954,8 +975,8 @@ func TestServer_StatsResetter(t *testing.T) {
 		MessageLimit:          5,
 		MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
-	require.Nil(t, s.userManager.AddUser("tieruser", "tieruser", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.AddUser("tieruser", "tieruser", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("tieruser", "test"))
 
 	// Send an anonymous message
@@ -1099,7 +1120,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 	require.Nil(t, s.userManager.AddTier(&user.Tier{
 		Code: "test",
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	u, err := s.userManager.User("phil")
@@ -1679,6 +1700,35 @@ func TestServer_PublishAsJSON_WithActions(t *testing.T) {
 	require.Equal(t, "target_temp_f=65", m.Actions[1].Body)
 }
 
+func TestServer_PublishAsJSON_NoCache(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	body := `{"topic":"mytopic","message": "this message is not cached","cache":"no"}`
+	response := request(t, s, "PUT", "/", body, nil)
+	msg := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg.ID)
+	require.Equal(t, "this message is not cached", msg.Message)
+	require.Equal(t, int64(0), msg.Expires)
+
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	messages := toMessages(t, response.Body.String())
+	require.Empty(t, messages)
+}
+
+func TestServer_PublishAsJSON_WithoutFirebase(t *testing.T) {
+	sender := newTestFirebaseSender(10)
+	s := newTestServer(t, newTestConfig(t))
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+	body := `{"topic":"mytopic","message": "my first message","firebase":"no"}`
+	response := request(t, s, "PUT", "/", body, nil)
+	msg1 := toMessage(t, response.Body.String())
+	require.NotEmpty(t, msg1.ID)
+	require.Equal(t, "my first message", msg1.Message)
+
+	time.Sleep(100 * time.Millisecond) // Firebase publishing happens
+	require.Equal(t, 0, len(sender.Messages()))
+}
+
 func TestServer_PublishAsJSON_Invalid(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	body := `{"topic":"mytopic",INVALID`
@@ -1696,7 +1746,7 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 		MessageLimit:          5,
 		MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish to reach message limit
@@ -1932,7 +1982,7 @@ func TestServer_PublishAttachmentWithTierBasedExpiry(t *testing.T) {
 		AttachmentExpiryDuration: sevenDays, // 7 days
 		AttachmentBandwidthLimit: 100000,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish and make sure we can retrieve it
@@ -1977,7 +2027,7 @@ func TestServer_PublishAttachmentWithTierBasedBandwidthLimit(t *testing.T) {
 		AttachmentExpiryDuration: time.Hour,
 		AttachmentBandwidthLimit: 14000, // < 3x5000 bytes -> enough for one upload, one download
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish and make sure we can retrieve it
@@ -2015,7 +2065,7 @@ func TestServer_PublishAttachmentWithTierBasedLimits(t *testing.T) {
 		AttachmentExpiryDuration: 30 * time.Second,
 		AttachmentBandwidthLimit: 1000000,
 	}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 
 	// Publish small file as anonymous
@@ -2184,7 +2234,7 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 func TestServer_Visitor_Custom_ClientIP_Header(t *testing.T) {
 	c := newTestConfig(t)
 	c.BehindProxy = true
-	c.ProxyClientIPHeader = "X-Client-IP"
+	c.ProxyForwardedHeader = "X-Client-IP"
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11"
@@ -2250,7 +2300,7 @@ func TestServer_AnonymousUser_And_NonTierUser_Are_Same_Visitor(t *testing.T) {
 	defer s.closeDatabases()
 
 	// Create user without tier
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 
 	// Publish a message (anonymous user)
 	rr := request(t, s, "POST", "/mytopic", "hi", nil)

@@ -413,7 +413,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		} else {
 			ev.Info("WebSocket error: %s", err.Error())
 		}
-		return // Do not attempt to write to upgraded connection
+		w.WriteHeader(httpErr.HTTPCode)
+		return // Do not attempt to write any body to upgraded connection
 	}
 	if isNormalError {
 		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
@@ -445,8 +446,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
-	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
+		return s.ensureAdmin(s.handleUsersUpdate)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {
@@ -1016,7 +1019,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap(e.Error())
+			return false, false, "", "", false, false, errHTTPBadRequestActionsInvalid.Wrap("%s", e.Error())
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
@@ -1025,7 +1028,8 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	template = readBoolParam(r, false, "x-template", "template", "tpl")
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
-	if unifiedpush {
+	contentEncoding := readParam(r, "content-encoding")
+	if unifiedpush || contentEncoding == "aes128gcm" {
 		firebase = false
 		unifiedpush = true
 	}
@@ -1556,8 +1560,8 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled b
 
 // parseSince returns a timestamp identifying the time span from which cached messages should be received.
 //
-// Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h), or
-// "all" for all messages.
+// Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h),
+// "all" for all messages, or "latest" for the most recent message for a topic
 func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 	since := readParam(r, "x-since", "since", "si")
 
@@ -1569,6 +1573,8 @@ func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
 		return sinceNoMessages, nil
 	} else if since == "all" {
 		return sinceAllMessages, nil
+	} else if since == "latest" {
+		return sinceLatestMessage, nil
 	} else if since == "none" {
 		return sinceNoMessages, nil
 	}
@@ -1862,6 +1868,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)
 		}
+		if m.Cache != "" {
+			r.Header.Set("X-Cache", m.Cache)
+		}
+		if m.Firebase != "" {
+			r.Header.Set("X-Firebase", m.Firebase)
+		}
 		return next(w, r, v)
 	}
 }
@@ -1885,14 +1897,14 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 }
 
 func (s *Server) authorizeTopicWrite(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionWrite)
+	return s.authorizeTopic(next, user.PermissionWrite)
 }
 
 func (s *Server) authorizeTopicRead(next handleFunc) handleFunc {
-	return s.autorizeTopic(next, user.PermissionRead)
+	return s.authorizeTopic(next, user.PermissionRead)
 }
 
-func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc {
+func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.userManager == nil {
 			return next(w, r, v)
@@ -1925,7 +1937,7 @@ func (s *Server) autorizeTopic(next handleFunc, perm user.Permission) handleFunc
 // that subsequent logging calls still have a visitor context.
 func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	// Read "Authorization" header value, and exit out early if it's not set
-	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyClientIPHeader)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader)
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
 		return vip, nil
@@ -2000,7 +2012,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 	if err != nil {
 		return nil, err
 	}
-	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyClientIPHeader)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader)
 	go s.userManager.EnqueueTokenUpdate(token, &user.TokenUpdate{
 		LastAccess: time.Now(),
 		LastOrigin: ip,

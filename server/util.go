@@ -73,61 +73,33 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func extractIPAddress(r *http.Request, behindProxy bool, proxyClientIPHeader string) netip.Addr {
-	logr(r).Debug("Starting IP extraction")
-
+func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string) netip.Addr {
 	remoteAddr := r.RemoteAddr
-	logr(r).Debug("RemoteAddr: %s", remoteAddr)
-
 	addrPort, err := netip.ParseAddrPort(remoteAddr)
 	ip := addrPort.Addr()
 	if err != nil {
-		logr(r).Warn("Failed to parse RemoteAddr as AddrPort: %v", err)
+		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
 		ip, err = netip.ParseAddr(remoteAddr)
 		if err != nil {
 			ip = netip.IPv4Unspecified()
-			logr(r).Error("Failed to parse RemoteAddr as IP: %v, defaulting to 0.0.0.0", err)
+			if remoteAddr != "@" && !behindProxy { // RemoteAddr is @ when unix socket is used
+				logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", remoteAddr)
+			}
 		}
 	}
-
-	// Log initial IP before further processing
-	logr(r).Debug("Initial IP after RemoteAddr parsing: %s", ip)
-
-	if proxyClientIPHeader != "" {
-		logr(r).Debug("Using ProxyClientIPHeader: %s", proxyClientIPHeader)
-		if customHeaderIP := r.Header.Get(proxyClientIPHeader); customHeaderIP != "" {
-			logr(r).Debug("Custom header %s value: %s", proxyClientIPHeader, customHeaderIP)
-			realIP, err := netip.ParseAddr(customHeaderIP)
-			if err != nil {
-				logr(r).Error("Invalid IP in %s header: %s, error: %v", proxyClientIPHeader, customHeaderIP, err)
-			} else {
-				logr(r).Debug("Successfully parsed IP from custom header: %s", realIP)
-				ip = realIP
-			}
+	if behindProxy && strings.TrimSpace(r.Header.Get(proxyForwardedHeader)) != "" {
+		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
+		// only the right-most address can be trusted (as this is the one added by our proxy server).
+		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
+		ips := util.SplitNoEmpty(r.Header.Get(proxyForwardedHeader), ",")
+		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
+		if err != nil {
+			logr(r).Err(err).Error("invalid IP address %s received in %s header", ip, proxyForwardedHeader)
+			// Fall back to the regular remote address if X-Forwarded-For is damaged
 		} else {
-			logr(r).Warn("Custom header %s is empty or missing", proxyClientIPHeader)
+			ip = realIP
 		}
-	} else if behindProxy {
-		logr(r).Debug("No ProxyClientIPHeader set, checking X-Forwarded-For")
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			logr(r).Debug("X-Forwarded-For value: %s", xff)
-			ips := util.SplitNoEmpty(xff, ",")
-			realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
-			if err != nil {
-				logr(r).Error("Invalid IP in X-Forwarded-For header: %s, error: %v", xff, err)
-			} else {
-				logr(r).Debug("Successfully parsed IP from X-Forwarded-For: %s", realIP)
-				ip = realIP
-			}
-		} else {
-			logr(r).Debug("X-Forwarded-For header is empty or missing")
-		}
-	} else {
-		logr(r).Debug("Behind proxy is false, skipping proxy headers")
 	}
-
-	// Final resolved IP
-	logr(r).Debug("Final resolved IP: %s", ip)
 	return ip
 }
 

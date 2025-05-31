@@ -105,6 +105,8 @@ type publishMessage struct {
 	Filename string   `json:"filename"`
 	Email    string   `json:"email"`
 	Call     string   `json:"call"`
+	Cache    string   `json:"cache"`    // use string as it defaults to true (or use &bool instead)
+	Firebase string   `json:"firebase"` // use string as it defaults to true (or use &bool instead)
 	Delay    string   `json:"delay"`
 }
 
@@ -169,8 +171,12 @@ func (t sinceMarker) IsNone() bool {
 	return t == sinceNoMessages
 }
 
+func (t sinceMarker) IsLatest() bool {
+	return t == sinceLatestMessage
+}
+
 func (t sinceMarker) IsID() bool {
-	return t.id != ""
+	return t.id != "" && t.id != "latest"
 }
 
 func (t sinceMarker) Time() time.Time {
@@ -182,8 +188,9 @@ func (t sinceMarker) ID() string {
 }
 
 var (
-	sinceAllMessages = sinceMarker{time.Unix(0, 0), ""}
-	sinceNoMessages  = sinceMarker{time.Unix(1, 0), ""}
+	sinceAllMessages   = sinceMarker{time.Unix(0, 0), ""}
+	sinceNoMessages    = sinceMarker{time.Unix(1, 0), ""}
+	sinceLatestMessage = sinceMarker{time.Unix(0, 0), "latest"}
 )
 
 type queryFilter struct {
@@ -248,9 +255,10 @@ type apiStatsResponse struct {
 	MessagesRate float64 `json:"messages_rate"` // Average number of messages per second
 }
 
-type apiUserAddRequest struct {
+type apiUserAddOrUpdateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Hash     string `json:"hash"`
 	Tier     string `json:"tier"`
 	// Do not add 'role' here. We don't want to add admins via the API.
 }

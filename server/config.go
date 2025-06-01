@@ -143,7 +143,9 @@ type Config struct {
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
-	BehindProxy                          bool
+	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address
+	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For"
+	ProxyTrustedAddresses                []string  // List of trusted proxy addresses that will be stripped from the Forwarded header if BehindProxy is true
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
@@ -232,7 +234,8 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorSubscriberRateLimiting:        false,
-		BehindProxy:                          false,
+		BehindProxy:                          false,             // If true, the server will trust the proxy client IP header to determine the client IP address
+		ProxyForwardedHeader:                 "X-Forwarded-For", // Default header for reverse proxy client IPs
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

@@ -10,12 +10,18 @@ import (
 	"net/http"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strings"
 )
 
 var (
-	mimeDecoder               mime.WordDecoder
+	mimeDecoder mime.WordDecoder
+
+	// priorityHeaderIgnoreRegex matches specific patterns of the "Priority" header (RFC 9218), so that it can be ignored
 	priorityHeaderIgnoreRegex = regexp.MustCompile(`^u=\d,\s*(i|\d)$|^u=\d$`)
+
+	// forwardedHeaderRegex parses IPv4 addresses from the "Forwarded" header (RFC 7239)
+	forwardedHeaderRegex = regexp.MustCompile(`(?i)\bfor="?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"?`)
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -34,15 +40,11 @@ func toBool(value string) bool {
 	return value == "1" || value == "yes" || value == "true"
 }
 
-func readCommaSeparatedParam(r *http.Request, names ...string) (params []string) {
-	paramStr := readParam(r, names...)
-	if paramStr != "" {
-		params = make([]string, 0)
-		for _, s := range util.SplitNoEmpty(paramStr, ",") {
-			params = append(params, strings.TrimSpace(s))
-		}
+func readCommaSeparatedParam(r *http.Request, names ...string) []string {
+	if paramStr := readParam(r, names...); paramStr != "" {
+		return util.Map(util.SplitNoEmpty(paramStr, ","), strings.TrimSpace)
 	}
-	return params
+	return []string{}
 }
 
 func readParam(r *http.Request, names ...string) string {
@@ -73,34 +75,58 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func extractIPAddress(r *http.Request, behindProxy bool) netip.Addr {
-	remoteAddr := r.RemoteAddr
-	addrPort, err := netip.ParseAddrPort(remoteAddr)
-	ip := addrPort.Addr()
+// extractIPAddress extracts the IP address of the visitor from the request,
+// either from the TCP socket or from a proxy header.
+func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddresses []string) netip.Addr {
+	if behindProxy && proxyForwardedHeader != "" {
+		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddresses); err == nil {
+			return addr
+		}
+		// Fall back to the remote address if the header is not found or invalid
+	}
+	addrPort, err := netip.ParseAddrPort(r.RemoteAddr)
 	if err != nil {
-		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
-		ip, err = netip.ParseAddr(remoteAddr)
-		if err != nil {
-			ip = netip.IPv4Unspecified()
-			if remoteAddr != "@" && !behindProxy { // RemoteAddr is @ when unix socket is used
-				logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", remoteAddr)
+		logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", r.RemoteAddr)
+		return netip.IPv4Unspecified()
+	}
+	return addrPort.Addr()
+}
+
+// extractIPAddressFromHeader extracts the last IP address from the specified header.
+//
+// It supports multiple formats:
+// - single IP address
+// - comma-separated list
+// - RFC 7239-style list (Forwarded header)
+//
+// If there are multiple addresses, we first remove the trusted IP addresses from the list, and
+// then take the right-most address in the list (as this is the one added by our proxy server).
+// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
+func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
+	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))
+	if value == "" {
+		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
+	}
+	// Extract valid addresses
+	addrsStrs := util.Map(util.SplitNoEmpty(value, ","), strings.TrimSpace)
+	var validAddrs []netip.Addr
+	for _, addrStr := range addrsStrs {
+		if addr, err := netip.ParseAddr(addrStr); err == nil {
+			validAddrs = append(validAddrs, addr)
+		} else if m := forwardedHeaderRegex.FindStringSubmatch(addrStr); len(m) == 2 {
+			if addr, err := netip.ParseAddr(m[1]); err == nil {
+				validAddrs = append(validAddrs, addr)
 			}
 		}
 	}
-	if behindProxy && strings.TrimSpace(r.Header.Get("X-Forwarded-For")) != "" {
-		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
-		// only the right-most address can be trusted (as this is the one added by our proxy server).
-		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
-		ips := util.SplitNoEmpty(r.Header.Get("X-Forwarded-For"), ",")
-		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
-		if err != nil {
-			logr(r).Err(err).Error("invalid IP address %s received in X-Forwarded-For header", ip)
-			// Fall back to regular remote address if X-Forwarded-For is damaged
-		} else {
-			ip = realIP
-		}
+	// Filter out proxy addresses
+	clientAddrs := util.Filter(validAddrs, func(addr netip.Addr) bool {
+		return !slices.Contains(trustedAddresses, addr.String())
+	})
+	if len(clientAddrs) == 0 {
+		return netip.IPv4Unspecified(), fmt.Errorf("no client IP address found in %s header: %s", forwardedHeader, value)
 	}
-	return ip
+	return clientAddrs[len(clientAddrs)-1], nil
 }
 
 func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, error) {
@@ -133,7 +159,7 @@ func fromContext[T any](r *http.Request, key contextKey) (T, error) {
 
 // maybeDecodeHeader decodes the given header value if it is MIME encoded, e.g. "=?utf-8?q?Hello_World?=",
 // or returns the original header value if it is not MIME encoded. It also calls maybeIgnoreSpecialHeader
-// to ignore new HTTP "Priority" header.
+// to ignore the new HTTP "Priority" header.
 func maybeDecodeHeader(name, value string) string {
 	decoded, err := mimeDecoder.DecodeHeader(value)
 	if err != nil {
@@ -142,7 +168,7 @@ func maybeDecodeHeader(name, value string) string {
 	return maybeIgnoreSpecialHeader(name, decoded)
 }
 
-// maybeIgnoreSpecialHeader ignores new HTTP "Priority" header (see https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-priority)
+// maybeIgnoreSpecialHeader ignores the new HTTP "Priority" header (RFC 9218, see https://datatracker.ietf.org/doc/html/rfc9218)
 //
 // Cloudflare (and potentially other providers) add this to requests when forwarding to the backend (ntfy),
 // so we just ignore it. If the "Priority" header is set to "u=*, i" or "u=*" (by Cloudflare), the header will be ignored.

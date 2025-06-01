@@ -1433,6 +1433,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.13.0 (UNRELEASED)
+
+**Features:**
+
+* Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-addresses` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha)) 
+
 ### ntfy Android app v1.16.1 (UNRELEASED)
 
 **Features:**

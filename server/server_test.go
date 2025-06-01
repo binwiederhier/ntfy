@@ -2200,7 +2200,7 @@ func TestServer_Visitor_XForwardedFor_None(t *testing.T) {
 	c.BehindProxy = true
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
-	r.RemoteAddr = "8.9.10.11"
+	r.RemoteAddr = "8.9.10.11:1234"
 	r.Header.Set("X-Forwarded-For", "  ") // Spaces, not empty!
 	v, err := s.maybeAuthenticate(r)
 	require.Nil(t, err)
@@ -2212,7 +2212,7 @@ func TestServer_Visitor_XForwardedFor_Single(t *testing.T) {
 	c.BehindProxy = true
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
-	r.RemoteAddr = "8.9.10.11"
+	r.RemoteAddr = "8.9.10.11:1234"
 	r.Header.Set("X-Forwarded-For", "1.1.1.1")
 	v, err := s.maybeAuthenticate(r)
 	require.Nil(t, err)
@@ -2224,11 +2224,38 @@ func TestServer_Visitor_XForwardedFor_Multiple(t *testing.T) {
 	c.BehindProxy = true
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
-	r.RemoteAddr = "8.9.10.11"
+	r.RemoteAddr = "8.9.10.11:1234"
 	r.Header.Set("X-Forwarded-For", "1.2.3.4 , 2.4.4.2,234.5.2.1 ")
 	v, err := s.maybeAuthenticate(r)
 	require.Nil(t, err)
 	require.Equal(t, "234.5.2.1", v.ip.String())
+}
+
+func TestServer_Visitor_Custom_ClientIP_Header(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyForwardedHeader = "X-Client-IP"
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11:1234"
+	r.Header.Set("X-Client-IP", "1.2.3.4")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "1.2.3.4", v.ip.String())
+}
+
+func TestServer_Visitor_Custom_Forwarded_Header(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyForwardedHeader = "Forwarded"
+	c.ProxyTrustedAddresses = []string{"1.2.3.4"}
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11:1234"
+	r.Header.Set("Forwarded", " for=5.6.7.8, by=example.com;for=1.2.3.4")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "5.6.7.8", v.ip.String())
 }
 
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
@@ -2320,7 +2347,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 
 	// "Register" visitor 1.2.3.4 to topic "upAAAAAAAAAAAA" as a rate limit visitor
 	subscriber1Fn := func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4"
+		r.RemoteAddr = "1.2.3.4:1234"
 	}
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriber1Fn)
 	require.Equal(t, 200, rr.Code)
@@ -2329,7 +2356,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 
 	// "Register" visitor 8.7.7.1 to topic "up012345678912" as a rate limit visitor (implicitly via topic name)
 	subscriber2Fn := func(r *http.Request) {
-		r.RemoteAddr = "8.7.7.1"
+		r.RemoteAddr = "8.7.7.1:1234"
 	}
 	rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, subscriber2Fn)
 	require.Equal(t, 200, rr.Code)
@@ -2372,7 +2399,7 @@ func TestServer_SubscriberRateLimiting_NotWrongTopic(t *testing.T) {
 	s := newTestServer(t, c)
 
 	subscriberFn := func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4"
+		r.RemoteAddr = "1.2.3.4:1234"
 	}
 	rr := request(t, s, "GET", "/alerts,upAAAAAAAAAAAA,upBBBBBBBBBBBB/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
@@ -2392,7 +2419,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 
 	// Registering visitor 1.2.3.4 to topic has no effect
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4"
+		r.RemoteAddr = "1.2.3.4:1234"
 	})
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
@@ -2400,7 +2427,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 
 	// Registering visitor 8.7.7.1 to topic has no effect
 	rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, func(r *http.Request) {
-		r.RemoteAddr = "8.7.7.1"
+		r.RemoteAddr = "8.7.7.1:1234"
 	})
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "", rr.Body.String())
@@ -2426,7 +2453,7 @@ func TestServer_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	// "Register" 5 different UnifiedPush visitors
 	for i := 0; i < 5; i++ {
 		subscriberFn := func(r *http.Request) {
-			r.RemoteAddr = fmt.Sprintf("1.2.3.%d", i+1)
+			r.RemoteAddr = fmt.Sprintf("1.2.3.%d:1234", i+1)
 		}
 		rr := request(t, s, "GET", fmt.Sprintf("/up12345678901%d/json?poll=1", i), "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
@@ -2450,7 +2477,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 	// "Register" 5 different UnifiedPush visitors
 	for i := 0; i < 5; i++ {
 		rr := request(t, s, "GET", fmt.Sprintf("/up12345678901%d/json?poll=1", i), "", nil, func(r *http.Request) {
-			r.RemoteAddr = fmt.Sprintf("1.2.3.%d", i+1)
+			r.RemoteAddr = fmt.Sprintf("1.2.3.%d:1234", i+1)
 		})
 		require.Equal(t, 200, rr.Code)
 	}
@@ -2477,7 +2504,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 
 	// "Register" rate visitor
 	subscriberFn := func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4"
+		r.RemoteAddr = "1.2.3.4:1234"
 	}
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
@@ -2516,7 +2543,7 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 	// - "up123456789012": Allowed, because no ACLs and nobody owns the topic
 	// - "announcements": NOT allowed, because it has read-only permissions for everyone
 	rr := request(t, s, "GET", "/up123456789012,announcements/json?poll=1", "", nil, func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4"
+		r.RemoteAddr = "1.2.3.4:1234"
 	})
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, "1.2.3.4", s.topics["up123456789012"].rateVisitor.ip.String())
@@ -2958,7 +2985,7 @@ func request(t *testing.T, s *Server, method, url, body string, headers map[stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.RemoteAddr = "9.9.9.9" // Used for tests
+	r.RemoteAddr = "9.9.9.9:1234" // Used for tests
 	for k, v := range headers {
 		r.Header.Set(k, v)
 	}

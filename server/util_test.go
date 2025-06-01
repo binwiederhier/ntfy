@@ -88,3 +88,33 @@ func TestMaybeDecodeHeaders(t *testing.T) {
 	r.Header.Set("X-Priority", "5") // ntfy priority header
 	require.Equal(t, "5", readHeaderParam(r, "x-priority", "priority", "p"))
 }
+
+func TestExtractIPAddress(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "10.0.0.1:1234"
+	r.Header.Set("X-Forwarded-For", "  1.2.3.4  , 5.6.7.8")
+	r.Header.Set("X-Client-IP", "9.10.11.12")
+	r.Header.Set("X-Real-IP", "13.14.15.16, 1.1.1.1")
+	r.Header.Set("Forwarded", "for=17.18.19.20;by=proxy.example.com, by=2.2.2.2;for=1.1.1.1")
+
+	trustedProxies := []string{"1.1.1.1"}
+
+	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+	require.Equal(t, "9.10.11.12", extractIPAddress(r, true, "X-Client-IP", trustedProxies).String())
+	require.Equal(t, "13.14.15.16", extractIPAddress(r, true, "X-Real-IP", trustedProxies).String())
+	require.Equal(t, "17.18.19.20", extractIPAddress(r, true, "Forwarded", trustedProxies).String())
+	require.Equal(t, "10.0.0.1", extractIPAddress(r, false, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_UnixSocket(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "@"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 1.1.1.1")
+	r.Header.Set("Forwarded", "by=bla.example.com;for=17.18.19.20")
+
+	trustedProxies := []string{"1.1.1.1"}
+
+	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+	require.Equal(t, "17.18.19.20", extractIPAddress(r, true, "Forwarded", trustedProxies).String())
+	require.Equal(t, "0.0.0.0", extractIPAddress(r, false, "X-Forwarded-For", trustedProxies).String())
+}

@@ -553,15 +553,67 @@ It may be desirable to run ntfy behind a proxy (e.g. nginx, HAproxy or Apache), 
 using Let's Encrypt using certbot, or simply because you'd like to share the ports (80/443) with other services. 
 Whatever your reasons may be, there are a few things to consider. 
 
+### IP-based rate limiting
 If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the 
-[rate limiting](#rate-limiting) logic to use the `X-Forwarded-For` header as the primary identifier for a visitor, 
-as opposed to the remote IP address. If the `behind-proxy` flag is not set, all visitors will
-be counted as one, because from the perspective of the ntfy server, they all share the proxy's IP address.
+[rate limiting](#rate-limiting) logic to use the header configured in `proxy-forwarded-header` (default is `X-Forwarded-For`)
+as the primary identifier for a visitor, as opposed to the remote IP address. 
 
-=== "/etc/ntfy/server.yml"
+If the `behind-proxy` flag is not set, all visitors will be counted as one, because from the perspective of the
+ntfy server, they all share the proxy's IP address. 
+
+Relevant flags to consider:
+
+* `behind-proxy` makes it so that the real visitor IP address is extracted from the header defined in `proxy-forwarded-header`.
+  Without this, the remote address of the incoming connection is used (default: `false`).
+* `proxy-forwarded-header` is the header to use to identify visitors (default: `X-Forwarded-For`). It may be a single IP address (e.g. `1.2.3.4`),
+  a comma-separated list of IP addresses (e.g. `1.2.3.4, 5.6.7.8`), or an [RFC 7239](https://datatracker.ietf.org/doc/html/rfc7239)-style
+ header (e.g. `for=1.2.3.4;by=proxy.example.com, for=5.6.7.8`).
+* `proxy-trusted-addresses` is a comma-separated list of IP addresses that are removed from the forwarded header 
+  to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
+  the forwarded header (default: empty).
+
+=== "/etc/ntfy/server.yml (behind a proxy)"
     ``` yaml
-    # Tell ntfy to use "X-Forwarded-For" to identify visitors
+    # Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting
+    #
+    # Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
+    #          the visitor IP will be 1.2.3.4 (right-most address).
+    #
     behind-proxy: true
+    ```
+
+=== "/etc/ntfy/server.yml (X-Client-IP header)"
+    ``` yaml
+    # Tell ntfy to use "X-Client-IP" header to identify visitors for rate limiting
+    #
+    # Example: If "X-Client-IP: 9.9.9.9" is set, 
+    #          the visitor IP will be 9.9.9.9.
+    #
+    behind-proxy: true
+    proxy-forwarded-header: "X-Client-IP"
+    ```
+
+=== "/etc/ntfy/server.yml (Forwarded header)"
+    ``` yaml
+    # Tell ntfy to use "Forwarded" header (RFC 7239) to identify visitors for rate limiting
+    #
+    # Example: If "Forwarded: for=1.2.3.4;by=proxy.example.com, for=9.9.9.9" is set, 
+    #          the visitor IP will be 9.9.9.9.
+    #
+    behind-proxy: true
+    proxy-forwarded-header: "Forwarded"
+    ```
+
+=== "/etc/ntfy/server.yml (multiple proxies)"
+    ``` yaml
+    # Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting,
+    # and to strip the IP addresses of the proxies 1.2.3.4 and 1.2.3.5
+    #
+    # Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
+    #          the visitor IP will be 9.9.9.9 (right-most unknown address).
+    #
+    behind-proxy: true
+    proxy-trusted-addresses: "1.2.3.4, 1.2.3.5"
     ```
 
 ### TLS/SSL
@@ -1390,7 +1442,9 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cache-batch-timeout`                      | `NTFY_CACHE_BATCH_TIMEOUT`                      | *duration*                                          | 0s                | Timeout for batched async writes to the message cache (if zero, writes are synchronous)                                                                                                                                         |
 | `auth-file`                                | `NTFY_AUTH_FILE`                                | *filename*                                          | -                 | Auth database file used for access control. If set, enables authentication and access control. See [access control](#access-control).                                                                                           |
 | `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | `read-write`      | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                             |
-| `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false             | If set, the X-Forwarded-For header is used to determine the visitor IP address instead of the remote address of the connection.                                                                                                 |
+| `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false             | If set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)                                                                                                            |
+| `proxy-forwarded-header`                   | `NTFY_PROXY_FORWARDED_HEADER`                   | *string*                                            | `X-Forwarded-For` | Use specified header to determine visitor IP address (for rate limiting)                                                                                                                                                        |
+| `proxy-trusted-addresses`                  | `NTFY_PROXY_TRUSTED_ADDRESSES`                  | *comma-separated list of IPs*                       | -                 | Comma-separated list of trusted IP addresses to remove from forwarded header                                                                                                                                                    |
 | `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory*                                         | -                 | Cache directory for attached files. To enable attachments, this has to be set.                                                                                                                                                  |
 | `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G                | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                   |
 | `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M               | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                       |

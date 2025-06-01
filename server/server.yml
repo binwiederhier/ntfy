@@ -95,13 +95,23 @@
 # auth-default-access: "read-write"
 # auth-startup-queries:
 
-# If set, the X-Forwarded-For header is used to determine the visitor IP address
-# instead of the remote address of the connection.
+# If set, the X-Forwarded-For header (or whatever is configured in proxy-forwarded-header) is used to determine
+# the visitor IP address instead of the remote address of the connection.
 #
-# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
+# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate-limited
 #          as if they are one.
 #
+# - behind-proxy makes it so that the real visitor IP address is extracted from the header defined in
+#   proxy-forwarded-header. Without this, the remote address of the incoming connection is used.
+# - proxy-forwarded-header is the header to use to identify visitors. It may be a single IP address (e.g. 1.2.3.4),
+#   a comma-separated list of IP addresses (e.g. "1.2.3.4, 5.6.7.8"), or an RFC 7239-style header (e.g. "for=1.2.3.4;by=proxy.example.com, for=5.6.7.8").
+# - proxy-trusted-addresses is a comma-separated list of IP addresses that are removed from the forwarded header
+#   to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
+#   the forwarded header.
+#
 # behind-proxy: false
+# proxy-forwarded-header: "X-Forwarded-For"
+# proxy-trusted-addresses:
 
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".
@@ -138,7 +148,7 @@
 # - smtp-server-domain is the e-mail domain, e.g. ntfy.sh
 # - smtp-server-addr-prefix is an optional prefix for the e-mail addresses to prevent spam. If set to "ntfy-",
 #   for instance, only e-mails to ntfy-$topic@ntfy.sh will be accepted. If this is not set, all emails to
-#   $topic@ntfy.sh will be accepted (which may obviously be a spam problem).
+#   $topic@ntfy.sh will be accepted (which may be a spam problem).
 #
 # smtp-server-listen:
 # smtp-server-domain:

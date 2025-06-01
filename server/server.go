@@ -1936,8 +1936,8 @@ func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFun
 // This function will ALWAYS return a visitor, even if an error occurs (e.g. unauthorized), so
 // that subsequent logging calls still have a visitor context.
 func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
-	// Read "Authorization" header value, and exit out early if it's not set
-	ip := extractIPAddress(r, s.config.BehindProxy)
+	// Read the "Authorization" header value and exit out early if it's not set
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedAddresses)
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
 		return vip, nil
@@ -2012,7 +2012,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 	if err != nil {
 		return nil, err
 	}
-	ip := extractIPAddress(r, s.config.BehindProxy)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedAddresses)
 	go s.userManager.EnqueueTokenUpdate(token, &user.TokenUpdate{
 		LastAccess: time.Now(),
 		LastOrigin: ip,

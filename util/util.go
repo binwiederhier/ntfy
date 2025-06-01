@@ -17,10 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -99,12 +98,26 @@ func SplitKV(s string, sep string) (key string, value string) {
 	return "", strings.TrimSpace(kv[0])
 }
 
-// LastString returns the last string in a slice, or def if s is empty
-func LastString(s []string, def string) string {
-	if len(s) == 0 {
-		return def
+// Map applies a function to each element of a slice and returns a new slice with the results
+// Example: Map([]int{1, 2, 3}, func(i int) int { return i * 2 }) -> []int{2, 4, 6}
+func Map[T any, U any](slice []T, f func(T) U) []U {
+	result := make([]U, len(slice))
+	for i, v := range slice {
+		result[i] = f(v)
 	}
-	return s[len(s)-1]
+	return result
+}
+
+// Filter returns a new slice containing only the elements of the original slice for which the
+// given function returns true.
+func Filter[T any](slice []T, f func(T) bool) []T {
+	result := make([]T, 0)
+	for _, v := range slice {
+		if f(v) {
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 // RandomString returns a random string with a given length

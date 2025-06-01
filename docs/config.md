@@ -563,8 +563,11 @@ ntfy server, they all share the proxy's IP address.
 
 Relevant flags to consider:
 
-* `behind-proxy`: if set, ntfy will use the `proxy-forwarded-header` to identify visitors (default: `false`)
-* `proxy-forwarded-header`: the header to use to identify visitors (default: `X-Forwarded-For`)
+* `behind-proxy` makes it so that the real visitor IP address is extracted from the header defined in `proxy-forwarded-header`.
+  Without this, the remote address of the incoming connection is used (default: `false`).
+* `proxy-forwarded-header` is the header to use to identify visitors (default: `X-Forwarded-For`). It may be a single IP address (e.g. `1.2.3.4`),
+  a comma-separated list of IP addresses (e.g. `1.2.3.4, 5.6.7.8`), or an [RFC 7239](https://datatracker.ietf.org/doc/html/rfc7239)-style
+ header (e.g. `for=1.2.3.4;by=proxy.example.com, for=5.6.7.8`).
 * `proxy-trusted-addresses`: a comma-separated list of IP addresses that are removed from the forwarded header 
   to determine the real IP address (default: empty)
 
@@ -578,7 +581,7 @@ Relevant flags to consider:
     behind-proxy: true
     ```
 
-=== "/etc/ntfy/server.yml (with custom header)"
+=== "/etc/ntfy/server.yml (X-Client-IP header)"
     ``` yaml
     # Tell ntfy to use "X-Client-IP" header to identify visitors for rate limiting
     #
@@ -587,6 +590,17 @@ Relevant flags to consider:
     #
     behind-proxy: true
     proxy-forwarded-header: "X-Client-IP"
+    ```
+
+=== "/etc/ntfy/server.yml (Forwarded header)"
+    ``` yaml
+    # Tell ntfy to use "Forwarded" header (RFC 7239) to identify visitors for rate limiting
+    #
+    # Example: If "Forwarded: for=1.2.3.4;by=proxy.example.com, for=9.9.9.9" is set, 
+    #          the visitor IP will be 9.9.9.9.
+    #
+    behind-proxy: true
+    proxy-forwarded-header: "Forwarded"
     ```
 
 === "/etc/ntfy/server.yml (multiple proxies)"

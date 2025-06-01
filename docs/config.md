@@ -568,8 +568,9 @@ Relevant flags to consider:
 * `proxy-forwarded-header` is the header to use to identify visitors (default: `X-Forwarded-For`). It may be a single IP address (e.g. `1.2.3.4`),
   a comma-separated list of IP addresses (e.g. `1.2.3.4, 5.6.7.8`), or an [RFC 7239](https://datatracker.ietf.org/doc/html/rfc7239)-style
  header (e.g. `for=1.2.3.4;by=proxy.example.com, for=5.6.7.8`).
-* `proxy-trusted-addresses`: a comma-separated list of IP addresses that are removed from the forwarded header 
-  to determine the real IP address (default: empty)
+* `proxy-trusted-addresses` is a comma-separated list of IP addresses that are removed from the forwarded header 
+  to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
+  the forwarded header (default: empty).
 
 === "/etc/ntfy/server.yml (behind a proxy)"
     ``` yaml

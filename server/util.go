@@ -75,6 +75,8 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
+// extractIPAddress extracts the IP address of the visitor from the request,
+// either from the TCP socket or from a proxy header.
 func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddresses []string) netip.Addr {
 	if behindProxy && proxyForwardedHeader != "" {
 		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddresses); err == nil {
@@ -92,8 +94,13 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 
 // extractIPAddressFromHeader extracts the last IP address from the specified header.
 //
-// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
-// only the right-most address can be trusted (as this is the one added by our proxy server).
+// It supports multiple formats:
+// - single IP address
+// - comma-separated list
+// - RFC 7239-style list (Forwarded header)
+//
+// If there are multiple addresses, we first remove the trusted IP addresses from the list, and
+// then take the right-most address in the list (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
 	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))

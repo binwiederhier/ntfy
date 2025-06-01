@@ -2244,6 +2244,20 @@ func TestServer_Visitor_Custom_ClientIP_Header(t *testing.T) {
 	require.Equal(t, "1.2.3.4", v.ip.String())
 }
 
+func TestServer_Visitor_Custom_Forwarded_Header(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyForwardedHeader = "Forwarded"
+	c.ProxyTrustedAddresses = []string{"1.2.3.4"}
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "8.9.10.11:1234"
+	r.Header.Set("Forwarded", " for=5.6.7.8, by=example.com;for=1.2.3.4")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "5.6.7.8", v.ip.String())
+}
+
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	t.Parallel()
 	count := 50000

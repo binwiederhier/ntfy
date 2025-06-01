@@ -553,6 +553,7 @@ It may be desirable to run ntfy behind a proxy (e.g. nginx, HAproxy or Apache), 
 using Let's Encrypt using certbot, or simply because you'd like to share the ports (80/443) with other services. 
 Whatever your reasons may be, there are a few things to consider. 
 
+### IP-based rate limiting
 If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. This will instruct the 
 [rate limiting](#rate-limiting) logic to use the header configured in `proxy-forwarded-header` (default is `X-Forwarded-For`)
 as the primary identifier for a visitor, as opposed to the remote IP address. 

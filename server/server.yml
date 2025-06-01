@@ -95,13 +95,21 @@
 # auth-default-access: "read-write"
 # auth-startup-queries:
 
-# If set, the X-Forwarded-For header is used to determine the visitor IP address
+# If set, the X-Forwarded-For header (or whatever is configured) is used to determine the visitor IP address
 # instead of the remote address of the connection.
 #
-# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate limited
+# WARNING: If you are behind a proxy, you must set this, otherwise all visitors are rate-limited
 #          as if they are one.
 #
+# - behind-proxy defines whether the server is behind a reverse proxy (e.g. nginx, traefik, ...)
+# - proxy-forwarded-header defines the header used to determine the visitor IP address. This defaults
+#   to "X-Forwarded-For", but can be set to any other header, e.g. "X-Real-IP", "X-Client-IP", ...
+# - proxy-trusted-addrs defines a list of trusted IP addresses that are stripped out of the
+#   forwarded header. This is useful if there are multiple trusted proxies involved.
+#
 # behind-proxy: false
+# proxy-forwarded-header: "X-Forwarded-For"
+# proxy-trusted-addrs:
 
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -73,34 +74,43 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string) netip.Addr {
-	remoteAddr := r.RemoteAddr
-	addrPort, err := netip.ParseAddrPort(remoteAddr)
-	ip := addrPort.Addr()
+func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddrs []string) netip.Addr {
+	if behindProxy && proxyForwardedHeader != "" {
+		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddrs); err == nil {
+			return addr
+		}
+		// Fall back to the remote address if the header is not found or invalid
+	}
+	addrPort, err := netip.ParseAddrPort(r.RemoteAddr)
 	if err != nil {
-		// This should not happen in real life; only in tests. So, using falling back to 0.0.0.0 if address unspecified
-		ip, err = netip.ParseAddr(remoteAddr)
-		if err != nil {
-			ip = netip.IPv4Unspecified()
-			if remoteAddr != "@" && !behindProxy { // RemoteAddr is @ when unix socket is used
-				logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", remoteAddr)
-			}
-		}
+		logr(r).Err(err).Warn("unable to parse IP (%s), new visitor with unspecified IP (0.0.0.0) created", r.RemoteAddr)
+		return netip.IPv4Unspecified()
 	}
-	if behindProxy && strings.TrimSpace(r.Header.Get(proxyForwardedHeader)) != "" {
-		// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
-		// only the right-most address can be trusted (as this is the one added by our proxy server).
-		// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
-		ips := util.SplitNoEmpty(r.Header.Get(proxyForwardedHeader), ",")
-		realIP, err := netip.ParseAddr(strings.TrimSpace(util.LastString(ips, remoteAddr)))
-		if err != nil {
-			logr(r).Err(err).Error("invalid IP address %s received in %s header", ip, proxyForwardedHeader)
-			// Fall back to the regular remote address if X-Forwarded-For is damaged
-		} else {
-			ip = realIP
-		}
+	return addrPort.Addr()
+}
+
+// extractIPAddressFromHeader extracts the last IP address from the specified header.
+//
+// X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
+// only the right-most address can be trusted (as this is the one added by our proxy server).
+// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
+func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddrs []string) (netip.Addr, error) {
+	value := strings.TrimSpace(r.Header.Get(forwardedHeader))
+	if value == "" {
+		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
 	}
-	return ip
+	addrs := util.Map(util.SplitNoEmpty(value, ","), strings.TrimSpace)
+	clientAddrs := util.Filter(addrs, func(addr string) bool {
+		return !slices.Contains(trustedAddrs, addr)
+	})
+	if len(clientAddrs) == 0 {
+		return netip.IPv4Unspecified(), fmt.Errorf("no client IP address found in %s header: %s", forwardedHeader, value)
+	}
+	clientAddr, err := netip.ParseAddr(clientAddrs[len(clientAddrs)-1])
+	if err != nil {
+		return netip.IPv4Unspecified(), fmt.Errorf("invalid IP address %s received in %s header: %s: %w", clientAddr, forwardedHeader, value, err)
+	}
+	return clientAddr, nil
 }
 
 func readJSONWithLimit[T any](r io.ReadCloser, limit int, allowEmpty bool) (*T, error) {

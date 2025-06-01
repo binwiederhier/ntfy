@@ -145,7 +145,7 @@ type Config struct {
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
 	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address
 	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For"
-	ProxyTrustedAddrs                    []string  // List of trusted proxy addresses that will be stripped from the Forwarded header if BehindProxy is true
+	ProxyTrustedAddresses                []string  // List of trusted proxy addresses that will be stripped from the Forwarded header if BehindProxy is true
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration

@@ -74,9 +74,9 @@ func readQueryParam(r *http.Request, names ...string) string {
 	return ""
 }
 
-func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddrs []string) netip.Addr {
+func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddresses []string) netip.Addr {
 	if behindProxy && proxyForwardedHeader != "" {
-		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddrs); err == nil {
+		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddresses); err == nil {
 			return addr
 		}
 		// Fall back to the remote address if the header is not found or invalid
@@ -94,14 +94,14 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 // X-Forwarded-For can contain multiple addresses (see #328). If we are behind a proxy,
 // only the right-most address can be trusted (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
-func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddrs []string) (netip.Addr, error) {
+func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
 	value := strings.TrimSpace(r.Header.Get(forwardedHeader))
 	if value == "" {
 		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
 	}
 	addrs := util.Map(util.SplitNoEmpty(value, ","), strings.TrimSpace)
 	clientAddrs := util.Filter(addrs, func(addr string) bool {
-		return !slices.Contains(trustedAddrs, addr)
+		return !slices.Contains(trustedAddresses, addr)
 	})
 	if len(clientAddrs) == 0 {
 		return netip.IPv4Unspecified(), fmt.Errorf("no client IP address found in %s header: %s", forwardedHeader, value)

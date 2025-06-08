@@ -409,6 +409,7 @@ type apiConfigResponse struct {
 	EnableEmails       bool     `json:"enable_emails"`
 	EnableReservations bool     `json:"enable_reservations"`
 	EnableWebPush      bool     `json:"enable_web_push"`
+	RequireLogin       bool     `json:"require_login"`
 	BillingContact     string   `json:"billing_contact"`
 	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`

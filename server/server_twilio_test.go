@@ -202,6 +202,67 @@ func TestServer_Twilio_Call_Success_With_Yes(t *testing.T) {
 	})
 }
 
+func TestServer_Twilio_Call_Success_with_custom_twiml(t *testing.T) {
+	var called atomic.Bool
+	twilioServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if called.Load() {
+			t.Fatal("Should be only called once")
+		}
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		require.Equal(t, "/2010-04-01/Accounts/AC1234567890/Calls.json", r.URL.Path)
+		require.Equal(t, "Basic QUMxMjM0NTY3ODkwOkFBRUFBMTIzNDU2Nzg5MA==", r.Header.Get("Authorization"))
+		require.Equal(t, "From=%2B1234567890&To=%2B11122233344&Twiml=%0A%3CResponse%3E%0A%09%3CPause+length%3D%221%22%2F%3E%0A%09%3CSay+language%3D%22de-DE%22+loop%3D%223%22%3E%0A%09%09Du+hast+eine+Nachricht+von+notify+im+Thema+mytopic.+Nachricht%3A%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09hi+there%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09Ende+der+Nachricht.%0A%09%09%3Cbreak+time%3D%221s%22%2F%3E%0A%09%09Diese+Nachricht+wurde+von+Benutzer+phil+gesendet.+Sie+wird+drei+Mal+wiederholt.%0A%09%09Um+dich+von+Anrufen+wie+diesen+abzumelden%2C+entferne+deine+Telefonnummer+in+der+notify+web+app.%0A%09%09%3Cbreak+time%3D%223s%22%2F%3E%0A%09%3C%2FSay%3E%0A%09%3CSay+language%3D%22de-DE%22%3EAuf+Wiederh%C3%B6ren.%3C%2FSay%3E%0A%3C%2FResponse%3E", string(body))
+		called.Store(true)
+	}))
+	defer twilioServer.Close()
+
+	c := newTestConfigWithAuthFile(t)
+	c.TwilioCallsBaseURL = twilioServer.URL
+	c.TwilioAccount = "AC1234567890"
+	c.TwilioAuthToken = "AAEAA1234567890"
+	c.TwilioPhoneNumber = "+1234567890"
+	c.TwilioCallFormat = `
+<Response>
+	<Pause length="1"/>
+	<Say language="de-DE" loop="3">
+		Du hast eine Nachricht von notify im Thema %s. Nachricht:
+		<break time="1s"/>
+		%s
+		<break time="1s"/>
+		Ende der Nachricht.
+		<break time="1s"/>
+		Diese Nachricht wurde von Benutzer %s gesendet. Sie wird drei Mal wiederholt.
+		Um dich von Anrufen wie diesen abzumelden, entferne deine Telefonnummer in der notify web app.
+		<break time="3s"/>
+	</Say>
+	<Say language="de-DE">Auf Wiederhören.</Say>
+</Response>`
+	s := newTestServer(t, c)
+
+	// Add tier and user
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "pro",
+		MessageLimit: 10,
+		CallLimit:    1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser))
+	require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, s.userManager.AddPhoneNumber(u.ID, "+11122233344"))
+
+	// Do the thing
+	response := request(t, s, "POST", "/mytopic", "hi there", map[string]string{
+		"authorization": util.BasicAuth("phil", "phil"),
+		"x-call":        "+11122233344",
+	})
+	require.Equal(t, "hi there", toMessage(t, response.Body.String()).Message)
+	waitFor(t, func() bool {
+		return called.Load()
+	})
+}
+
 func TestServer_Twilio_Call_UnverifiedNumber(t *testing.T) {
 	c := newTestConfigWithAuthFile(t)
 	c.TwilioCallsBaseURL = "http://dummy.invalid"

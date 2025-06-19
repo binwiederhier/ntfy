@@ -79,7 +79,6 @@ using Docker Compose (i.e. `docker-compose.yml`):
 
 === "Docker Compose (w/ auth, cache, attachments)"
     ``` yaml
-	version: '3'
 	services:
 	  ntfy:
 	    image: binwiederhier/ntfy
@@ -101,7 +100,6 @@ using Docker Compose (i.e. `docker-compose.yml`):
 
 === "Docker Compose (w/ auth, cache, web push, iOS)"
     ``` yaml
-	version: '3'
 	services:
 	  ntfy:
 	    image: binwiederhier/ntfy

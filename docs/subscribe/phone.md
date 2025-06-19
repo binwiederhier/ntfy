@@ -4,9 +4,9 @@ to receive notifications directly on your phone. Just like the server, this app 
 on GitHub ([Android](https://github.com/binwiederhier/ntfy-android), [iOS](https://github.com/binwiederhier/ntfy-ios)). Feel free to 
 contribute, or [build your own](../develop.md).
 
-<a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img src="../../static/img/badge-googleplay.png"></a>
-<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img src="../../static/img/badge-fdroid.png"></a>
-<a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img src="../../static/img/badge-appstore.png"></a>
+<a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img width="170" src="../../static/img/badge-googleplay.png"></a>
+<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="../../static/img/badge-fdroid.png"></a>
+<a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img width="150" src="../../static/img/badge-appstore.png"></a>
 
 You can get the Android app from both [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) and 
 from [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/). Both are largely identical, with the one exception that

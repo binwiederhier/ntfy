@@ -280,8 +280,6 @@ docker run \
 
 Using docker-compose with non-root user and healthchecks enabled:
 ```yaml
-version: "2.3"
-
 services:
   ntfy:
     image: binwiederhier/ntfy

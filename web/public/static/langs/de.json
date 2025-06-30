@@ -390,7 +390,7 @@
     "alert_notification_ios_install_required_description": "Klicke auf das Teilen-Symbol und “Zum Home-Bildschirm” um auf iOS Benachrichtigungen zu aktivieren",
     "subscribe_dialog_subscribe_use_another_background_info": "Benachrichtigungen von anderen Servern werden nicht empfangen, wenn die Web App nicht geöffnet ist",
     "publish_dialog_checkbox_markdown": "Als Markdown formatieren",
-    "prefs_notifications_web_push_title": "Hintergrundbenachrichtigung",
+    "prefs_notifications_web_push_title": "Hintergrundbenachrichtigungen",
     "prefs_notifications_web_push_disabled_description": "Benachrichtigungen werden empfangen, wenn die Web App geöffnet ist (via WebSocket)",
     "prefs_notifications_web_push_enabled": "Aktiviert für {{server}}",
     "prefs_notifications_web_push_disabled": "Deaktiviert",

@@ -36,7 +36,7 @@
     "message_bar_type_message": "Gib hier eine Nachricht ein",
     "message_bar_error_publishing": "Fehler beim Senden der Benachrichtigung",
     "alert_not_supported_title": "Benachrichtigungen werden nicht unterstützt",
-    "alert_not_supported_description": "Benachrichtigungen werden von Deinem Browser nicht unterstützt",
+    "alert_not_supported_description": "Benachrichtigungen werden von deinem Browser nicht unterstützt:",
     "action_bar_settings": "Einstellungen",
     "action_bar_clear_notifications": "Alle Benachrichtigungen löschen",
     "alert_notification_permission_required_button": "Jetzt erlauben",
@@ -401,7 +401,7 @@
     "error_boundary_button_reload_ntfy": "ntfy neu laden",
     "web_push_subscription_expiring_title": "Benachrichtigungen werden pausiert",
     "web_push_subscription_expiring_body": "Öffne ntfy um weiterhin Benachrichtigungen zu erhalten",
-    "web_push_unknown_notification_title": "Unbekannte Benachrichtigung vom server empfangen",
+    "web_push_unknown_notification_title": "Unbekannte Benachrichtigung vom Server empfangen",
     "web_push_unknown_notification_body": "Du musst möglicherweise ntfy aktualisieren, indem du die Web App öffnest.",
     "prefs_notifications_web_push_enabled_description": "Benachrichtigungen werden empfangen, auch wenn die Web App nicht läuft (über Web Push)"
 }

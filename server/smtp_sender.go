@@ -4,9 +4,10 @@ import (
 	_ "embed" // required by go:embed
 	"encoding/json"
 	"fmt"
+	gomail "gopkg.in/gomail.v2"
 	"mime"
 	"net"
-	"net/smtp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,17 +30,17 @@ type smtpSender struct {
 
 func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 	return s.withCount(v, m, func() error {
-		host, _, err := net.SplitHostPort(s.config.SMTPSenderAddr)
+		host, portStr, err := net.SplitHostPort(s.config.SMTPSenderAddr)
 		if err != nil {
 			return err
 		}
-		message, err := formatMail(s.config.BaseURL, v.ip.String(), s.config.SMTPSenderFrom, to, m)
+		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			return err
 		}
-		var auth smtp.Auth
-		if s.config.SMTPSenderUser != "" {
-			auth = smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+		from, subject, message, err := formatMail(s.config.BaseURL, v.ip.String(), s.config.SMTPSenderFrom, m)
+		if err != nil {
+			return err
 		}
 		ev := logvm(v, m).
 			Tag(tagEmail).
@@ -53,7 +54,18 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 		} else if ev.IsDebug() {
 			ev.Debug("Sending email")
 		}
-		return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
+
+		smtpMessage := gomail.NewMessage()
+		smtpMessage.SetHeader("From", from)
+		smtpMessage.SetHeader("To", to)
+		smtpMessage.SetHeader("Subject", subject)
+		smtpMessage.SetBody("text/plain", message)
+		dialer := gomail.NewDialer(host, port, s.config.SMTPSenderUser, s.config.SMTPSenderPass)
+		err = dialer.DialAndSend(smtpMessage)
+		if err == nil {
+			ev.Debug("Mail sent ok")
+		}
+		return err
 	})
 }
 
@@ -76,7 +88,8 @@ func (s *smtpSender) withCount(v *visitor, m *message, fn func() error) error {
 	return err
 }
 
-func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) {
+// returns: from, subject, content
+func formatMail(baseURL, senderIP, from string, m *message) (string, string, string, error) {
 	topicURL := baseURL + "/" + m.Topic
 	subject := m.Title
 	if subject == "" {
@@ -88,7 +101,7 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if len(m.Tags) > 0 {
 		emojis, tags, err := toEmojis(m.Tags)
 		if err != nil {
-			return "", err
+			return "", "", "", err
 		}
 		if len(emojis) > 0 {
 			subject = strings.Join(emojis, " ") + " " + subject
@@ -100,7 +113,7 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if m.Priority != 0 && m.Priority != 3 {
 		priority, err := util.PriorityString(m.Priority)
 		if err != nil {
-			return "", err
+			return "", "", "", err
 		}
 		if trailer != "" {
 			trailer += "\n"
@@ -110,28 +123,20 @@ func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) 
 	if trailer != "" {
 		message += "\n\n" + trailer
 	}
-	date := time.Unix(m.Time, 0).UTC().Format(time.RFC1123Z)
 	subject = mime.BEncoding.Encode("utf-8", subject)
-	body := `From: "{shortTopicURL}" <{from}>
-To: {to}
-Date: {date}
-Subject: {subject}
-Content-Type: text/plain; charset="utf-8"
+	fullFrom := `"{shortTopicURL}" <{from}>`
+	fullFrom = strings.ReplaceAll(fullFrom, "{from}", from)
+	fullFrom = strings.ReplaceAll(fullFrom, "{shortTopicURL}", util.ShortTopicURL(topicURL))
 
-{message}
+	body := `{message}
 
 --
 This message was sent by {ip} at {time} via {topicURL}`
-	body = strings.ReplaceAll(body, "{from}", from)
-	body = strings.ReplaceAll(body, "{to}", to)
-	body = strings.ReplaceAll(body, "{date}", date)
-	body = strings.ReplaceAll(body, "{subject}", subject)
 	body = strings.ReplaceAll(body, "{message}", message)
 	body = strings.ReplaceAll(body, "{topicURL}", topicURL)
-	body = strings.ReplaceAll(body, "{shortTopicURL}", util.ShortTopicURL(topicURL))
 	body = strings.ReplaceAll(body, "{time}", time.Unix(m.Time, 0).UTC().Format(time.RFC1123))
 	body = strings.ReplaceAll(body, "{ip}", senderIP)
-	return body, nil
+	return fullFrom, subject, body, nil
 }
 
 var (

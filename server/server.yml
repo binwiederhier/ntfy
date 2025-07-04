@@ -292,6 +292,18 @@
 # visitor-email-limit-burst: 16
 # visitor-email-limit-replenish: "1h"
 
+# Rate limiting: IPv4/IPv6 address prefix bits used for rate limiting
+# - visitor-prefix-bits-ipv4: number of bits of the IPv4 address to use for rate limiting (default: 32, full address)
+# - visitor-prefix-bits-ipv6: number of bits of the IPv6 address to use for rate limiting (default: 64, /64 subnet)
+#
+# This is used to group visitors by their IP address or subnet. For example, if you set visitor-prefix-bits-ipv4 to 24,
+# all visitors in the 1.2.3.0/24 network are treated as one.
+#
+# By default, ntfy uses the full IPv4 address (32 bits) and the /64 subnet of the IPv6 address (64 bits).
+#
+# visitor-prefix-bits-ipv4: 32
+# visitor-prefix-bits-ipv6: 64
+
 # Rate limiting: Attachment size and bandwidth limits per visitor:
 # - visitor-attachment-total-size-limit is the total storage limit used for attachments per visitor
 # - visitor-attachment-daily-bandwidth-limit is the total daily attachment download/upload traffic limit per visitor

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadBoolParam(t *testing.T) {
@@ -117,4 +118,28 @@ func TestExtractIPAddress_UnixSocket(t *testing.T) {
 	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
 	require.Equal(t, "17.18.19.20", extractIPAddress(r, true, "Forwarded", trustedProxies).String())
 	require.Equal(t, "0.0.0.0", extractIPAddress(r, false, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_MixedIPv4IPv6(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "[2001:db8:abcd::1]:1234"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 2001:db8:abcd::2, 5.6.7.8")
+	trustedProxies := []string{"1.2.3.4"}
+	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_TrustedIPv6Prefix(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "[2001:db8:abcd::1]:1234"
+	r.Header.Set("X-Forwarded-For", "2001:db8:abcd::1, 2001:db8:abcd:1::2, 2001:db8:abcd:2::3")
+	trustedProxies := []string{"2001:db8:abcd::/48"}
+	require.Equal(t, "2001:db8:abcd:2::3", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_EdgeCases(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "[::ffff:192.0.2.128]:1234" // IPv4-mapped IPv6
+	r.Header.Set("X-Forwarded-For", "::ffff:192.0.2.128, 2001:db8:abcd::1")
+	trustedProxies := []string{"::ffff:192.0.2.128"}
+	require.Equal(t, "2001:db8:abcd::1", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
 }

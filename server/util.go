@@ -22,8 +22,13 @@ var (
 	priorityHeaderIgnoreRegex = regexp.MustCompile(`^u=\d,\s*(i|\d)$|^u=\d$`)
 
 	// forwardedHeaderRegex parses IPv4 and IPv6 addresses from the "Forwarded" header (RFC 7239)
-	// IPv6 addresses in Forwarded header are enclosed in square brackets, e.g. for="[2001:db8::1]"
-	forwardedHeaderRegex = regexp.MustCompile(`(?i)\\bfor=\"?((?:[0-9]{1,3}\.){3}[0-9]{1,3}|\[[0-9a-fA-F:]+\])\"?`)
+	// IPv6 addresses in Forwarded header are enclosed in square brackets. The port is optional.
+	//
+	// Examples:
+	//  for="1.2.3.4"
+	//  for="[2001:db8::1]"; for=1.2.3.4:8080, by=phil
+	//  for="1.2.3.4:8080"
+	forwardedHeaderRegex = regexp.MustCompile(`(?i)\bfor="?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[0-9a-f:]+])(?::\d+)?"?`)
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -105,7 +110,7 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 // then take the right-most address in the list (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
-	value := strings.TrimSpace(r.Header.Get(forwardedHeader))
+	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))
 	if value == "" {
 		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
 	}

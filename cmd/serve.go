@@ -80,6 +80,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-delay-limit", Aliases: []string{"message_delay_limit"}, EnvVars: []string{"NTFY_MESSAGE_DELAY_LIMIT"}, Value: util.FormatDuration(server.DefaultMessageDelayMax), Usage: "max duration a message can be scheduled into the future"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"visitor_subscription_limit"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "visitor-subscriber-rate-limiting", Aliases: []string{"visitor_subscriber_rate_limiting"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING"}, Value: false, Usage: "enables subscriber-based rate limiting"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-total-size-limit", Aliases: []string{"visitor_attachment_total_size_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultVisitorAttachmentTotalSizeLimit), Usage: "total storage limit used for attachments per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-attachment-daily-bandwidth-limit", Aliases: []string{"visitor_attachment_daily_bandwidth_limit"}, EnvVars: []string{"NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT"}, Value: "500M", Usage: "total daily attachment download/upload bandwidth limit per visitor"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-request-limit-burst", Aliases: []string{"visitor_request_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_REQUEST_LIMIT_BURST"}, Value: server.DefaultVisitorRequestLimitBurst, Usage: "initial limit of requests per visitor"}),
@@ -88,7 +89,8 @@ var flagsServe = append(
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-message-daily-limit", Aliases: []string{"visitor_message_daily_limit"}, EnvVars: []string{"NTFY_VISITOR_MESSAGE_DAILY_LIMIT"}, Value: server.DefaultVisitorMessageDailyLimit, Usage: "max messages per visitor per day, derived from request limit if unset"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-email-limit-burst", Aliases: []string{"visitor_email_limit_burst"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_BURST"}, Value: server.DefaultVisitorEmailLimitBurst, Usage: "initial limit of e-mails per visitor"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "visitor-email-limit-replenish", Aliases: []string{"visitor_email_limit_replenish"}, EnvVars: []string{"NTFY_VISITOR_EMAIL_LIMIT_REPLENISH"}, Value: util.FormatDuration(server.DefaultVisitorEmailLimitReplenish), Usage: "interval at which burst limit is replenished (one per x)"}),
-	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "visitor-subscriber-rate-limiting", Aliases: []string{"visitor_subscriber_rate_limiting"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING"}, Value: false, Usage: "enables subscriber-based rate limiting"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-prefix-bits-ipv4", Aliases: []string{"visitor_prefix_bits_ipv4"}, EnvVars: []string{"NTFY_VISITOR_PREFIX_BITS_IPV4"}, Value: server.DefaultVisitorPrefixBitsIPv4, Usage: "number of bits of the IPv4 address to use for rate limiting (default: 32, full address)"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-prefix-bits-ipv6", Aliases: []string{"visitor_prefix_bits_ipv6"}, EnvVars: []string{"NTFY_VISITOR_PREFIX_BITS_IPV6"}, Value: server.DefaultVisitorPrefixBitsIPv6, Usage: "number of bits of the IPv6 address to use for rate limiting (default: 64, /64 subnet)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-forwarded-header", Aliases: []string{"proxy_forwarded_header"}, EnvVars: []string{"NTFY_PROXY_FORWARDED_HEADER"}, Value: "X-Forwarded-For", Usage: "use specified header to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-trusted-addresses", Aliases: []string{"proxy_trusted_addresses"}, EnvVars: []string{"NTFY_PROXY_TRUSTED_ADDRESSES"}, Value: "", Usage: "comma-separated list of trusted IP addresses to remove from forwarded header"}),
@@ -192,6 +194,8 @@ func execServe(c *cli.Context) error {
 	visitorMessageDailyLimit := c.Int("visitor-message-daily-limit")
 	visitorEmailLimitBurst := c.Int("visitor-email-limit-burst")
 	visitorEmailLimitReplenishStr := c.String("visitor-email-limit-replenish")
+	visitorPrefixBitsIPv4 := c.Int("visitor-prefix-bits-ipv4")
+	visitorPrefixBitsIPv6 := c.Int("visitor-prefix-bits-ipv6")
 	behindProxy := c.Bool("behind-proxy")
 	proxyForwardedHeader := c.String("proxy-forwarded-header")
 	proxyTrustedAddresses := util.SplitNoEmpty(c.String("proxy-trusted-addresses"), ",")
@@ -325,6 +329,10 @@ func execServe(c *cli.Context) error {
 		return errors.New("web push expiry warning duration cannot be higher than web push expiry duration")
 	} else if behindProxy && proxyForwardedHeader == "" {
 		return errors.New("if behind-proxy is set, proxy-forwarded-header must also be set")
+	} else if visitorPrefixBitsIPv4 < 1 || visitorPrefixBitsIPv4 > 32 {
+		return errors.New("visitor-prefix-bits-ipv4 must be between 1 and 32")
+	} else if visitorPrefixBitsIPv6 < 1 || visitorPrefixBitsIPv6 > 128 {
+		return errors.New("visitor-prefix-bits-ipv6 must be between 1 and 128")
 	}
 
 	// Backwards compatibility
@@ -413,6 +421,7 @@ func execServe(c *cli.Context) error {
 	conf.MessageDelayMax = messageDelayLimit
 	conf.TotalTopicLimit = totalTopicLimit
 	conf.VisitorSubscriptionLimit = visitorSubscriptionLimit
+	conf.VisitorSubscriberRateLimiting = visitorSubscriberRateLimiting
 	conf.VisitorAttachmentTotalSizeLimit = visitorAttachmentTotalSizeLimit
 	conf.VisitorAttachmentDailyBandwidthLimit = visitorAttachmentDailyBandwidthLimit
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
@@ -421,7 +430,8 @@ func execServe(c *cli.Context) error {
 	conf.VisitorMessageDailyLimit = visitorMessageDailyLimit
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
-	conf.VisitorSubscriberRateLimiting = visitorSubscriberRateLimiting
+	conf.VisitorPrefixBitsIPv4 = visitorPrefixBitsIPv4
+	conf.VisitorPrefixBitsIPv6 = visitorPrefixBitsIPv6
 	conf.BehindProxy = behindProxy
 	conf.ProxyForwardedHeader = proxyForwardedHeader
 	conf.ProxyTrustedAddresses = proxyTrustedAddresses
@@ -434,7 +444,6 @@ func execServe(c *cli.Context) error {
 	conf.EnableMetrics = enableMetrics
 	conf.MetricsListenHTTP = metricsListenHTTP
 	conf.ProfileListenHTTP = profileListenHTTP
-	conf.Version = c.App.Version
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile
@@ -442,6 +451,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushStartupQueries = webPushStartupQueries
 	conf.WebPushExpiryDuration = webPushExpiryDuration
 	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
+	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)

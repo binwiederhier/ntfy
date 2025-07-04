@@ -61,6 +61,8 @@ const (
 	DefaultVisitorAuthFailureLimitReplenish     = time.Minute
 	DefaultVisitorAttachmentTotalSizeLimit      = 100 * 1024 * 1024 // 100 MB
 	DefaultVisitorAttachmentDailyBandwidthLimit = 500 * 1024 * 1024 // 500 MB
+	DefaultVisitorPrefixBitsIPv4                = 32                // Use the entire IPv4 address for rate limiting
+	DefaultVisitorPrefixBitsIPv6                = 64                // Use /64 for IPv6 rate limiting
 )
 
 var (
@@ -143,6 +145,8 @@ type Config struct {
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
+	VisitorPrefixBitsIPv4                int       // Number of bits for IPv4 rate limiting (default: 32)
+	VisitorPrefixBitsIPv6                int       // Number of bits for IPv6 rate limiting (default: 64)
 	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedAddresses                []string  // List of trusted proxy addresses (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
@@ -234,6 +238,8 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorSubscriberRateLimiting:        false,
+		VisitorPrefixBitsIPv4:                32,                // Default: use full IPv4 address
+		VisitorPrefixBitsIPv6:                64,                // Default: use /64 for IPv6
 		BehindProxy:                          false,             // If true, the server will trust the proxy client IP header to determine the client IP address
 		ProxyForwardedHeader:                 "X-Forwarded-For", // Default header for reverse proxy client IPs
 		StripeSecretKey:                      "",

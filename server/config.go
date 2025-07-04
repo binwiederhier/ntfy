@@ -224,6 +224,7 @@ func NewConfig() *Config {
 		TotalTopicLimit:                      DefaultTotalTopicLimit,
 		TotalAttachmentSizeLimit:             0,
 		VisitorSubscriptionLimit:             DefaultVisitorSubscriptionLimit,
+		VisitorSubscriberRateLimiting:        false,
 		VisitorAttachmentTotalSizeLimit:      DefaultVisitorAttachmentTotalSizeLimit,
 		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
 		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
@@ -237,11 +238,10 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
-		VisitorSubscriberRateLimiting:        false,
-		VisitorPrefixBitsIPv4:                32,                // Default: use full IPv4 address
-		VisitorPrefixBitsIPv6:                64,                // Default: use /64 for IPv6
-		BehindProxy:                          false,             // If true, the server will trust the proxy client IP header to determine the client IP address
-		ProxyForwardedHeader:                 "X-Forwarded-For", // Default header for reverse proxy client IPs
+		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
+		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
+		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address
+		ProxyForwardedHeader:                 "X-Forwarded-For",            // Default header for reverse proxy client IPs
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

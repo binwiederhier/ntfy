@@ -63,8 +63,9 @@ account costs. Even small donations are very much appreciated.
 
 Thank you to our commercial sponsors, who help keep the service running and the development going:
 
-<a href="https://m.do.co/c/442b929528db"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a><br/>
-<a href="https://www.magicbell.com/?utm_source=ntfy"><img src="assets/sponsors/magicbell.png" width="201px"></a>
+<a href="https://m.do.co/c/442b929528db"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
+
+<a href="https://www.magicbell.com/?utm_source=ntfy"><img src="assets/sponsors/magicbell.png" width="180px"></a>
 
 And a big fat **Thank You** to the individuals who have sponsored ntfy in the past, or are still sponsoring ntfy:
 

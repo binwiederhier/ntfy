@@ -143,9 +143,9 @@ type Config struct {
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
-	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address
-	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For"
-	ProxyTrustedAddresses                []string  // List of trusted proxy addresses that will be stripped from the Forwarded header if BehindProxy is true
+	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
+	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
+	ProxyTrustedAddresses                []string  // List of trusted proxy addresses (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration

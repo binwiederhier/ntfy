@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/v2/util"
 	"io"
 	"mime"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"heckel.io/ntfy/v2/util"
 )
 
 var (
@@ -20,8 +21,9 @@ var (
 	// priorityHeaderIgnoreRegex matches specific patterns of the "Priority" header (RFC 9218), so that it can be ignored
 	priorityHeaderIgnoreRegex = regexp.MustCompile(`^u=\d,\s*(i|\d)$|^u=\d$`)
 
-	// forwardedHeaderRegex parses IPv4 addresses from the "Forwarded" header (RFC 7239)
-	forwardedHeaderRegex = regexp.MustCompile(`(?i)\bfor="?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"?`)
+	// forwardedHeaderRegex parses IPv4 and IPv6 addresses from the "Forwarded" header (RFC 7239)
+	// IPv6 addresses in Forwarded header are enclosed in square brackets, e.g. for="[2001:db8::1]"
+	forwardedHeaderRegex = regexp.MustCompile(`(?i)\\bfor=\"?((?:[0-9]{1,3}\.){3}[0-9]{1,3}|\[[0-9a-fA-F:]+\])\"?`)
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -103,7 +105,7 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 // then take the right-most address in the list (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
-	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))
+	value := strings.TrimSpace(r.Header.Get(forwardedHeader))
 	if value == "" {
 		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
 	}
@@ -111,12 +113,17 @@ func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trusted
 	addrsStrs := util.Map(util.SplitNoEmpty(value, ","), strings.TrimSpace)
 	var validAddrs []netip.Addr
 	for _, addrStr := range addrsStrs {
-		if addr, err := netip.ParseAddr(addrStr); err == nil {
-			validAddrs = append(validAddrs, addr)
-		} else if m := forwardedHeaderRegex.FindStringSubmatch(addrStr); len(m) == 2 {
-			if addr, err := netip.ParseAddr(m[1]); err == nil {
+		// Handle Forwarded header with for="[IPv6]" or for="IPv4"
+		if m := forwardedHeaderRegex.FindStringSubmatch(addrStr); len(m) == 2 {
+			addrRaw := m[1]
+			if strings.HasPrefix(addrRaw, "[") && strings.HasSuffix(addrRaw, "]") {
+				addrRaw = addrRaw[1 : len(addrRaw)-1]
+			}
+			if addr, err := netip.ParseAddr(addrRaw); err == nil {
 				validAddrs = append(validAddrs, addr)
 			}
+		} else if addr, err := netip.ParseAddr(addrStr); err == nil {
+			validAddrs = append(validAddrs, addr)
 		}
 	}
 	// Filter out proxy addresses

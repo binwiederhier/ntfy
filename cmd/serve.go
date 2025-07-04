@@ -5,13 +5,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/stripe/stripe-go/v74"
-	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/server"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"io/fs"
 	"math"
 	"net"
@@ -22,6 +15,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/stripe/stripe-go/v74"
+	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 func init() {
@@ -473,7 +474,7 @@ func sigHandlerConfigReload(config string) {
 }
 
 func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
-	// Try parsing as prefix, e.g. 10.0.1.0/24
+	// Try parsing as prefix, e.g. 10.0.1.0/24 or 2001:db8::/32
 	prefix, err := netip.ParsePrefix(host)
 	if err == nil {
 		prefixes = append(prefixes, prefix.Masked())

@@ -528,5 +528,11 @@ func visitorID(ip netip.Addr, u *user.User) string {
 	if u != nil && u.Tier != nil {
 		return fmt.Sprintf("user:%s", u.ID)
 	}
+	if ip.Is6() {
+		// IPv6 addresses are too long to be used as visitor IDs, so we use the first 8 bytes
+		ip = netip.PrefixFrom(ip, 64).Masked().Addr()
+	} else if ip.Is4() {
+		ip = netip.PrefixFrom(ip, 20).Masked().Addr()
+	}
 	return fmt.Sprintf("ip:%s", ip.String())
 }

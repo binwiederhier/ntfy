@@ -2023,7 +2023,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := visitorID(ip, user)
+	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
 		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)

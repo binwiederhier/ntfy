@@ -16,7 +16,7 @@ const (
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
-		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
 		} else if !v.RequestAllowed() {
 			return errHTTPTooManyRequestsLimitRequests
@@ -40,7 +40,7 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 			contextRateVisitor: vrate,
 			contextTopic:       t,
 		})
-		if util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) {
+		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
 		} else if !vrate.RequestAllowed() {
 			return errHTTPTooManyRequestsLimitRequests

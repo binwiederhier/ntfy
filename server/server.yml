@@ -105,13 +105,13 @@
 #   proxy-forwarded-header. Without this, the remote address of the incoming connection is used.
 # - proxy-forwarded-header is the header to use to identify visitors. It may be a single IP address (e.g. 1.2.3.4),
 #   a comma-separated list of IP addresses (e.g. "1.2.3.4, 5.6.7.8"), or an RFC 7239-style header (e.g. "for=1.2.3.4;by=proxy.example.com, for=5.6.7.8").
-# - proxy-trusted-addresses is a comma-separated list of IP addresses that are removed from the forwarded header
+# - proxy-trusted-hosts is a comma-separated list of IP addresses, hostnames or CIDRs that are removed from the forwarded header
 #   to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
 #   the forwarded header.
 #
 # behind-proxy: false
 # proxy-forwarded-header: "X-Forwarded-For"
-# proxy-trusted-addresses:
+# proxy-trusted-hosts:
 
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".

@@ -93,7 +93,7 @@ var flagsServe = append(
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-prefix-bits-ipv6", Aliases: []string{"visitor_prefix_bits_ipv6"}, EnvVars: []string{"NTFY_VISITOR_PREFIX_BITS_IPV6"}, Value: server.DefaultVisitorPrefixBitsIPv6, Usage: "number of bits of the IPv6 address to use for rate limiting (default: 64, /64 subnet)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-forwarded-header", Aliases: []string{"proxy_forwarded_header"}, EnvVars: []string{"NTFY_PROXY_FORWARDED_HEADER"}, Value: "X-Forwarded-For", Usage: "use specified header to determine visitor IP address (for rate limiting)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-trusted-addresses", Aliases: []string{"proxy_trusted_addresses"}, EnvVars: []string{"NTFY_PROXY_TRUSTED_ADDRESSES"}, Value: "", Usage: "comma-separated list of trusted IP addresses to remove from forwarded header"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-trusted-hosts", Aliases: []string{"proxy_trusted_hosts"}, EnvVars: []string{"NTFY_PROXY_TRUSTED_HOSTS"}, Value: "", Usage: "comma-separated list of trusted IP addresses, hosts, or CIDRs to remove from forwarded header"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-webhook-key", Aliases: []string{"stripe_webhook_key"}, EnvVars: []string{"NTFY_STRIPE_WEBHOOK_KEY"}, Value: "", Usage: "key required to validate the authenticity of incoming webhooks from Stripe"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "billing-contact", Aliases: []string{"billing_contact"}, EnvVars: []string{"NTFY_BILLING_CONTACT"}, Value: "", Usage: "e-mail or website to display in upgrade dialog (only if payments are enabled)"}),
@@ -198,7 +198,7 @@ func execServe(c *cli.Context) error {
 	visitorPrefixBitsIPv6 := c.Int("visitor-prefix-bits-ipv6")
 	behindProxy := c.Bool("behind-proxy")
 	proxyForwardedHeader := c.String("proxy-forwarded-header")
-	proxyTrustedAddresses := util.SplitNoEmpty(c.String("proxy-trusted-addresses"), ",")
+	proxyTrustedHosts := util.SplitNoEmpty(c.String("proxy-trusted-hosts"), ",")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
 	billingContact := c.String("billing-contact")
@@ -358,14 +358,24 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Resolve hosts
-	visitorRequestLimitExemptIPs := make([]netip.Prefix, 0)
+	visitorRequestLimitExemptPrefixes := make([]netip.Prefix, 0)
 	for _, host := range visitorRequestLimitExemptHosts {
-		ips, err := parseIPHostPrefix(host)
+		prefixes, err := parseIPHostPrefix(host)
 		if err != nil {
 			log.Warn("cannot resolve host %s: %s, ignoring visitor request exemption", host, err.Error())
 			continue
 		}
-		visitorRequestLimitExemptIPs = append(visitorRequestLimitExemptIPs, ips...)
+		visitorRequestLimitExemptPrefixes = append(visitorRequestLimitExemptPrefixes, prefixes...)
+	}
+
+	// Parse trusted prefixes
+	trustedProxyPrefixes := make([]netip.Prefix, 0)
+	for _, host := range proxyTrustedHosts {
+		prefixes, err := parseIPHostPrefix(host)
+		if err != nil {
+			return fmt.Errorf("cannot resolve trusted proxy host %s: %s", host, err.Error())
+		}
+		trustedProxyPrefixes = append(trustedProxyPrefixes, prefixes...)
 	}
 
 	// Stripe things
@@ -426,7 +436,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorAttachmentDailyBandwidthLimit = visitorAttachmentDailyBandwidthLimit
 	conf.VisitorRequestLimitBurst = visitorRequestLimitBurst
 	conf.VisitorRequestLimitReplenish = visitorRequestLimitReplenish
-	conf.VisitorRequestExemptIPAddrs = visitorRequestLimitExemptIPs
+	conf.VisitorRequestExemptPrefixes = visitorRequestLimitExemptPrefixes
 	conf.VisitorMessageDailyLimit = visitorMessageDailyLimit
 	conf.VisitorEmailLimitBurst = visitorEmailLimitBurst
 	conf.VisitorEmailLimitReplenish = visitorEmailLimitReplenish
@@ -434,7 +444,7 @@ func execServe(c *cli.Context) error {
 	conf.VisitorPrefixBitsIPv6 = visitorPrefixBitsIPv6
 	conf.BehindProxy = behindProxy
 	conf.ProxyForwardedHeader = proxyForwardedHeader
-	conf.ProxyTrustedAddresses = proxyTrustedAddresses
+	conf.ProxyTrustedPrefixes = trustedProxyPrefixes
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact

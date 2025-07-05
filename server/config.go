@@ -135,7 +135,7 @@ type Config struct {
 	VisitorAttachmentDailyBandwidthLimit int64
 	VisitorRequestLimitBurst             int
 	VisitorRequestLimitReplenish         time.Duration
-	VisitorRequestExemptIPAddrs          []netip.Prefix
+	VisitorRequestExemptPrefixes         []netip.Prefix
 	VisitorMessageDailyLimit             int
 	VisitorEmailLimitBurst               int
 	VisitorEmailLimitReplenish           time.Duration
@@ -143,13 +143,13 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time // Time of the day at which to reset visitor stats
-	VisitorSubscriberRateLimiting        bool      // Enable subscriber-based rate limiting for UnifiedPush topics
-	VisitorPrefixBitsIPv4                int       // Number of bits for IPv4 rate limiting (default: 32)
-	VisitorPrefixBitsIPv6                int       // Number of bits for IPv6 rate limiting (default: 64)
-	BehindProxy                          bool      // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
-	ProxyForwardedHeader                 string    // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
-	ProxyTrustedAddresses                []string  // List of trusted proxy addresses (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
+	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
+	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
+	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
+	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
+	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
+	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
+	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
 	StripeSecretKey                      string
 	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
@@ -159,7 +159,6 @@ type Config struct {
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
-	Version                              string // injected by App
 	WebPushPrivateKey                    string
 	WebPushPublicKey                     string
 	WebPushFile                          string
@@ -167,6 +166,7 @@ type Config struct {
 	WebPushStartupQueries                string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
+	Version                              string // injected by App
 }
 
 // NewConfig instantiates a default new server config
@@ -229,7 +229,7 @@ func NewConfig() *Config {
 		VisitorAttachmentDailyBandwidthLimit: DefaultVisitorAttachmentDailyBandwidthLimit,
 		VisitorRequestLimitBurst:             DefaultVisitorRequestLimitBurst,
 		VisitorRequestLimitReplenish:         DefaultVisitorRequestLimitReplenish,
-		VisitorRequestExemptIPAddrs:          make([]netip.Prefix, 0),
+		VisitorRequestExemptPrefixes:         make([]netip.Prefix, 0),
 		VisitorMessageDailyLimit:             DefaultVisitorMessageDailyLimit,
 		VisitorEmailLimitBurst:               DefaultVisitorEmailLimitBurst,
 		VisitorEmailLimitReplenish:           DefaultVisitorEmailLimitReplenish,

@@ -1437,7 +1437,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-addresses` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha)) 
+* Full support for IPv6 ([#519](https://github.com/binwiederhier/ntfy/issues/519)/[#1380](https://github.com/binwiederhier/ntfy/pull/1380)/[ansible#4](https://github.com/binwiederhier/ntfy-ansible/pull/4))
+* Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-hosts` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha))
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

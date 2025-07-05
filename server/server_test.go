@@ -1225,7 +1225,7 @@ func TestServer_PublishTooManyRequests_IPv6_Slash48(t *testing.T) {
 func TestServer_PublishTooManyRequests_Defaults_ExemptHosts(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 3
-	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
 	for i := 0; i < 5; i++ { // > 3
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
@@ -1236,7 +1236,7 @@ func TestServer_PublishTooManyRequests_Defaults_ExemptHosts(t *testing.T) {
 func TestServer_PublishTooManyRequests_Defaults_ExemptHosts_IPv6(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 3
-	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("2001:db8:9999::/48")}
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("2001:db8:9999::/48")}
 	s := newTestServer(t, c)
 	overrideRemoteAddr := func(r *http.Request) {
 		r.RemoteAddr = "[2001:db8:9999::1]:1234"
@@ -1251,7 +1251,7 @@ func TestServer_PublishTooManyRequests_Defaults_ExemptHosts_MessageDailyLimit(t 
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 10
 	c.VisitorMessageDailyLimit = 4
-	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
 	for i := 0; i < 8; i++ { // 4
 		response := request(t, s, "PUT", "/mytopic", "message", nil)
@@ -2318,7 +2318,7 @@ func TestServer_Visitor_Custom_Forwarded_Header(t *testing.T) {
 	c := newTestConfig(t)
 	c.BehindProxy = true
 	c.ProxyForwardedHeader = "Forwarded"
-	c.ProxyTrustedAddresses = []string{"1.2.3.4"}
+	c.ProxyTrustedPrefixes = []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")}
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11:1234"
@@ -2332,7 +2332,7 @@ func TestServer_Visitor_Custom_Forwarded_Header_IPv6(t *testing.T) {
 	c := newTestConfig(t)
 	c.BehindProxy = true
 	c.ProxyForwardedHeader = "Forwarded"
-	c.ProxyTrustedAddresses = []string{"2001:db8:1111::1"}
+	c.ProxyTrustedPrefixes = []netip.Prefix{netip.MustParsePrefix("2001:db8:1111::/64")}
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "[2001:db8:2222::1]:1234"

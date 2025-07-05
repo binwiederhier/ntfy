@@ -18,8 +18,8 @@ get a list of [command line options](#command-line-options).
 
 ## Example config
 !!! info
-    Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)** file.
-    It contains examples and detailed descriptions of all the settings.
+    Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)** file. It contains examples and detailed descriptions of all the settings.
+    You may also want to look at how ntfy.sh is configured in the [ntfy-ansible](https://github.com/binwiederhier/ntfy-ansible) repository.
 
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
@@ -559,7 +559,17 @@ If you are running ntfy behind a proxy, you should set the `behind-proxy` flag. 
 as the primary identifier for a visitor, as opposed to the remote IP address. 
 
 If the `behind-proxy` flag is not set, all visitors will be counted as one, because from the perspective of the
-ntfy server, they all share the proxy's IP address. 
+ntfy server, they all share the proxy's IP address.
+
+In IPv4 environments, by default, a visitor's IP address is used as-is for rate limiting (**full IPv4 address**). This
+means that if a visitor publishes messages from multiple IP addresses, they will be counted as separate visitors. 
+You can adjust this by setting the `visitor-prefix-bits-ipv4` config option (default is `32`, which is the entire IP address). 
+To limit visitors to a /24 subnet, for instance, set it to `24`. In that case, `1.2.3.4` and `1.2.3.99` are treated as the same visitor.
+
+In IPv6 environments, by default, a visitor's IP address is **truncated to the /64 subnet**, meaning that 
+`2001:db8::1` and `2001:db8::2` are treated as the same visitor. Use the `visitor-prefix-bits-ipv6` config option to
+adjust this behavior (default is `64`, which is the entire /64 subnet). See [IPv6 considerations](#ipv6-considerations)
+for more details.
 
 Relevant flags to consider:
 
@@ -568,7 +578,7 @@ Relevant flags to consider:
 * `proxy-forwarded-header` is the header to use to identify visitors (default: `X-Forwarded-For`). It may be a single IP address (e.g. `1.2.3.4`),
   a comma-separated list of IP addresses (e.g. `1.2.3.4, 5.6.7.8`), or an [RFC 7239](https://datatracker.ietf.org/doc/html/rfc7239)-style
  header (e.g. `for=1.2.3.4;by=proxy.example.com, for=5.6.7.8`).
-* `proxy-trusted-addresses` is a comma-separated list of IP addresses that are removed from the forwarded header 
+* `proxy-trusted-hosts` is a comma-separated list of IP addresses, hosts or CIDRs that are removed from the forwarded header 
   to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
   the forwarded header (default: empty).
 
@@ -613,7 +623,7 @@ Relevant flags to consider:
     #          the visitor IP will be 9.9.9.9 (right-most unknown address).
     #
     behind-proxy: true
-    proxy-trusted-addresses: "1.2.3.4, 1.2.3.5"
+    proxy-trusted-hosts: "1.2.3.0/24, 1.2.2.2, 2001:db8::/64"
     ```
 
 ### TLS/SSL
@@ -1138,6 +1148,18 @@ If this ever happens, there will be a log message that looks something like this
 WARN Firebase quota exceeded (likely for topic), temporarily denying Firebase access to visitor
 ```
 
+### IPv6 considerations
+By default, rate limiting for IPv6 is done using the `/64` subnet of the visitor's IPv6 address. This means that all visitors
+in the same `/64` subnet are treated as one visitor. This is done to prevent abuse, as IPv6 subnet assignments are typically
+much larger than IPv4 subnets (and much cheaper), and it is common for ISPs to assign large subnets to their customers.
+
+Other than that, rate limiting for IPv6 is done the same way as for IPv4, using the visitor's IP address or subnet to identify them.
+
+There are two options to configure the number of bits used for rate limiting (for IPv4 and IPv6):
+
+- `visitor-prefix-bits-ipv4` is number of bits of the IPv4 address to use for rate limiting (default: 32, full address)
+- `visitor-prefix-bits-ipv6` is number of bits of the IPv6 address to use for rate limiting (default: 64, /64 subnet)
+
 ### Subscriber-based rate limiting
 By default, ntfy puts almost all rate limits on the message publisher, e.g. number of messages, requests, and attachment
 size are all based on the visitor who publishes a message. **Subscriber-based rate limiting is a way to use the rate limits
@@ -1444,7 +1466,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | `read-write`      | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                             |
 | `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false             | If set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)                                                                                                            |
 | `proxy-forwarded-header`                   | `NTFY_PROXY_FORWARDED_HEADER`                   | *string*                                            | `X-Forwarded-For` | Use specified header to determine visitor IP address (for rate limiting)                                                                                                                                                        |
-| `proxy-trusted-addresses`                  | `NTFY_PROXY_TRUSTED_ADDRESSES`                  | *comma-separated list of IPs*                       | -                 | Comma-separated list of trusted IP addresses to remove from forwarded header                                                                                                                                                    |
+| `proxy-trusted-hosts`                      | `NTFY_PROXY_TRUSTED_HOSTS`                      | *comma-separated host/IP/CIDR list*                 | -                 | Comma-separated list of trusted IP addresses, hosts, or CIDRs to remove from forwarded header                                                                                                                                   |
 | `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory*                                         | -                 | Cache directory for attached files. To enable attachments, this has to be set.                                                                                                                                                  |
 | `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G                | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                   |
 | `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M               | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                       |
@@ -1474,9 +1496,11 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every day at midnight (UTC). By default, this value is unset.                                                                                              |
 | `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*                                            | 60                | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                           |
 | `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 5s                | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                      |
-| `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP list*                      | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                |
+| `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP/CIDR list*                 | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                |
 | `visitor-subscription-limit`               | `NTFY_VISITOR_SUBSCRIPTION_LIMIT`               | *number*                                            | 30                | Rate limiting: Number of subscriptions per visitor (IP address)                                                                                                                                                                 |
 | `visitor-subscriber-rate-limiting`         | `NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING`         | *bool*                                              | `false`           | Rate limiting: Enables subscriber-based rate limiting                                                                                                                                                                           |
+| `visitor-prefix-bits-ipv4`                 | `NTFY_VISITOR_PREFIX_BITS_IPV4`                 | *number*                                            | 32                | Rate limiting: Number of bits to use for IPv4 visitor prefix, e.g. 24 for /24                                                                                                                                                   |
+| `visitor-prefix-bits-ipv6`                 | `NTFY_VISITOR_PREFIX_BITS_IPV6`                 | *number*                                            | 64                | Rate limiting: Number of bits to use for IPv6 visitor prefix, e.g. 48 for /48                                                                                                                                                   |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | *path*, e.g. `/` or `/app`, or `disable`            | `/`               | Sets root of the web app (e.g. /, or /app), or disables it entirely (disable)                                                                                                                                                   |
 | `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                 |
 | `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                  |
@@ -1572,6 +1596,7 @@ OPTIONS:
    --message-delay-limit value, --message_delay_limit value                                                               max duration a message can be scheduled into the future (default: "3d") [$NTFY_MESSAGE_DELAY_LIMIT]
    --global-topic-limit value, --global_topic_limit value, -T value                                                       total number of topics allowed (default: 15000) [$NTFY_GLOBAL_TOPIC_LIMIT]
    --visitor-subscription-limit value, --visitor_subscription_limit value                                                 number of subscriptions per visitor (default: 30) [$NTFY_VISITOR_SUBSCRIPTION_LIMIT]
+   --visitor-subscriber-rate-limiting, --visitor_subscriber_rate_limiting                                                 enables subscriber-based rate limiting (default: false) [$NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING]
    --visitor-attachment-total-size-limit value, --visitor_attachment_total_size_limit value                               total storage limit used for attachments per visitor (default: "100M") [$NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT]
    --visitor-attachment-daily-bandwidth-limit value, --visitor_attachment_daily_bandwidth_limit value                     total daily attachment download/upload bandwidth limit per visitor (default: "500M") [$NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT]
    --visitor-request-limit-burst value, --visitor_request_limit_burst value                                               initial limit of requests per visitor (default: 60) [$NTFY_VISITOR_REQUEST_LIMIT_BURST]
@@ -1580,8 +1605,11 @@ OPTIONS:
    --visitor-message-daily-limit value, --visitor_message_daily_limit value                                               max messages per visitor per day, derived from request limit if unset (default: 0) [$NTFY_VISITOR_MESSAGE_DAILY_LIMIT]
    --visitor-email-limit-burst value, --visitor_email_limit_burst value                                                   initial limit of e-mails per visitor (default: 16) [$NTFY_VISITOR_EMAIL_LIMIT_BURST]
    --visitor-email-limit-replenish value, --visitor_email_limit_replenish value                                           interval at which burst limit is replenished (one per x) (default: "1h") [$NTFY_VISITOR_EMAIL_LIMIT_REPLENISH]
-   --visitor-subscriber-rate-limiting, --visitor_subscriber_rate_limiting                                                 enables subscriber-based rate limiting (default: false) [$NTFY_VISITOR_SUBSCRIBER_RATE_LIMITING]
-   --behind-proxy, --behind_proxy, -P                                                                                     if set, use X-Forwarded-For header to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+   --visitor-prefix-bits-ipv4 value, --visitor_prefix_bits_ipv4 value                                                     number of bits of the IPv4 address to use for rate limiting (default: 32, full address) (default: 32) [$NTFY_VISITOR_PREFIX_BITS_IPV4]
+   --visitor-prefix-bits-ipv6 value, --visitor_prefix_bits_ipv6 value                                                     number of bits of the IPv6 address to use for rate limiting (default: 64, /64 subnet) (default: 64) [$NTFY_VISITOR_PREFIX_BITS_IPV6]
+   --behind-proxy, --behind_proxy, -P                                                                                     if set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting) (default: false) [$NTFY_BEHIND_PROXY]
+   --proxy-forwarded-header value, --proxy_forwarded_header value                                                         use specified header to determine visitor IP address (for rate limiting) (default: "X-Forwarded-For") [$NTFY_PROXY_FORWARDED_HEADER]
+   --proxy-trusted-hosts value, --proxy_trusted_hosts value                                                               comma-separated list of trusted IP addresses, hosts, or CIDRs to remove from forwarded header [$NTFY_PROXY_TRUSTED_HOSTS]
    --stripe-secret-key value, --stripe_secret_key value                                                                   key used for the Stripe API communication, this enables payments [$NTFY_STRIPE_SECRET_KEY]
    --stripe-webhook-key value, --stripe_webhook_key value                                                                 key required to validate the authenticity of incoming webhooks from Stripe [$NTFY_STRIPE_WEBHOOK_KEY]
    --billing-contact value, --billing_contact value                                                                       e-mail or website to display in upgrade dialog (only if payments are enabled) [$NTFY_BILLING_CONTACT]
@@ -1595,5 +1623,5 @@ OPTIONS:
    --web-push-startup-queries value, --web_push_startup_queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]
    --web-push-expiry-duration value, --web_push_expiry_duration value                                                     automatically expire unused subscriptions after this time (default: "60d") [$NTFY_WEB_PUSH_EXPIRY_DURATION]
    --web-push-expiry-warning-duration value, --web_push_expiry_warning_duration value                                     send web push warning notification after this time before expiring unused subscriptions (default: "55d") [$NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION]
-   --help, -h                                                                                                             show help
+   --help, -h 
 ```

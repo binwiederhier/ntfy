@@ -1324,6 +1324,22 @@ Note that if you run nginx in a container, append `, chain=DOCKER-USER` to the j
 is `INPUT`, but `FORWARD` is used when using docker networks. `DOCKER-USER`, available when using docker, is part of the `FORWARD`
 chain.
 
+## IPv6 support
+ntfy fully supports IPv6, though there are a few things to keep in mind.
+
+- **Listening on an IPv6 address**: By default, ntfy listens on `:80` (IPv4-only). If you want to listen on an IPv6 address, you need to
+  explicitly set the `listen-http` and/or `listen-https` options in your `server.yml` file to an IPv6 address, e.g. `[::]:80`. Alternatively, 
+  if you're running ntfy behind a reverse proxy, make sure that the proxy is configured to listen on an IPv6 address (e.g. `listen [::]:80;` in nginx).
+- **Rate limiting:** By default, ntfy uses the `/64` subnet of the visitor's IPv6 address for rate limiting. This means that all visitors in the same `/64`
+  subnet are treated as one visitor. If you want to change this, you can set the `visitor-prefix-bits-ipv6` option in your `server.yml` file to a different
+  value (e.g. `48` for `/48` subnets). See [IPv6 considerations](#ipv6-considerations) and [IP-based rate limiting](#ip-based-rate-limiting) for more details.
+- **Banning IPs with fail2ban:** If you use fail2ban to ban IPs, please ensure that your `actionban` and `actionunban` commands
+  support IPv6 and also ban the entire prefix (e.g. `/48`). See [Banning bad actors](#banning-bad-actors-fail2ban) for details.
+
+!!! info
+    The official ntfy.sh server supports IPv6. Check out ntfy.sh's [Ansible repository](https://github.com/binwiederhier/ntfy-ansible) for examples of how to
+    configure [ntfy](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/ntfy), [nginx](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/nginx) and [fail2ban](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/fail2ban).
+
 ## Health checks
 A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
 If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.

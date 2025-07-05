@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"heckel.io/ntfy/v2/user"
 	"net/http"
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -142,4 +144,25 @@ func TestExtractIPAddress_EdgeCases(t *testing.T) {
 	r.Header.Set("X-Forwarded-For", "::ffff:192.0.2.128, 2001:db8:abcd::1")
 	trustedProxies := []string{"::ffff:192.0.2.128"}
 	require.Equal(t, "2001:db8:abcd::1", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestVisitorID(t *testing.T) {
+	confWithDefaults := &Config{
+		VisitorPrefixBitsIPv4: 32,
+		VisitorPrefixBitsIPv6: 64,
+	}
+	confWithShortenedPrefixes := &Config{
+		VisitorPrefixBitsIPv4: 16,
+		VisitorPrefixBitsIPv6: 56,
+	}
+	userWithTier := &user.User{
+		ID:   "u_123",
+		Tier: &user.Tier{},
+	}
+	require.Equal(t, "ip:1.2.3.4", visitorID(netip.MustParseAddr("1.2.3.4"), nil, confWithDefaults))
+	require.Equal(t, "ip:2a01:599:b26:2397::", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, confWithDefaults))
+	require.Equal(t, "user:u_123", visitorID(netip.MustParseAddr("1.2.3.4"), userWithTier, confWithDefaults))
+	require.Equal(t, "user:u_123", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), userWithTier, confWithDefaults))
+	require.Equal(t, "ip:1.2.0.0", visitorID(netip.MustParseAddr("1.2.3.4"), nil, confWithShortenedPrefixes))
+	require.Equal(t, "ip:2a01:599:b26:2300::", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, confWithShortenedPrefixes))
 }

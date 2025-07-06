@@ -69,6 +69,7 @@ Examples:
   ntfy pub --icon="http://some.tld/icon.png" 'Icon!'      # Send notification with custom icon
   ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
   ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
+  echo 'message' | ntfy publish mytopic                   # Send message from stdin
   ntfy pub -u phil:mypass secret Psst                     # Publish with username/password
   ntfy pub --wait-pid 1234 mytopic                        # Wait for process 1234 to exit before publishing
   ntfy pub --wait-cmd mytopic rsync -av ./ /tmp/a         # Run command and publish after it completes
@@ -260,6 +261,7 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 		var stdinBytes []byte
 		stdinBytes, err = io.ReadAll(c.App.Reader)
 		if err != nil {
+			log.Debug("Failed to read from stdin: %v", err)
 			return
 		}
 		message = strings.TrimSpace(string(stdinBytes))
@@ -326,6 +328,7 @@ func runAndWaitForCommand(command []string) (message string, err error) {
 func stdinHasData() bool {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
+		log.Debug("Failed to stat stdin: %v", err)
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) == 0

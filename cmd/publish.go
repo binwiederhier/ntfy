@@ -256,13 +256,13 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 		message = c.String("message")
 	}
 	if message == "" && isStdinRedirected() {
-		var bytes []byte
-		bytes, err = io.ReadAll(c.App.Reader)
+		var data []byte
+		data, err = io.ReadAll(io.LimitReader(c.App.Reader, 1024*1024))
 		if err != nil {
 			log.Debug("Failed to read from stdin: %s", err.Error())
 			return
 		}
-		message = strings.TrimSpace(string(bytes))
+		message = strings.TrimSpace(string(data))
 	}
 	return
 }

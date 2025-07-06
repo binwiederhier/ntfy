@@ -95,6 +95,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [wlzntfy](https://github.com/Walzen-Group/ntfy-toaster) - A minimalistic, receive-only toast notification client for Windows 11
 - [Ntfy_CSV_Reminders](https://github.com/thiswillbeyourgithub/Ntfy_CSV_Reminders) - A Python tool that sends random-timing phone notifications for recurring tasks by using daily probability checks based on CSV-defined frequencies.
 - [Daily Fact Ntfy](https://github.com/thiswillbeyourgithub/Daily_Fact_Ntfy) - Generate [llm](https://github.com/simonw/llm) generated fact every day about any topic you're interested in.
+- [ntfyexec](https://github.com/alecthomas/ntfyexec) - Send a notification through ntfy.sh if a command fails
 
 ## Projects + scripts 
 

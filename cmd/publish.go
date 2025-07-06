@@ -255,16 +255,14 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 	if c.String("message") != "" {
 		message = c.String("message")
 	}
-	
-	// If no message provided and stdin has data, read from stdin
-	if message == "" && stdinHasData() {
-		var stdinBytes []byte
-		stdinBytes, err = io.ReadAll(c.App.Reader)
+	if message == "" && isStdinRedirected() {
+		var bytes []byte
+		bytes, err = io.ReadAll(c.App.Reader)
 		if err != nil {
-			log.Debug("Failed to read from stdin: %v", err)
+			log.Debug("Failed to read from stdin: %s", err.Error())
 			return
 		}
-		message = strings.TrimSpace(string(stdinBytes))
+		message = strings.TrimSpace(string(bytes))
 	}
 	return
 }
@@ -325,10 +323,10 @@ func runAndWaitForCommand(command []string) (message string, err error) {
 	return fmt.Sprintf("Command succeeded after %s: %s", runtime, prettyCmd), nil
 }
 
-func stdinHasData() bool {
+func isStdinRedirected() bool {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		log.Debug("Failed to stat stdin: %v", err)
+		log.Debug("Failed to stat stdin: %s", err.Error())
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) == 0

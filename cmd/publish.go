@@ -254,6 +254,16 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 	if c.String("message") != "" {
 		message = c.String("message")
 	}
+	
+	// If no message provided and stdin has data, read from stdin
+	if message == "" && stdinHasData() {
+		var stdinBytes []byte
+		stdinBytes, err = io.ReadAll(c.App.Reader)
+		if err != nil {
+			return
+		}
+		message = strings.TrimSpace(string(stdinBytes))
+	}
 	return
 }
 
@@ -311,4 +321,12 @@ func runAndWaitForCommand(command []string) (message string, err error) {
 	}
 	log.Debug("Command succeeded after %s: %s", runtime, prettyCmd)
 	return fmt.Sprintf("Command succeeded after %s: %s", runtime, prettyCmd), nil
+}
+
+func stdinHasData() bool {
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }

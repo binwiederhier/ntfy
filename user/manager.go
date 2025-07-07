@@ -441,36 +441,53 @@ var (
 // Manager is an implementation of Manager. It stores users and access control list
 // in a SQLite database.
 type Manager struct {
-	db            *sql.DB
-	defaultAccess Permission              // Default permission if no ACL matches
-	statsQueue    map[string]*Stats       // "Queue" to asynchronously write user stats to the database (UserID -> Stats)
-	tokenQueue    map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	bcryptCost    int                     // Makes testing easier
-	mu            sync.Mutex
+	config     *Config
+	db         *sql.DB
+	statsQueue map[string]*Stats       // "Queue" to asynchronously write user stats to the database (UserID -> Stats)
+	tokenQueue map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
+	mu         sync.Mutex
+}
+
+type Config struct {
+	Filename            string
+	StartupQueries      string
+	DefaultAccess       Permission          // Default permission if no ACL matches
+	ProvisionedUsers    []*User             // Predefined users to create on startup
+	ProvisionedAccess   map[string][]*Grant // Predefined access grants to create on startup
+	BcryptCost          int                 // Makes testing easier
+	QueueWriterInterval time.Duration
 }
 
 var _ Auther = (*Manager)(nil)
 
 // NewManager creates a new Manager instance
-func NewManager(filename, startupQueries string, defaultAccess Permission, bcryptCost int, queueWriterInterval time.Duration) (*Manager, error) {
-	db, err := sql.Open("sqlite3", filename)
+func NewManager(config *Config) (*Manager, error) {
+	// Set defaults
+	if config.BcryptCost <= 0 {
+		config.BcryptCost = DefaultUserPasswordBcryptCost
+	}
+	if config.QueueWriterInterval.Seconds() <= 0 {
+		config.QueueWriterInterval = DefaultUserStatsQueueWriterInterval
+	}
+
+	// Open DB and run setup queries
+	db, err := sql.Open("sqlite3", config.Filename)
 	if err != nil {
 		return nil, err
 	}
 	if err := setupDB(db); err != nil {
 		return nil, err
 	}
-	if err := runStartupQueries(db, startupQueries); err != nil {
+	if err := runStartupQueries(db, config.StartupQueries); err != nil {
 		return nil, err
 	}
 	manager := &Manager{
-		db:            db,
-		defaultAccess: defaultAccess,
-		statsQueue:    make(map[string]*Stats),
-		tokenQueue:    make(map[string]*TokenUpdate),
-		bcryptCost:    bcryptCost,
+		db:         db,
+		config:     config,
+		statsQueue: make(map[string]*Stats),
+		tokenQueue: make(map[string]*TokenUpdate),
 	}
-	go manager.asyncQueueWriter(queueWriterInterval)
+	go manager.asyncQueueWriter(config.QueueWriterInterval)
 	return manager, nil
 }
 
@@ -843,7 +860,7 @@ func (a *Manager) Authorize(user *User, topic string, perm Permission) error {
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return a.resolvePerms(a.defaultAccess, perm)
+		return a.resolvePerms(a.config.DefaultAccess, perm)
 	}
 	var read, write bool
 	if err := rows.Scan(&read, &write); err != nil {
@@ -873,7 +890,7 @@ func (a *Manager) AddUser(username, password string, role Role, hashed bool) err
 	if hashed {
 		hash = []byte(password)
 	} else {
-		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
+		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.config.BcryptCost)
 		if err != nil {
 			return err
 		}
@@ -1205,7 +1222,7 @@ func (a *Manager) ChangePassword(username, password string, hashed bool) error {
 	if hashed {
 		hash = []byte(password)
 	} else {
-		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.bcryptCost)
+		hash, err = bcrypt.GenerateFromPassword([]byte(password), a.config.BcryptCost)
 		if err != nil {
 			return err
 		}
@@ -1387,7 +1404,7 @@ func (a *Manager) RemoveReservations(username string, topics ...string) error {
 
 // DefaultAccess returns the default read/write access if no access control entry matches
 func (a *Manager) DefaultAccess() Permission {
-	return a.defaultAccess
+	return a.config.DefaultAccess
 }
 
 // AddTier creates a new tier in the database

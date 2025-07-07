@@ -94,7 +94,6 @@ Example:
 
 You may set the NTFY_PASSWORD environment variable to pass the new password or NTFY_PASSWORD_HASH to pass
 directly the bcrypt hash. This is useful if you are updating users via scripts.
-
 `,
 		},
 		{

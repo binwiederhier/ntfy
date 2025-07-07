@@ -576,8 +576,10 @@ const Language = () => {
           <MenuItem value="zh_Hans">简体中文</MenuItem>
           <MenuItem value="da">Dansk</MenuItem>
           <MenuItem value="de">Deutsch</MenuItem>
+          <MenuItem value="et">Eesti</MenuItem>
           <MenuItem value="es">Español</MenuItem>
           <MenuItem value="fr">Français</MenuItem>
+          <MenuItem value="gl">Galego</MenuItem>
           <MenuItem value="it">Italiano</MenuItem>
           <MenuItem value="hu">Magyar</MenuItem>
           <MenuItem value="ko">한국어</MenuItem>
@@ -589,6 +591,8 @@ const Language = () => {
           <MenuItem value="pt_BR">Português (Brasil)</MenuItem>
           <MenuItem value="pl">Polski</MenuItem>
           <MenuItem value="ru">Русский</MenuItem>
+          <MenuItem value="ro">Română</MenuItem>
+          <MenuItem value="sk">Slovenčina</MenuItem>
           <MenuItem value="fi">Suomi</MenuItem>
           <MenuItem value="sv">Svenska</MenuItem>
           <MenuItem value="tr">Türkçe</MenuItem>

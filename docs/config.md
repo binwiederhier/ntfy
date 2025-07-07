@@ -559,16 +559,6 @@ as the primary identifier for a visitor, as opposed to the remote IP address.
 If the `behind-proxy` flag is not set, all visitors will be counted as one, because from the perspective of the
 ntfy server, they all share the proxy's IP address.
 
-In IPv4 environments, by default, a visitor's IP address is used as-is for rate limiting (**full IPv4 address**). This
-means that if a visitor publishes messages from multiple IP addresses, they will be counted as separate visitors. 
-You can adjust this by setting the `visitor-prefix-bits-ipv4` config option (default is `32`, which is the entire IP address). 
-To limit visitors to a /24 subnet, for instance, set it to `24`. In that case, `1.2.3.4` and `1.2.3.99` are treated as the same visitor.
-
-In IPv6 environments, by default, a visitor's IP address is **truncated to the /64 subnet**, meaning that 
-`2001:db8::1` and `2001:db8::2` are treated as the same visitor. Use the `visitor-prefix-bits-ipv6` config option to
-adjust this behavior (default is `64`, which is the entire /64 subnet). See [IPv6 considerations](#ipv6-considerations)
-for more details.
-
 Relevant flags to consider:
 
 * `behind-proxy` makes it so that the real visitor IP address is extracted from the header defined in `proxy-forwarded-header`.
@@ -579,6 +569,14 @@ Relevant flags to consider:
 * `proxy-trusted-hosts` is a comma-separated list of IP addresses, hosts or CIDRs that are removed from the forwarded header 
   to determine the real IP address. This is only useful if there are multiple proxies involved that add themselves to
   the forwarded header (default: empty).
+* `visitor-prefix-bits-ipv4` is the number of bits of the IPv4 address to use for rate limiting (default is `32`, which is the entire
+  IP address). In IPv4 environments, by default, a visitor's **full IPv4 address** is used as-is for rate limiting. This means that
+  if someone publishes messages from multiple IP addresses, they will be counted as separate visitors. You can adjust this by setting the `visitor-prefix-bits-ipv4` config option. To group visitors in a /24 subnet and count them as one, for instance,
+  set it to `24`. In that case, `1.2.3.4` and `1.2.3.99` are treated as the same visitor.
+* `visitor-prefix-bits-ipv6` is the number of bits of the IPv6 address to use for rate limiting (default is `64`, which is a /64 subnet). 
+  In IPv6 environments, by default, a visitor's IP address is **truncated to the /64 subnet**, meaning that `2001:db8:25:86:1::1` and 
+  `2001:db8:25:86:2::1` are treated as the same visitor. Use the `visitor-prefix-bits-ipv6` config option to adjust this behavior.
+  See [IPv6 considerations](#ipv6-considerations) for more details.
 
 === "/etc/ntfy/server.yml (behind a proxy)"
     ``` yaml
@@ -622,6 +620,20 @@ Relevant flags to consider:
     #
     behind-proxy: true
     proxy-trusted-hosts: "1.2.3.0/24, 1.2.2.2, 2001:db8::/64"
+    ```
+
+=== "/etc/ntfy/server.yml (adjusted IPv4/IPv6 prefixes proxies)"
+    ``` yaml
+    # Tell ntfy to treat visitors as being in a /24 subnet (IPv4) or /48 subnet (IPv6)
+    # as one visitor, so that they are counted as one for rate limiting.
+    #
+    # Example 1: If 1.2.3.4 and 1.2.3.5 publish a message, the visitor 1.2.3.0 will have
+    #            used 2 messages.
+    # Example 2: If 2001:db8:2500:1::1 and 2001:db8:2500:2::1 publish a message, the visitor
+    #            2001:db8:2500:: will have used 2 messages.
+    #
+    visitor-prefix-bits-ipv4: 24
+    visitor-prefix-bits-ipv6: 48
     ```
 
 ### TLS/SSL
@@ -1322,16 +1334,19 @@ Note that if you run nginx in a container, append `, chain=DOCKER-USER` to the j
 is `INPUT`, but `FORWARD` is used when using docker networks. `DOCKER-USER`, available when using docker, is part of the `FORWARD`
 chain.
 
+The official ntfy.sh server uses fail2ban to ban IPs. Check out ntfy.sh's [Ansible fail2ban role](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/fail2ban) for details. Ban actors are banned for 1 hour initially, and up to
+4 hours at a time for repeated offenses. IPv4 addresses are banned individually, while IPv6 addresses are banned by their `/56` prefix.
+
 ## IPv6 support
 ntfy fully supports IPv6, though there are a few things to keep in mind.
 
 - **Listening on an IPv6 address**: By default, ntfy listens on `:80` (IPv4-only). If you want to listen on an IPv6 address, you need to
-  explicitly set the `listen-http` and/or `listen-https` options in your `server.yml` file to an IPv6 address, e.g. `[::]:80`. Alternatively, 
-  if you're running ntfy behind a reverse proxy, make sure that the proxy is configured to listen on an IPv6 address (e.g. `listen [::]:80;` in nginx).
+  explicitly set the `listen-http` and/or `listen-https` options in your `server.yml` file to an IPv6 address, e.g. `[::]:80`. To listen on
+  IPv4 and IPv6, you must run ntfy behind a reverse proxy, e.g. `listen :80; listen [::]:80;` in nginx.
 - **Rate limiting:** By default, ntfy uses the `/64` subnet of the visitor's IPv6 address for rate limiting. This means that all visitors in the same `/64`
   subnet are treated as one visitor. If you want to change this, you can set the `visitor-prefix-bits-ipv6` option in your `server.yml` file to a different
   value (e.g. `48` for `/48` subnets). See [IPv6 considerations](#ipv6-considerations) and [IP-based rate limiting](#ip-based-rate-limiting) for more details.
-- **Banning IPs with fail2ban:** If you use fail2ban to ban IPs, please ensure that your `actionban` and `actionunban` commands
+- **Banning IPs with fail2ban:** By default, if you're using the `iptables-multiport` action, fail2ban bans individual IPv4 and IPv6 addresses via `iptables` and `ip6tables`. While this behavior is fine for IPv4, it is not for IPv6, because every host can technically have up to 2^64 addresses. Please ensure that your `actionban` and `actionunban` commands
   support IPv6 and also ban the entire prefix (e.g. `/48`). See [Banning bad actors](#banning-bad-actors-fail2ban) for details.
 
 !!! info

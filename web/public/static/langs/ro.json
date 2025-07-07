@@ -228,5 +228,19 @@
     "account_basics_password_dialog_new_password_label": "Parola nouă",
     "account_basics_password_title": "Parolă",
     "account_basics_tier_description": "Nivelul de putere al contului",
-    "account_basics_tier_free": "Gratuit"
+    "account_basics_tier_free": "Gratuit",
+    "account_delete_description": "Șterge definitiv contul tău",
+    "account_usage_messages_title": "Mesaje publicate",
+    "account_basics_tier_manage_billing_button": "Gestionare facturare",
+    "account_usage_emails_title": "Emailuri trimise",
+    "account_usage_calls_title": "Apeluri telefonice efectuate",
+    "account_usage_calls_none": "Nu se pot efectua apeluri telefonice cu acest cont",
+    "account_usage_reservations_title": "Subiecte rezervate",
+    "account_usage_cannot_create_portal_session": "Nu s-a putut deschide portalul de facturare",
+    "account_delete_title": "Șterge contul",
+    "account_usage_attachment_storage_description": "{{filesize}} per fișier, șters după {{expiry}}",
+    "account_usage_attachment_storage_title": "Stocare atașamente",
+    "account_usage_basis_ip_description": "Statistica și limitele de utilizare pentru acest cont se bazează pe adresa ta IP, așadar pot fi partajate cu alți utilizatori. Limitele afișate mai sus sunt aproximative, bazate pe limitele de viteză existente.",
+    "account_usage_reservations_none": "Nu există subiecte rezervate pentru acest cont",
+    "account_basics_tier_canceled_subscription": "Abonamentul tău a fost anulat și va fi retrogradat la un cont gratuit în data de {{date}}."
 }

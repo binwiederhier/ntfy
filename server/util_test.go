@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/user"
 	"net/http"
+	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadBoolParam(t *testing.T) {
@@ -97,7 +100,7 @@ func TestExtractIPAddress(t *testing.T) {
 	r.Header.Set("X-Real-IP", "13.14.15.16, 1.1.1.1")
 	r.Header.Set("Forwarded", "for=17.18.19.20;by=proxy.example.com, by=2.2.2.2;for=1.1.1.1")
 
-	trustedProxies := []string{"1.1.1.1"}
+	trustedProxies := []netip.Prefix{netip.MustParsePrefix("1.1.1.1/32")}
 
 	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
 	require.Equal(t, "9.10.11.12", extractIPAddress(r, true, "X-Client-IP", trustedProxies).String())
@@ -112,9 +115,50 @@ func TestExtractIPAddress_UnixSocket(t *testing.T) {
 	r.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 1.1.1.1")
 	r.Header.Set("Forwarded", "by=bla.example.com;for=17.18.19.20")
 
-	trustedProxies := []string{"1.1.1.1"}
+	trustedProxies := []netip.Prefix{netip.MustParsePrefix("1.1.1.1/32")}
 
 	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
 	require.Equal(t, "17.18.19.20", extractIPAddress(r, true, "Forwarded", trustedProxies).String())
 	require.Equal(t, "0.0.0.0", extractIPAddress(r, false, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_MixedIPv4IPv6(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "[2001:db8:abcd::1]:1234"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 2001:db8:abcd::2, 5.6.7.8")
+	trustedProxies := []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")}
+	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestExtractIPAddress_TrustedIPv6Prefix(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "[2001:db8:abcd::1]:1234"
+	r.Header.Set("X-Forwarded-For", "2001:db8:aaaa::1, 2001:db8:aaaa::2, 2001:db8:abcd:2::3")
+	trustedProxies := []netip.Prefix{netip.MustParsePrefix("2001:db8:aaaa::/48")}
+	require.Equal(t, "2001:db8:abcd:2::3", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+}
+
+func TestVisitorID(t *testing.T) {
+	confWithDefaults := &Config{
+		VisitorPrefixBitsIPv4: 32,
+		VisitorPrefixBitsIPv6: 64,
+	}
+	confWithShortenedPrefixes := &Config{
+		VisitorPrefixBitsIPv4: 16,
+		VisitorPrefixBitsIPv6: 56,
+	}
+	userWithTier := &user.User{
+		ID:   "u_123",
+		Tier: &user.Tier{},
+	}
+	require.Equal(t, "ip:1.2.3.4", visitorID(netip.MustParseAddr("1.2.3.4"), nil, confWithDefaults))
+	require.Equal(t, "ip:2a01:599:b26:2397::", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, confWithDefaults))
+	require.Equal(t, "ip:2001:db8:25:86::", visitorID(netip.MustParseAddr("2001:db8:25:86:1::1"), nil, confWithDefaults))
+	require.Equal(t, "ip:2001:db8:25:86::", visitorID(netip.MustParseAddr("2001:db8:25:86:2::1"), nil, confWithDefaults))
+
+	require.Equal(t, "user:u_123", visitorID(netip.MustParseAddr("1.2.3.4"), userWithTier, confWithDefaults))
+	require.Equal(t, "user:u_123", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), userWithTier, confWithDefaults))
+
+	require.Equal(t, "ip:1.2.0.0", visitorID(netip.MustParseAddr("1.2.3.4"), nil, confWithShortenedPrefixes))
+	require.Equal(t, "ip:2a01:599:b26:2300::", visitorID(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, confWithShortenedPrefixes))
 }

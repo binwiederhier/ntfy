@@ -2,13 +2,13 @@ package server
 
 import (
 	"fmt"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/user"
 	"net/netip"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -151,7 +151,7 @@ func (v *visitor) Context() log.Context {
 func (v *visitor) contextNoLock() log.Context {
 	info := v.infoLightNoLock()
 	fields := log.Context{
-		"visitor_id":                     visitorID(v.ip, v.user),
+		"visitor_id":                     visitorID(v.ip, v.user, v.config),
 		"visitor_ip":                     v.ip.String(),
 		"visitor_seen":                   util.FormatTime(v.seen),
 		"visitor_messages":               info.Stats.Messages,
@@ -524,9 +524,15 @@ func dailyLimitToRate(limit int64) rate.Limit {
 	return rate.Limit(limit) * rate.Every(oneDay)
 }
 
-func visitorID(ip netip.Addr, u *user.User) string {
+// visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
+func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
 	if u != nil && u.Tier != nil {
 		return fmt.Sprintf("user:%s", u.ID)
+	}
+	if ip.Is4() {
+		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv4).Masked().Addr()
+	} else if ip.Is6() {
+		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
 	}
 	return fmt.Sprintf("ip:%s", ip.String())
 }

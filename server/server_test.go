@@ -1169,7 +1169,7 @@ func (t *testMailer) Count() int {
 	return t.count
 }
 
-func TestServer_PublishTooRequests_Defaults(t *testing.T) {
+func TestServer_PublishTooManyRequests_Defaults(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t))
 	for i := 0; i < 60; i++ {
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
@@ -1179,10 +1179,53 @@ func TestServer_PublishTooRequests_Defaults(t *testing.T) {
 	require.Equal(t, 429, response.Code)
 }
 
-func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
+func TestServer_PublishTooManyRequests_Defaults_IPv6(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t))
+	overrideRemoteAddr1 := func(r *http.Request) {
+		r.RemoteAddr = "[2001:db8:9999:8888:1::1]:1234"
+	}
+	overrideRemoteAddr2 := func(r *http.Request) {
+		r.RemoteAddr = "[2001:db8:9999:8888:2::1]:1234" // Same /64
+	}
+	for i := 0; i < 30; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil, overrideRemoteAddr1)
+		require.Equal(t, 200, response.Code)
+	}
+	for i := 0; i < 30; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil, overrideRemoteAddr2)
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "message", nil, overrideRemoteAddr1)
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishTooManyRequests_IPv6_Slash48(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 6
+	c.VisitorPrefixBitsIPv6 = 48 // Use /48 for IPv6 prefixes
+	s := newTestServer(t, c)
+	overrideRemoteAddr1 := func(r *http.Request) {
+		r.RemoteAddr = "[2001:db8:9999::1]:1234"
+	}
+	overrideRemoteAddr2 := func(r *http.Request) {
+		r.RemoteAddr = "[2001:db8:9999::2]:1234" // Same /48
+	}
+	for i := 0; i < 3; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil, overrideRemoteAddr1)
+		require.Equal(t, 200, response.Code)
+	}
+	for i := 0; i < 3; i++ {
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil, overrideRemoteAddr2)
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "message", nil, overrideRemoteAddr1)
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishTooManyRequests_Defaults_ExemptHosts(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 3
-	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
 	for i := 0; i < 5; i++ { // > 3
 		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil)
@@ -1190,11 +1233,25 @@ func TestServer_PublishTooRequests_Defaults_ExemptHosts(t *testing.T) {
 	}
 }
 
-func TestServer_PublishTooRequests_Defaults_ExemptHosts_MessageDailyLimit(t *testing.T) {
+func TestServer_PublishTooManyRequests_Defaults_ExemptHosts_IPv6(t *testing.T) {
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 3
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("2001:db8:9999::/48")}
+	s := newTestServer(t, c)
+	overrideRemoteAddr := func(r *http.Request) {
+		r.RemoteAddr = "[2001:db8:9999::1]:1234"
+	}
+	for i := 0; i < 5; i++ { // > 3
+		response := request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil, overrideRemoteAddr)
+		require.Equal(t, 200, response.Code)
+	}
+}
+
+func TestServer_PublishTooManyRequests_Defaults_ExemptHosts_MessageDailyLimit(t *testing.T) {
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 10
 	c.VisitorMessageDailyLimit = 4
-	c.VisitorRequestExemptIPAddrs = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
 	s := newTestServer(t, c)
 	for i := 0; i < 8; i++ { // 4
 		response := request(t, s, "PUT", "/mytopic", "message", nil)
@@ -1202,7 +1259,7 @@ func TestServer_PublishTooRequests_Defaults_ExemptHosts_MessageDailyLimit(t *tes
 	}
 }
 
-func TestServer_PublishTooRequests_ShortReplenish(t *testing.T) {
+func TestServer_PublishTooManyRequests_ShortReplenish(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig(t)
 	c.VisitorRequestLimitBurst = 60
@@ -2244,11 +2301,24 @@ func TestServer_Visitor_Custom_ClientIP_Header(t *testing.T) {
 	require.Equal(t, "1.2.3.4", v.ip.String())
 }
 
+func TestServer_Visitor_Custom_ClientIP_Header_IPv6(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyForwardedHeader = "X-Client-IP"
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "[2001:db8:9999::1]:1234"
+	r.Header.Set("X-Client-IP", "2001:db8:7777::1")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "2001:db8:7777::1", v.ip.String())
+}
+
 func TestServer_Visitor_Custom_Forwarded_Header(t *testing.T) {
 	c := newTestConfig(t)
 	c.BehindProxy = true
 	c.ProxyForwardedHeader = "Forwarded"
-	c.ProxyTrustedAddresses = []string{"1.2.3.4"}
+	c.ProxyTrustedPrefixes = []netip.Prefix{netip.MustParsePrefix("1.2.3.0/24")}
 	s := newTestServer(t, c)
 	r, _ := http.NewRequest("GET", "/bla", nil)
 	r.RemoteAddr = "8.9.10.11:1234"
@@ -2256,6 +2326,20 @@ func TestServer_Visitor_Custom_Forwarded_Header(t *testing.T) {
 	v, err := s.maybeAuthenticate(r)
 	require.Nil(t, err)
 	require.Equal(t, "5.6.7.8", v.ip.String())
+}
+
+func TestServer_Visitor_Custom_Forwarded_Header_IPv6(t *testing.T) {
+	c := newTestConfig(t)
+	c.BehindProxy = true
+	c.ProxyForwardedHeader = "Forwarded"
+	c.ProxyTrustedPrefixes = []netip.Prefix{netip.MustParsePrefix("2001:db8:1111::/64")}
+	s := newTestServer(t, c)
+	r, _ := http.NewRequest("GET", "/bla", nil)
+	r.RemoteAddr = "[2001:db8:2222::1]:1234"
+	r.Header.Set("Forwarded", " for=[2001:db8:1111::1], by=example.com;for=[2001:db8:3333::1]")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Equal(t, "2001:db8:3333::1", v.ip.String())
 }
 
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {

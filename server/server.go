@@ -760,7 +760,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
-	} else if !util.ContainsIP(s.config.VisitorRequestExemptIPAddrs, v.ip) && !vrate.MessageAllowed() {
+	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
 	} else if email != "" && !vrate.EmailAllowed() {
 		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
@@ -1937,7 +1937,7 @@ func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFun
 // that subsequent logging calls still have a visitor context.
 func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	// Read the "Authorization" header value and exit out early if it's not set
-	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedAddresses)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedPrefixes)
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
 		return vip, nil
@@ -2012,7 +2012,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 	if err != nil {
 		return nil, err
 	}
-	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedAddresses)
+	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedPrefixes)
 	go s.userManager.EnqueueTokenUpdate(token, &user.TokenUpdate{
 		LastAccess: time.Now(),
 		LastOrigin: ip,
@@ -2023,7 +2023,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := visitorID(ip, user)
+	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
 		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)

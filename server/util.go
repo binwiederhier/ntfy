@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/v2/util"
 	"io"
 	"mime"
 	"net/http"
 	"net/netip"
 	"regexp"
-	"slices"
 	"strings"
+
+	"heckel.io/ntfy/v2/util"
 )
 
 var (
@@ -20,8 +20,14 @@ var (
 	// priorityHeaderIgnoreRegex matches specific patterns of the "Priority" header (RFC 9218), so that it can be ignored
 	priorityHeaderIgnoreRegex = regexp.MustCompile(`^u=\d,\s*(i|\d)$|^u=\d$`)
 
-	// forwardedHeaderRegex parses IPv4 addresses from the "Forwarded" header (RFC 7239)
-	forwardedHeaderRegex = regexp.MustCompile(`(?i)\bfor="?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"?`)
+	// forwardedHeaderRegex parses IPv4 and IPv6 addresses from the "Forwarded" header (RFC 7239)
+	// IPv6 addresses in Forwarded header are enclosed in square brackets. The port is optional.
+	//
+	// Examples:
+	//  for="1.2.3.4"
+	//  for="[2001:db8::1]"; for=1.2.3.4:8080, by=phil
+	//  for="1.2.3.4:8080"
+	forwardedHeaderRegex = regexp.MustCompile(`(?i)\bfor="?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[0-9a-f:]+])(?::\d+)?"?`)
 )
 
 func readBoolParam(r *http.Request, defaultValue bool, names ...string) bool {
@@ -77,9 +83,9 @@ func readQueryParam(r *http.Request, names ...string) string {
 
 // extractIPAddress extracts the IP address of the visitor from the request,
 // either from the TCP socket or from a proxy header.
-func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedAddresses []string) netip.Addr {
+func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader string, proxyTrustedPrefixes []netip.Prefix) netip.Addr {
 	if behindProxy && proxyForwardedHeader != "" {
-		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedAddresses); err == nil {
+		if addr, err := extractIPAddressFromHeader(r, proxyForwardedHeader, proxyTrustedPrefixes); err == nil {
 			return addr
 		}
 		// Fall back to the remote address if the header is not found or invalid
@@ -102,7 +108,7 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 // If there are multiple addresses, we first remove the trusted IP addresses from the list, and
 // then take the right-most address in the list (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
-func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedAddresses []string) (netip.Addr, error) {
+func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedPrefixes []netip.Prefix) (netip.Addr, error) {
 	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))
 	if value == "" {
 		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
@@ -111,17 +117,27 @@ func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trusted
 	addrsStrs := util.Map(util.SplitNoEmpty(value, ","), strings.TrimSpace)
 	var validAddrs []netip.Addr
 	for _, addrStr := range addrsStrs {
-		if addr, err := netip.ParseAddr(addrStr); err == nil {
-			validAddrs = append(validAddrs, addr)
-		} else if m := forwardedHeaderRegex.FindStringSubmatch(addrStr); len(m) == 2 {
-			if addr, err := netip.ParseAddr(m[1]); err == nil {
+		// Handle Forwarded header with for="[IPv6]" or for="IPv4"
+		if m := forwardedHeaderRegex.FindStringSubmatch(addrStr); len(m) == 2 {
+			addrRaw := m[1]
+			if strings.HasPrefix(addrRaw, "[") && strings.HasSuffix(addrRaw, "]") {
+				addrRaw = addrRaw[1 : len(addrRaw)-1]
+			}
+			if addr, err := netip.ParseAddr(addrRaw); err == nil {
 				validAddrs = append(validAddrs, addr)
 			}
+		} else if addr, err := netip.ParseAddr(addrStr); err == nil {
+			validAddrs = append(validAddrs, addr)
 		}
 	}
 	// Filter out proxy addresses
 	clientAddrs := util.Filter(validAddrs, func(addr netip.Addr) bool {
-		return !slices.Contains(trustedAddresses, addr.String())
+		for _, prefix := range trustedPrefixes {
+			if prefix.Contains(addr) {
+				return false // Address is in the trusted range, ignore it
+			}
+		}
+		return true
 	})
 	if len(clientAddrs) == 0 {
 		return netip.IPv4Unspecified(), fmt.Errorf("no client IP address found in %s header: %s", forwardedHeader, value)

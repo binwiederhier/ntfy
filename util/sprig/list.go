@@ -39,7 +39,7 @@ func mustPush(list interface{}, v interface{}) ([]interface{}, error) {
 		return append(nl, v), nil
 
 	default:
-		return nil, fmt.Errorf("Cannot push on type %s", tp)
+		return nil, fmt.Errorf("cannot push on type %s", tp)
 	}
 }
 
@@ -69,7 +69,7 @@ func mustPrepend(list interface{}, v interface{}) ([]interface{}, error) {
 		return append([]interface{}{v}, nl...), nil
 
 	default:
-		return nil, fmt.Errorf("Cannot prepend on type %s", tp)
+		return nil, fmt.Errorf("cannot prepend on type %s", tp)
 	}
 }
 
@@ -113,7 +113,7 @@ func mustChunk(size int, list interface{}) ([][]interface{}, error) {
 		return nl, nil
 
 	default:
-		return nil, fmt.Errorf("Cannot chunk type %s", tp)
+		return nil, fmt.Errorf("cannot chunk type %s", tp)
 	}
 }
 
@@ -139,7 +139,7 @@ func mustLast(list interface{}) (interface{}, error) {
 
 		return l2.Index(l - 1).Interface(), nil
 	default:
-		return nil, fmt.Errorf("Cannot find last on type %s", tp)
+		return nil, fmt.Errorf("cannot find last on type %s", tp)
 	}
 }
 
@@ -165,7 +165,7 @@ func mustFirst(list interface{}) (interface{}, error) {
 
 		return l2.Index(0).Interface(), nil
 	default:
-		return nil, fmt.Errorf("Cannot find first on type %s", tp)
+		return nil, fmt.Errorf("cannot find first on type %s", tp)
 	}
 }
 
@@ -196,7 +196,7 @@ func mustRest(list interface{}) ([]interface{}, error) {
 
 		return nl, nil
 	default:
-		return nil, fmt.Errorf("Cannot find rest on type %s", tp)
+		return nil, fmt.Errorf("cannot find rest on type %s", tp)
 	}
 }
 
@@ -227,7 +227,7 @@ func mustInitial(list interface{}) ([]interface{}, error) {
 
 		return nl, nil
 	default:
-		return nil, fmt.Errorf("Cannot find initial on type %s", tp)
+		return nil, fmt.Errorf("cannot find initial on type %s", tp)
 	}
 }
 
@@ -267,7 +267,7 @@ func mustReverse(v interface{}) ([]interface{}, error) {
 
 		return nl, nil
 	default:
-		return nil, fmt.Errorf("Cannot find reverse on type %s", tp)
+		return nil, fmt.Errorf("cannot find reverse on type %s", tp)
 	}
 }
 
@@ -298,7 +298,7 @@ func mustCompact(list interface{}) ([]interface{}, error) {
 
 		return nl, nil
 	default:
-		return nil, fmt.Errorf("Cannot compact on type %s", tp)
+		return nil, fmt.Errorf("cannot compact on type %s", tp)
 	}
 }
 
@@ -329,7 +329,7 @@ func mustUniq(list interface{}) ([]interface{}, error) {
 
 		return dest, nil
 	default:
-		return nil, fmt.Errorf("Cannot find uniq on type %s", tp)
+		return nil, fmt.Errorf("cannot find uniq on type %s", tp)
 	}
 }
 
@@ -369,7 +369,7 @@ func mustWithout(list interface{}, omit ...interface{}) ([]interface{}, error) {
 
 		return res, nil
 	default:
-		return nil, fmt.Errorf("Cannot find without on type %s", tp)
+		return nil, fmt.Errorf("cannot find without on type %s", tp)
 	}
 }
 
@@ -401,7 +401,7 @@ func mustHas(needle interface{}, haystack interface{}) (bool, error) {
 
 		return false, nil
 	default:
-		return false, fmt.Errorf("Cannot find has on type %s", tp)
+		return false, fmt.Errorf("cannot find has on type %s", tp)
 	}
 }
 
@@ -457,7 +457,7 @@ func concat(lists ...interface{}) interface{} {
 				res = append(res, l2.Index(i).Interface())
 			}
 		default:
-			panic(fmt.Sprintf("Cannot concat type %s as list", tp))
+			panic(fmt.Sprintf("cannot concat type %s as list", tp))
 		}
 	}
 	return res

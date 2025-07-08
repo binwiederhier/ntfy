@@ -11,6 +11,8 @@ import (
 	"strings"
 	ttemplate "text/template"
 	"time"
+
+	"golang.org/x/text/cases"
 )
 
 // FuncMap produces the function map.
@@ -107,7 +109,7 @@ var genericMap = map[string]interface{}{
 	"trim":   strings.TrimSpace,
 	"upper":  strings.ToUpper,
 	"lower":  strings.ToLower,
-	"title":  strings.Title,
+	"title":  cases.Title,
 	"substr": substring,
 	// Switch order so that "foo" | repeat 5
 	"repeat": func(count int, str string) string { return strings.Repeat(str, count) },

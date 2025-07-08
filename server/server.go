@@ -1133,11 +1133,7 @@ func replaceTemplate(tpl string, source string) (string, error) {
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	sprigFuncs := sprig.FuncMap()
-	// remove unsafe functions
-	delete(sprigFuncs, "env")
-	delete(sprigFuncs, "expandenv")
-	t, err := template.New("").Funcs(sprigFuncs).Parse(tpl)
+	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid
 	}

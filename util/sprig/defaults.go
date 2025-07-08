@@ -3,15 +3,9 @@ package sprig
 import (
 	"bytes"
 	"encoding/json"
-	"math/rand"
 	"reflect"
 	"strings"
-	"time"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // dfault checks whether `given` is set, and returns default if not set.
 //

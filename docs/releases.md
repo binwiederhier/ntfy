@@ -1440,7 +1440,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Full [IPv6 support](config.md#ipv6-support) for ntfy and the official ntfy.sh server ([#519](https://github.com/binwiederhier/ntfy/issues/519)/[#1380](https://github.com/binwiederhier/ntfy/pull/1380)/[ansible#4](https://github.com/binwiederhier/ntfy-ansible/pull/4))
 * Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-hosts` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha))
 * Add STDIN support for `ntfy publish` ([#1382](https://github.com/binwiederhier/ntfy/pull/1382), thanks to [@srevn](https://github.com/srevn))
-* You can now use [Slim-Sprig](https://github.com/go-task/slim-sprig) functions in message/title templates ([#1121](https://github.com/binwiederhier/ntfy/issues/1121), thanks to [@davidatkinsondoyle](https://github.com/davidatkinsondoyle) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
+* You can now use a subset of [Sprig](https://github.com/Masterminds/sprig) functions in message/title templates ([#1121](https://github.com/binwiederhier/ntfy/issues/1121), thanks to [@davidatkinsondoyle](https://github.com/davidatkinsondoyle) for reporting and to [@wunter8](https://github.com/wunter8) for implementing)
 
 **Languages**
 

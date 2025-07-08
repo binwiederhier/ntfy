@@ -101,7 +101,7 @@ func TestToFloat64(t *testing.T) {
 	if target != toFloat64("102") {
 		t.Errorf("Expected 102")
 	}
-	if 0 != toFloat64("frankie") {
+	if toFloat64("frankie") != 0 {
 		t.Errorf("Expected 0")
 	}
 	if target != toFloat64(uint16(102)) {
@@ -110,10 +110,10 @@ func TestToFloat64(t *testing.T) {
 	if target != toFloat64(uint64(102)) {
 		t.Errorf("Expected 102")
 	}
-	if 102.1234 != toFloat64(float64(102.1234)) {
+	if toFloat64(float64(102.1234)) != 102.1234 {
 		t.Errorf("Expected 102.1234")
 	}
-	if 1 != toFloat64(true) {
+	if toFloat64(true) != 1 {
 		t.Errorf("Expected 102")
 	}
 }
@@ -137,7 +137,7 @@ func TestToInt64(t *testing.T) {
 	if target != toInt64("102") {
 		t.Errorf("Expected 102")
 	}
-	if 0 != toInt64("frankie") {
+	if toInt64("frankie") != 0 {
 		t.Errorf("Expected 0")
 	}
 	if target != toInt64(uint16(102)) {
@@ -149,7 +149,7 @@ func TestToInt64(t *testing.T) {
 	if target != toInt64(float64(102.1234)) {
 		t.Errorf("Expected 102")
 	}
-	if 1 != toInt64(true) {
+	if toInt64(true) != 1 {
 		t.Errorf("Expected 102")
 	}
 }
@@ -174,7 +174,7 @@ func TestToInt(t *testing.T) {
 	if target != toInt("102") {
 		t.Errorf("Expected 102")
 	}
-	if 0 != toInt("frankie") {
+	if toInt("frankie") != 0 {
 		t.Errorf("Expected 0")
 	}
 	if target != toInt(uint16(102)) {
@@ -186,7 +186,7 @@ func TestToInt(t *testing.T) {
 	if target != toInt(float64(102.1234)) {
 		t.Errorf("Expected 102")
 	}
-	if 1 != toInt(true) {
+	if toInt(true) != 1 {
 		t.Errorf("Expected 102")
 	}
 }

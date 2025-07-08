@@ -1071,6 +1071,32 @@ are the easiest), and then configure the following options:
 After you have configured phone calls, create a [tier](#tiers) with a call limit (e.g. `ntfy tier create --call-limit=10 ...`),
 and then assign it to a user. Users may then use the `X-Call` header to receive a phone call when publishing a message.
 
+To customize your message send to Twilio's Call API, set the `twilio-call-format` option with [TwiML](https://www.twilio.com/docs/voice/twiml).
+This is the default TwiML:
+
+``` xml
+<Response>
+	<Pause length="1"/>
+	<Say loop="3">
+		You have a message from notify on topic %s. Message:
+		<break time="1s"/>
+		%s
+		<break time="1s"/>
+		End of message.
+		<break time="1s"/>
+		This message was sent by user %s. It will be repeated three times.
+		To unsubscribe from calls like this, remove your phone number in the notify web app.
+		<break time="3s"/>
+	</Say>
+	<Say>Goodbye.</Say>
+</Response>`
+```
+
+The TwiML is internaly used as a format string:
+1. The first `%s` will be replaced with the topic.
+1. The second `%s` will be replaced with the message.
+1. The third `%s` will be replaced with the message`s sender name.
+
 ## Message limits
 There are a few message limits that you can configure:
 

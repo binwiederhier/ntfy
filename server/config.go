@@ -122,6 +122,7 @@ type Config struct {
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
 	TwilioVerifyService                  string
+	TwilioCallFormat                     string
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
@@ -218,6 +219,7 @@ func NewConfig() *Config {
 		TwilioPhoneNumber:                    "",
 		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
 		TwilioVerifyService:                  "",
+		TwilioCallFormat:                     "",
 		MessageSizeLimit:                     DefaultMessageSizeLimit,
 		MessageDelayMin:                      DefaultMessageDelayMin,
 		MessageDelayMax:                      DefaultMessageDelayMax,

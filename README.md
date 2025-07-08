@@ -253,3 +253,4 @@ Third-party libraries and resources:
 * [Statically linking go-sqlite3](https://www.arp242.net/static-go.html)
 * [Linked tabs in mkdocs](https://facelessuser.github.io/pymdown-extensions/extensions/tabbed/#linked-tabs)
 * [webpush-go](https://github.com/SherClockHolmes/webpush-go) (MIT) is used to send web push notifications
+* [Sprig](https://github.com/Masterminds/sprig) (MIT) is used to add template parsing functions

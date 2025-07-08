@@ -34,6 +34,7 @@ import (
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	"heckel.io/ntfy/v2/util/sprig"
 )
 
 // Server is the main server, providing the UI and API for ntfy
@@ -1132,7 +1133,11 @@ func replaceTemplate(tpl string, source string) (string, error) {
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	t, err := template.New("").Parse(tpl)
+	sprigFuncs := sprig.FuncMap()
+	// remove unsafe functions
+	delete(sprigFuncs, "env")
+	delete(sprigFuncs, "expandenv")
+	t, err := template.New("").Funcs(sprigFuncs).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid
 	}

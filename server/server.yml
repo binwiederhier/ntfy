@@ -228,10 +228,12 @@
 # - enable-signup allows users to sign up via the web app, or API
 # - enable-login allows users to log in via the web app, or API
 # - enable-reservations allows users to reserve topics (if their tier allows it)
+# - require-login all user actions via the web app require a login
 #
 # enable-signup: false
 # enable-login: false
 # enable-reservations: false
+# require-login: false
 
 # Server URL of a Firebase/APNS-connected ntfy server (likely "https://ntfy.sh").
 #

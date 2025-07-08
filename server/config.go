@@ -249,6 +249,7 @@ func NewConfig() *Config {
 		EnableSignup:                         false,
 		EnableLogin:                          false,
 		EnableReservations:                   false,
+		RequireLogin:                         false,
 		AccessControlAllowOrigin:             "*",
 		Version:                              "",
 		WebPushPrivateKey:                    "",

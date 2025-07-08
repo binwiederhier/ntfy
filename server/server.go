@@ -586,6 +586,7 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 		EnableCalls:        s.config.TwilioAccount != "",
 		EnableEmails:       s.config.SMTPSenderFrom != "",
 		EnableReservations: s.config.EnableReservations,
+		ReuqireLogin:       s.config.RequireLogin,
 		EnableWebPush:      s.config.WebPushPublicKey != "",
 		BillingContact:     s.config.BillingContact,
 		WebPushPublicKey:   s.config.WebPushPublicKey,

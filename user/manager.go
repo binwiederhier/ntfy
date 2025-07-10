@@ -449,13 +449,13 @@ type Manager struct {
 }
 
 type Config struct {
-	Filename            string
-	StartupQueries      string
+	Filename            string              // Database filename, e.g. "/var/lib/ntfy/user.db"
+	StartupQueries      string              // Queries to run on startup, e.g. to create initial users or tiers
 	DefaultAccess       Permission          // Default permission if no ACL matches
 	ProvisionedUsers    []*User             // Predefined users to create on startup
 	ProvisionedAccess   map[string][]*Grant // Predefined access grants to create on startup
-	BcryptCost          int                 // Makes testing easier
-	QueueWriterInterval time.Duration
+	QueueWriterInterval time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
+	BcryptCost          int                 // Cost of generated passwords; lowering makes testing faster
 }
 
 var _ Auther = (*Manager)(nil)
@@ -469,7 +469,6 @@ func NewManager(config *Config) (*Manager, error) {
 	if config.QueueWriterInterval.Seconds() <= 0 {
 		config.QueueWriterInterval = DefaultUserStatsQueueWriterInterval
 	}
-
 	// Open DB and run setup queries
 	db, err := sql.Open("sqlite3", config.Filename)
 	if err != nil {
@@ -486,6 +485,9 @@ func NewManager(config *Config) (*Manager, error) {
 		config:     config,
 		statsQueue: make(map[string]*Stats),
 		tokenQueue: make(map[string]*TokenUpdate),
+	}
+	if err := manager.provisionUsers(); err != nil {
+		return nil, err
 	}
 	go manager.asyncQueueWriter(config.QueueWriterInterval)
 	return manager, nil
@@ -1520,6 +1522,22 @@ func (a *Manager) readTier(rows *sql.Rows) (*Tier, error) {
 // Close closes the underlying database
 func (a *Manager) Close() error {
 	return a.db.Close()
+}
+
+func (a *Manager) provisionUsers() error {
+	for _, user := range a.config.ProvisionedUsers {
+		if err := a.AddUser(user.Name, user.Hash, user.Role, true); err != nil && !errors.Is(err, ErrUserExists) {
+			return err
+		}
+	}
+	for username, grants := range a.config.ProvisionedAccess {
+		for _, grant := range grants {
+			if err := a.AllowAccess(username, grant.TopicPattern, grant.Allow); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // toSQLWildcard converts a wildcard string to a SQL wildcard string. It only allows '*' as wildcards,

@@ -193,6 +193,8 @@ func New(conf *Config) (*Server, error) {
 			Filename:            conf.AuthFile,
 			StartupQueries:      conf.AuthStartupQueries,
 			DefaultAccess:       conf.AuthDefault,
+			ProvisionedUsers:    conf.AuthProvisionedUsers,
+			ProvisionedAccess:   conf.AuthProvisionedAccess,
 			BcryptCost:          conf.AuthBcryptCost,
 			QueueWriterInterval: conf.AuthStatsQueueWriterInterval,
 		}

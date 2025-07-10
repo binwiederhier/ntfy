@@ -220,7 +220,7 @@ cli-deps-static-sites:
 	touch server/docs/index.html server/site/app.html
 
 cli-deps-all:
-	go install github.com/goreleaser/goreleaser@latest
+	go install github.com/goreleaser/goreleaser/v2@latest
 
 cli-deps-gcc-armv6-armv7:
 	which arm-linux-gnueabi-gcc || { echo "ERROR: ARMv6/ARMv7 cross compiler not installed. On Ubuntu, run: apt install gcc-arm-linux-gnueabi"; exit 1; }

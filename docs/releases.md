@@ -2,6 +2,25 @@
 Binaries for all releases can be found on the GitHub releases pages for the [ntfy server](https://github.com/binwiederhier/ntfy/releases)
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
+### ntfy server v2.13.0
+Released July 10, 2025
+
+This is a relatively small release, mainly to support IPv6 and to add more sophisticated
+proxy header support. Quick reminder that if you like ntfy, **please consider sponsoring us**
+via [GitHub Sponsors](https://github.com/sponsors/binwiederhier) and [Liberapay](https://en.liberapay.com/ntfy/), or buying a [paid plan via the web app](https://ntfy.sh/app).
+ntfy will always remain open source.
+
+**Features:**
+
+* Full [IPv6 support](config.md#ipv6-support) for ntfy and the official ntfy.sh server ([#519](https://github.com/binwiederhier/ntfy/issues/519)/[#1380](https://github.com/binwiederhier/ntfy/pull/1380)/[ansible#4](https://github.com/binwiederhier/ntfy-ansible/pull/4))
+* Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-hosts` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha))
+* Add STDIN support for `ntfy publish` ([#1382](https://github.com/binwiederhier/ntfy/pull/1382), thanks to [@srevn](https://github.com/srevn))
+
+**Languages**
+
+* Update new languages from Weblate. Thanks to all the contributors!
+* Added Estonian (Esti), Galician (Galego), Romanian (Română), Slovak (Slovenčina) as new languages to the web app
+
 ### ntfy server v2.12.0
 Released May 29, 2025
 
@@ -1432,19 +1451,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.13.0 (UNRELEASED)
-
-**Features:**
-
-* Full [IPv6 support](config.md#ipv6-support) for ntfy and the official ntfy.sh server ([#519](https://github.com/binwiederhier/ntfy/issues/519)/[#1380](https://github.com/binwiederhier/ntfy/pull/1380)/[ansible#4](https://github.com/binwiederhier/ntfy-ansible/pull/4))
-* Support `X-Client-IP`, `X-Real-IP`, `Forwarded` headers for [rate limiting](config.md#ip-based-rate-limiting) via `proxy-forwarded-header` and `proxy-trusted-hosts` ([#1360](https://github.com/binwiederhier/ntfy/pull/1360)/[#1252](https://github.com/binwiederhier/ntfy/pull/1252), thanks to [@pixitha](https://github.com/pixitha))
-* Add STDIN support for `ntfy publish` ([#1382](https://github.com/binwiederhier/ntfy/pull/1382), thanks to [@srevn](https://github.com/srevn))
-
-**Languages**
-
-* Update new languages from Weblate. Thanks to all the contributors!
-* Added Estonian (Esti), Galician (Galego), Romanian (Română), Slovak (Slovenčina) as new languages to the web app
 
 ### ntfy Android app v1.16.1 (UNRELEASED)
 

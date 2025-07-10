@@ -301,7 +301,7 @@ release: clean cli-deps release-checks docs web check
 	goreleaser release --clean
 
 release-snapshot: clean cli-deps docs web check
-	goreleaser release --snapshot --skip-publish --clean
+	goreleaser release --snapshot --clean
 
 release-checks:
 	$(eval LATEST_TAG := $(shell git describe --abbrev=0 --tags | cut -c2-))

@@ -731,7 +731,14 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 }
 
 func TestManager_EnqueueStats_ResetStats(t *testing.T) {
-	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
+	conf := &Config{
+		Filename:            filepath.Join(t.TempDir(), "db"),
+		StartupQueries:      "",
+		DefaultAccess:       PermissionReadWrite,
+		BcryptCost:          bcrypt.MinCost,
+		QueueWriterInterval: 1500 * time.Millisecond,
+	}
+	a, err := NewManager(conf)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
@@ -773,7 +780,14 @@ func TestManager_EnqueueStats_ResetStats(t *testing.T) {
 }
 
 func TestManager_EnqueueTokenUpdate(t *testing.T) {
-	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 500*time.Millisecond)
+	conf := &Config{
+		Filename:            filepath.Join(t.TempDir(), "db"),
+		StartupQueries:      "",
+		DefaultAccess:       PermissionReadWrite,
+		BcryptCost:          bcrypt.MinCost,
+		QueueWriterInterval: 500 * time.Millisecond,
+	}
+	a, err := NewManager(conf)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
@@ -806,7 +820,14 @@ func TestManager_EnqueueTokenUpdate(t *testing.T) {
 }
 
 func TestManager_ChangeSettings(t *testing.T) {
-	a, err := NewManager(filepath.Join(t.TempDir(), "db"), "", PermissionReadWrite, bcrypt.MinCost, 1500*time.Millisecond)
+	conf := &Config{
+		Filename:            filepath.Join(t.TempDir(), "db"),
+		StartupQueries:      "",
+		DefaultAccess:       PermissionReadWrite,
+		BcryptCost:          bcrypt.MinCost,
+		QueueWriterInterval: 1500 * time.Millisecond,
+	}
+	a, err := NewManager(conf)
 	require.Nil(t, err)
 	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
 
@@ -1075,6 +1096,24 @@ func TestManager_Topic_Wildcard_With_Underscore(t *testing.T) {
 	require.Equal(t, ErrUnauthorized, a.Authorize(nil, "mytopicX", PermissionWrite))
 }
 
+func TestManager_WithProvisionedUsers(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "user.db")
+	conf := &Config{
+		Filename:      f,
+		DefaultAccess: PermissionReadWrite,
+		ProvisionedUsers: []*User{
+			{Name: "phil", Hash: "$2a$10$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C", Role: RoleAdmin},
+		},
+	}
+	a, err := NewManager(conf)
+	require.Nil(t, err)
+	users, err := a.Users()
+	require.Nil(t, err)
+	for _, u := range users {
+		fmt.Println(u.ID, u.Name, u.Role)
+	}
+}
+
 func TestToFromSQLWildcard(t *testing.T) {
 	require.Equal(t, "up%", toSQLWildcard("up*"))
 	require.Equal(t, "up\\_%", toSQLWildcard("up_*"))
@@ -1336,7 +1375,14 @@ func newTestManager(t *testing.T, defaultAccess Permission) *Manager {
 }
 
 func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) *Manager {
-	a, err := NewManager(filename, startupQueries, defaultAccess, bcryptCost, statsWriterInterval)
+	conf := &Config{
+		Filename:            filename,
+		StartupQueries:      startupQueries,
+		DefaultAccess:       defaultAccess,
+		BcryptCost:          bcryptCost,
+		QueueWriterInterval: statsWriterInterval,
+	}
+	a, err := NewManager(conf)
 	require.Nil(t, err)
 	return a
 }

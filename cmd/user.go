@@ -94,7 +94,6 @@ Example:
 
 You may set the NTFY_PASSWORD environment variable to pass the new password or NTFY_PASSWORD_HASH to pass
 directly the bcrypt hash. This is useful if you are updating users via scripts.
-
 `,
 		},
 		{
@@ -225,7 +224,7 @@ func execUserDel(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrUserNotFound {
+	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.RemoveUser(username); err != nil {
@@ -251,7 +250,7 @@ func execUserChangePass(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrUserNotFound {
+	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if password == "" {
@@ -279,7 +278,7 @@ func execUserChangeRole(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrUserNotFound {
+	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if err := manager.ChangeRole(username, role); err != nil {
@@ -303,7 +302,7 @@ func execUserChangeTier(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); err == user.ErrUserNotFound {
+	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
 		return fmt.Errorf("user %s does not exist", username)
 	}
 	if tier == tierReset {
@@ -345,7 +344,16 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 	if err != nil {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	}
-	return user.NewManager(authFile, authStartupQueries, authDefault, user.DefaultUserPasswordBcryptCost, user.DefaultUserStatsQueueWriterInterval)
+	authConfig := &user.Config{
+		Filename:            authFile,
+		StartupQueries:      authStartupQueries,
+		DefaultAccess:       authDefault,
+		ProvisionedUsers:    nil, //FIXME
+		ProvisionedAccess:   nil, //FIXME
+		BcryptCost:          user.DefaultUserPasswordBcryptCost,
+		QueueWriterInterval: user.DefaultUserStatsQueueWriterInterval,
+	}
+	return user.NewManager(authConfig)
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

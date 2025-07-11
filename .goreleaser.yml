@@ -1,76 +1,70 @@
+version: 2
 before:
   hooks:
     - go mod download
     - go mod tidy
 builds:
-  -
-    id: ntfy_linux_amd64
+  - id: ntfy_linux_amd64
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
-    tags: [sqlite_omit_load_extension,osusergo,netgo]
+    tags: [ sqlite_omit_load_extension,osusergo,netgo ]
     ldflags:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [linux]
-    goarch: [amd64]
-  -
-    id: ntfy_linux_armv6
-    binary: ntfy
-    env:
-      - CGO_ENABLED=1 # required for go-sqlite3
-      - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
-    tags: [sqlite_omit_load_extension,osusergo,netgo]
-    ldflags:
-      - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [linux]
-    goarch: [arm]
-    goarm: [6]
-  -
-    id: ntfy_linux_armv7
+    goos: [ linux ]
+    goarch: [ amd64 ]
+  - id: ntfy_linux_armv6
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
       - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
-    tags: [sqlite_omit_load_extension,osusergo,netgo]
+    tags: [ sqlite_omit_load_extension,osusergo,netgo ]
     ldflags:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [linux]
-    goarch: [arm]
-    goarm: [7]
-  -
-    id: ntfy_linux_arm64
+    goos: [ linux ]
+    goarch: [ arm ]
+    goarm: [ 6 ]
+  - id: ntfy_linux_armv7
+    binary: ntfy
+    env:
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=arm-linux-gnueabi-gcc # apt install gcc-arm-linux-gnueabi
+    tags: [ sqlite_omit_load_extension,osusergo,netgo ]
+    ldflags:
+      - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [ linux ]
+    goarch: [ arm ]
+    goarm: [ 7 ]
+  - id: ntfy_linux_arm64
     binary: ntfy
     env:
       - CGO_ENABLED=1 # required for go-sqlite3
       - CC=aarch64-linux-gnu-gcc # apt install gcc-aarch64-linux-gnu
-    tags: [sqlite_omit_load_extension,osusergo,netgo]
+    tags: [ sqlite_omit_load_extension,osusergo,netgo ]
     ldflags:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [linux]
-    goarch: [arm64]
-  -
-    id: ntfy_windows_amd64
+    goos: [ linux ]
+    goarch: [ arm64 ]
+  - id: ntfy_windows_amd64
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
-    tags: [noserver] # don't include server files
+    tags: [ noserver ] # don't include server files
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [windows]
-    goarch: [amd64]
-  -
-    id: ntfy_darwin_all
+    goos: [ windows ]
+    goarch: [ amd64 ]
+  - id: ntfy_darwin_all
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
-    tags: [noserver] # don't include server files
+    tags: [ noserver ] # don't include server files
     ldflags:
       - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
-    goos: [darwin]
-    goarch: [amd64, arm64] # will be combined to "universal binary" (see below)
+    goos: [ darwin ]
+    goarch: [ amd64, arm64 ] # will be combined to "universal binary" (see below)
 nfpms:
-  -
-    package_name: ntfy
+  - package_name: ntfy
     homepage: https://heckel.io/ntfy
     maintainer: Philipp C. Heckel <philipp.heckel@gmail.com>
     description: Simple pub-sub notification service
@@ -106,9 +100,8 @@ nfpms:
       preremove: "scripts/prerm.sh"
       postremove: "scripts/postrm.sh"
 archives:
-  -
-    id: ntfy_linux
-    builds:
+  - id: ntfy_linux
+    ids:
       - ntfy_linux_amd64
       - ntfy_linux_armv6
       - ntfy_linux_armv7
@@ -122,19 +115,17 @@ archives:
       - client/client.yml
       - client/ntfy-client.service
       - client/user/ntfy-client.service
-  -
-    id: ntfy_windows
-    builds:
+  - id: ntfy_windows
+    ids:
       - ntfy_windows_amd64
-    format: zip
+    formats: [ zip ]
     wrap_in_directory: true
     files:
       - LICENSE
       - README.md
       - client/client.yml
-  -
-    id: ntfy_darwin
-    builds:
+  - id: ntfy_darwin
+    ids:
       - ntfy_darwin_all
     wrap_in_directory: true
     files:
@@ -142,14 +133,13 @@ archives:
       - README.md
       - client/client.yml
 universal_binaries:
-  -
-    id: ntfy_darwin_all
+  - id: ntfy_darwin_all
     replace: true
     name_template: ntfy
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 changelog:
   sort: asc
   filters:

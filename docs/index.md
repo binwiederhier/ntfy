@@ -40,6 +40,7 @@ simple message using a POST request:
     ``` http
     POST /mytopic HTTP/1.1
     Host: ntfy.sh
+    Content-Length: 22
     
     Backup successful 😀
     ```

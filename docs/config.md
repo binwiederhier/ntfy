@@ -6,7 +6,7 @@ or using environment variables.
 ## Quick start
 By default, simply running `ntfy serve` will start the server at port 80. No configuration needed. Batteries included 😀. 
 If everything works as it should, you'll see something like this:
-```
+```shell
 $ ntfy serve
 2021/11/30 19:59:08 Listening on :80
 ```
@@ -26,103 +26,100 @@ and `listen-https`), and socket path (`listen-unix`). All the other things are a
 
 Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
 
-=== "server.yml (HTTP-only, with cache + attachments)"
-    ``` yaml
-    base-url: "http://ntfy.example.com"
-    cache-file: "/var/cache/ntfy/cache.db"
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    ```
+### server.yml (HTTP-only, with cache + attachments)
+```yaml
+base-url: "http://ntfy.example.com"
+cache-file: "/var/cache/ntfy/cache.db"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+```
+### server.yml (HTTP+HTTPS, with cache + attachments)
+```yaml
+base-url: "http://ntfy.example.com"
+listen-http: ":80"
+listen-https: ":443"
+key-file: "/etc/letsencrypt/live/ntfy.example.com.key"
+cert-file: "/etc/letsencrypt/live/ntfy.example.com.crt"
+cache-file: "/var/cache/ntfy/cache.db"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+```
+### server.yml (behind proxy, with cache + attachments)
+```yaml
+base-url: "http://ntfy.example.com"
+listen-http: ":2586"
+cache-file: "/var/cache/ntfy/cache.db"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+behind-proxy: true
+```
+### server.yml (ntfy.sh config)
+```yaml
+# All the things: Behind a proxy, Firebase, cache, attachments, 
+# SMTP publishing & receiving
 
-=== "server.yml (HTTP+HTTPS, with cache + attachments)"
-    ``` yaml
-    base-url: "http://ntfy.example.com"
-    listen-http: ":80"
-    listen-https: ":443"
-    key-file: "/etc/letsencrypt/live/ntfy.example.com.key"
-    cert-file: "/etc/letsencrypt/live/ntfy.example.com.crt"
-    cache-file: "/var/cache/ntfy/cache.db"
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    ```
-
-=== "server.yml (behind proxy, with cache + attachments)"
-    ``` yaml
-    base-url: "http://ntfy.example.com"
-    listen-http: ":2586"
-    cache-file: "/var/cache/ntfy/cache.db"
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    behind-proxy: true
-    ```
-
-=== "server.yml (ntfy.sh config)"
-    ``` yaml
-    # All the things: Behind a proxy, Firebase, cache, attachments, 
-    # SMTP publishing & receiving
-
-    base-url: "https://ntfy.sh"
-    listen-http: "127.0.0.1:2586"
-    firebase-key-file: "/etc/ntfy/firebase.json"
-    cache-file: "/var/cache/ntfy/cache.db"
-    behind-proxy: true
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
-    smtp-sender-user: "AKIDEADBEEFAFFE12345"
-    smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
-    smtp-sender-from: "ntfy@ntfy.sh"
-    smtp-server-listen: ":25"
-    smtp-server-domain: "ntfy.sh"
-    smtp-server-addr-prefix: "ntfy-"
-    keepalive-interval: "45s"
-    ```
+base-url: "https://ntfy.sh"
+listen-http: "127.0.0.1:2586"
+firebase-key-file: "/etc/ntfy/firebase.json"
+cache-file: "/var/cache/ntfy/cache.db"
+behind-proxy: true
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
+smtp-sender-user: "AKIDEADBEEFAFFE12345"
+smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
+smtp-sender-from: "ntfy@ntfy.sh"
+smtp-server-listen: ":25"
+smtp-server-domain: "ntfy.sh"
+smtp-server-addr-prefix: "ntfy-"
+keepalive-interval: "45s"
+```
 
 Alternatively, you can also use command line arguments or environment variables to configure the server. Here's an example
 using Docker Compose (i.e. `docker-compose.yml`):
 
-=== "Docker Compose (w/ auth, cache, attachments)"
-    ``` yaml
-	services:
-	  ntfy:
-	    image: binwiederhier/ntfy
-	    restart: unless-stopped
-	    environment:
-	      NTFY_BASE_URL: http://ntfy.example.com
-	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
-	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
-	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
-	      NTFY_BEHIND_PROXY: true
-	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
-	      NTFY_ENABLE_LOGIN: true
-	    volumes:
-	      - ./:/var/lib/ntfy
-	    ports:
-	      - 80:80
-	    command: serve
-    ```
+### Docker Compose (w/ auth, cache, attachments)
+```yaml
+    services:
+      ntfy:
+        image: binwiederhier/ntfy
+        restart: unless-stopped
+        environment:
+          NTFY_BASE_URL: http://ntfy.example.com
+          NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+          NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+          NTFY_AUTH_DEFAULT_ACCESS: deny-all
+          NTFY_BEHIND_PROXY: true
+          NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+          NTFY_ENABLE_LOGIN: true
+        volumes:
+          - ./:/var/lib/ntfy
+        ports:
+          - 80:80
+        command: serve
+```
 
-=== "Docker Compose (w/ auth, cache, web push, iOS)"
-    ``` yaml
-	services:
-	  ntfy:
-	    image: binwiederhier/ntfy
-	    restart: unless-stopped
-	    environment:
-	      NTFY_BASE_URL: http://ntfy.example.com
-	      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
-	      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
-	      NTFY_AUTH_DEFAULT_ACCESS: deny-all
-	      NTFY_BEHIND_PROXY: true
-	      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
-	      NTFY_ENABLE_LOGIN: true
-	      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
-	      NTFY_WEB_PUSH_PUBLIC_KEY: <public_key>
-	      NTFY_WEB_PUSH_PRIVATE_KEY: <private_key>
-	      NTFY_WEB_PUSH_FILE: /var/lib/ntfy/webpush.db
-	      NTFY_WEB_PUSH_EMAIL_ADDRESS: <email>
-	    volumes:
-	      - ./:/var/lib/ntfy
-	    ports:
-	      - 8093:80
-	    command: serve
-    ```
+### Docker Compose (w/ auth, cache, web push, iOS)
+```yaml
+    services:
+      ntfy:
+        image: binwiederhier/ntfy
+        restart: unless-stopped
+        environment:
+          NTFY_BASE_URL: http://ntfy.example.com
+          NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+          NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+          NTFY_AUTH_DEFAULT_ACCESS: deny-all
+          NTFY_BEHIND_PROXY: true
+          NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+          NTFY_ENABLE_LOGIN: true
+          NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
+          NTFY_WEB_PUSH_PUBLIC_KEY: <public_key>
+          NTFY_WEB_PUSH_PRIVATE_KEY: <private_key>
+          NTFY_WEB_PUSH_FILE: /var/lib/ntfy/webpush.db
+          NTFY_WEB_PUSH_EMAIL_ADDRESS: <email>
+        volumes:
+          - ./:/var/lib/ntfy
+        ports:
+          - 8093:80
+        command: serve
+```
 
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period
@@ -160,22 +157,21 @@ feature) to download the file. The following config options are relevant to atta
 
 Here's an example config using mostly the defaults (except for the cache directory, which is empty by default): 
 
-=== "/etc/ntfy/server.yml (minimal)"
-    ``` yaml
-    base-url: "https://ntfy.sh"
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    ```
-
-=== "/etc/ntfy/server.yml (all options)"
-    ``` yaml
-    base-url: "https://ntfy.sh"
-    attachment-cache-dir: "/var/cache/ntfy/attachments"
-    attachment-total-size-limit: "5G"
-    attachment-file-size-limit: "15M"
-    attachment-expiry-duration: "3h"
-    visitor-attachment-total-size-limit: "100M"
-    visitor-attachment-daily-bandwidth-limit: "500M"
-    ```
+### /etc/ntfy/server.yml (minimal)
+```yaml
+base-url: "https://ntfy.sh"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+```
+### /etc/ntfy/server.yml (all options)
+```yaml
+base-url: "https://ntfy.sh"
+attachment-cache-dir: "/var/cache/ntfy/attachments"
+attachment-total-size-limit: "5G"
+attachment-file-size-limit: "15M"
+attachment-expiry-duration: "3h"
+visitor-attachment-total-size-limit: "100M"
+visitor-attachment-daily-bandwidth-limit: "500M"
+```
 
 Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-attachment-total-size-limit`
 and `visitor-attachment-daily-bandwidth-limit`. Setting these conservatively is necessary to avoid abuse.
@@ -213,7 +209,7 @@ user with `ntfy user add --role=admin ...` and be done with all this (see [examp
 
 **Example commands** (type `ntfy user --help` or `ntfy user COMMAND --help` for more details):
 
-```
+```shell
 ntfy user list                     # Shows list of users (alias: 'ntfy access')
 ntfy user add phil                 # Add regular user phil  
 ntfy user add --role=admin phil    # Add admin user phil
@@ -229,7 +225,7 @@ Each entry represents the access permissions for a user to a specific topic or t
 
 The ACL can be displayed or modified with the `ntfy access` command:
 
-```
+```shell
 ntfy access                            # Shows access control list (alias: 'ntfy user list')
 ntfy access USERNAME                   # Shows access control entries for USERNAME
 ntfy access USERNAME TOPIC PERMISSION  # Allow/deny access for USERNAME to TOPIC
@@ -251,7 +247,7 @@ A `PERMISSION` is any of the following supported permissions:
 * `deny` (alias: `none`): Allows neither publishing nor subscribing to a topic 
 
 **Example commands** (type `ntfy access --help` for more details):
-```
+```shell
 ntfy access                        # Shows entire access control list
 ntfy access phil                   # Shows access for user phil
 ntfy access phil mytopic rw        # Allow read-write access to mytopic for user phil
@@ -263,7 +259,7 @@ ntfy access --reset phil mytopic   # Reset access for user phil and topic mytopi
 ```
 
 **Example ACL:**
-```
+```shell
 $ ntfy access
 user phil (admin)
 - read-write access to all topics (admin role)
@@ -296,7 +292,7 @@ The `ntfy token` command can be used to manage access tokens for users. Tokens c
 automatically (or never expire). Each user can have up to 60 tokens (hardcoded). 
 
 **Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
-```
+```shell
 ntfy token list                      # Shows list of tokens for all users
 ntfy token list phil                 # Shows list of tokens for user phil
 ntfy token add phil                  # Create token for user phil which never expires
@@ -305,7 +301,7 @@ ntfy token remove phil tk_th2sxr...  # Delete token
 ```
 
 **Creating an access token:**
-```
+```shell
 $ ntfy token add --expires=30d --label="backups" phil
 $ ntfy token list
 user phil
@@ -318,15 +314,15 @@ subscribe to topics**. To learn how, check out [authenticate via access tokens](
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`:
 
-=== "/etc/ntfy/server.yml"
-    ``` yaml
-    auth-file: "/var/lib/ntfy/user.db"
-    auth-default-access: "deny-all"
-    ```
+### /etc/ntfy/server.yml
+```yaml
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+```
 
 After that, simply create an `admin` user:
 
-```
+```shell
 $ ntfy user add --role=admin phil
 password: mypass
 confirm: mypass
@@ -336,71 +332,67 @@ user phil added with role admin
 Once you've done that, you can publish and subscribe using [Basic Auth](https://en.wikipedia.org/wiki/Basic_access_authentication) 
 with the given username/password. Be sure to use HTTPS to avoid eavesdropping and exposing your password. Here's a simple example:
 
-=== "Command line (curl)"
-    ```
-    curl \
-        -u phil:mypass \
-        -d "Look ma, with auth" \
-        https://ntfy.example.com/mysecrets
-    ```
+### Command line (curl)
+```shell
+curl \
+   -u phil:mypass \
+   -d "Look ma, with auth" \
+   https://ntfy.example.com/mysecrets
+```
+### ntfy CLI
+```shell
+ntfy publish \
+    -u phil:mypass \
+    ntfy.example.com/mysecrets \
+    "Look ma, with auth"
+```
+### HTTP
+```http
+POST /mysecrets HTTP/1.1
+Host: ntfy.example.com
+Authorization: Basic cGhpbDpteXBhc3M=
 
-=== "ntfy CLI"
-    ```
-    ntfy publish \
-        -u phil:mypass \
-        ntfy.example.com/mysecrets \
-        "Look ma, with auth"
-    ```
+Look ma, with auth
+```
+### JavaScript
+```javascript
+fetch('https://ntfy.example.com/mysecrets', {
+    method: 'POST', // PUT works too
+    body: 'Look ma, with auth',
+    headers: {
+        'Authorization': 'Basic cGhpbDpteXBhc3M='
+    }
+})
+```
+### Go
+```go
+req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
+    strings.NewReader("Look ma, with auth"))
+req.Header.Set("Authorization", "Basic cGhpbDpteXBhc3M=")
+http.DefaultClient.Do(req)
+```
 
-=== "HTTP"
-    ``` http
-    POST /mysecrets HTTP/1.1
-    Host: ntfy.example.com
-    Authorization: Basic cGhpbDpteXBhc3M=
-
-    Look ma, with auth
-    ```
-
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.example.com/mysecrets', {
-        method: 'POST', // PUT works too
-        body: 'Look ma, with auth',
-        headers: {
-            'Authorization': 'Basic cGhpbDpteXBhc3M='
-        }
+### Python
+```python
+ requests.post("https://ntfy.example.com/mysecrets",
+     data="Look ma, with auth",
+     headers={
+        "Authorization": "Basic cGhpbDpteXBhc3M="
     })
-    ```
+```
 
-=== "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mysecrets",
-        strings.NewReader("Look ma, with auth"))
-    req.Header.Set("Authorization", "Basic cGhpbDpteXBhc3M=")
-    http.DefaultClient.Do(req)
-    ```
-
-=== "Python"
-    ``` python
-    requests.post("https://ntfy.example.com/mysecrets",
-        data="Look ma, with auth",
-        headers={
-            "Authorization": "Basic cGhpbDpteXBhc3M="
-        })
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
-        'http' => [
-            'method' => 'POST', // PUT also works
-            'header' => 
-                'Content-Type: text/plain\r\n' .
-                'Authorization: Basic cGhpbDpteXBhc3M=',
-            'content' => 'Look ma, with auth'
-        ]
-    ]));
-    ```
+### PHP
+```php
+file_get_contents('https://ntfy.example.com/mysecrets', false, stream_context_create([
+    'http' => [
+        'method' => 'POST', // PUT also works
+        'header' => 
+            'Content-Type: text/plain\r\n' .
+            'Authorization: Basic cGhpbDpteXBhc3M=',
+        'content' => 'Look ma, with auth'
+    ]
+]));
+```
 
 ### Example: UnifiedPush
 [UnifiedPush](https://unifiedpush.org) requires that the [application server](https://unifiedpush.org/developers/spec/definitions/#application-server) (e.g. Synapse, Fediverse Server, …) 
@@ -411,15 +403,15 @@ The topic names used by UnifiedPush all start with the `up*` prefix. Please refe
 To enable support for UnifiedPush for private servers (i.e. `auth-default-access: "deny-all"`), you should either 
 allow anonymous write access for the entire prefix or explicitly per topic:
 
-=== "Prefix"
-    ```
-    $ ntfy access '*' 'up*' write-only
-    ```
+### Prefix
+```shell
+$ ntfy access '*' 'up*' write-only
+```
 
-=== "Explicitly"
-    ```
-    $ ntfy access '*' upYzMtZGZiYTY5 write-only
-    ```
+### Explicitly
+```shell
+$ ntfy access '*' upYzMtZGZiYTY5 write-only
+```
 
 ## E-mail notifications
 To allow forwarding messages via e-mail, you can configure an **SMTP server for outgoing messages**. Once configured, 
@@ -437,14 +429,14 @@ following settings:
 Here's an example config using [Amazon SES](https://aws.amazon.com/ses/) for outgoing mail (this is how it is 
 configured for `ntfy.sh`):
 
-=== "/etc/ntfy/server.yml"
-    ``` yaml
-    base-url: "https://ntfy.sh"
-    smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
-    smtp-sender-user: "AKIDEADBEEFAFFE12345"
-    smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
-    smtp-sender-from: "ntfy@ntfy.sh"
-    ```
+### /etc/ntfy/server.yml
+```yaml
+base-url: "https://ntfy.sh"
+smtp-sender-addr: "email-smtp.us-east-2.amazonaws.com:587"
+smtp-sender-user: "AKIDEADBEEFAFFE12345"
+smtp-sender-pass: "Abd13Kf+sfAk2DzifjafldkThisIsNotARealKeyOMG."
+smtp-sender-from: "ntfy@ntfy.sh"
+```
 
 Please also refer to the [rate limiting](#rate-limiting) settings below, specifically `visitor-email-limit-burst` 
 and `visitor-email-limit-burst`. Setting these conservatively is necessary to avoid abuse.
@@ -465,12 +457,12 @@ To configure the SMTP server, you must at least set `smtp-server-listen` and `sm
 
 Here's an example config (this is how it is configured for `ntfy.sh`):
 
-=== "/etc/ntfy/server.yml"
-    ``` yaml
-    smtp-server-listen: ":25"
-    smtp-server-domain: "ntfy.sh"
-    smtp-server-addr-prefix: "ntfy-"
-    ```
+### /etc/ntfy/server.yml
+```yaml
+smtp-server-listen: ":25"
+smtp-server-domain: "ntfy.sh"
+smtp-server-addr-prefix: "ntfy-"
+```
 
 In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record) 
 and a corresponding A record), so incoming mail will find its way to your server. Here's an example of how `ntfy.sh` is 
@@ -499,7 +491,7 @@ Hello from 🇩🇪
 And then send the mail via `nc` like this. If you see any lines starting with `451`, those are errors from the 
 ntfy server. Read them carefully.
 
-```
+```shell
 $ cat email.txt | nc -N ntfy.sh 25
 220 ntfy.sh ESMTP Service Ready
 250-Hello example.com
@@ -510,7 +502,7 @@ $ cat email.txt | nc -N ntfy.sh 25
 
 As for the DNS setup, be sure to verify that `dig MX` and `dig A` are returning results similar to this:
 
-```
+```shell
 $ dig MX ntfy.sh +short 
 10 mx1.ntfy.sh.
 $ dig A mx1.ntfy.sh +short 
@@ -522,12 +514,12 @@ If you want to send emails from an internal service on the same network as your 
 worry about DNS records at all. Define a port for the SMTP server and pick an SMTP server domain (can be
 anything).
 
-=== "/etc/ntfy/server.yml"
-    ``` yaml
-    smtp-server-listen: ":25"
-    smtp-server-domain: "example.com"
-    smtp-server-addr-prefix: "ntfy-"  # optional
-    ```
+### /etc/ntfy/server.yml
+```yaml
+smtp-server-listen: ":25"
+smtp-server-domain: "example.com"
+smtp-server-addr-prefix: "ntfy-"  # optional
+```
 
 Then, in the email settings of your internal service, set the SMTP server address to the IP address of your
 ntfy instance. Set the port to the value you defined in `smtp-server-listen`. Leave any username and password
@@ -578,63 +570,59 @@ Relevant flags to consider:
   `2001:db8:25:86:2::1` are treated as the same visitor. Use the `visitor-prefix-bits-ipv6` config option to adjust this behavior.
   See [IPv6 considerations](#ipv6-considerations) for more details.
 
-=== "/etc/ntfy/server.yml (behind a proxy)"
-    ``` yaml
-    # Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting
-    #
-    # Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
-    #          the visitor IP will be 1.2.3.4 (right-most address).
-    #
-    behind-proxy: true
-    ```
-
-=== "/etc/ntfy/server.yml (X-Client-IP header)"
-    ``` yaml
-    # Tell ntfy to use "X-Client-IP" header to identify visitors for rate limiting
-    #
-    # Example: If "X-Client-IP: 9.9.9.9" is set, 
-    #          the visitor IP will be 9.9.9.9.
-    #
-    behind-proxy: true
-    proxy-forwarded-header: "X-Client-IP"
-    ```
-
-=== "/etc/ntfy/server.yml (Forwarded header)"
-    ``` yaml
-    # Tell ntfy to use "Forwarded" header (RFC 7239) to identify visitors for rate limiting
-    #
-    # Example: If "Forwarded: for=1.2.3.4;by=proxy.example.com, for=9.9.9.9" is set, 
-    #          the visitor IP will be 9.9.9.9.
-    #
-    behind-proxy: true
-    proxy-forwarded-header: "Forwarded"
-    ```
-
-=== "/etc/ntfy/server.yml (multiple proxies)"
-    ``` yaml
-    # Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting,
-    # and to strip the IP addresses of the proxies 1.2.3.4 and 1.2.3.5
-    #
-    # Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
-    #          the visitor IP will be 9.9.9.9 (right-most unknown address).
-    #
-    behind-proxy: true
-    proxy-trusted-hosts: "1.2.3.0/24, 1.2.2.2, 2001:db8::/64"
-    ```
-
-=== "/etc/ntfy/server.yml (adjusted IPv4/IPv6 prefixes proxies)"
-    ``` yaml
-    # Tell ntfy to treat visitors as being in a /24 subnet (IPv4) or /48 subnet (IPv6)
-    # as one visitor, so that they are counted as one for rate limiting.
-    #
-    # Example 1: If 1.2.3.4 and 1.2.3.5 publish a message, the visitor 1.2.3.0 will have
-    #            used 2 messages.
-    # Example 2: If 2001:db8:2500:1::1 and 2001:db8:2500:2::1 publish a message, the visitor
-    #            2001:db8:2500:: will have used 2 messages.
-    #
-    visitor-prefix-bits-ipv4: 24
-    visitor-prefix-bits-ipv6: 48
-    ```
+### /etc/ntfy/server.yml (behind a proxy)
+```yaml
+# Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting
+#
+# Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
+#          the visitor IP will be 1.2.3.4 (right-most address).
+#
+behind-proxy: true
+```
+### /etc/ntfy/server.yml (X-Client-IP header)
+```yaml
+# Tell ntfy to use "X-Client-IP" header to identify visitors for rate limiting
+#
+# Example: If "X-Client-IP: 9.9.9.9" is set, 
+#          the visitor IP will be 9.9.9.9.
+#
+behind-proxy: true
+proxy-forwarded-header: "X-Client-IP"
+```
+### /etc/ntfy/server.yml (Forwarded header)
+```yaml
+# Tell ntfy to use "Forwarded" header (RFC 7239) to identify visitors for rate limiting
+#
+# Example: If "Forwarded: for=1.2.3.4;by=proxy.example.com, for=9.9.9.9" is set, 
+#          the visitor IP will be 9.9.9.9.
+#
+behind-proxy: true
+proxy-forwarded-header: "Forwarded"
+```
+### /etc/ntfy/server.yml (multiple proxies)
+```yaml
+# Tell ntfy to use "X-Forwarded-For" header to identify visitors for rate limiting,
+# and to strip the IP addresses of the proxies 1.2.3.4 and 1.2.3.5
+#
+# Example: If "X-Forwarded-For: 9.9.9.9, 1.2.3.4" is set, 
+#          the visitor IP will be 9.9.9.9 (right-most unknown address).
+#
+behind-proxy: true
+proxy-trusted-hosts: "1.2.3.0/24, 1.2.2.2, 2001:db8::/64"
+```
+### /etc/ntfy/server.yml (adjusted IPv4/IPv6 prefixes proxies)
+```yaml
+# Tell ntfy to treat visitors as being in a /24 subnet (IPv4) or /48 subnet (IPv6)
+# as one visitor, so that they are counted as one for rate limiting.
+#
+# Example 1: If 1.2.3.4 and 1.2.3.5 publish a message, the visitor 1.2.3.0 will have
+#            used 2 messages.
+# Example 2: If 2001:db8:2500:1::1 and 2001:db8:2500:2::1 publish a message, the visitor
+#            2001:db8:2500:: will have used 2 messages.
+#
+visitor-prefix-bits-ipv4: 24
+visitor-prefix-bits-ipv6: 48
+```
 
 ### TLS/SSL
 ntfy supports HTTPS/TLS by setting the `listen-https` [config option](#config-options). However, if you 
@@ -652,219 +640,219 @@ by forwarding the `Connection` and `Upgrade` headers accordingly.
 In this example, ntfy runs on `:2586` and we proxy traffic to it. We also redirect HTTP to HTTPS for GET requests against a topic
 or the root domain:
 
-=== "nginx (convenient)"
-    ```
-    # /etc/nginx/sites-*/ntfy
-    #
-    # This config allows insecure HTTP POST/PUT requests against topics to allow a short curl syntax (without -L
-    # and "https://" prefix). It also disables output buffering, which has worked well for the ntfy.sh server.
-    #
-    # This is pretty much how ntfy.sh is configured. To see the exact configuration,
-    # see https://github.com/binwiederhier/ntfy-ansible/
+### nginx (convenient)
+```nginx
+# /etc/nginx/sites-*/ntfy
+#
+# This config allows insecure HTTP POST/PUT requests against topics to allow a short curl syntax (without -L
+# and "https://" prefix). It also disables output buffering, which has worked well for the ntfy.sh server.
+#
+# This is pretty much how ntfy.sh is configured. To see the exact configuration,
+# see https://github.com/binwiederhier/ntfy-ansible/
 
-    server {
-      listen 80;
-      server_name ntfy.sh;
+server {
+  listen 80;
+  server_name ntfy.sh;
 
-      location / {
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix
-        set $redirect_https "";
-        if ($request_method = GET) {
-          set $redirect_https "yes";
-        }
-        if ($request_uri ~* "^/([-_a-z0-9]{0,64}$|docs/|static/)") {
-          set $redirect_https "${redirect_https}yes";
-        }
-        if ($redirect_https = "yesyes") {
-          return 302 https://$http_host$request_uri$is_args$query_string;
-        }
-
-        proxy_pass http://127.0.0.1:2586;
-        proxy_http_version 1.1;
-    
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_redirect off;
-     
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    
-        proxy_connect_timeout 3m;
-        proxy_send_timeout 3m;
-        proxy_read_timeout 3m;
-
-        client_max_body_size 0; # Stream request body to backend
-      }
+  location / {
+    # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+    # it to work with curl without the annoying https:// prefix
+    set $redirect_https "";
+    if ($request_method = GET) {
+      set $redirect_https "yes";
     }
+    if ($request_uri ~* "^/([-_a-z0-9]{0,64}$|docs/|static/)") {
+      set $redirect_https "${redirect_https}yes";
+    }
+    if ($redirect_https = "yesyes") {
+      return 302 https://$http_host$request_uri$is_args$query_string;
+    }
+
+    proxy_pass http://127.0.0.1:2586;
+    proxy_http_version 1.1;
     
-    server {
-      listen 443 ssl http2;
-      server_name ntfy.sh;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_redirect off;
+     
+    proxy_set_header Host $http_host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     
-      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
-      ssl_session_timeout 1d;
-      ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
-      ssl_session_tickets off;
-      ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-      ssl_prefer_server_ciphers off;
+    proxy_connect_timeout 3m;
+    proxy_send_timeout 3m;
+    proxy_read_timeout 3m;
+
+    client_max_body_size 0; # Stream request body to backend
+  }
+}
+    
+server {
+  listen 443 ssl http2;
+  server_name ntfy.sh;
+    
+  # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+  ssl_session_timeout 1d;
+  ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+  ssl_session_tickets off;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+  ssl_prefer_server_ciphers off;
  
-      ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
-      ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
-    
-      location / {
-        proxy_pass http://127.0.0.1:2586;
-        proxy_http_version 1.1;
+  ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
 
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_redirect off;
-     
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  location / {
+    proxy_pass http://127.0.0.1:2586;
+    proxy_http_version 1.1;
+
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_redirect off;
+
+    proxy_set_header Host $http_host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    proxy_connect_timeout 3m;
+    proxy_send_timeout 3m;
+    proxy_read_timeout 3m;
+
+    client_max_body_size 0; # Stream request body to backend
+  }
+}
+```
+
+### nginx (more secure)
+```nginx
+# /etc/nginx/sites-*/ntfy
+#
+# This config requires the use of the -L flag in curl to redirect to HTTPS, and it keeps nginx output buffering
+# enabled. While recommended, I have had issues with that in the past.
+
+server {
+  listen 80;
+  server_name ntfy.sh;
+
+  location / {
+    return 302 https://$http_host$request_uri$is_args$query_string;
+
+    proxy_pass http://127.0.0.1:2586;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $http_host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    proxy_connect_timeout 3m;
+    proxy_send_timeout 3m;
+    proxy_read_timeout 3m;
+
+    client_max_body_size 0; # Stream request body to backend
+  }
+}
     
-        proxy_connect_timeout 3m;
-        proxy_send_timeout 3m;
-        proxy_read_timeout 3m;
+server {
+  listen 443 ssl http2;
+  server_name ntfy.sh;
+    
+  # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
+  ssl_session_timeout 1d;
+  ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+  ssl_session_tickets off;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+  ssl_prefer_server_ciphers off;
+    
+  ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
+    
+  location / {
+    proxy_pass http://127.0.0.1:2586;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $http_host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    proxy_connect_timeout 3m;
+    proxy_send_timeout 3m;
+    proxy_read_timeout 3m;
+
+    client_max_body_size 0; # Stream request body to backend
+  }
+}
+```
+
+### Apache2
+```apache
+# /etc/apache2/sites-*/ntfy.conf
+
+<VirtualHost *:80>
+    ServerName ntfy.sh
+
+    # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+    ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
+    ProxyPassReverse / http://127.0.0.1:2586/
+
+    SetEnv proxy-nokeepalive 1
+    SetEnv proxy-sendchunked 1
+
+    # Higher than the max message size of 4096 bytes
+    LimitRequestBody 102400
         
-        client_max_body_size 0; # Stream request body to backend
-      }
-    }
-    ```
+    # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
+    # it to work with curl without the annoying https:// prefix (requires "a2enmod alias")
+    <If "%{REQUEST_METHOD} == 'GET'">
+        RedirectMatch permanent "^/([-_A-Za-z0-9]{0,64})$" "https://%{SERVER_NAME}/$1"
+    </If>
 
-=== "nginx (more secure)"
-    ```
-    # /etc/nginx/sites-*/ntfy
-    #
-    # This config requires the use of the -L flag in curl to redirect to HTTPS, and it keeps nginx output buffering
-    # enabled. While recommended, I have had issues with that in the past.
+</VirtualHost>
     
-    server {
-      listen 80;
-      server_name ntfy.sh;
-
-      location / {
-        return 302 https://$http_host$request_uri$is_args$query_string;
-
-        proxy_pass http://127.0.0.1:2586;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-        proxy_connect_timeout 3m;
-        proxy_send_timeout 3m;
-        proxy_read_timeout 3m;
-
-        client_max_body_size 0; # Stream request body to backend
-      }
-    }
-    
-    server {
-      listen 443 ssl http2;
-      server_name ntfy.sh;
-    
-      # See https://ssl-config.mozilla.org/#server=nginx&version=1.18.0&config=intermediate&openssl=1.1.1k&hsts=false&ocsp=false&guideline=5.6
-      ssl_session_timeout 1d;
-      ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
-      ssl_session_tickets off;
-      ssl_protocols TLSv1.2 TLSv1.3;
-      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-      ssl_prefer_server_ciphers off;
-    
-      ssl_certificate /etc/letsencrypt/live/ntfy.sh/fullchain.pem;
-      ssl_certificate_key /etc/letsencrypt/live/ntfy.sh/privkey.pem;
-    
-      location / {
-        proxy_pass http://127.0.0.1:2586;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-        proxy_connect_timeout 3m;
-        proxy_send_timeout 3m;
-        proxy_read_timeout 3m;
-
-        client_max_body_size 0; # Stream request body to backend
-      }
-    }
-    ```
-
-=== "Apache2"
-    ```
-    # /etc/apache2/sites-*/ntfy.conf
-
-    <VirtualHost *:80>
-        ServerName ntfy.sh
-
-        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
-        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
-        ProxyPassReverse / http://127.0.0.1:2586/
-
-        SetEnv proxy-nokeepalive 1
-        SetEnv proxy-sendchunked 1
-
-        # Higher than the max message size of 4096 bytes
-        LimitRequestBody 102400
+<VirtualHost *:443>
+    ServerName ntfy.sh
         
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want 
-        # it to work with curl without the annoying https:// prefix (requires "a2enmod alias")
-        <If "%{REQUEST_METHOD} == 'GET'">
-            RedirectMatch permanent "^/([-_A-Za-z0-9]{0,64})$" "https://%{SERVER_NAME}/$1"
-        </If>
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/ntfy.sh/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
 
-    </VirtualHost>
-    
-    <VirtualHost *:443>
-        ServerName ntfy.sh
-        
-        SSLEngine on
-        SSLCertificateFile /etc/letsencrypt/live/ntfy.sh/fullchain.pem
-        SSLCertificateKeyFile /etc/letsencrypt/live/ntfy.sh/privkey.pem
-        Include /etc/letsencrypt/options-ssl-apache.conf
+    # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
+    ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
+    ProxyPassReverse / http://127.0.0.1:2586/
 
-        # Proxy connections to ntfy (requires "a2enmod proxy proxy_http")
-        ProxyPass / http://127.0.0.1:2586/ upgrade=websocket
-        ProxyPassReverse / http://127.0.0.1:2586/
+    SetEnv proxy-nokeepalive 1
+    SetEnv proxy-sendchunked 1
 
-        SetEnv proxy-nokeepalive 1
-        SetEnv proxy-sendchunked 1
-
-        # Higher than the max message size of 4096 bytes 
-        LimitRequestBody 102400
+    # Higher than the max message size of 4096 bytes 
+    LimitRequestBody 102400
 	
-    </VirtualHost>
-    ```
+</VirtualHost>
+```
 
-=== "caddy"
-    ```
-    # Note that this config is most certainly incomplete. Please help out and let me know what's missing
-    # via Discord/Matrix or in a GitHub issue.
-    # Note: Caddy automatically handles both HTTP and WebSockets with reverse_proxy 
+### caddy
+```
+# Note that this config is most certainly incomplete. Please help out and let me know what's missing
+# via Discord/Matrix or in a GitHub issue.
+# Note: Caddy automatically handles both HTTP and WebSockets with reverse_proxy 
 
-    ntfy.sh, http://nfty.sh {
-        reverse_proxy 127.0.0.1:2586
+ntfy.sh, http://nfty.sh {
+    reverse_proxy 127.0.0.1:2586
 
-        # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want
-        # it to work with curl without the annoying https:// prefix
-        @httpget {
-            protocol http
-            method GET
-            path_regexp ^/([-_a-z0-9]{0,64}$|docs/|static/)
-        }
-        redir @httpget https://{host}{uri}
+    # Redirect HTTP to HTTPS, but only for GET topic addresses, since we want
+    # it to work with curl without the annoying https:// prefix
+    @httpget {
+        protocol http
+        method GET
+        path_regexp ^/([-_a-z0-9]{0,64}$|docs/|static/)
     }
-    ```
+    redir @httpget https://{host}{uri}
+}
+```
 
 ## Firebase (FCM)
 !!! info
@@ -903,7 +891,7 @@ which will then forward it to Firebase/APNS.
 
 To configure it, simply set `upstream-base-url` like so:
 
-``` yaml
+```yaml
 upstream-base-url: "https://ntfy.sh"
 upstream-access-token: "..." # optional, only if rate limits exceeded, or upstream server protected
 ```
@@ -963,7 +951,7 @@ Limitations:
 
 To configure VAPID keys, first generate them:
 
-```sh
+```shell
 $ ntfy webpush keys
 Web Push keys generated.
 ...
@@ -1000,7 +988,7 @@ Once a user is associated with a tier, some limits are overridden based on the t
 The `ntfy tier` command can be used to manage all available tiers. By default, there are no pre-defined tiers.
 
 **Example commands** (type `ntfy token --help` or `ntfy token COMMAND --help` for more details):
-```
+```shell
 ntfy tier add pro                     # Add tier with code "pro", using the defaults
 ntfy tier change --name="Pro" pro     # Update the name of an existing tier
 ntfy tier del starter                 # Delete an existing tier
@@ -1008,7 +996,7 @@ ntfy user change-tier phil pro        # Switch user "phil" to tier "pro"
 ```
 
 **Creating a tier (full example):**
-```
+```shell
 ntfy tier add \
   --name="Pro" \
   --message-limit=10000 \
@@ -1049,7 +1037,7 @@ to `https://ntfy.example.com/v1/account/billing/webhook`.
 
 Here's an example:
 
-``` yaml
+```yaml
 stripe-secret-key: "sk_test_ZmhzZGtmbGhkc2tqZmhzYcO2a2hmbGtnaHNkbGtnaGRsc2hnbG"
 stripe-webhook-key: "whsec_ZnNkZnNIRExBSFNES0hBRFNmaHNka2ZsaGR"
 billing-contact: "phil@example.com"
@@ -1229,23 +1217,23 @@ If you're running ntfy in a systemd service (e.g. for .deb/.rpm packages), the m
 by creating a `/etc/systemd/system/ntfy.service.d/override.conf` file. As far as I can tell, `/etc/security/limits.conf`
 is not relevant.
 
-=== "/etc/systemd/system/ntfy.service.d/override.conf"
-    ```
-    # Allow 20,000 ntfy connections (and give room for other file handles)
-    [Service]
-    LimitNOFILE=20500
-    ```
+### /etc/systemd/system/ntfy.service.d/override.conf
+```conf
+# Allow 20,000 ntfy connections (and give room for other file handles)
+[Service]
+LimitNOFILE=20500
+```
 
 ### Outside of systemd
 If you're running outside systemd, you may want to adjust your `/etc/security/limits.conf` file to
 increase the `nofile` setting. Here's an example that increases the limit to 5,000. You can find out the current setting
 by running `ulimit -n`, or manually override it temporarily by running `ulimit -n 50000`.
 
-=== "/etc/security/limits.conf"
-    ```
-    # Increase open files limit globally
-    * hard nofile 20500
-    ```
+### /etc/security/limits.conf
+```conf
+# Increase open files limit globally
+* hard nofile 20500
+```
 
 ### Proxy limits (nginx, Apache2)
 If you are running [behind a proxy](#behind-a-proxy-tls-etc) (e.g. nginx, Apache), the open files limit of the proxy is also
@@ -1253,22 +1241,22 @@ relevant. So if your proxy runs inside of systemd, increase the limits in system
 open files limit has to be **double the number of how many connections you'd like to support**, because the proxy has
 to maintain the client connection and the connection to ntfy.
 
-=== "/etc/nginx/nginx.conf"
-    ```
-    events {
-      # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
-      # and give room for other file handles)
-      worker_connections 40500;
-    }
-    ```
+### /etc/nginx/nginx.conf
+```nginx
+events {
+  # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
+  # and give room for other file handles)
+  worker_connections 40500;
+}
+```
 
-=== "/etc/systemd/system/nginx.service.d/override.conf"
-    ```
-    # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
-    # and give room for other file handles)
-    [Service]
-    LimitNOFILE=40500
-    ```
+### /etc/systemd/system/nginx.service.d/override.conf
+  ```conf
+  # Allow 40,000 proxy connections (2x of the desired ntfy connection count;
+  # and give room for other file handles)
+  [Service]
+  LimitNOFILE=40500
+  ```
 
 ### Banning bad actors (fail2ban)
 If you put stuff on the Internet, bad actors will try to break them or break in. [fail2ban](https://www.fail2ban.org/)
@@ -1278,57 +1266,57 @@ to ban client IPs if they misbehave. This is on top of the [rate limiting](#rate
 Here's an example for how ntfy.sh is configured, following the instructions from two tutorials ([here](https://easyengine.io/tutorials/nginx/fail2ban/) 
 and [here](https://easyengine.io/tutorials/nginx/block-wp-login-php-bruteforce-attack/)):
 
-=== "/etc/nginx/nginx.conf"
-    ```
-    # Rate limit all IP addresses
-    http {
-	  limit_req_zone $binary_remote_addr zone=one:10m rate=45r/m;
-    }
+### /etc/nginx/nginx.conf
+```nginx
+# Rate limit all IP addresses
+http {
+	limit_req_zone $binary_remote_addr zone=one:10m rate=45r/m;
+}
 
-    # Alternatively, whitelist certain IP addresses
-    http {
-      geo $limited {
-        default 1;
-        116.203.112.46/32 0;
-        132.226.42.65/32 0;
-        ...
-      }
-      map $limited $limitkey {
-        1 $binary_remote_addr;
-        0 "";
-      }
-      limit_req_zone $limitkey zone=one:10m rate=45r/m;
-    }
-    ```
+# Alternatively, whitelist certain IP addresses
+http {
+  geo $limited {
+    default 1;
+    116.203.112.46/32 0;
+    132.226.42.65/32 0;
+    ...
+  }
+  map $limited $limitkey {
+    1 $binary_remote_addr;
+    0 "";
+  }
+  limit_req_zone $limitkey zone=one:10m rate=45r/m;
+}
+```
 
-=== "/etc/nginx/sites-enabled/ntfy.sh"
-    ```
-    # For each server/location block
-    server {
-      location / {
-        limit_req zone=one burst=1000 nodelay;
-      }
-    }    
-    ```
+/etc/nginx/sites-enabled/ntfy.sh
+```nginx
+# For each server/location block
+server {
+  location / {
+    limit_req zone=one burst=1000 nodelay;
+  }
+}    
+```
 
-=== "/etc/fail2ban/filter.d/nginx-req-limit.conf"
-    ```
-    [Definition]
-    failregex = limiting requests, excess:.* by zone.*client: <HOST>
-    ignoreregex =
-    ```
+### /etc/fail2ban/filter.d/nginx-req-limit.conf
+```conf
+[Definition]
+failregex = limiting requests, excess:.* by zone.*client: <HOST>
+ignoreregex =
+```
 
-=== "/etc/fail2ban/jail.local"
-    ```
-    [nginx-req-limit]
-    enabled = true
-    filter = nginx-req-limit
-    action = iptables-multiport[name=ReqLimit, port="http,https", protocol=tcp]
-    logpath = /var/log/nginx/error.log
-    findtime = 600
-    bantime = 14400
-    maxretry = 10
-    ```
+###  /etc/fail2ban/jail.local
+```conf
+[nginx-req-limit]
+enabled = true
+filter = nginx-req-limit
+action = iptables-multiport[name=ReqLimit, port="http,https", protocol=tcp]
+logpath = /var/log/nginx/error.log
+findtime = 600
+bantime = 14400
+maxretry = 10
+```
 
 Note that if you run nginx in a container, append `, chain=DOCKER-USER` to the jail.local action. By default, the jail action chain
 is `INPUT`, but `FORWARD` is used when using docker networks. `DOCKER-USER`, available when using docker, is part of the `FORWARD`
@@ -1375,25 +1363,25 @@ doing, and/or secure access to the endpoint in your reverse proxy.
 - `metrics-listen-http` exposes the metrics endpoint via a dedicated `[IP]:port`. If set, this option implicitly
   enables metrics as well, e.g. "10.0.1.1:9090" or ":9090"
 
-=== "server.yml (Using default port)"
-    ```yaml
-    enable-metrics: true
-    ```
+### server.yml (Using default port)
+```yaml
+enable-metrics: true
+```
 
-=== "server.yml (Using dedicated IP/port)"
-    ```yaml
-    metrics-listen-http: "10.0.1.1:9090"
-    ```
+### server.yml (Using dedicated IP/port)
+```yaml
+metrics-listen-http: "10.0.1.1:9090"
+```
 
 In Prometheus, an example scrape config would look like this:
 
-=== "prometheus.yml"
-    ```yaml
-    scrape_configs:
-      - job_name: "ntfy"
-        static_configs:
-          - targets: ["10.0.1.1:9090"]
-    ```
+### prometheus.yml
+```yaml
+scrape_configs:
+  - job_name: "ntfy"
+    static_configs:
+      - targets: ["10.0.1.1:9090"]
+```
 
 Here's an example Grafana dashboard built from the metrics (see [Grafana JSON on GitHub](https://raw.githubusercontent.com/binwiederhier/ntfy/main/examples/grafana-dashboard/ntfy-grafana.json)):
 
@@ -1427,7 +1415,7 @@ The following config options define the logging behavior:
     - `field -> level` to match any value, e.g. `time_taken_ms -> debug`
 
 **Logging config (good for production use):**
-``` yaml
+```yaml
 log-level: info
 log-format: json
 log-file: /var/log/ntfy.log
@@ -1443,7 +1431,7 @@ a username (`user_name`), or a tag (`tag`). There are dozens of fields you can u
 they are, either turn the log-level to `trace` and observe, or reference the [source code](https://github.com/binwiederhier/ntfy).
 
 Here's an example that will output only `info` log events, except when they match either of the defined overrides:
-``` yaml
+```yaml
 log-level: info
 log-level-overrides:
   - "tag=manager -> trace"

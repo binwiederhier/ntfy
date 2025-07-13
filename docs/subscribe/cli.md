@@ -156,7 +156,7 @@ environment variables. Here are a few examples:
 ```
 ntfy sub mytopic 'notify-send "$m"'
 ntfy sub topic1 /my/script.sh
-ntfy sub topic1 'echo "Message $m was received. Its title was $t and it had priority $p'
+ntfy sub topic1 'echo "Message $m was received. Its title was $t and it had priority $p"'
 ```
 
 <figure>

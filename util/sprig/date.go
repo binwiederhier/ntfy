@@ -10,19 +10,19 @@ import (
 // Date can be a `time.Time` or an `int, int32, int64`.
 // In the later case, it is treated as seconds since UNIX
 // epoch.
-func date(fmt string, date interface{}) string {
+func date(fmt string, date any) string {
 	return dateInZone(fmt, date, "Local")
 }
 
-func htmlDate(date interface{}) string {
+func htmlDate(date any) string {
 	return dateInZone("2006-01-02", date, "Local")
 }
 
-func htmlDateInZone(date interface{}, zone string) string {
+func htmlDateInZone(date any, zone string) string {
 	return dateInZone("2006-01-02", date, zone)
 }
 
-func dateInZone(fmt string, date interface{}, zone string) string {
+func dateInZone(fmt string, date any, zone string) string {
 	var t time.Time
 	switch date := date.(type) {
 	default:
@@ -63,7 +63,7 @@ func mustDateModify(fmt string, date time.Time) (time.Time, error) {
 	return date.Add(d), nil
 }
 
-func dateAgo(date interface{}) string {
+func dateAgo(date any) string {
 	var t time.Time
 
 	switch date := date.(type) {
@@ -81,7 +81,7 @@ func dateAgo(date interface{}) string {
 	return duration.String()
 }
 
-func duration(sec interface{}) string {
+func duration(sec any) string {
 	var n int64
 	switch value := sec.(type) {
 	default:
@@ -94,7 +94,7 @@ func duration(sec interface{}) string {
 	return (time.Duration(n) * time.Second).String()
 }
 
-func durationRound(duration interface{}) string {
+func durationRound(duration any) string {
 	var d time.Duration
 	switch duration := duration.(type) {
 	default:

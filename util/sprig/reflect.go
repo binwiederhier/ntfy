@@ -6,23 +6,23 @@ import (
 )
 
 // typeIs returns true if the src is the type named in target.
-func typeIs(target string, src interface{}) bool {
+func typeIs(target string, src any) bool {
 	return target == typeOf(src)
 }
 
-func typeIsLike(target string, src interface{}) bool {
+func typeIsLike(target string, src any) bool {
 	t := typeOf(src)
 	return target == t || "*"+target == t
 }
 
-func typeOf(src interface{}) string {
+func typeOf(src any) string {
 	return fmt.Sprintf("%T", src)
 }
 
-func kindIs(target string, src interface{}) bool {
+func kindIs(target string, src any) bool {
 	return target == kindOf(src)
 }
 
-func kindOf(src interface{}) string {
+func kindOf(src any) string {
 	return reflect.ValueOf(src).Kind().String()
 }

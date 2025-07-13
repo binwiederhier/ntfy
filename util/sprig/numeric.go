@@ -9,7 +9,7 @@ import (
 )
 
 // toFloat64 converts 64-bit floats
-func toFloat64(v interface{}) float64 {
+func toFloat64(v any) float64 {
 	if str, ok := v.(string); ok {
 		iv, err := strconv.ParseFloat(str, 64)
 		if err != nil {
@@ -38,13 +38,13 @@ func toFloat64(v interface{}) float64 {
 	}
 }
 
-func toInt(v interface{}) int {
+func toInt(v any) int {
 	// It's not optimal. But I don't want duplicate toInt64 code.
 	return int(toInt64(v))
 }
 
 // toInt64 converts integer types to 64-bit integers
-func toInt64(v interface{}) int64 {
+func toInt64(v any) int64 {
 	if str, ok := v.(string); ok {
 		iv, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
@@ -78,7 +78,7 @@ func toInt64(v interface{}) int64 {
 	}
 }
 
-func max(a interface{}, i ...interface{}) int64 {
+func max(a any, i ...any) int64 {
 	aa := toInt64(a)
 	for _, b := range i {
 		bb := toInt64(b)
@@ -89,7 +89,7 @@ func max(a interface{}, i ...interface{}) int64 {
 	return aa
 }
 
-func maxf(a interface{}, i ...interface{}) float64 {
+func maxf(a any, i ...any) float64 {
 	aa := toFloat64(a)
 	for _, b := range i {
 		bb := toFloat64(b)
@@ -98,7 +98,7 @@ func maxf(a interface{}, i ...interface{}) float64 {
 	return aa
 }
 
-func min(a interface{}, i ...interface{}) int64 {
+func min(a any, i ...any) int64 {
 	aa := toInt64(a)
 	for _, b := range i {
 		bb := toInt64(b)
@@ -109,7 +109,7 @@ func min(a interface{}, i ...interface{}) int64 {
 	return aa
 }
 
-func minf(a interface{}, i ...interface{}) float64 {
+func minf(a any, i ...any) float64 {
 	aa := toFloat64(a)
 	for _, b := range i {
 		bb := toFloat64(b)
@@ -148,17 +148,17 @@ func untilStep(start, stop, step int) []int {
 	return v
 }
 
-func floor(a interface{}) float64 {
+func floor(a any) float64 {
 	aa := toFloat64(a)
 	return math.Floor(aa)
 }
 
-func ceil(a interface{}) float64 {
+func ceil(a any) float64 {
 	aa := toFloat64(a)
 	return math.Ceil(aa)
 }
 
-func round(a interface{}, p int, rOpt ...float64) float64 {
+func round(a any, p int, rOpt ...float64) float64 {
 	roundOn := .5
 	if len(rOpt) > 0 {
 		roundOn = rOpt[0]
@@ -179,7 +179,7 @@ func round(a interface{}, p int, rOpt ...float64) float64 {
 }
 
 // converts unix octal to decimal
-func toDecimal(v interface{}) int64 {
+func toDecimal(v any) int64 {
 	result, err := strconv.ParseInt(fmt.Sprint(v), 8, 64)
 	if err != nil {
 		return 0

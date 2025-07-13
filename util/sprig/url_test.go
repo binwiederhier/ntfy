@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var urlTests = map[string]map[string]interface{}{
+var urlTests = map[string]map[string]any{
 	"proto://auth@host:80/path?query#fragment": {
 		"fragment": "fragment",
 		"host":     "host:80",

@@ -192,7 +192,7 @@ func TestToInt(t *testing.T) {
 }
 
 func TestToDecimal(t *testing.T) {
-	tests := map[interface{}]int64{
+	tests := map[any]int64{
 		"777": 511,
 		777:   511,
 		770:   504,

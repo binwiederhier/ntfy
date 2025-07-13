@@ -33,7 +33,7 @@ func base32decode(v string) string {
 	return string(data)
 }
 
-func quote(str ...interface{}) string {
+func quote(str ...any) string {
 	out := make([]string, 0, len(str))
 	for _, s := range str {
 		if s != nil {
@@ -43,7 +43,7 @@ func quote(str ...interface{}) string {
 	return strings.Join(out, " ")
 }
 
-func squote(str ...interface{}) string {
+func squote(str ...any) string {
 	out := make([]string, 0, len(str))
 	for _, s := range str {
 		if s != nil {
@@ -53,7 +53,7 @@ func squote(str ...interface{}) string {
 	return strings.Join(out, " ")
 }
 
-func cat(v ...interface{}) string {
+func cat(v ...any) string {
 	v = removeNilElements(v)
 	r := strings.TrimSpace(strings.Repeat("%v ", len(v)))
 	return fmt.Sprintf(r, v...)
@@ -79,11 +79,11 @@ func plural(one, many string, count int) string {
 	return many
 }
 
-func strslice(v interface{}) []string {
+func strslice(v any) []string {
 	switch v := v.(type) {
 	case []string:
 		return v
-	case []interface{}:
+	case []any:
 		b := make([]string, 0, len(v))
 		for _, s := range v {
 			if s != nil {
@@ -114,8 +114,8 @@ func strslice(v interface{}) []string {
 	}
 }
 
-func removeNilElements(v []interface{}) []interface{} {
-	newSlice := make([]interface{}, 0, len(v))
+func removeNilElements(v []any) []any {
+	newSlice := make([]any, 0, len(v))
 	for _, i := range v {
 		if i != nil {
 			newSlice = append(newSlice, i)
@@ -124,7 +124,7 @@ func removeNilElements(v []interface{}) []interface{} {
 	return newSlice
 }
 
-func strval(v interface{}) string {
+func strval(v any) string {
 	switch v := v.(type) {
 	case string:
 		return v
@@ -149,7 +149,7 @@ func trunc(c int, s string) string {
 	return s
 }
 
-func join(sep string, v interface{}) string {
+func join(sep string, v any) string {
 	return strings.Join(strslice(v), sep)
 }
 

@@ -24,68 +24,26 @@ func FuncMap() template.FuncMap {
 	return HTMLFuncMap()
 }
 
-// HermeticTxtFuncMap returns a 'text/template'.FuncMap with only repeatable functions.
-func HermeticTxtFuncMap() ttemplate.FuncMap {
-	r := TxtFuncMap()
-	for _, name := range nonhermeticFunctions {
-		delete(r, name)
-	}
-	return r
-}
-
-// HermeticHTMLFuncMap returns an 'html/template'.Funcmap with only repeatable functions.
-func HermeticHTMLFuncMap() template.FuncMap {
-	r := HTMLFuncMap()
-	for _, name := range nonhermeticFunctions {
-		delete(r, name)
-	}
-	return r
-}
-
 // TxtFuncMap returns a 'text/template'.FuncMap
 func TxtFuncMap() ttemplate.FuncMap {
-	return ttemplate.FuncMap(GenericFuncMap())
+	return GenericFuncMap()
 }
 
 // HTMLFuncMap returns an 'html/template'.Funcmap
 func HTMLFuncMap() template.FuncMap {
-	return template.FuncMap(GenericFuncMap())
+	return GenericFuncMap()
 }
 
-// GenericFuncMap returns a copy of the basic function map as a map[string]interface{}.
-func GenericFuncMap() map[string]interface{} {
-	gfm := make(map[string]interface{}, len(genericMap))
+// GenericFuncMap returns a copy of the basic function map as a map[string]any.
+func GenericFuncMap() map[string]any {
+	gfm := make(map[string]any, len(genericMap))
 	for k, v := range genericMap {
 		gfm[k] = v
 	}
 	return gfm
 }
 
-// These functions are not guaranteed to evaluate to the same result for given input, because they
-// refer to the environment or global state.
-var nonhermeticFunctions = []string{
-	// Date functions
-	"date",
-	"date_in_zone",
-	"date_modify",
-	"now",
-	"htmlDate",
-	"htmlDateInZone",
-	"dateInZone",
-	"dateModify",
-
-	// Strings
-	"randAlphaNum",
-	"randAlpha",
-	"randAscii",
-	"randNumeric",
-	"randBytes",
-	"uuidv4",
-}
-
-var genericMap = map[string]interface{}{
-	"hello": func() string { return "Hello!" },
-
+var genericMap = map[string]any{
 	// Date functions
 	"ago":              dateAgo,
 	"date":             date,
@@ -157,18 +115,18 @@ var genericMap = map[string]interface{}{
 	"untilStep": untilStep,
 
 	// VERY basic arithmetic.
-	"add1": func(i interface{}) int64 { return toInt64(i) + 1 },
-	"add": func(i ...interface{}) int64 {
+	"add1": func(i any) int64 { return toInt64(i) + 1 },
+	"add": func(i ...any) int64 {
 		var a int64 = 0
 		for _, b := range i {
 			a += toInt64(b)
 		}
 		return a
 	},
-	"sub": func(a, b interface{}) int64 { return toInt64(a) - toInt64(b) },
-	"div": func(a, b interface{}) int64 { return toInt64(a) / toInt64(b) },
-	"mod": func(a, b interface{}) int64 { return toInt64(a) % toInt64(b) },
-	"mul": func(a interface{}, v ...interface{}) int64 {
+	"sub": func(a, b any) int64 { return toInt64(a) - toInt64(b) },
+	"div": func(a, b any) int64 { return toInt64(a) / toInt64(b) },
+	"mod": func(a, b any) int64 { return toInt64(a) % toInt64(b) },
+	"mul": func(a any, v ...any) int64 {
 		val := toInt64(a)
 		for _, b := range v {
 			val = val * toInt64(b)
@@ -195,7 +153,7 @@ var genericMap = map[string]interface{}{
 	"empty":            empty,
 	"coalesce":         coalesce,
 	"all":              all,
-	"any":              any,
+	"any":              anyNonEmpty,
 	"compact":          compact,
 	"mustCompact":      mustCompact,
 	"fromJSON":         fromJSON,
@@ -250,8 +208,10 @@ var genericMap = map[string]interface{}{
 	"omit":   omit,
 	"values": values,
 
-	"append": push, "push": push,
-	"mustAppend": mustPush, "mustPush": mustPush,
+	"append":      push,
+	"push":        push,
+	"mustAppend":  mustPush,
+	"mustPush":    mustPush,
 	"prepend":     prepend,
 	"mustPrepend": mustPrepend,
 	"first":       first,

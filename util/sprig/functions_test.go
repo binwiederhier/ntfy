@@ -43,7 +43,7 @@ func runt(tpl, expect string) error {
 // runtv takes a template, and expected return, and values for substitution.
 //
 // It runs the template and verifies that the output is an exact match.
-func runtv(tpl, expect string, vars interface{}) error {
+func runtv(tpl, expect string, vars any) error {
 	fmap := TxtFuncMap()
 	t := template.Must(template.New("test").Funcs(fmap).Parse(tpl))
 	var b bytes.Buffer
@@ -58,7 +58,7 @@ func runtv(tpl, expect string, vars interface{}) error {
 }
 
 // runRaw runs a template with the given variables and returns the result.
-func runRaw(tpl string, vars interface{}) (string, error) {
+func runRaw(tpl string, vars any) (string, error) {
 	fmap := TxtFuncMap()
 	t := template.Must(template.New("test").Funcs(fmap).Parse(tpl))
 	var b bytes.Buffer

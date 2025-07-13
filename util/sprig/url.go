@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func dictGetOrEmpty(dict map[string]interface{}, key string) string {
+func dictGetOrEmpty(dict map[string]any, key string) string {
 	value, ok := dict[key]
 	if !ok {
 		return ""
@@ -19,8 +19,8 @@ func dictGetOrEmpty(dict map[string]interface{}, key string) string {
 }
 
 // parses given URL to return dict object
-func urlParse(v string) map[string]interface{} {
-	dict := map[string]interface{}{}
+func urlParse(v string) map[string]any {
+	dict := map[string]any{}
 	parsedURL, err := url.Parse(v)
 	if err != nil {
 		panic(fmt.Sprintf("unable to parse url: %s", err))
@@ -42,7 +42,7 @@ func urlParse(v string) map[string]interface{} {
 }
 
 // join given dict to URL string
-func urlJoin(d map[string]interface{}) string {
+func urlJoin(d map[string]any) string {
 	resURL := url.URL{
 		Scheme:   dictGetOrEmpty(d, "scheme"),
 		Host:     dictGetOrEmpty(d, "host"),

@@ -53,7 +53,7 @@ func TestEmpty(t *testing.T) {
 		t.Error(err)
 	}
 
-	dict := map[string]interface{}{"top": map[string]interface{}{}}
+	dict := map[string]any{"top": map[string]any{}}
 	tpl = `{{if empty .top.NoSuchThing}}1{{else}}0{{end}}`
 	if err := runtv(tpl, "1", dict); err != nil {
 		t.Error(err)
@@ -77,7 +77,7 @@ func TestCoalesce(t *testing.T) {
 		assert.NoError(t, runt(tpl, expect))
 	}
 
-	dict := map[string]interface{}{"top": map[string]interface{}{}}
+	dict := map[string]any{"top": map[string]any{}}
 	tpl := `{{ coalesce .top.NoSuchThing .bottom .bottom.dollar "airplane"}}`
 	if err := runtv(tpl, "airplane", dict); err != nil {
 		t.Error(err)
@@ -97,7 +97,7 @@ func TestAll(t *testing.T) {
 		assert.NoError(t, runt(tpl, expect))
 	}
 
-	dict := map[string]interface{}{"top": map[string]interface{}{}}
+	dict := map[string]any{"top": map[string]any{}}
 	tpl := `{{ all .top.NoSuchThing .bottom .bottom.dollar "airplane"}}`
 	if err := runtv(tpl, "false", dict); err != nil {
 		t.Error(err)
@@ -117,7 +117,7 @@ func TestAny(t *testing.T) {
 		assert.NoError(t, runt(tpl, expect))
 	}
 
-	dict := map[string]interface{}{"top": map[string]interface{}{}}
+	dict := map[string]any{"top": map[string]any{}}
 	tpl := `{{ any .top.NoSuchThing .bottom .bottom.dollar "airplane"}}`
 	if err := runtv(tpl, "true", dict); err != nil {
 		t.Error(err)
@@ -125,7 +125,7 @@ func TestAny(t *testing.T) {
 }
 
 func TestFromJSON(t *testing.T) {
-	dict := map[string]interface{}{"Input": `{"foo": 55}`}
+	dict := map[string]any{"Input": `{"foo": 55}`}
 
 	tpl := `{{.Input | fromJSON}}`
 	expected := `map[foo:55]`
@@ -141,7 +141,7 @@ func TestFromJSON(t *testing.T) {
 }
 
 func TestToJSON(t *testing.T) {
-	dict := map[string]interface{}{"Top": map[string]interface{}{"bool": true, "string": "test", "number": 42}}
+	dict := map[string]any{"Top": map[string]any{"bool": true, "string": "test", "number": 42}}
 
 	tpl := `{{.Top | toJSON}}`
 	expected := `{"bool":true,"number":42,"string":"test"}`
@@ -151,7 +151,7 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestToPrettyJSON(t *testing.T) {
-	dict := map[string]interface{}{"Top": map[string]interface{}{"bool": true, "string": "test", "number": 42}}
+	dict := map[string]any{"Top": map[string]any{"bool": true, "string": "test", "number": 42}}
 	tpl := `{{.Top | toPrettyJSON}}`
 	expected := `{
   "bool": true,
@@ -164,7 +164,7 @@ func TestToPrettyJSON(t *testing.T) {
 }
 
 func TestToRawJSON(t *testing.T) {
-	dict := map[string]interface{}{"Top": map[string]interface{}{"bool": true, "string": "test", "number": 42, "html": "<HEAD>"}}
+	dict := map[string]any{"Top": map[string]any{"bool": true, "string": "test", "number": 42, "html": "<HEAD>"}}
 	tpl := `{{.Top | toRawJSON}}`
 	expected := `{"bool":true,"html":"<HEAD>","number":42,"string":"test"}`
 

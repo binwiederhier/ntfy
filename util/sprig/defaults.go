@@ -17,7 +17,7 @@ import (
 // Structs are never considered unset.
 //
 // For everything else, including pointers, a nil value is unset.
-func dfault(d interface{}, given ...interface{}) interface{} {
+func dfault(d any, given ...any) any {
 
 	if empty(given) || empty(given[0]) {
 		return d
@@ -26,7 +26,7 @@ func dfault(d interface{}, given ...interface{}) interface{} {
 }
 
 // empty returns true if the given value has the zero value for its type.
-func empty(given interface{}) bool {
+func empty(given any) bool {
 	g := reflect.ValueOf(given)
 	if !g.IsValid() {
 		return true
@@ -54,7 +54,7 @@ func empty(given interface{}) bool {
 }
 
 // coalesce returns the first non-empty value.
-func coalesce(v ...interface{}) interface{} {
+func coalesce(v ...any) any {
 	for _, val := range v {
 		if !empty(val) {
 			return val
@@ -65,7 +65,7 @@ func coalesce(v ...interface{}) interface{} {
 
 // all returns true if empty(x) is false for all values x in the list.
 // If the list is empty, return true.
-func all(v ...interface{}) bool {
+func all(v ...any) bool {
 	for _, val := range v {
 		if empty(val) {
 			return false
@@ -74,9 +74,9 @@ func all(v ...interface{}) bool {
 	return true
 }
 
-// any returns true if empty(x) is false for any x in the list.
+// anyNonEmpty returns true if empty(x) is false for anyNonEmpty x in the list.
 // If the list is empty, return false.
-func any(v ...interface{}) bool {
+func anyNonEmpty(v ...any) bool {
 	for _, val := range v {
 		if !empty(val) {
 			return true
@@ -86,25 +86,25 @@ func any(v ...interface{}) bool {
 }
 
 // fromJSON decodes JSON into a structured value, ignoring errors.
-func fromJSON(v string) interface{} {
+func fromJSON(v string) any {
 	output, _ := mustFromJSON(v)
 	return output
 }
 
 // mustFromJSON decodes JSON into a structured value, returning errors.
-func mustFromJSON(v string) (interface{}, error) {
-	var output interface{}
+func mustFromJSON(v string) (any, error) {
+	var output any
 	err := json.Unmarshal([]byte(v), &output)
 	return output, err
 }
 
 // toJSON encodes an item into a JSON string
-func toJSON(v interface{}) string {
+func toJSON(v any) string {
 	output, _ := json.Marshal(v)
 	return string(output)
 }
 
-func mustToJSON(v interface{}) (string, error) {
+func mustToJSON(v any) (string, error) {
 	output, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -113,12 +113,12 @@ func mustToJSON(v interface{}) (string, error) {
 }
 
 // toPrettyJSON encodes an item into a pretty (indented) JSON string
-func toPrettyJSON(v interface{}) string {
+func toPrettyJSON(v any) string {
 	output, _ := json.MarshalIndent(v, "", "  ")
 	return string(output)
 }
 
-func mustToPrettyJSON(v interface{}) (string, error) {
+func mustToPrettyJSON(v any) (string, error) {
 	output, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", err
@@ -127,7 +127,7 @@ func mustToPrettyJSON(v interface{}) (string, error) {
 }
 
 // toRawJSON encodes an item into a JSON string with no escaping of HTML characters.
-func toRawJSON(v interface{}) string {
+func toRawJSON(v any) string {
 	output, err := mustToRawJSON(v)
 	if err != nil {
 		panic(err)
@@ -136,7 +136,7 @@ func toRawJSON(v interface{}) string {
 }
 
 // mustToRawJSON encodes an item into a JSON string with no escaping of HTML characters.
-func mustToRawJSON(v interface{}) (string, error) {
+func mustToRawJSON(v any) (string, error) {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -148,10 +148,9 @@ func mustToRawJSON(v interface{}) (string, error) {
 }
 
 // ternary returns the first value if the last value is true, otherwise returns the second value.
-func ternary(vt interface{}, vf interface{}, v bool) interface{} {
+func ternary(vt any, vf any, v bool) any {
 	if v {
 		return vt
 	}
-
 	return vf
 }

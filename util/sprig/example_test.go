@@ -8,7 +8,7 @@ import (
 
 func Example() {
 	// Set up variables and template.
-	vars := map[string]interface{}{"Name": "  John Jacob Jingleheimer Schmidt "}
+	vars := map[string]any{"Name": "  John Jacob Jingleheimer Schmidt "}
 	tpl := `Hello {{.Name | trim | lower}}`
 
 	// Get the Sprig function map.

@@ -537,5 +537,8 @@ func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
 	} else {
 		log.Info("Log level is %v", strings.ToUpper(newLevelStr))
 	}
+	if err := log.Reopen(); err != nil {
+		return fmt.Errorf("cannot reopen log file: %s", err.Error())
+	}
 	return nil
 }

@@ -135,7 +135,7 @@ const NavList = (props) => {
         {showNotificationContextNotSupportedBox && <NotificationContextNotSupportedAlert />}
         {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
         {alertVisible && <Divider />}
-        {!showSubscriptionsList && (
+        {!showSubscriptionsList && (session.exists() || !config.require_login) && (
           <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
               <ChatBubble />
@@ -164,30 +164,36 @@ const NavList = (props) => {
             <ListItemText primary={t("nav_button_account")} />
           </ListItemButton>
         )}
+        {session.exists() || !config.require_login && (
         <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
           <ListItemIcon>
             <SettingsIcon />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_settings")} />
         </ListItemButton>
+        )}
         <ListItemButton onClick={() => openUrl("/docs")}>
           <ListItemIcon>
             <ArticleIcon />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_documentation")} />
         </ListItemButton>
+        {session.exists() || !config.require_login && (
         <ListItemButton onClick={() => props.onPublishMessageClick()}>
           <ListItemIcon>
             <Send />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_publish_message")} />
         </ListItemButton>
+        )}
+        {session.exists() || !config.require_login && (
         <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
           <ListItemIcon>
             <AddIcon />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
+        )}
         {showUpgradeBanner && (
           // The text background gradient didn't seem to do well with switching between light/dark mode,
           // So adding a `key` forces React to replace the entire component when the theme changes

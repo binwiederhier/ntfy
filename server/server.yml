@@ -185,11 +185,13 @@
 # - twilio-auth-token is the Twilio auth token, e.g. affebeef258625862586258625862586
 # - twilio-phone-number is the outgoing phone number you purchased, e.g. +18775132586
 # - twilio-verify-service is the Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586
+# - twilio-call-format (optional) is the custom TwiML send to the Call API. See: https://www.twilio.com/docs/voice/twiml
 #
 # twilio-account:
 # twilio-auth-token:
 # twilio-phone-number:
 # twilio-verify-service:
+# twilio-call-format:
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.

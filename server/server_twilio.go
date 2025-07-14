@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	twilioCallFormat = `
+	defaultTwilioCallFormat = `
 <Response>
 	<Pause length="1"/>
 	<Say loop="3">
@@ -64,6 +64,10 @@ func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
 	u, sender := v.User(), m.Sender.String()
 	if u != nil {
 		sender = u.Name
+	}
+	twilioCallFormat := defaultTwilioCallFormat
+	if len(s.config.TwilioCallFormat) > 0 {
+		twilioCallFormat = s.config.TwilioCallFormat
 	}
 	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(sender))
 	data := url.Values{}

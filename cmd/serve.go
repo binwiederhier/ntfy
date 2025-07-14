@@ -181,6 +181,7 @@ func execServe(c *cli.Context) error {
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioPhoneNumber := c.String("twilio-phone-number")
 	twilioVerifyService := c.String("twilio-verify-service")
+	twilioCallFormat := c.String("twilio-call-format")
 	messageSizeLimitStr := c.String("message-size-limit")
 	messageDelayLimitStr := c.String("message-delay-limit")
 	totalTopicLimit := c.Int("global-topic-limit")
@@ -427,6 +428,7 @@ func execServe(c *cli.Context) error {
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioPhoneNumber = twilioPhoneNumber
 	conf.TwilioVerifyService = twilioVerifyService
+	conf.TwilioCallFormat = twilioCallFormat
 	conf.MessageSizeLimit = int(messageSizeLimit)
 	conf.MessageDelayMax = messageDelayLimit
 	conf.TotalTopicLimit = totalTopicLimit

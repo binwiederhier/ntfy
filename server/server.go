@@ -77,6 +77,7 @@ var (
 	wsPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
+	messagePathRegex       = regexp.MustCompile(`^/[-A-Za-z-0-9]{1,64}/([A-Za-z0-9]{12})$`)
 
 	webConfigPath                                        = "/config.js"
 	webManifestPath                                      = "/manifest.webmanifest"
@@ -540,6 +541,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.limitRequests(s.authorizeTopicRead(s.handleTopicAuth))(w, r, v)
 	} else if r.Method == http.MethodGet && (topicPathRegex.MatchString(r.URL.Path) || externalTopicPathRegex.MatchString(r.URL.Path)) {
 		return s.ensureWebEnabled(s.handleTopic)(w, r, v)
+	} else if r.Method == http.MethodDelete && (messagePathRegex.MatchString(r.URL.Path)) {
+		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handleMessageUnpublish))(w, r, v)
 	}
 	return errHTTPNotFound
 }
@@ -559,6 +562,25 @@ func (s *Server) handleTopic(w http.ResponseWriter, r *http.Request, v *visitor)
 	}
 	r.URL.Path = webAppIndex
 	return s.handleStatic(w, r, v)
+}
+
+func (s *Server) handleMessageUnpublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	segments := strings.Split(r.URL.Path, "/")
+	msg, err := s.messageCache.Message(segments[len(segments)-1])
+	if err != nil {
+		if err == errMessageNotFound {
+			return errHTTPNotFound
+		}
+		return err
+	}
+	if time.Now().Unix() >= msg.Time {
+		httpErr := errHTTPBadRequest
+		alreadyPublished := httpErr.Wrap("Message \"%s\" has already been published", msg.ID)
+		s.handleError(w, r, v, alreadyPublished)
+		return alreadyPublished
+	}
+	s.messageCache.DeleteMessages(msg.ID)
+	return s.writeJSON(w, msg)
 }
 
 func (s *Server) handleEmpty(_ http.ResponseWriter, _ *http.Request, _ *visitor) error {

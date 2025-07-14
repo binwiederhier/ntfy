@@ -7,8 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/v2/user"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +19,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/user"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
@@ -3022,6 +3023,64 @@ template ""}}`,
 			require.Equal(t, 40044, toHTTPError(t, response.Body.String()).Code)
 		})
 	}
+}
+
+func TestServer_Message_Unpublish_Existing(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response1 := request(t, s, "PUT", "/mytopic", "hello universe", map[string]string{
+		"In": "1m",
+	})
+	msg1 := toMessage(t, response1.Body.String())
+	time.Sleep(500)
+
+	response2 := request(t, s, "DELETE", fmt.Sprintf("/mytopic/%s", msg1.ID), "", nil)
+	require.Equal(t, 200, response2.Code)
+	msg2 := toMessage(t, response2.Body.String())
+	require.Equal(t, msg1.ID, msg2.ID)
+}
+
+func TestServer_Message_Unpublish_Nonexistent(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+
+	response2 := request(t, s, "DELETE", "/mytopic/n0nexist3nt1", "", nil)
+	require.Equal(t, 404, response2.Code)
+}
+
+func TestServer_Message_Unpublish_Protected_Fail_Unauthorized(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AllowAccess(user.Everyone, "announcements", user.PermissionRead))
+
+	response1 := request(t, s, "PUT", "/announcements", "hello universe", map[string]string{
+		"In":            "1m",
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	msg1 := toMessage(t, response1.Body.String())
+
+	response2 := request(t, s, "DELETE", fmt.Sprintf("/announcements/%s", msg1.ID), "", nil)
+	require.Equal(t, 403, response2.Code)
+}
+func TestServer_Message_Unpublish_Private(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin))
+	require.Nil(t, s.userManager.AllowAccess("phil", "announcements", user.PermissionReadWrite))
+
+	h := map[string]string{
+		"In":            "1m",
+		"Authorization": util.BasicAuth("phil", "phil"),
+	}
+	response1 := request(t, s, "PUT", "/announcements", "hello universe", h)
+	msg1 := toMessage(t, response1.Body.String())
+
+	response2 := request(t, s, "DELETE", fmt.Sprintf("/announcements/%s", msg1.ID), "", h)
+	msg2 := toMessage(t, response2.Body.String())
+	require.Equal(t, 200, response2.Code)
+	require.Equal(t, msg1.ID, msg2.ID)
 }
 
 func newTestConfig(t *testing.T) *Config {

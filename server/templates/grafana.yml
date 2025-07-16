@@ -1,0 +1,9 @@
+message: |
+    {{if .alerts}}
+        {{.alerts | len}} alert(s) triggered
+    {{else}}
+        No alerts triggered.
+    {{end}}
+title: |
+  ⚠️ Grafana alert: {{.title}}
+

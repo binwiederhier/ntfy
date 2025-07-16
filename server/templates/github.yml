@@ -1,23 +1,32 @@
+title: |
+  {{- if .pull_request }}
+  Pull request {{ .action }}: #{{ .pull_request.number }} {{ .pull_request.title }}
+  {{- else if and .starred_at (eq .action "created")}}
+  ⭐ {{ .sender.login }} starred {{ .repository.full_name }}
+  {{- else if and .comment (eq .action "created") }}
+  💬 New comment on issue #{{ .issue.number }} — {{ .issue.title }}
+  {{- else }}
+  Unsupported GitHub event type or action.
+  {{- end }}
 message: |
-    {{- if .pull_request }}
-    🔀 PR {{ .action }}: #{{ .pull_request.number }} — {{ .pull_request.title }}
-    📦 {{ .repository.full_name }}
-    👤 {{ .pull_request.user.login }}
-    🌿 {{ .pull_request.head.ref }} → {{ .pull_request.base.ref }}
-    🔗 {{ .pull_request.html_url }}
-    📝 {{ .pull_request.body | default "(no description)" }}
-    {{- else if and .starred_at (eq .action "created")}}
-    ⭐ {{ .sender.login }} starred {{ .repository.full_name }}
-    📦 {{ .repository.description | default "(no description)" }}
-    🔗 {{ .repository.html_url }}
-    📅 {{ .starred_at }}
-    {{- else if and .comment (eq .action "created") }}
-    💬 New comment on issue #{{ .issue.number }} — {{ .issue.title }}
-    📦 {{ .repository.full_name }}
-    👤 {{ .comment.user.login }}
-    🔗 {{ .comment.html_url }}
-    📝 {{ .comment.body | default "(no comment body)" }}
-    {{- else }}
-    {{ fail "Unsupported GitHub event type or action." }}
-    {{- end }}
+  {{- if .pull_request }}
+  Repository: {{ .repository.full_name }}, branch {{ .pull_request.head.ref }} → {{ .pull_request.base.ref }}
+  Created by: {{ .pull_request.user.login }}
+  Link: {{ .pull_request.html_url }}
+  {{ if .pull_request.body }}Description:
+  {{ .pull_request.body }}{{ end }}
+  {{- else if and .starred_at (eq .action "created")}}
+  ⭐ {{ .sender.login }} starred {{ .repository.full_name }}
+  📦 {{ .repository.description | default "(no description)" }}
+  🔗 {{ .repository.html_url }}
+  📅 {{ .starred_at }}
+  {{- else if and .comment (eq .action "created") }}
+  💬 New comment on issue #{{ .issue.number }} — {{ .issue.title }}
+  📦 {{ .repository.full_name }}
+  👤 {{ .comment.user.login }}
+  🔗 {{ .comment.html_url }}
+  📝 {{ .comment.body | default "(no comment body)" }}
+  {{- else }}
+  {{ fail "Unsupported GitHub event type or action." }}
+  {{- end }}
 

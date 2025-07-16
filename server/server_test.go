@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -3067,6 +3068,23 @@ func TestServer_MessageTemplate_UnsafeSprigFunctions(t *testing.T) {
 
 	require.Equal(t, 400, response.Code)
 	require.Equal(t, 40043, toHTTPError(t, response.Body.String()).Code)
+}
+
+var (
+	//go:embed testdata/webhook_github_comment_created.json
+	githubCommentCreatedJSON string
+)
+
+func TestServer_MessageTemplate_FromNamedTemplate(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "POST", "/mytopic", githubCommentCreatedJSON, map[string]string{
+		"Template": "github",
+	})
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "💬 New comment on issue #1389 — instant alerts without Pull to refresh", m.Title)
+	require.Equal(t, "💬 New comment on issue #1389 — instant alerts without Pull to refresh", m.Message)
 }
 
 func newTestConfig(t *testing.T) *Config {

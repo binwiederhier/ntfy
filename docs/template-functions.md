@@ -1,90 +1,128 @@
-# String Functions
+# Template functions
+
+## Table of Contents
+
+- [String Functions](#string-functions)
+- [String List Functions](#string-list-functions)
+- [Integer Math Functions](#integer-math-functions)
+- [Integer List Functions](#integer-list-functions)
+- [Date Functions](#date-functions)
+- [Default Functions](#default-functions)
+- [Encoding Functions](#encoding-functions)
+- [Lists and List Functions](#lists-and-list-functions)
+- [Dictionaries and Dict Functions](#dictionaries-and-dict-functions)
+- [Type Conversion Functions](#type-conversion-functions)
+- [Path and Filepath Functions](#path-and-filepath-functions)
+- [Flow Control Functions](#flow-control-functions)
+- [UUID Functions](#uuid-functions)
+- [Reflection Functions](#reflection-functions)
+- [Cryptographic and Security Functions](#cryptographic-and-security-functions)
+- [URL Functions](#url-functions)
+
+## String Functions
 
 Sprig has a number of string manipulation functions.
 
-## trim
-
-The `trim` function removes space from either side of a string:
+<table>
+<tr>
+<td><code>trim</code></td>
+<td>The `trim` function removes space from either side of a string:
 
 ```
 trim "   hello    "
 ```
 
 The above produces `hello`
+</td>
+</tr>
 
-## trimAll
-
-Remove given characters from the front or back of a string:
+<tr>
+<td><code>trimAll</code></td>
+<td>Remove given characters from the front or back of a string:
 
 ```
 trimAll "$" "$5.00"
 ```
 
 The above returns `5.00` (as a string).
+</td>
+</tr>
 
-## trimSuffix
-
-Trim just the suffix from a string:
+<tr>
+<td><code>trimSuffix</code></td>
+<td>Trim just the suffix from a string:
 
 ```
 trimSuffix "-" "hello-"
 ```
 
 The above returns `hello`
+</td>
+</tr>
 
-## trimPrefix
-
-Trim just the prefix from a string:
+<tr>
+<td><code>trimPrefix</code></td>
+<td>Trim just the prefix from a string:
 
 ```
 trimPrefix "-" "-hello"
 ```
 
 The above returns `hello`
+</td>
+</tr>
 
-## upper
-
-Convert the entire string to uppercase:
+<tr>
+<td><code>upper</code></td>
+<td>Convert the entire string to uppercase:
 
 ```
 upper "hello"
 ```
 
 The above returns `HELLO`
+</td>
+</tr>
 
-## lower
-
-Convert the entire string to lowercase:
+<tr>
+<td><code>lower</code></td>
+<td>Convert the entire string to lowercase:
 
 ```
 lower "HELLO"
 ```
 
 The above returns `hello`
+</td>
+</tr>
 
-## title
-
-Convert to title case:
+<tr>
+<td><code>title</code></td>
+<td>Convert to title case:
 
 ```
 title "hello world"
 ```
 
 The above returns `Hello World`
+</td>
+</tr>
 
-## repeat
-
-Repeat a string multiple times:
+<tr>
+<td><code>repeat</code></td>
+<td>Repeat a string multiple times:
 
 ```
 repeat 3 "hello"
 ```
 
 The above returns `hellohellohello`
+</td>
+</tr>
 
-## substr
-
-Get a substring from a string. It takes three parameters:
+<tr>
+<td><code>substr</code></td>
+<td>Get a substring from a string. It takes three parameters:
 
 - start (int)
 - end (int)
@@ -95,10 +133,12 @@ substr 0 5 "hello world"
 ```
 
 The above returns `hello`
+</td>
+</tr>
 
-## trunc
-
-Truncate a string (and add no suffix)
+<tr>
+<td><code>trunc</code></td>
+<td>Truncate a string (and add no suffix)
 
 ```
 trunc 5 "hello world"
@@ -111,20 +151,24 @@ trunc -5 "hello world"
 ```
 
 The above produces `world`.
+</td>
+</tr>
 
-## contains
-
-Test to see if one string is contained inside of another:
+<tr>
+<td><code>contains</code></td>
+<td>Test to see if one string is contained inside of another:
 
 ```
 contains "cat" "catch"
 ```
 
 The above returns `true` because `catch` contains `cat`.
+</td>
+</tr>
 
-## hasPrefix and hasSuffix
-
-The `hasPrefix` and `hasSuffix` functions test whether a string has a given
+<tr>
+<td><code>hasPrefix</code> and <code>hasSuffix</code></td>
+<td>The `hasPrefix` and `hasSuffix` functions test whether a string has a given
 prefix or suffix:
 
 ```
@@ -132,15 +176,19 @@ hasPrefix "cat" "catch"
 ```
 
 The above returns `true` because `catch` has the prefix `cat`.
+</td>
+</tr>
 
-## quote and squote
-
-These functions wrap a string in double quotes (`quote`) or single quotes
+<tr>
+<td><code>quote</code> and <code>squote</code></td>
+<td>These functions wrap a string in double quotes (`quote`) or single quotes
 (`squote`).
+</td>
+</tr>
 
-## cat
-
-The `cat` function concatenates multiple strings together into one, separating
+<tr>
+<td><code>cat</code></td>
+<td>The `cat` function concatenates multiple strings together into one, separating
 them with spaces:
 
 ```
@@ -148,10 +196,12 @@ cat "hello" "beautiful" "world"
 ```
 
 The above produces `hello beautiful world`
+</td>
+</tr>
 
-## indent
-
-The `indent` function indents every line in a given string to the specified
+<tr>
+<td><code>indent</code></td>
+<td>The `indent` function indents every line in a given string to the specified
 indent width. This is useful when aligning multi-line strings:
 
 ```
@@ -159,10 +209,12 @@ indent 4 $lots_of_text
 ```
 
 The above will indent every line of text by 4 space characters.
+</td>
+</tr>
 
-## nindent
-
-The `nindent` function is the same as the indent function, but prepends a new
+<tr>
+<td><code>nindent</code></td>
+<td>The `nindent` function is the same as the indent function, but prepends a new
 line to the beginning of the string.
 
 ```
@@ -171,10 +223,12 @@ nindent 4 $lots_of_text
 
 The above will indent every line of text by 4 space characters and add a new
 line to the beginning.
+</td>
+</tr>
 
-## replace
-
-Perform simple string replacement.
+<tr>
+<td><code>replace</code></td>
+<td>Perform simple string replacement.
 
 It takes three arguments:
 
@@ -187,10 +241,12 @@ It takes three arguments:
 ```
 
 The above will produce `I-Am-Henry-VIII`
+</td>
+</tr>
 
-## plural
-
-Pluralize a string.
+<tr>
+<td><code>plural</code></td>
+<td>Pluralize a string.
 
 ```
 len $fish | plural "one anchovy" "many anchovies"
@@ -210,10 +266,12 @@ NOTE: Sprig does not currently support languages with more complex pluralization
 rules. And `0` is considered a plural because the English language treats it
 as such (`zero anchovies`). The Sprig developers are working on a solution for
 better internationalization.
+</td>
+</tr>
 
-## regexMatch, mustRegexMatch
-
-Returns true if the input string contains any match of the regular expression.
+<tr>
+<td><code>regexMatch</code>, <code>mustRegexMatch</code></td>
+<td>Returns true if the input string contains any match of the regular expression.
 
 ```
 regexMatch "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" "test@acme.com"
@@ -223,10 +281,12 @@ The above produces `true`
 
 `regexMatch` panics if there is a problem and `mustRegexMatch` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexFindAll, mustRegexFindAll
-
-Returns a slice of all matches of the regular expression in the input string.
+<tr>
+<td><code>regexFindAll</code>, <code>mustRegexFindAll</code></td>
+<td>Returns a slice of all matches of the regular expression in the input string.
 The last parameter n determines the number of substrings to return, where -1 means return all matches
 
 ```
@@ -237,10 +297,12 @@ The above produces `[2 4 6 8]`
 
 `regexFindAll` panics if there is a problem and `mustRegexFindAll` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexFind, mustRegexFind
-
-Return the first (left most) match of the regular expression in the input string
+<tr>
+<td><code>regexFind</code>, <code>mustRegexFind</code></td>
+<td>Return the first (left most) match of the regular expression in the input string
 
 ```
 regexFind "[a-zA-Z][1-9]" "abcd1234"
@@ -250,10 +312,12 @@ The above produces `d1`
 
 `regexFind` panics if there is a problem and `mustRegexFind` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexReplaceAll, mustRegexReplaceAll
-
-Returns a copy of the input string, replacing matches of the Regexp with the replacement string replacement.
+<tr>
+<td><code>regexReplaceAll</code>, <code>mustRegexReplaceAll</code></td>
+<td>Returns a copy of the input string, replacing matches of the Regexp with the replacement string replacement.
 Inside string replacement, $ signs are interpreted as in Expand, so for instance $1 represents the text of the first submatch
 
 ```
@@ -264,10 +328,12 @@ The above produces `-W-xxW-`
 
 `regexReplaceAll` panics if there is a problem and `mustRegexReplaceAll` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexReplaceAllLiteral, mustRegexReplaceAllLiteral
-
-Returns a copy of the input string, replacing matches of the Regexp with the replacement string replacement
+<tr>
+<td><code>regexReplaceAllLiteral</code>, <code>mustRegexReplaceAllLiteral</code></td>
+<td>Returns a copy of the input string, replacing matches of the Regexp with the replacement string replacement
 The replacement string is substituted directly, without using Expand
 
 ```
@@ -278,10 +344,12 @@ The above produces `-${1}-${1}-`
 
 `regexReplaceAllLiteral` panics if there is a problem and `mustRegexReplaceAllLiteral` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexSplit, mustRegexSplit
-
-Slices the input string into substrings separated by the expression and returns a slice of the substrings between those expression matches. The last parameter `n` determines the number of substrings to return, where `-1` means return all matches
+<tr>
+<td><code>regexSplit</code>, <code>mustRegexSplit</code></td>
+<td>Slices the input string into substrings separated by the expression and returns a slice of the substrings between those expression matches. The last parameter `n` determines the number of substrings to return, where `-1` means return all matches
 
 ```
 regexSplit "z+" "pizza" -1
@@ -291,10 +359,12 @@ The above produces `[pi a]`
 
 `regexSplit` panics if there is a problem and `mustRegexSplit` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## regexQuoteMeta
-
-Returns a string that escapes all regular expression metacharacters inside the argument text;
+<tr>
+<td><code>regexQuoteMeta</code></td>
+<td>Returns a string that escapes all regular expression metacharacters inside the argument text;
 the returned string is a regular expression matching the literal text.
 
 ```
@@ -302,19 +372,22 @@ regexQuoteMeta "1.2.3"
 ```
 
 The above produces `1\.2\.3`
-
-## See Also...
+</td>
+</tr>
+</table>
 
 The [Conversion Functions](conversion.md) contain functions for converting strings. The [String List Functions](string_slice.md) contains
 functions for working with an array of strings.
-# String List Functions
+
+## String List Functions
 
 These function operate on or generate slices of strings. In Go, a slice is a
 growable array. In Sprig, it's a special case of a `list`.
 
-## join
-
-Join a list of strings into a single string, with the given separator.
+<table>
+<tr>
+<td><code>join</code></td>
+<td>Join a list of strings into a single string, with the given separator.
 
 ```
 list "hello" "world" | join "_"
@@ -329,10 +402,12 @@ list 1 2 3 | join "+"
 ```
 
 The above will produce `1+2+3`
+</td>
+</tr>
 
-## splitList and split
-
-Split a string into a list of strings:
+<tr>
+<td><code>splitList</code> and <code>split</code></td>
+<td>Split a string into a list of strings:
 
 ```
 splitList "$" "foo$bar$baz"
@@ -354,10 +429,12 @@ $a._0
 ```
 
 The above produces `foo`
+</td>
+</tr>
 
-## splitn
-
-`splitn` function splits a string into a `dict` with `n` keys. It is designed to make
+<tr>
+<td><code>splitn</code></td>
+<td>`splitn` function splits a string into a `dict` with `n` keys. It is designed to make
 it easy to use template dot notation for accessing members:
 
 ```
@@ -371,97 +448,132 @@ $a._0
 ```
 
 The above produces `foo`
+</td>
+</tr>
 
-## sortAlpha
-
-The `sortAlpha` function sorts a list of strings into alphabetical (lexicographical)
+<tr>
+<td><code>sortAlpha</code></td>
+<td>The `sortAlpha` function sorts a list of strings into alphabetical (lexicographical)
 order.
 
 It does _not_ sort in place, but returns a sorted copy of the list, in keeping
 with the immutability of lists.
-# Integer Math Functions
+</td>
+</tr>
+</table>
+
+## Integer Math Functions
 
 The following math functions operate on `int64` values.
 
-## add
-
-Sum numbers with `add`. Accepts two or more inputs.
+<table>
+<tr>
+<td><code>add</code></td>
+<td>Sum numbers with `add`. Accepts two or more inputs.
 
 ```
 add 1 2 3
 ```
+</td>
+</tr>
 
-## add1
+<tr>
+<td><code>add1</code></td>
+<td>To increment by 1, use `add1`
+</td>
+</tr>
 
-To increment by 1, use `add1`
+<tr>
+<td><code>sub</code></td>
+<td>To subtract, use `sub`
+</td>
+</tr>
 
-## sub
+<tr>
+<td><code>div</code></td>
+<td>Perform integer division with `div`
+</td>
+</tr>
 
-To subtract, use `sub`
+<tr>
+<td><code>mod</code></td>
+<td>Modulo with `mod`
+</td>
+</tr>
 
-## div
-
-Perform integer division with `div`
-
-## mod
-
-Modulo with `mod`
-
-## mul
-
-Multiply with `mul`. Accepts two or more inputs.
+<tr>
+<td><code>mul</code></td>
+<td>Multiply with `mul`. Accepts two or more inputs.
 
 ```
 mul 1 2 3
 ```
+</td>
+</tr>
 
-## max
-
-Return the largest of a series of integers:
+<tr>
+<td><code>max</code></td>
+<td>Return the largest of a series of integers:
 
 This will return `3`:
 
 ```
 max 1 2 3
 ```
+</td>
+</tr>
 
-## min
-
-Return the smallest of a series of integers.
+<tr>
+<td><code>min</code></td>
+<td>Return the smallest of a series of integers.
 
 `min 1 2 3` will return `1`
+</td>
+</tr>
 
-## floor
-
-Returns the greatest float value less than or equal to input value
+<tr>
+<td><code>floor</code></td>
+<td>Returns the greatest float value less than or equal to input value
 
 `floor 123.9999` will return `123.0`
+</td>
+</tr>
 
-## ceil
-
-Returns the greatest float value greater than or equal to input value
+<tr>
+<td><code>ceil</code></td>
+<td>Returns the greatest float value greater than or equal to input value
 
 `ceil 123.001` will return `124.0`
+</td>
+</tr>
 
-## round
-
-Returns a float value with the remainder rounded to the given number to digits after the decimal point.
+<tr>
+<td><code>round</code></td>
+<td>Returns a float value with the remainder rounded to the given number to digits after the decimal point.
 
 `round 123.555555 3` will return `123.556`
+</td>
+</tr>
 
-## randInt
-Returns a random integer value from min (inclusive) to max (exclusive).
+<tr>
+<td><code>randInt</code></td>
+<td>Returns a random integer value from min (inclusive) to max (exclusive).
 
 ```
 randInt 12 30
 ```
 
 The above will produce a random number in the range [12,30].
-# Integer List Functions
+</td>
+</tr>
+</table>
 
-## until
+## Integer List Functions
 
-The `until` function builds a range of integers.
+<table>
+<tr>
+<td><code>until</code></td>
+<td>The `until` function builds a range of integers.
 
 ```
 until 5
@@ -470,10 +582,12 @@ until 5
 The above generates the list `[0, 1, 2, 3, 4]`.
 
 This is useful for looping with `range $i, $e := until 5`.
+</td>
+</tr>
 
-## untilStep
-
-Like `until`, `untilStep` generates a list of counting integers. But it allows
+<tr>
+<td><code>untilStep</code></td>
+<td>Like `until`, `untilStep` generates a list of counting integers. But it allows
 you to define a start, stop, and step:
 
 ```
@@ -482,10 +596,12 @@ untilStep 3 6 2
 
 The above will produce `[3 5]` by starting with 3, and adding 2 until it is equal
 or greater than 6. This is similar to Python's `range` function.
+</td>
+</tr>
 
-## seq
-
-Works like the bash `seq` command.
+<tr>
+<td><code>seq</code></td>
+<td>Works like the bash `seq` command.
 * 1 parameter  (end) - will generate all counting integers between 1 and `end` inclusive.
 * 2 parameters (start, end) - will generate all counting integers between `start` and `end` inclusive incrementing or decrementing by 1.
 * 3 parameters (start, step, end) - will generate all counting integers between `start` and `end` inclusive incrementing or decrementing by `step`.
@@ -498,15 +614,22 @@ seq 2 -2    => 2 1 0 -1 -2
 seq 0 2 10  => 0 2 4 6 8 10
 seq 0 -2 -5 => 0 -2 -4
 ```
-# Date Functions
+</td>
+</tr>
+</table>
 
-## now
+## Date Functions
 
-The current date/time. Use this in conjunction with other date functions.
+<table>
+<tr>
+<td><code>now</code></td>
+<td>The current date/time. Use this in conjunction with other date functions.
+</td>
+</tr>
 
-## ago
-
-The `ago` function returns duration from time.Now in seconds resolution.
+<tr>
+<td><code>ago</code></td>
+<td>The `ago` function returns duration from time.Now in seconds resolution.
 
 ```
 ago .CreatedAt
@@ -517,10 +640,12 @@ returns in `time.Duration` String() format
 ```
 2h34m7s
 ```
+</td>
+</tr>
 
-## date
-
-The `date` function formats a date.
+<tr>
+<td><code>date</code></td>
+<td>The `date` function formats a date.
 
 Format the date to YEAR-MONTH-DAY:
 
@@ -538,28 +663,34 @@ Mon Jan 2 15:04:05 MST 2006
 
 Write it in the format you want. Above, `2006-01-02` is the same date, but
 in the format we want.
+</td>
+</tr>
 
-## dateInZone
-
-Same as `date`, but with a timezone.
+<tr>
+<td><code>dateInZone</code></td>
+<td>Same as `date`, but with a timezone.
 
 ```
 dateInZone "2006-01-02" (now) "UTC"
 ```
+</td>
+</tr>
 
-## duration
-
-Formats a given amount of seconds as a `time.Duration`.
+<tr>
+<td><code>duration</code></td>
+<td>Formats a given amount of seconds as a `time.Duration`.
 
 This returns 1m35s
 
 ```
 duration "95"
 ```
+</td>
+</tr>
 
-## durationRound
-
-Rounds a given duration to the most significant unit. Strings and `time.Duration`
+<tr>
+<td><code>durationRound</code></td>
+<td>Rounds a given duration to the most significant unit. Strings and `time.Duration`
 gets parsed as a duration, while a `time.Time` is calculated as the duration since.
 
 This return 2h
@@ -573,18 +704,22 @@ This returns 3mo
 ```
 durationRound "2400h10m5s"
 ```
+</td>
+</tr>
 
-## unixEpoch
-
-Returns the seconds since the unix epoch for a `time.Time`.
+<tr>
+<td><code>unixEpoch</code></td>
+<td>Returns the seconds since the unix epoch for a `time.Time`.
 
 ```
 now | unixEpoch
 ```
+</td>
+</tr>
 
-## dateModify, mustDateModify
-
-The `dateModify` takes a modification and a date and returns the timestamp.
+<tr>
+<td><code>dateModify</code>, <code>mustDateModify</code></td>
+<td>The `dateModify` takes a modification and a date and returns the timestamp.
 
 Subtract an hour and thirty minutes from the current time:
 
@@ -593,27 +728,33 @@ now | date_modify "-1.5h"
 ```
 
 If the modification format is wrong `dateModify` will return the date unmodified. `mustDateModify` will return an error otherwise.
+</td>
+</tr>
 
-## htmlDate
-
-The `htmlDate` function formats a date for inserting into an HTML date picker
+<tr>
+<td><code>htmlDate</code></td>
+<td>The `htmlDate` function formats a date for inserting into an HTML date picker
 input field.
 
 ```
 now | htmlDate
 ```
+</td>
+</tr>
 
-## htmlDateInZone
-
-Same as htmlDate, but with a timezone.
+<tr>
+<td><code>htmlDateInZone</code></td>
+<td>Same as htmlDate, but with a timezone.
 
 ```
 htmlDateInZone (now) "UTC"
 ```
+</td>
+</tr>
 
-## toDate, mustToDate
-
-`toDate` converts a string to a date. The first argument is the date layout and
+<tr>
+<td><code>toDate</code>, <code>mustToDate</code></td>
+<td>`toDate` converts a string to a date. The first argument is the date layout and
 the second the date string. If the string can't be convert it returns the zero
 value.
 `mustToDate` will return an error in case the string cannot be converted.
@@ -624,13 +765,18 @@ This is useful when you want to convert a string date to another format
 ```
 toDate "2006-01-02" "2017-12-31" | date "02/01/2006"
 ```
-# Default Functions
+</td>
+</tr>
+</table>
+
+## Default Functions
 
 Sprig provides tools for setting default values for templates.
 
-## default
-
-To set a simple default value, use `default`:
+<table>
+<tr>
+<td><code>default</code></td>
+<td>To set a simple default value, use `default`:
 
 ```
 default "foo" .Bar
@@ -650,10 +796,12 @@ The definition of "empty" depends on type:
 
 For structs, there is no definition of empty, so a struct will never return the
 default.
+</td>
+</tr>
 
-## empty
-
-The `empty` function returns `true` if the given value is considered empty, and
+<tr>
+<td><code>empty</code></td>
+<td>The `empty` function returns `true` if the given value is considered empty, and
 `false` otherwise. The empty values are listed in the `default` section.
 
 ```
@@ -662,10 +810,12 @@ empty .Foo
 
 Note that in Go template conditionals, emptiness is calculated for you. Thus,
 you rarely need `if empty .Foo`. Instead, just use `if .Foo`.
+</td>
+</tr>
 
-## coalesce
-
-The `coalesce` function takes a list of values and returns the first non-empty
+<tr>
+<td><code>coalesce</code></td>
+<td>The `coalesce` function takes a list of values and returns the first non-empty
 one.
 
 ```
@@ -683,10 +833,12 @@ coalesce .name .parent.name "Matt"
 The above will first check to see if `.name` is empty. If it is not, it will return
 that value. If it _is_ empty, `coalesce` will evaluate `.parent.name` for emptiness.
 Finally, if both `.name` and `.parent.name` are empty, it will return `Matt`.
+</td>
+</tr>
 
-## all
-
-The `all` function takes a list of values and returns true if all values are non-empty.
+<tr>
+<td><code>all</code></td>
+<td>The `all` function takes a list of values and returns true if all values are non-empty.
 
 ```
 all 0 1 2
@@ -701,10 +853,12 @@ all (eq .Request.TLS.Version 0x0304) (.Request.ProtoAtLeast 2 0) (eq .Request.Me
 ```
 
 The above will check http.Request is POST with tls 1.3 and http/2.
+</td>
+</tr>
 
-## any
-
-The `any` function takes a list of values and returns true if any value is non-empty.
+<tr>
+<td><code>any</code></td>
+<td>The `any` function takes a list of values and returns true if any value is non-empty.
 
 ```
 any 0 1 2
@@ -719,19 +873,23 @@ any (eq .Request.Method "GET") (eq .Request.Method "POST") (eq .Request.Method "
 ```
 
 The above will check http.Request method is one of GET/POST/OPTIONS.
+</td>
+</tr>
 
-## fromJSON, mustFromJSON
-
-`fromJSON` decodes a JSON document into a structure. If the input cannot be decoded as JSON the function will return an empty string.
+<tr>
+<td><code>fromJSON</code>, <code>mustFromJSON</code></td>
+<td>`fromJSON` decodes a JSON document into a structure. If the input cannot be decoded as JSON the function will return an empty string.
 `mustFromJSON` will return an error in case the JSON is invalid.
 
 ```
 fromJSON "{\"foo\": 55}"
 ```
+</td>
+</tr>
 
-## toJSON, mustToJSON
-
-The `toJSON` function encodes an item into a JSON string. If the item cannot be converted to JSON the function will return an empty string.
+<tr>
+<td><code>toJSON</code>, <code>mustToJSON</code></td>
+<td>The `toJSON` function encodes an item into a JSON string. If the item cannot be converted to JSON the function will return an empty string.
 `mustToJSON` will return an error in case the item cannot be encoded in JSON.
 
 ```
@@ -739,30 +897,36 @@ toJSON .Item
 ```
 
 The above returns JSON string representation of `.Item`.
+</td>
+</tr>
 
-## toPrettyJSON, mustToPrettyJSON
-
-The `toPrettyJSON` function encodes an item into a pretty (indented) JSON string.
+<tr>
+<td><code>toPrettyJSON</code>, <code>mustToPrettyJSON</code></td>
+<td>The `toPrettyJSON` function encodes an item into a pretty (indented) JSON string.
 
 ```
 toPrettyJSON .Item
 ```
 
 The above returns indented JSON string representation of `.Item`.
+</td>
+</tr>
 
-## toRawJSON, mustToRawJSON
-
-The `toRawJSON` function encodes an item into JSON string with HTML characters unescaped.
+<tr>
+<td><code>toRawJSON</code>, <code>mustToRawJSON</code></td>
+<td>The `toRawJSON` function encodes an item into JSON string with HTML characters unescaped.
 
 ```
 toRawJSON .Item
 ```
 
 The above returns unescaped JSON string representation of `.Item`.
+</td>
+</tr>
 
-## ternary
-
-The `ternary` function takes two values, and a test value. If the test value is
+<tr>
+<td><code>ternary</code></td>
+<td>The `ternary` function takes two values, and a test value. If the test value is
 true, the first value will be returned. If the test value is empty, the second
 value will be returned. This is similar to the c ternary operator.
 
@@ -793,13 +957,29 @@ false | ternary "foo" "bar"
 ```
 
 The above returns `"bar"`.
-# Encoding Functions
+</td>
+</tr>
+</table>
+
+## Encoding Functions
 
 Sprig has the following encoding and decoding functions:
 
-- `b64enc`/`b64dec`: Encode or decode with Base64
-- `b32enc`/`b32dec`: Encode or decode with Base32
-# Lists and List Functions
+<table>
+<tr>
+<td><code>b64enc</code>/<code>b64dec</code></td>
+<td>Encode or decode with Base64
+</td>
+</tr>
+
+<tr>
+<td><code>b32enc</code>/<code>b32dec</code></td>
+<td>Encode or decode with Base32
+</td>
+</tr>
+</table>
+
+## Lists and List Functions
 
 Sprig provides a simple `list` type that can contain arbitrary sequential lists
 of data. This is similar to arrays or slices, but lists are designed to be used
@@ -813,45 +993,54 @@ $myList := list 1 2 3 4 5
 
 The above creates a list of `[1 2 3 4 5]`.
 
-## first, mustFirst
-
-To get the head item on a list, use `first`.
+<table>
+<tr>
+<td><code>first</code>, <code>mustFirst</code></td>
+<td>To get the head item on a list, use `first`.
 
 `first $myList` returns `1`
 
 `first` panics if there is a problem while `mustFirst` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## rest, mustRest
-
-To get the tail of the list (everything but the first item), use `rest`.
+<tr>
+<td><code>rest</code>, <code>mustRest</code></td>
+<td>To get the tail of the list (everything but the first item), use `rest`.
 
 `rest $myList` returns `[2 3 4 5]`
 
 `rest` panics if there is a problem while `mustRest` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## last, mustLast
-
-To get the last item on a list, use `last`:
+<tr>
+<td><code>last</code>, <code>mustLast</code></td>
+<td>To get the last item on a list, use `last`:
 
 `last $myList` returns `5`. This is roughly analogous to reversing a list and
 then calling `first`.
 
 `last` panics if there is a problem while `mustLast` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## initial, mustInitial
-
-This compliments `last` by returning all _but_ the last element.
+<tr>
+<td><code>initial</code>, <code>mustInitial</code></td>
+<td>This compliments `last` by returning all _but_ the last element.
 `initial $myList` returns `[1 2 3 4]`.
 
 `initial` panics if there is a problem while `mustInitial` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## append, mustAppend
-
-Append a new item to an existing list, creating a new list.
+<tr>
+<td><code>append</code>, <code>mustAppend</code></td>
+<td>Append a new item to an existing list, creating a new list.
 
 ```
 $new = append $myList 6
@@ -861,10 +1050,12 @@ The above would set `$new` to `[1 2 3 4 5 6]`. `$myList` would remain unaltered.
 
 `append` panics if there is a problem while `mustAppend` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## prepend, mustPrepend
-
-Push an element onto the front of a list, creating a new list.
+<tr>
+<td><code>prepend</code>, <code>mustPrepend</code></td>
+<td>Push an element onto the front of a list, creating a new list.
 
 ```
 prepend $myList 0
@@ -874,20 +1065,24 @@ The above would produce `[0 1 2 3 4 5]`. `$myList` would remain unaltered.
 
 `prepend` panics if there is a problem while `mustPrepend` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## concat
-
-Concatenate arbitrary number of lists into one.
+<tr>
+<td><code>concat</code></td>
+<td>Concatenate arbitrary number of lists into one.
 
 ```
 concat $myList ( list 6 7 ) ( list 8 )
 ```
 
 The above would produce `[1 2 3 4 5 6 7 8]`. `$myList` would remain unaltered.
+</td>
+</tr>
 
-## reverse, mustReverse
-
-Produce a new list with the reversed elements of the given list.
+<tr>
+<td><code>reverse</code>, <code>mustReverse</code></td>
+<td>Produce a new list with the reversed elements of the given list.
 
 ```
 reverse $myList
@@ -897,10 +1092,12 @@ The above would generate the list `[5 4 3 2 1]`.
 
 `reverse` panics if there is a problem while `mustReverse` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## uniq, mustUniq
-
-Generate a list with all of the duplicates removed.
+<tr>
+<td><code>uniq</code>, <code>mustUniq</code></td>
+<td>Generate a list with all of the duplicates removed.
 
 ```
 list 1 1 1 2 | uniq
@@ -910,10 +1107,12 @@ The above would produce `[1 2]`
 
 `uniq` panics if there is a problem while `mustUniq` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## without, mustWithout
-
-The `without` function filters items out of a list.
+<tr>
+<td><code>without</code>, <code>mustWithout</code></td>
+<td>The `without` function filters items out of a list.
 
 ```
 without $myList 3
@@ -931,10 +1130,12 @@ That would produce `[2 4]`
 
 `without` panics if there is a problem while `mustWithout` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## has, mustHas
-
-Test to see if a list has a particular element.
+<tr>
+<td><code>has</code>, <code>mustHas</code></td>
+<td>Test to see if a list has a particular element.
 
 ```
 has 4 $myList
@@ -944,10 +1145,12 @@ The above would return `true`, while `has "hello" $myList` would return false.
 
 `has` panics if there is a problem while `mustHas` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## compact, mustCompact
-
-Accepts a list and removes entries with empty values.
+<tr>
+<td><code>compact</code>, <code>mustCompact</code></td>
+<td>Accepts a list and removes entries with empty values.
 
 ```
 $list := list 1 "a" "foo" ""
@@ -958,10 +1161,12 @@ $copy := compact $list
 
 `compact` panics if there is a problem and `mustCompact` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## slice, mustSlice
-
-To get partial elements of a list, use `slice list [n] [m]`. It is
+<tr>
+<td><code>slice</code>, <code>mustSlice</code></td>
+<td>To get partial elements of a list, use `slice list [n] [m]`. It is
 equivalent of `list[n:m]`.
 
 - `slice $myList` returns `[1 2 3 4 5]`. It is same as `myList[:]`.
@@ -971,23 +1176,29 @@ equivalent of `list[n:m]`.
 
 `slice` panics if there is a problem while `mustSlice` returns an error to the
 template engine if there is a problem.
+</td>
+</tr>
 
-## chunk
-
-To split a list into chunks of given size, use `chunk size list`. This is useful for pagination.
+<tr>
+<td><code>chunk</code></td>
+<td>To split a list into chunks of given size, use `chunk size list`. This is useful for pagination.
 
 ```
 chunk 3 (list 1 2 3 4 5 6 7 8)
 ```
 
 This produces list of lists `[ [ 1 2 3 ] [ 4 5 6 ] [ 7 8 ] ]`.
+</td>
+</tr>
+</table>
 
-## A Note on List Internals
+### A Note on List Internals
 
 A list is implemented in Go as a `[]interface{}`. For Go developers embedding
 Sprig, you may pass `[]interface{}` items into your template context and be
 able to use all of the `list` functions on those items.
-# Dictionaries and Dict Functions
+
+## Dictionaries and Dict Functions
 
 Sprig provides a key/value storage type called a `dict` (short for "dictionary",
 as in Python). A `dict` is an _unorder_ type.
@@ -998,9 +1209,10 @@ type, even another `dict` or `list`.
 Unlike `list`s, `dict`s are not immutable. The `set` and `unset` functions will
 modify the contents of a dictionary.
 
-## dict
-
-Creating dictionaries is done by calling the `dict` function and passing it a
+<table>
+<tr>
+<td><code>dict</code></td>
+<td>Creating dictionaries is done by calling the `dict` function and passing it a
 list of pairs.
 
 The following creates a dictionary with three items:
@@ -1008,10 +1220,12 @@ The following creates a dictionary with three items:
 ```
 $myDict := dict "name1" "value1" "name2" "value2" "name3" "value 3"
 ```
+</td>
+</tr>
 
-## get
-
-Given a map and a key, get the value from the map.
+<tr>
+<td><code>get</code></td>
+<td>Given a map and a key, get the value from the map.
 
 ```
 get $myDict "name1"
@@ -1021,10 +1235,12 @@ The above returns `"value1"`
 
 Note that if the key is not found, this operation will simply return `""`. No error
 will be generated.
+</td>
+</tr>
 
-## set
-
-Use `set` to add a new key/value pair to a dictionary.
+<tr>
+<td><code>set</code></td>
+<td>Use `set` to add a new key/value pair to a dictionary.
 
 ```
 $_ := set $myDict "name4" "value4"
@@ -1032,10 +1248,12 @@ $_ := set $myDict "name4" "value4"
 
 Note that `set` _returns the dictionary_ (a requirement of Go template functions),
 so you may need to trap the value as done above with the `$_` assignment.
+</td>
+</tr>
 
-## unset
-
-Given a map and a key, delete the key from the map.
+<tr>
+<td><code>unset</code></td>
+<td>Given a map and a key, delete the key from the map.
 
 ```
 $_ := unset $myDict "name4"
@@ -1045,20 +1263,24 @@ As with `set`, this returns the dictionary.
 
 Note that if the key is not found, this operation will simply return. No error
 will be generated.
+</td>
+</tr>
 
-## hasKey
-
-The `hasKey` function returns `true` if the given dict contains the given key.
+<tr>
+<td><code>hasKey</code></td>
+<td>The `hasKey` function returns `true` if the given dict contains the given key.
 
 ```
 hasKey $myDict "name1"
 ```
 
 If the key is not found, this returns `false`.
+</td>
+</tr>
 
-## pluck
-
-The `pluck` function makes it possible to give one key and multiple maps, and
+<tr>
+<td><code>pluck</code></td>
+<td>The `pluck` function makes it possible to give one key and multiple maps, and
 get a list of all of the matches:
 
 ```
@@ -1076,10 +1298,12 @@ inserted.
 
 A common idiom in Sprig templates is to uses `pluck... | first` to get the first
 matching key out of a collection of dictionaries.
+</td>
+</tr>
 
-## dig
-
-The `dig` function traverses a nested set of dicts, selecting keys from a list
+<tr>
+<td><code>dig</code></td>
+<td>The `dig` function traverses a nested set of dicts, selecting keys from a list
 of values. It returns a default value if any of the keys are not found at the
 associated dict.
 
@@ -1107,10 +1331,12 @@ especially since Go's template package's `and` doesn't shortcut. For instance
 `a.maybeNil.iNeedThis`, and panic if `a` lacks a `maybeNil` field.)
 
 `dig` accepts its dict argument last in order to support pipelining.
+</td>
+</tr>
 
-## keys
-
-The `keys` function will return a `list` of all of the keys in one or more `dict`
+<tr>
+<td><code>keys</code></td>
+<td>The `keys` function will return a `list` of all of the keys in one or more `dict`
 types. Since a dictionary is _unordered_, the keys will not be in a predictable order.
 They can be sorted with `sortAlpha`.
 
@@ -1124,10 +1350,12 @@ function along with `sortAlpha` to get a unqiue, sorted list of keys.
 ```
 keys $myDict $myOtherDict | uniq | sortAlpha
 ```
+</td>
+</tr>
 
-## pick
-
-The `pick` function selects just the given keys out of a dictionary, creating a
+<tr>
+<td><code>pick</code></td>
+<td>The `pick` function selects just the given keys out of a dictionary, creating a
 new `dict`.
 
 ```
@@ -1135,10 +1363,12 @@ $new := pick $myDict "name1" "name2"
 ```
 
 The above returns `{name1: value1, name2: value2}`
+</td>
+</tr>
 
-## omit
-
-The `omit` function is similar to `pick`, except it returns a new `dict` with all
+<tr>
+<td><code>omit</code></td>
+<td>The `omit` function is similar to `pick`, except it returns a new `dict` with all
 the keys that _do not_ match the given keys.
 
 ```
@@ -1146,10 +1376,12 @@ $new := omit $myDict "name1" "name3"
 ```
 
 The above returns `{name2: value2}`
+</td>
+</tr>
 
-## values
-
-The `values` function is similar to `keys`, except it returns a new `list` with
+<tr>
+<td><code>values</code></td>
+<td>The `values` function is similar to `keys`, except it returns a new `list` with
 all the values of the source `dict` (only one dictionary is supported).
 
 ```
@@ -1159,48 +1391,68 @@ $vals := values $myDict
 The above returns `list["value1", "value2", "value 3"]`. Note that the `values`
 function gives no guarantees about the result ordering- if you care about this,
 then use `sortAlpha`.
-# Type Conversion Functions
+</td>
+</tr>
+</table>
+
+## Type Conversion Functions
 
 The following type conversion functions are provided by Sprig:
 
-- `atoi`: Convert a string to an integer.
-- `float64`: Convert to a `float64`.
-- `int`: Convert to an `int` at the system's width.
-- `int64`: Convert to an `int64`.
-- `toDecimal`: Convert a unix octal to a `int64`.
-- `toString`: Convert to a string.
-- `toStrings`: Convert a list, slice, or array to a list of strings.
+<table>
+<tr>
+<td><code>atoi</code></td>
+<td>Convert a string to an integer.
+</td>
+</tr>
+
+<tr>
+<td><code>float64</code></td>
+<td>Convert to a `float64`.
+</td>
+</tr>
+
+<tr>
+<td><code>int</code></td>
+<td>Convert to an `int` at the system's width.
+</td>
+</tr>
+
+<tr>
+<td><code>int64</code></td>
+<td>Convert to an `int64`.
+</td>
+</tr>
+
+<tr>
+<td><code>toDecimal</code></td>
+<td>Convert a unix octal to a `int64`.
+</td>
+</tr>
+
+<tr>
+<td><code>toString</code></td>
+<td>Convert to a string.
+</td>
+</tr>
+
+<tr>
+<td><code>toStrings</code></td>
+<td>Convert a list, slice, or array to a list of strings.
+</td>
+</tr>
+</table>
 
 Only `atoi` requires that the input be a specific type. The others will attempt
 to convert from any type to the destination type. For example, `int64` can convert
 floats to ints, and it can also convert strings to ints.
 
-## toStrings
-
-Given a list-like collection, produce a slice of strings.
-
-```
-list 1 2 3 | toStrings
-```
-
-The above converts `1` to `"1"`, `2` to `"2"`, and so on, and then returns
-them as a list.
-
-## toDecimal
-
-Given a unix octal permission, produce a decimal.
-
-```
-"0777" | toDecimal
-```
-
-The above converts `0777` to `511` and returns the value as an int64.
-# Path and Filepath Functions
+## Path and Filepath Functions
 
 While Sprig does not grant access to the filesystem, it does provide functions
 for working with strings that follow file path conventions.
 
-## Paths
+### Paths
 
 Paths separated by the slash character (`/`), processed by the `path` package.
 
@@ -1214,46 +1466,58 @@ Examples:
   [URIs](https://en.wikipedia.org/wiki/Uniform_Resource_Identifier):
   `https://example.com/some/content/`, `ftp://example.com/file/`.
 
-### base
-
-Return the last element of a path.
+<table>
+<tr>
+<td><code>base</code></td>
+<td>Return the last element of a path.
 
 ```
 base "foo/bar/baz"
 ```
 
 The above prints "baz".
+</td>
+</tr>
 
-### dir
-
-Return the directory, stripping the last part of the path. So `dir "foo/bar/baz"`
+<tr>
+<td><code>dir</code></td>
+<td>Return the directory, stripping the last part of the path. So `dir "foo/bar/baz"`
 returns `foo/bar`.
+</td>
+</tr>
 
-### clean
-
-Clean up a path.
+<tr>
+<td><code>clean</code></td>
+<td>Clean up a path.
 
 ```
 clean "foo/bar/../baz"
 ```
 
 The above resolves the `..` and returns `foo/baz`.
+</td>
+</tr>
 
-### ext
-
-Return the file extension.
+<tr>
+<td><code>ext</code></td>
+<td>Return the file extension.
 
 ```
 ext "foo.bar"
 ```
 
 The above returns `.bar`.
+</td>
+</tr>
 
-### isAbs
+<tr>
+<td><code>isAbs</code></td>
+<td>To check whether a path is absolute, use `isAbs`.
+</td>
+</tr>
+</table>
 
-To check whether a path is absolute, use `isAbs`.
-
-## Filepaths
+### Filepaths
 
 Paths separated by the `os.PathSeparator` variable, processed by the `path/filepath` package.
 
@@ -1267,9 +1531,10 @@ Examples:
   the filesystem path is separated by the backslash character (`\`):
   `C:\Users\Username\`, `C:\Program Files\Application\`;
 
-### osBase
-
-Return the last element of a filepath.
+<table>
+<tr>
+<td><code>osBase</code></td>
+<td>Return the last element of a filepath.
 
 ```
 osBase "/foo/bar/baz"
@@ -1277,16 +1542,20 @@ osBase "C:\\foo\\bar\\baz"
 ```
 
 The above prints "baz" on Linux and Windows, respectively.
+</td>
+</tr>
 
-### osDir
-
-Return the directory, stripping the last part of the path. So `osDir "/foo/bar/baz"`
+<tr>
+<td><code>osDir</code></td>
+<td>Return the directory, stripping the last part of the path. So `osDir "/foo/bar/baz"`
 returns `/foo/bar` on Linux, and `osDir "C:\\foo\\bar\\baz"`
 returns `C:\\foo\\bar` on Windows.
+</td>
+</tr>
 
-### osClean
-
-Clean up a path.
+<tr>
+<td><code>osClean</code></td>
+<td>Clean up a path.
 
 ```
 osClean "/foo/bar/../baz"
@@ -1294,10 +1563,12 @@ osClean "C:\\foo\\bar\\..\\baz"
 ```
 
 The above resolves the `..` and returns `foo/baz` on Linux and `C:\\foo\\baz` on Windows.
+</td>
+</tr>
 
-### osExt
-
-Return the file extension.
+<tr>
+<td><code>osExt</code></td>
+<td>Return the file extension.
 
 ```
 osExt "/foo.bar"
@@ -1305,31 +1576,50 @@ osExt "C:\\foo.bar"
 ```
 
 The above returns `.bar` on Linux and Windows, respectively.
+</td>
+</tr>
 
-### osIsAbs
+<tr>
+<td><code>osIsAbs</code></td>
+<td>To check whether a file path is absolute, use `osIsAbs`.
+</td>
+</tr>
+</table>
 
-To check whether a file path is absolute, use `osIsAbs`.
-# Flow Control Functions
+## Flow Control Functions
 
-## fail
-
-Unconditionally returns an empty `string` and an `error` with the specified
+<table>
+<tr>
+<td><code>fail</code></td>
+<td>Unconditionally returns an empty `string` and an `error` with the specified
 text. This is useful in scenarios where other conditionals have determined that
 template rendering should fail.
 
 ```
 fail "Please accept the end user license agreement"
 ```
-# UUID Functions
+</td>
+</tr>
+</table>
+
+## UUID Functions
 
 Sprig can generate UUID v4 universally unique IDs.
 
+<table>
+<tr>
+<td><code>uuidv4</code></td>
+<td>
 ```
 uuidv4
 ```
 
 The above returns a new UUID of the v4 (randomly generated) type.
-# Reflection Functions
+</td>
+</tr>
+</table>
+
+## Reflection Functions
 
 Sprig provides rudimentary reflection tools. These help advanced template
 developers understand the underlying Go type information for a particular value.
@@ -1340,37 +1630,65 @@ Go has an open _type_ system that allows developers to create their own types.
 
 Sprig provides a set of functions for each.
 
-## Kind Functions
+### Kind Functions
 
-There are two Kind functions: `kindOf` returns the kind of an object.
+<table>
+<tr>
+<td><code>kindOf</code></td>
+<td>Returns the kind of an object.
 
 ```
 kindOf "hello"
 ```
 
-The above would return `string`. For simple tests (like in `if` blocks), the
-`kindIs` function will let you verify that a value is a particular kind:
+The above would return `string`.
+</td>
+</tr>
+
+<tr>
+<td><code>kindIs</code></td>
+<td>For simple tests (like in `if` blocks), the `kindIs` function will let you verify that a value is a particular kind:
 
 ```
 kindIs "int" 123
 ```
 
 The above will return `true`
+</td>
+</tr>
+</table>
 
-## Type Functions
+### Type Functions
 
 Types are slightly harder to work with, so there are three different functions:
 
-- `typeOf` returns the underlying type of a value: `typeOf $foo`
-- `typeIs` is like `kindIs`, but for types: `typeIs "*io.Buffer" $myVal`
-- `typeIsLike` works as `typeIs`, except that it also dereferences pointers.
+<table>
+<tr>
+<td><code>typeOf</code></td>
+<td>Returns the underlying type of a value: `typeOf $foo`
+</td>
+</tr>
+
+<tr>
+<td><code>typeIs</code></td>
+<td>Like `kindIs`, but for types: `typeIs "*io.Buffer" $myVal`
+</td>
+</tr>
+
+<tr>
+<td><code>typeIsLike</code></td>
+<td>Works as `typeIs`, except that it also dereferences pointers.
+</td>
+</tr>
+</table>
 
 **Note:** None of these can test whether or not something implements a given
 interface, since doing so would require compiling the interface in ahead of time.
 
-## deepEqual
-
-`deepEqual` returns true if two values are ["deeply equal"](https://golang.org/pkg/reflect/#DeepEqual)
+<table>
+<tr>
+<td><code>deepEqual</code></td>
+<td>Returns true if two values are ["deeply equal"](https://golang.org/pkg/reflect/#DeepEqual)
 
 Works for non-primitive types as well (compared to the built-in `eq`).
 
@@ -1379,21 +1697,28 @@ deepEqual (list 1 2 3) (list 1 2 3)
 ```
 
 The above will return `true`
-# Cryptographic and Security Functions
+</td>
+</tr>
+</table>
+
+## Cryptographic and Security Functions
 
 Sprig provides a couple of advanced cryptographic functions.
 
-## sha1sum
-
-The `sha1sum` function receives a string, and computes it's SHA1 digest.
+<table>
+<tr>
+<td><code>sha1sum</code></td>
+<td>The `sha1sum` function receives a string, and computes it's SHA1 digest.
 
 ```
 sha1sum "Hello world!"
 ```
+</td>
+</tr>
 
-## sha256sum
-
-The `sha256sum` function receives a string, and computes it's SHA256 digest.
+<tr>
+<td><code>sha256sum</code></td>
+<td>The `sha256sum` function receives a string, and computes it's SHA256 digest.
 
 ```
 sha256sum "Hello world!"
@@ -1401,10 +1726,12 @@ sha256sum "Hello world!"
 
 The above will compute the SHA 256 sum in an "ASCII armored" format that is
 safe to print.
+</td>
+</tr>
 
-## sha512sum
-
-The `sha512sum` function receives a string, and computes it's SHA512 digest.
+<tr>
+<td><code>sha512sum</code></td>
+<td>The `sha512sum` function receives a string, and computes it's SHA512 digest.
 
 ```
 sha512sum "Hello world!"
@@ -1412,18 +1739,26 @@ sha512sum "Hello world!"
 
 The above will compute the SHA 512 sum in an "ASCII armored" format that is
 safe to print.
+</td>
+</tr>
 
-## adler32sum
-
-The `adler32sum` function receives a string, and computes its Adler-32 checksum.
+<tr>
+<td><code>adler32sum</code></td>
+<td>The `adler32sum` function receives a string, and computes its Adler-32 checksum.
 
 ```
 adler32sum "Hello world!"
 ```
-# URL Functions
+</td>
+</tr>
+</table>
 
-## urlParse
-Parses string for URL and produces dict with URL parts
+## URL Functions
+
+<table>
+<tr>
+<td><code>urlParse</code></td>
+<td>Parses string for URL and produces dict with URL parts
 
 ```
 urlParse "http://admin:secret@server.com:8080/api?list=false#anchor"
@@ -1441,9 +1776,12 @@ userinfo: 'admin:secret'
 ```
 
 For more info, check https://golang.org/pkg/net/url/#URL
+</td>
+</tr>
 
-## urlJoin
-Joins map (produced by `urlParse`) to produce URL string
+<tr>
+<td><code>urlJoin</code></td>
+<td>Joins map (produced by `urlParse`) to produce URL string
 
 ```
 urlJoin (dict "fragment" "fragment" "host" "host:80" "path" "/path" "query" "query" "scheme" "http")
@@ -1453,3 +1791,6 @@ The above returns the following string:
 ```
 proto://host:80/path?query#fragment
 ```
+</td>
+</tr>
+</table>

@@ -1183,7 +1183,7 @@ func (s *Server) replaceTemplate(tpl string, source string) (string, error) {
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(tpl)
+	t, err := template.New("").Funcs(sprig.TxtFuncMap()).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid.Wrap("%s", err.Error())
 	}
@@ -2110,33 +2110,4 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
 		}
 	}()
-}
-
-func loadTemplatesFromDir(dir string) (map[string]*template.Template, error) {
-	templates := make(map[string]*template.Template)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".tmpl") {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read template %s: %w", name, err)
-		}
-		tmpl, err := template.New(name).Funcs(sprig.FuncMap()).Parse(string(content))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse template %s: %w", name, err)
-		}
-		base := strings.TrimSuffix(name, ".tmpl")
-		templates[base] = tmpl
-	}
-	return templates, nil
 }

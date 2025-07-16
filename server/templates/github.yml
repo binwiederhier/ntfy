@@ -1,31 +1,56 @@
 title: |
-  {{- if .pull_request }}
-  Pull request {{ .action }}: #{{ .pull_request.number }} {{ .pull_request.title }}
-  {{- else if and .starred_at (eq .action "created")}}
-  ⭐ {{ .sender.login }} starred {{ .repository.full_name }}
+  {{- if and .starred_at (eq .action "created")}}
+  ⭐ {{ .sender.login }} starred {{ .repository.name }}
+  
+  {{- else if and .repository (eq .action "started")}}
+  👀 {{ .sender.login }} started watching {{ .repository.name }}
+  
   {{- else if and .comment (eq .action "created") }}
-  💬 New comment on issue #{{ .issue.number }} — {{ .issue.title }}
+  💬 New comment on #{{ .issue.number }}: {{ .issue.title }}
+  
+  {{- else if .pull_request }}
+  🔀 Pull request {{ .action }}: #{{ .pull_request.number }} {{ .pull_request.title }}
+  
+  {{- else if .issue }}
+  🐛 Issue {{ .action }}: #{{ .issue.number }} {{ .issue.title }}
+  
   {{- else }}
-  Unsupported GitHub event type or action.
+  {{ fail "Unsupported GitHub event type or action." }}
   {{- end }}
 message: |
-  {{- if .pull_request }}
-  Repository: {{ .repository.full_name }}, branch {{ .pull_request.head.ref }} → {{ .pull_request.base.ref }}
-  Created by: {{ .pull_request.user.login }}
-  Link: {{ .pull_request.html_url }}
-  {{ if .pull_request.body }}Description:
-  {{ .pull_request.body }}{{ end }}
-  {{- else if and .starred_at (eq .action "created")}}
-  ⭐ {{ .sender.login }} starred {{ .repository.full_name }}
-  📦 {{ .repository.description | default "(no description)" }}
-  🔗 {{ .repository.html_url }}
-  📅 {{ .starred_at }}
+  {{ if and .starred_at (eq .action "created")}}
+  Stargazer: {{ .sender.html_url }}
+  Repository: {{ .repository.html_url }}
+  
+  {{- else if and .repository (eq .action "started")}}
+  Watcher: {{ .sender.html_url }}
+  Repository: {{ .repository.html_url }}
+  
   {{- else if and .comment (eq .action "created") }}
-  💬 New comment on issue #{{ .issue.number }} — {{ .issue.title }}
-  📦 {{ .repository.full_name }}
-  👤 {{ .comment.user.login }}
-  🔗 {{ .comment.html_url }}
-  📝 {{ .comment.body | default "(no comment body)" }}
+  Commenter: {{ .comment.user.html_url }}
+  Repository: {{ .repository.html_url }}
+  Comment link: {{ .comment.html_url }}
+  {{ if .comment.body }}
+  Comment:
+  {{ .comment.body | trunc 2000 }}{{ end }}
+  
+  {{- else if .pull_request }}
+  Branch: {{ .pull_request.head.ref }} → {{ .pull_request.base.ref }}
+  {{ .action | title }} by: {{ .pull_request.user.html_url }}
+  Repository: {{ .repository.html_url }}
+  Pull request: {{ .pull_request.html_url }}
+  {{ if .pull_request.body }}
+  Description:
+  {{ .pull_request.body | trunc 2000 }}{{ end }}
+  
+  {{- else if .issue }}
+  {{ .action | title }} by: {{ .issue.user.html_url }}
+  Repository: {{ .repository.html_url }}
+  Issue link: {{ .issue.html_url }}
+  {{ if .issue.body }}
+  Description:
+  {{ .issue.body | trunc 2000 }}{{ end }}
+  
   {{- else }}
   {{ fail "Unsupported GitHub event type or action." }}
   {{- end }}

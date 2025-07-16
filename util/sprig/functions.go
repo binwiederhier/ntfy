@@ -2,40 +2,26 @@ package sprig
 
 import (
 	"errors"
-	"html/template"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"math/rand"
 	"path"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
-	ttemplate "text/template"
+	"text/template"
 	"time"
-
-	"golang.org/x/text/cases"
 )
 
-// FuncMap produces the function map.
+// TxtFuncMap produces the function map.
 //
 // Use this to pass the functions into the template engine:
 //
 //	tpl := template.New("foo").Funcs(sprig.FuncMap()))
-func FuncMap() template.FuncMap {
-	return HTMLFuncMap()
-}
-
+//
 // TxtFuncMap returns a 'text/template'.FuncMap
-func TxtFuncMap() ttemplate.FuncMap {
-	return GenericFuncMap()
-}
-
-// HTMLFuncMap returns an 'html/template'.Funcmap
-func HTMLFuncMap() template.FuncMap {
-	return GenericFuncMap()
-}
-
-// GenericFuncMap returns a copy of the basic function map as a map[string]any.
-func GenericFuncMap() map[string]any {
+func TxtFuncMap() template.FuncMap {
 	gfm := make(map[string]any, len(genericMap))
 	for k, v := range genericMap {
 		gfm[k] = v
@@ -63,11 +49,13 @@ var genericMap = map[string]any{
 	"unixEpoch":        unixEpoch,
 
 	// Strings
-	"trunc":  trunc,
-	"trim":   strings.TrimSpace,
-	"upper":  strings.ToUpper,
-	"lower":  strings.ToLower,
-	"title":  cases.Title,
+	"trunc": trunc,
+	"trim":  strings.TrimSpace,
+	"upper": strings.ToUpper,
+	"lower": strings.ToLower,
+	"title": func(s string) string {
+		return cases.Title(language.English).String(s)
+	},
 	"substr": substring,
 	// Switch order so that "foo" | repeat 5
 	"repeat": func(count int, str string) string { return strings.Repeat(str, count) },
@@ -98,11 +86,6 @@ var genericMap = map[string]any{
 	"atoi":      func(a string) int { i, _ := strconv.Atoi(a); return i },
 	"seq":       seq,
 	"toDecimal": toDecimal,
-
-	//"gt": func(a, b int) bool {return a > b},
-	//"gte": func(a, b int) bool {return a >= b},
-	//"lt": func(a, b int) bool {return a < b},
-	//"lte": func(a, b int) bool {return a <= b},
 
 	// split "/" foo/bar returns map[int]string{0: foo, 1: bar}
 	"split":     split,

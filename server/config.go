@@ -167,6 +167,7 @@ type Config struct {
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
 	Version                              string // injected by App
+	TemplateDirectory                    string // Directory to load named templates from
 }
 
 // NewConfig instantiates a default new server config
@@ -257,5 +258,6 @@ func NewConfig() *Config {
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
+		TemplateDirectory:                    "",
 	}
 }

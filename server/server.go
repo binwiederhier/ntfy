@@ -62,6 +62,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
 	mu                sync.RWMutex
+	templates         map[string]*template.Template // Loaded named templates
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -222,8 +223,16 @@ func New(conf *Config) (*Server, error) {
 		messagesHistory: []int64{messages},
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
+		templates:       make(map[string]*template.Template),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	if conf.TemplateDirectory != "" {
+		tmpls, err := loadTemplatesFromDir(conf.TemplateDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load templates from %s: %w", conf.TemplateDirectory, err)
+		}
+		s.templates = tmpls
+	}
 	return s, nil
 }
 
@@ -1113,10 +1122,10 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedR
 		return errHTTPEntityTooLargeJSONBody
 	}
 	peekedBody := strings.TrimSpace(string(body.PeekedBytes))
-	if m.Message, err = replaceTemplate(m.Message, peekedBody); err != nil {
+	if m.Message, err = s.replaceTemplate(m.Message, peekedBody); err != nil {
 		return err
 	}
-	if m.Title, err = replaceTemplate(m.Title, peekedBody); err != nil {
+	if m.Title, err = s.replaceTemplate(m.Title, peekedBody); err != nil {
 		return err
 	}
 	if len(m.Message) > s.config.MessageSizeLimit {
@@ -1125,9 +1134,25 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, body *util.PeekedR
 	return nil
 }
 
-func replaceTemplate(tpl string, source string) (string, error) {
+func (s *Server) replaceTemplate(tpl string, source string) (string, error) {
 	if templateDisallowedRegex.MatchString(tpl) {
 		return "", errHTTPBadRequestTemplateDisallowedFunctionCalls
+	}
+	if strings.HasPrefix(tpl, "@") {
+		name := strings.TrimPrefix(tpl, "@")
+		t, ok := s.templates[name]
+		if !ok {
+			return "", fmt.Errorf("template '@%s' not found", name)
+		}
+		var data any
+		if err := json.Unmarshal([]byte(source), &data); err != nil {
+			return "", errHTTPBadRequestTemplateMessageNotJSON
+		}
+		var buf bytes.Buffer
+		if err := t.Execute(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), data); err != nil {
+			return "", errHTTPBadRequestTemplateExecuteFailed
+		}
+		return buf.String(), nil
 	}
 	var data any
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
@@ -2060,4 +2085,33 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
 		}
 	}()
+}
+
+func loadTemplatesFromDir(dir string) (map[string]*template.Template, error) {
+	templates := make(map[string]*template.Template)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tmpl") {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read template %s: %w", name, err)
+		}
+		tmpl, err := template.New(name).Funcs(sprig.FuncMap()).Parse(string(content))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse template %s: %w", name, err)
+		}
+		base := strings.TrimSuffix(name, ".tmpl")
+		templates[base] = tmpl
+	}
+	return templates, nil
 }

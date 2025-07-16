@@ -107,6 +107,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryDuration), Usage: "automatically expire unused subscriptions after this time"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-warning-duration", Aliases: []string{"web_push_expiry_warning_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryWarningDuration), Usage: "send web push warning notification after this time before expiring unused subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "template-directory", Aliases: []string{"template_directory"}, EnvVars: []string{"NTFY_TEMPLATE_DIRECTORY"}, Usage: "directory to load named templates from"}),
 )
 
 var cmdServe = &cli.Command{
@@ -205,6 +206,7 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
+	templateDirectory := c.String("template-directory")
 
 	// Convert durations
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
@@ -461,6 +463,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushStartupQueries = webPushStartupQueries
 	conf.WebPushExpiryDuration = webPushExpiryDuration
 	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
+	conf.TemplateDirectory = templateDirectory
 	conf.Version = c.App.Version
 
 	// Set up hot-reloading of config

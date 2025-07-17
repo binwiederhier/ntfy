@@ -547,3 +547,10 @@ type webManifestIcon struct {
 	Sizes string `json:"sizes"`
 	Type  string `json:"type"`
 }
+
+type apiTopicSubscribersResponse struct {
+	Topic      string    `json:"topic"`
+	Subscribed bool      `json:"subscribed"`
+	Count      int       `json:"count"`
+	LastAccess time.Time `json:"last_access"`
+}

@@ -87,6 +87,7 @@ var (
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
 	apiStatsPath                                         = "/v1/stats"
+	apiTopicSubscribersPath                              = "/v1/topics/%s/subscribers"
 	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
@@ -105,6 +106,7 @@ var (
 	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
 	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
 	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
+	apiTopicSubscribersRegex                             = regexp.MustCompile(`^/v1/topics/([-_A-Za-z0-9]{1,64})/subscribers$`)
 	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
@@ -506,6 +508,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
+	} else if r.Method == http.MethodGet && apiTopicSubscribersRegex.MatchString(r.URL.Path) {
+		return s.handleTopicSubscribers(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
@@ -651,6 +655,42 @@ func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor)
 	response := &apiStatsResponse{
 		Messages:     messages,
 		MessagesRate: rate,
+	}
+	return s.writeJSON(w, response)
+}
+
+// handleTopicSubscribers returns information about subscribers to a specific topic
+func (s *Server) handleTopicSubscribers(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	matches := apiTopicSubscribersRegex.FindStringSubmatch(r.URL.Path)
+	if len(matches) != 2 {
+		return errHTTPNotFound
+	}
+	topicID := matches[1]
+
+	// Get topic from server's topics map
+	s.mu.RLock()
+	topic, exists := s.topics[topicID]
+	s.mu.RUnlock()
+
+	var subscribed bool
+	var count int
+	var lastAccess time.Time
+
+	if exists && topic != nil {
+		count, lastAccess = topic.Stats()
+		subscribed = count > 0
+	} else {
+		// Topic doesn't exist or has no subscribers
+		subscribed = false
+		count = 0
+		lastAccess = time.Time{} // Zero time
+	}
+
+	response := &apiTopicSubscribersResponse{
+		Topic:      topicID,
+		Subscribed: subscribed,
+		Count:      count,
+		LastAccess: lastAccess,
 	}
 	return s.writeJSON(w, response)
 }

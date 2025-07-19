@@ -2918,7 +2918,7 @@ func TestServer_MessageTemplate_Range(t *testing.T) {
 
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "Severe URLs:\n- https://severe1.com\n- https://severe2.com\n", m.Message)
+	require.Equal(t, "Severe URLs:\n- https://severe1.com\n- https://severe2.com", m.Message)
 }
 
 func TestServer_MessageTemplate_ExceedMessageSize_TemplatedMessageOK(t *testing.T) {
@@ -2971,8 +2971,7 @@ Labels:
 Annotations:
  - summary = 15m load average too high
 Source: localhost:3000/alerting/grafana/NW9oDw-4z/view
-Silence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter
-`, m.Message)
+Silence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter`, m.Message)
 }
 
 func TestServer_MessageTemplate_GitHub(t *testing.T) {
@@ -3073,18 +3072,75 @@ func TestServer_MessageTemplate_UnsafeSprigFunctions(t *testing.T) {
 var (
 	//go:embed testdata/webhook_github_comment_created.json
 	githubCommentCreatedJSON string
+
+	//go:embed testdata/webhook_github_issue_opened.json
+	githubIssueOpenedJSON string
 )
 
-func TestServer_MessageTemplate_FromNamedTemplate(t *testing.T) {
+func TestServer_MessageTemplate_FromNamedTemplate_GitHubCommentCreated(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, newTestConfig(t))
-	response := request(t, s, "POST", "/mytopic", githubCommentCreatedJSON, map[string]string{
-		"Template": "github",
-	})
+	response := request(t, s, "POST", "/mytopic?template=github", githubCommentCreatedJSON, nil)
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "💬 New comment on issue #1389 — instant alerts without Pull to refresh", m.Title)
-	require.Equal(t, "💬 New comment on issue #1389 — instant alerts without Pull to refresh", m.Message)
+	require.Equal(t, "💬 [ntfy] New comment on issue #1389 instant alerts without Pull to refresh", m.Title)
+	require.Equal(t, `Commenter: https://github.com/wunter8
+Repository: https://github.com/binwiederhier/ntfy
+Comment link: https://github.com/binwiederhier/ntfy/issues/1389#issuecomment-3078214289
+
+Comment:
+These are the things you need to do to get iOS push notifications to work:
+1. open a browser to the web app of your ntfy instance and copy the URL (including "http://" or "https://", your domain or IP address, and any ports, and excluding any trailing slashes)
+2. put the URL you copied in the ntfy `+"`"+`base-url`+"`"+` config in server.yml or NTFY_BASE_URL in env variables
+3. put the URL you copied in the default server URL setting in the iOS ntfy app
+4. set `+"`"+`upstream-base-url`+"`"+` in server.yml or NTFY_UPSTREAM_BASE_URL in env variables to "https://ntfy.sh" (without a trailing slash)`, m.Message)
+}
+
+func TestServer_MessageTemplate_FromNamedTemplate_GitHubIssueOpened(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "POST", "/mytopic?template=github", githubIssueOpenedJSON, nil)
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "🐛 [ntfy] Issue opened: #1391 http 500 error (ntfy error 50001)", m.Title)
+	require.Equal(t, `Opened by: https://github.com/TheUser-dev
+Repository: https://github.com/binwiederhier/ntfy
+Issue link: https://github.com/binwiederhier/ntfy/issues/1391
+Labels: 🪲 bug 
+
+Description:
+:lady_beetle: **Describe the bug**
+When sending a notification (especially when it happens with multiple requests) this error occurs
+
+:computer: **Components impacted**
+ntfy server 2.13.0 in docker, debian 12 arm64
+
+:bulb: **Screenshots and/or logs**
+`+"```"+`
+closed with HTTP 500 (ntfy error 50001) (error=database table is locked, http_method=POST, http_path=/_matrix/push/v1/notify, tag=http, visitor_auth_limiter_limit=0.016666666666666666, visitor_auth_limiter_tokens=30, visitor_id=ip:<edited>, visitor_ip=<edited>, visitor_messages=448, visitor_messages_limit=17280, visitor_messages_remaining=16832, visitor_request_limiter_limit=0.2, visitor_request_limiter_tokens=57.049697891799994, visitor_seen=2025-07-16T15:06:35.429Z)
+`+"```"+`
+
+:crystal_ball: **Additional context**
+Looks like this has already been fixed by #498, regression?`, m.Message)
+}
+
+func TestServer_MessageTemplate_FromNamedTemplate_GitHubIssueOpened_OverrideConfigTemplate(t *testing.T) {
+	t.Parallel()
+	c := newTestConfig(t)
+	c.TemplateDir = t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "github.yml"), []byte(`
+title: |
+  Custom title: action={{ .action }} trunctitle={{ .issue.title | trunc 10 }}
+message: |
+  Custom message {{ .issue.number }}
+`), 0644))
+	s := newTestServer(t, c)
+	response := request(t, s, "POST", "/mytopic?template=github", githubIssueOpenedJSON, nil)
+	fmt.Println(response.Body.String())
+	require.Equal(t, 200, response.Code)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "Custom title: action=opened trunctitle=http 500 e", m.Title)
+	require.Equal(t, "Custom message 1391", m.Message)
 }
 
 func newTestConfig(t *testing.T) *Config {
@@ -3093,6 +3149,7 @@ func newTestConfig(t *testing.T) *Config {
 	conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 	conf.CacheStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
 	conf.AttachmentCacheDir = t.TempDir()
+	conf.TemplateDir = t.TempDir()
 	return conf
 }
 

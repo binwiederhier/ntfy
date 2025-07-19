@@ -77,6 +77,12 @@ func WithMarkdown() PublishOption {
 	return WithHeader("X-Markdown", "yes")
 }
 
+// WithTemplate instructs the server to use a specific template for the message. If templateName is is "yes" or "1",
+// the server will interpret the message and title as a template.
+func WithTemplate(templateName string) PublishOption {
+	return WithHeader("X-Template", templateName)
+}
+
 // WithFilename sets a filename for the attachment, and/or forces the HTTP body to interpreted as an attachment
 func WithFilename(filename string) PublishOption {
 	return WithHeader("X-Filename", filename)

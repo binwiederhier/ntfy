@@ -6,7 +6,7 @@ title: |
   👀 {{ .sender.login }} started watching {{ .repository.name }}
   
   {{- else if and .comment (eq .action "created") }}
-  💬 New comment on #{{ .issue.number }}: {{ .issue.title }}
+  💬 New comment on issue #{{ .issue.number }} {{ .issue.title }}
   
   {{- else if .pull_request }}
   🔀 Pull request {{ .action }}: #{{ .pull_request.number }} {{ .pull_request.title }}
@@ -47,6 +47,7 @@ message: |
   {{ .action | title }} by: {{ .issue.user.html_url }}
   Repository: {{ .repository.html_url }}
   Issue link: {{ .issue.html_url }}
+  {{ if .issue.labels }}Labels: {{ range .issue.labels }}{{ .name }} {{ end }}{{ end }}
   {{ if .issue.body }}
   Description:
   {{ .issue.body | trunc 2000 }}{{ end }}

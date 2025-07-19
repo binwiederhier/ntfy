@@ -944,27 +944,165 @@ Templating lets you **format a JSON message body into human-friendly message and
 [Go templates](https://pkg.go.dev/text/template) (see tutorials [here](https://blog.gopheracademy.com/advent-2017/using-go-templates/), 
 [here](https://www.digitalocean.com/community/tutorials/how-to-use-templates-in-go), and
 [here](https://developer.hashicorp.com/nomad/tutorials/templates/go-template-syntax)). This is specifically useful when
-**combined with webhooks** from services such as GitHub, Grafana, or other services that emit JSON webhooks.
+**combined with webhooks** from services such as [GitHub](https://docs.github.com/en/webhooks/about-webhooks),
+[Grafana](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/),
+[Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config), or other services that emit JSON webhooks.
 
 Instead of using a separate bridge program to parse the webhook body into the format ntfy expects, you can include a templated
 message and/or a templated title which will be populated based on the fields of the webhook body (so long as the webhook body
 is valid JSON).
 
-You can enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`):
+You can enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`, or the query parameter `?template=...`):
 
+* **Pre-defined template files**: Setting the `X-Template` header or query parameter to a template name (e.g. `?template=github`)
+  to a pre-defined template name (e.g. `github`, `grafana`, or `alertmanager`) will use the template with that name.
+  See [pre-defined templates](#pre-defined-templates) for more details.
+* **Custom template files**: Setting the `X-Template` header or query parameter to a custom template name (e.g. `?template=myapp`)
+  will use a custom template file from the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`).
+  See [custom templates](#custom-templates) for more details.
 * **Inline templating**: Setting the `X-Template` header or query parameter to `yes` or `1` (e.g. `?template=yes`)
-  will enable inline templating, which means that the `message` and/or `title` **will be parsed as a Go template**.
-  See [Inline templating](#inline-templating) and [Template syntax](#template-syntax) for details on how to use Go
-  templates in your messages and titles.
-* **Pre-defined template files**: You can also set `X-Template` header or query parameter to a template name (e.g. `?template=github`).
-  ntfy will then read the template from either the built-in pre-defined template files, or from the template files defined in
-  the `template-dir`. See [Template files](#pre-defined-templates) for more details.
+  will enable inline templating, which means that the `message` and/or `title` will be parsed as a Go template.
+  See [inline templating](#inline-templating) for more details.
+
+To learn the basics of Go's templating language, please see [template syntax](#template-syntax).
+
+### Pre-defined templates
+
+When `X-Template: <name>` (aliases: `Template: <name>`, `Tpl: <name>`) or `?template=<name>` is set, ntfy will transform the
+message and/or title based on one of the built-in pre-defined templates
+
+The following **pre-defined templates** are available:
+
+* `github`: Formats a subset of [GitHub webhook](https://docs.github.com/en/webhooks/about-webhooks) payloads (PRs, issues, new star, new watcher, new comment)
+* `grafana`: Formats [Grafana webhook](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) payloads (firing/resolved alerts)
+* `alertmanager`: Formats [Alertmanager webhook](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config) payloads (firing/resolved alerts)
+
+Here's an example of how to use the pre-defined `github` template: First, configure the webhook in GitHub to send a webhook to your ntfy topic, e.g. `https://ntfy.sh/mytopic?template=github`.
+<figure markdown>
+  ![GitHub webhook config](static/img/screenshot-github-webhook-config.png){ width=600 }
+  <figcaption>GitHub webhook configuration</figcaption>
+</figure>
+
+After that, when GitHub publishes a JSON webhook to the topic, ntfy will transform it according to the template rules
+and you'll receive notifications in the ntfy app. Here's an example for when somebody stars your repository:
+
+<figure markdown>
+  ![pre-defined template](static/img/android-screenshot-template-predefined.png){ width=500 }
+  <figcaption>Receiving a webhook, formatted using the pre-defined "github" template</figcaption>
+</figure>
+
+### Custom templates
+
+To define **your own custom templates**, place a template file in the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`)
+and set the `X-Template` header or query parameter to the name of the template file (without the `.yml` extension). 
+
+For example, if you have a template file `/etc/ntfy/templates/myapp.yml`, you can set the header `X-Template: myapp` or
+the query parameter `?template=myapp` to use it.
+
+Template files must have the `.yml` (not: `.yaml`!) extension and must be formatted as YAML. They may contain `title` and `message` keys,
+which are interpreted as Go templates.
+
+Here's an **example custom template**:
+
+=== "Custom template (/etc/ntfy/templates/myapp.yml)"
+    ```yaml
+    title: |
+      {{- if eq .status "firing" }}
+        {{- if gt .percent 90.0 }}🚨 Critical alert
+        {{- else }}⚠️ Alert{{- end }}
+      {{- else if eq .status "resolved" }}
+      ✅ Alert resolved
+      {{- end }}
+    message: |
+      Status: {{ .status }}
+      Type: {{ .type | upper }} ({{ .percent }}%)
+      Server: {{ .server }}
+    ```
+
+Once you have the template file in place, you can send the payload to your topic using the `X-Template`
+header or query parameter:
+
+=== "Command line (curl)"
+    ```
+    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
+      curl -sT- "https://ntfy.example.com/mytopic?template=myapp"
+    ```
+
+=== "ntfy CLI"
+    ```
+    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
+      ntfy publish --template=myapp https://ntfy.example.com/mytopic 
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic?template=myapp HTTP/1.1
+    Host: ntfy.example.com
+
+    {
+      "status": "firing",
+      "type": "cpu",
+      "server": "ntfy.sh",
+      "percent": 99
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mytopic?template=myapp', {
+        method: 'POST',
+        body: '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+    })
+    ```
+
+=== "Go"
+    ``` go
+    payload := `{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}`
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mytopic?template=myapp", strings.NewReader(payload))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      Uri = "https://ntfy.example.com/mytopic?template=myapp"
+      Body = '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mytopic?template=myapp",
+      json={"status":"firing","type":"cpu","server":"ntfy.sh","percent":99})
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mytopic?template=myapp', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+        ]
+    ]));
+    ```
+
+Which will result in a notification that looks like this:
+
+<figure markdown>
+  ![notification from custom JSON webhook template](static/img/android-screenshot-template-custom.png){ width=500 }
+  <figcaption>JSON webhook, transformed using a custom template</figcaption>
+</figure>
 
 ### Inline templating
 
-When `X-Template: yes` or `?template=yes` is set, you can use Go templates in the `message` and `title` fields of your
-webhook payload. This is most useful if no [pre-defined template](#pre-defined-templates) exists, for templated one-off messages,
-of if you do not control the ntfy server (e.g., if you're using ntfy.sh). Please consider using [template files](#pre-defined-templates)
+When `X-Template: yes` (aliases: `Template: yes`, `Tpl: yes`) or `?template=yes` is set, you can use Go templates in the `message` and `title` fields of your
+webhook payload. 
+
+Inline templates are most useful for templated one-off messages, of if you do not control the ntfy server (e.g., if you're using ntfy.sh).
+Consider using [pre-defined templates](#pre-defined-templates) or [custom templates](#custom-templates) instead, 
 if you control the ntfy server, as templates are much easier to maintain.
 
 Here's an **example for a Grafana alert**:
@@ -1078,10 +1216,6 @@ This example uses the `message`/`m` and `title`/`t` query parameters, but obviou
 `Message`/`Title` headers. It will send a notification with a title `phil-pc: A severe error has occurred` and a message
 `Error message: Disk has run out of space`.
 
-### Pre-defined templates
-
-XXXXXXXXXXXXxx
-
 ### Template syntax
 ntfy uses [Go templates](https://pkg.go.dev/text/template) for its templates, which is arguably one of the most powerful,
 yet also one of the worst templating languages out there.
@@ -1101,23 +1235,23 @@ message templating and for transforming the data provided through the JSON paylo
 
 Below are the functions that are available to use inside your message/title templates.
 
-* [String Functions](./sprig/strings.md): `trim`, `trunc`, `substr`, `plural`, etc.
-    * [String List Functions](./sprig/string_slice.md): `splitList`, `sortAlpha`, etc.
-* [Integer Math Functions](./sprig/math.md): `add`, `max`, `mul`, etc.
-    * [Integer List Functions](./sprig/integer_slice.md): `until`, `untilStep`
-* [Date Functions](./sprig/date.md): `now`, `date`, etc.
-* [Defaults Functions](./sprig/defaults.md): `default`, `empty`, `coalesce`, `fromJSON`, `toJSON`, `toPrettyJSON`, `toRawJSON`, `ternary`
-* [Encoding Functions](./sprig/encoding.md): `b64enc`, `b64dec`, etc.
-* [Lists and List Functions](./sprig/lists.md): `list`, `first`, `uniq`, etc.
-* [Dictionaries and Dict Functions](./sprig/dicts.md): `get`, `set`, `dict`, `hasKey`, `pluck`, `dig`, etc.
-* [Type Conversion Functions](./sprig/conversion.md): `atoi`, `int64`, `toString`, etc.
-* [Path and Filepath Functions](./sprig/paths.md): `base`, `dir`, `ext`, `clean`, `isAbs`, `osBase`, `osDir`, `osExt`, `osClean`, `osIsAbs`
-* [Flow Control Functions]( ./sprig/flow_control.md): `fail`
+* [String Functions](publish/template-functions.md#string-functions): `trim`, `trunc`, `substr`, `plural`, etc.
+* [String List Functions](publish/template-functions.md#string-list-functions): `splitList`, `sortAlpha`, etc.
+* [Integer Math Functions](publish/template-functions.md#integer-math-functions): `add`, `max`, `mul`, etc.
+* [Integer List Functions](publish/template-functions.md#integer-list-functions): `until`, `untilStep`
+* [Date Functions](publish/template-functions.md#date-functions): `now`, `date`, etc.
+* [Defaults Functions](publish/template-functions.md#default-functions): `default`, `empty`, `coalesce`, `fromJSON`, `toJSON`, `toPrettyJSON`, `toRawJSON`, `ternary`
+* [Encoding Functions](publish/template-functions.md#encoding-functions): `b64enc`, `b64dec`, etc.
+* [Lists and List Functions](publish/template-functions.md#lists-and-list-functions): `list`, `first`, `uniq`, etc.
+* [Dictionaries and Dict Functions](publish/template-functions.md#dictionaries-and-dict-functions): `get`, `set`, `dict`, `hasKey`, `pluck`, `dig`, etc.
+* [Type Conversion Functions](publish/template-functions.md#type-conversion-functions): `atoi`, `int64`, `toString`, etc.
+* [Path and Filepath Functions](publish/template-functions.md#path-and-filepath-functions): `base`, `dir`, `ext`, `clean`, `isAbs`, `osBase`, `osDir`, `osExt`, `osClean`, `osIsAbs`
+* [Flow Control Functions](publish/template-functions.md#flow-control-functions): `fail`
 * Advanced Functions
-    * [UUID Functions](./sprig/uuid.md): `uuidv4`
-    * [Reflection](./sprig/reflection.md): `typeOf`, `kindIs`, `typeIsLike`, etc.
-    * [Cryptographic and Security Functions](./sprig/crypto.md): `sha256sum`, etc.
-    * [URL](./sprig/url.md): `urlParse`, `urlJoin`
+    * [UUID Functions](publish/template-functions.md#uuid-functions): `uuidv4`
+    * [Reflection](publish/template-functions.md#reflection-functions): `typeOf`, `kindIs`, `typeIsLike`, etc.
+    * [Cryptographic and Security Functions](publish/template-functions.md#cryptographic-and-security-functions): `sha256sum`, etc.
+    * [URL](publish/template-functions.md#url-functions): `urlParse`, `urlJoin`
 
 
 ## Publish as JSON

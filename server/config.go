@@ -11,6 +11,8 @@ import (
 // Defines default config settings (excluding limits, see below)
 const (
 	DefaultListenHTTP                           = ":80"
+	DefaultConfigFile                           = "/etc/ntfy/server.yml"
+	DefaultTemplateDir                          = "/etc/ntfy/templates"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
 	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
@@ -173,7 +175,7 @@ type Config struct {
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
-		File:                                 "", // Only used for testing
+		File:                                 DefaultConfigFile, // Only used for testing
 		BaseURL:                              "",
 		ListenHTTP:                           DefaultListenHTTP,
 		ListenHTTPS:                          "",
@@ -196,6 +198,7 @@ func NewConfig() *Config {
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
+		TemplateDir:                          DefaultTemplateDir,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
 		DisallowedTopics:                     DefaultDisallowedTopics,
@@ -258,6 +261,5 @@ func NewConfig() *Config {
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
-		TemplateDir:                          "",
 	}
 }

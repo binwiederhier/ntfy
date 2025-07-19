@@ -1,0 +1,29 @@
+title: |
+  {{- if eq .status "firing" }}
+  🚨 Alert: {{ (first .alerts).labels.alertname }}
+  {{- else if eq .status "resolved" }}
+  ✅ Resolved: {{ (first .alerts).labels.alertname }}
+  {{- else }}
+  {{ fail "Unsupported Alertmanager status." }}
+  {{- end }}
+message: |
+  Status: {{ .status | title }}
+  Receiver: {{ .receiver }}
+  
+  {{- range .alerts }}
+  Alert: {{ .labels.alertname }}
+  Instance: {{ .labels.instance }}
+  Severity: {{ .labels.severity }}
+  Starts at: {{ .startsAt }}
+  {{- if .endsAt }}Ends at: {{ .endsAt }}{{ end }}
+  {{- if .annotations.summary }}
+  Summary: {{ .annotations.summary }}
+  {{- end }}
+  {{- if .annotations.description }}
+  Description: {{ .annotations.description }}
+  {{- end }}
+  Source: {{ .generatorURL }}
+  
+  {{ end }}
+
+

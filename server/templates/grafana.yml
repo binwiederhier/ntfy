@@ -1,9 +1,11 @@
-message: |
-    {{if .alerts}}
-        {{.alerts | len}} alert(s) triggered
-    {{else}}
-        No alerts triggered.
-    {{end}}
 title: |
-  ⚠️ Grafana alert: {{.title}}
+  {{- if eq .status "firing" }}
+  🚨 {{ .title | default "Alert firing" }}
+  {{- else if eq .status "resolved" }}
+  ✅ {{ .title | default "Alert resolved" }}
+  {{- else }}
+  ⚠️ Unknown alert: {{ .title | default "Alert" }}
+  {{- end }}
+message: |
+  {{ .message | trunc 2000 }}
 

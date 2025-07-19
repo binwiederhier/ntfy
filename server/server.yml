@@ -126,6 +126,26 @@
 # attachment-file-size-limit: "15M"
 # attachment-expiry-duration: "3h"
 
+# Template directory for message templates.
+#
+# When "X-Template: <name>" (aliases: "Template: <name>", "Tpl: <name>") or "?template=<name>" is set, transform the message
+# based on one of the built-in pre-defined templates, or on a template defined in the "template-dir" directory.
+#
+# Template files must have the ".yml" extension and must be formatted as YAML. They may contain "title" and "message" keys,
+# which are interpreted as Go templates.
+#
+# Example template file (e.g. /etc/ntfy/templates/grafana.yml):
+#   title: |
+#     {{- if eq .status "firing" }}
+#     {{ .title | default "Alert firing" }}
+#     {{- else if eq .status "resolved" }}
+#     {{ .title | default "Alert resolved" }}
+#     {{- end }}
+#   message: |
+#     {{ .message | trunc 2000 }}
+#
+# template-dir: "/etc/ntfy/templates"
+
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
 # messages will additionally be sent out as e-mail using an external SMTP server.
 #

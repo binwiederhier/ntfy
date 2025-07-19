@@ -1,0 +1,51 @@
+{
+  "receiver": "ntfy\\.example\\.com/alerts",
+  "status": "resolved",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": {
+        "alertname": "Load avg 15m too high",
+        "grafana_folder": "Node alerts",
+        "instance": "10.108.0.2:9100",
+        "job": "node-exporter"
+      },
+      "annotations": {
+        "summary": "15m load average too high"
+      },
+      "startsAt": "2024-03-15T02:28:00Z",
+      "endsAt": "2024-03-15T02:42:00Z",
+      "generatorURL": "localhost:3000/alerting/grafana/NW9oDw-4z/view",
+      "fingerprint": "becbfb94bd81ef48",
+      "silenceURL": "localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter",
+      "dashboardURL": "",
+      "panelURL": "",
+      "values": {
+        "B": 18.98211314475876,
+        "C": 0
+      },
+      "valueString": "[ var='B' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=18.98211314475876 ], [ var='C' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=0 ]"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "Load avg 15m too high",
+    "grafana_folder": "Node alerts"
+  },
+  "commonLabels": {
+    "alertname": "Load avg 15m too high",
+    "grafana_folder": "Node alerts",
+    "instance": "10.108.0.2:9100",
+    "job": "node-exporter"
+  },
+  "commonAnnotations": {
+    "summary": "15m load average too high"
+  },
+  "externalURL": "localhost:3000/",
+  "version": "1",
+  "groupKey": "{}:{alertname=\"Load avg 15m too high\", grafana_folder=\"Node alerts\"}",
+  "truncatedAlerts": 0,
+  "orgId": 1,
+  "title": "[RESOLVED] Load avg 15m too high Node alerts (10.108.0.2:9100 node-exporter)",
+  "state": "ok",
+  "message": "**Resolved**\n\nValue: B=18.98211314475876, C=0\nLabels:\n - alertname = Load avg 15m too high\n - grafana_folder = Node alerts\n - instance = 10.108.0.2:9100\n - job = node-exporter\n"
+}

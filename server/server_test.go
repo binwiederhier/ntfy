@@ -3143,6 +3143,42 @@ message: |
 	require.Equal(t, "Custom message 1391", m.Message)
 }
 
+func TestServer_MessageTemplate_Repeat9999_TooLarge(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "POST", "/mytopic", `{}`, map[string]string{
+		"X-Message":  `{{ repeat 9999 "mystring" }}`,
+		"X-Template": "1",
+	})
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40041, toHTTPError(t, response.Body.String()).Code)
+	require.Contains(t, toHTTPError(t, response.Body.String()).Message, "message or title is too large after replacing template")
+}
+
+func TestServer_MessageTemplate_Repeat10001_TooLarge(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "POST", "/mytopic", `{}`, map[string]string{
+		"X-Message":  `{{ repeat 10001 "mystring" }}`,
+		"X-Template": "1",
+	})
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40045, toHTTPError(t, response.Body.String()).Code)
+	require.Contains(t, toHTTPError(t, response.Body.String()).Message, "repeat count 10001 exceeds limit of 10000")
+}
+
+func TestServer_MessageTemplate_Until100_000(t *testing.T) {
+	t.Parallel()
+	s := newTestServer(t, newTestConfig(t))
+	response := request(t, s, "POST", "/mytopic", `{}`, map[string]string{
+		"X-Message":  `{{ range $i, $e := until 100_000 }}{{end}}`,
+		"X-Template": "1",
+	})
+	require.Equal(t, 400, response.Code)
+	require.Equal(t, 40045, toHTTPError(t, response.Body.String()).Code)
+	require.Contains(t, toHTTPError(t, response.Body.String()).Message, "too many iterations")
+}
+
 func newTestConfig(t *testing.T) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"

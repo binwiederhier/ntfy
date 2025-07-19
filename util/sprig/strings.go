@@ -187,3 +187,12 @@ func substring(start, end int, s string) string {
 	}
 	return s[start:end]
 }
+
+func repeat(count int, str string) string {
+	if count > loopExecutionLimit {
+		panic(fmt.Sprintf("repeat count %d exceeds limit of %d", count, loopExecutionLimit))
+	} else if count*len(str) >= stringLengthLimit {
+		panic(fmt.Sprintf("repeat count %d with string length %d exceeds limit of %d", count, len(str), stringLengthLimit))
+	}
+	return strings.Repeat(str, count)
+}

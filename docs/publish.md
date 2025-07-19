@@ -969,15 +969,20 @@ To learn the basics of Go's templating language, please see [template syntax](#t
 ### Pre-defined templates
 
 When `X-Template: <name>` (aliases: `Template: <name>`, `Tpl: <name>`) or `?template=<name>` is set, ntfy will transform the
-message and/or title based on one of the built-in pre-defined templates
+message and/or title based on one of the built-in pre-defined templates.
 
 The following **pre-defined templates** are available:
 
-* `github`: Formats a subset of [GitHub webhook](https://docs.github.com/en/webhooks/about-webhooks) payloads (PRs, issues, new star, new watcher, new comment)
-* `grafana`: Formats [Grafana webhook](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) payloads (firing/resolved alerts)
-* `alertmanager`: Formats [Alertmanager webhook](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config) payloads (firing/resolved alerts)
+* `github`: Formats a subset of [GitHub webhook](https://docs.github.com/en/webhooks/about-webhooks) payloads (PRs, issues, new star, new watcher, new comment). See [github.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/github.yml).
+* `grafana`: Formats [Grafana webhook](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) payloads (firing/resolved alerts). See [grafana.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/grafana.yml).
+* `alertmanager`: Formats [Alertmanager webhook](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config) payloads (firing/resolved alerts). See [alertmanager.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/alertmanager.yml).
 
-Here's an example of how to use the pre-defined `github` template: First, configure the webhook in GitHub to send a webhook to your ntfy topic, e.g. `https://ntfy.sh/mytopic?template=github`.
+To override the pre-defined templates, you can place a file with the same name in the template directory (defaults to `/etc/ntfy/templates`,
+can be overridden with `template-dir`). See [custom templates](#custom-templates) for more details.
+
+Here's an example of how to use the **pre-defined `github` template**: 
+
+First, configure the webhook in GitHub to send a webhook to your ntfy topic, e.g. `https://ntfy.sh/mytopic?template=github`.
 <figure markdown>
   ![GitHub webhook config](static/img/screenshot-github-webhook-config.png){ width=600 }
   <figcaption>GitHub webhook configuration</figcaption>

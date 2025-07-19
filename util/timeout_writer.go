@@ -7,7 +7,7 @@ import (
 )
 
 // ErrWriteTimeout is returned when a write timed out
-var ErrWriteTimeout = errors.New("write operation failed due to timeout since creation")
+var ErrWriteTimeout = errors.New("write operation failed due to timeout")
 
 // TimeoutWriter wraps an io.Writer that will time out after the given timeout
 type TimeoutWriter struct {
@@ -28,7 +28,7 @@ func NewTimeoutWriter(w io.Writer, timeout time.Duration) *TimeoutWriter {
 // Write implements the io.Writer interface, failing if called after the timeout period from creation.
 func (tw *TimeoutWriter) Write(p []byte) (n int, err error) {
 	if time.Since(tw.start) > tw.timeout {
-		return 0, errors.New("write operation failed due to timeout since creation")
+		return 0, ErrWriteTimeout
 	}
 	return tw.writer.Write(p)
 }

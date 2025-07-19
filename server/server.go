@@ -145,6 +145,7 @@ const (
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
 	templateMaxExecutionTime = 100 * time.Millisecond    // Maximum time a template can take to execute, used to prevent DoS attacks
+	templateMaxOutputBytes   = 1024 * 1024               // Maximum number of bytes a template can output, used to prevent DoS attacks
 	templateFileExtension    = ".yml"                    // Template files must end with this extension
 )
 
@@ -1127,7 +1128,7 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, template templateM
 			return err
 		}
 	}
-	if len(m.Message) > s.config.MessageSizeLimit {
+	if len(m.Title) > s.config.MessageSizeLimit || len(m.Message) > s.config.MessageSizeLimit {
 		return errHTTPBadRequestTemplateMessageTooLarge
 	}
 	return nil
@@ -1188,7 +1189,8 @@ func (s *Server) replaceTemplate(tpl string, source string) (string, error) {
 		return "", errHTTPBadRequestTemplateInvalid.Wrap("%s", err.Error())
 	}
 	var buf bytes.Buffer
-	if err := t.Execute(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), data); err != nil {
+	limitWriter := util.NewLimitWriter(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), util.NewFixedLimiter(templateMaxOutputBytes))
+	if err := t.Execute(limitWriter, data); err != nil {
 		return "", errHTTPBadRequestTemplateExecuteFailed.Wrap("%s", err.Error())
 	}
 	return strings.TrimSpace(buf.String()), nil

@@ -132,7 +132,7 @@ func toRawJSON(v any) string {
 	if err != nil {
 		panic(err)
 	}
-	return string(output)
+	return output
 }
 
 // mustToRawJSON encodes an item into a JSON string with no escaping of HTML characters.

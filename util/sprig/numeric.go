@@ -127,7 +127,15 @@ func until(count int) []int {
 }
 
 func untilStep(start, stop, step int) []int {
-	v := []int{}
+	var v []int
+	if step == 0 {
+		return v
+	}
+
+	iterations := math.Abs(float64(stop)-float64(start)) / float64(step)
+	if iterations > loopExecutionLimit {
+		panic(fmt.Sprintf("too many iterations in untilStep; max allowed is %d, got %f", loopExecutionLimit, iterations))
+	}
 
 	if stop < start {
 		if step >= 0 {

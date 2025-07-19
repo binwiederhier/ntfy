@@ -14,6 +14,11 @@ import (
 	"time"
 )
 
+const (
+	loopExecutionLimit = 10_000  // Limit the number of loop executions to prevent execution from taking too long
+	stringLengthLimit  = 100_000 // Limit the length of strings to prevent memory issues
+)
+
 // TxtFuncMap produces the function map.
 //
 // Use this to pass the functions into the template engine:
@@ -58,7 +63,7 @@ var genericMap = map[string]any{
 	},
 	"substr": substring,
 	// Switch order so that "foo" | repeat 5
-	"repeat":     func(count int, str string) string { return strings.Repeat(str, count) },
+	"repeat":     repeat,
 	"trimAll":    func(a, b string) string { return strings.Trim(b, a) },
 	"trimSuffix": func(a, b string) string { return strings.TrimSuffix(b, a) },
 	"trimPrefix": func(a, b string) string { return strings.TrimPrefix(b, a) },

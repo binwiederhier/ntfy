@@ -7,8 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/adler32"
-
-	"github.com/google/uuid"
 )
 
 func sha512sum(input string) string {
@@ -29,9 +27,4 @@ func sha1sum(input string) string {
 func adler32sum(input string) string {
 	hash := adler32.Checksum([]byte(input))
 	return fmt.Sprintf("%d", hash)
-}
-
-// uuidv4 provides a safe and secure UUID v4 implementation
-func uuidv4() string {
-	return uuid.New().String()
 }

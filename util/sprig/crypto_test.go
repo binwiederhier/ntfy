@@ -31,24 +31,3 @@ func TestAdler32Sum(t *testing.T) {
 		t.Error(err)
 	}
 }
-
-func TestUUIDGeneration(t *testing.T) {
-	tpl := `{{uuidv4}}`
-	out, err := runRaw(tpl, nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(out) != 36 {
-		t.Error("Expected UUID of length 36")
-	}
-
-	out2, err := runRaw(tpl, nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if out == out2 {
-		t.Error("Expected subsequent UUID generations to be different")
-	}
-}

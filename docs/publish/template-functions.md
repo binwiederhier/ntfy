@@ -18,7 +18,6 @@ The original set of template functions is based on the [Sprig library](https://m
 - [Type Conversion Functions](#type-conversion-functions)
 - [Path and Filepath Functions](#path-and-filepath-functions)
 - [Flow Control Functions](#flow-control-functions)
-- [UUID Functions](#uuid-functions)
 - [Reflection Functions](#reflection-functions)
 - [Cryptographic and Security Functions](#cryptographic-and-security-functions)
 - [URL Functions](#url-functions)
@@ -1356,16 +1355,6 @@ template rendering should fail.
 ```
 fail "Please accept the end user license agreement"
 ```
-
-## UUID Functions
-
-Sprig can generate UUID v4 universally unique IDs.
-
-```
-uuidv4
-```
-
-The above returns a new UUID of the v4 (randomly generated) type.
 
 ## Reflection Functions
 

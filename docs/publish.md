@@ -1248,7 +1248,6 @@ Below are the functions that are available to use inside your message/title temp
 * [Path and Filepath Functions](publish/template-functions.md#path-and-filepath-functions): `base`, `dir`, `ext`, `clean`, `isAbs`, `osBase`, `osDir`, `osExt`, `osClean`, `osIsAbs`
 * [Flow Control Functions](publish/template-functions.md#flow-control-functions): `fail`
 * Advanced Functions
-    * [UUID Functions](publish/template-functions.md#uuid-functions): `uuidv4`
     * [Reflection](publish/template-functions.md#reflection-functions): `typeOf`, `kindIs`, `typeIsLike`, etc.
     * [Cryptographic and Security Functions](publish/template-functions.md#cryptographic-and-security-functions): `sha256sum`, etc.
     * [URL](publish/template-functions.md#url-functions): `urlParse`, `urlJoin`

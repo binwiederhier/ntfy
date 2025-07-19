@@ -3083,7 +3083,7 @@ func TestServer_MessageTemplate_FromNamedTemplate_GitHubCommentCreated(t *testin
 	response := request(t, s, "POST", "/mytopic?template=github", githubCommentCreatedJSON, nil)
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "💬 [ntfy] New comment on issue #1389 instant alerts without Pull to refresh", m.Title)
+	require.Equal(t, "💬 New comment on issue #1389 instant alerts without Pull to refresh", m.Title)
 	require.Equal(t, `Commenter: https://github.com/wunter8
 Repository: https://github.com/binwiederhier/ntfy
 Comment link: https://github.com/binwiederhier/ntfy/issues/1389#issuecomment-3078214289
@@ -3102,7 +3102,7 @@ func TestServer_MessageTemplate_FromNamedTemplate_GitHubIssueOpened(t *testing.T
 	response := request(t, s, "POST", "/mytopic?template=github", githubIssueOpenedJSON, nil)
 	require.Equal(t, 200, response.Code)
 	m := toMessage(t, response.Body.String())
-	require.Equal(t, "🐛 [ntfy] Issue opened: #1391 http 500 error (ntfy error 50001)", m.Title)
+	require.Equal(t, "🐛 Issue opened: #1391 http 500 error (ntfy error 50001)", m.Title)
 	require.Equal(t, `Opened by: https://github.com/TheUser-dev
 Repository: https://github.com/binwiederhier/ntfy
 Issue link: https://github.com/binwiederhier/ntfy/issues/1391

@@ -58,10 +58,7 @@ var genericMap = map[string]any{
 	},
 	"substr": substring,
 	// Switch order so that "foo" | repeat 5
-	"repeat": func(count int, str string) string { return strings.Repeat(str, count) },
-	// Deprecated: Use trimAll.
-	"trimall": func(a, b string) string { return strings.Trim(b, a) },
-	// Switch order so that "$foo" | trimall "$"
+	"repeat":     func(count int, str string) string { return strings.Repeat(str, count) },
 	"trimAll":    func(a, b string) string { return strings.Trim(b, a) },
 	"trimSuffix": func(a, b string) string { return strings.TrimSuffix(b, a) },
 	"trimPrefix": func(a, b string) string { return strings.TrimPrefix(b, a) },
@@ -219,9 +216,6 @@ var genericMap = map[string]any{
 	"dig":         dig,
 	"chunk":       chunk,
 	"mustChunk":   mustChunk,
-
-	// UUIDs:
-	"uuidv4": uuidv4,
 
 	// Flow Control:
 	"fail": func(msg string) (string, error) { return "", errors.New(msg) },

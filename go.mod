@@ -35,6 +35,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/prometheus/client_golang v1.22.0
 	github.com/stripe/stripe-go/v74 v74.30.0
+	golang.org/x/text v0.26.0
 )
 
 require (
@@ -93,7 +94,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect

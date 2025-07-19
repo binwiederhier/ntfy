@@ -1,0 +1,33 @@
+{
+  "version": "4",
+  "groupKey": "...",
+  "status": "firing",
+  "receiver": "webhook-receiver",
+  "groupLabels": {
+    "alertname": "HighCPUUsage"
+  },
+  "commonLabels": {
+    "alertname": "HighCPUUsage",
+    "instance": "server01",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "summary": "High CPU usage detected"
+  },
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighCPUUsage",
+        "instance": "server01",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "High CPU usage detected"
+      },
+      "startsAt": "2025-07-17T07:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus.local/graph?g0.expr=..."
+    }
+  ]
+}

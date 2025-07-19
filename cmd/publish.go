@@ -32,6 +32,7 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "actions", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ACTIONS"}, Usage: "actions JSON array or simple definition"},
 	&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
 	&cli.BoolFlag{Name: "markdown", Aliases: []string{"md"}, EnvVars: []string{"NTFY_MARKDOWN"}, Usage: "Message is formatted as Markdown"},
+	&cli.StringFlag{Name: "template", Aliases: []string{"tpl"}, EnvVars: []string{"NTFY_TEMPLATE"}, Usage: "use templates to transform JSON message body"},
 	&cli.StringFlag{Name: "filename", Aliases: []string{"name", "n"}, EnvVars: []string{"NTFY_FILENAME"}, Usage: "filename for the attachment"},
 	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
@@ -98,6 +99,7 @@ func execPublish(c *cli.Context) error {
 	actions := c.String("actions")
 	attach := c.String("attach")
 	markdown := c.Bool("markdown")
+	template := c.String("template")
 	filename := c.String("filename")
 	file := c.String("file")
 	email := c.String("email")
@@ -145,6 +147,9 @@ func execPublish(c *cli.Context) error {
 	}
 	if markdown {
 		options = append(options, client.WithMarkdown())
+	}
+	if template != "" {
+		options = append(options, client.WithTemplate(template))
 	}
 	if filename != "" {
 		options = append(options, client.WithFilename(filename))

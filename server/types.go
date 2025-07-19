@@ -7,7 +7,6 @@ import (
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
-
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -244,6 +243,24 @@ func (q *queryFilter) Pass(msg *message) bool {
 		return false
 	}
 	return true
+}
+
+type templateMode string
+
+func (t templateMode) Enabled() bool {
+	return t != ""
+}
+
+func (t templateMode) Name() string {
+	if isBoolValue(string(t)) {
+		return ""
+	}
+	return string(t)
+}
+
+type templateFile struct {
+	Title   *string `yaml:"title"`
+	Message *string `yaml:"message"`
 }
 
 type apiHealthResponse struct {

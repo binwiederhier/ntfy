@@ -29,13 +29,9 @@ func init() {
 	commands = append(commands, cmdServe)
 }
 
-const (
-	defaultServerConfigFile = "/etc/ntfy/server.yml"
-)
-
 var flagsServe = append(
 	append([]cli.Flag{}, flagsDefault...),
-	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: defaultServerConfigFile, Usage: "config file"},
+	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
@@ -56,6 +52,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentFileSizeLimit), Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultAttachmentExpiryDuration), Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "template-dir", Aliases: []string{"template_dir"}, EnvVars: []string{"NTFY_TEMPLATE_DIR"}, Value: server.DefaultTemplateDir, Usage: "directory to load named message templates from"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: util.FormatDuration(server.DefaultKeepaliveInterval), Usage: "interval of keepalive messages"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: util.FormatDuration(server.DefaultManagerInterval), Usage: "interval of for message pruning and stats printing"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "disallowed-topics", Aliases: []string{"disallowed_topics"}, EnvVars: []string{"NTFY_DISALLOWED_TOPICS"}, Usage: "topics that are not allowed to be used"}),
@@ -161,6 +158,7 @@ func execServe(c *cli.Context) error {
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
 	attachmentExpiryDurationStr := c.String("attachment-expiry-duration")
+	templateDir := c.String("template-dir")
 	keepaliveIntervalStr := c.String("keepalive-interval")
 	managerIntervalStr := c.String("manager-interval")
 	disallowedTopics := c.StringSlice("disallowed-topics")
@@ -410,6 +408,7 @@ func execServe(c *cli.Context) error {
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
 	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit
 	conf.AttachmentExpiryDuration = attachmentExpiryDuration
+	conf.TemplateDir = templateDir
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval
 	conf.DisallowedTopics = disallowedTopics

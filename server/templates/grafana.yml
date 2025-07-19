@@ -1,0 +1,11 @@
+title: |
+  {{- if eq .status "firing" }}
+  🚨 {{ .title | default "Alert firing" }}
+  {{- else if eq .status "resolved" }}
+  ✅ {{ .title | default "Alert resolved" }}
+  {{- else }}
+  ⚠️ Unknown alert: {{ .title | default "Alert" }}
+  {{- end }}
+message: |
+  {{ .message | trunc 2000 }}
+

@@ -1,7 +1,13 @@
 # Publishing
 Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](install.md). Topics are created on the fly by 
-subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
-something that's not easily guessable.
+subscribing or publishing to them. 
+
+> [!IMPORTANT]  
+> Because there is no sign-up, **the topic is essentially a password**, so pick 
+something unique that's not easily guessable.
+ 
+> [!NOTE]  
+> Note a topics length is limited technically to 64 characters.
 
 Here's an example showing how to publish a simple message using a POST request:
 

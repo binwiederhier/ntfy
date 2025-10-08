@@ -7,7 +7,7 @@ subscribing or publishing to them.
 something unique that's not easily guessable.
  
 !!! info
-    Note a topics length is limited technically to 64 characters.
+    Note a topic's length is limited technically to 64 characters.
 
 Here's an example showing how to publish a simple message using a POST request:
 

@@ -636,6 +636,16 @@ func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *vi
 			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
 			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
 		},
+		ShareTarget: &webManifestShareTarget{
+			Action: "/share-target",
+			Method: "POST",
+			Enctype: "multipart/form-data",
+			Params: &webManifestShareParams{
+				Title: "title",
+				Text:  "text",
+				Url:   "url",
+			},
+		},
 	}
 	return s.writeJSONWithContentType(w, response, "application/manifest+json")
 }

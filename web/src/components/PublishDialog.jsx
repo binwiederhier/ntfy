@@ -109,6 +109,18 @@ const PublishDialog = (props) => {
     setMessage(props.message);
   }, [props.message]);
 
+  useEffect(() => {
+    if (typeof props.title !== "undefined") {
+      setTitle(props.title || "");
+    }
+  }, [props.title]);
+
+  useEffect(() => {
+    if (typeof props.clickUrl !== "undefined") {
+      setClickUrl(props.clickUrl || "");
+    }
+  }, [props.clickUrl]);
+
   const updateBaseUrl = (newVal) => {
     if (validUrl(newVal)) {
       setBaseUrl(newVal.replace(/\/$/, "")); // strip traililng slash after https?://

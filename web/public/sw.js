@@ -221,6 +221,40 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(handleClick(event));
 });
 
+// Handle incoming Share Target POSTs from installed PWA share action.
+// The share_target in the manifest posts to `/share-target` as a `multipart/form-data` POST.
+// We parse the form and redirect to the app with query params so the client can pick them up.
+self.addEventListener("fetch", (event) => {
+  try {
+    const reqUrl = new URL(event.request.url);
+    if (reqUrl.pathname === "/share-target" && event.request.method === "POST") {
+      event.respondWith(
+        (async () => {
+          try {
+            const formData = await event.request.formData();
+            const title = formData.get("title") || "";
+            const text = formData.get("text") || "";
+            const sharedUrl = formData.get("url") || "";
+            const params = new URLSearchParams();
+            if (title) params.set("share_title", title);
+            if (text) params.set("share_text", text);
+            if (sharedUrl) params.set("share_url", sharedUrl);
+            // todo support files?
+            // redirect to app.html which is the SPA entry used by the service worker
+            const redirectUrl = `/app.html?${params.toString()}`;
+            return Response.redirect(redirectUrl, 303);
+          } catch (e) {
+            return new Response("", { status: 500 });
+          }
+        })()
+      );
+    }
+    // other fetches are not handled here
+  } catch (e) {
+    // ignore malformed urls
+  }
+});
+
 // See https://vite-pwa-org.netlify.app/guide/inject-manifest.html#service-worker-code
 // self.__WB_MANIFEST is the workbox injection point that injects the manifest of the
 // vite dist files and their revision ids, for example:

@@ -1,7 +1,7 @@
 MAKEFLAGS := --jobs=1
 PYTHON := python3
 PIP := pip3
-VERSION := $(shell git describe --tag)
+VERSION := 1111
 COMMIT := $(shell git rev-parse --short HEAD)
 
 .PHONY:

@@ -53,7 +53,9 @@ const Messaging = (props) => {
         openMode={dialogOpenMode}
         baseUrl={subscription?.baseUrl ?? config.base_url}
         topic={subscription?.topic ?? ""}
-        message={message}
+        message={props.sharePayload?.message ?? message}
+        title={props.sharePayload?.title}
+        clickUrl={props.sharePayload?.url}
         attachFile={attachFile}
         getPastedImage={getPastedImage}
         onClose={handleDialogClose}

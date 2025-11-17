@@ -104,6 +104,7 @@ const Layout = () => {
   const { account, setAccount } = useContext(AccountContext);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
+  const [sharePayload, setSharePayload] = useState(null);
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
   const webPushTopics = useWebPushTopics();
@@ -119,6 +120,29 @@ const Layout = () => {
   useAccountListener(setAccount);
   useBackgroundProcesses();
   useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
+
+  // Check URL for share-target params inserted by the service worker redirect
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const title = params.get("share_title");
+      const text = params.get("share_text");
+      const url = params.get(" share_url");
+      if (title || text || url) {
+        const payload = {
+          title: title || undefined,
+          message: text || undefined,
+          url: url || undefined,
+        };
+        setSharePayload(payload);
+        setSendDialogOpenMode(PublishDialog.OPEN_MODE_DEFAULT);
+        // remove params to avoid repeated triggers
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -139,7 +163,12 @@ const Layout = () => {
           }}
         />
       </Main>
-      <Messaging selected={selected} dialogOpenMode={sendDialogOpenMode} onDialogOpenModeChange={setSendDialogOpenMode} />
+      <Messaging
+        selected={selected}
+        dialogOpenMode={sendDialogOpenMode}
+        onDialogOpenModeChange={setSendDialogOpenMode}
+        sharePayload={sharePayload}
+      />
     </Box>
   );
 };

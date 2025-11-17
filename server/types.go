@@ -587,10 +587,25 @@ type webManifestResponse struct {
 	BackgroundColor string             `json:"background_color"`
 	ThemeColor      string             `json:"theme_color"`
 	Icons           []*webManifestIcon `json:"icons"`
+	// Optional PWA share_target support
+	ShareTarget     *webManifestShareTarget `json:"share_target,omitempty"`
 }
 
 type webManifestIcon struct {
 	SRC   string `json:"src"`
 	Sizes string `json:"sizes"`
 	Type  string `json:"type"`
+}
+
+type webManifestShareTarget struct {
+	Action string                 `json:"action"`
+	Method string                 `json:"method"`
+	Enctype string                `json:"enctype"`
+	Params *webManifestShareParams `json:"params"`
+}
+
+type webManifestShareParams struct {
+	Title string `json:"title,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Url   string `json:"url,omitempty"`
 }

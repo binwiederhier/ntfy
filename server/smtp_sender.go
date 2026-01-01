@@ -87,7 +87,7 @@ func (a *plainOrLoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	case bytes.Equal(fromServer, []byte("Password:")):
 		return []byte(a.password), nil
 	default:
-		return nil, fmt.Errorf("%w: %s", errUnexpectedServerChallenge, fromServer)
+		return nil, fmt.Errorf("%w: %s", errUnexpectedServerChallenge, string(fromServer))
 	}
 }
 

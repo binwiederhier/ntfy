@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bytes"
 	_ "embed" // required by go:embed
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"net"
 	"net/smtp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +18,77 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
+var (
+	errUnencryptedConnection     = errors.New("unencrypted connection")
+	errWrongHostname             = errors.New("wrong host name")
+	errNoSupportedAuth           = errors.New("no supported auth mechanisms found")
+	errUnexpectedServerChallenge = errors.New("unexpected server challenge")
+)
+
 type mailer interface {
 	Send(v *visitor, m *message, to string) error
 	Counts() (total int64, success int64, failure int64)
+}
+
+type plainOrLoginAuth struct {
+	identity   string
+	username   string
+	password   string
+	host       string
+	authMethod string
+}
+
+func PlainOrLoginAuth(identity, username, password, host string) smtp.Auth {
+	return &plainOrLoginAuth{identity: identity, username: username, password: password, host: host}
+}
+
+func isLocalhost(name string) bool {
+	return name == "localhost" || name == "127.0.0.1" || name == "::1"
+}
+
+func (a *plainOrLoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	// Must have TLS, or else localhost server.
+	// Note: If TLS is not true, then we can't trust ANYTHING in ServerInfo.
+	// In particular, it doesn't matter if the server advertises PLAIN auth.
+	// That might just be the attacker saying
+	// "it's ok, you can trust me with your password."
+	if !server.TLS && !isLocalhost(server.Name) {
+		return "", nil, errUnencryptedConnection
+	}
+	if server.Name != a.host {
+		return "", nil, errWrongHostname
+	}
+
+	if slices.Contains(server.Auth, "PLAIN") {
+		a.authMethod = "PLAIN"
+		resp := []byte(a.identity + "\x00" + a.username + "\x00" + a.password)
+		return a.authMethod, resp, nil
+	} else if slices.Contains(server.Auth, "LOGIN") {
+		a.authMethod = "LOGIN"
+		return a.authMethod, nil, nil
+	} else {
+		return "", nil, errNoSupportedAuth
+	}
+}
+
+func (a *plainOrLoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+
+	if a.authMethod == "PLAIN" {
+		// We've already sent everything.
+		return nil, errUnexpectedServerChallenge
+	}
+
+	switch {
+	case bytes.Equal(fromServer, []byte("Username:")):
+		return []byte(a.username), nil
+	case bytes.Equal(fromServer, []byte("Password:")):
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("%w: %s", errUnexpectedServerChallenge, fromServer)
+	}
 }
 
 type smtpSender struct {
@@ -39,7 +110,7 @@ func (s *smtpSender) Send(v *visitor, m *message, to string) error {
 		}
 		var auth smtp.Auth
 		if s.config.SMTPSenderUser != "" {
-			auth = smtp.PlainAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
+			auth = PlainOrLoginAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
 		}
 		ev := logvm(v, m).
 			Tag(tagEmail).

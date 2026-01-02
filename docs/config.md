@@ -619,7 +619,7 @@ users can [send emails to a topic e-mail address](publish.md#e-mail-publishing) 
 `myprefix-mytopic@ntfy.sh`) to publish messages to a topic. This is useful for e-mail based integrations such as for 
 statuspage.io (though these days most services also support webhooks and HTTP calls).
 
-To configure the SMTP server, you must at least set `smtp-server-listen` and `smtp-server-domain` (TLS can be optionally be enabled providing the required certificate files):
+To configure the SMTP server, you must at least set `smtp-server-listen` and `smtp-server-domain` (TLS can optionally be enabled by providing the required certificate files):
 
 * `smtp-server-listen` defines the IP address and port the SMTP server will listen on, e.g. `:25` or `1.2.3.4:25`
 * `smtp-server-domain` is the e-mail domain, e.g. `ntfy.sh` (must be identical to MX record, see below)

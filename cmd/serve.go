@@ -73,6 +73,9 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", Aliases: []string{"smtp_server_listen"}, EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "SMTP server address (ip:port) for incoming emails, e.g. :25"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", Aliases: []string{"smtp_server_domain"}, EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "SMTP domain for incoming e-mail, e.g. ntfy.sh"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", Aliases: []string{"smtp_server_addr_prefix"}, EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-cert-file", Aliases: []string{"smtp_server_cert_file"}, EnvVars: []string{"NTFY_SMTP_SERVER_CERT_FILE"}, Usage: "SMTP certificate file to enable TLS"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-key-file", Aliases: []string{"smtp_server_key_file"}, EnvVars: []string{"NTFY_SMTP_SERVER_KEY_FILE"}, Usage: "SMTP key file to enable TLS"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "smtp-server-implicit-tls", Aliases: []string{"smtp_server_implicit_tls"}, EnvVars: []string{"NTFY_SMTP_SERVER_IMPLICIT_TLS"}, Value: false, Usage: "if true, the SMTP server will force TLS connections for all clients (Implicit TLS), otherwise STARTTLS will be used"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-account", Aliases: []string{"twilio_account"}, EnvVars: []string{"NTFY_TWILIO_ACCOUNT"}, Usage: "Twilio account SID, used for phone calls, e.g. AC123..."}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-phone-number", Aliases: []string{"twilio_phone_number"}, EnvVars: []string{"NTFY_TWILIO_PHONE_NUMBER"}, Usage: "Twilio number to use for outgoing calls"}),
@@ -183,6 +186,9 @@ func execServe(c *cli.Context) error {
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
+	smtpServerCertFile := c.String("smtp-server-cert-file")
+	smtpServerKeyFile := c.String("smtp-server-key-file")
+	smtpServerImplicitTLS := c.Bool("smtp-server-implicit-tls")
 	twilioAccount := c.String("twilio-account")
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioPhoneNumber := c.String("twilio-phone-number")
@@ -301,6 +307,10 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-sender-addr is set, base-url, and smtp-sender-from must also be set")
 	} else if smtpServerListen != "" && smtpServerDomain == "" {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
+	} else if (smtpServerCertFile != "" && smtpServerKeyFile == "") || (smtpServerCertFile == "" && smtpServerKeyFile != "") {
+		return errors.New("if one of smtp-server-cert-file or smtp-server-key-file is set, the other must also be set")
+	} else if smtpServerImplicitTLS && (smtpServerCertFile == "" || smtpServerKeyFile == "") {
+		return errors.New("if smtp-server-implicit-tls is true, smtp-server-cert-file and smtp-server-key-file must be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
 	} else if baseURL != "" {
@@ -452,6 +462,9 @@ func execServe(c *cli.Context) error {
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
+	conf.SMTPServerCertFile = smtpServerCertFile
+	conf.SMTPServerKeyFile = smtpServerKeyFile
+	conf.SMTPServerImplicitTLS = smtpServerImplicitTLS
 	conf.TwilioAccount = twilioAccount
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioPhoneNumber = twilioPhoneNumber

@@ -600,7 +600,7 @@ const NoNotifications = (props) => {
       <Paragraph>
         {t("notifications_example")}:<br />
         <tt>
-          {'$ curl -d "Hi" '}
+          {'$ curl -d "Hi" https://'}
           {topicShortUrlResolved}
         </tt>
       </Paragraph>

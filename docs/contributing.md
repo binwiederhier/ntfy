@@ -7,9 +7,9 @@ translator, or just an enthusiastic user.
 
 If you'd like to contribute code to ntfy:
 
-1. Check out the [development guide](develop.md) to set up your environment
+1. Check out the [development guide](/docs/develop.md) to set up your environment
 2. Look at [open issues](https://github.com/binwiederhier/ntfy/issues) for ideas, or propose your own
-3. For larger features or architectural changes, please reach out on [Discord/Matrix](contact.md) first to discuss 
+3. For larger features or architectural changes, please reach out on [Discord/Matrix](/docs/contact.md) first to discuss 
    before investing significant time
 4. Submit a pull request on GitHub
 

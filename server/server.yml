@@ -1,5 +1,24 @@
 # ntfy server config file
 #
+# IMPORTANT: This is an example config. Copy it to server.yml and configure:
+#   cp server.yml.example server.yml
+#
+# Minimal required configuration for royal-trust.ru:
+#   base-url: https://ntfy.royal-trust.ru
+#   cache-file: /var/cache/ntfy/cache.db
+#   cache-duration: "12h"
+#   cache-startup-queries: |
+#     pragma journal_mode = WAL;
+#     pragma synchronous = normal;
+#     pragma temp_store = memory;
+#   auth-file: /var/lib/ntfy/auth.db
+#   auth-default-access: deny-all
+#   enable-login: true
+#   auth-users:
+#     - "username:$2a$10$...:admin"  # Generate: echo 'password' | docker exec -i ntfy ntfy user hash
+#   attachment-cache-dir: /var/cache/ntfy/attachments
+#   behind-proxy: true
+#
 # Please refer to the documentation at https://ntfy.sh/docs/config/ for details.
 # All options also support underscores (_) instead of dashes (-) to comply with the YAML spec.
 
@@ -160,7 +179,7 @@
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
 # messages will additionally be sent out as e-mail using an external SMTP server.
 #
-# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTLS are supported.
+# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTTLS are supported.
 # Please also refer to the rate limiting settings below (visitor-email-limit-burst & visitor-email-limit-burst).
 #
 # - smtp-sender-addr is the hostname:port of the SMTP server
@@ -198,8 +217,8 @@
 # - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
 # - web-push-file is a database file to keep track of browser subscription endpoints, e.g. /var/cache/ntfy/webpush.db
 # - web-push-email-address is the admin email address send to the push provider, e.g. sysadmin@example.com
-# - web-push-startup-queries is an optional list of queries to run on startup`
-# - web-push-expiry-warning-duration defines the duration after which unused subscriptions are sent a warning (default is 55d`)
+# - web-push-startup-queries is an optional list of queries to run on startup
+# - web-push-expiry-warning-duration defines the duration after which unused subscriptions are sent a warning (default is 55d)
 # - web-push-expiry-duration defines the duration after which unused subscriptions will expire (default is 60d)
 #
 # web-push-public-key:
@@ -280,7 +299,7 @@
 #
 # - upstream-base-url is the base URL of the upstream server. Should be "https://ntfy.sh".
 # - upstream-access-token is the token used to authenticate with the upstream server. This is only required
-#   if you exceed the upstream rate limits, or the uptream server requires authentication.
+#   if you exceed the upstream rate limits, or the upstream server requires authentication.
 #
 # upstream-base-url:
 # upstream-access-token:

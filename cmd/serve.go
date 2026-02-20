@@ -54,6 +54,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentFileSizeLimit), Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultAttachmentExpiryDuration), Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "debounce-interval", Aliases: []string{"debounce_interval"}, EnvVars: []string{"NTFY_DEBOUNCE_INTERVAL"}, Value: util.FormatDuration(server.DefaultDebounceInterval), Usage: "duration in which a second identical message-publish after the first will be prevented (e.g. 3h, 20h)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "template-dir", Aliases: []string{"template_dir"}, EnvVars: []string{"NTFY_TEMPLATE_DIR"}, Value: server.DefaultTemplateDir, Usage: "directory to load named message templates from"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: util.FormatDuration(server.DefaultKeepaliveInterval), Usage: "interval of keepalive messages"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "manager-interval", Aliases: []string{"manager_interval", "m"}, EnvVars: []string{"NTFY_MANAGER_INTERVAL"}, Value: util.FormatDuration(server.DefaultManagerInterval), Usage: "interval of for message pruning and stats printing"}),
@@ -165,6 +166,7 @@ func execServe(c *cli.Context) error {
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
 	attachmentExpiryDurationStr := c.String("attachment-expiry-duration")
+	debounceIntervalStr := c.String("debounce-interval")
 	templateDir := c.String("template-dir")
 	keepaliveIntervalStr := c.String("keepalive-interval")
 	managerIntervalStr := c.String("manager-interval")
@@ -253,6 +255,10 @@ func execServe(c *cli.Context) error {
 	webPushExpiryWarningDuration, err := util.ParseDuration(webPushExpiryWarningDurationStr)
 	if err != nil {
 		return fmt.Errorf("invalid web push expiry warning duration: %s", webPushExpiryWarningDurationStr)
+	}
+	debounceInterval, err := util.ParseDuration(debounceIntervalStr)
+	if err != nil {
+		return fmt.Errorf("invalid debounce interval duration: %s", debounceIntervalStr)
 	}
 
 	// Convert sizes to bytes
@@ -441,6 +447,7 @@ func execServe(c *cli.Context) error {
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
 	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit
 	conf.AttachmentExpiryDuration = attachmentExpiryDuration
+	conf.DebounceInterval = debounceInterval
 	conf.TemplateDir = templateDir
 	conf.KeepaliveInterval = keepaliveInterval
 	conf.ManagerInterval = managerInterval

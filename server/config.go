@@ -27,6 +27,7 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultDebounceInterval                     = time.Duration(0) // Time we avoid duplicate messages per message-content + http-method hash
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -113,6 +114,7 @@ type Config struct {
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
 	AttachmentExpiryDuration             time.Duration
+	DebounceInterval                     time.Duration
 	TemplateDir                          string // Directory to load named templates from
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
@@ -214,6 +216,7 @@ func NewConfig() *Config {
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
+		DebounceInterval:                     DefaultDebounceInterval,
 		TemplateDir:                          DefaultTemplateDir,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,

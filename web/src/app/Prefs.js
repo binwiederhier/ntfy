@@ -63,7 +63,10 @@ class Prefs {
 
   async dateTimeFormat() {
     const dateTimeFormat = await this.db.prefs.get("dateTimeFormat");
-    return dateTimeFormat?.value ?? DATE_TIME_FORMAT.LOCALE;
+    if (Object.values(DATE_TIME_FORMAT).includes(dateTimeFormat?.value)) {
+      return dateTimeFormat.value;
+    }
+    return DATE_TIME_FORMAT.LOCALE;
   }
 
   async setDateTimeFormat(mode) {

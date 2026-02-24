@@ -46,7 +46,7 @@ import { UnauthorizedError } from "../app/errors";
 import prefs from "../app/Prefs";
 
 export const SubscriptionPopup = (props) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
   const { account } = useContext(AccountContext);
   const navigate = useNavigate();
@@ -122,14 +122,14 @@ export const SubscriptionPopup = (props) => {
     const message = shuffle([
       `Hello friend, this is a test notification from ntfy web. It's ${formatShortDateTime(
         nowSeconds,
-        "en-US",
+        i18n.language,
         dateTimeFormat
       )} right now. Is that early or late?`,
       `So I heard you like ntfy? If that's true, go to GitHub and star it, or to the Play store and rate it. Thanks! Oh yeah, this is a test notification.`,
       `It's almost like you want to hear what I have to say. I'm not even a machine. I'm just a sentence that Phil typed on a random Thursday.`,
       `Alright then, it's ${formatShortDateTime(
         nowSeconds,
-        "en-US",
+        i18n.language,
         dateTimeFormat
       )} already. Boy oh boy, where did the time go? I hope you're alright, friend.`,
       `There are nine million bicycles in Beijing That's a fact; It's a thing we can't deny. I wonder if that's true ...`,

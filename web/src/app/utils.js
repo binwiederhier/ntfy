@@ -8,7 +8,7 @@ import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
 import emojisMapped from "./emojisMapped";
-import { THEME } from "./Prefs";
+import { DATE_TIME_FORMAT, THEME } from "./Prefs";
 
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
@@ -140,14 +140,30 @@ export const hashCode = (s) => {
  */
 export const getKebabCaseLangStr = (language) => language.replace(/_/g, "-");
 
-export const formatShortDateTime = (timestamp, language) =>
-  new Intl.DateTimeFormat(getKebabCaseLangStr(language), {
+const pad2 = (value) => `${value}`.padStart(2, "0");
+
+const formatIsoDate = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+const formatIsoDateTime = (date) => `${formatIsoDate(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+export const formatShortDateTime = (timestamp, language, dateTimeFormat = DATE_TIME_FORMAT.LOCALE) => {
+  const date = new Date(timestamp * 1000);
+  if (dateTimeFormat === DATE_TIME_FORMAT.ISO_8601) {
+    return formatIsoDateTime(date);
+  }
+  return new Intl.DateTimeFormat(getKebabCaseLangStr(language), {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(new Date(timestamp * 1000));
+  }).format(date);
+};
 
-export const formatShortDate = (timestamp, language) =>
-  new Intl.DateTimeFormat(getKebabCaseLangStr(language), { dateStyle: "short" }).format(new Date(timestamp * 1000));
+export const formatShortDate = (timestamp, language, dateTimeFormat = DATE_TIME_FORMAT.LOCALE) => {
+  const date = new Date(timestamp * 1000);
+  if (dateTimeFormat === DATE_TIME_FORMAT.ISO_8601) {
+    return formatIsoDate(date);
+  }
+  return new Intl.DateTimeFormat(getKebabCaseLangStr(language), { dateStyle: "short" }).format(date);
+};
 
 export const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return "0 bytes";

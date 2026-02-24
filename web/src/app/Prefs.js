@@ -6,6 +6,11 @@ export const THEME = {
   SYSTEM: "system",
 };
 
+export const DATE_TIME_FORMAT = {
+  LOCALE: "locale",
+  ISO_8601: "iso8601",
+};
+
 class Prefs {
   constructor(dbImpl) {
     this.db = dbImpl;
@@ -54,6 +59,15 @@ class Prefs {
 
   async setTheme(mode) {
     await this.db.prefs.put({ key: "theme", value: mode });
+  }
+
+  async dateTimeFormat() {
+    const dateTimeFormat = await this.db.prefs.get("dateTimeFormat");
+    return dateTimeFormat?.value ?? DATE_TIME_FORMAT.LOCALE;
+  }
+
+  async setDateTimeFormat(mode) {
+    await this.db.prefs.put({ key: "dateTimeFormat", value: mode });
   }
 }
 

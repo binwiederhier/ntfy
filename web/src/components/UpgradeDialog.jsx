@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useContext, useEffect, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import { AccountContext } from "./App";
 import routes from "./routes";
 import session from "../app/Session";
 import accountApi, { SubscriptionInterval } from "../app/AccountApi";
+import prefs from "../app/Prefs";
 
 const Feature = (props) => <FeatureItem feature>{props.children}</FeatureItem>;
 
@@ -63,6 +65,7 @@ const Banner = {
 const UpgradeDialog = (props) => {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
+  const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
   const { account } = useContext(AccountContext); // May be undefined!
   const [error, setError] = useState("");
   const [tiers, setTiers] = useState(null);
@@ -233,7 +236,7 @@ const UpgradeDialog = (props) => {
             <Trans
               i18nKey="account_upgrade_dialog_cancel_warning"
               values={{
-                date: formatShortDate(account?.billing?.paid_until || 0, i18n.language),
+                date: formatShortDate(account?.billing?.paid_until || 0, i18n.language, dateTimeFormat),
               }}
             />
           </Alert>

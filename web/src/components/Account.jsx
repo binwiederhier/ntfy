@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useContext, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   Alert,
   CardActions,
@@ -56,6 +57,7 @@ import { Paragraph } from "./styles";
 import { IncorrectPasswordError, UnauthorizedError } from "../app/errors";
 import { ProChip } from "./SubscriptionPopup";
 import session from "../app/Session";
+import prefs from "../app/Prefs";
 
 const Account = () => {
   if (!session.exists()) {
@@ -234,6 +236,7 @@ const ChangePasswordDialog = (props) => {
 const AccountType = () => {
   const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
+  const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
   const [upgradeDialogKey, setUpgradeDialogKey] = useState(0);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [showPortalError, setShowPortalError] = useState(false);
@@ -291,7 +294,7 @@ const AccountType = () => {
         {account.billing?.paid_until && !account.billing?.cancel_at && (
           <Tooltip
             title={t("account_basics_tier_paid_until", {
-              date: formatShortDate(account.billing?.paid_until, i18n.language),
+              date: formatShortDate(account.billing?.paid_until, i18n.language, dateTimeFormat),
             })}
           >
             <span>
@@ -336,7 +339,7 @@ const AccountType = () => {
       {account.billing?.cancel_at > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>
           {t("account_basics_tier_canceled_subscription", {
-            date: formatShortDate(account.billing.cancel_at, i18n.language),
+            date: formatShortDate(account.billing.cancel_at, i18n.language, dateTimeFormat),
           })}
         </Alert>
       )}
@@ -807,6 +810,7 @@ const Tokens = () => {
 
 const TokensTable = (props) => {
   const { t, i18n } = useTranslation();
+  const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
   const [snackOpen, setSnackOpen] = useState(false);
   const [upsertDialogKey, setUpsertDialogKey] = useState(0);
   const [upsertDialogOpen, setUpsertDialogOpen] = useState(false);
@@ -880,11 +884,11 @@ const TokensTable = (props) => {
               {token.token !== session.token() && (token.label || "-")}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_expires_header")}>
-              {token.expires ? formatShortDateTime(token.expires, i18n.language) : <em>{t("account_tokens_table_never_expires")}</em>}
+              {token.expires ? formatShortDateTime(token.expires, i18n.language, dateTimeFormat) : <em>{t("account_tokens_table_never_expires")}</em>}
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }} aria-label={t("account_tokens_table_last_access_header")}>
               <div style={{ display: "flex", alignItems: "center" }}>
-                <span>{formatShortDateTime(token.last_access, i18n.language)}</span>
+                <span>{formatShortDateTime(token.last_access, i18n.language, dateTimeFormat)}</span>
                 <Tooltip
                   title={t("account_tokens_table_last_origin_tooltip", {
                     ip: token.last_origin,

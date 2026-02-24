@@ -43,7 +43,7 @@ import accountApi, { Permission, Role } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
 import { AccountContext } from "./App";
 import { Paragraph } from "./styles";
-import prefs, { THEME } from "../app/Prefs";
+import prefs, { DATE_TIME_FORMAT, THEME } from "../app/Prefs";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { ReserveAddDialog, ReserveDeleteDialog, ReserveEditDialog } from "./ReserveDialogs";
 import { UnauthorizedError } from "../app/errors";
@@ -524,6 +524,7 @@ const Appearance = () => {
       </Typography>
       <PrefGroup>
         <Theme />
+        <DateTimeFormat />
         <Language />
       </PrefGroup>
     </Card>
@@ -609,6 +610,32 @@ const Language = () => {
           <MenuItem value="sv">Svenska</MenuItem>
           <MenuItem value="tr">Türkçe</MenuItem>
           <MenuItem value="ta">தமிழ்</MenuItem>
+        </Select>
+      </FormControl>
+    </Pref>
+  );
+};
+
+const DateTimeFormat = () => {
+  const { t } = useTranslation();
+  const labelId = "prefDateTimeFormat";
+  const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
+
+  const handleChange = async (ev) => {
+    await prefs.setDateTimeFormat(ev.target.value);
+  };
+
+  const description =
+    dateTimeFormat === DATE_TIME_FORMAT.ISO_8601
+      ? t("prefs_appearance_datetime_format_description_iso8601")
+      : t("prefs_appearance_datetime_format_description_locale");
+
+  return (
+    <Pref labelId={labelId} title={t("prefs_appearance_datetime_format_title")} description={description}>
+      <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
+        <Select value={dateTimeFormat ?? DATE_TIME_FORMAT.LOCALE} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem value={DATE_TIME_FORMAT.LOCALE}>{t("prefs_appearance_datetime_format_locale")}</MenuItem>
+          <MenuItem value={DATE_TIME_FORMAT.ISO_8601}>{t("prefs_appearance_datetime_format_iso8601")}</MenuItem>
         </Select>
       </FormControl>
     </Pref>

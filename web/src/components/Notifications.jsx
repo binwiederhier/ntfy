@@ -41,6 +41,7 @@ import { formatMessage, formatTitle, isImage } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
 import notifier from "../app/Notifier";
+import prefs from "../app/Prefs";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
@@ -104,6 +105,7 @@ const NotificationList = (props) => {
   const { t } = useTranslation();
   const pageSize = 20;
   const { notifications } = props;
+  const dateTimeFormat = useLiveQuery(async () => prefs.dateTimeFormat());
   const [snackOpen, setSnackOpen] = useState(false);
   const [maxCount, setMaxCount] = useState(pageSize);
   const count = Math.min(notifications.length, maxCount);
@@ -139,7 +141,12 @@ const NotificationList = (props) => {
       >
         <Stack spacing={3}>
           {notifications.slice(0, count).map((notification) => (
-            <NotificationItem key={notification.id} notification={notification} onShowSnack={() => setSnackOpen(true)} />
+            <NotificationItem
+              key={notification.id}
+              notification={notification}
+              dateTimeFormat={dateTimeFormat}
+              onShowSnack={() => setSnackOpen(true)}
+            />
           ))}
           <Snackbar
             open={snackOpen}
@@ -236,9 +243,9 @@ const NotificationBody = ({ notification }) => {
 
 const NotificationItem = (props) => {
   const { t, i18n } = useTranslation();
-  const { notification } = props;
+  const { notification, dateTimeFormat } = props;
   const { attachment } = notification;
-  const date = formatShortDateTime(notification.time, i18n.language);
+  const date = formatShortDateTime(notification.time, i18n.language, dateTimeFormat);
   const otherTags = unmatchedTags(notification.tags);
   const tags = otherTags.length > 0 ? otherTags.join(", ") : null;
   const handleDelete = async () => {
@@ -309,7 +316,7 @@ const NotificationItem = (props) => {
           <NotificationBody notification={notification} />
           {maybeActionErrors(notification)}
         </Typography>
-        {attachment && <Attachment attachment={attachment} />}
+        {attachment && <Attachment attachment={attachment} dateTimeFormat={dateTimeFormat} />}
         {tags && (
           <Typography sx={{ fontSize: 14 }} color="text.secondary">
             {t("notifications_tags")}: {tags}
@@ -355,7 +362,7 @@ const NotificationItem = (props) => {
 
 const Attachment = (props) => {
   const { t, i18n } = useTranslation();
-  const { attachment } = props;
+  const { attachment, dateTimeFormat } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
   const displayableImage = !expired && isImage(attachment);
@@ -373,7 +380,7 @@ const Attachment = (props) => {
   if (expires) {
     infos.push(
       t("notifications_attachment_link_expires", {
-        date: formatShortDateTime(attachment.expires, i18n.language),
+        date: formatShortDateTime(attachment.expires, i18n.language, dateTimeFormat),
       })
     );
   }

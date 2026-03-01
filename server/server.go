@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net"
 	"net/http"
@@ -59,6 +60,7 @@ type Server struct {
 	messageCache      *messageCache                       // Database that stores the messages
 	webPush           *webPushStore                       // Database that stores web push subscriptions
 	fileCache         *fileCache                          // File system based cache that stores attachments
+	debounceMap       map[uint64]int64                    // Describes if message should be debounced, key -> message-hash, value -> timestamp since last identical message in ms
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
@@ -241,6 +243,7 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		visitors:        make(map[string]*visitor),
+		debounceMap:     make(map[uint64]int64),
 		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
@@ -824,6 +827,22 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if m.Message == "" {
 		m.Message = emptyMessageBody
 	}
+
+	// Debounce message, compared against http-body + http-method
+	if s.config.DebounceInterval > 0 && m.Message != emptyMessageBody {
+		debounceKey := calcDebounceKey(m.Message, r.Method)
+		oldDebounceTime, keyExists := s.debounceMap[debounceKey]
+		newDebounceTime := start.UnixMilli()
+
+		s.debounceMap[debounceKey] = newDebounceTime
+
+		if keyExists && ((newDebounceTime - oldDebounceTime) <= s.config.DebounceInterval.Milliseconds()) {
+			logvrm(v, r, m).Tag(tagPublish).Debug("Debounce prevented message-publish")
+
+			return nil, errHTTPTooManyIdenticalMessagesInShortTime.With(t)
+		}
+	}
+
 	delayed := m.Time > time.Now().Unix()
 	ev := logvrm(v, r, m).
 		Tag(tagPublish).
@@ -2257,4 +2276,14 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
 		}
 	}()
+}
+
+func calcDebounceKey(message string, requestMethod string) uint64 {
+	hasher := fnv.New64()
+	hasher.Write([]byte(message))
+	hasher.Write([]byte(requestMethod))
+	result := hasher.Sum64()
+	hasher.Reset()
+
+	return result
 }

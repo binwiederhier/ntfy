@@ -1315,6 +1315,67 @@ func TestServer_PublishTooManyRequests_Defaults_ExemptHosts_MessageDailyLimit(t 
 	}
 }
 
+func TestServer_PublishTooManyIdenticalMessagesInShortTime_SameHttpMethodAndBodyArePrevented(t *testing.T) {
+	t.Parallel()
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 20
+	c.DebounceInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+
+	request(t, s, "PUT", "/mytopic", "Same message every loop", nil)
+
+	var response *httptest.ResponseRecorder
+	for range 15 {
+		response = request(t, s, "PUT", "/mytopic", "Same message every loop", nil)
+		require.Equal(t, 429, response.Code)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	response = request(t, s, "PUT", "/mytopic", "Same message every loop", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_PublishTooManyIdenticalMessagesInShortTime_DifferentHttpMethodsAreFine(t *testing.T) {
+	t.Parallel()
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 10
+	c.DebounceInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+
+	// First one is fine
+	response := request(t, s, "PUT", "/mytopic", "Same message", nil)
+	require.Equal(t, 200, response.Code)
+
+	// Second one has different http-method, also fine
+	response = request(t, s, "GET", "/mytopic", "Same message", nil)
+	require.Equal(t, 200, response.Code)
+
+	// Same as first -> different hash than second but same as first -> still in time-limit => blocked
+	response = request(t, s, "PUT", "/mytopic", "Same message", nil)
+	require.Equal(t, 429, response.Code)
+}
+
+func TestServer_PublishTooManyIdenticalMessagesInShortTime_DifferentHttpBodiesAreFine(t *testing.T) {
+	t.Parallel()
+	c := newTestConfig(t)
+	c.VisitorRequestLimitBurst = 10
+	c.DebounceInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+
+	// First one is fine
+	response := request(t, s, "PUT", "/mytopic", "Same message", nil)
+	require.Equal(t, 200, response.Code)
+
+	// Second one has different body, also fine
+	response = request(t, s, "PUT", "/mytopic", "Different message", nil)
+	require.Equal(t, 200, response.Code)
+
+	// Same as first -> different hash than second but same as first -> still in time-limit => blocked
+	response = request(t, s, "PUT", "/mytopic", "Same message", nil)
+	require.Equal(t, 429, response.Code)
+}
+
 func TestServer_PublishTooManyRequests_ShortReplenish(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig(t)

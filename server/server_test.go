@@ -2399,6 +2399,102 @@ func TestServer_Visitor_Custom_Forwarded_Header_IPv6(t *testing.T) {
 	require.Equal(t, "2001:db8:3333::1", v.ip.String())
 }
 
+func TestServer_AuthUserHeader_Success(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = true
+	c.AuthUserHeader = "X-Forwarded-User"
+	s := newTestServer(t, c)
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	r.Header.Set("X-Forwarded-User", "phil")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.NotNil(t, v.User())
+	require.Equal(t, "phil", v.User().Name)
+}
+
+func TestServer_AuthUserHeader_UserNotFound(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = true
+	c.AuthUserHeader = "X-Forwarded-User"
+	s := newTestServer(t, c)
+
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	r.Header.Set("X-Forwarded-User", "unknown-user")
+	_, err := s.maybeAuthenticate(r)
+	require.Equal(t, errHTTPUnauthorized, err)
+}
+
+func TestServer_AuthUserHeader_NoHeader_ReturnsUnauthorized(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = true
+	c.AuthUserHeader = "X-Forwarded-User"
+	s := newTestServer(t, c)
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+
+	// No X-Forwarded-User header, even with Authorization header -> unauthorized
+	// When auth-user-header is configured, the header MUST be present
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	r.Header.Set("Authorization", util.BasicAuth("phil", "phil"))
+	_, err := s.maybeAuthenticate(r)
+	require.Equal(t, errHTTPUnauthorized, err)
+}
+
+func TestServer_AuthUserHeader_NoHeader_NoAuthReturnsUnauthorized(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = true
+	c.AuthUserHeader = "X-Forwarded-User"
+	s := newTestServer(t, c)
+
+	// No X-Forwarded-User header and no Authorization header -> unauthorized
+	// When auth-user-header is configured, the header MUST be present
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	_, err := s.maybeAuthenticate(r)
+	require.Equal(t, errHTTPUnauthorized, err)
+}
+
+func TestServer_AuthUserHeader_NotBehindProxy(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = false // Auth user header should be ignored if not behind proxy
+	c.AuthUserHeader = "X-Forwarded-User"
+	s := newTestServer(t, c)
+
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+
+	// Header is present but should be ignored since behind-proxy is false
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	r.Header.Set("X-Forwarded-User", "phil")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.Nil(t, v.User()) // Should be anonymous since header is ignored
+}
+
+func TestServer_AuthUserHeader_RemoteUser(t *testing.T) {
+	c := newTestConfigWithAuthFile(t)
+	c.BehindProxy = true
+	c.AuthUserHeader = "Remote-User" // Common alternative header name
+	s := newTestServer(t, c)
+
+	require.Nil(t, s.userManager.AddUser("admin", "admin", user.RoleAdmin, false))
+
+	r, _ := http.NewRequest("GET", "/mytopic/json?poll=1", nil)
+	r.RemoteAddr = "1.2.3.4:1234"
+	r.Header.Set("Remote-User", "admin")
+	v, err := s.maybeAuthenticate(r)
+	require.Nil(t, err)
+	require.NotNil(t, v.User())
+	require.Equal(t, "admin", v.User().Name)
+	require.True(t, v.User().IsAdmin())
+}
+
 func TestServer_PublishWhileUpdatingStatsWithLotsOfMessages(t *testing.T) {
 	t.Parallel()
 	count := 50000

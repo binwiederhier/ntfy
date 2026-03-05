@@ -37,6 +37,7 @@ ADD go.mod go.sum main.go ./
 ADD ./client ./client
 ADD ./cmd ./cmd
 ADD ./log ./log
+ADD ./payments ./payments
 ADD ./server ./server
 ADD ./user ./user
 ADD ./util ./util

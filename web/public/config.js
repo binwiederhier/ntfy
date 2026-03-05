@@ -20,4 +20,6 @@ var config = {
   web_push_public_key: "",
   disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"],
   config_hash: "dev", // Placeholder for development; actual value is generated server-side
+  auth_mode: "", // "proxy" if auth-user-header is set, empty otherwise
+  auth_logout_url: "", // URL to redirect to on logout (only for proxy auth)
 };

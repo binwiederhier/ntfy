@@ -629,6 +629,10 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) configResponse() *apiConfigResponse {
+	authMode := ""
+	if s.config.AuthUserHeader != "" {
+		authMode = "proxy"
+	}
 	return &apiConfigResponse{
 		BaseURL:            "", // Will translate to window.location.origin
 		AppRoot:            s.config.WebRoot,
@@ -644,6 +648,8 @@ func (s *Server) configResponse() *apiConfigResponse {
 		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
 		ConfigHash:         s.config.Hash(),
+		AuthMode:           authMode,
+		AuthLogoutURL:      s.config.AuthLogoutURL,
 	}
 }
 
@@ -676,6 +682,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, _ *visito
 // handleStatic returns all static resources (excluding the docs), including the web app
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request, _ *visitor) error {
 	r.URL.Path = webSiteDir + r.URL.Path
+	// Prevent caching of HTML files to ensure auth proxies can intercept unauthenticated requests.
+	// Static hashed assets (JS, CSS, images) can still be cached normally.
+	if strings.HasSuffix(r.URL.Path, ".html") {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	util.Gzip(http.FileServer(http.FS(webFsCached))).ServeHTTP(w, r)
 	return nil
 }
@@ -2180,6 +2191,24 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*visitor, error) {
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
 		return vip, nil
+	}
+	// Check for proxy-forwarded user header (requires behind-proxy and auth-user-header to be set)
+	if s.config.BehindProxy && s.config.AuthUserHeader != "" {
+		if username := strings.TrimSpace(r.Header.Get(s.config.AuthUserHeader)); username != "" {
+			u, err := s.userManager.User(username)
+			if err != nil {
+				logr(r).Err(err).Debug("User from auth-user-header not found")
+				return vip, errHTTPUnauthorized
+			}
+			if u.Deleted {
+				logr(r).Debug("User from auth-user-header is deleted")
+				return vip, errHTTPUnauthorized
+			}
+			logr(r).Debug("User from header found")
+			return s.visitor(ip, u), nil
+		}
+		// If auth-user-header is set, but no user was provided, return unauthorized
+		return vip, errHTTPUnauthorized
 	}
 	header, err := readAuthHeader(r)
 	if err != nil {

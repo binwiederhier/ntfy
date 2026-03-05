@@ -124,6 +124,27 @@
 # proxy-forwarded-header: "X-Forwarded-For"
 # proxy-trusted-hosts:
 
+# If set (along with behind-proxy and auth-file), trust this header to contain the authenticated
+# username. This is useful when running ntfy behind an authentication proxy like Authelia,
+# Authentik, or Caddy Security that handles authentication and forwards the user identity.
+#
+# Common header names:
+# - X-Forwarded-User (Authelia default)
+# - Remote-User (common convention)
+# - X-Remote-User
+#
+# IMPORTANT: Only enable this if you trust the proxy to authenticate users. The header value
+# is trusted unconditionally when behind-proxy is also set. Users must be pre-provisioned in
+# the ntfy database (via auth-file); they are not auto-created.
+#
+# auth-user-header:
+
+# If auth-user-header is set, this is the URL to redirect users to when they click logout.
+# This is typically the logout URL of your authentication proxy (e.g. Authelia, Authentik).
+# If not set, the logout button will be hidden in the web UI when using proxy auth.
+#
+# auth-logout-url:
+
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".
 #

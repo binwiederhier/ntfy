@@ -3,6 +3,10 @@ import Dexie from "dexie";
 /**
  * Manages the logged-in user's session and access token.
  * The session replica is stored in IndexedDB so that the service worker can access it.
+ *
+ * For proxy authentication (when config.auth_mode === "proxy"), the token will be empty
+ * since authentication is handled by the proxy. In this case, store(username, "") is called
+ * with an empty token, and exists() returns true based on the username alone.
  */
 class Session {
   constructor() {
@@ -53,7 +57,7 @@ class Session {
   }
 
   exists() {
-    return this.username() && this.token();
+    return !!this.username();
   }
 
   username() {

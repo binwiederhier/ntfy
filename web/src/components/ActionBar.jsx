@@ -16,7 +16,7 @@ import routes from "./routes";
 import db from "../app/db";
 import { topicDisplayName } from "../app/utils";
 import Navigation from "./Navigation";
-import accountApi from "../app/AccountApi";
+import accountApi, { AuthMode } from "../app/AccountApi";
 import PopupMenu from "./PopupMenu";
 import { SubscriptionPopup } from "./SubscriptionPopup";
 import { useIsLaunchedPWA } from "./hooks";
@@ -139,6 +139,17 @@ const ProfileIcon = () => {
   };
 
   const handleLogout = async () => {
+    // For proxy auth, redirect to the logout URL if configured
+    if (config.auth_mode === AuthMode.PROXY) {
+      if (config.auth_logout_url) {
+        await db().delete();
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        window.location.href = config.auth_logout_url;
+      }
+      return;
+    }
+    // Standard logout
     try {
       await accountApi.logout();
       await db().delete();
@@ -146,6 +157,9 @@ const ProfileIcon = () => {
       await session.resetAndRedirect(routes.app);
     }
   };
+
+  // Determine if logout button should be shown (hide if proxy auth without logout URL)
+  const showLogout = config.auth_mode !== AuthMode.PROXY || config.auth_logout_url;
 
   return (
     <>
@@ -178,12 +192,14 @@ const ProfileIcon = () => {
           </ListItemIcon>
           {t("action_bar_profile_settings")}
         </MenuItem>
-        <MenuItem onClick={handleLogout}>
-          <ListItemIcon>
-            <Logout fontSize="small" />
-          </ListItemIcon>
-          {t("action_bar_profile_logout")}
-        </MenuItem>
+        {showLogout && (
+          <MenuItem onClick={handleLogout}>
+            <ListItemIcon>
+              <Logout fontSize="small" />
+            </ListItemIcon>
+            {t("action_bar_profile_logout")}
+          </MenuItem>
+        )}
       </PopupMenu>
     </>
   );

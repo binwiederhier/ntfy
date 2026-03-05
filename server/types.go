@@ -492,6 +492,8 @@ type apiConfigResponse struct {
 	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
 	ConfigHash         string   `json:"config_hash"`
+	AuthMode           string   `json:"auth_mode,omitempty"`       // "proxy" if auth-user-header is set, empty otherwise
+	AuthLogoutURL      string   `json:"auth_logout_url,omitempty"` // URL to redirect to on logout (only for proxy auth)
 }
 
 type apiAccountBillingPrices struct {
